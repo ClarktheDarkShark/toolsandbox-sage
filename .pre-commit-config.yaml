@@ -33,7 +33,7 @@ repos:
       - id: mypy
         name: mypy
         entry: mypy
-        language: python
+        language: system
         args: [--follow-imports=silent]
         files: ^(src/sage_ts|scripts|tests/unit)/
         types: [ python ]
