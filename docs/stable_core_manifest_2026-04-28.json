@@ -1,0 +1,69 @@
+{
+  "manifest_type": "sage_toolsandbox_stable_core",
+  "created_at_utc": "2026-04-28T11:45:40Z",
+  "repository": "toolsandbox-sage",
+  "branch": "sage/init-toolsandbox",
+  "git_sha": "7525dfd20c19581da21c7045216f994c45dc42e8",
+  "tag": "sage-toolsandbox-stable-core-20260428",
+  "benchmark": {
+    "name": "ToolSandbox",
+    "upstream_remote": "https://github.com/apple/ToolSandbox.git",
+    "core_policy": "keep benchmark internals close to upstream; SAGE code lives under src/sage_ts"
+  },
+  "model_defaults": {
+    "agent_model_for_campaign": "gpt-5-mini",
+    "generation_model": "gpt-5-mini",
+    "user_role": "GPT_4_o_2024_05_13"
+  },
+  "current_proven_state": {
+    "tool_birth": "live accepted tool birth observed in outputs/sage_registry_mechanism/registry_manifest.json",
+    "accepted_tool": "recency_label_canonicalizer",
+    "parser": "robust generated-tool JSON parsing committed",
+    "registry": "accepted tool manifest persistence committed",
+    "tool_injection": "pickle-safe ToolSandbox registry injection committed",
+    "schema_exposure": "generated tools are exposed through ToolSandbox tool schema",
+    "unit_integration_tests": "end-to-end birth, registry exposure, injection, invocation, and reuse-event proof tests exist"
+  },
+  "current_known_gap": {
+    "primary_gap": "retained transfer/reuse value is not yet proven",
+    "reason": "accepted tool birth happened without enough later matched scenarios to show reuse and later-task improvement",
+    "next_required_harness": [
+      "mechanism_40",
+      "transfer_40",
+      "extended_reuse_80_or_100"
+    ]
+  },
+  "base_toolset": {
+    "current_status": "upstream ToolSandbox tool allow-lists plus optional injected accepted SAGE registry tools",
+    "reduced_base_toolset_status": "not yet implemented in this checkpoint; required next for fair base-incomplete comparison"
+  },
+  "generation_settings": {
+    "enabled_flag": "--enable-generation",
+    "recurrence_threshold_default": 2,
+    "allowed_initial_family": "canonicalizer for recency canonicalization observations",
+    "prompt_cache_default": "outputs/prompt_cache"
+  },
+  "registry_settings": {
+    "default_registry_dir": "outputs/sage_registry",
+    "known_accepted_registry": "outputs/sage_registry_mechanism",
+    "registry_manifest_file": "registry_manifest.json"
+  },
+  "cache_settings": {
+    "prompt_cache": "enabled through PromptCache for generated-tool LLM calls",
+    "paired_run_policy": "use same cache settings for paired control/evolution runs unless isolating a validator path requires otherwise"
+  },
+  "validation_gate": {
+    "required_before_widening": [
+      "accepted tool exists",
+      "preloaded registry injects the accepted tool",
+      "later scenario invokes the generated tool",
+      "matched later-task outcome improves or preserves versus control"
+    ],
+    "not_sufficient": [
+      "tool birth alone",
+      "registry write alone",
+      "schema exposure alone",
+      "reuse-event test without benchmark later-task value"
+    ]
+  }
+}
