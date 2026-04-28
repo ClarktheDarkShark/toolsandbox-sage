@@ -24,9 +24,10 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def _scenario_rows(run_dir: Path) -> list[dict[str, Any]]:
-    return list(
-        _read_json(run_dir / "result_summary.json").get("per_scenario_results", [])
-    )
+    final_summary = run_dir / "result_summary.json"
+    live_summary = run_dir / "live_result_summary.json"
+    source = final_summary if final_summary.exists() else live_summary
+    return list(_read_json(source).get("per_scenario_results", []))
 
 
 def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, Any]:
@@ -37,6 +38,7 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
     run_events = _read_jsonl(run_dir / "sage_run_events.jsonl")
     visibility = _read_jsonl(run_dir / "scenario_tool_visibility.jsonl")
     cache_metrics = _read_json(run_dir / "prompt_cache_metrics.json")
+    live_summary = _read_json(run_dir / "live_result_summary.json")
     registry_manifest = (
         _read_json(registry_dir / "registry_manifest.json") if registry_dir else {}
     )
@@ -59,6 +61,13 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
     return {
         "run_dir": str(run_dir),
         "scenario_count": len(rows),
+        "planned_scenario_count": int(
+            live_summary.get("scenario_count", len(rows)) or len(rows)
+        ),
+        "run_status": live_summary.get(
+            "status",
+            "complete" if (run_dir / "result_summary.json").exists() else "unknown",
+        ),
         "success_count": len(successful),
         "mean_similarity": sum(similarities) / len(similarities)
         if similarities

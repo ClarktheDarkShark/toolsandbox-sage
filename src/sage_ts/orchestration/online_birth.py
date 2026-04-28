@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Callable, Protocol
 
 from sage_ts.adequacy.inadequacy_classifier import CapabilityObservation
 from sage_ts.generation.tool_generator import ToolGenerationRequest
@@ -20,14 +20,22 @@ class GeneratedToolFactory(Protocol):
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool: ...
 
 
+CampaignEventHook = Callable[[str, dict[str, Any]], None]
+
+
 @dataclass
 class OnlineBirthController:
     store: RegistryStore
     generator: GeneratedToolFactory
     output_dir: Path
     recurrence_threshold: int = 2
+    event_hook: CampaignEventHook | None = None
     counts: Counter[str] = field(default_factory=Counter)
     generated_keys: set[str] = field(default_factory=set)
+
+    def _event(self, event: str, payload: dict[str, Any]) -> None:
+        if self.event_hook is not None:
+            self.event_hook(event, payload)
 
     def observe(self, observation: CapabilityObservation) -> None:
         append_jsonl(
@@ -52,8 +60,24 @@ class OnlineBirthController:
             ),
         )
         self.generated_keys.add(observation.canonical_key)
+        self._event(
+            "tool_birth_started",
+            {
+                "canonical_key": observation.canonical_key,
+                "scenario": observation.scenario_name,
+                "allowed_families": observation.allowed_families,
+            },
+        )
         try:
             tool = self.generator.generate(request)
+            self._event(
+                "validation_started",
+                {
+                    "canonical_key": observation.canonical_key,
+                    "tool_name": tool.spec.tool_name,
+                    "scenario": observation.scenario_name,
+                },
+            )
             validation = validate_generated_tool(
                 tool,
                 examples=observation.validation_examples,
@@ -67,6 +91,14 @@ class OnlineBirthController:
                     "errors": [f"generation_error:{type(exc).__name__}:{exc}"],
                 },
             )
+            self._event(
+                "tool_birth_rejected",
+                {
+                    "canonical_key": observation.canonical_key,
+                    "scenario": observation.scenario_name,
+                    "error": f"{type(exc).__name__}:{exc}",
+                },
+            )
             return
 
         append_jsonl(
@@ -76,6 +108,15 @@ class OnlineBirthController:
                 "tool_name": tool.spec.tool_name,
                 "family": tool.spec.family.value,
                 "accepted": validation.accepted,
+                "errors": list(validation.errors),
+            },
+        )
+        self._event(
+            "validation_passed" if validation.accepted else "validation_failed",
+            {
+                "canonical_key": observation.canonical_key,
+                "tool_name": tool.spec.tool_name,
+                "scenario": observation.scenario_name,
                 "errors": list(validation.errors),
             },
         )
@@ -101,5 +142,33 @@ class OnlineBirthController:
                     "tool_name": tool.spec.tool_name,
                     "birth_scenario": observation.scenario_name,
                     "snapshot_path": str(snapshot_path),
+                },
+            )
+            self._event(
+                "tool_birth_succeeded",
+                {
+                    "canonical_key": observation.canonical_key,
+                    "tool_name": tool.spec.tool_name,
+                    "scenario": observation.scenario_name,
+                    "family": tool.spec.family.value,
+                    "snapshot_path": str(snapshot_path),
+                },
+            )
+            self._event(
+                "registry_saved",
+                {
+                    "registry_dir": str(self.store.root),
+                    "tool_name": tool.spec.tool_name,
+                    "scenario": observation.scenario_name,
+                },
+            )
+        else:
+            self._event(
+                "tool_birth_rejected",
+                {
+                    "canonical_key": observation.canonical_key,
+                    "tool_name": tool.spec.tool_name,
+                    "scenario": observation.scenario_name,
+                    "errors": list(validation.errors),
                 },
             )

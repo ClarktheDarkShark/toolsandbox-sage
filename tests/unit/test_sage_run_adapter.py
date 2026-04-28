@@ -44,6 +44,7 @@ def test_sage_runner_records_registry_reuse(
         *,
         scenario_transform: ScenarioTransform,
         result_hook: Optional[ResultHook] = None,
+        **_kwargs: object,
     ) -> Path:
         output_dir = tmp_path / "run"
         output_dir.mkdir()

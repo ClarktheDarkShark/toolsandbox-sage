@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sage_ts.adapters.toolsandbox_adapter import (
+    EventHook,
+    ProgressHook,
     ToolSandboxRunConfig,
     run_scenario_sequence,
 )
@@ -37,6 +39,8 @@ def run_sage_with_registry(
     config: SageRunConfig,
     *,
     generator: GeneratedToolFactory | None = None,
+    progress_hook: ProgressHook | None = None,
+    event_hook: EventHook | None = None,
 ) -> Path:
     """Run ToolSandbox scenarios with accepted generated tools available."""
     store = RegistryStore(config.registry_dir)
@@ -48,11 +52,17 @@ def run_sage_with_registry(
     def transform(name: str, scenario: Scenario, output_directory: Path) -> Scenario:
         nonlocal birth_controller, registry_load_logged
         if generator is not None and birth_controller is None:
+
+            def birth_event_hook(event: str, payload: dict[str, object]) -> None:
+                if event_hook is not None:
+                    event_hook(event, output_directory, payload)
+
             birth_controller = OnlineBirthController(
                 store=store,
                 generator=generator,
                 output_dir=output_directory,
                 recurrence_threshold=config.recurrence_threshold,
+                event_hook=birth_event_hook,
             )
         if not registry_load_logged:
             append_jsonl(
@@ -66,6 +76,18 @@ def run_sage_with_registry(
                     "generation_enabled": generator is not None,
                 },
             )
+            if event_hook is not None:
+                event_hook(
+                    "registry_loaded",
+                    output_directory,
+                    {
+                        "registry_dir": str(config.registry_dir),
+                        "registry_tools": registry_tools,
+                        "registry_size": len(registry_tools),
+                        "base_tool_policy": config.base_tool_policy,
+                        "generation_enabled": generator is not None,
+                    },
+                )
             registry_load_logged = True
 
         def record_reuse(tool_name: str) -> None:
@@ -78,6 +100,16 @@ def run_sage_with_registry(
                     "event": "generated_tool_invoked",
                 },
             )
+            if event_hook is not None:
+                event_hook(
+                    "tool_reused",
+                    output_directory,
+                    {
+                        "scenario": name,
+                        "tool_name": tool_name,
+                        "registry_dir": str(config.registry_dir),
+                    },
+                )
 
         enhanced = with_registry_tools(scenario, store, on_reuse=record_reuse)
         append_jsonl(
@@ -108,6 +140,12 @@ def run_sage_with_registry(
             return result
         observations = classify_scenario_observations(name, scenario, result)
         for observation in observations:
+            if event_hook is not None:
+                event_hook(
+                    "inadequacy_detected",
+                    output_directory,
+                    observation.to_json(),
+                )
             birth_controller.observe(observation)
         result["sage_observations"] = [item.to_json() for item in observations]
         return result
@@ -124,6 +162,8 @@ def run_sage_with_registry(
         ),
         scenario_transform=transform,
         result_hook=after_result,
+        progress_hook=progress_hook,
+        event_hook=event_hook,
     )
     final_registry_tools = sorted(store.load_entries())
     append_jsonl(

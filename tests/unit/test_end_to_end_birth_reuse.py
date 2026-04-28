@@ -136,6 +136,7 @@ def test_sage_run_adapter_full_loop(
         *,
         scenario_transform: ScenarioTransform,
         result_hook: Optional[ResultHook] = None,
+        **_kwargs: object,
     ) -> Path:
         outdir = tmp_path / "run"
         outdir.mkdir(exist_ok=True)

@@ -6,12 +6,12 @@ import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from tool_sandbox.common.tool_discovery import ToolBackend
 from tool_sandbox.scenarios import named_scenarios
 
-DEFAULT_TOOL_BACKEND = cast(ToolBackend, ToolBackend.DEFAULT)
+DEFAULT_TOOL_BACKEND = ToolBackend("DEFAULT")
 
 DEFAULT_SPLIT_SIZES = {
     "smoke_10": 10,
