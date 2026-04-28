@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import inspect
-from collections.abc import Iterable
+from collections.abc import Iterable, MutableMapping
 from typing import Any, Callable, cast
 
 from sage_ts.registry.manifest import RegistryEntry
@@ -110,7 +110,13 @@ def inject_registry_tools_into_context(
         tool_name = entry.tool.spec.tool_name
         if tool_name in context.name_to_tool:
             raise ValueError(f"tool name already exists in ToolSandbox: {tool_name}")
-        context.name_to_tool[tool_name] = _compile_toolsandbox_tool(entry, on_reuse)
+        compiled_tool = _compile_toolsandbox_tool(entry, on_reuse)
+        context.name_to_tool[tool_name] = compiled_tool
+        console_locals = cast(
+            MutableMapping[str, Any],
+            context.interactive_console.locals,
+        )
+        console_locals[tool_name] = compiled_tool
         if (
             context.tool_allow_list is not None
             and tool_name not in context.tool_allow_list

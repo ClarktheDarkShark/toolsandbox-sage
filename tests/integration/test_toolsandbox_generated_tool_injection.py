@@ -6,9 +6,15 @@ from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.toolsandbox_integration import with_registry_tools
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 
-from tool_sandbox.common.execution_context import ExecutionContext, ScenarioCategories
+from tool_sandbox.common.execution_context import (
+    ExecutionContext,
+    RoleType,
+    ScenarioCategories,
+)
+from tool_sandbox.common.message_conversion import Message
 from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_conversion import convert_to_openai_tool
+from tool_sandbox.roles.execution_environment import respond_to_single_message
 
 
 def _registry_with_canonicalizer(tmp_path: Path) -> RegistryStore:
@@ -56,6 +62,39 @@ def test_registry_tools_are_available_to_toolsandbox_context(tmp_path: Path) -> 
         "Raw connectivity label."
     )
     assert parameters["required"] == ["label"]
+
+
+def test_registry_tools_execute_through_toolsandbox_console(tmp_path: Path) -> None:
+    store = _registry_with_canonicalizer(tmp_path)
+    context = ExecutionContext(tool_allow_list=["end_conversation"])
+    reused_tools: list[str] = []
+    enhanced = with_registry_tools(
+        Scenario(starting_context=context),
+        store,
+        on_reuse=reused_tools.append,
+    )
+
+    message = Message(
+        sender=RoleType.AGENT,
+        recipient=RoleType.EXECUTION_ENVIRONMENT,
+        content=(
+            "call_1_parameters = {'label': 'Wi-Fi'}\n"
+            "call_1_response = canonicalize_connectivity_label(**call_1_parameters)\n"
+            "print(repr(call_1_response))"
+        ),
+        openai_tool_call_id="call_1",
+        openai_function_name="canonicalize_connectivity_label",
+    )
+    response = respond_to_single_message(
+        enhanced.starting_context.interactive_console,
+        message,
+        RoleType.EXECUTION_ENVIRONMENT,
+    )
+
+    assert response is not None
+    assert response.tool_call_exception is None
+    assert response.content == "'wifi'"
+    assert reused_tools == ["canonicalize_connectivity_label"]
 
 
 def test_generated_tools_support_toolsandbox_name_scrambling(tmp_path: Path) -> None:
