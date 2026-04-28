@@ -13,6 +13,7 @@ from sage_ts.config.splits import load_split_names
 from sage_ts.generation.prompt_cache import PromptCache
 from sage_ts.generation.tool_generator import ToolGenerator
 from sage_ts.orchestration.toy_mechanism import run_toy_birth_reuse
+from sage_ts.runtime.base_toolset import KNOWN_POLICIES, UPSTREAM_POLICY
 
 
 def main() -> None:
@@ -21,6 +22,11 @@ def main() -> None:
     parser.add_argument("--split")
     parser.add_argument("--agent", default="Unhelpful")
     parser.add_argument("--user", default="GPT_4_o_2024_05_13")
+    parser.add_argument(
+        "--base-tool-policy",
+        choices=KNOWN_POLICIES,
+        default=UPSTREAM_POLICY,
+    )
     parser.add_argument("--generation-model", default="gpt-5-mini")
     parser.add_argument("--recurrence-threshold", type=int, default=2)
     parser.add_argument(
@@ -56,10 +62,11 @@ def main() -> None:
         )
 
     scenario_names = tuple(load_split_names(args.manifest, args.split))
+    prompt_cache = PromptCache(args.prompt_cache_dir)
     generator = (
         ToolGenerator(
             completer=OpenAIChatAdapter(model=args.generation_model),
-            cache=PromptCache(args.prompt_cache_dir),
+            cache=prompt_cache,
         )
         if args.enable_generation
         else None
@@ -72,8 +79,13 @@ def main() -> None:
             output_dir=args.output_dir,
             registry_dir=args.registry_dir,
             recurrence_threshold=args.recurrence_threshold,
+            base_tool_policy=args.base_tool_policy,
         ),
         generator=generator,
+    )
+    (output_directory / "prompt_cache_metrics.json").write_text(
+        json.dumps(prompt_cache.metrics(), indent=2) + "\n",
+        encoding="utf-8",
     )
     print(json.dumps({"output_directory": str(output_directory)}, indent=2))
 

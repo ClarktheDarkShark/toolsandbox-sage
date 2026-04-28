@@ -82,5 +82,14 @@ def test_sage_runner_records_registry_reuse(
     assert reuse_event["scenario"] == "later_scenario"
     assert reuse_event["tool_name"] == "canonicalize_connectivity_label"
 
-    run_event = json.loads((output_dir / "sage_run_events.jsonl").read_text())
-    assert run_event["registry_tools"] == ["canonicalize_connectivity_label"]
+    run_events = [
+        json.loads(line)
+        for line in (output_dir / "sage_run_events.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    assert run_events[0]["event"] == "registry_load"
+    assert run_events[0]["registry_tools"] == ["canonicalize_connectivity_label"]
+    assert run_events[-1]["final_registry_tools"] == ["canonicalize_connectivity_label"]
+
+    visibility = json.loads((output_dir / "scenario_tool_visibility.jsonl").read_text())
+    assert "canonicalize_connectivity_label" in visibility["available_tools"]

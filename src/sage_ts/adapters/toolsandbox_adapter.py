@@ -15,6 +15,7 @@ import polars as pl
 from tqdm import tqdm
 
 from sage_ts.adapters.role_factory import make_agent, make_user
+from sage_ts.runtime.base_toolset import UPSTREAM_POLICY, apply_base_tool_policy
 from tool_sandbox.cli import write_result_summary
 from tool_sandbox.cli.utils import (
     get_category_summary,
@@ -38,6 +39,7 @@ class ToolSandboxRunConfig:
     output_dir: Path
     processes: int = 1
     run_type: str = "baseline"
+    base_tool_policy: str = UPSTREAM_POLICY
 
 
 def git_sha() -> str | None:
@@ -139,10 +141,11 @@ def run_scenario_sequence(
     ordered_items = [(name, name_to_scenario[name]) for name in config.scenario_names]
     result_summary: list[dict[str, Any]] = []
     for name, scenario in tqdm(ordered_items, desc="Scenarios"):
+        base_scenario = apply_base_tool_policy(scenario, config.base_tool_policy)
         active_scenario = (
-            scenario_transform(name, scenario, output_directory)
+            scenario_transform(name, base_scenario, output_directory)
             if scenario_transform is not None
-            else scenario
+            else base_scenario
         )
         result = run_one_scenario(
             name,

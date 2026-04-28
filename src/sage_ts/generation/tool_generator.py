@@ -41,8 +41,15 @@ class ToolGenerationRequest:
             '"description"), '
             "output_annotation (str), generalization_rationale (str), "
             "inadequacy_evidence (str). "
-            '"code" is a self-contained Python function string with no imports, '
-            "no side effects, and only primitive types. "
+            "Annotations must be exactly one of: str, int, float, bool, dict. "
+            'If the output is a dictionary, output_annotation must be exactly "dict". '
+            '"code" is a self-contained Python function string with exactly one '
+            "function whose name matches spec.tool_name. The function signature must "
+            "include type annotations matching spec.inputs and spec.output_annotation. "
+            "Do not include imports, try/except, classes, lambdas, filesystem access, "
+            "network access, subprocess calls, side effects, hidden global state, or "
+            "wrapper functions. "
+            "The function must pass every validation example exactly. "
             f"Allowed families: {families}. "
             f"Scenario: {self.scenario_name}. Observation: {self.observation}.{examples}"
         )
@@ -55,7 +62,7 @@ class ToolGenerator:
 
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
         prompt = request.prompt()
-        key = cache_key(self.completer.model, {"kind": "tool_generation_v2"}, prompt)
+        key = cache_key(self.completer.model, {"kind": "tool_generation_v3"}, prompt)
         response = self.cache.get(key)
         if response is None:
             response = self.completer.complete(

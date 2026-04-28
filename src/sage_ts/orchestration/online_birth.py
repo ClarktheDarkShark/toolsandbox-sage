@@ -80,10 +80,26 @@ class OnlineBirthController:
             },
         )
         if validation.accepted:
-            self.store.put(
-                RegistryEntry.accepted(
-                    tool,
-                    validation,
-                    birth_scenario=observation.scenario_name,
-                )
+            entry = RegistryEntry.accepted(
+                tool,
+                validation,
+                birth_scenario=observation.scenario_name,
+            )
+            self.store.put(entry)
+            saved_entry = self.store.get(tool.spec.tool_name) or entry
+            snapshot_dir = self.output_dir / "generated_tool_snapshots"
+            snapshot_dir.mkdir(parents=True, exist_ok=True)
+            snapshot_path = (
+                snapshot_dir / f"{tool.spec.tool_name}_v{saved_entry.version}.py"
+            )
+            snapshot_path.write_text(tool.code + "\n", encoding="utf-8")
+            append_jsonl(
+                self.output_dir / "sage_run_events.jsonl",
+                {
+                    "event": "registry_save",
+                    "registry_dir": str(self.store.root),
+                    "tool_name": tool.spec.tool_name,
+                    "birth_scenario": observation.scenario_name,
+                    "snapshot_path": str(snapshot_path),
+                },
             )

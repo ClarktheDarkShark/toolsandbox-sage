@@ -8,6 +8,7 @@ from pathlib import Path
 
 from sage_ts.adapters.toolsandbox_adapter import ToolSandboxRunConfig, run_toolsandbox
 from sage_ts.config.splits import load_split_names
+from sage_ts.runtime.base_toolset import KNOWN_POLICIES, UPSTREAM_POLICY
 
 
 def main() -> None:
@@ -17,6 +18,11 @@ def main() -> None:
     parser.add_argument("--agent", default="Unhelpful")
     parser.add_argument("--user", default="GPT_4_o_2024_05_13")
     parser.add_argument("--processes", type=int, default=1)
+    parser.add_argument(
+        "--base-tool-policy",
+        choices=KNOWN_POLICIES,
+        default=UPSTREAM_POLICY,
+    )
     parser.add_argument(
         "-o", "--output-dir", type=Path, default=Path("outputs/baseline")
     )
@@ -31,6 +37,7 @@ def main() -> None:
             output_dir=args.output_dir,
             processes=args.processes,
             run_type="baseline",
+            base_tool_policy=args.base_tool_policy,
         )
     )
 
