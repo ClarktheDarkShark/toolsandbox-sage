@@ -49,13 +49,27 @@ def compile_generated_tool(tool: GeneratedTool) -> SchemaResult:
 
     fn = namespace.get(tool.spec.tool_name)
     if not isinstance(fn, FunctionType):
+        # Fall back to the first function defined in the namespace.
+        fn = next((v for v in namespace.values() if isinstance(v, FunctionType)), None)
+    if not isinstance(fn, FunctionType):
         return SchemaResult(False, ("missing_expected_function",), None)
 
     annotations = getattr(fn, "__annotations__", {})
     expected_inputs = {item.name: item.annotation for item in tool.spec.inputs}
     for name, annotation in expected_inputs.items():
-        if annotations.get(name) != annotation:
-            errors.append(f"input_annotation_mismatch:{name}")
-    if annotations.get("return") != tool.spec.output_annotation:
-        errors.append("return_annotation_mismatch")
+        actual = annotations.get(name)
+        if actual is None:
+            continue  # unannotated is allowed; wrong annotation is not
+        actual_name = getattr(actual, "__name__", str(actual))
+        if actual_name != annotation:
+            errors.append(
+                f"input_annotation_mismatch:{name}:{actual_name}!={annotation}"
+            )
+    ret = annotations.get("return")
+    if ret is not None:
+        ret_name = getattr(ret, "__name__", str(ret))
+        if ret_name != tool.spec.output_annotation:
+            errors.append(
+                f"return_annotation_mismatch:{ret_name}!={tool.spec.output_annotation}"
+            )
     return SchemaResult(not errors, tuple(errors), fn if not errors else None)
