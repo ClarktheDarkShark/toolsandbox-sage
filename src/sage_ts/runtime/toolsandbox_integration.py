@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import copy
+import inspect
 from collections.abc import Iterable
 from typing import Any, Callable, cast
+
+from decorator import decorate
 
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
@@ -33,6 +36,13 @@ def _google_docstring(entry: RegistryEntry) -> str:
 
 def compile_toolsandbox_tool(entry: RegistryEntry) -> Callable[..., Any]:
     """Compile an accepted registry entry into a ToolSandbox-visible callable."""
+    return _compile_toolsandbox_tool(entry, on_reuse=None)
+
+
+def _compile_toolsandbox_tool(
+    entry: RegistryEntry,
+    on_reuse: Callable[[str], None] | None,
+) -> Callable[..., Any]:
     if entry.retired or not entry.validation.accepted:
         raise ValueError(f"registry entry is not active: {entry.tool.spec.tool_name}")
 
@@ -42,25 +52,49 @@ def compile_toolsandbox_tool(entry: RegistryEntry) -> Callable[..., Any]:
             f"registry entry failed schema compilation: {entry.tool.spec.tool_name}"
         )
 
-    annotations = dict(compiled.function.__annotations__)
+    function = compiled.function
+    if on_reuse is not None:
+
+        def _record_reuse(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+            result = func(*args, **kwargs)
+            on_reuse(entry.tool.spec.tool_name)
+            return result
+
+        function = decorate(function, _record_reuse)
+
+    annotations = dict(function.__annotations__)
     for item in entry.tool.spec.inputs:
         annotations[item.name] = PYTHON_TYPES[item.annotation]
     annotations["return"] = PYTHON_TYPES[entry.tool.spec.output_annotation]
-    compiled.function.__annotations__ = annotations
-    compiled.function.__doc__ = _google_docstring(entry)
-    compiled.function.__module__ = "sage_ts.generated_tools"
+    function.__annotations__ = annotations
+    function.__doc__ = _google_docstring(entry)
+    function.__module__ = "sage_ts.generated_tools"
 
     registered = register_as_tool(
         visible_to=(RoleType.AGENT,),
         backend=ToolBackend.DEFAULT,
-    )(compiled.function)
+    )(function)
+    registered.__annotations__ = annotations
+    registered.__doc__ = function.__doc__
     registered.__module__ = "sage_ts.generated_tools"
+    signature = inspect.signature(registered)
+    registered.__signature__ = signature.replace(
+        parameters=[
+            parameter.replace(
+                annotation=annotations.get(parameter.name, parameter.annotation)
+            )
+            for parameter in signature.parameters.values()
+        ],
+        return_annotation=annotations["return"],
+    )
     return cast(Callable[..., Any], registered)
 
 
 def inject_registry_tools_into_context(
     context: ExecutionContext,
     entries: Iterable[RegistryEntry],
+    *,
+    on_reuse: Callable[[str], None] | None = None,
 ) -> list[str]:
     """Inject accepted generated helpers into a ToolSandbox execution context."""
     injected: list[str] = []
@@ -68,7 +102,7 @@ def inject_registry_tools_into_context(
         tool_name = entry.tool.spec.tool_name
         if tool_name in context.name_to_tool:
             raise ValueError(f"tool name already exists in ToolSandbox: {tool_name}")
-        context.name_to_tool[tool_name] = compile_toolsandbox_tool(entry)
+        context.name_to_tool[tool_name] = _compile_toolsandbox_tool(entry, on_reuse)
         if (
             context.tool_allow_list is not None
             and tool_name not in context.tool_allow_list
@@ -86,11 +120,17 @@ def inject_registry_tools_into_context(
     return injected
 
 
-def with_registry_tools(scenario: Scenario, store: RegistryStore) -> Scenario:
+def with_registry_tools(
+    scenario: Scenario,
+    store: RegistryStore,
+    *,
+    on_reuse: Callable[[str], None] | None = None,
+) -> Scenario:
     """Return a scenario copy whose starting context includes registry tools."""
     scenario_copy = copy.deepcopy(scenario)
     inject_registry_tools_into_context(
         scenario_copy.starting_context,
         store.load_entries().values(),
+        on_reuse=on_reuse,
     )
     return scenario_copy

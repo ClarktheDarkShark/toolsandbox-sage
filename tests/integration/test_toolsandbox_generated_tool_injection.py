@@ -31,7 +31,8 @@ def test_registry_tools_are_available_to_toolsandbox_context(tmp_path: Path) -> 
     context = ExecutionContext(tool_allow_list=["end_conversation"])
     scenario = Scenario(starting_context=context)
 
-    enhanced = with_registry_tools(scenario, store)
+    reused_tools: list[str] = []
+    enhanced = with_registry_tools(scenario, store, on_reuse=reused_tools.append)
 
     tool_name = "canonicalize_connectivity_label"
     assert tool_name not in scenario.starting_context.name_to_tool
@@ -43,6 +44,7 @@ def test_registry_tools_are_available_to_toolsandbox_context(tmp_path: Path) -> 
         scrambling_allowed=False
     )
     assert available_tools[tool_name]("Wi-Fi") == "wifi"
+    assert reused_tools == [tool_name]
 
     openai_tool = convert_to_openai_tool(available_tools[tool_name], tool_name)
     parameters = openai_tool["function"]["parameters"]
