@@ -22,15 +22,22 @@ class ToolGenerationRequest:
     scenario_name: str
     observation: str
     allowed_families: tuple[str, ...]
+    validation_examples: tuple[dict[str, object], ...] = ()
 
     def prompt(self) -> str:
         families = ", ".join(self.allowed_families)
+        examples = (
+            f" Validation examples: {json.dumps(list(self.validation_examples))}."
+            if self.validation_examples
+            else ""
+        )
         return (
             "Propose one deterministic Python helper tool as JSON. "
             "Required keys: spec, code. spec keys: tool_name, family, description, "
             "inputs, output_annotation, generalization_rationale, inadequacy_evidence. "
+            "Use only primitive typed inputs and deterministic code with no imports. "
             f"Allowed families: {families}. "
-            f"Scenario: {self.scenario_name}. Observation: {self.observation}"
+            f"Scenario: {self.scenario_name}. Observation: {self.observation}.{examples}"
         )
 
 
@@ -56,6 +63,10 @@ class ToolGenerator:
 
 
 def parse_generated_tool_json(response: str) -> GeneratedTool:
+    response = response.strip()
+    if response.startswith("```"):
+        response = response.removeprefix("```json").removeprefix("```").strip()
+        response = response.removesuffix("```").strip()
     payload = json.loads(response)
     spec_payload = payload["spec"]
     spec = ToolSpec(

@@ -9,7 +9,7 @@ import traceback
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import polars as pl
 from tqdm import tqdm
@@ -27,6 +27,7 @@ from tool_sandbox.roles.execution_environment import ExecutionEnvironment
 
 DEFAULT_TOOL_BACKEND = ToolBackend.DEFAULT
 ScenarioTransform = Callable[[str, Scenario, Path], Scenario]
+ResultHook = Callable[[str, Scenario, dict[str, Any], Path], Optional[dict[str, Any]]]
 
 
 @dataclass(frozen=True)
@@ -83,7 +84,7 @@ def run_one_scenario(
     }
     try:
         result = scenario.play_and_evaluate(
-            roles=roles,
+            roles=roles,  # type: ignore[arg-type]
             output_directory=output_directory,
             scenario_name=name,
         )
@@ -121,6 +122,7 @@ def run_scenario_sequence(
     config: ToolSandboxRunConfig,
     *,
     scenario_transform: ScenarioTransform | None = None,
+    result_hook: ResultHook | None = None,
 ) -> Path:
     """Run scenarios in manifest order and write upstream-compatible summaries."""
     random.seed(42)
@@ -132,7 +134,7 @@ def run_scenario_sequence(
 
     name_to_scenario = resolve_scenarios(
         desired_scenario_names=list(config.scenario_names),
-        preferred_tool_backend=DEFAULT_TOOL_BACKEND,
+        preferred_tool_backend=DEFAULT_TOOL_BACKEND,  # type: ignore[arg-type]
     )
     ordered_items = [(name, name_to_scenario[name]) for name in config.scenario_names]
     result_summary: list[dict[str, Any]] = []
@@ -142,15 +144,18 @@ def run_scenario_sequence(
             if scenario_transform is not None
             else scenario
         )
-        result_summary.append(
-            run_one_scenario(
-                name,
-                active_scenario,
-                agent=config.agent,
-                user=config.user,
-                output_directory=output_directory,
-            )
+        result = run_one_scenario(
+            name,
+            active_scenario,
+            agent=config.agent,
+            user=config.user,
+            output_directory=output_directory,
         )
+        if result_hook is not None:
+            result = (
+                result_hook(name, active_scenario, result, output_directory) or result
+            )
+        result_summary.append(result)
 
     write_result_summary(
         result_summary=result_summary,

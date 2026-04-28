@@ -1,9 +1,11 @@
 import json
 from pathlib import Path
+from typing import Optional
 
 import pytest
 from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
 from sage_ts.adapters.toolsandbox_adapter import (
+    ResultHook,
     ScenarioTransform,
     ToolSandboxRunConfig,
 )
@@ -41,6 +43,7 @@ def test_sage_runner_records_registry_reuse(
         config: ToolSandboxRunConfig,
         *,
         scenario_transform: ScenarioTransform,
+        result_hook: Optional[ResultHook] = None,
     ) -> Path:
         output_dir = tmp_path / "run"
         output_dir.mkdir()
@@ -52,6 +55,8 @@ def test_sage_runner_records_registry_reuse(
             "canonicalize_connectivity_label"
         ]
         assert tool("Wi-Fi") == "wifi"
+        if result_hook is not None:
+            result_hook("later_scenario", enhanced, {"similarity": 1}, output_dir)
         return output_dir
 
     monkeypatch.setattr(

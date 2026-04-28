@@ -107,7 +107,11 @@ exclude = ["data/"]
 # - by VSCode's built-in testing extension
 # - when running `pytest .` on the command line
 [tool.pytest.ini_options]
-addopts="-n auto"
+addopts=""
+
+[[tool.mypy.overrides]]
+module = ["polars", "tqdm", "tqdm.*"]
+ignore_missing_imports = true
 
 [tool.mypy]
 # The options below are what `--strict` encompasses.

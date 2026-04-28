@@ -7,8 +7,11 @@ import argparse
 import json
 from pathlib import Path
 
+from sage_ts.adapters.openai_agent_adapter import OpenAIChatAdapter
 from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
 from sage_ts.config.splits import load_split_names
+from sage_ts.generation.prompt_cache import PromptCache
+from sage_ts.generation.tool_generator import ToolGenerator
 from sage_ts.orchestration.toy_mechanism import run_toy_birth_reuse
 
 
@@ -18,6 +21,16 @@ def main() -> None:
     parser.add_argument("--split")
     parser.add_argument("--agent", default="Unhelpful")
     parser.add_argument("--user", default="GPT_4_o_2024_05_13")
+    parser.add_argument("--generation-model", default="gpt-5-mini")
+    parser.add_argument("--recurrence-threshold", type=int, default=2)
+    parser.add_argument(
+        "--prompt-cache-dir", type=Path, default=Path("outputs/prompt_cache")
+    )
+    parser.add_argument(
+        "--enable-generation",
+        action="store_true",
+        help="Enable repeated-observation to generated-tool birth.",
+    )
     parser.add_argument(
         "--registry-dir", type=Path, default=Path("outputs/sage_registry")
     )
@@ -43,6 +56,14 @@ def main() -> None:
         )
 
     scenario_names = tuple(load_split_names(args.manifest, args.split))
+    generator = (
+        ToolGenerator(
+            completer=OpenAIChatAdapter(model=args.generation_model),
+            cache=PromptCache(args.prompt_cache_dir),
+        )
+        if args.enable_generation
+        else None
+    )
     output_directory = run_sage_with_registry(
         SageRunConfig(
             agent=args.agent,
@@ -50,7 +71,9 @@ def main() -> None:
             scenario_names=scenario_names,
             output_dir=args.output_dir,
             registry_dir=args.registry_dir,
-        )
+            recurrence_threshold=args.recurrence_threshold,
+        ),
+        generator=generator,
     )
     print(json.dumps({"output_directory": str(output_directory)}, indent=2))
 
