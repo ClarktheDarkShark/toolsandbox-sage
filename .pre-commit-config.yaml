@@ -17,6 +17,14 @@ repos:
       # Run the formatter.
       - id: ruff-format
   - repo: local
+    hooks:
+      - id: sage-secret-scan
+        name: SAGE secret scan
+        entry: python scripts/check_no_secrets.py
+        language: python
+        pass_filenames: true
+        require_serial: true
+  - repo: local
     # Getting mypy to work in pre-commit have always been tricky
     # pre-commit/mirrors-mypy isn't good enough since its env and config
     # could differ with local environment, leading to unexpected behavior.
@@ -26,6 +34,8 @@ repos:
         name: mypy
         entry: mypy
         language: python
+        args: [--follow-imports=silent]
+        files: ^(src/sage_ts|scripts|tests/unit)/
         types: [ python ]
         require_serial: true
         verbose: true

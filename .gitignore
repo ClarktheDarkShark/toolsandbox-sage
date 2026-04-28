@@ -103,12 +103,15 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+.secrets/
 
 # Spyder project settings
 .spyderproject
@@ -154,3 +157,15 @@ wandb/
 .DS_Store
 
 data/
+
+# SAGE local artifacts
+outputs/
+.sage_cache/
+persistent_prompt_cache/
+generated_tools/
+*.local.json
+*.local.yaml
+
+# Local notebooks and ad-hoc analysis
+notebooks/local/
+*.scratch.ipynb
