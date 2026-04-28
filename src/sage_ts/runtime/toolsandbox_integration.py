@@ -7,15 +7,12 @@ import inspect
 from collections.abc import Iterable
 from typing import Any, Callable, cast
 
-from decorator import decorate
-
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.schema_check import compile_generated_tool
 from tool_sandbox.common.execution_context import ExecutionContext, RoleType
 from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_discovery import ToolBackend, get_scrambled_tool_names
-from tool_sandbox.common.utils import register_as_tool
 
 PYTHON_TYPES: dict[str, Any] = {
     "str": str,
@@ -52,42 +49,52 @@ def _compile_toolsandbox_tool(
             f"registry entry failed schema compilation: {entry.tool.spec.tool_name}"
         )
 
-    function = compiled.function
-    if on_reuse is not None:
+    raw_fn = compiled.function
 
-        def _record_reuse(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
-            result = func(*args, **kwargs)
-            on_reuse(entry.tool.spec.tool_name)
+    # Wrap with reuse callback if provided, using a plain closure (pickle-safe).
+    if on_reuse is not None:
+        _tool_name = entry.tool.spec.tool_name
+        _inner = raw_fn
+
+        def _wrapped(*args: Any, **kwargs: Any) -> Any:
+            result = _inner(*args, **kwargs)
+            on_reuse(_tool_name)
             return result
 
-        function = decorate(function, _record_reuse)
+        _wrapped.__name__ = raw_fn.__name__
+        _wrapped.__doc__ = raw_fn.__doc__
+        fn: Callable[..., Any] = _wrapped
+    else:
+        fn = cast(Callable[..., Any], raw_fn)
 
-    annotations = dict(function.__annotations__)
+    # Build annotations using Python type objects.
+    annotations: dict[str, Any] = {}
     for item in entry.tool.spec.inputs:
-        annotations[item.name] = PYTHON_TYPES[item.annotation]
-    annotations["return"] = PYTHON_TYPES[entry.tool.spec.output_annotation]
-    function.__annotations__ = annotations
-    function.__doc__ = _google_docstring(entry)
-    function.__module__ = "sage_ts.generated_tools"
+        if item.annotation in PYTHON_TYPES:
+            annotations[item.name] = PYTHON_TYPES[item.annotation]
+    if entry.tool.spec.output_annotation in PYTHON_TYPES:
+        annotations["return"] = PYTHON_TYPES[entry.tool.spec.output_annotation]
+    fn.__annotations__ = annotations
+    fn.__doc__ = _google_docstring(entry)
+    fn.__module__ = "sage_ts.generated_tools"
 
-    registered = register_as_tool(
-        visible_to=(RoleType.AGENT,),
-        backend=ToolBackend.DEFAULT,
-    )(function)
-    registered.__annotations__ = annotations
-    registered.__doc__ = function.__doc__
-    registered.__module__ = "sage_ts.generated_tools"
-    signature = inspect.signature(registered)
-    registered.__signature__ = signature.replace(
+    # Set ToolSandbox tool metadata directly — avoids the register_as_tool
+    # decorator which wraps the function with new_context_with_attribute, a
+    # contextvars-backed context manager whose internals are not picklable by dill.
+    fn.is_tool = True  # type: ignore[attr-defined]
+    fn.visible_to = (RoleType.AGENT,)  # type: ignore[attr-defined]
+    fn.backend = ToolBackend.DEFAULT  # type: ignore[attr-defined]
+
+    # Rebuild the inspect.Signature so the agent role can introspect parameters.
+    sig = inspect.signature(raw_fn)
+    fn.__signature__ = sig.replace(  # type: ignore[attr-defined]
         parameters=[
-            parameter.replace(
-                annotation=annotations.get(parameter.name, parameter.annotation)
-            )
-            for parameter in signature.parameters.values()
+            p.replace(annotation=annotations.get(p.name, p.annotation))
+            for p in sig.parameters.values()
         ],
-        return_annotation=annotations["return"],
+        return_annotation=annotations.get("return", inspect.Parameter.empty),
     )
-    return cast(Callable[..., Any], registered)
+    return fn
 
 
 def inject_registry_tools_into_context(
