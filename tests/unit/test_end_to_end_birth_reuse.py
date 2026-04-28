@@ -26,6 +26,31 @@ from sage_ts.validation.sandbox_validator import ToolExample, validate_generated
 from tool_sandbox.common.execution_context import ExecutionContext, ScenarioCategories
 from tool_sandbox.common.scenario import Scenario
 
+_TOOL_NAME = "recency_to_timestamp_bounds"
+_TOOL_CODE = (
+    "def recency_to_timestamp_bounds(recency_label: str, current_timestamp: float) -> dict:\n"
+    "    SECONDS_PER_DAY = 86400\n"
+    "    label = recency_label.strip().lower()\n"
+    "    day_start = float(int(current_timestamp) // SECONDS_PER_DAY * SECONDS_PER_DAY)\n"
+    "    if label == 'yesterday':\n"
+    "        return {'lower_bound': day_start - SECONDS_PER_DAY, 'upper_bound': day_start}\n"
+    "    if label in ('today', 'earlier today'):\n"
+    "        return {'lower_bound': day_start, 'upper_bound': current_timestamp}\n"
+    "    if 'upcoming' in label or label == 'future':\n"
+    "        return {'lower_bound': current_timestamp, 'upper_bound': current_timestamp + 365 * SECONDS_PER_DAY}\n"
+    "    return {'lower_bound': 0.0, 'upper_bound': current_timestamp}\n"
+)
+_VALIDATION_EXAMPLES = (
+    ToolExample(
+        {"recency_label": "yesterday", "current_timestamp": float(10 * 86400)},
+        {"lower_bound": float(9 * 86400), "upper_bound": float(10 * 86400)},
+    ),
+    ToolExample(
+        {"recency_label": "today", "current_timestamp": float(10 * 86400 + 3600)},
+        {"lower_bound": float(10 * 86400), "upper_bound": float(10 * 86400 + 3600)},
+    ),
+)
+
 
 @dataclass
 class _RecencyGenerator:
@@ -34,36 +59,24 @@ class _RecencyGenerator:
     def generate(self, _request: ToolGenerationRequest) -> GeneratedTool:
         self.calls += 1
         spec = ToolSpec(
-            tool_name="canonicalize_recency_label",
-            family=ToolFamily("canonicalizer"),
-            description="Normalize recency labels.",
-            inputs=(ToolInput("label", "str", "Recency label."),),
-            output_annotation="str",
-            generalization_rationale="Recency labels recur across scenarios.",
-            inadequacy_evidence="No existing tool normalizes recency words.",
+            tool_name=_TOOL_NAME,
+            family=ToolFamily("derived_value_calculator"),
+            description="Convert a recency label to Unix timestamp lower/upper bounds.",
+            inputs=(
+                ToolInput("recency_label", "str", "Recency word, e.g. yesterday."),
+                ToolInput("current_timestamp", "float", "Current Unix timestamp."),
+            ),
+            output_annotation="dict",
+            generalization_rationale="Recency-to-bounds needed across reminder/message search.",
+            inadequacy_evidence="Base toolset lacks a single recency→bounds helper.",
         )
-        code = (
-            "def canonicalize_recency_label(label: str) -> str:\n"
-            "    s = label.strip().lower()\n"
-            "    if s in ('newest', 'latest', 'recent'): return 'latest'\n"
-            "    if s in ('oldest', 'earliest'): return 'oldest'\n"
-            "    if 'upcoming' in s: return 'upcoming'\n"
-            "    if 'yesterday' in s: return 'yesterday'\n"
-            "    return s\n"
-        )
-        return GeneratedTool(spec=spec, code=code)
+        return GeneratedTool(spec=spec, code=_TOOL_CODE)
 
 
 def _make_entry(tmp_path: Path) -> tuple[RegistryStore, RegistryEntry]:
     generator = _RecencyGenerator()
     tool = generator.generate(None)  # type: ignore[arg-type]
-    validation = validate_generated_tool(
-        tool,
-        examples=(
-            ToolExample({"label": "Newest"}, "latest"),
-            ToolExample({"label": "oldest"}, "oldest"),
-        ),
-    )
+    validation = validate_generated_tool(tool, examples=_VALIDATION_EXAMPLES)
     assert validation.accepted
     store = RegistryStore(tmp_path / "registry")
     entry = RegistryEntry.accepted(tool, validation, birth_scenario="scenario_birth")
@@ -94,20 +107,21 @@ def test_birth_then_reuse_in_later_scenario(tmp_path: Path) -> None:
         controller.observe(obs[0])
 
     assert generator.calls == 1
-    entry = store.get("canonicalize_recency_label")
+    entry = store.get(_TOOL_NAME)
     assert entry is not None, "tool should be in registry after birth"
     assert entry.validation.accepted
 
     # Compile and invoke the tool — reuse event must fire
     reuse_log: list[str] = []
     fn = _compile_toolsandbox_tool(entry, on_reuse=reuse_log.append)
-    assert fn("Newest") == "latest"
-    assert reuse_log == ["canonicalize_recency_label"]
+    result = fn("yesterday", float(10 * 86400))
+    assert result == {"lower_bound": float(9 * 86400), "upper_bound": float(10 * 86400)}
+    assert reuse_log == [_TOOL_NAME]
 
     # Verify birth events jsonl
     birth_line = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
     assert birth_line["accepted"] is True
-    assert birth_line["tool_name"] == "canonicalize_recency_label"
+    assert birth_line["tool_name"] == _TOOL_NAME
 
 
 def test_sage_run_adapter_full_loop(
@@ -130,10 +144,13 @@ def test_sage_run_adapter_full_loop(
         )
         enhanced = scenario_transform("later_scenario", scenario, outdir)
         tools = enhanced.starting_context.get_available_tools(scrambling_allowed=False)
-        assert "canonicalize_recency_label" in tools, "tool must be injected"
-        result = tools["canonicalize_recency_label"]("Newest")
-        assert result == "latest"
-        invoked_tools.append("canonicalize_recency_label")
+        assert _TOOL_NAME in tools, "tool must be injected"
+        result = tools[_TOOL_NAME]("yesterday", float(10 * 86400))
+        assert result == {
+            "lower_bound": float(9 * 86400),
+            "upper_bound": float(10 * 86400),
+        }
+        invoked_tools.append(_TOOL_NAME)
         if result_hook is not None:
             result_hook("later_scenario", enhanced, {"similarity": 1}, outdir)
         return outdir
@@ -153,11 +170,11 @@ def test_sage_run_adapter_full_loop(
         )
     )
 
-    assert invoked_tools == ["canonicalize_recency_label"]
-    entry = store.get("canonicalize_recency_label")
+    assert invoked_tools == [_TOOL_NAME]
+    entry = store.get(_TOOL_NAME)
     assert entry is not None
     assert entry.reuse_count == 1
 
     reuse_event = json.loads((outdir / "reuse_events.jsonl").read_text())
-    assert reuse_event["tool_name"] == "canonicalize_recency_label"
+    assert reuse_event["tool_name"] == _TOOL_NAME
     assert reuse_event["scenario"] == "later_scenario"

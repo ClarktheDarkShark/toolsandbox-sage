@@ -11,6 +11,8 @@ from sage_ts.registry.store import RegistryStore
 from tool_sandbox.common.execution_context import ScenarioCategories
 from tool_sandbox.common.scenario import Scenario
 
+_TOOL_NAME = "recency_to_timestamp_bounds"
+
 
 @dataclass
 class FakeRecencyGenerator:
@@ -19,31 +21,30 @@ class FakeRecencyGenerator:
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
         self.calls += 1
         spec = ToolSpec(
-            tool_name="canonicalize_recency_label",
-            family=ToolFamily("canonicalizer"),
-            description="Normalize recency labels to stable search directives.",
-            inputs=(ToolInput("label", "str", "Raw recency label."),),
-            output_annotation="str",
-            generalization_rationale=(
-                "Recency labels recur across message and reminder search scenarios."
+            tool_name=_TOOL_NAME,
+            family=ToolFamily("derived_value_calculator"),
+            description="Convert recency label to Unix timestamp lower/upper bounds.",
+            inputs=(
+                ToolInput("recency_label", "str", "Recency word, e.g. yesterday."),
+                ToolInput("current_timestamp", "float", "Current Unix timestamp."),
             ),
-            inadequacy_evidence=(
-                "Existing tools search records, but do not normalize recency words."
-            ),
+            output_annotation="dict",
+            generalization_rationale="Recency-to-bounds needed across reminder/message search.",
+            inadequacy_evidence="Base toolset lacks a single recency→bounds helper.",
         )
-        code = """
-def canonicalize_recency_label(label: str) -> str:
-    cleaned = " ".join(label.strip().lower().split())
-    if cleaned in {"newest", "latest", "recent", "most recent"}:
-        return "latest"
-    if cleaned in {"oldest", "earliest"}:
-        return "oldest"
-    if "upcoming" in cleaned:
-        return "upcoming"
-    if "yesterday" in cleaned:
-        return "yesterday"
-    return cleaned
-"""
+        code = (
+            "def recency_to_timestamp_bounds(recency_label: str, current_timestamp: float) -> dict:\n"
+            "    SECONDS_PER_DAY = 86400\n"
+            "    label = recency_label.strip().lower()\n"
+            "    day_start = float(int(current_timestamp) // SECONDS_PER_DAY * SECONDS_PER_DAY)\n"
+            "    if label == 'yesterday':\n"
+            "        return {'lower_bound': day_start - SECONDS_PER_DAY, 'upper_bound': day_start}\n"
+            "    if label in ('today', 'earlier today'):\n"
+            "        return {'lower_bound': day_start, 'upper_bound': current_timestamp}\n"
+            "    if 'upcoming' in label or label == 'future':\n"
+            "        return {'lower_bound': current_timestamp, 'upper_bound': current_timestamp + 365 * SECONDS_PER_DAY}\n"
+            "    return {'lower_bound': 0.0, 'upper_bound': current_timestamp}\n"
+        )
         return GeneratedTool(spec=spec, code=code)
 
 
@@ -55,7 +56,7 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
         {"similarity": 0},
     )
     assert len(observations) == 1
-    assert observations[0].canonical_key == "canonicalization:recency_label"
+    assert observations[0].canonical_key == "derived_value:recency_timestamp_bounds"
     assert observations[0].generation_allowed
 
     store = RegistryStore(tmp_path / "registry")
@@ -69,12 +70,12 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
 
     controller.observe(observations[0])
     assert generator.calls == 0
-    assert store.get("canonicalize_recency_label") is None
+    assert store.get(_TOOL_NAME) is None
 
     controller.observe(observations[0])
     assert generator.calls == 1
-    assert store.get("canonicalize_recency_label") is not None
+    assert store.get(_TOOL_NAME) is not None
 
     birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
     assert birth_event["accepted"] is True
-    assert birth_event["tool_name"] == "canonicalize_recency_label"
+    assert birth_event["tool_name"] == _TOOL_NAME

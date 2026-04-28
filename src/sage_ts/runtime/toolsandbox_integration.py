@@ -19,6 +19,7 @@ PYTHON_TYPES: dict[str, Any] = {
     "int": int,
     "float": float,
     "bool": bool,
+    "dict": dict,
 }
 
 

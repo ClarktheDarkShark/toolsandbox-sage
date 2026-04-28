@@ -63,21 +63,35 @@ def classify_scenario_observations(
         "recency" in scenario_name
         and ScenarioCategories.CANONICALIZATION in scenario.categories
     ):
+        # Validation constants: day 10 boundary (all values are exact float arithmetic)
+        _ts = float(10 * 86400)  # 864000.0
+        _yesterday_start = float(9 * 86400)  # 777600.0
+        _today_ts = float(10 * 86400 + 3600)  # 867600.0
+        _today_start = float(10 * 86400)  # 864000.0
         return (
             CapabilityObservation(
                 scenario_name=scenario_name,
-                canonical_key="canonicalization:recency_label",
+                canonical_key="derived_value:recency_timestamp_bounds",
                 observation=(
-                    "Repeated ToolSandbox scenarios require normalizing user-facing "
-                    "recency words such as latest, oldest, yesterday, and upcoming "
-                    "before choosing search/sort arguments."
+                    "ToolSandbox scenarios repeatedly require converting user-facing "
+                    "recency words (yesterday, today, upcoming, latest, oldest) into "
+                    "Unix timestamp lower/upper bounds to pass to search tools "
+                    "(search_reminder, search_messages). The base toolset provides "
+                    "get_current_timestamp, timestamp_to_datetime_info, and "
+                    "datetime_info_to_timestamp as building blocks but not a single "
+                    "recency-to-bounds helper. Agents must make 3+ extra calls and "
+                    "are error-prone on day boundary arithmetic."
                 ),
-                allowed_families=(str(ToolFamily.CANONICALIZER),),
+                allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
                 validation_examples=(
-                    ToolExample({"label": "Newest"}, "latest"),
-                    ToolExample({"label": "oldest"}, "oldest"),
-                    ToolExample({"label": " yesterday "}, "yesterday"),
-                    ToolExample({"label": "upcoming reminders"}, "upcoming"),
+                    ToolExample(
+                        {"recency_label": "yesterday", "current_timestamp": _ts},
+                        {"lower_bound": _yesterday_start, "upper_bound": _ts},
+                    ),
+                    ToolExample(
+                        {"recency_label": "today", "current_timestamp": _today_ts},
+                        {"lower_bound": _today_start, "upper_bound": _today_ts},
+                    ),
                 ),
                 generation_allowed=True,
                 reason=f"categories:{','.join(sorted(categories))}",
