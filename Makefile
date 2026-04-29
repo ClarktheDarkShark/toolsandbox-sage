@@ -12,7 +12,7 @@ REGISTRY ?= outputs/sage_protocol_campaign/latest_registry
 RUN ?= outputs/sage_protocol_campaign/extended_reuse_100_20260428_125232
 MODE ?= evolve
 PORT ?= 5520
-DASHBOARD_OPEN ?= 0
+DASHBOARD_OPEN ?= 1
 DASHBOARD_FLAGS := $(if $(filter 1,$(DASHBOARD_OPEN)),,--no-dashboard-open)
 CATEGORY ?= general
 ifeq ($(CATEGORY),state)
