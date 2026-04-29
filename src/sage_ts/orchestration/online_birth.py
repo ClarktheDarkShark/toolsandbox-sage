@@ -23,6 +23,16 @@ class GeneratedToolFactory(Protocol):
 CampaignEventHook = Callable[[str, dict[str, Any]], None]
 
 
+def suggested_tool_name(canonical_key: str) -> str | None:
+    """Map recurring capability keys to stable, reusable tool names."""
+    suffix = canonical_key.split(":", 1)[-1].strip()
+    if not suffix:
+        return None
+    if suffix == "recency_timestamp_bounds":
+        return "recency_to_timestamp_bounds"
+    return suffix
+
+
 @dataclass
 class OnlineBirthController:
     store: RegistryStore
@@ -58,6 +68,7 @@ class OnlineBirthController:
                 {"inputs": item.inputs, "expected": item.expected}
                 for item in observation.validation_examples
             ),
+            suggested_tool_name=suggested_tool_name(observation.canonical_key),
         )
         self.generated_keys.add(observation.canonical_key)
         self._event(

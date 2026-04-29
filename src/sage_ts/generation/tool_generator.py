@@ -24,12 +24,18 @@ class ToolGenerationRequest:
     observation: str
     allowed_families: tuple[str, ...]
     validation_examples: tuple[dict[str, object], ...] = ()
+    suggested_tool_name: str | None = None
 
     def prompt(self) -> str:
         families = ", ".join(self.allowed_families)
         examples = (
             f" Validation examples: {json.dumps(list(self.validation_examples))}."
             if self.validation_examples
+            else ""
+        )
+        tool_name_hint = (
+            f' The tool_name must be exactly "{self.suggested_tool_name}".'
+            if self.suggested_tool_name
             else ""
         )
         return (
@@ -50,6 +56,7 @@ class ToolGenerationRequest:
             "network access, subprocess calls, side effects, hidden global state, or "
             "wrapper functions. "
             "The function must pass every validation example exactly. "
+            f"{tool_name_hint} "
             f"Allowed families: {families}. "
             f"Scenario: {self.scenario_name}. Observation: {self.observation}.{examples}"
         )

@@ -29,6 +29,34 @@ def test_summarize_run_counts_birth_and_reuse_events(tmp_path: Path) -> None:
         json.dumps({"scenario": "b", "tool_name": "helper"}) + "\n",
         encoding="utf-8",
     )
+    (run_dir / "scenario_tool_selection.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "scenario": "a",
+                        "generated_tools_visible": [],
+                        "generated_tools_called": [],
+                        "selection_status": "no_visible_generated_tools",
+                        "similarity": 1.0,
+                        "failure_after_selection": False,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "scenario": "b",
+                        "generated_tools_visible": ["helper"],
+                        "generated_tools_called": ["helper"],
+                        "selection_status": "generated_tool_called",
+                        "similarity": 0.0,
+                        "failure_after_selection": True,
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     metrics = summarize_run(run_dir)
 
@@ -37,6 +65,10 @@ def test_summarize_run_counts_birth_and_reuse_events(tmp_path: Path) -> None:
     assert metrics["accepted_tool_count"] == 1
     assert metrics["reuse_count"] == 1
     assert metrics["reused_tools"] == ["helper"]
+    assert metrics["generated_tool_visible_scenarios"] == 1
+    assert metrics["generated_tool_called_scenarios"] == 1
+    assert metrics["generated_tool_visible_not_called_scenarios"] == 0
+    assert metrics["generated_tool_selection_failures"][0]["scenario"] == "b"
 
 
 def test_compare_runs_reports_gain_and_regression(tmp_path: Path) -> None:

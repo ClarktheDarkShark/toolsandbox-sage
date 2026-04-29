@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,6 +22,26 @@ from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 from sage_ts.runtime.toolsandbox_integration import with_registry_tools
 from tool_sandbox.common.scenario import Scenario
+
+
+def _reuse_log_tools(output_directory: Path, scenario_name: str) -> list[str]:
+    path = output_directory / "reuse_events.jsonl"
+    if not path.exists():
+        return []
+    tools: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("scenario") != scenario_name:
+            continue
+        tool_name = event.get("tool_name")
+        if isinstance(tool_name, str) and tool_name not in tools:
+            tools.append(tool_name)
+    return tools
 
 
 @dataclass(frozen=True)
@@ -45,6 +66,8 @@ def run_sage_with_registry(
     """Run ToolSandbox scenarios with accepted generated tools available."""
     store = RegistryStore(config.registry_dir)
     registry_tools = sorted(store.load_entries())
+    visible_generated_by_scenario: dict[str, list[str]] = {}
+    called_generated_by_scenario: dict[str, list[str]] = {}
 
     birth_controller: OnlineBirthController | None = None
     registry_load_logged = False
@@ -92,6 +115,9 @@ def run_sage_with_registry(
 
         def record_reuse(tool_name: str) -> None:
             store.record_reuse(tool_name)
+            called = called_generated_by_scenario.setdefault(name, [])
+            if tool_name not in called:
+                called.append(tool_name)
             append_jsonl(
                 output_directory / "reuse_events.jsonl",
                 {
@@ -112,6 +138,8 @@ def run_sage_with_registry(
                 )
 
         enhanced = with_registry_tools(scenario, store, on_reuse=record_reuse)
+        generated_tools = sorted(store.load_entries())
+        visible_generated_by_scenario[name] = generated_tools
         append_jsonl(
             output_directory / "scenario_tool_visibility.jsonl",
             {
@@ -125,7 +153,7 @@ def run_sage_with_registry(
                         scrambling_allowed=False
                     )
                 ),
-                "generated_tools": sorted(store.load_entries()),
+                "generated_tools": generated_tools,
             },
         )
         return enhanced
@@ -136,6 +164,45 @@ def run_sage_with_registry(
         result: dict[str, object],
         output_directory: Path,
     ) -> dict[str, object]:
+        generated_visible = visible_generated_by_scenario.get(name, [])
+        generated_called = list(called_generated_by_scenario.get(name, []))
+        for tool_name in _reuse_log_tools(output_directory, name):
+            if tool_name not in generated_called:
+                generated_called.append(tool_name)
+        generated_not_called = [
+            tool for tool in generated_visible if tool not in set(generated_called)
+        ]
+        raw_similarity = result.get("similarity", 0.0)
+        try:
+            similarity = (
+                float(raw_similarity)
+                if isinstance(raw_similarity, (int, float, str))
+                else 0.0
+            )
+        except ValueError:
+            similarity = 0.0
+        selection_status = (
+            "generated_tool_called"
+            if generated_called
+            else "generated_tool_visible_not_called"
+            if generated_visible
+            else "no_visible_generated_tools"
+        )
+        append_jsonl(
+            output_directory / "scenario_tool_selection.jsonl",
+            {
+                "scenario": name,
+                "base_tool_policy": config.base_tool_policy,
+                "generated_tools_visible": generated_visible,
+                "generated_tools_called": generated_called,
+                "generated_tools_not_called": generated_not_called,
+                "selection_status": selection_status,
+                "similarity": similarity,
+                "exception_type": result.get("exception_type"),
+                "failure_after_selection": similarity < 1.0
+                or bool(result.get("exception_type")),
+            },
+        )
         if birth_controller is None:
             return result
         observations = classify_scenario_observations(name, scenario, result)

@@ -94,3 +94,8 @@ def test_sage_runner_records_registry_reuse(
 
     visibility = json.loads((output_dir / "scenario_tool_visibility.jsonl").read_text())
     assert "canonicalize_connectivity_label" in visibility["available_tools"]
+
+    selection = json.loads((output_dir / "scenario_tool_selection.jsonl").read_text())
+    assert selection["scenario"] == "later_scenario"
+    assert selection["selection_status"] == "generated_tool_called"
+    assert selection["generated_tools_called"] == ["canonicalize_connectivity_label"]

@@ -37,6 +37,7 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
     reuse_events = _read_jsonl(run_dir / "reuse_events.jsonl")
     run_events = _read_jsonl(run_dir / "sage_run_events.jsonl")
     visibility = _read_jsonl(run_dir / "scenario_tool_visibility.jsonl")
+    selection = _read_jsonl(run_dir / "scenario_tool_selection.jsonl")
     cache_metrics = _read_json(run_dir / "prompt_cache_metrics.json")
     live_summary = _read_json(run_dir / "live_result_summary.json")
     registry_manifest = (
@@ -58,6 +59,22 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
         for tool in event.get("generated_tools", [])
         if isinstance(tool, str)
     }
+    called_selection = [
+        event
+        for event in selection
+        if event.get("selection_status") == "generated_tool_called"
+    ]
+    ignored_selection = [
+        event
+        for event in selection
+        if event.get("selection_status") == "generated_tool_visible_not_called"
+    ]
+    visible_selection = [
+        event
+        for event in selection
+        if event.get("selection_status")
+        in {"generated_tool_called", "generated_tool_visible_not_called"}
+    ]
     return {
         "run_dir": str(run_dir),
         "scenario_count": len(rows),
@@ -89,6 +106,22 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
             else len(registry_manifest.get("tools", {}))
         ),
         "visible_generated_tools": sorted(visible_generated),
+        "generated_tool_visible_scenarios": len(visible_selection),
+        "generated_tool_called_scenarios": len(called_selection),
+        "generated_tool_visible_not_called_scenarios": len(ignored_selection),
+        "generated_tool_selection_failures": [
+            {
+                "scenario": event.get("scenario"),
+                "selection_status": event.get("selection_status"),
+                "generated_tools_visible": event.get("generated_tools_visible", []),
+                "generated_tools_called": event.get("generated_tools_called", []),
+                "similarity": event.get("similarity"),
+                "exception_type": event.get("exception_type"),
+            }
+            for event in selection
+            if event.get("failure_after_selection")
+            and event.get("selection_status") != "no_visible_generated_tools"
+        ],
         "cache_metrics": cache_metrics,
         "failures": [
             {

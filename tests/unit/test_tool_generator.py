@@ -51,3 +51,14 @@ def test_tool_generator_uses_prompt_cache(tmp_path: Path) -> None:
     assert first.spec.tool_name == "normalize_label"
     assert second.spec.tool_name == "normalize_label"
     assert completer.calls == 1
+
+
+def test_generation_request_includes_reusable_name_hint() -> None:
+    request = ToolGenerationRequest(
+        scenario_name="find_temperature_f_with_location_alt",
+        observation="Repeated Celsius to Fahrenheit conversion is needed.",
+        allowed_families=("derived_value_calculator",),
+        suggested_tool_name="celsius_to_fahrenheit",
+    )
+
+    assert 'tool_name must be exactly "celsius_to_fahrenheit"' in request.prompt()

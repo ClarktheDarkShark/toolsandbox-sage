@@ -20,6 +20,7 @@ class FakeRecencyGenerator:
 
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
         self.calls += 1
+        assert request.suggested_tool_name == _TOOL_NAME
         spec = ToolSpec(
             tool_name=_TOOL_NAME,
             family=ToolFamily("derived_value_calculator"),
