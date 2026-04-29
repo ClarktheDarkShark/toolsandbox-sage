@@ -6,7 +6,9 @@ from sage_ts.adequacy.inadequacy_classifier import classify_scenario_observation
 from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.orchestration.online_birth import OnlineBirthController
+from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
+from sage_ts.validation.sandbox_validator import ValidationResult
 
 from tool_sandbox.common.execution_context import ScenarioCategories
 from tool_sandbox.common.scenario import Scenario
@@ -81,6 +83,50 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
     birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
     assert birth_event["accepted"] is True
     assert birth_event["tool_name"] == _TOOL_NAME
+
+
+def test_existing_registry_tool_skips_duplicate_birth(tmp_path: Path) -> None:
+    scenario = Scenario(categories=[ScenarioCategories.CANONICALIZATION])  # type: ignore[list-item]
+    observations = classify_scenario_observations(
+        "search_message_with_recency_latest",
+        scenario,
+        {"similarity": 0},
+    )
+
+    store = RegistryStore(tmp_path / "registry")
+    generator = FakeRecencyGenerator()
+    controller = OnlineBirthController(
+        store=store,
+        generator=generator,
+        output_dir=tmp_path,
+        recurrence_threshold=2,
+    )
+    tool = generator.generate(
+        ToolGenerationRequest(
+            scenario_name="seed",
+            observation="Seed accepted recency helper.",
+            allowed_families=("derived_value_calculator",),
+            suggested_tool_name=_TOOL_NAME,
+        )
+    )
+    store.put(
+        RegistryEntry.accepted(
+            tool,
+            ValidationResult(accepted=True, errors=()),
+            birth_scenario="seed",
+        )
+    )
+    generator.calls = 0
+
+    controller.observe(observations[0])
+    controller.observe(observations[0])
+
+    assert generator.calls == 0
+    assert store.get(_TOOL_NAME) is not None
+    assert (
+        "tool_birth_skipped_existing"
+        in (tmp_path / "sage_run_events.jsonl").read_text()
+    )
 
 
 def test_modify_reminder_relative_datetime_observation_is_canonicalizer() -> None:

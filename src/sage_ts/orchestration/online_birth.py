@@ -62,6 +62,30 @@ class OnlineBirthController:
         if self.counts[observation.canonical_key] < self.recurrence_threshold:
             return
 
+        suggested_name = suggested_tool_name(observation.canonical_key)
+        if suggested_name is not None:
+            existing_entry = self.store.get(suggested_name)
+            if existing_entry is not None and not existing_entry.retired:
+                self.generated_keys.add(observation.canonical_key)
+                append_jsonl(
+                    self.output_dir / "sage_run_events.jsonl",
+                    {
+                        "event": "tool_birth_skipped_existing",
+                        "canonical_key": observation.canonical_key,
+                        "tool_name": suggested_name,
+                        "registry_dir": str(self.store.root),
+                    },
+                )
+                self._event(
+                    "tool_birth_skipped_existing",
+                    {
+                        "canonical_key": observation.canonical_key,
+                        "tool_name": suggested_name,
+                        "registry_dir": str(self.store.root),
+                    },
+                )
+                return
+
         request = ToolGenerationRequest(
             scenario_name=observation.scenario_name,
             observation=observation.observation,
@@ -70,7 +94,7 @@ class OnlineBirthController:
                 {"inputs": item.inputs, "expected": item.expected}
                 for item in observation.validation_examples
             ),
-            suggested_tool_name=suggested_tool_name(observation.canonical_key),
+            suggested_tool_name=suggested_name,
         )
         self.generated_keys.add(observation.canonical_key)
         self._event(
