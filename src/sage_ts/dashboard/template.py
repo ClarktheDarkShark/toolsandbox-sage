@@ -109,6 +109,15 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .event strong { display: block; margin-bottom: 4px; }
     .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    .links { display: flex; gap: 12px; flex-wrap: wrap; margin: 0 0 22px; }
+    .btn {
+      border: 1px solid var(--line);
+      background: #0d1630;
+      color: var(--blue);
+      border-radius: 999px;
+      padding: 10px 15px;
+      font-weight: 800;
+    }
     input, select {
       background: #0b132a;
       color: var(--text);
@@ -132,6 +141,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   <main class="wrap">
     <h1>ToolSandbox SAGE</h1>
     <div class="sub" id="subtitle">Loading dashboard data...</div>
+    <div class="links"><a class="btn" href="task_focus.html">Task Focus</a></div>
     <section class="grid" id="metricGrid"></section>
     <section class="panel">
       <h2>Run Progress</h2>

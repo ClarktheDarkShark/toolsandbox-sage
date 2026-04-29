@@ -14,6 +14,7 @@ from typing import Any, cast
 from urllib.parse import quote
 
 from sage_ts.campaign.artifacts import ARTIFACT_ROOT, read_jsonl
+from sage_ts.dashboard.task_focus_template import TASK_FOCUS_HTML
 from sage_ts.dashboard.template import DASHBOARD_HTML
 from sage_ts.evaluation.run_metrics import compare_runs, summarize_run
 
@@ -22,6 +23,12 @@ def _read_json(path: Path, default: dict[str, Any] | None = None) -> dict[str, A
     if not path.exists():
         return default or {}
     return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+
+
+def _read_json_value(path: Path, default: Any) -> Any:
+    if not path.exists():
+        return default
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -64,6 +71,278 @@ def _trace_url(dashboard_dir: Path, run_dir: Path | None, scenario: str) -> str 
     if not pretty.exists():
         return None
     return os.path.relpath(pretty, dashboard_dir)
+
+
+def _manifest_order(run_dir: Path) -> dict[str, int]:
+    manifest = _read_json(run_dir.parent / "sage_ts_run_manifest.json")
+    names = manifest.get("scenario_names") or []
+    return {str(name): index for index, name in enumerate(names)}
+
+
+def _generated_tool_usage(run_dir: Path) -> dict[str, list[str]]:
+    usage: dict[str, list[str]] = {}
+    for event in _read_jsonl(run_dir / "reuse_events.jsonl"):
+        scenario = event.get("scenario")
+        tool = event.get("tool_name")
+        if not scenario or not tool:
+            continue
+        tools = usage.setdefault(str(scenario), [])
+        if str(tool) not in tools:
+            tools.append(str(tool))
+    return usage
+
+
+def _compact_content(value: Any, *, limit: int = 10000) -> str:
+    if value is None:
+        return ""
+    text = value if isinstance(value, str) else json.dumps(value, indent=2, default=str)
+    text = text.strip()
+    return text if len(text) <= limit else text[:limit] + "\n... [truncated]"
+
+
+def _one_line(value: Any, *, limit: int = 180) -> str:
+    text = " ".join(_compact_content(value, limit=max(limit * 4, 1000)).split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def _message_label(message: dict[str, Any]) -> str:
+    role = str(message.get("role", "message"))
+    if role == "tool":
+        return f"tool: {message.get('name', 'unknown')}"
+    tool_calls = message.get("tool_calls") or []
+    if tool_calls:
+        names = [
+            call.get("function", {}).get("name", "tool")
+            for call in tool_calls
+            if isinstance(call, dict)
+        ]
+        return f"assistant tool call: {', '.join(names)}"
+    return role
+
+
+def _serialize_message(
+    index: int,
+    message: dict[str, Any],
+    generated_tools: set[str],
+) -> dict[str, Any]:
+    tool_calls = message.get("tool_calls") or []
+    call_text = "\n\n".join(
+        (
+            f"{call.get('function', {}).get('name', 'tool')}("
+            f"{call.get('function', {}).get('arguments', '')})"
+        )
+        for call in tool_calls
+        if isinstance(call, dict)
+    )
+    content = _compact_content(message.get("content"))
+    if call_text:
+        content = call_text if not content else f"{content}\n\n{call_text}"
+    haystack = " ".join(
+        [str(message.get("name", "")), _message_label(message), content, call_text]
+    )
+    used = sorted(tool for tool in generated_tools if tool and tool in haystack)
+    return {
+        "index": index,
+        "role": message.get("role", "message"),
+        "label": _message_label(message),
+        "content": content,
+        "generated_tools": used,
+        "uses_generated_tool": bool(used),
+    }
+
+
+def _expected_answers_from_messages(messages: list[dict[str, Any]]) -> list[str]:
+    answers: list[str] = []
+    for message in messages:
+        details = [
+            message.get("assistant_details") or {},
+            message.get("tool_details") or {},
+        ]
+        for detail in details:
+            for match in detail.get("milestone_matches", []):
+                milestone = (
+                    match.get("milestone", {}) if isinstance(match, dict) else {}
+                )
+                for constraint in milestone.get("snapshot_constraints", []):
+                    rows = constraint.get("target_dataframe") or []
+                    for row in rows:
+                        if not isinstance(row, dict):
+                            continue
+                        if (
+                            row.get("sender") == "AGENT"
+                            and row.get("recipient") == "USER"
+                        ):
+                            content = _compact_content(row.get("content"), limit=3000)
+                            if content and content not in answers:
+                                answers.append(content)
+    return answers
+
+
+def _summarize_tool_messages(messages: list[dict[str, Any]]) -> str:
+    tool_bits: list[str] = []
+    for message in messages:
+        if message.get("role") != "tool":
+            continue
+        name = str(message.get("name") or "tool")
+        content = _compact_content(message.get("content"), limit=900)
+        if content.lower() in {"", "none", "null"}:
+            content = "no visible state change"
+        tool_bits.append(f"{name}: {_one_line(content, limit=80)}")
+    return _one_line("; ".join(tool_bits[-3:]), limit=220)
+
+
+def _task_outcome(
+    messages: list[dict[str, Any]],
+    result: dict[str, Any] | None,
+    scenario: str,
+) -> dict[str, Any]:
+    final_index: int | None = None
+    for index, message in enumerate(messages):
+        if message.get("role") == "assistant" and message.get("assistant_details"):
+            final_index = index
+    if final_index is None:
+        for index, message in enumerate(messages):
+            if message.get("role") == "assistant" and _compact_content(
+                message.get("content")
+            ):
+                final_index = index
+    final_answer = (
+        ""
+        if final_index is None
+        else _compact_content(messages[final_index].get("content"), limit=4000)
+    )
+    similarity = None if result is None else result.get("similarity")
+    exact = bool(similarity is not None and float(similarity) >= 0.999)
+    tool_summary = _summarize_tool_messages(messages)
+    result_parts = []
+    if final_answer:
+        result_parts.append(f"Answer: {_one_line(final_answer, limit=130)}")
+    if tool_summary:
+        result_parts.append(f"Tools: {tool_summary}")
+    if similarity is not None and float(similarity) < 0.999:
+        result_parts.append(f"Score: {float(similarity):.3f}")
+    return {
+        "agent_final_answer": final_answer,
+        "agent_result_summary": "\n".join(result_parts),
+        "expected_answers": _expected_answers_from_messages(messages),
+        "expected_note": (
+            "State/tool milestone-scored target; inspect messages and tool evidence."
+        ),
+        "similarity": similarity,
+        "exact_correct": exact,
+        "correctness_label": (
+            "pending" if result is None else "correct" if exact else "not exact"
+        ),
+        "scenario": scenario,
+    }
+
+
+def _task_focus_rows(
+    run_root: Path,
+    run_dir: Path | None,
+) -> list[dict[str, Any]]:
+    if run_dir is None:
+        return []
+    rows = {
+        str(row.get("name")): row
+        for row in _scenario_rows(run_dir)
+        if isinstance(row, dict) and row.get("name")
+    }
+    order = _manifest_order(run_dir)
+    usage = _generated_tool_usage(run_dir)
+    trajectory_dir = run_dir / "trajectories"
+    trajectory_names = (
+        {path.name for path in trajectory_dir.iterdir() if path.is_dir()}
+        if trajectory_dir.exists()
+        else set()
+    )
+    tasks: list[dict[str, Any]] = []
+    for scenario in sorted(
+        set(rows) | trajectory_names,
+        key=lambda name: (order.get(name, 10_000), name),
+    ):
+        result = rows.get(scenario)
+        conversation = _read_json_value(
+            run_dir / "trajectories" / scenario / "conversation.json", []
+        )
+        raw_messages = [m for m in conversation if isinstance(m, dict)]
+        generated_tools = usage.get(scenario, [])
+        generated_set = set(generated_tools)
+        phase = run_dir.relative_to(run_root).parts[0]
+        tasks.append(
+            {
+                "id": f"{phase}:{run_dir.name}:{scenario}",
+                "phase": phase,
+                "run_type": run_dir.name,
+                "scenario": scenario,
+                "short_name": scenario.replace("_", " "),
+                "status": "complete" if result else "running",
+                "order_index": order.get(scenario),
+                "generated_tools": generated_tools,
+                "similarity": None if result is None else result.get("similarity"),
+                "turn_count": None if result is None else result.get("turn_count"),
+                "exception_type": None
+                if result is None
+                else result.get("exception_type"),
+                "categories": [] if result is None else result.get("categories", []),
+                "message_count": len(raw_messages),
+                "messages": [
+                    _serialize_message(index, message, generated_set)
+                    for index, message in enumerate(raw_messages)
+                ],
+                "outcome": _task_outcome(raw_messages, result, scenario),
+            }
+        )
+    return tasks
+
+
+def _write_task_focus_dashboard(
+    dashboard_dir: Path,
+    run_root: Path,
+    data: dict[str, Any],
+    control_dir: Path | None,
+    candidate_dir: Path | None,
+) -> None:
+    tasks = [
+        *_task_focus_rows(run_root, control_dir),
+        *_task_focus_rows(run_root, candidate_dir),
+    ]
+    active = next(
+        (task for task in reversed(tasks) if task["status"] != "complete"), None
+    )
+    if active is None and tasks:
+        active = tasks[-1]
+    current = data.get("candidate") or data.get("control") or {}
+    payload = {
+        "updated_at": data.get("updated_at"),
+        "run_root": str(run_root),
+        "mode": data.get("mode"),
+        "phase": data.get("phase"),
+        "status": data.get("status"),
+        "agent": data.get("agent"),
+        "base_tool_policy": data.get("base_tool_policy"),
+        "summary": {
+            "scenario_count": data.get("scenario_count"),
+            "control_completed": data.get("control", {}).get("scenario_count"),
+            "control_mean_similarity": data.get("control", {}).get("mean_similarity"),
+            "candidate_completed": data.get("candidate", {}).get("scenario_count"),
+            "candidate_mean_similarity": data.get("candidate", {}).get(
+                "mean_similarity"
+            ),
+            "accepted_tools": current.get("accepted_tool_count", 0),
+            "reuse_count": current.get("reuse_count", 0),
+            "current_completed": current.get("scenario_count"),
+            "current_mean_similarity": current.get("mean_similarity"),
+            "current_turns": current.get("total_turns"),
+            "current_exceptions": current.get("exception_count"),
+        },
+        "active_task_id": None if active is None else active["id"],
+        "tasks": tasks,
+    }
+    (dashboard_dir / "task_focus_data.json").write_text(
+        json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+    )
+    (dashboard_dir / "task_focus.html").write_text(TASK_FOCUS_HTML, encoding="utf-8")
 
 
 def _scenario_table(
@@ -196,6 +475,13 @@ def write_protocol_dashboard(
         json.dumps(data, indent=2) + "\n", encoding="utf-8"
     )
     (dashboard_dir / "index.html").write_text(DASHBOARD_HTML, encoding="utf-8")
+    _write_task_focus_dashboard(
+        dashboard_dir,
+        run_root,
+        data,
+        control_dir,
+        candidate_dir,
+    )
     _write_latest_pointer(dashboard_dir / "index.html")
     return dashboard_dir / "index.html"
 
