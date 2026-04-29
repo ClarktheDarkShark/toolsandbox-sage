@@ -108,25 +108,28 @@ def inject_registry_tools_into_context(
 ) -> list[str]:
     """Inject accepted generated helpers into a ToolSandbox execution context."""
     injected: list[str] = []
+    compiled_by_name: dict[str, Callable[..., Any]] = {}
     for entry in entries:
         tool_name = entry.tool.spec.tool_name
         if tool_name in context.name_to_tool:
             raise ValueError(f"tool name already exists in ToolSandbox: {tool_name}")
         compiled_tool = _compile_toolsandbox_tool(entry, on_reuse)
-        context.name_to_tool[tool_name] = compiled_tool
+        compiled_by_name[tool_name] = compiled_tool
         console_locals = cast(
             MutableMapping[str, Any],
             context.interactive_console.locals,
         )
         console_locals[tool_name] = compiled_tool
-        if (
-            context.tool_allow_list is not None
-            and tool_name not in context.tool_allow_list
-        ):
-            context.tool_allow_list.append(tool_name)
         injected.append(tool_name)
 
     if injected:
+        # OpenAI receives tools in dict insertion order. Put retained SAGE tools
+        # first so transfer runs test whether the model will adopt them when useful.
+        context.name_to_tool = {**compiled_by_name, **context.name_to_tool}
+        if context.tool_allow_list is not None:
+            context.tool_allow_list = injected + [
+                tool for tool in context.tool_allow_list if tool not in set(injected)
+            ]
         context._actual_to_scrambled_tool_name = get_scrambled_tool_names(
             context.name_to_tool.values()
         )

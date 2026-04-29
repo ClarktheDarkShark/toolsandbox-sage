@@ -46,12 +46,14 @@ def test_registry_tools_are_available_to_toolsandbox_context(tmp_path: Path) -> 
     tool_name = "canonicalize_connectivity_label"
     assert tool_name not in scenario.starting_context.name_to_tool
     assert tool_name in enhanced.starting_context.name_to_tool
+    assert next(iter(enhanced.starting_context.name_to_tool)) == tool_name
     assert enhanced.starting_context.tool_allow_list is not None
-    assert tool_name in enhanced.starting_context.tool_allow_list
+    assert enhanced.starting_context.tool_allow_list[0] == tool_name
 
     available_tools = enhanced.starting_context.get_available_tools(
         scrambling_allowed=False
     )
+    assert next(iter(available_tools)) == tool_name
     assert available_tools[tool_name]("Wi-Fi") == "wifi"
     assert reused_tools == [tool_name]
 
