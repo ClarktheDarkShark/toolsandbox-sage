@@ -20,7 +20,10 @@ from sage_ts.orchestration.online_birth import (
 )
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
-from sage_ts.runtime.toolsandbox_integration import with_registry_tools
+from sage_ts.runtime.toolsandbox_integration import (
+    registry_entry_matches_scenario,
+    with_registry_tools,
+)
 from tool_sandbox.common.scenario import Scenario
 
 
@@ -68,6 +71,7 @@ def run_sage_with_registry(
     registry_tools = sorted(store.load_entries())
     visible_generated_by_scenario: dict[str, list[str]] = {}
     called_generated_by_scenario: dict[str, list[str]] = {}
+    selection_context_by_scenario: dict[str, dict[str, object]] = {}
 
     birth_controller: OnlineBirthController | None = None
     registry_load_logged = False
@@ -137,12 +141,30 @@ def run_sage_with_registry(
                     },
                 )
 
+        loaded_entries = store.load_entries()
+        retained_tools_loaded = sorted(loaded_entries)
+        shortlisted_generated_tools = [
+            tool_name
+            for tool_name, entry in sorted(loaded_entries.items())
+            if registry_entry_matches_scenario(entry, name)
+        ]
+        filtered_out_generated_tools = [
+            tool_name
+            for tool_name in retained_tools_loaded
+            if tool_name not in set(shortlisted_generated_tools)
+        ]
+        filtered_out_reasons = {
+            tool_name: "scenario_relevance_filter"
+            for tool_name in filtered_out_generated_tools
+        }
+        original_tool_order = list(scenario.starting_context.name_to_tool)
         enhanced = with_registry_tools(
             scenario,
             store,
             on_reuse=record_reuse,
             scenario_name=name,
         )
+        enhanced_tool_order = list(enhanced.starting_context.name_to_tool)
         available_tools = set(
             enhanced.starting_context.get_available_tools(scrambling_allowed=False)
         )
@@ -152,11 +174,36 @@ def run_sage_with_registry(
             if tool_name in available_tools
         ]
         visible_generated_by_scenario[name] = generated_tools
+        priority_injection_changed_tool_order = bool(
+            generated_tools
+            and enhanced_tool_order[: len(generated_tools)] == generated_tools
+            and enhanced_tool_order != original_tool_order
+        )
+        selection_context_by_scenario[name] = {
+            "retained_tools_loaded": retained_tools_loaded,
+            "filtered_out_generated_tools": filtered_out_generated_tools,
+            "filtered_out_reasons": filtered_out_reasons,
+            "shortlisted_generated_tools": shortlisted_generated_tools,
+            "priority_injection_changed_tool_order": (
+                priority_injection_changed_tool_order
+            ),
+            "relevance_gating_hid_retained_tool": bool(filtered_out_generated_tools),
+        }
         append_jsonl(
             output_directory / "scenario_tool_visibility.jsonl",
             {
                 "scenario": name,
                 "base_tool_policy": config.base_tool_policy,
+                "retained_tools_loaded": retained_tools_loaded,
+                "filtered_out_generated_tools": filtered_out_generated_tools,
+                "filtered_out_reasons": filtered_out_reasons,
+                "shortlisted_generated_tools": shortlisted_generated_tools,
+                "priority_injection_changed_tool_order": (
+                    priority_injection_changed_tool_order
+                ),
+                "relevance_gating_hid_retained_tool": bool(
+                    filtered_out_generated_tools
+                ),
                 "tool_allow_list": list(
                     enhanced.starting_context.tool_allow_list or []
                 ),
@@ -206,27 +253,45 @@ def run_sage_with_registry(
             selection_reason = "retained_tool_visible_but_model_did_not_call_it"
         else:
             selection_reason = "no_retained_tool_visible_after_relevance_filter"
+        context = selection_context_by_scenario.get(name, {})
+        selection_record = {
+            "scenario": name,
+            "base_tool_policy": config.base_tool_policy,
+            "retained_tools_loaded": context.get("retained_tools_loaded", []),
+            "filtered_out_generated_tools": context.get(
+                "filtered_out_generated_tools", []
+            ),
+            "filtered_out_reasons": context.get("filtered_out_reasons", {}),
+            "shortlisted_generated_tools": context.get(
+                "shortlisted_generated_tools", generated_visible
+            ),
+            "chosen_retained_tool": generated_called[0] if generated_called else None,
+            "priority_injection_changed_tool_order": context.get(
+                "priority_injection_changed_tool_order", False
+            ),
+            "relevance_gating_hid_retained_tool": context.get(
+                "relevance_gating_hid_retained_tool", False
+            ),
+            "generated_tools_visible": generated_visible,
+            "generated_tools_called": generated_called,
+            "generated_tools_not_called": generated_not_called,
+            "visible_generated_tool_count": len(generated_visible),
+            "called_generated_tool_count": len(generated_called),
+            "selection_status": selection_status,
+            "selection_reason": selection_reason,
+            "not_called_reason": None
+            if generated_called or not generated_visible
+            else "model_did_not_call_retained_tool",
+            "similarity": similarity,
+            "exception_type": result.get("exception_type"),
+            "failure_after_selection": similarity < 1.0
+            or bool(result.get("exception_type")),
+        }
         append_jsonl(
             output_directory / "scenario_tool_selection.jsonl",
-            {
-                "scenario": name,
-                "base_tool_policy": config.base_tool_policy,
-                "generated_tools_visible": generated_visible,
-                "generated_tools_called": generated_called,
-                "generated_tools_not_called": generated_not_called,
-                "visible_generated_tool_count": len(generated_visible),
-                "called_generated_tool_count": len(generated_called),
-                "selection_status": selection_status,
-                "selection_reason": selection_reason,
-                "not_called_reason": None
-                if generated_called or not generated_visible
-                else "model_did_not_call_retained_tool",
-                "similarity": similarity,
-                "exception_type": result.get("exception_type"),
-                "failure_after_selection": similarity < 1.0
-                or bool(result.get("exception_type")),
-            },
+            selection_record,
         )
+        append_jsonl(output_directory / "selection_trace.jsonl", selection_record)
         if birth_controller is None:
             return result
         observations = classify_scenario_observations(name, scenario, result)
@@ -266,5 +331,26 @@ def run_sage_with_registry(
             "final_registry_tools": final_registry_tools,
             "final_registry_size": len(final_registry_tools),
         },
+    )
+    selection_summary = {
+        "scenario_count": len(config.scenario_names),
+        "registry_dir": str(config.registry_dir),
+        "registry_tools": registry_tools,
+        "final_registry_tools": final_registry_tools,
+        "generated_tool_visible_scenarios": sum(
+            1 for tools in visible_generated_by_scenario.values() if tools
+        ),
+        "generated_tool_called_scenarios": sum(
+            1 for tools in called_generated_by_scenario.values() if tools
+        ),
+        "relevance_gate_hidden_scenarios": sum(
+            1
+            for context in selection_context_by_scenario.values()
+            if context.get("relevance_gating_hid_retained_tool")
+        ),
+    }
+    (output_directory / "selection_summary.json").write_text(
+        json.dumps(selection_summary, indent=2) + "\n",
+        encoding="utf-8",
     )
     return output_directory
