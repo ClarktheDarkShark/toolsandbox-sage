@@ -1,10 +1,10 @@
 import pytest
+
 from sage_ts.adapters.openai_toolsandbox_roles import (
     ConfigurableOpenAIAgent,
     ConfigurableOpenAIUser,
 )
 from sage_ts.adapters.role_factory import make_agent, make_user
-
 from tool_sandbox.roles.unhelpful_agent import UnhelpfulAgent
 
 

@@ -1,5 +1,4 @@
 from sage_ts.runtime.base_toolset import apply_base_tool_policy
-
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
 

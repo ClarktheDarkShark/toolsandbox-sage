@@ -32,6 +32,8 @@ def suggested_tool_name(canonical_key: str) -> str | None:
         return "recency_to_timestamp_bounds"
     if suffix == "relative_day_time_timestamp":
         return "relative_day_time_to_timestamp"
+    if suffix == "service_next_action":
+        return "next_service_enablement_action"
     return suffix
 
 

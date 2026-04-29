@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 import pytest
+
 from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
 from sage_ts.adapters.toolsandbox_adapter import (
     ResultHook,
@@ -13,7 +14,6 @@ from sage_ts.orchestration.toy_mechanism import canonicalizer_tool
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
-
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
 

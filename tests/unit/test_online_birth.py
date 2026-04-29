@@ -9,7 +9,6 @@ from sage_ts.orchestration.online_birth import OnlineBirthController
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.sandbox_validator import ValidationResult
-
 from tool_sandbox.common.execution_context import ScenarioCategories
 from tool_sandbox.common.scenario import Scenario
 
@@ -162,3 +161,26 @@ def test_modify_reminder_relative_datetime_observation_is_canonicalizer() -> Non
         "local_utc_offset_hours": -4,
     }
     assert relative.validation_examples[0].expected == 1777496400.0
+
+
+def test_direct_state_failure_observation_requests_next_action_helper() -> None:
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.STATE_DEPENDENCY))]
+    )
+
+    observations = classify_scenario_observations(
+        "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    assert len(observations) == 1
+    observation = observations[0]
+    assert observation.canonical_key == "state_precondition:service_next_action"
+    assert observation.generation_allowed
+    assert observation.allowed_families == (str(ToolFamily.STATE_PRECONDITION_HELPER),)
+    assert observation.validation_examples[0].expected == {
+        "ready": False,
+        "next_action": "set_low_battery_mode_status_false",
+        "target_service": "wifi",
+    }

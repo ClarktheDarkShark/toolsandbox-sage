@@ -155,6 +155,83 @@ def classify_scenario_observations(
             )
         return tuple(observations)
 
+    if (
+        ScenarioCategories.STATE_DEPENDENCY in scenario.categories
+        and scenario_name.startswith(("turn_on_", "enable_", "set_"))
+        and any(
+            token in scenario_name
+            for token in ("wifi", "cellular", "location", "low_battery")
+        )
+        and _similarity(result) < 1.0
+    ):
+        return (
+            CapabilityObservation(
+                scenario_name=scenario_name,
+                canonical_key="state_precondition:service_next_action",
+                observation=(
+                    "Direct state-dependency scenarios repeatedly require deciding "
+                    "one concrete service-precondition action before finalizing. "
+                    "Generate a small deterministic helper named "
+                    "next_service_enablement_action. It must return a dictionary "
+                    "with exactly a readiness predicate and one concrete next_action, "
+                    "not an advisory ordered plan. Inputs: target_service, "
+                    "wifi_enabled, cellular_enabled, location_service_enabled, "
+                    "low_battery_mode. If the target is already enabled, return "
+                    "ready=True and next_action='none'. If the target is disabled "
+                    "and low_battery_mode is true, return next_action="
+                    "'set_low_battery_mode_status_false'. Otherwise return the "
+                    "single setter action for the target service."
+                ),
+                allowed_families=(str(ToolFamily.STATE_PRECONDITION_HELPER),),
+                validation_examples=(
+                    ToolExample(
+                        {
+                            "target_service": "wifi",
+                            "wifi_enabled": False,
+                            "cellular_enabled": True,
+                            "location_service_enabled": True,
+                            "low_battery_mode": True,
+                        },
+                        {
+                            "ready": False,
+                            "next_action": "set_low_battery_mode_status_false",
+                            "target_service": "wifi",
+                        },
+                    ),
+                    ToolExample(
+                        {
+                            "target_service": "cellular",
+                            "wifi_enabled": True,
+                            "cellular_enabled": False,
+                            "location_service_enabled": True,
+                            "low_battery_mode": False,
+                        },
+                        {
+                            "ready": False,
+                            "next_action": "set_cellular_service_status_true",
+                            "target_service": "cellular",
+                        },
+                    ),
+                    ToolExample(
+                        {
+                            "target_service": "location",
+                            "wifi_enabled": True,
+                            "cellular_enabled": True,
+                            "location_service_enabled": True,
+                            "low_battery_mode": False,
+                        },
+                        {
+                            "ready": True,
+                            "next_action": "none",
+                            "target_service": "location",
+                        },
+                    ),
+                ),
+                generation_allowed=True,
+                reason=f"categories:{','.join(sorted(categories))}",
+            ),
+        )
+
     if result.get("similarity") == 0:
         return (
             CapabilityObservation(

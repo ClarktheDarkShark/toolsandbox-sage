@@ -7,7 +7,6 @@ from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.toolsandbox_integration import with_registry_tools
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
-
 from tool_sandbox.common.execution_context import (
     DatabaseNamespace,
     ExecutionContext,
