@@ -9,6 +9,16 @@ from pathlib import Path
 
 from sage_ts.adapters.openai_agent_adapter import OpenAIChatAdapter
 from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
+from sage_ts.cache.openai_response_cache import (
+    configure_response_cache_context,
+    install_openai_response_cache,
+)
+from sage_ts.cache.openai_response_cache import (
+    reset_metrics as reset_openai_response_cache_metrics,
+)
+from sage_ts.cache.openai_response_cache import (
+    write_metrics as write_openai_response_cache_metrics,
+)
 from sage_ts.config.splits import load_split_names
 from sage_ts.generation.prompt_cache import PromptCache
 from sage_ts.generation.tool_generator import ToolGenerator
@@ -44,6 +54,12 @@ def main() -> None:
         "-o", "--output-dir", type=Path, default=Path("outputs/sage_online")
     )
     parser.add_argument(
+        "--openai-response-cache-dir",
+        type=Path,
+        default=Path("outputs/openai_response_cache"),
+    )
+    parser.add_argument("--disable-openai-response-cache", action="store_true")
+    parser.add_argument(
         "--toy-mechanism",
         action="store_true",
         help="Run a controlled generated-tool birth/reuse smoke.",
@@ -62,6 +78,22 @@ def main() -> None:
         )
 
     scenario_names = tuple(load_split_names(args.manifest, args.split))
+    response_cache_enabled = not args.disable_openai_response_cache
+    if response_cache_enabled:
+        install_openai_response_cache(args.openai_response_cache_dir)
+    configure_response_cache_context(
+        mode=f"sage_online:{args.split}",
+        arm="candidate",
+        agent=args.agent,
+        user=args.user,
+        base_tool_policy=args.base_tool_policy,
+        scenario_names=scenario_names,
+        registry_dir=args.registry_dir,
+        generation_enabled=args.enable_generation,
+        generation_model=args.generation_model,
+        recurrence_threshold=args.recurrence_threshold,
+    )
+    reset_openai_response_cache_metrics()
     prompt_cache = PromptCache(args.prompt_cache_dir)
     generator = (
         ToolGenerator(
@@ -87,6 +119,10 @@ def main() -> None:
         json.dumps(prompt_cache.metrics(), indent=2) + "\n",
         encoding="utf-8",
     )
+    if response_cache_enabled:
+        write_openai_response_cache_metrics(
+            output_directory / "openai_response_cache_metrics.json"
+        )
     print(json.dumps({"output_directory": str(output_directory)}, indent=2))
 
 

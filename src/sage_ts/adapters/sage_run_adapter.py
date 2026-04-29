@@ -137,8 +137,20 @@ def run_sage_with_registry(
                     },
                 )
 
-        enhanced = with_registry_tools(scenario, store, on_reuse=record_reuse)
-        generated_tools = sorted(store.load_entries())
+        enhanced = with_registry_tools(
+            scenario,
+            store,
+            on_reuse=record_reuse,
+            scenario_name=name,
+        )
+        available_tools = set(
+            enhanced.starting_context.get_available_tools(scrambling_allowed=False)
+        )
+        generated_tools = [
+            tool_name
+            for tool_name in sorted(store.load_entries())
+            if tool_name in available_tools
+        ]
         visible_generated_by_scenario[name] = generated_tools
         append_jsonl(
             output_directory / "scenario_tool_visibility.jsonl",
@@ -188,6 +200,12 @@ def run_sage_with_registry(
             if generated_visible
             else "no_visible_generated_tools"
         )
+        if generated_called:
+            selection_reason = "retained_tool_invoked"
+        elif generated_visible:
+            selection_reason = "retained_tool_visible_but_model_did_not_call_it"
+        else:
+            selection_reason = "no_retained_tool_visible_after_relevance_filter"
         append_jsonl(
             output_directory / "scenario_tool_selection.jsonl",
             {
@@ -196,7 +214,13 @@ def run_sage_with_registry(
                 "generated_tools_visible": generated_visible,
                 "generated_tools_called": generated_called,
                 "generated_tools_not_called": generated_not_called,
+                "visible_generated_tool_count": len(generated_visible),
+                "called_generated_tool_count": len(generated_called),
                 "selection_status": selection_status,
+                "selection_reason": selection_reason,
+                "not_called_reason": None
+                if generated_called or not generated_visible
+                else "model_did_not_call_retained_tool",
                 "similarity": similarity,
                 "exception_type": result.get("exception_type"),
                 "failure_after_selection": similarity < 1.0

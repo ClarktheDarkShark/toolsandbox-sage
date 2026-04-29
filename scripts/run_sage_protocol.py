@@ -12,6 +12,16 @@ from pathlib import Path
 from sage_ts.adapters.openai_agent_adapter import OpenAIChatAdapter
 from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
 from sage_ts.adapters.toolsandbox_adapter import ToolSandboxRunConfig, run_toolsandbox
+from sage_ts.cache.openai_response_cache import (
+    configure_response_cache_context,
+    install_openai_response_cache,
+)
+from sage_ts.cache.openai_response_cache import (
+    reset_metrics as reset_openai_response_cache_metrics,
+)
+from sage_ts.cache.openai_response_cache import (
+    write_metrics as write_openai_response_cache_metrics,
+)
 from sage_ts.campaign.artifacts import (
     append_event,
     initialize_campaign,
@@ -61,6 +71,12 @@ def main() -> None:
     parser.add_argument("--dashboard-port", type=int, default=5520)
     parser.add_argument("--no-dashboard-open", action="store_true")
     parser.add_argument("--artifact-root", type=Path, default=Path("artifacts"))
+    parser.add_argument(
+        "--openai-response-cache-dir",
+        type=Path,
+        default=Path("outputs/openai_response_cache"),
+    )
+    parser.add_argument("--disable-openai-response-cache", action="store_true")
     args = parser.parse_args()
 
     scenario_names = tuple(load_split_names(args.manifest, args.mode))
@@ -115,6 +131,9 @@ def main() -> None:
         if should_open_dashboard
         else None
     )
+    response_cache_enabled = not args.disable_openai_response_cache
+    if response_cache_enabled:
+        install_openai_response_cache(args.openai_response_cache_dir)
 
     def refresh_dashboard(phase: str, status: str) -> None:
         write_protocol_dashboard(
@@ -159,6 +178,19 @@ def main() -> None:
         control_dir = run_dir
         refresh_dashboard("control", status)
 
+    configure_response_cache_context(
+        mode=args.mode,
+        arm="control",
+        agent=args.agent,
+        user=args.user,
+        base_tool_policy=args.base_tool_policy,
+        scenario_names=scenario_names,
+        registry_dir=registry_dir,
+        generation_enabled=False,
+        generation_model=args.generation_model,
+        recurrence_threshold=args.recurrence_threshold,
+    )
+    reset_openai_response_cache_metrics()
     control_dir = run_toolsandbox(
         ToolSandboxRunConfig(
             agent=args.agent,
@@ -172,6 +204,10 @@ def main() -> None:
         progress_hook=control_progress,
         event_hook=campaign_event,
     )
+    if response_cache_enabled:
+        write_openai_response_cache_metrics(
+            control_dir / "openai_response_cache_metrics.json"
+        )
     append_event(
         "phase_completed",
         {"mode": args.mode, "phase": "control", "run_dir": str(control_dir)},
@@ -199,6 +235,19 @@ def main() -> None:
         candidate_dir = run_dir
         refresh_dashboard("candidate", status)
 
+    configure_response_cache_context(
+        mode=args.mode,
+        arm="candidate",
+        agent=args.agent,
+        user=args.user,
+        base_tool_policy=args.base_tool_policy,
+        scenario_names=scenario_names,
+        registry_dir=registry_dir,
+        generation_enabled=generation_enabled,
+        generation_model=args.generation_model,
+        recurrence_threshold=args.recurrence_threshold,
+    )
+    reset_openai_response_cache_metrics()
     candidate_dir = run_sage_with_registry(
         SageRunConfig(
             agent=args.agent,
@@ -218,6 +267,10 @@ def main() -> None:
         json.dumps(prompt_cache.metrics(), indent=2) + "\n",
         encoding="utf-8",
     )
+    if response_cache_enabled:
+        write_openai_response_cache_metrics(
+            candidate_dir / "openai_response_cache_metrics.json"
+        )
     comparison = compare_runs(control_dir, candidate_dir, registry_dir=registry_dir)
     comparison_path = run_root / "paired_comparison.json"
     comparison_path.write_text(
@@ -268,6 +321,8 @@ def main() -> None:
         "comparison_path": str(comparison_path),
         "dashboard_path": str(dashboard_index),
         "dashboard_url": dashboard_url,
+        "openai_response_cache_enabled": response_cache_enabled,
+        "openai_response_cache_dir": str(args.openai_response_cache_dir),
     }
     manifest_path = run_root / "protocol_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

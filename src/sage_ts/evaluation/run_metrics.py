@@ -38,7 +38,10 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
     run_events = _read_jsonl(run_dir / "sage_run_events.jsonl")
     visibility = _read_jsonl(run_dir / "scenario_tool_visibility.jsonl")
     selection = _read_jsonl(run_dir / "scenario_tool_selection.jsonl")
-    cache_metrics = _read_json(run_dir / "prompt_cache_metrics.json")
+    prompt_cache_metrics = _read_json(run_dir / "prompt_cache_metrics.json")
+    openai_response_cache_metrics = _read_json(
+        run_dir / "openai_response_cache_metrics.json"
+    )
     live_summary = _read_json(run_dir / "live_result_summary.json")
     registry_manifest = (
         _read_json(registry_dir / "registry_manifest.json") if registry_dir else {}
@@ -122,7 +125,10 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
             if event.get("failure_after_selection")
             and event.get("selection_status") != "no_visible_generated_tools"
         ],
-        "cache_metrics": cache_metrics,
+        "cache_metrics": {
+            "prompt_cache": prompt_cache_metrics,
+            "openai_response_cache": openai_response_cache_metrics,
+        },
         "failures": [
             {
                 "scenario": row.get("name"),

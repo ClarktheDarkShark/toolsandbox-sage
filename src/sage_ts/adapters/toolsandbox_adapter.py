@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 import subprocess
 import traceback
@@ -174,6 +175,8 @@ def run_scenario_sequence(
     if progress_hook is not None:
         progress_hook(output_directory, result_summary, "running", len(ordered_items))
     for name, scenario in tqdm(ordered_items, desc="Scenarios"):
+        os.environ["SAGE_TS_CURRENT_SCENARIO"] = name
+        os.environ["SAGE_TS_SCENARIO_ORDER_INDEX"] = str(len(result_summary))
         if event_hook is not None:
             event_hook(
                 "scenario_started",

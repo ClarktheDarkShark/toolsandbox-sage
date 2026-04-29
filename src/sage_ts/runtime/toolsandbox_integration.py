@@ -7,6 +7,7 @@ import inspect
 from collections.abc import Iterable, MutableMapping
 from typing import Any, Callable, cast
 
+from sage_ts.generation.tool_spec import ToolFamily
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.schema_check import compile_generated_tool
@@ -68,7 +69,7 @@ def _compile_toolsandbox_tool(
 
     _wrapped.__name__ = raw_fn.__name__
     _wrapped.__doc__ = raw_fn.__doc__
-    fn = cast(Callable[..., Any], _wrapped)
+    fn = _wrapped
 
     # Build annotations using Python type objects.
     annotations: dict[str, Any] = {}
@@ -139,17 +140,49 @@ def inject_registry_tools_into_context(
     return injected
 
 
+def registry_entry_matches_scenario(
+    entry: RegistryEntry,
+    scenario_name: str | None,
+) -> bool:
+    """Return whether a retained helper should be exposed for this scenario."""
+    if not scenario_name:
+        return True
+    if entry.tool.spec.family != ToolFamily.STATE_PRECONDITION_HELPER:
+        return True
+
+    name = scenario_name.lower()
+    direct_state_prefixes = ("turn_on_", "enable_", "set_")
+    service_tokens = (
+        "wifi",
+        "wi_fi",
+        "wi-fi",
+        "cellular",
+        "location",
+        "low_battery",
+        "low-battery",
+    )
+    return name.startswith(direct_state_prefixes) and any(
+        token in name for token in service_tokens
+    )
+
+
 def with_registry_tools(
     scenario: Scenario,
     store: RegistryStore,
     *,
     on_reuse: Callable[[str], None] | None = None,
+    scenario_name: str | None = None,
 ) -> Scenario:
     """Return a scenario copy whose starting context includes registry tools."""
     scenario_copy = copy.deepcopy(scenario)
+    entries = [
+        entry
+        for entry in store.load_entries().values()
+        if registry_entry_matches_scenario(entry, scenario_name)
+    ]
     inject_registry_tools_into_context(
         scenario_copy.starting_context,
-        store.load_entries().values(),
+        entries,
         on_reuse=on_reuse,
     )
     return scenario_copy

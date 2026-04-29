@@ -53,7 +53,9 @@ class FakeRecencyGenerator:
 
 
 def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) -> None:
-    scenario = Scenario(categories=[ScenarioCategories.CANONICALIZATION])  # type: ignore[list-item]
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
+    )
     observations = classify_scenario_observations(
         "search_message_with_recency_latest",
         scenario,
@@ -86,7 +88,9 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
 
 
 def test_existing_registry_tool_skips_duplicate_birth(tmp_path: Path) -> None:
-    scenario = Scenario(categories=[ScenarioCategories.CANONICALIZATION])  # type: ignore[list-item]
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
+    )
     observations = classify_scenario_observations(
         "search_message_with_recency_latest",
         scenario,
@@ -130,7 +134,9 @@ def test_existing_registry_tool_skips_duplicate_birth(tmp_path: Path) -> None:
 
 
 def test_modify_reminder_relative_datetime_observation_is_canonicalizer() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.CANONICALIZATION])  # type: ignore[list-item]
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
+    )
     observations = classify_scenario_observations(
         "modify_reminder_with_recency_latest_3_distraction_tools",
         scenario,

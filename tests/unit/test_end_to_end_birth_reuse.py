@@ -96,7 +96,9 @@ def test_birth_then_reuse_in_later_scenario(tmp_path: Path) -> None:
     )
 
     # Two observations → tool born
-    scenario = Scenario(categories=[ScenarioCategories.CANONICALIZATION])  # type: ignore[list-item]
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
+    )
     for i in range(2):
         obs = classify_scenario_observations(
             f"search_reminder_with_recency_latest_s{i}",

@@ -8,6 +8,16 @@ import json
 from pathlib import Path
 
 from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
+from sage_ts.cache.openai_response_cache import (
+    configure_response_cache_context,
+    install_openai_response_cache,
+)
+from sage_ts.cache.openai_response_cache import (
+    reset_metrics as reset_openai_response_cache_metrics,
+)
+from sage_ts.cache.openai_response_cache import (
+    write_metrics as write_openai_response_cache_metrics,
+)
 from sage_ts.config.splits import load_split_names
 from sage_ts.runtime.base_toolset import KNOWN_POLICIES, UPSTREAM_POLICY
 
@@ -27,9 +37,31 @@ def main() -> None:
     parser.add_argument(
         "-o", "--output-dir", type=Path, default=Path("outputs/sage_transfer")
     )
+    parser.add_argument(
+        "--openai-response-cache-dir",
+        type=Path,
+        default=Path("outputs/openai_response_cache"),
+    )
+    parser.add_argument("--disable-openai-response-cache", action="store_true")
     args = parser.parse_args()
 
     scenario_names = tuple(load_split_names(args.manifest, args.split))
+    response_cache_enabled = not args.disable_openai_response_cache
+    if response_cache_enabled:
+        install_openai_response_cache(args.openai_response_cache_dir)
+    configure_response_cache_context(
+        mode=f"sage_transfer:{args.split}",
+        arm="candidate",
+        agent=args.agent,
+        user=args.user,
+        base_tool_policy=args.base_tool_policy,
+        scenario_names=scenario_names,
+        registry_dir=args.registry,
+        generation_enabled=False,
+        generation_model=None,
+        recurrence_threshold=None,
+    )
+    reset_openai_response_cache_metrics()
     output_directory = run_sage_with_registry(
         SageRunConfig(
             agent=args.agent,
@@ -42,6 +74,10 @@ def main() -> None:
         ),
         generator=None,
     )
+    if response_cache_enabled:
+        write_openai_response_cache_metrics(
+            output_directory / "openai_response_cache_metrics.json"
+        )
     print(json.dumps({"output_directory": str(output_directory)}, indent=2))
 
 

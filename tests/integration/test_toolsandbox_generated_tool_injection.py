@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.orchestration.toy_mechanism import canonicalizer_tool
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
@@ -27,6 +28,47 @@ def _registry_with_canonicalizer(tmp_path: Path) -> RegistryStore:
         examples=(
             ToolExample({"label": "Wi-Fi"}, "wifi"),
             ToolExample({"label": "mobile data"}, "cellular"),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    return store
+
+
+def _registry_with_state_helper(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="next_service_enablement_action",
+        family=ToolFamily.STATE_PRECONDITION_HELPER,
+        description="Return a concrete next_action and readiness predicate.",
+        inputs=(
+            ToolInput("target_service", "str", "Requested service."),
+            ToolInput("wifi_enabled", "bool", "Whether Wi-Fi is already enabled."),
+        ),
+        output_annotation="dict",
+        generalization_rationale=(
+            "Direct service-state scenarios repeatedly need a deterministic readiness "
+            "predicate and a single next action before finalizing."
+        ),
+        inadequacy_evidence=(
+            "Base tools expose raw service setters/getters but not a reusable "
+            "state-precondition decision helper."
+        ),
+    )
+    code = """
+def next_service_enablement_action(target_service: str, wifi_enabled: bool) -> dict:
+    if target_service.lower() == "wifi" and not wifi_enabled:
+        return {"ready": False, "next_action": "set_wifi_status_true"}
+    return {"ready": True, "next_action": "none"}
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {"target_service": "wifi", "wifi_enabled": False},
+                {"ready": False, "next_action": "set_wifi_status_true"},
+            ),
         ),
     )
     assert validation.accepted
@@ -67,6 +109,33 @@ def test_registry_tools_are_available_to_toolsandbox_context(tmp_path: Path) -> 
         "Raw connectivity label."
     )
     assert parameters["required"] == ["label"]
+
+
+def test_state_helpers_are_only_exposed_on_relevant_state_scenarios(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_state_helper(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    unrelated = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="modify_reminder_with_recency_latest",
+    )
+    direct_state = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="turn_on_wifi_low_battery_mode",
+    )
+
+    assert (
+        "next_service_enablement_action" not in unrelated.starting_context.name_to_tool
+    )
+    assert (
+        "next_service_enablement_action" in direct_state.starting_context.name_to_tool
+    )
 
 
 def test_registry_tools_execute_through_toolsandbox_console(tmp_path: Path) -> None:

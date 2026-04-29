@@ -7,6 +7,15 @@ from dataclasses import dataclass
 from sage_ts.generation.tool_spec import ToolFamily, ToolSpec
 
 ALLOWED_FAMILIES = frozenset(ToolFamily)
+STATE_ACTIONABLE_TOKENS = (
+    "next_action",
+    "next action",
+    "single next action",
+    "readiness",
+    "ready",
+    "precondition_met",
+    "predicate",
+)
 
 
 @dataclass(frozen=True)
@@ -24,4 +33,8 @@ def evaluate_candidate_gate(spec: ToolSpec) -> GateDecision:
         return GateDecision(False, "weak_generalization_rationale")
     if len(spec.inadequacy_evidence.strip()) < 20:
         return GateDecision(False, "weak_inadequacy_evidence")
+    if spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
+        text = " ".join([spec.tool_name, spec.description]).lower()
+        if not any(token in text for token in STATE_ACTIONABLE_TOKENS):
+            return GateDecision(False, "state_helper_not_runtime_actionable")
     return GateDecision(True, "allowed")
