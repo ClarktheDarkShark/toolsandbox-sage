@@ -22,6 +22,7 @@ EVENT_TYPES = {
     "tool_birth_started",
     "tool_birth_succeeded",
     "tool_birth_rejected",
+    "tool_birth_skipped_existing",
     "validation_started",
     "validation_passed",
     "validation_failed",
