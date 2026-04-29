@@ -278,8 +278,12 @@ def _task_focus_rows(
                 "short_name": scenario.replace("_", " "),
                 "status": "complete" if result else "running",
                 "order_index": order.get(scenario),
+                "display_index": None
+                if order.get(scenario) is None
+                else int(order[scenario]) + 1,
                 "generated_tools": generated_tools,
                 "similarity": None if result is None else result.get("similarity"),
+                "score": None if result is None else result.get("similarity"),
                 "turn_count": None if result is None else result.get("turn_count"),
                 "exception_type": None
                 if result is None
@@ -303,10 +307,39 @@ def _write_task_focus_dashboard(
     control_dir: Path | None,
     candidate_dir: Path | None,
 ) -> None:
-    tasks = [
-        *_task_focus_rows(run_root, control_dir),
-        *_task_focus_rows(run_root, candidate_dir),
-    ]
+    control_tasks = _task_focus_rows(run_root, control_dir)
+    candidate_tasks = _task_focus_rows(run_root, candidate_dir)
+    tasks = [*control_tasks, *candidate_tasks]
+    pair_lookup: dict[str, dict[str, Any]] = {}
+    for task in tasks:
+        scenario = str(task.get("scenario") or "")
+        if not scenario:
+            continue
+        pair = pair_lookup.setdefault(
+            scenario,
+            {
+                "id": f"pair:{scenario}",
+                "scenario": scenario,
+                "short_name": str(task.get("short_name") or scenario),
+                "order_index": task.get("order_index"),
+                "display_index": task.get("display_index"),
+                "control": None,
+                "candidate": None,
+            },
+        )
+        phase = str(task.get("phase") or "")
+        if phase in {"control", "candidate"}:
+            pair[phase] = task
+        if pair.get("order_index") is None and task.get("order_index") is not None:
+            pair["order_index"] = task.get("order_index")
+            pair["display_index"] = task.get("display_index")
+    pairs = sorted(
+        pair_lookup.values(),
+        key=lambda pair: (
+            10_000 if pair.get("order_index") is None else pair["order_index"],
+            str(pair.get("scenario") or ""),
+        ),
+    )
     active = next(
         (task for task in reversed(tasks) if task["status"] != "complete"), None
     )
@@ -338,6 +371,7 @@ def _write_task_focus_dashboard(
         },
         "active_task_id": None if active is None else active["id"],
         "tasks": tasks,
+        "pairs": pairs,
     }
     (dashboard_dir / "task_focus_data.json").write_text(
         json.dumps(payload, indent=2) + "\n", encoding="utf-8"

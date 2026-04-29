@@ -105,6 +105,18 @@ TASK_FOCUS_HTML = r"""<!doctype html>
     .pill.running { color: var(--warn); border-color: rgba(255, 211, 106, 0.42); }
     .task-name { line-height: 1.25; overflow-wrap: anywhere; }
     .task-meta { color: var(--muted); font-size: 12px; margin-top: 7px; }
+    .pair-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+    .pair-chip {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 5px 7px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .pair-chip strong { color: var(--text); display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+    .pair-chip.has-tool { border-color: rgba(99, 214, 191, 0.58); background: rgba(99, 214, 191, 0.1); }
+    .pair-chip.missing { opacity: 0.55; }
     .tool-badge {
       display: inline-block;
       margin-top: 7px;
@@ -172,9 +184,9 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       <div class="task-head">
         <div class="label" id="taskCount">Tasks</div>
         <div class="toggles">
-          <button data-filter="candidate" class="active">SAGE</button>
+          <button data-filter="paired" class="active">Matched</button>
+          <button data-filter="candidate">SAGE</button>
           <button data-filter="control">Control</button>
-          <button data-filter="all">All</button>
         </div>
       </div>
       <div id="taskList"></div>
@@ -186,17 +198,35 @@ TASK_FOCUS_HTML = r"""<!doctype html>
   </main>
   <script>
     let data = null;
-    let filter = localStorage.getItem("sageTaskFocusFilter") || "candidate";
+    const FILTER_KEY = "sageTaskFocusFilterV2";
+    let filter = localStorage.getItem(FILTER_KEY) || "paired";
     let selected = null;
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const fmt = (n, d = 3) => Number.isFinite(Number(n)) ? Number(n).toFixed(d) : "-";
-    function visibleTasks() {
+    function visibleEntries() {
+      if (filter === "paired") return data?.pairs || [];
       const tasks = data?.tasks || [];
-      return tasks.filter(t => filter === "all" || t.phase === filter);
+      return tasks.filter(t => t.phase === filter);
     }
-    function currentTask() {
-      const tasks = visibleTasks();
-      return tasks.find(t => t.id === selected) || tasks.find(t => t.id === data?.active_task_id) || tasks[tasks.length - 1];
+    function taskFromEntry(entry) {
+      if (!entry) return null;
+      if (entry.phase) return entry;
+      return entry.candidate || entry.control || null;
+    }
+    function currentEntry() {
+      const entries = visibleEntries();
+      const direct = entries.find(t => t.id === selected);
+      if (direct) return direct;
+      const activeTask = (data?.tasks || []).find(t => t.id === data?.active_task_id);
+      if (activeTask && filter === "paired") {
+        const pair = entries.find(t => t.scenario === activeTask.scenario);
+        if (pair) return pair;
+      }
+      if (activeTask) {
+        const matching = entries.find(t => t.id === activeTask.id);
+        if (matching) return matching;
+      }
+      return entries[entries.length - 1];
     }
     function renderTop() {
       const s = data?.summary || {};
@@ -210,33 +240,61 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       ].map(([label, value, note]) => `<div class="metric"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div><div class="note">${esc(note)}</div></div>`).join("");
     }
     function renderList() {
-      const tasks = visibleTasks();
+      const entries = visibleEntries();
+      const current = currentEntry();
       document.querySelectorAll(".toggles button").forEach(b => b.classList.toggle("active", b.dataset.filter === filter));
-      document.getElementById("taskCount").textContent = `${filter === "all" ? "All" : filter.toUpperCase()} Tasks (${tasks.length})`;
-      document.getElementById("taskList").innerHTML = tasks.map((t, i) => `
-        <button class="task ${t.id === currentTask()?.id ? "selected" : ""}" data-id="${esc(t.id)}">
-          <div class="row"><span class="phase">${esc(t.phase)}</span><span class="pill ${esc(t.status)}">${esc(t.status)}</span></div>
-          <div class="task-name">${i + 1}. ${esc(t.short_name || t.scenario)}</div>
-          <div class="task-meta">score ${fmt(t.similarity)} · ${t.message_count || 0} messages</div>
-          ${(t.generated_tools || []).map(tool => `<span class="tool-badge">generated: ${esc(tool)}</span>`).join("")}
-        </button>`).join("");
+      document.getElementById("taskCount").textContent = `${filter === "paired" ? "Matched" : filter.toUpperCase()} Tasks (${entries.length})`;
+      document.getElementById("taskList").innerHTML = entries.map((entry, i) => {
+        if (!entry.phase) {
+          const c = entry.control || {};
+          const s = entry.candidate || {};
+          const tools = s.generated_tools || [];
+          const status = s.status || c.status || "pending";
+          return `
+        <button class="task ${entry.id === current?.id ? "selected" : ""}" data-id="${esc(entry.id)}">
+          <div class="row"><span class="phase">matched #${esc(entry.display_index || i + 1)}</span><span class="pill ${esc(status)}">${esc(status)}</span></div>
+          <div class="task-name">${esc(entry.short_name || entry.scenario)}</div>
+          <div class="pair-row">
+            <span class="pair-chip ${c.id ? "" : "missing"}"><strong>Control</strong>${c.id ? `score ${fmt(c.similarity)}` : "not started"}</span>
+            <span class="pair-chip ${tools.length ? "has-tool" : ""} ${s.id ? "" : "missing"}"><strong>SAGE</strong>${s.id ? `score ${fmt(s.similarity)}` : "not started"}</span>
+          </div>
+          ${tools.map(tool => `<span class="tool-badge">generated: ${esc(tool)}</span>`).join("")}
+        </button>`;
+        }
+        return `
+        <button class="task ${entry.id === current?.id ? "selected" : ""}" data-id="${esc(entry.id)}">
+          <div class="row"><span class="phase">${esc(entry.phase)}</span><span class="pill ${esc(entry.status)}">${esc(entry.status)}</span></div>
+          <div class="task-name">${entry.display_index || i + 1}. ${esc(entry.short_name || entry.scenario)}</div>
+          <div class="task-meta">score ${fmt(entry.similarity)} · ${entry.message_count || 0} messages</div>
+          ${(entry.generated_tools || []).map(tool => `<span class="tool-badge">generated: ${esc(tool)}</span>`).join("")}
+        </button>`;
+      }).join("");
     }
     function renderDetail() {
-      const task = currentTask();
+      const entry = currentEntry();
+      const task = taskFromEntry(entry);
       if (!task) {
         document.getElementById("detailHead").innerHTML = "<div class='empty'>Waiting for task data...</div>";
         document.getElementById("chat").innerHTML = "";
         return;
       }
-      selected = task.id;
+      selected = entry.id;
       const o = task.outcome || {};
       const correctness = o.correctness_label === "correct" ? "good" : o.correctness_label === "pending" ? "" : "bad";
       const expected = (o.expected_answers || []).join("\n\n") || o.expected_note || "State-scored target; inspect messages and tool evidence.";
       const agent = o.agent_result_summary || o.agent_final_answer || "not available yet";
+      const comparison = entry && !entry.phase ? `
+        <div class="tags">
+          <span class="pill">Control score ${fmt(entry.control?.similarity)}</span>
+          <span class="pill">SAGE score ${fmt(entry.candidate?.similarity)}</span>
+          <span class="pill">${entry.candidate?.generated_tools?.length ? "SAGE used retained/generated tool" : "No generated tool call recorded"}</span>
+        </div>` : "";
       document.getElementById("detailHead").innerHTML = `
         <h2 class="detail-title">${esc(task.short_name || task.scenario)}</h2>
+        ${comparison}
         <div class="tags">
           <span class="pill ${esc(task.status)}">${esc(task.status)}</span>
+          <span class="pill">${esc(task.phase || "matched")}</span>
           <span class="pill">score ${fmt(task.similarity)}</span>
           <span class="pill">${task.turn_count || "-"} turns</span>
           ${(task.categories || []).map(c => `<span class="pill">${esc(c)}</span>`).join("")}
@@ -270,8 +328,8 @@ TASK_FOCUS_HTML = r"""<!doctype html>
     document.querySelector(".toggles").addEventListener("click", e => {
       const b = e.target.closest("button");
       if (!b) return;
-      filter = b.dataset.filter || "candidate";
-      localStorage.setItem("sageTaskFocusFilter", filter);
+      filter = b.dataset.filter || "paired";
+      localStorage.setItem(FILTER_KEY, filter);
       selected = null;
       render();
     });
