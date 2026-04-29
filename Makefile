@@ -28,6 +28,7 @@ SPLIT ?= extended_reuse_100
 GENERATION ?= 0
 GENERATION_FLAGS := $(if $(filter 1,$(GENERATION)),--enable-generation,)
 POC_MANIFEST ?= outputs/splits/relative_datetime_probe.json
+POC_PROTOCOL_MANIFEST ?= outputs/splits/relative_datetime_protocol.json
 RECENCY_TRANSFER_MANIFEST ?= outputs/splits/sage_campaign_splits.json
 RELATIVE_TIME_TRANSFER_MANIFEST ?= outputs/splits/relative_datetime_transfer.json
 
@@ -54,7 +55,8 @@ reproduce_poc:
 		echo "Refusing to reproduce POC into non-empty REGISTRY=$(REGISTRY). Pass a fresh REGISTRY=..."; \
 		exit 2; \
 	fi
-	$(RUN_PYTHON) scripts/run_sage_online.py --manifest $(POC_MANIFEST) --split relative_datetime_probe --agent $(MODEL) --user $(USER_MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-dir $(OUTPUT_ROOT)/reproduce_poc --enable-generation --recurrence-threshold 2
+	@$(RUN_PYTHON) -c "import json; from pathlib import Path; src=Path('$(POC_MANIFEST)'); dst=Path('$(POC_PROTOCOL_MANIFEST)'); data=json.loads(src.read_text()); rows=data['splits']['relative_datetime_probe']; dst.parent.mkdir(parents=True, exist_ok=True); dst.write_text(json.dumps({'manifest_type':'sage_protocol_poc','splits':{'mechanism_40':rows}}, indent=2)+'\n')"
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(POC_PROTOCOL_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(DASHBOARD_FLAGS)
 
 transfer_recency:
 	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RECENCY_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(DASHBOARD_FLAGS)
