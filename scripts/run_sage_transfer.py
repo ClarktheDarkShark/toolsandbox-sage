@@ -11,6 +11,7 @@ from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_regis
 from sage_ts.cache.openai_response_cache import (
     configure_response_cache_context,
     install_openai_response_cache,
+    write_cache_artifacts,
 )
 from sage_ts.cache.openai_response_cache import (
     reset_metrics as reset_openai_response_cache_metrics,
@@ -42,13 +43,24 @@ def main() -> None:
         type=Path,
         default=Path("outputs/openai_response_cache"),
     )
+    parser.add_argument(
+        "--cache-mode",
+        choices=("off", "read_write", "read_only", "write_only"),
+        default="read_write",
+    )
+    parser.add_argument("--artifact-root", type=Path, default=Path("artifacts"))
     parser.add_argument("--disable-openai-response-cache", action="store_true")
     args = parser.parse_args()
 
     scenario_names = tuple(load_split_names(args.manifest, args.split))
-    response_cache_enabled = not args.disable_openai_response_cache
+    response_cache_enabled = (
+        not args.disable_openai_response_cache and args.cache_mode != "off"
+    )
     if response_cache_enabled:
-        install_openai_response_cache(args.openai_response_cache_dir)
+        install_openai_response_cache(
+            args.openai_response_cache_dir,
+            mode=args.cache_mode,
+        )
     configure_response_cache_context(
         mode=f"sage_transfer:{args.split}",
         arm="candidate",
@@ -78,6 +90,7 @@ def main() -> None:
         write_openai_response_cache_metrics(
             output_directory / "openai_response_cache_metrics.json"
         )
+        write_cache_artifacts(args.artifact_root)
     print(json.dumps({"output_directory": str(output_directory)}, indent=2))
 
 

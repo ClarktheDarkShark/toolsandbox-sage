@@ -15,6 +15,7 @@ from sage_ts.adapters.toolsandbox_adapter import ToolSandboxRunConfig, run_tools
 from sage_ts.cache.openai_response_cache import (
     configure_response_cache_context,
     install_openai_response_cache,
+    write_cache_artifacts,
 )
 from sage_ts.cache.openai_response_cache import (
     reset_metrics as reset_openai_response_cache_metrics,
@@ -76,6 +77,11 @@ def main() -> None:
         type=Path,
         default=Path("outputs/openai_response_cache"),
     )
+    parser.add_argument(
+        "--cache-mode",
+        choices=("off", "read_write", "read_only", "write_only"),
+        default=os.environ.get("CACHE_MODE", "read_write"),
+    )
     parser.add_argument("--disable-openai-response-cache", action="store_true")
     args = parser.parse_args()
 
@@ -131,9 +137,14 @@ def main() -> None:
         if should_open_dashboard
         else None
     )
-    response_cache_enabled = not args.disable_openai_response_cache
+    response_cache_enabled = (
+        not args.disable_openai_response_cache and args.cache_mode != "off"
+    )
     if response_cache_enabled:
-        install_openai_response_cache(args.openai_response_cache_dir)
+        install_openai_response_cache(
+            args.openai_response_cache_dir,
+            mode=args.cache_mode,
+        )
 
     def refresh_dashboard(phase: str, status: str) -> None:
         write_protocol_dashboard(
@@ -208,6 +219,7 @@ def main() -> None:
         write_openai_response_cache_metrics(
             control_dir / "openai_response_cache_metrics.json"
         )
+        write_cache_artifacts(args.artifact_root)
     append_event(
         "phase_completed",
         {"mode": args.mode, "phase": "control", "run_dir": str(control_dir)},
@@ -271,6 +283,7 @@ def main() -> None:
         write_openai_response_cache_metrics(
             candidate_dir / "openai_response_cache_metrics.json"
         )
+        write_cache_artifacts(args.artifact_root)
     comparison = compare_runs(control_dir, candidate_dir, registry_dir=registry_dir)
     comparison_path = run_root / "paired_comparison.json"
     comparison_path.write_text(
@@ -322,6 +335,7 @@ def main() -> None:
         "dashboard_path": str(dashboard_index),
         "dashboard_url": dashboard_url,
         "openai_response_cache_enabled": response_cache_enabled,
+        "openai_response_cache_mode": args.cache_mode,
         "openai_response_cache_dir": str(args.openai_response_cache_dir),
     }
     manifest_path = run_root / "protocol_manifest.json"

@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, cast
 
@@ -15,7 +17,17 @@ from tool_sandbox.roles.openai_api_agent import OpenAIAPIAgent
 
 _ORIGINAL_MODEL_INFERENCE: Any = None
 _CACHE_ROOT: Path | None = None
-_METRICS: dict[str, int] = {"hits": 0, "misses": 0, "writes": 0}
+_CACHE_MODE = "read_write"
+_EVENTS: list[dict[str, Any]] = []
+_METRICS: dict[str, int] = {
+    "hits": 0,
+    "misses": 0,
+    "writes": 0,
+    "live_model_call_count": 0,
+    "cached_model_call_count": 0,
+}
+
+CACHE_MODES = {"off", "read_write", "read_only", "write_only"}
 
 CONTEXT_ENV_KEYS = (
     "SAGE_TS_MODEL_VERSION",
@@ -160,7 +172,7 @@ def build_response_cache_key(
     return digest_value(payload)
 
 
-def _cache_file(cache_key: str) -> Path:
+def _legacy_cache_file(cache_key: str) -> Path:
     if _CACHE_ROOT is None:
         raise RuntimeError("OpenAI response cache is not installed")
     shard = _CACHE_ROOT / cache_key[:2]
@@ -168,24 +180,195 @@ def _cache_file(cache_key: str) -> Path:
     return shard / f"{cache_key}.json"
 
 
+def _cache_db_path() -> Path:
+    if _CACHE_ROOT is None:
+        raise RuntimeError("OpenAI response cache is not installed")
+    return _CACHE_ROOT / "openai_response_cache.sqlite"
+
+
+def _connect() -> sqlite3.Connection:
+    db_path = _cache_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS responses (
+            cache_key TEXT PRIMARY KEY,
+            model TEXT NOT NULL,
+            context_json TEXT NOT NULL,
+            response_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL,
+            event TEXT NOT NULL,
+            cache_key TEXT NOT NULL,
+            cache_mode TEXT NOT NULL
+        )
+        """
+    )
+    return conn
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _record_event(event: str, cache_key: str) -> None:
+    item = {
+        "created_at": _now(),
+        "event": event,
+        "cache_key": cache_key,
+        "cache_mode": _CACHE_MODE,
+    }
+    _EVENTS.append(item)
+    if _CACHE_ROOT is None or _CACHE_MODE == "off":
+        return
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO events(created_at, event, cache_key, cache_mode) VALUES (?, ?, ?, ?)",
+            (item["created_at"], event, cache_key, _CACHE_MODE),
+        )
+
+
+def _read_cached_response(cache_key: str) -> dict[str, Any] | None:
+    if _CACHE_ROOT is None:
+        return None
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT response_json FROM responses WHERE cache_key = ?",
+            (cache_key,),
+        ).fetchone()
+    if row is not None:
+        return cast(dict[str, Any], json.loads(str(row[0])))
+
+    legacy_path = _legacy_cache_file(cache_key)
+    if not legacy_path.exists():
+        return None
+    payload = json.loads(legacy_path.read_text(encoding="utf-8"))
+    response = payload.get("response")
+    if not isinstance(response, dict):
+        return None
+    if _CACHE_MODE in {"read_write"}:
+        _write_cached_response(
+            cache_key=cache_key,
+            model=str(payload.get("model", "")),
+            context=cast(dict[str, str], payload.get("context", {})),
+            response=response,
+            count_metric=False,
+        )
+    return response
+
+
+def _write_cached_response(
+    *,
+    cache_key: str,
+    model: str,
+    context: dict[str, str],
+    response: dict[str, Any],
+    count_metric: bool = True,
+) -> None:
+    if _CACHE_ROOT is None:
+        return
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO responses(cache_key, model, context_json, response_json, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                cache_key,
+                model,
+                stable_json(context),
+                stable_json(response),
+                _now(),
+            ),
+        )
+    if count_metric:
+        _METRICS["writes"] += 1
+
+
 def reset_metrics() -> None:
     for key in _METRICS:
         _METRICS[key] = 0
+    _EVENTS.clear()
 
 
-def metrics() -> dict[str, int]:
-    return dict(_METRICS)
+def metrics() -> dict[str, Any]:
+    return {
+        "cache_mode": _CACHE_MODE,
+        **dict(_METRICS),
+    }
 
 
 def write_metrics(path: Path) -> None:
     path.write_text(json.dumps(metrics(), indent=2) + "\n", encoding="utf-8")
 
 
-def install_openai_response_cache(cache_root: Path) -> None:
+def write_cache_artifacts(artifact_root: Path) -> None:
+    cache_root = artifact_root / "cache"
+    cache_root.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "cache_mode": _CACHE_MODE,
+        "cache_root": None if _CACHE_ROOT is None else str(_CACHE_ROOT),
+        "sqlite_path": str(cache_root / "openai_response_cache.sqlite"),
+        "key_context_env_keys": list(CONTEXT_ENV_KEYS),
+        "key_includes": [
+            "model",
+            "model_version",
+            "messages_digest",
+            "full_tool_schema_digest",
+            "tool_order_digest",
+            "registry_lock_digest",
+            "registry_digest",
+            "retained_tool_visibility_digest",
+            "run_config_digest",
+            "current_scenario",
+            "scenario_order_index",
+            "generation_settings_digest",
+            "prompt_policy_digest",
+            "run_arm",
+            "runtime_digest",
+        ],
+    }
+    (cache_root / "cache_manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
+    (cache_root / "cache_stats.json").write_text(
+        json.dumps(metrics(), indent=2) + "\n", encoding="utf-8"
+    )
+    (cache_root / "cache_events.jsonl").write_text(
+        "".join(json.dumps(event, sort_keys=True) + "\n" for event in _EVENTS),
+        encoding="utf-8",
+    )
+    if _CACHE_ROOT is not None and _cache_db_path().exists():
+        (cache_root / "openai_response_cache.sqlite").write_bytes(
+            _cache_db_path().read_bytes()
+        )
+    else:
+        (cache_root / "openai_response_cache.sqlite").touch()
+
+
+def install_openai_response_cache(
+    cache_root: Path,
+    *,
+    mode: str = "read_write",
+) -> None:
     """Patch ToolSandbox OpenAI agents to reuse exact matching responses."""
-    global _CACHE_ROOT, _ORIGINAL_MODEL_INFERENCE
+    global _CACHE_ROOT, _CACHE_MODE, _ORIGINAL_MODEL_INFERENCE
+    if mode not in CACHE_MODES:
+        raise ValueError(f"Unsupported OpenAI response cache mode: {mode}")
     _CACHE_ROOT = cache_root
+    _CACHE_MODE = mode
     _CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+    if mode != "off":
+        with _connect():
+            pass
     if _ORIGINAL_MODEL_INFERENCE is not None:
         return
 
@@ -202,13 +385,19 @@ def install_openai_response_cache(cache_root: Path) -> None:
             messages=openai_messages,
             tools=normalized_tools,
         )
-        cache_path = _cache_file(cache_key)
-        if cache_path.exists():
+        if _CACHE_MODE in {"read_write", "read_only"}:
+            cached_response = _read_cached_response(cache_key)
+        else:
+            cached_response = None
+        if cached_response is not None:
             _METRICS["hits"] += 1
-            payload = json.loads(cache_path.read_text(encoding="utf-8"))
-            return ChatCompletion.model_validate(payload["response"])
+            _METRICS["cached_model_call_count"] += 1
+            _record_event("cache_hit", cache_key)
+            return ChatCompletion.model_validate(cached_response)
 
         _METRICS["misses"] += 1
+        _METRICS["live_model_call_count"] += 1
+        _record_event("cache_miss", cache_key)
         assert _ORIGINAL_MODEL_INFERENCE is not None
         response = cast(
             ChatCompletion,
@@ -218,20 +407,14 @@ def install_openai_response_cache(cache_root: Path) -> None:
                 openai_tools=tools_for_call,
             ),
         )
-        cache_path.write_text(
-            json.dumps(
-                {
-                    "cache_key": cache_key,
-                    "model": self.model_name,
-                    "context": _context_payload(),
-                    "response": response.model_dump(mode="json"),
-                },
-                indent=2,
+        if _CACHE_MODE in {"read_write", "write_only"}:
+            _write_cached_response(
+                cache_key=cache_key,
+                model=self.model_name,
+                context=_context_payload(),
+                response=response.model_dump(mode="json"),
             )
-            + "\n",
-            encoding="utf-8",
-        )
-        _METRICS["writes"] += 1
+            _record_event("cache_write", cache_key)
         return response
 
     OpenAIAPIAgent.model_inference = cast(Any, cached_model_inference)  # type: ignore[method-assign]

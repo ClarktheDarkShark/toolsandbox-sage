@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from enum import Enum
 from typing import Any
 
-from strenum import StrEnum
 
-
-class ToolFamily(StrEnum):
+class ToolFamily(str, Enum):
     CANONICALIZER = "canonicalizer"
     DERIVED_VALUE_CALCULATOR = "derived_value_calculator"
     STATE_PRECONDITION_HELPER = "state_precondition_helper"
     COMPOSITE_WORKFLOW_HELPER = "composite_workflow_helper"
     VALIDATION_ABSTENTION_HELPER = "validation_abstention_helper"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 @dataclass(frozen=True)

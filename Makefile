@@ -9,11 +9,14 @@ USER_MODEL ?= GPT_4_o_2024_05_13
 BASE_TOOL_POLICY ?= recency_reduced
 OUTPUT_ROOT ?= outputs/sage_protocol_campaign
 REGISTRY ?= outputs/sage_protocol_campaign/latest_registry
+OUT ?= artifacts/registries/frozen_registry.json
 RUN ?= outputs/sage_protocol_campaign/extended_reuse_100_20260428_125232
 MODE ?= evolve
 PORT ?= 5520
 DASHBOARD_OPEN ?= 1
 DASHBOARD_FLAGS := $(if $(filter 1,$(DASHBOARD_OPEN)),,--no-dashboard-open)
+CACHE_MODE ?= read_write
+CACHE_FLAGS := --cache-mode $(CACHE_MODE)
 CATEGORY ?= general
 ifeq ($(CATEGORY),state)
 CATEGORY_MANIFEST ?= outputs/splits/sage_state_precondition_splits.json
@@ -32,7 +35,7 @@ POC_PROTOCOL_MANIFEST ?= outputs/splits/relative_datetime_protocol.json
 RECENCY_TRANSFER_MANIFEST ?= outputs/splits/sage_campaign_splits.json
 RELATIVE_TIME_TRANSFER_MANIFEST ?= outputs/splits/relative_datetime_transfer.json
 
-.PHONY: test lint dashboard reproduce_poc transfer_recency transfer_relative_time mechanism40 transfer40 confirm100 validate100 validate250 summarize campaign-init
+.PHONY: test lint dashboard reproduce_poc transfer_recency transfer_relative_time smoke4 viability12 mechanism40 transfer40 transfer60 confirm100 validate100 validate250 summarize cache_stats cache_validate freeze_registry campaign-init
 
 test:
 	$(PYTEST) tests/unit tests/integration
@@ -48,7 +51,13 @@ dashboard:
 	$(RUN_PYTHON) -c "from pathlib import Path; from sage_ts.dashboard.exporters import ensure_dashboard_server, dashboard_url; p=Path('$(RUN)')/'dashboard'/'index.html'; ensure_dashboard_server(port=$(PORT)); print(dashboard_url(p, port=$(PORT)))"
 
 mechanism40:
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
+
+smoke4:
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
+
+viability12:
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 reproduce_poc:
 	@if [ -f "$(REGISTRY)/registry_manifest.json" ]; then \
@@ -56,31 +65,34 @@ reproduce_poc:
 		exit 2; \
 	fi
 	@$(RUN_PYTHON) -c "import json; from pathlib import Path; src=Path('$(POC_MANIFEST)'); dst=Path('$(POC_PROTOCOL_MANIFEST)'); data=json.loads(src.read_text()); rows=data['splits']['relative_datetime_probe']; dst.parent.mkdir(parents=True, exist_ok=True); dst.write_text(json.dumps({'manifest_type':'sage_protocol_poc','splits':{'mechanism_40':rows}}, indent=2)+'\n')"
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(POC_PROTOCOL_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(POC_PROTOCOL_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer_recency:
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RECENCY_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RECENCY_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer_relative_time:
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RELATIVE_TIME_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RELATIVE_TIME_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer40:
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
+
+transfer60:
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 confirm100: validate100
 
 validate100:
 	@if [ "$(MODE)" = "control" ]; then \
-		$(RUN_PYTHON) scripts/run_baseline.py --manifest $(MANIFEST) --split extended_reuse_100 --agent $(MODEL) --user $(USER_MODEL) --base-tool-policy $(BASE_TOOL_POLICY) -o outputs/validate100_control; \
+		$(RUN_PYTHON) scripts/run_baseline.py --manifest $(MANIFEST) --split extended_reuse_100 --agent $(MODEL) --user $(USER_MODEL) --base-tool-policy $(BASE_TOOL_POLICY) $(CACHE_FLAGS) -o outputs/validate100_control; \
 	else \
-		$(RUN_PYTHON) scripts/run_sage_online.py --manifest $(MANIFEST) --split extended_reuse_100 --agent $(MODEL) --user $(USER_MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) $(GENERATION_FLAGS) --generation-model $(MODEL) -o outputs/validate100_evolve; \
+		$(RUN_PYTHON) scripts/run_sage_online.py --manifest $(MANIFEST) --split extended_reuse_100 --agent $(MODEL) --user $(USER_MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) $(GENERATION_FLAGS) --generation-model $(MODEL) $(CACHE_FLAGS) -o outputs/validate100_evolve; \
 	fi
 
 validate250:
 	@if [ "$(MODE)" = "control" ]; then \
-		$(RUN_PYTHON) scripts/run_baseline.py --manifest $(MANIFEST) --split $(SPLIT) --agent $(MODEL) --user $(USER_MODEL) --base-tool-policy $(BASE_TOOL_POLICY) -o outputs/validate250_control; \
+		$(RUN_PYTHON) scripts/run_baseline.py --manifest $(MANIFEST) --split $(SPLIT) --agent $(MODEL) --user $(USER_MODEL) --base-tool-policy $(BASE_TOOL_POLICY) $(CACHE_FLAGS) -o outputs/validate250_control; \
 	else \
-		$(RUN_PYTHON) scripts/run_sage_online.py --manifest $(MANIFEST) --split $(SPLIT) --agent $(MODEL) --user $(USER_MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) $(GENERATION_FLAGS) --generation-model $(MODEL) -o outputs/validate250_evolve; \
+		$(RUN_PYTHON) scripts/run_sage_online.py --manifest $(MANIFEST) --split $(SPLIT) --agent $(MODEL) --user $(USER_MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) $(GENERATION_FLAGS) --generation-model $(MODEL) $(CACHE_FLAGS) -o outputs/validate250_evolve; \
 	fi
 
 summarize:
@@ -90,3 +102,12 @@ summarize:
 	else \
 		$(RUN_PYTHON) scripts/export_sage_metrics.py --run-dir $(RUN) -o artifacts/summaries/run_summary.json; \
 	fi
+
+cache_stats:
+	$(RUN_PYTHON) -c "import json; from pathlib import Path; p=Path('$(RUN)'); files=sorted(p.glob('**/openai_response_cache_metrics.json')); print(json.dumps({str(f): json.loads(f.read_text()) for f in files}, indent=2))"
+
+cache_validate:
+	$(RUN_PYTHON) -c "from pathlib import Path; required=[Path('artifacts/cache/openai_response_cache.sqlite'),Path('artifacts/cache/cache_manifest.json'),Path('artifacts/cache/cache_stats.json'),Path('artifacts/cache/cache_events.jsonl')]; missing=[str(p) for p in required if not p.exists()]; print('cache artifacts valid' if not missing else 'missing: '+', '.join(missing)); raise SystemExit(1 if missing else 0)"
+
+freeze_registry:
+	$(RUN_PYTHON) -c "import hashlib, json, shutil; from pathlib import Path; reg=Path('$(REGISTRY)')/'registry_manifest.json'; out=Path('$(OUT)'); out.parent.mkdir(parents=True, exist_ok=True); data=reg.read_bytes(); shutil.copy2(reg,out); lock=out.with_suffix('.lock.json'); lock.write_text(json.dumps({'registry_manifest':str(out),'sha256':hashlib.sha256(data).hexdigest()}, indent=2)+'\n'); print(lock)"
