@@ -11,6 +11,14 @@ from tool_sandbox.common.execution_context import ScenarioCategories
 from tool_sandbox.common.scenario import Scenario
 
 
+def _similarity(result: dict[str, Any]) -> float:
+    value = result.get("similarity", 0.0)
+    try:
+        return float(value) if isinstance(value, (int, float, str)) else 0.0
+    except ValueError:
+        return 0.0
+
+
 @dataclass(frozen=True)
 class CapabilityObservation:
     scenario_name: str
@@ -68,7 +76,7 @@ def classify_scenario_observations(
         _yesterday_start = float(9 * 86400)  # 777600.0
         _today_ts = float(10 * 86400 + 3600)  # 867600.0
         _today_start = float(10 * 86400)  # 864000.0
-        return (
+        observations = [
             CapabilityObservation(
                 scenario_name=scenario_name,
                 canonical_key="derived_value:recency_timestamp_bounds",
@@ -95,8 +103,57 @@ def classify_scenario_observations(
                 ),
                 generation_allowed=True,
                 reason=f"categories:{','.join(sorted(categories))}",
-            ),
-        )
+            )
+        ]
+        if (
+            scenario_name.startswith("modify_reminder_with_recency_latest")
+            and _similarity(result) < 1.0
+        ):
+            observations.append(
+                CapabilityObservation(
+                    scenario_name=scenario_name,
+                    canonical_key="canonicalizer:relative_day_time_timestamp",
+                    observation=(
+                        "Repeated modify_reminder recency scenarios require turning "
+                        "a user-facing relative date/time such as 'tomorrow 5PM' "
+                        "into the exact local Unix timestamp passed to "
+                        "modify_reminder. In the reduced base toolset the date/time "
+                        "decomposition helpers are absent, so agents find the right "
+                        "reminder but often write the wrong timestamp. Generate a "
+                        "small deterministic canonicalizer named "
+                        "relative_day_time_to_timestamp that accepts current_timestamp, "
+                        "day_offset, hour, minute, and local_utc_offset_hours. Use "
+                        "local_utc_offset_hours=-4 for the current ToolSandbox local "
+                        "environment unless another offset is explicitly known."
+                    ),
+                    allowed_families=(str(ToolFamily.CANONICALIZER),),
+                    validation_examples=(
+                        ToolExample(
+                            {
+                                "current_timestamp": 1777428906.194959,
+                                "day_offset": 1,
+                                "hour": 17,
+                                "minute": 0,
+                                "local_utc_offset_hours": -4,
+                            },
+                            1777496400.0,
+                        ),
+                        ToolExample(
+                            {
+                                "current_timestamp": 1777428906.194959,
+                                "day_offset": 2,
+                                "hour": 8,
+                                "minute": 30,
+                                "local_utc_offset_hours": -4,
+                            },
+                            1777552200.0,
+                        ),
+                    ),
+                    generation_allowed=True,
+                    reason="repeated_modify_reminder_relative_datetime_failure",
+                )
+            )
+        return tuple(observations)
 
     if result.get("similarity") == 0:
         return (

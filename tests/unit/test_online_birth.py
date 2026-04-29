@@ -12,6 +12,7 @@ from tool_sandbox.common.execution_context import ScenarioCategories
 from tool_sandbox.common.scenario import Scenario
 
 _TOOL_NAME = "recency_to_timestamp_bounds"
+_RELATIVE_TIME_TOOL_NAME = "relative_day_time_to_timestamp"
 
 
 @dataclass
@@ -80,3 +81,32 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
     birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
     assert birth_event["accepted"] is True
     assert birth_event["tool_name"] == _TOOL_NAME
+
+
+def test_modify_reminder_relative_datetime_observation_is_canonicalizer() -> None:
+    scenario = Scenario(categories=[ScenarioCategories.CANONICALIZATION])  # type: ignore[list-item]
+    observations = classify_scenario_observations(
+        "modify_reminder_with_recency_latest_3_distraction_tools",
+        scenario,
+        {"similarity": 2 / 3},
+    )
+
+    keys = {observation.canonical_key for observation in observations}
+    assert "derived_value:recency_timestamp_bounds" in keys
+    assert "canonicalizer:relative_day_time_timestamp" in keys
+
+    relative = next(
+        observation
+        for observation in observations
+        if observation.canonical_key == "canonicalizer:relative_day_time_timestamp"
+    )
+    assert relative.generation_allowed
+    assert relative.allowed_families == (str(ToolFamily.CANONICALIZER),)
+    assert relative.validation_examples[0].inputs == {
+        "current_timestamp": 1777428906.194959,
+        "day_offset": 1,
+        "hour": 17,
+        "minute": 0,
+        "local_utc_offset_hours": -4,
+    }
+    assert relative.validation_examples[0].expected == 1777496400.0

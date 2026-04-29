@@ -13,6 +13,7 @@ from sage_ts.validation.schema_check import compile_generated_tool
 from tool_sandbox.common.execution_context import ExecutionContext, RoleType
 from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_discovery import ToolBackend, get_scrambled_tool_names
+from tool_sandbox.common.utils import add_tool_trace
 
 PYTHON_TYPES: dict[str, Any] = {
     "str": str,
@@ -52,21 +53,22 @@ def _compile_toolsandbox_tool(
 
     raw_fn = compiled.function
 
-    # Wrap with reuse callback if provided, using a plain closure (pickle-safe).
-    if on_reuse is not None:
-        _tool_name = entry.tool.spec.tool_name
-        _inner = raw_fn
+    # ToolSandbox expects every successful tool call to append a tool_trace.
+    # We keep this as a plain closure instead of register_as_tool so injected
+    # generated helpers stay pickle-safe for scenario execution.
+    _tool_name = entry.tool.spec.tool_name
+    _inner = raw_fn
 
-        def _wrapped(*args: Any, **kwargs: Any) -> Any:
-            result = _inner(*args, **kwargs)
+    def _wrapped(*args: Any, **kwargs: Any) -> Any:
+        result = _inner(*args, **kwargs)
+        add_tool_trace(_inner, result, *args, **kwargs)
+        if on_reuse is not None:
             on_reuse(_tool_name)
-            return result
+        return result
 
-        _wrapped.__name__ = raw_fn.__name__
-        _wrapped.__doc__ = raw_fn.__doc__
-        fn: Callable[..., Any] = _wrapped
-    else:
-        fn = cast(Callable[..., Any], raw_fn)
+    _wrapped.__name__ = raw_fn.__name__
+    _wrapped.__doc__ = raw_fn.__doc__
+    fn = cast(Callable[..., Any], _wrapped)
 
     # Build annotations using Python type objects.
     annotations: dict[str, Any] = {}
