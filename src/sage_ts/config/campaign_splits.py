@@ -58,6 +58,7 @@ def make_campaign_manifest() -> dict[str, object]:
             f"Need at least 100 eligible recency scenarios, found {len(recency)}"
         )
     mechanism = recency[:40]
+    transfer = recency[40:80]
     extended = recency[:100]
     return {
         "manifest_type": "sage_toolsandbox_campaign_splits",
@@ -68,12 +69,12 @@ def make_campaign_manifest() -> dict[str, object]:
         ),
         "splits": {
             "mechanism_40": [record.to_json() for record in mechanism],
-            "transfer_40": [record.to_json() for record in mechanism],
+            "transfer_40": [record.to_json() for record in transfer],
             "extended_reuse_100": [record.to_json() for record in extended],
         },
         "split_sizes": {
             "mechanism_40": len(mechanism),
-            "transfer_40": len(mechanism),
+            "transfer_40": len(transfer),
             "extended_reuse_100": len(extended),
         },
     }
