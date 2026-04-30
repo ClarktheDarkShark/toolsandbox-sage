@@ -184,9 +184,9 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       <div class="task-head">
         <div class="label" id="taskCount">Tasks</div>
         <div class="toggles">
-          <button data-filter="paired" class="active">Matched</button>
-          <button data-filter="candidate">SAGE</button>
-          <button data-filter="control">Control</button>
+          <button data-filter="paired" class="active">Matched pairs</button>
+          <button data-filter="candidate">SAGE only</button>
+          <button data-filter="control">Control only</button>
         </div>
       </div>
       <div id="taskList"></div>
@@ -198,8 +198,7 @@ TASK_FOCUS_HTML = r"""<!doctype html>
   </main>
   <script>
     let data = null;
-    const FILTER_KEY = "sageTaskFocusFilterV2";
-    let filter = localStorage.getItem(FILTER_KEY) || "paired";
+    let filter = "paired";
     let selected = null;
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const fmt = (n, d = 3) => Number.isFinite(Number(n)) ? Number(n).toFixed(d) : "-";
@@ -283,6 +282,9 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       const correctness = o.correctness_label === "correct" ? "good" : o.correctness_label === "pending" ? "" : "bad";
       const expected = (o.expected_answers || []).join("\n\n") || o.expected_note || "State-scored target; inspect messages and tool evidence.";
       const agent = o.agent_result_summary || o.agent_final_answer || "not available yet";
+      const pairContext = entry && !entry.phase ? `
+        <div class="label">Matched scenario</div>
+        <div class="muted">${esc(entry.scenario || task.scenario)} · showing SAGE trace by default</div>` : "";
       const comparison = entry && !entry.phase ? `
         <div class="tags">
           <span class="pill">Control score ${fmt(entry.control?.similarity)}</span>
@@ -291,6 +293,7 @@ TASK_FOCUS_HTML = r"""<!doctype html>
         </div>` : "";
       document.getElementById("detailHead").innerHTML = `
         <h2 class="detail-title">${esc(task.short_name || task.scenario)}</h2>
+        ${pairContext}
         ${comparison}
         <div class="tags">
           <span class="pill ${esc(task.status)}">${esc(task.status)}</span>
@@ -329,7 +332,6 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       const b = e.target.closest("button");
       if (!b) return;
       filter = b.dataset.filter || "paired";
-      localStorage.setItem(FILTER_KEY, filter);
       selected = null;
       render();
     });
