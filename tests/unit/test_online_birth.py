@@ -60,9 +60,12 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
         scenario,
         {"similarity": 0},
     )
-    assert len(observations) == 1
-    assert observations[0].canonical_key == "derived_value:recency_timestamp_bounds"
-    assert observations[0].generation_allowed
+    recency = next(
+        observation
+        for observation in observations
+        if observation.canonical_key == "derived_value:recency_timestamp_bounds"
+    )
+    assert recency.generation_allowed
 
     store = RegistryStore(tmp_path / "registry")
     generator = FakeRecencyGenerator()
@@ -73,11 +76,11 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
         recurrence_threshold=2,
     )
 
-    controller.observe(observations[0])
+    controller.observe(recency)
     assert generator.calls == 0
     assert store.get(_TOOL_NAME) is None
 
-    controller.observe(observations[0])
+    controller.observe(recency)
     assert generator.calls == 1
     assert store.get(_TOOL_NAME) is not None
 
@@ -161,6 +164,54 @@ def test_modify_reminder_relative_datetime_observation_is_canonicalizer() -> Non
         "local_utc_offset_hours": -4,
     }
     assert relative.validation_examples[0].expected == 1777496400.0
+
+
+def test_latest_record_failure_requests_search_filter_helper() -> None:
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
+    )
+    observations = classify_scenario_observations(
+        "modify_reminder_with_recency_latest_alt_10_distraction_tools",
+        scenario,
+        {"similarity": 2 / 3},
+    )
+
+    selector = next(
+        observation
+        for observation in observations
+        if observation.canonical_key
+        == "search_filter:select_latest_record_by_timestamp"
+    )
+    assert selector.generation_allowed
+    assert selector.allowed_families == (str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),)
+    assert selector.validation_examples[0].inputs == {
+        "records_payload": {
+            "records": [
+                {"content": "older", "creation_timestamp": 10.0},
+                {"content": "newer", "creation_timestamp": 20.0},
+            ]
+        },
+        "timestamp_key": "creation_timestamp",
+    }
+    assert selector.validation_examples[0].expected == {
+        "content": "newer",
+        "creation_timestamp": 20.0,
+    }
+
+
+def test_latest_record_failure_does_not_require_canonicalization_category() -> None:
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL))]
+    )
+    observations = classify_scenario_observations(
+        "search_message_with_recency_latest",
+        scenario,
+        {"similarity": 0.0},
+    )
+
+    assert tuple(observation.canonical_key for observation in observations) == (
+        "search_filter:select_latest_record_by_timestamp",
+    )
 
 
 def test_direct_state_failure_observation_requests_next_action_helper() -> None:

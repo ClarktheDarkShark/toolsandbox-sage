@@ -17,6 +17,7 @@ DASHBOARD_OPEN ?= 1
 DASHBOARD_FLAGS := $(if $(filter 1,$(DASHBOARD_OPEN)),,--no-dashboard-open)
 CACHE_MODE ?= read_write
 CACHE_FLAGS := --cache-mode $(CACHE_MODE)
+MIN_GATE_SCENARIOS ?= 12
 CATEGORY ?= general
 ifeq ($(CATEGORY),state)
 CATEGORY_MANIFEST ?= outputs/splits/sage_state_precondition_splits.json
@@ -35,7 +36,11 @@ POC_PROTOCOL_MANIFEST ?= outputs/splits/relative_datetime_protocol.json
 RECENCY_TRANSFER_MANIFEST ?= outputs/splits/sage_campaign_splits.json
 RELATIVE_TIME_TRANSFER_MANIFEST ?= outputs/splits/relative_datetime_transfer.json
 
-.PHONY: test lint dashboard reproduce_poc transfer_recency transfer_relative_time smoke4 viability12 mechanism40 transfer40 transfer60 confirm100 validate100 validate250 summarize cache_stats cache_validate freeze_registry campaign-init
+.PHONY: test lint dashboard reproduce_poc transfer_recency transfer_relative_time smoke4 smoke12 viability12 mechanism40 transfer40 transfer60 confirm100 validate100 validate250 summarize cache_stats cache_validate freeze_registry campaign-init
+
+define CHECK_GATE_SIZE
+	@$(RUN_PYTHON) -c "from pathlib import Path; from sage_ts.config.splits import load_split_names; manifest=Path('$(1)'); split='$(2)'; count=len(load_split_names(manifest, split)); minimum=int('$(MIN_GATE_SCENARIOS)'); print(f'{manifest} {split}: {count} scenarios (minimum {minimum})'); raise SystemExit(0 if count >= minimum else 2)"
+endef
 
 test:
 	$(PYTEST) tests/unit tests/integration
@@ -51,15 +56,21 @@ dashboard:
 	$(RUN_PYTHON) -c "from pathlib import Path; from sage_ts.dashboard.exporters import ensure_dashboard_server, dashboard_url; p=Path('$(RUN)')/'dashboard'/'index.html'; ensure_dashboard_server(port=$(PORT)); print(dashboard_url(p, port=$(PORT)))"
 
 mechanism40:
+	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),mechanism_40)
 	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
-smoke4:
+smoke4: smoke12
+
+smoke12:
+	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
 	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 viability12:
+	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
 	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 reproduce_poc:
+	$(call CHECK_GATE_SIZE,$(POC_PROTOCOL_MANIFEST),mechanism_40)
 	@if [ -f "$(REGISTRY)/registry_manifest.json" ]; then \
 		echo "Refusing to reproduce POC into non-empty REGISTRY=$(REGISTRY). Pass a fresh REGISTRY=..."; \
 		exit 2; \
@@ -68,15 +79,19 @@ reproduce_poc:
 	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(POC_PROTOCOL_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer_recency:
+	$(call CHECK_GATE_SIZE,$(RECENCY_TRANSFER_MANIFEST),transfer_40)
 	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RECENCY_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer_relative_time:
+	$(call CHECK_GATE_SIZE,$(RELATIVE_TIME_TRANSFER_MANIFEST),transfer_40)
 	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RELATIVE_TIME_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer40:
+	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
 	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer60:
+	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
 	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(DASHBOARD_FLAGS)
 
 confirm100: validate100

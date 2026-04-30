@@ -19,6 +19,74 @@ def _similarity(result: dict[str, Any]) -> float:
         return 0.0
 
 
+def _is_latest_record_scenario(scenario_name: str) -> bool:
+    return "latest" in scenario_name and scenario_name.startswith(
+        (
+            "modify_reminder_with_recency_latest",
+            "remove_reminder_with_recency_latest",
+            "search_message_with_recency_latest",
+        )
+    )
+
+
+def _latest_record_selection_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="search_filter:select_latest_record_by_timestamp",
+        observation=(
+            "Repeated latest-result scenarios require choosing the single record "
+            "with the greatest timestamp from a visible list returned by search "
+            "tools. Agents can compute valid search bounds but still select or "
+            "report the wrong candidate. Generate a small deterministic "
+            "search/filter/ranking helper named select_latest_record_by_timestamp. "
+            "Inputs: records_payload as a dict containing a 'records' list of "
+            "record dictionaries, and timestamp_key as the timestamp field to "
+            "compare. Ignore records missing a numeric timestamp. Return the full "
+            "record with the largest timestamp, or an empty dict if no valid "
+            "timestamp exists."
+        ),
+        allowed_families=(str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "records_payload": {
+                        "records": [
+                            {"content": "older", "creation_timestamp": 10.0},
+                            {"content": "newer", "creation_timestamp": 20.0},
+                        ]
+                    },
+                    "timestamp_key": "creation_timestamp",
+                },
+                {"content": "newer", "creation_timestamp": 20.0},
+            ),
+            ToolExample(
+                {
+                    "records_payload": {
+                        "records": [
+                            {"content": "missing"},
+                            {"content": "old", "reminder_timestamp": 5.0},
+                            {"content": "new", "reminder_timestamp": 15.0},
+                        ]
+                    },
+                    "timestamp_key": "reminder_timestamp",
+                },
+                {"content": "new", "reminder_timestamp": 15.0},
+            ),
+            ToolExample(
+                {
+                    "records_payload": {"records": [{"content": "none"}]},
+                    "timestamp_key": "creation_timestamp",
+                },
+                {},
+            ),
+        ),
+        generation_allowed=True,
+        reason="repeated_latest_record_selection_failure",
+    )
+
+
 @dataclass(frozen=True)
 class CapabilityObservation:
     scenario_name: str
@@ -153,7 +221,12 @@ def classify_scenario_observations(
                     reason="repeated_modify_reminder_relative_datetime_failure",
                 )
             )
+        if _similarity(result) < 1.0 and _is_latest_record_scenario(scenario_name):
+            observations.append(_latest_record_selection_observation(scenario_name))
         return tuple(observations)
+
+    if _similarity(result) < 1.0 and _is_latest_record_scenario(scenario_name):
+        return (_latest_record_selection_observation(scenario_name),)
 
     if (
         ScenarioCategories.STATE_DEPENDENCY in scenario.categories

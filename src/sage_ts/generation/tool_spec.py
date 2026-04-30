@@ -11,6 +11,7 @@ class ToolFamily(str, Enum):
     CANONICALIZER = "canonicalizer"
     DERIVED_VALUE_CALCULATOR = "derived_value_calculator"
     STATE_PRECONDITION_HELPER = "state_precondition_helper"
+    SEARCH_FILTER_RANKING_HELPER = "search_filter_ranking_helper"
     COMPOSITE_WORKFLOW_HELPER = "composite_workflow_helper"
     VALIDATION_ABSTENTION_HELPER = "validation_abstention_helper"
 
