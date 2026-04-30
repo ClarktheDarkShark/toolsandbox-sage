@@ -147,17 +147,6 @@ def registry_entry_matches_scenario(
     """Return whether a retained helper should be exposed for this scenario."""
     if not scenario_name:
         return True
-    if entry.tool.spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
-        name = scenario_name.lower()
-        if entry.tool.spec.tool_name == "select_latest_record_by_timestamp":
-            return "latest" in name and name.startswith(
-                (
-                    "modify_reminder_with_recency_latest",
-                    "remove_reminder_with_recency_latest",
-                    "search_message_with_recency_latest",
-                )
-            )
-        return False
     if entry.tool.spec.family != ToolFamily.STATE_PRECONDITION_HELPER:
         return True
 
