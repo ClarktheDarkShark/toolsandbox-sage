@@ -76,6 +76,65 @@ def next_service_enablement_action(target_service: str, wifi_enabled: bool) -> d
     return store
 
 
+def _registry_with_latest_selector(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="select_latest_record_by_timestamp",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description="Select the visible candidate record with the largest timestamp.",
+        inputs=(
+            ToolInput("records_payload", "dict", "Dict containing records list."),
+            ToolInput("timestamp_key", "str", "Timestamp field to compare."),
+        ),
+        output_annotation="dict",
+        generalization_rationale=(
+            "Latest-record tasks repeatedly require selecting the newest visible "
+            "search result before using original ToolSandbox tools."
+        ),
+        inadequacy_evidence=(
+            "Base search tools return records but do not provide a reusable "
+            "timestamp-ranking helper."
+        ),
+    )
+    code = """
+def select_latest_record_by_timestamp(records_payload: dict, timestamp_key: str) -> dict:
+    records = records_payload.get("records", [])
+    best = {}
+    best_value = None
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        value = record.get(timestamp_key)
+        if not isinstance(value, (int, float)):
+            continue
+        if best_value is None or float(value) > best_value:
+            best_value = float(value)
+            best = dict(record)
+    return best
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {
+                    "records_payload": {
+                        "records": [
+                            {"content": "old", "creation_timestamp": 10.0},
+                            {"content": "new", "creation_timestamp": 20.0},
+                        ]
+                    },
+                    "timestamp_key": "creation_timestamp",
+                },
+                {"content": "new", "creation_timestamp": 20.0},
+            ),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    return store
+
+
 def test_registry_tools_are_available_to_toolsandbox_context(tmp_path: Path) -> None:
     store = _registry_with_canonicalizer(tmp_path)
     context = ExecutionContext(tool_allow_list=["end_conversation"])
@@ -135,6 +194,30 @@ def test_state_helpers_are_only_exposed_on_relevant_state_scenarios(
     assert (
         "next_service_enablement_action" in direct_state.starting_context.name_to_tool
     )
+
+
+def test_latest_selector_only_exposed_on_latest_record_scenarios(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_latest_selector(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    unrelated = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_sender_phone_number_with_content",
+    )
+    latest = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_message_with_recency_latest_10_distraction_tools",
+    )
+
+    tool_name = "select_latest_record_by_timestamp"
+    assert tool_name not in unrelated.starting_context.name_to_tool
+    assert tool_name in latest.starting_context.name_to_tool
 
 
 def test_registry_tools_execute_through_toolsandbox_console(tmp_path: Path) -> None:

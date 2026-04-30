@@ -16,6 +16,15 @@ STATE_ACTIONABLE_TOKENS = (
     "precondition_met",
     "predicate",
 )
+SEARCH_FILTER_ACTIONABLE_TOKENS = (
+    "select",
+    "filter",
+    "rank",
+    "record",
+    "candidate",
+    "timestamp",
+    "constraint",
+)
 
 
 @dataclass(frozen=True)
@@ -37,4 +46,8 @@ def evaluate_candidate_gate(spec: ToolSpec) -> GateDecision:
         text = " ".join([spec.tool_name, spec.description]).lower()
         if not any(token in text for token in STATE_ACTIONABLE_TOKENS):
             return GateDecision(False, "state_helper_not_runtime_actionable")
+    if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
+        text = " ".join([spec.tool_name, spec.description]).lower()
+        if not any(token in text for token in SEARCH_FILTER_ACTIONABLE_TOKENS):
+            return GateDecision(False, "search_filter_not_runtime_actionable")
     return GateDecision(True, "allowed")

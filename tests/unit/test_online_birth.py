@@ -14,6 +14,7 @@ from tool_sandbox.common.scenario import Scenario
 
 _TOOL_NAME = "recency_to_timestamp_bounds"
 _RELATIVE_TIME_TOOL_NAME = "relative_day_time_to_timestamp"
+_LATEST_SELECTOR_TOOL_NAME = "select_latest_record_by_timestamp"
 
 
 @dataclass
@@ -51,6 +52,50 @@ class FakeRecencyGenerator:
         return GeneratedTool(spec=spec, code=code)
 
 
+@dataclass
+class FakeLatestSelectorGenerator:
+    calls: int = 0
+
+    def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
+        self.calls += 1
+        assert request.suggested_tool_name == _LATEST_SELECTOR_TOOL_NAME
+        spec = ToolSpec(
+            tool_name=_LATEST_SELECTOR_TOOL_NAME,
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            description="Select the record with the largest numeric timestamp.",
+            inputs=(
+                ToolInput("records_payload", "dict", "Dict containing records list."),
+                ToolInput("timestamp_key", "str", "Timestamp field to compare."),
+            ),
+            output_annotation="dict",
+            generalization_rationale=(
+                "Latest-record scenarios repeatedly require ranking visible search "
+                "results by timestamp before calling the original benchmark tool."
+            ),
+            inadequacy_evidence=(
+                "Base search tools return raw records, but no deterministic helper "
+                "selects the newest visible candidate."
+            ),
+        )
+        code = (
+            "def select_latest_record_by_timestamp(records_payload: dict, timestamp_key: str) -> dict:\n"
+            "    records = records_payload.get('records', [])\n"
+            "    best = {}\n"
+            "    best_value = None\n"
+            "    for record in records:\n"
+            "        if not isinstance(record, dict):\n"
+            "            continue\n"
+            "        value = record.get(timestamp_key)\n"
+            "        if not isinstance(value, (int, float)):\n"
+            "            continue\n"
+            "        if best_value is None or float(value) > best_value:\n"
+            "            best_value = float(value)\n"
+            "            best = dict(record)\n"
+            "    return best\n"
+        )
+        return GeneratedTool(spec=spec, code=code)
+
+
 def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) -> None:
     scenario = Scenario(
         categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
@@ -60,9 +105,12 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
         scenario,
         {"similarity": 0},
     )
-    assert len(observations) == 1
-    assert observations[0].canonical_key == "derived_value:recency_timestamp_bounds"
-    assert observations[0].generation_allowed
+    recency = next(
+        observation
+        for observation in observations
+        if observation.canonical_key == "derived_value:recency_timestamp_bounds"
+    )
+    assert recency.generation_allowed
 
     store = RegistryStore(tmp_path / "registry")
     generator = FakeRecencyGenerator()
@@ -73,11 +121,11 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
         recurrence_threshold=2,
     )
 
-    controller.observe(observations[0])
+    controller.observe(recency)
     assert generator.calls == 0
     assert store.get(_TOOL_NAME) is None
 
-    controller.observe(observations[0])
+    controller.observe(recency)
     assert generator.calls == 1
     assert store.get(_TOOL_NAME) is not None
 
@@ -161,6 +209,74 @@ def test_modify_reminder_relative_datetime_observation_is_canonicalizer() -> Non
         "local_utc_offset_hours": -4,
     }
     assert relative.validation_examples[0].expected == 1777496400.0
+
+
+def test_latest_record_failure_requests_search_filter_helper() -> None:
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
+    )
+    observations = classify_scenario_observations(
+        "modify_reminder_with_recency_latest_alt_10_distraction_tools",
+        scenario,
+        {"similarity": 2 / 3},
+    )
+
+    selector = next(
+        observation
+        for observation in observations
+        if observation.canonical_key
+        == "search_filter:select_latest_record_by_timestamp"
+    )
+    assert selector.generation_allowed
+    assert selector.allowed_families == (str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),)
+    assert selector.validation_examples[0].inputs == {
+        "records_payload": {
+            "records": [
+                {"content": "older", "creation_timestamp": 10.0},
+                {"content": "newer", "creation_timestamp": 20.0},
+            ]
+        },
+        "timestamp_key": "creation_timestamp",
+    }
+    assert selector.validation_examples[0].expected == {
+        "content": "newer",
+        "creation_timestamp": 20.0,
+    }
+
+
+def test_latest_record_helper_birth_uses_stable_tool_name(tmp_path: Path) -> None:
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
+    )
+    observations = classify_scenario_observations(
+        "search_message_with_recency_latest_10_distraction_tools",
+        scenario,
+        {"similarity": 0.5},
+    )
+    selector = next(
+        observation
+        for observation in observations
+        if observation.canonical_key
+        == "search_filter:select_latest_record_by_timestamp"
+    )
+
+    store = RegistryStore(tmp_path / "registry")
+    generator = FakeLatestSelectorGenerator()
+    controller = OnlineBirthController(
+        store=store,
+        generator=generator,
+        output_dir=tmp_path,
+        recurrence_threshold=2,
+    )
+
+    controller.observe(selector)
+    assert generator.calls == 0
+    controller.observe(selector)
+
+    assert generator.calls == 1
+    entry = store.get(_LATEST_SELECTOR_TOOL_NAME)
+    assert entry is not None
+    assert entry.tool.spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER
 
 
 def test_direct_state_failure_observation_requests_next_action_helper() -> None:
