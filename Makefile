@@ -19,6 +19,8 @@ CACHE_MODE ?= read_write
 CACHE_FLAGS := --cache-mode $(CACHE_MODE)
 PARALLEL_ARMS ?= 1
 PARALLEL_FLAGS := $(if $(filter 1,$(PARALLEL_ARMS)),--parallel-arms,)
+PROTOCOL_GENERATION ?= auto
+PROTOCOL_GENERATION_FLAGS := --generation $(PROTOCOL_GENERATION)
 MIN_GATE_SCENARIOS ?= 12
 CATEGORY ?= general
 ifeq ($(CATEGORY),state)
@@ -59,17 +61,17 @@ dashboard:
 
 mechanism40:
 	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),mechanism_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(DASHBOARD_FLAGS)
 
 smoke4: smoke12
 
 smoke12:
 	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(DASHBOARD_FLAGS)
 
 viability12:
 	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(DASHBOARD_FLAGS)
 
 reproduce_poc:
 	$(call CHECK_GATE_SIZE,$(POC_PROTOCOL_MANIFEST),mechanism_40)
@@ -78,25 +80,27 @@ reproduce_poc:
 		exit 2; \
 	fi
 	@$(RUN_PYTHON) -c "import json; from pathlib import Path; src=Path('$(POC_MANIFEST)'); dst=Path('$(POC_PROTOCOL_MANIFEST)'); data=json.loads(src.read_text()); rows=data['splits']['relative_datetime_probe']; dst.parent.mkdir(parents=True, exist_ok=True); dst.write_text(json.dumps({'manifest_type':'sage_protocol_poc','splits':{'mechanism_40':rows}}, indent=2)+'\n')"
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(POC_PROTOCOL_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(POC_PROTOCOL_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer_recency:
 	$(call CHECK_GATE_SIZE,$(RECENCY_TRANSFER_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RECENCY_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RECENCY_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer_relative_time:
 	$(call CHECK_GATE_SIZE,$(RELATIVE_TIME_TRANSFER_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RELATIVE_TIME_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RELATIVE_TIME_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer40:
 	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(DASHBOARD_FLAGS)
 
 transfer60:
 	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(DASHBOARD_FLAGS)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(DASHBOARD_FLAGS)
 
-confirm100: validate100
+confirm100:
+	$(call CHECK_GATE_SIZE,$(MANIFEST),extended_reuse_100)
+	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode extended_reuse_100 --manifest $(MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(DASHBOARD_FLAGS)
 
 validate100:
 	@if [ "$(MODE)" = "control" ]; then \

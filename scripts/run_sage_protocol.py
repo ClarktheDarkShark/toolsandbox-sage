@@ -482,6 +482,12 @@ def main() -> None:
         action="store_true",
         help="Run the matched control and SAGE arms concurrently in isolated processes.",
     )
+    parser.add_argument(
+        "--generation",
+        choices=("auto", "on", "off"),
+        default="auto",
+        help="Override candidate-side helper generation. Use off for frozen-registry validation.",
+    )
     args = parser.parse_args()
 
     scenario_names = tuple(load_split_names(args.manifest, args.mode))
@@ -492,6 +498,10 @@ def main() -> None:
     control_dir: Path | None = None
     candidate_dir: Path | None = None
     generation_enabled = args.mode in {"mechanism_40", "extended_reuse_100"}
+    if args.generation == "on":
+        generation_enabled = True
+    elif args.generation == "off":
+        generation_enabled = False
     initialize_campaign(root=args.artifact_root, phase=args.mode)
     append_event(
         "phase_started",
