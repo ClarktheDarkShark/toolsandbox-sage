@@ -211,17 +211,14 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-registry", action="append", type=Path, required=True)
     parser.add_argument("--output-registry", type=Path, required=True)
-    parser.add_argument(
-        "--tool",
-        action="append",
-        default=[
-            "relative_day_time_to_timestamp",
-            "days_between_timestamps",
-            "prepare_reminder_arguments_with_optional_location",
-            "select_record_by_timestamp_extreme",
-            "recency_to_timestamp_bounds",
-        ],
-    )
+    default_tools = [
+        "relative_day_time_to_timestamp",
+        "days_between_timestamps",
+        "prepare_reminder_arguments_with_optional_location",
+        "select_record_by_timestamp_extreme",
+        "recency_to_timestamp_bounds",
+    ]
+    parser.add_argument("--tool", action="append", default=None)
     parser.add_argument(
         "--report",
         type=Path,
@@ -234,7 +231,8 @@ def main() -> None:
     store.save_entries({})
     accepted: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
-    for tool_name in args.tool:
+    requested_tools = args.tool or default_tools
+    for tool_name in requested_tools:
         entry = source_entries.get(tool_name)
         if entry is None:
             rejected.append(
