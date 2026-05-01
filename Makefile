@@ -81,6 +81,7 @@ claim_portfolio_registry:
 		--source-registry outputs/record_ranking20_livegen_registry_20260501_042246/registry_manifest.json \
 		--source-registry outputs/holiday_calendar_confirm30_registry_20260430/registry_manifest.json \
 		--source-registry outputs/contact_message_constraint20_livegen_registry_20260501/registry_manifest.json \
+		--source-registry outputs/claim_portfolio_reminder_argprep_v2_only_registry_20260501/registry_manifest.json \
 		--output-registry $(CLAIM_PORTFOLIO_REGISTRY) \
 		--report artifacts/summaries/claim_portfolio_validation.json
 

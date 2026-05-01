@@ -231,6 +231,7 @@ def main() -> None:
 
     source_entries = _load_entries(args.source_registry)
     store = RegistryStore(args.output_registry)
+    store.save_entries({})
     accepted: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     for tool_name in args.tool:
