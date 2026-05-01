@@ -71,6 +71,18 @@ class FakeRecordSelectorGenerator:
                 ToolInput("selection_mode", "str", "Either latest or oldest."),
             ),
             output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                },
+            },
+            positive_triggers=("visible_candidate_list_wrong_selected_record",),
+            negative_triggers=("no_valid_timestamp_candidates",),
+            abstain_behavior=(
+                "Return {} when there are no valid timestamped candidates or ties "
+                "make the selection ambiguous."
+            ),
             generalization_rationale=(
                 "Timestamp record selection is reused across search and modify tasks."
             ),
@@ -547,5 +559,6 @@ def test_direct_state_failure_births_trace_compatible_tool_call_helper() -> None
         "ready": False,
         "tool_name": "set_low_battery_mode_status",
         "arguments": {"on": False},
-        "target_service": "wifi",
+        "should_call": True,
+        "reason": "wifi cannot be enabled while low battery mode is on",
     }

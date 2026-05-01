@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 from types import FunctionType
 from typing import Any
@@ -39,6 +40,33 @@ class SchemaResult:
 
 
 def compile_generated_tool(tool: GeneratedTool) -> SchemaResult:
+    try:
+        parsed = ast.parse(tool.code, filename=f"<generated:{tool.spec.tool_name}>")
+    except SyntaxError as exc:
+        return SchemaResult(
+            False,
+            (f"compile_error:SyntaxError:{exc.msg}",),
+            None,
+        )
+    function_defs = [
+        node
+        for node in parsed.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    if len(function_defs) != 1:
+        return SchemaResult(
+            False,
+            (f"function_count_mismatch:{len(function_defs)}",),
+            None,
+        )
+    defined_name = function_defs[0].name
+    if defined_name != tool.spec.tool_name:
+        return SchemaResult(
+            False,
+            (f"function_name_mismatch:{defined_name}!={tool.spec.tool_name}",),
+            None,
+        )
+
     namespace: dict[str, Any] = {"__builtins__": SAFE_BUILTINS}
     errors: list[str] = []
     try:
@@ -48,6 +76,15 @@ def compile_generated_tool(tool: GeneratedTool) -> SchemaResult:
     except Exception as exc:
         return SchemaResult(False, (f"compile_error:{type(exc).__name__}:{exc}",), None)
 
+    compiled_functions = [
+        value for value in namespace.values() if isinstance(value, FunctionType)
+    ]
+    if len(compiled_functions) != 1:
+        return SchemaResult(
+            False,
+            (f"compiled_function_count_mismatch:{len(compiled_functions)}",),
+            None,
+        )
     fn = namespace.get(tool.spec.tool_name)
     if not isinstance(fn, FunctionType):
         return SchemaResult(False, ("missing_expected_function",), None)

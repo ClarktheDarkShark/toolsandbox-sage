@@ -1,11 +1,21 @@
 from pathlib import Path
 
-from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
+from sage_ts.generation.tool_spec import (
+    GeneratedTool,
+    StructuredInadequacyEvidence,
+    ToolFamily,
+    ToolInput,
+    ToolSpec,
+)
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.tool_invoker import invoke_registered_tool
 from sage_ts.validation.ast_safety import check_ast_safety
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
+
+
+def _evidence(summary: str, *signals: str) -> StructuredInadequacyEvidence:
+    return StructuredInadequacyEvidence(summary=summary, signals=signals)
 
 
 def _wifi_canonicalizer() -> GeneratedTool:
@@ -19,9 +29,10 @@ def _wifi_canonicalizer() -> GeneratedTool:
             "Connectivity labels recur across scenarios with spacing and punctuation "
             "differences, so a deterministic normalizer can transfer."
         ),
-        inadequacy_evidence=(
+        inadequacy_evidence=_evidence(
             "The base tool list exposes state setters and getters, but not a reusable "
-            "canonicalization helper for noisy connectivity labels."
+            "canonicalization helper for noisy connectivity labels.",
+            "visible_raw_data_lacking_deterministic_transform",
         ),
     )
     code = """
@@ -84,13 +95,26 @@ def test_generated_tool_validation_allows_safe_filter_builtin() -> None:
                 ToolInput("expected_value", "str", "Expected field value."),
             ),
             output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                },
+            },
+            positive_triggers=("wrong_selected_record",),
+            negative_triggers=("ambiguous_match", "no_match"),
+            abstain_behavior=(
+                "Return {} when there is not exactly one normalized match, ties remain, "
+                "or the candidate set is empty."
+            ),
             generalization_rationale=(
                 "Contact lookup tasks repeatedly need deterministic candidate selection "
                 "from search_contacts output before a downstream action."
             ),
-            inadequacy_evidence=(
+            inadequacy_evidence=_evidence(
                 "The base contact search returns candidate rows but does not provide "
-                "a deterministic selector for exact normalized field matching."
+                "a deterministic selector for exact normalized field matching.",
+                "wrong_selected_record",
             ),
         ),
         code="""
@@ -152,6 +176,16 @@ def select_contact_by_constraint(records_payload: dict, field_name: str, expecte
                     "expected_value": "friend",
                 },
                 {},
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "records_payload": {"records": []},
+                    "field_name": "name",
+                    "expected_value": "Ada",
+                },
+                {},
+                negative_applicability=True,
             ),
         ),
     )
@@ -164,18 +198,31 @@ def test_generated_tool_validation_allows_safe_lambda_sort_key() -> None:
         spec=ToolSpec(
             tool_name="select_record_by_timestamp_extreme",
             family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
-            description="Select the oldest or latest record by timestamp.",
+            description="Select the oldest or latest record by timestamp with deterministic tie handling.",
             inputs=(
                 ToolInput("records_payload", "dict", "Records payload."),
                 ToolInput("timestamp_key", "str", "Timestamp field."),
                 ToolInput("selection_mode", "str", "oldest or latest."),
             ),
             output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                },
+            },
+            positive_triggers=("visible_candidate_list_wrong_selected_record",),
+            negative_triggers=("no_valid_timestamp_candidates", "timestamp_tie"),
+            abstain_behavior=(
+                "Return {} when no valid timestamped candidate exists or timestamp ties "
+                "make the selection ambiguous."
+            ),
             generalization_rationale=(
                 "Record-ranking tasks repeatedly need deterministic timestamp extrema."
             ),
-            inadequacy_evidence=(
-                "Base search tools return candidates but not a reusable timestamp ranker."
+            inadequacy_evidence=_evidence(
+                "Base search tools return candidates but not a reusable timestamp ranker.",
+                "wrong_selected_record",
             ),
         ),
         code="""
@@ -204,6 +251,15 @@ def select_record_by_timestamp_extreme(records_payload: dict, timestamp_key: str
                     "selection_mode": "latest",
                 },
                 {"content": "new", "creation_timestamp": 20.0},
+            ),
+            ToolExample(
+                {
+                    "records_payload": {"records": [{"content": "missing"}]},
+                    "timestamp_key": "creation_timestamp",
+                    "selection_mode": "latest",
+                },
+                {},
+                negative_applicability=True,
             ),
             ToolExample(
                 {

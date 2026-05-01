@@ -1,7 +1,12 @@
 from dataclasses import replace
 
 from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate
-from sage_ts.generation.tool_spec import ToolFamily, ToolInput, ToolSpec
+from sage_ts.generation.tool_spec import (
+    StructuredInadequacyEvidence,
+    ToolFamily,
+    ToolInput,
+    ToolSpec,
+)
 
 
 def _state_spec(description: str) -> ToolSpec:
@@ -11,13 +16,44 @@ def _state_spec(description: str) -> ToolSpec:
         description=description,
         inputs=(ToolInput("target_service", "str", "Requested service."),),
         output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "tool_name": {
+                    "type": "string",
+                    "enum": [
+                        "",
+                        "set_wifi_status",
+                        "set_cellular_service_status",
+                        "set_location_service_status",
+                        "set_low_battery_mode_status",
+                    ],
+                },
+                "arguments": {"type": "object"},
+                "should_call": {"type": "boolean"},
+                "reason": {"type": "string"},
+            },
+        },
+        positive_triggers=("service_precondition_failure",),
+        negative_triggers=("insufficient_information",),
+        preserves_side_effect_tools=(
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+            "set_low_battery_mode_status",
+        ),
+        required_original_tool_calls=("set_wifi_status",),
+        abstain_behavior="Return should_call false for insufficient information or already-enabled states.",
         generalization_rationale=(
             "State dependency scenarios repeatedly need deterministic handling of "
             "service readiness before the benchmark action can succeed."
         ),
-        inadequacy_evidence=(
-            "Base tools expose raw setters/getters but not a reusable intermediate "
-            "readiness decision for repeated service precondition failures."
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary=(
+                "Base tools expose raw setters/getters but not a reusable intermediate "
+                "readiness decision for repeated service precondition failures."
+            ),
+            signals=("failed_base_tool_with_deterministic_fallback",),
         ),
     )
 

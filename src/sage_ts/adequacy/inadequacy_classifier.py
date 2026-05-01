@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from sage_ts.generation.tool_spec import ToolFamily
+from sage_ts.generation.tool_spec import StructuredInadequacyEvidence, ToolFamily
 from sage_ts.validation.sandbox_validator import ToolExample
 from tool_sandbox.common.execution_context import ScenarioCategories
 from tool_sandbox.common.scenario import Scenario
@@ -177,10 +177,18 @@ def _reminder_optional_location_argument_observation(
                     "should_retry_location_lookup": False,
                     "location_status": "omitted",
                 },
+                negative_applicability=True,
             ),
         ),
         generation_allowed=True,
         reason="reminder_optional_location_argument_preparation_failure",
+        inadequacy_signals=(
+            "optional_info_treated_as_required",
+            "visible_raw_data_lacking_deterministic_transform",
+        ),
+        visible_data_gaps=(
+            "relative day/time and optional location must be converted into add_reminder kwargs",
+        ),
     )
 
 
@@ -236,10 +244,17 @@ def _message_search_window_observation(scenario_name: str) -> CapabilityObservat
                     "creation_timestamp_lowerbound": 1000.0,
                     "creation_timestamp_upperbound": 1000.0,
                 },
+                negative_applicability=True,
             ),
         ),
         generation_allowed=True,
         reason="contact_message_search_requires_trace_compatible_time_bounds",
+        inadequacy_signals=(
+            "repeated_failed_tool_call",
+            "visible_raw_data_lacking_deterministic_transform",
+        ),
+        failed_tool_calls=("search_messages",),
+        visible_data_gaps=("missing benchmark-compatible timestamp window",),
     )
 
 
@@ -293,10 +308,15 @@ def _latest_record_selection_observation(
                     "selection_mode": "latest",
                 },
                 {},
+                negative_applicability=True,
             ),
         ),
         generation_allowed=True,
         reason="repeated_latest_record_selection_failure",
+        inadequacy_signals=("wrong_selected_record",),
+        visible_data_gaps=(
+            "visible candidate list requires deterministic extreme selection",
+        ),
     )
 
 
@@ -334,6 +354,10 @@ def _days_between_timestamps_observation(
         ),
         generation_allowed=True,
         reason="reduced_base_missing_timestamp_diff_for_calendar_distance",
+        inadequacy_signals=("visible_raw_data_lacking_deterministic_transform",),
+        visible_data_gaps=(
+            "holiday timestamp and current timestamp need day-distance computation",
+        ),
     )
 
 
@@ -420,10 +444,15 @@ def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation
                     "output_field": "person_id",
                 },
                 {},
+                negative_applicability=True,
             ),
         ),
         generation_allowed=True,
         reason="repeated_contact_candidate_selection_failure",
+        inadequacy_signals=("wrong_selected_record",),
+        visible_data_gaps=(
+            "visible contact candidates need deterministic field-constrained selection",
+        ),
     )
 
 
@@ -451,6 +480,10 @@ def _stock_symbol_extraction_observation(
         ),
         generation_allowed=True,
         reason="stock_symbol_field_extraction_failure",
+        inadequacy_signals=("visible_raw_data_lacking_deterministic_transform",),
+        visible_data_gaps=(
+            "visible stock payload requires deterministic symbol extraction",
+        ),
     )
 
 
@@ -483,7 +516,8 @@ def _next_service_tool_call_observation(
             "uses the returned ToolSandbox tool call, it should report only the "
             "final state of that chosen target service unless the user explicitly "
             "asks to broaden scope. For unknown target services, return ready "
-            "False, empty tool_name, and empty arguments."
+            "False, empty tool_name, empty arguments, should_call False, and a "
+            "brief reason."
         ),
         allowed_families=(str(ToolFamily.STATE_PRECONDITION_HELPER),),
         validation_examples=(
@@ -499,7 +533,8 @@ def _next_service_tool_call_observation(
                     "ready": False,
                     "tool_name": "set_low_battery_mode_status",
                     "arguments": {"on": False},
-                    "target_service": "wifi",
+                    "should_call": True,
+                    "reason": "wifi cannot be enabled while low battery mode is on",
                 },
             ),
             ToolExample(
@@ -514,7 +549,8 @@ def _next_service_tool_call_observation(
                     "ready": False,
                     "tool_name": "set_cellular_service_status",
                     "arguments": {"on": True},
-                    "target_service": "cellular",
+                    "should_call": True,
+                    "reason": "cellular is disabled and must be enabled first",
                 },
             ),
             ToolExample(
@@ -529,12 +565,20 @@ def _next_service_tool_call_observation(
                     "ready": True,
                     "tool_name": "",
                     "arguments": {},
-                    "target_service": "location",
+                    "should_call": False,
+                    "reason": "location is already enabled",
                 },
+                negative_applicability=True,
             ),
         ),
         generation_allowed=True,
         reason="trace_compatible_service_precondition_next_tool_call",
+        inadequacy_signals=("failed_base_tool_with_deterministic_fallback",),
+        failed_tool_calls=(
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+        ),
     )
 
 
@@ -547,6 +591,23 @@ class CapabilityObservation:
     validation_examples: tuple[ToolExample, ...]
     generation_allowed: bool
     reason: str
+    inadequacy_signals: tuple[str, ...] = ()
+    failed_tool_calls: tuple[str, ...] = ()
+    repeated_failed_tool_calls: tuple[str, ...] = ()
+    visible_data_gaps: tuple[str, ...] = ()
+    planner_failures: tuple[str, ...] = ()
+    final_answer_route_mismatch: bool = False
+
+    def to_inadequacy_evidence(self) -> StructuredInadequacyEvidence:
+        return StructuredInadequacyEvidence(
+            summary=self.observation,
+            signals=self.inadequacy_signals,
+            failed_tool_calls=self.failed_tool_calls,
+            repeated_failed_tool_calls=self.repeated_failed_tool_calls,
+            visible_data_gaps=self.visible_data_gaps,
+            planner_failures=self.planner_failures,
+            final_answer_route_mismatch=self.final_answer_route_mismatch,
+        )
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -559,11 +620,13 @@ class CapabilityObservation:
                     "inputs": item.inputs,
                     "expected": item.expected,
                     "held_out": item.held_out,
+                    "negative_applicability": item.negative_applicability,
                 }
                 for item in self.validation_examples
             ],
             "generation_allowed": self.generation_allowed,
             "reason": self.reason,
+            "inadequacy_evidence": self.to_inadequacy_evidence().to_json(),
         }
 
 
@@ -575,6 +638,18 @@ def classify_scenario_observations(
     """Classify only narrow, repeated ToolSandbox hard-mode observations."""
     categories = {str(category) for category in scenario.categories}
     similarity = _similarity(result)
+    raw_outcome_similarity = result.get("outcome_similarity")
+    try:
+        outcome_similarity = (
+            float(raw_outcome_similarity)
+            if isinstance(raw_outcome_similarity, (int, float, str))
+            else None
+        )
+    except ValueError:
+        outcome_similarity = None
+    route_mismatch = bool(
+        outcome_similarity is not None and outcome_similarity > similarity
+    )
     if ScenarioCategories.INSUFFICIENT_INFORMATION in scenario.categories:
         return (
             CapabilityObservation(
@@ -588,6 +663,8 @@ def classify_scenario_observations(
                 validation_examples=(),
                 generation_allowed=False,
                 reason="insufficient_information_observation_only",
+                inadequacy_signals=("missing_user_information",),
+                planner_failures=("abstain_or_clarify_instead_of_birth",),
             ),
         )
 
@@ -627,6 +704,13 @@ def classify_scenario_observations(
                 ),
                 generation_allowed=True,
                 reason=f"categories:{','.join(sorted(categories))}",
+                inadequacy_signals=(
+                    "visible_raw_data_lacking_deterministic_transform",
+                ),
+                visible_data_gaps=(
+                    "bounded recency label must become timestamp lower/upper bounds",
+                ),
+                final_answer_route_mismatch=route_mismatch,
             )
         ]
         if scenario_name.startswith("modify_reminder_with_recency_latest"):
@@ -672,6 +756,13 @@ def classify_scenario_observations(
                     ),
                     generation_allowed=True,
                     reason="repeated_modify_reminder_relative_datetime_failure",
+                    inadequacy_signals=(
+                        "visible_raw_data_lacking_deterministic_transform",
+                    ),
+                    visible_data_gaps=(
+                        "relative day/time must become exact benchmark timestamp",
+                    ),
+                    final_answer_route_mismatch=route_mismatch,
                 )
             )
         if _is_latest_record_scenario(
@@ -732,6 +823,7 @@ def classify_scenario_observations(
                 validation_examples=(),
                 generation_allowed=False,
                 reason="no_repeated_supported_pattern",
+                inadequacy_signals=("no_valid_deterministic_helper_opportunity",),
             ),
         )
     return ()

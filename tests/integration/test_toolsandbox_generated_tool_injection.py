@@ -29,7 +29,7 @@ def _registry_with_canonicalizer(tmp_path: Path) -> RegistryStore:
         tool,
         examples=(
             ToolExample({"label": "Wi-Fi"}, "wifi"),
-            ToolExample({"label": "mobile data"}, "cellular"),
+            ToolExample({"label": "mobile data"}, "cellular", held_out=True),
         ),
     )
     assert validation.accepted
@@ -59,6 +59,43 @@ def _registry_with_state_helper(tmp_path: Path) -> RegistryStore:
             ),
         ),
         output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "tool_name": {
+                    "type": "string",
+                    "enum": [
+                        "",
+                        "set_wifi_status",
+                        "set_cellular_service_status",
+                        "set_location_service_status",
+                        "set_low_battery_mode_status",
+                    ],
+                },
+                "arguments": {"type": "object"},
+                "should_call": {"type": "boolean"},
+                "reason": {"type": "string"},
+                "ready": {"type": "boolean"},
+            },
+        },
+        positive_triggers=("service_precondition_failure",),
+        negative_triggers=("insufficient_information", "service_already_enabled"),
+        preserves_side_effect_tools=(
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+            "set_low_battery_mode_status",
+        ),
+        required_original_tool_calls=(
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+            "set_low_battery_mode_status",
+        ),
+        abstain_behavior=(
+            "Return should_call false with empty tool_name and arguments when the "
+            "target is already enabled or the target service is unknown."
+        ),
         generalization_rationale=(
             "Direct service-state scenarios repeatedly need a deterministic readiness "
             "predicate and exact benchmark tool call before finalizing."
@@ -77,17 +114,17 @@ def next_service_tool_call(target_service: str, wifi_enabled: bool, cellular_ena
         "location": location_service_enabled,
     }
     if target not in state_by_target:
-        return {"ready": False, "tool_name": "", "arguments": {}, "target_service": target}
+        return {"ready": False, "tool_name": "", "arguments": {}, "should_call": False, "reason": "unknown target service"}
     if state_by_target[target]:
-        return {"ready": True, "tool_name": "", "arguments": {}, "target_service": target}
+        return {"ready": True, "tool_name": "", "arguments": {}, "should_call": False, "reason": f"{target} is already enabled"}
     if low_battery_mode:
-        return {"ready": False, "tool_name": "set_low_battery_mode_status", "arguments": {"on": False}, "target_service": target}
+        return {"ready": False, "tool_name": "set_low_battery_mode_status", "arguments": {"on": False}, "should_call": True, "reason": f"{target} cannot be enabled while low battery mode is on"}
     tool_by_target = {
         "wifi": "set_wifi_status",
         "cellular": "set_cellular_service_status",
         "location": "set_location_service_status",
     }
-    return {"ready": False, "tool_name": tool_by_target[target], "arguments": {"on": True}, "target_service": target}
+    return {"ready": False, "tool_name": tool_by_target[target], "arguments": {"on": True}, "should_call": True, "reason": f"{target} is disabled and must be enabled first"}
 """
     tool = GeneratedTool(spec=spec, code=code)
     validation = validate_generated_tool(
@@ -105,7 +142,8 @@ def next_service_tool_call(target_service: str, wifi_enabled: bool, cellular_ena
                     "ready": False,
                     "tool_name": "set_low_battery_mode_status",
                     "arguments": {"on": False},
-                    "target_service": "wifi",
+                    "should_call": True,
+                    "reason": "wifi cannot be enabled while low battery mode is on",
                 },
             ),
             ToolExample(
@@ -120,9 +158,27 @@ def next_service_tool_call(target_service: str, wifi_enabled: bool, cellular_ena
                     "ready": False,
                     "tool_name": "set_cellular_service_status",
                     "arguments": {"on": True},
-                    "target_service": "cellular",
+                    "should_call": True,
+                    "reason": "cellular is disabled and must be enabled first",
                 },
                 held_out=True,
+            ),
+            ToolExample(
+                {
+                    "target_service": "location",
+                    "wifi_enabled": True,
+                    "cellular_enabled": True,
+                    "location_service_enabled": True,
+                    "low_battery_mode": False,
+                },
+                {
+                    "ready": True,
+                    "tool_name": "",
+                    "arguments": {},
+                    "should_call": False,
+                    "reason": "location is already enabled",
+                },
+                negative_applicability=True,
             ),
         ),
     )
@@ -142,6 +198,13 @@ def _registry_with_recency_bounds(tmp_path: Path) -> RegistryStore:
             ToolInput("current_timestamp", "float", "Current Unix timestamp."),
         ),
         output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "lower_bound": {"type": "number"},
+                "upper_bound": {"type": "number"},
+            },
+        },
         generalization_rationale=(
             "Creation-recency search repeatedly needs deterministic timestamp bounds."
         ),
@@ -184,6 +247,18 @@ def _registry_with_latest_selector(tmp_path: Path) -> RegistryStore:
             ToolInput("timestamp_key", "str", "Timestamp field to compare."),
         ),
         output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "selected_record": {"type": "object"},
+            },
+        },
+        positive_triggers=("visible_candidate_list_wrong_selected_record",),
+        negative_triggers=("no_valid_timestamp_candidates",),
+        abstain_behavior=(
+            "Return {} when no valid timestamped candidate exists or timestamp ties "
+            "make the choice ambiguous."
+        ),
         generalization_rationale=(
             "Latest-record tasks repeatedly require selecting the newest visible "
             "search result before using original ToolSandbox tools."
@@ -238,6 +313,14 @@ def select_latest_record_by_timestamp(records_payload: dict, timestamp_key: str)
                 {"content": "newer", "creation_timestamp": 7.0},
                 held_out=True,
             ),
+            ToolExample(
+                {
+                    "records_payload": {"records": [{"content": "missing"}]},
+                    "timestamp_key": "creation_timestamp",
+                },
+                {},
+                negative_applicability=True,
+            ),
         ),
     )
     assert validation.accepted
@@ -257,6 +340,18 @@ def _registry_with_timestamp_extreme_selector(tmp_path: Path) -> RegistryStore:
             ToolInput("selection_mode", "str", "Either oldest or latest."),
         ),
         output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "selected_record": {"type": "object"},
+            },
+        },
+        positive_triggers=("visible_candidate_list_wrong_selected_record",),
+        negative_triggers=("no_valid_timestamp_candidates",),
+        abstain_behavior=(
+            "Return {} when no valid timestamped candidate exists or timestamp ties "
+            "make the choice ambiguous."
+        ),
         generalization_rationale=(
             "Oldest/latest record tasks repeatedly require deterministic timestamp "
             "ranking over visible search results before using original tools."
@@ -310,6 +405,15 @@ def select_record_by_timestamp_extreme(records: list, timestamp_key: str, select
                 {"content": "new", "creation_timestamp": 20.0},
                 held_out=True,
             ),
+            ToolExample(
+                {
+                    "records": [{"content": "missing"}],
+                    "timestamp_key": "creation_timestamp",
+                    "selection_mode": "latest",
+                },
+                {},
+                negative_applicability=True,
+            ),
         ),
     )
     assert validation.accepted
@@ -328,6 +432,23 @@ def _registry_with_message_search_window(tmp_path: Path) -> RegistryStore:
             ToolInput("lookback_days", "int", "Days to include before the anchor."),
         ),
         output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "add_reminder_kwargs": {"type": "object"},
+                "should_call_add_reminder": {"type": "boolean"},
+                "should_retry_location_lookup": {"type": "boolean"},
+                "location_status": {"type": "string"},
+            },
+        },
+        positive_triggers=("optional_info_treated_as_required",),
+        negative_triggers=("insufficient_information", "service_precondition_blocker"),
+        preserves_side_effect_tools=("add_reminder",),
+        required_original_tool_calls=("add_reminder",),
+        abstain_behavior=(
+            "Prepare add_reminder kwargs only; never perform reminder side effects "
+            "inside the helper."
+        ),
         generalization_rationale=(
             "Message workflows repeatedly need safe timestamp criteria before "
             "calling search_messages when no contact id or phone number is known."
@@ -402,6 +523,23 @@ def _registry_with_reminder_argument_prep(tmp_path: Path) -> RegistryStore:
             ),
         ),
         output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "add_reminder_kwargs": {"type": "object"},
+                "should_call_add_reminder": {"type": "boolean"},
+                "should_retry_location_lookup": {"type": "boolean"},
+                "location_status": {"type": "string"},
+            },
+        },
+        positive_triggers=("optional_info_treated_as_required",),
+        negative_triggers=("location_unavailable_but_reminder_can_still_be_added",),
+        preserves_side_effect_tools=("add_reminder",),
+        required_original_tool_calls=("add_reminder",),
+        abstain_behavior=(
+            "Prepare add_reminder kwargs only. Return omitted coordinates and do not "
+            "retry optional location lookup when enough information already exists."
+        ),
         generalization_rationale=(
             "Reminder creation tasks need deterministic argument preparation while "
             "still calling the original add_reminder ToolSandbox side-effect tool."
@@ -476,6 +614,32 @@ def prepare_reminder_arguments_with_optional_location(content: str, current_time
                 },
                 held_out=True,
             ),
+            ToolExample(
+                {
+                    "content": "Arrive early",
+                    "current_timestamp": 1777428906.194959,
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": -4.0,
+                    "location_available": True,
+                    "latitude": 37.3237926356735,
+                    "longitude": -122.03961770355414,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {
+                        "content": "Arrive early",
+                        "reminder_timestamp": 1777496400.0,
+                        "latitude": 37.3237926356735,
+                        "longitude": -122.03961770355414,
+                    },
+                    "should_call_add_reminder": True,
+                    "should_retry_location_lookup": False,
+                    "location_status": "provided",
+                },
+                negative_applicability=True,
+            ),
         ),
     )
     assert validation.accepted
@@ -547,6 +711,13 @@ def _registry_with_days_between_helper(tmp_path: Path) -> RegistryStore:
             ToolInput("timestamp_1", "float", "Timestamp to subtract from."),
         ),
         output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer"},
+                "seconds": {"type": "integer"},
+            },
+        },
         generalization_rationale=(
             "Calendar-distance tasks repeatedly need deterministic day/second "
             "differences after retrieving current and target timestamps."
@@ -598,6 +769,19 @@ def _registry_with_contact_constraint_helper(tmp_path: Path) -> RegistryStore:
             ),
         ),
         output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "selected_record": {"type": "object"},
+                "value": {},
+            },
+        },
+        positive_triggers=("wrong_selected_record",),
+        negative_triggers=("ambiguous_match", "no_match"),
+        abstain_behavior=(
+            "Return {} when there is not exactly one normalized match, ties remain, "
+            "or the output field is unavailable."
+        ),
         generalization_rationale="Contact lookup tasks repeatedly need one exact field from one record.",
         inadequacy_evidence="Agents confuse contact candidates, phone formatting, and target fields.",
     )
@@ -648,6 +832,20 @@ def select_contact_field_by_constraint(records: list, match_field: str, expected
                     "output_field": "phone_number",
                 },
                 {},
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {"person_id": "a", "relationship": "friend"},
+                        {"person_id": "b", "relationship": "friend"},
+                    ],
+                    "match_field": "relationship",
+                    "expected_value": "friend",
+                    "output_field": "person_id",
+                },
+                {},
+                negative_applicability=True,
             ),
         ),
     )

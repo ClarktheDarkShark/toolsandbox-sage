@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate
-from sage_ts.generation.tool_spec import GeneratedTool
+from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily
 from sage_ts.validation.ast_safety import check_ast_safety
 from sage_ts.validation.schema_check import compile_generated_tool
 from tool_sandbox.common.execution_context import (
@@ -25,6 +25,7 @@ class ToolExample:
     inputs: dict[str, Any]
     expected: Any
     held_out: bool = False
+    negative_applicability: bool = False
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,7 @@ class ValidationResult:
     errors: tuple[str, ...]
     source_example_count: int = 0
     held_out_check_count: int = 0
+    negative_applicability_count: int = 0
     runtime_smoke_passed: bool = False
 
 
@@ -46,7 +48,7 @@ def _json_serializable(value: Any) -> bool:
 
 def _partition_examples(
     examples: tuple[ToolExample, ...],
-) -> tuple[tuple[ToolExample, ...], tuple[ToolExample, ...]]:
+) -> tuple[tuple[ToolExample, ...], tuple[ToolExample, ...], tuple[ToolExample, ...]]:
     """Split examples into source and semantic held-out cases.
 
     Existing observations predate the ``held_out`` flag and usually include
@@ -54,13 +56,38 @@ def _partition_examples(
     final case as source and reserve the final case as held-out. A single
     example is no longer sufficient for claim-grade acceptance.
     """
-    marked_held_out = tuple(example for example in examples if example.held_out)
+    negative_examples = tuple(
+        example for example in examples if example.negative_applicability
+    )
+    non_negative_examples = tuple(
+        example for example in examples if not example.negative_applicability
+    )
+    marked_held_out = tuple(
+        example
+        for example in examples
+        if example.held_out and not example.negative_applicability
+    )
     if marked_held_out:
-        source = tuple(example for example in examples if not example.held_out)
-        return source, marked_held_out
-    if len(examples) >= 2:
-        return examples[:-1], examples[-1:]
-    return examples, ()
+        source = tuple(
+            example
+            for example in examples
+            if not example.held_out and not example.negative_applicability
+        )
+        return source, marked_held_out, negative_examples
+    if len(non_negative_examples) >= 2:
+        source = non_negative_examples[:-1]
+        held_out = non_negative_examples[-1:]
+        return source, held_out, negative_examples
+    source = non_negative_examples
+    return source, (), negative_examples
+
+
+def _requires_negative_applicability(tool: GeneratedTool) -> bool:
+    return tool.spec.family in {
+        ToolFamily.STATE_PRECONDITION_HELPER,
+        ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+    }
 
 
 def _runtime_smoke(
@@ -114,7 +141,9 @@ def validate_generated_tool(
 ) -> ValidationResult:
     if not examples:
         return ValidationResult(False, ("missing_source_examples",))
-    source_examples, held_out_examples = _partition_examples(examples)
+    source_examples, held_out_examples, negative_examples = _partition_examples(
+        examples
+    )
     if not source_examples:
         return ValidationResult(False, ("missing_source_examples",))
     if not held_out_examples:
@@ -122,6 +151,13 @@ def validate_generated_tool(
             False,
             ("missing_semantic_held_out_examples",),
             source_example_count=len(source_examples),
+        )
+    if _requires_negative_applicability(tool) and not negative_examples:
+        return ValidationResult(
+            False,
+            ("missing_negative_applicability_examples",),
+            source_example_count=len(source_examples),
+            held_out_check_count=len(held_out_examples),
         )
 
     gate = evaluate_candidate_gate(tool.spec)
@@ -152,6 +188,10 @@ def validate_generated_tool(
             (f"held_out_{index}", example)
             for index, example in enumerate(held_out_examples)
         ),
+        *(
+            (f"negative_{index}", example)
+            for index, example in enumerate(negative_examples)
+        ),
     )
     for label, example in all_examples:
         try:
@@ -179,5 +219,6 @@ def validate_generated_tool(
         tuple(errors),
         source_example_count=len(source_examples),
         held_out_check_count=len(held_out_examples),
+        negative_applicability_count=len(negative_examples),
         runtime_smoke_passed=runtime_smoke_passed,
     )

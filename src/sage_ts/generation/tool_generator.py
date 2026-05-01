@@ -9,7 +9,13 @@ from typing import Any, Protocol
 
 from sage_ts.adapters.openai_agent_adapter import ChatRequest
 from sage_ts.generation.prompt_cache import PromptCache, cache_key
-from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
+from sage_ts.generation.tool_spec import (
+    GeneratedTool,
+    StructuredInadequacyEvidence,
+    ToolFamily,
+    ToolInput,
+    ToolSpec,
+)
 
 
 class ChatCompleter(Protocol):
@@ -25,6 +31,7 @@ class ToolGenerationRequest:
     allowed_families: tuple[str, ...]
     validation_examples: tuple[dict[str, object], ...] = ()
     suggested_tool_name: str | None = None
+    inadequacy_evidence: dict[str, object] | None = None
 
     def prompt(self) -> str:
         families = ", ".join(self.allowed_families)
@@ -38,6 +45,11 @@ class ToolGenerationRequest:
             if self.suggested_tool_name
             else ""
         )
+        evidence = (
+            f" Structured inadequacy evidence: {json.dumps(self.inadequacy_evidence)}."
+            if self.inadequacy_evidence
+            else ""
+        )
         return (
             "Propose one deterministic Python helper tool as JSON with two top-level "
             'keys: "spec" and "code". '
@@ -45,8 +57,15 @@ class ToolGenerationRequest:
             "description (str), "
             'inputs (list of objects each with exactly keys "name", "annotation", '
             '"description"), '
-            "output_annotation (str), generalization_rationale (str), "
-            "inadequacy_evidence (str). "
+            "output_annotation (str), output_schema (object|null), "
+            "positive_triggers (list[str]), negative_triggers (list[str]), "
+            "preserves_side_effect_tools (list[str]), "
+            "required_original_tool_calls (list[str]), abstain_behavior (str), "
+            "generalization_rationale (str), inadequacy_evidence (object). "
+            "inadequacy_evidence must include: summary (str), signals (list[str]), "
+            "failed_tool_calls (list[str]), repeated_failed_tool_calls (list[str]), "
+            "visible_data_gaps (list[str]), planner_failures (list[str]), "
+            "final_answer_route_mismatch (bool). "
             "Annotations must be exactly one of: str, int, float, bool, dict, list. "
             'If the output is a dictionary, output_annotation must be exactly "dict". '
             '"code" is a self-contained Python function string with exactly one '
@@ -59,7 +78,8 @@ class ToolGenerationRequest:
             "The function must pass every validation example exactly. "
             f"{tool_name_hint} "
             f"Allowed families: {families}. "
-            f"Scenario: {self.scenario_name}. Observation: {self.observation}.{examples}"
+            f"Scenario: {self.scenario_name}. Observation: {self.observation}."
+            f"{evidence}{examples}"
         )
 
 
@@ -82,11 +102,6 @@ class ToolGenerator:
             )
             self.cache.put(key, response)
         return parse_generated_tool_json(response)
-
-
-def _to_snake_case(name: str) -> str:
-    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
-    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
 def _coerce_input(item: Any) -> ToolInput:
@@ -112,13 +127,39 @@ def parse_generated_tool_json(response: str) -> GeneratedTool:
         response = response.removesuffix("```").strip()
     payload = json.loads(response)
     spec_payload = payload["spec"]
+    tool_name = str(spec_payload["tool_name"])
+    if tool_name != tool_name.strip():
+        raise ValueError("tool_name_has_surrounding_whitespace")
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", tool_name):
+        raise ValueError(f"invalid_python_function_name:{tool_name}")
     spec = ToolSpec(
-        tool_name=_to_snake_case(str(spec_payload["tool_name"])),
+        tool_name=tool_name,
         family=ToolFamily(str(spec_payload["family"])),
         description=str(spec_payload["description"]),
         inputs=tuple(_coerce_input(item) for item in spec_payload["inputs"]),
         output_annotation=str(spec_payload["output_annotation"]),
+        output_schema=spec_payload.get("output_schema"),
+        positive_triggers=tuple(
+            str(item) for item in spec_payload.get("positive_triggers", ())
+        ),
+        negative_triggers=tuple(
+            str(item) for item in spec_payload.get("negative_triggers", ())
+        ),
+        preserves_side_effect_tools=tuple(
+            str(item) for item in spec_payload.get("preserves_side_effect_tools", ())
+        ),
+        required_original_tool_calls=tuple(
+            str(item) for item in spec_payload.get("required_original_tool_calls", ())
+        ),
+        abstain_behavior=str(spec_payload.get("abstain_behavior", "")),
         generalization_rationale=str(spec_payload["generalization_rationale"]),
-        inadequacy_evidence=str(spec_payload["inadequacy_evidence"]),
+        inadequacy_evidence=StructuredInadequacyEvidence.from_json(
+            dict(spec_payload.get("inadequacy_evidence", {}))
+        )
+        if isinstance(spec_payload.get("inadequacy_evidence"), dict)
+        else StructuredInadequacyEvidence(
+            summary=str(spec_payload.get("inadequacy_evidence", "")),
+            signals=(),
+        ),
     )
     return GeneratedTool(spec=spec, code=str(payload["code"]))

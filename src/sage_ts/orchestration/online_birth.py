@@ -133,6 +133,7 @@ class OnlineBirthController:
                 for item in observation.validation_examples
             ),
             suggested_tool_name=suggested_name,
+            inadequacy_evidence=observation.to_inadequacy_evidence().to_json(),
         )
         self._event(
             "tool_birth_started",

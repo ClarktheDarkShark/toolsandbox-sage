@@ -73,6 +73,10 @@ def _generation_enabled_by_default(mode: str, manifest_type: str) -> bool:
     return "discovery" in manifest_type.lower()
 
 
+def _is_frozen_transfer_mode(mode: str) -> bool:
+    return mode.startswith("transfer_")
+
+
 def _timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -721,7 +725,9 @@ def main() -> None:
     control_resume_dir = _resume_arm_dir(args.resume_run_root, "control")
     candidate_resume_dir = _resume_arm_dir(args.resume_run_root, "candidate")
     generation_enabled = _generation_enabled_by_default(args.mode, manifest_type)
-    if args.generation == "on":
+    if _is_frozen_transfer_mode(args.mode):
+        generation_enabled = False
+    elif args.generation == "on":
         generation_enabled = True
     elif args.generation == "off":
         generation_enabled = False
