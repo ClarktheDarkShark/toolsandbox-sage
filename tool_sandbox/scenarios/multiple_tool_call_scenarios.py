@@ -3,7 +3,6 @@
 """Scenarios where more than 1 tool call to be issued to complete the task"""
 
 import datetime
-
 import json
 from functools import partial
 

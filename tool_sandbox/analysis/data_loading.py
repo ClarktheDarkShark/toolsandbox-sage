@@ -47,9 +47,9 @@ def get_scenario_artifacts_path(
     result_summary_path: pathlib.Path, *, scenario_name: str
 ) -> pathlib.Path:
     """Get the path to the artifacts for a specific scenario."""
-    assert (
-        result_summary_path.suffix == ".json"
-    ), f"Expected the path to the `result_summary.json` file, but got '{result_summary_path}'."
+    assert result_summary_path.suffix == ".json", (
+        f"Expected the path to the `result_summary.json` file, but got '{result_summary_path}'."
+    )
     return result_summary_path.parent / "trajectories" / scenario_name
 
 

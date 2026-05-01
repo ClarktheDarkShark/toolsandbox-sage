@@ -2,7 +2,6 @@
 # Copyright (C) 2024 Apple Inc. All Rights Reserved.
 """Simple Scenarios which only requires 1 tool call to be issued"""
 
-
 import json
 from functools import partial
 from typing import Dict, List

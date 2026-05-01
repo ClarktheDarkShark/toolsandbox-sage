@@ -332,10 +332,7 @@ def serialize_to_conversation(
         get_all_history_snapshots=True,
     ).filter(
         ((pl.col("sender") == RoleType.AGENT) | (pl.col("recipient") == RoleType.AGENT))
-        & (
-            (pl.col("visible_to") != [RoleType.USER])
-            | (pl.col("visible_to").is_null())
-        )
+        & ((pl.col("visible_to") != [RoleType.USER]) | (pl.col("visible_to").is_null()))
     )
     subset_to_snapshot_indices_mapping: list[int] = cast(
         list[int], message_subset_database["sandbox_message_index"].to_list()

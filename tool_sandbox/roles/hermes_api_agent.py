@@ -213,9 +213,9 @@ def to_chat_completion_message(choice: CompletionChoice) -> ChatCompletionMessag
 
 def completion_to_chat_completion(response: Completion) -> ChatCompletion:
     """Convert the `Completion` to a `ChatCompletion` object with tool calls."""
-    assert (
-        len(response.choices) > 0
-    ), f"The `choices` list of the response must not be empty:\n{response}"
+    assert len(response.choices) > 0, (
+        f"The `choices` list of the response must not be empty:\n{response}"
+    )
     assert len(response.choices) == 1, (
         f"Only a single choice is currently supported but got {len(response.choices)}:"
         f"\n{response}"
@@ -248,9 +248,9 @@ class HermesAPIAgent(BaseRole):
         super().__init__()
 
         self.model_name = model_name
-        assert (
-            "OPENAI_BASE_URL" in os.environ
-        ), "The `OPENAI_BASE_URL` environment variable must be set."
+        assert "OPENAI_BASE_URL" in os.environ, (
+            "The `OPENAI_BASE_URL` environment variable must be set."
+        )
         self.client = OpenAI(api_key="EMPTY")
 
         prompts_file = os.path.join(

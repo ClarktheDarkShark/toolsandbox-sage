@@ -152,13 +152,13 @@ def response_to_messages(
         ]
 
     # No tool use needed. Simply return the text response.
-    assert (
-        len(response.content) == 1
-    ), f"Only a single content element is supported, but got {len(response.content)}."
+    assert len(response.content) == 1, (
+        f"Only a single content element is supported, but got {len(response.content)}."
+    )
     text_block = response.content[0]
-    assert isinstance(
-        text_block, anthropic.types.text_block.TextBlock
-    ), f"Expected content element to be a `TextBlock`, but got {type(text_block)}."
+    assert isinstance(text_block, anthropic.types.text_block.TextBlock), (
+        f"Expected content element to be a `TextBlock`, but got {type(text_block)}."
+    )
     return [
         Message(
             sender=sender,
@@ -283,9 +283,9 @@ def to_anthropic_message_collection(
 
     for message in messages:
         if message.sender == RoleType.SYSTEM and message.recipient == RoleType.AGENT:
-            assert (
-                system_prompt is anthropic.NOT_GIVEN
-            ), f"System prompt is already set to '{system_prompt}'."
+            assert system_prompt is anthropic.NOT_GIVEN, (
+                f"System prompt is already set to '{system_prompt}'."
+            )
             system_prompt = message.content
         elif message.sender == RoleType.USER and message.recipient == RoleType.AGENT:
             anthropic_messages.append(

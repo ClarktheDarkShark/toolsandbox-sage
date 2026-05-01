@@ -756,9 +756,9 @@ class InstructRequestNormalizer(
         """
         tool_messages: List[ToolMessageType] = []
         for message in messages:
-            assert isinstance(
-                message, self._tool_message_class
-            ), "Expected tool message"
+            assert isinstance(message, self._tool_message_class), (
+                "Expected tool message"
+            )
             content = self._aggregate_content_chunks(message.content)
             normalized_content = self._normalize_json_content(content)
             tool_messages.append(
@@ -790,9 +790,9 @@ class InstructRequestNormalizer(
         tool_calls: List[ToolCall] = []
         prefix: bool = False
         for message in messages:
-            assert isinstance(
-                message, self._assistant_message_class
-            ), "Expected assistant message"
+            assert isinstance(message, self._assistant_message_class), (
+                "Expected assistant message"
+            )
             if message.tool_calls is not None:
                 for tool_call in message.tool_calls:
                     normalized_tool_call = self._normalize_tool_call(tool_call)
@@ -814,9 +814,9 @@ class InstructRequestNormalizer(
     def _aggregate_user_messages(self, messages: List[UATS]) -> UserMessageType:  # type: ignore
         aggregated_content: List[str] = []
         for message in messages:
-            assert isinstance(
-                message, self._user_message_class
-            ), "Expected user message"
+            assert isinstance(message, self._user_message_class), (
+                "Expected user message"
+            )
             content = self._aggregate_content_chunks(message.content)
             if content:
                 aggregated_content.append(content)
@@ -1273,9 +1273,9 @@ class InstructTokenizerV3(
 
     def _prepare_tool_result(self, tool_message: ToolMessage) -> Dict[str, Any]:
         assert tool_message.content is not None, "Tool message content cannot be None"
-        assert (
-            tool_message.tool_call_id is not None
-        ), "Tool message has to have the tool call id defined in v3"
+        assert tool_message.tool_call_id is not None, (
+            "Tool message has to have the tool call id defined in v3"
+        )
 
         return {
             "content": self._parse_json_content(tool_message.content),

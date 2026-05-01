@@ -213,9 +213,9 @@ class MistralAgent(BaseRole):
         MISTRAL_PATH.mkdir(parents=True, exist_ok=True)
         if not MISTRAL_TOKENIZER_PATH.exists():
             hf_token = os.environ.get("HF_TOKEN")
-            assert (
-                hf_token is not None
-            ), "`HF_TOKEN` must be set to your Hugging Face token."
+            assert hf_token is not None, (
+                "`HF_TOKEN` must be set to your Hugging Face token."
+            )
             snapshot_download(
                 repo_id="mistralai/Mistral-7B-Instruct-v0.3",
                 allow_patterns=["tokenizer.model.v3"],
@@ -359,9 +359,9 @@ class MistralOpenAIServerAgent(MistralAgent):
         super().__init__()
         self.model_name = model_name
 
-        assert (
-            "OPENAI_BASE_URL" in os.environ
-        ), "The `OPENAI_BASE_URL` environment variable must be set."
+        assert "OPENAI_BASE_URL" in os.environ, (
+            "The `OPENAI_BASE_URL` environment variable must be set."
+        )
         self.openai_client: OpenAI = OpenAI(api_key="EMPTY")
 
         # Monkey patch self.openai_client.chat.completions.create with pre and post
