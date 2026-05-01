@@ -3,18 +3,29 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import inspect
+import json
 from collections.abc import Iterable, MutableMapping
 from typing import Any, Callable, cast
 
+from sage_ts.evaluation.task_strata import (
+    HELPER_TRIGGERS,
+    base_task_family,
+    classify_task_strata,
+)
 from sage_ts.generation.tool_spec import ToolFamily
-from sage_ts.registry.manifest import RegistryEntry
+from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.schema_check import compile_generated_tool
+from tool_sandbox.common import tool_conversion
 from tool_sandbox.common.execution_context import ExecutionContext, RoleType
 from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_discovery import ToolBackend, get_scrambled_tool_names
 from tool_sandbox.common.utils import add_tool_trace
+
+tool_conversion.PYTHON_TO_JSON_TYPES.setdefault("dict", "object")
+tool_conversion.PYTHON_TO_JSON_TYPES.setdefault("list", "array")
 
 PYTHON_TYPES: dict[str, Any] = {
     "str": str,
@@ -22,15 +33,54 @@ PYTHON_TYPES: dict[str, Any] = {
     "float": float,
     "bool": bool,
     "dict": dict,
+    "list": list,
 }
 
 
 def _google_docstring(entry: RegistryEntry) -> str:
     spec = entry.tool.spec
-    lines = [spec.description, "", "Args:"]
+    description = spec.description
+    if spec.tool_name in {"next_service_tool_call", "recover_from_tool_error"}:
+        description = (
+            f"{description} Use only for the single service you are actively "
+            "trying to change. Do not call this helper for multiple alternative "
+            "services in parallel. Use this helper only to prepare the next "
+            "original ToolSandbox side-effect call. After calling it, execute "
+            "the returned original ToolSandbox tool; do not treat the helper "
+            "itself as completing the task."
+        )
+    lines = [description, "", "Args:"]
     for item in spec.inputs:
         lines.append(f"    {item.name}: {item.description}")
     lines.extend(["", "Returns:", f"    {spec.output_annotation}"])
+    if spec.tool_name == "next_service_tool_call":
+        lines.extend(
+            [
+                "",
+                "Usage:",
+                "    Use only for the single service you are actively trying to"
+                " change.",
+                "    Do not call this helper for multiple alternative services in"
+                " parallel.",
+                "    Execute only the returned ToolSandbox tool call for the"
+                " chosen target service.",
+                "    If the target service succeeds, answer only about that final"
+                " target state unless the user asked to broaden scope.",
+            ]
+        )
+    if spec.tool_name == "recover_from_tool_error":
+        lines.extend(
+            [
+                "",
+                "Usage:",
+                "    Call this helper immediately after a ToolSandbox tool returns",
+                " a PermissionError or ConnectionError about service state.",
+                "    Then execute the returned original ToolSandbox tool name with",
+                " the returned JSON arguments.",
+                "    This helper prepares the next legal call; it does not perform",
+                " the side effect itself.",
+            ]
+        )
     return "\n".join(lines)
 
 
@@ -45,6 +95,11 @@ def _compile_toolsandbox_tool(
 ) -> Callable[..., Any]:
     if entry.retired or not entry.validation.accepted:
         raise ValueError(f"registry entry is not active: {entry.tool.spec.tool_name}")
+    if not has_current_validation_proof(entry):
+        raise ValueError(
+            "registry entry lacks current validation proof: "
+            f"{entry.tool.spec.tool_name}"
+        )
 
     compiled = compile_generated_tool(entry.tool)
     if compiled.function is None:
@@ -62,12 +117,12 @@ def _compile_toolsandbox_tool(
 
     def _wrapped(*args: Any, **kwargs: Any) -> Any:
         result = _inner(*args, **kwargs)
-        add_tool_trace(_inner, result, *args, **kwargs)
+        add_tool_trace(_wrapped, result, *args, **kwargs)
         if on_reuse is not None:
             on_reuse(_tool_name)
         return result
 
-    _wrapped.__name__ = raw_fn.__name__
+    _wrapped.__name__ = _tool_name
     _wrapped.__doc__ = raw_fn.__doc__
     fn = _wrapped
 
@@ -140,41 +195,219 @@ def inject_registry_tools_into_context(
     return injected
 
 
+def registry_entry_visibility_reason(
+    entry: RegistryEntry,
+    scenario_name: str | None,
+) -> tuple[bool, str]:
+    """Return whether a retained helper should be exposed and why."""
+    if entry.retired or not entry.validation.accepted:
+        return False, "registry_entry_not_active"
+    if not has_current_validation_proof(entry):
+        return False, "legacy_validation_missing_current_proof"
+
+    if not scenario_name:
+        return True, "missing_scenario_name"
+
+    name = scenario_name.lower()
+    tool_name = entry.tool.spec.tool_name
+    scenario_strata = set(classify_task_strata(name))
+    is_insufficient = "insufficient_information" in name
+
+    if tool_name == "relative_day_time_to_timestamp":
+        if name.startswith("modify_reminder_with_recency_latest"):
+            return True, "relative_time_modify_latest_reminder"
+        if name.startswith("add_reminder_content_and_week_delta"):
+            return True, "relative_time_add_reminder_week_delta"
+        return False, "relative_time_requires_explicit_relative_datetime_task"
+
+    if tool_name == "recency_to_timestamp_bounds":
+        bounded_recency = any(
+            token in name for token in ("yesterday", "today", "upcoming")
+        )
+        if (
+            "insufficient_information" not in name
+            and name.startswith("search_reminder_with_creation_recency_")
+            and bounded_recency
+        ):
+            return True, "recency_bounds_creation_search_task"
+        if name.startswith("search_message_with_recency_") and bounded_recency:
+            return True, "recency_bounds_search_task"
+        return False, "recency_bounds_requires_bounded_recency_task"
+
+    if tool_name == "days_between_timestamps":
+        if name.startswith("find_days_till_holiday"):
+            return True, "calendar_day_distance_task"
+        return False, "calendar_day_distance_requires_holiday_task"
+
+    if tool_name == "prepare_reminder_arguments_with_optional_location":
+        if is_insufficient:
+            return (
+                False,
+                "reminder_argument_prep_suppressed_for_insufficient_information",
+            )
+        if "low_battery" in name:
+            return (
+                False,
+                "reminder_argument_prep_suppressed_for_service_precondition_task",
+            )
+        if (
+            name.startswith("add_reminder_content_and_")
+            and "_time" in name
+            and "_location" in name
+        ):
+            return True, "reminder_argument_prep_add_reminder_time_location_task"
+        return False, "reminder_argument_prep_requires_add_reminder_time_location_task"
+
+    if tool_name == "message_search_time_window":
+        return False, "message_search_window_suppressed_after_focused_regression"
+
+    if tool_name == "message_search_args_for_contact":
+        return (
+            False,
+            "message_search_args_suppressed_schema_requires_preexisting_contact",
+        )
+
+    if entry.tool.spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
+        if tool_name == "select_contact_by_constraint":
+            return False, "contact_selector_suppressed_visible_not_called_pollution"
+        if tool_name == "select_contact_field_by_constraint":
+            return (
+                False,
+                "contact_field_selector_suppressed_visible_not_called_pollution",
+            )
+        if tool_name == "select_latest_record_by_timestamp":
+            if "insufficient_information" not in name and name.startswith(
+                ("modify_contact_with_message_recency",)
+            ):
+                return True, "latest_message_record_selection_required"
+            return False, "latest_record_suppressed_outside_message_search"
+        if tool_name == "select_record_by_timestamp_extreme":
+            if (
+                "insufficient_information" not in name
+                and "multiple_user_turn" not in name
+                and "_alt" not in name
+                and name.startswith(
+                    (
+                        "search_message_with_recency_latest",
+                        "search_message_with_recency_oldest",
+                    )
+                )
+            ):
+                return True, "simple_message_timestamp_extreme_selection_required"
+            return False, "timestamp_extreme_suppressed_outside_message_ranking_tasks"
+        if tool_name == "select_self_message_by_timestamp":
+            return False, "self_message_selector_suppressed_empty_input_misuse"
+        return _provisional_birth_family_visibility(entry, name)
+
+    if entry.tool.spec.family == ToolFamily.CANONICALIZER:
+        return _provisional_birth_family_visibility(entry, name)
+
+    if tool_name == "extract_stock_symbol":
+        if "insufficient_information" not in name and name.startswith(
+            "find_stock_symbol_with_company_name"
+        ):
+            return True, "stock_symbol_extraction_task"
+        return False, "stock_symbol_requires_stock_lookup_task"
+
+    if entry.tool.spec.family != ToolFamily.STATE_PRECONDITION_HELPER:
+        return _provisional_birth_family_visibility(entry, name)
+
+    if tool_name == "next_service_enablement_action":
+        return False, "state_helper_suppressed_trace_mismatch_use_tool_call_variant"
+
+    if tool_name == "next_service_tool_call":
+        if "insufficient_information" in name:
+            return False, "state_helper_suppressed_for_insufficient_information"
+        direct_service_prefixes = (
+            "turn_on_wifi_low_battery_mode",
+            "turn_on_cellular_low_battery_mode",
+            "turn_on_location_low_battery_mode",
+        )
+        if name.startswith(direct_service_prefixes):
+            return True, "state_tool_call_direct_service_precondition_task"
+        if "low_battery_mode" in name:
+            return True, "state_tool_call_downstream_service_precondition_task"
+        return False, "state_helper_requires_direct_service_precondition_task"
+
+    if tool_name == "recover_from_tool_error":
+        if "insufficient_information" in name:
+            return False, "error_recovery_suppressed_for_insufficient_information"
+        if "low_battery_mode" in name:
+            return True, "error_recovery_low_battery_service_precondition_task"
+        return False, "error_recovery_requires_service_precondition_task"
+
+    return False, "state_helper_requires_direct_service_state_task"
+
+
+def retained_tool_visibility_policy_digest() -> str:
+    """Return a digest that changes when retained-tool routing policy changes."""
+    payload = {
+        "policy_version": "v4_failure_driven_strata_shared_birth",
+        "helper_triggers": HELPER_TRIGGERS,
+        "visibility_source": inspect.getsource(registry_entry_visibility_reason),
+        "provisional_source": inspect.getsource(_provisional_birth_family_visibility),
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _provisional_birth_family_visibility(
+    entry: RegistryEntry,
+    normalized_scenario_name: str,
+) -> tuple[bool, str]:
+    """Expose unknown helpers by task stratum before falling back to birth family."""
+    scenario_strata = set(classify_task_strata(normalized_scenario_name))
+    tool_name = entry.tool.spec.tool_name
+    trigger_strata = set(HELPER_TRIGGERS.get(tool_name, ()))
+    if trigger_strata and scenario_strata & trigger_strata:
+        return True, "provisional_helper_trigger_stratum_visibility"
+
+    family_strata = {
+        ToolFamily.CANONICALIZER: {
+            "temporal_reminder_date_canonicalization",
+            "holiday_calendar_business_day_logic",
+        },
+        ToolFamily.DERIVED_VALUE_CALCULATOR: {
+            "temporal_reminder_date_canonicalization",
+            "record_filtering_ranking_latest_selection",
+            "holiday_calendar_business_day_logic",
+            "contact_message_search_disambiguation",
+            "stock_market_numeric_normalization",
+        },
+        ToolFamily.SEARCH_FILTER_RANKING_HELPER: {
+            "contact_message_search_disambiguation",
+            "record_filtering_ranking_latest_selection",
+        },
+        ToolFamily.STATE_PRECONDITION_HELPER: {
+            "direct_state_precondition_service_enablement",
+        },
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER: {
+            "generic_multi_tool_composition",
+        },
+        ToolFamily.VALIDATION_ABSTENTION_HELPER: {
+            "insufficient_information_clarification",
+        },
+    }.get(entry.tool.spec.family, set())
+    birth_scenario = (entry.birth_scenario or "").lower()
+    if birth_scenario:
+        birth_strata = set(classify_task_strata(birth_scenario))
+        shared_family_strata = scenario_strata & birth_strata & family_strata
+        if shared_family_strata:
+            return True, "provisional_shared_birth_stratum_visibility"
+
+    if birth_scenario and base_task_family(birth_scenario) == base_task_family(
+        normalized_scenario_name
+    ):
+        return True, "provisional_same_birth_family_visibility"
+    return False, "unknown_helper_requires_visibility_policy"
+
+
 def registry_entry_matches_scenario(
     entry: RegistryEntry,
     scenario_name: str | None,
 ) -> bool:
     """Return whether a retained helper should be exposed for this scenario."""
-    if not scenario_name:
-        return True
-    if entry.tool.spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
-        name = scenario_name.lower()
-        if entry.tool.spec.tool_name == "select_latest_record_by_timestamp":
-            return "latest" in name and name.startswith(
-                (
-                    "modify_reminder_with_recency_latest",
-                    "remove_reminder_with_recency_latest",
-                    "search_message_with_recency_latest",
-                )
-            )
-        return False
-    if entry.tool.spec.family != ToolFamily.STATE_PRECONDITION_HELPER:
-        return True
-
-    name = scenario_name.lower()
-    direct_state_prefixes = ("turn_on_", "enable_", "set_")
-    service_tokens = (
-        "wifi",
-        "wi_fi",
-        "wi-fi",
-        "cellular",
-        "location",
-        "low_battery",
-        "low-battery",
-    )
-    return name.startswith(direct_state_prefixes) and any(
-        token in name for token in service_tokens
-    )
+    return registry_entry_visibility_reason(entry, scenario_name)[0]
 
 
 def with_registry_tools(

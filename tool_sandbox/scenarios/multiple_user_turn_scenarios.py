@@ -3026,8 +3026,10 @@ def get_extensions(base_scenarios: dict[str, Scenario]) -> list[ScenarioExtensio
                 "datetime_info_to_timestamp",
                 "search_location_around_lat_lon",
                 "set_low_battery_mode_status",
+                "set_location_service_status",
                 "set_wifi_status",
                 "get_low_battery_mode_status",
+                "get_location_service_status",
                 "get_wifi_status",
             ],
             milestones=[

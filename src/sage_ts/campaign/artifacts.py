@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
+from sage_ts.config.models import DEFAULT_MODEL
+
 ARTIFACT_ROOT = Path("artifacts")
 EVENT_TYPES = {
     "campaign_started",
@@ -128,7 +130,7 @@ def initialize_campaign(
         "phase": phase,
         "branch": git_value("branch", "--show-current"),
         "git_sha": git_value("rev-parse", "HEAD"),
-        "model": "gpt-5-mini",
+        "model": DEFAULT_MODEL,
         "benchmark": "ToolSandbox",
         "base_toolset": "recency_reduced for current proof; category-specific reduced policies for future lanes",
         "generation_settings": {

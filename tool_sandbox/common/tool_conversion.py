@@ -314,7 +314,11 @@ def _get_python_function_arguments(
             hasattr(arg_type, "__name__")
             and getattr(arg_type, "__name__") in PYTHON_TO_JSON_TYPES
         ):
-            properties[arg] = {"type": PYTHON_TO_JSON_TYPES[arg_type.__name__]}
+            json_type = PYTHON_TO_JSON_TYPES[arg_type.__name__]
+            if json_type == "array":
+                properties[arg] = {"type": "array", "items": {}}
+            else:
+                properties[arg] = {"type": json_type}
         elif (
             hasattr(arg_type, "__dict__")
             and getattr(arg_type, "__dict__").get("__origin__", None) == Literal

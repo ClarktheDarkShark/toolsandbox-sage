@@ -20,6 +20,7 @@ from sage_ts.cache.openai_response_cache import (
 from sage_ts.cache.openai_response_cache import (
     write_metrics as write_openai_response_cache_metrics,
 )
+from sage_ts.config.models import DEFAULT_MODEL
 from sage_ts.config.splits import load_split_names
 from sage_ts.generation.prompt_cache import PromptCache
 from sage_ts.generation.tool_generator import ToolGenerator
@@ -38,7 +39,7 @@ def main() -> None:
         choices=KNOWN_POLICIES,
         default=UPSTREAM_POLICY,
     )
-    parser.add_argument("--generation-model", default="gpt-5-mini")
+    parser.add_argument("--generation-model", default=DEFAULT_MODEL)
     parser.add_argument("--recurrence-threshold", type=int, default=2)
     parser.add_argument(
         "--prompt-cache-dir", type=Path, default=Path("outputs/prompt_cache")

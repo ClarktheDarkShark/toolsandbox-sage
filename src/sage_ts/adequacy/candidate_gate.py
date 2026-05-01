@@ -15,6 +15,11 @@ STATE_ACTIONABLE_TOKENS = (
     "ready",
     "precondition_met",
     "predicate",
+    "tool_call",
+    "tool call",
+    "tool_name",
+    "arguments",
+    "setter",
 )
 SEARCH_FILTER_ACTIONABLE_TOKENS = (
     "select",
@@ -43,7 +48,14 @@ def evaluate_candidate_gate(spec: ToolSpec) -> GateDecision:
     if len(spec.inadequacy_evidence.strip()) < 20:
         return GateDecision(False, "weak_inadequacy_evidence")
     if spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
-        text = " ".join([spec.tool_name, spec.description]).lower()
+        text = " ".join(
+            [
+                spec.tool_name,
+                spec.description,
+                spec.output_annotation,
+                *(item.name for item in spec.inputs),
+            ]
+        ).lower()
         if not any(token in text for token in STATE_ACTIONABLE_TOKENS):
             return GateDecision(False, "state_helper_not_runtime_actionable")
     if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:

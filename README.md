@@ -1,4 +1,62 @@
-# ToolSandbox: A Stateful, Conversational, Interactive Evaluation Benchmark for LLM Tool Use Capabilities
+# SAGE: Self-Adaptive Generative Evolution
+
+SAGE is a ToolSandbox-based self-evolving agent research system. It starts from an intentionally incomplete but fair base toolset, detects missing deterministic capabilities during ToolSandbox tasks, generates small typed Python helper tools, validates those helpers, stores accepted helpers in a persistent registry, and later routes retained helpers back into unseen ToolSandbox scenarios.
+
+The research claim is not simply “better tool calling.” The claim is tool evolution:
+
+1. the base toolset is inadequate for a repeated deterministic subproblem,
+2. SAGE detects that inadequacy with an explicit adequacy gate,
+3. SAGE generates a reusable helper tool rather than a one-off script,
+4. the helper passes held-out semantic validation and runtime smoke checks,
+5. the helper is retained in a local registry,
+6. later tasks load and call that retained helper,
+7. matched control/SAGE runs show task-outcome improvement or preservation from reuse.
+
+This repository is built on Apple’s ToolSandbox benchmark. The upstream ToolSandbox code, license, and benchmark README are retained below for attribution and reproducibility.
+
+## What SAGE Adds
+
+SAGE sits around the ToolSandbox execution loop rather than replacing it. The benchmark still provides the stateful environment, user simulator, tool calls, trajectories, and canonical milestone scoring. SAGE adds the experimental layer for autonomous helper-tool evolution.
+
+- **Adequacy gate:** decides whether a task failure reflects a missing deterministic capability, repeated transform, raw-data-to-derived-value gap, or insufficient information that should not trigger tool generation.
+- **Tool generation:** creates small typed Python helpers for canonicalization, timestamp/date computation, record selection/ranking, state-precondition next actions, and argument preparation.
+- **Validation:** checks generated helpers with AST safety rules, import/compile checks, schema checks, semantic held-out cases, and ToolSandbox runtime smoke tests before registry insertion.
+- **Persistent registry:** stores accepted helper code, metadata, validation evidence, source scenario, reuse counts, known failure modes, and registry lock/digest data.
+- **Runtime routing:** exposes retained helpers only when task-stratum and helper-family triggers indicate relevance, then logs visible tools, called tools, filtered tools, and selection outcomes.
+- **Evaluation harness:** runs matched control and SAGE cohorts with shared scenario order, model, base tools, cache policy, and dashboard artifacts.
+- **Dashboard:** exports live run state, task transcripts, tool births, accepted/rejected helpers, registry contents, canonical score, outcome-score sanity checks, cache status, and blockers.
+- **Caching and API safeguards:** uses exact OpenAI response caching for development runs and local RapidAPI caching for fixed external lookup results, while keeping claim runs cache-symmetric and explicitly reported.
+
+Generated helpers are not allowed to be hidden-answer checkers, advisory prose plans, broad natural-language wrappers, one-off scenario patches, or replacements for ToolSandbox side-effect tools when canonical milestones require those original tools. Helpers should prepare arguments, normalize values, choose records, compute deterministic values, or return one benchmark-compatible next tool call.
+
+## SAGE Command Surface
+
+Common commands used during the ToolSandbox SAGE campaign:
+
+```bash
+make test
+make dashboard
+make reproduce_poc CACHE_MODE=read_write
+make transfer_recency REGISTRY=<path> CACHE_MODE=write_only
+make transfer_relative_time REGISTRY=<path> CACHE_MODE=write_only
+make smoke4 CATEGORY=<category> REGISTRY=<path> CACHE_MODE=read_write
+make viability12 CATEGORY=<category> REGISTRY=<path> CACHE_MODE=read_write
+make transfer60 CATEGORY=<category> REGISTRY=<path> CACHE_MODE=write_only
+make confirm100 REGISTRY=<path> MODE=<control|evolve> CACHE_MODE=write_only
+make summarize RUN=<path>
+make cache_stats RUN=<path>
+make freeze_registry REGISTRY=<path> OUT=<lockfile>
+```
+
+Local secrets should be kept out of Git. Use `.secrets/` or environment variables for keys such as `OPENAI_API_KEY` and `RAPID_API_KEY`; `.secrets/` is ignored by Git.
+
+## Current Evidence Snapshot
+
+The current SAGE prototype has demonstrated the full mechanical loop for temporal and calendar-style helpers: birth, validation, registry persistence, runtime injection, later reuse, matched control comparison, and dashboard-backed artifact inspection. Broad validation remains an active research campaign: the next goal is a claim-grade 3-5 tool portfolio that improves real ToolSandbox outcomes across multiple task strata without broad context pollution.
+
+---
+
+# Upstream ToolSandbox: A Stateful, Conversational, Interactive Evaluation Benchmark for LLM Tool Use Capabilities
 
 This software project accompanies the research paper, [ToolSandbox: A Stateful, Conversational, Interactive Evaluation Benchmark for LLM Tool Use Capabilities](https://arxiv.org/abs/2408.04682).
 
@@ -544,12 +602,12 @@ shape: (15, 5)
 To cite _ToolSandbox_:
 ```text
 @misc{lu2024toolsandboxstatefulconversationalinteractive,
-      title={ToolSandbox: A Stateful, Conversational, Interactive Evaluation Benchmark for LLM Tool Use Capabilities}, 
+      title={ToolSandbox: A Stateful, Conversational, Interactive Evaluation Benchmark for LLM Tool Use Capabilities},
       author={Jiarui Lu and Thomas Holleis and Yizhe Zhang and Bernhard Aumayer and Feng Nan and Felix Bai and Shuang Ma and Shen Ma and Mengyu Li and Guoli Yin and Zirui Wang and Ruoming Pang},
       year={2024},
       eprint={2408.04682},
       archivePrefix={arXiv},
       primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2408.04682}, 
+      url={https://arxiv.org/abs/2408.04682},
 }
 ```

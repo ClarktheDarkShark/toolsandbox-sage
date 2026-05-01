@@ -1,4 +1,6 @@
+import copy
 import json
+import ssl
 from pathlib import Path
 from typing import Optional
 
@@ -33,7 +35,7 @@ def _registry_with_canonicalizer(path: Path) -> RegistryStore:
     return store
 
 
-def test_sage_runner_records_registry_reuse(
+def test_sage_runner_logs_frozen_registry_reuse_without_mutating_manifest(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -51,13 +53,13 @@ def test_sage_runner_records_registry_reuse(
         scenario = Scenario(
             starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
         )
-        enhanced = scenario_transform("later_scenario", scenario, output_dir)
+        enhanced = scenario_transform("toy_birth", scenario, output_dir)
         tool = enhanced.starting_context.get_available_tools(scrambling_allowed=False)[
             "canonicalize_connectivity_label"
         ]
         assert tool("Wi-Fi") == "wifi"
         if result_hook is not None:
-            result_hook("later_scenario", enhanced, {"similarity": 1}, output_dir)
+            result_hook("toy_birth", enhanced, {"similarity": 1}, output_dir)
         return output_dir
 
     monkeypatch.setattr(
@@ -69,7 +71,7 @@ def test_sage_runner_records_registry_reuse(
         SageRunConfig(
             agent="Unhelpful",
             user="GPT_4_o_2024_05_13",
-            scenario_names=("later_scenario",),
+            scenario_names=("toy_birth",),
             output_dir=tmp_path / "outputs",
             registry_dir=store.root,
         )
@@ -77,10 +79,10 @@ def test_sage_runner_records_registry_reuse(
 
     entry = store.get("canonicalize_connectivity_label")
     assert entry is not None
-    assert entry.reuse_count == 1
+    assert entry.reuse_count == 0
 
     reuse_event = json.loads((output_dir / "reuse_events.jsonl").read_text())
-    assert reuse_event["scenario"] == "later_scenario"
+    assert reuse_event["scenario"] == "toy_birth"
     assert reuse_event["tool_name"] == "canonicalize_connectivity_label"
 
     run_events = [
@@ -96,6 +98,204 @@ def test_sage_runner_records_registry_reuse(
     assert "canonicalize_connectivity_label" in visibility["available_tools"]
 
     selection = json.loads((output_dir / "scenario_tool_selection.jsonl").read_text())
-    assert selection["scenario"] == "later_scenario"
+    assert selection["scenario"] == "toy_birth"
     assert selection["selection_status"] == "generated_tool_called"
     assert selection["generated_tools_called"] == ["canonicalize_connectivity_label"]
+
+    summary = json.loads((output_dir / "selection_summary.json").read_text())
+    assert summary["generated_tool_called_scenarios"] == 1
+
+
+def test_generation_enabled_registry_tools_do_not_capture_unpicklable_generator(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Retained tool wrappers must stay pickle-safe when live generation is on."""
+    store = _registry_with_canonicalizer(tmp_path / "registry")
+
+    class UnpicklableGenerator:
+        def __init__(self) -> None:
+            self.ssl_context = ssl.create_default_context()
+
+    def fake_sequence(
+        config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        result_hook: Optional[ResultHook] = None,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / "run"
+        output_dir.mkdir()
+        scenario = Scenario(
+            starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        )
+        enhanced = scenario_transform("toy_birth", scenario, output_dir)
+        copy.deepcopy(enhanced.starting_context)
+        tool = enhanced.starting_context.get_available_tools(scrambling_allowed=False)[
+            "canonicalize_connectivity_label"
+        ]
+        assert tool("Wi-Fi") == "wifi"
+        if result_hook is not None:
+            result_hook("toy_birth", enhanced, {"similarity": 1}, output_dir)
+        return output_dir
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        fake_sequence,
+    )
+
+    run_sage_with_registry(
+        SageRunConfig(
+            agent="Unhelpful",
+            user="GPT_4_o_2024_05_13",
+            scenario_names=("toy_birth",),
+            output_dir=tmp_path / "outputs",
+            registry_dir=store.root,
+        ),
+        generator=UnpicklableGenerator(),  # type: ignore[arg-type]
+    )
+
+
+def test_sage_runner_selection_summary_includes_resumed_rows(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_canonicalizer(tmp_path / "registry")
+
+    def fake_sequence(
+        config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        result_hook: Optional[ResultHook] = None,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / "run"
+        output_dir.mkdir()
+        (output_dir / "scenario_tool_selection.jsonl").write_text(
+            json.dumps(
+                {
+                    "scenario": "previous_scenario",
+                    "generated_tools_visible": ["canonicalize_connectivity_label"],
+                    "generated_tools_called": ["canonicalize_connectivity_label"],
+                    "selection_status": "generated_tool_called",
+                    "relevance_gating_hid_retained_tool": False,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        scenario = Scenario(
+            starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        )
+        enhanced = scenario_transform("toy_birth", scenario, output_dir)
+        tool = enhanced.starting_context.get_available_tools(scrambling_allowed=False)[
+            "canonicalize_connectivity_label"
+        ]
+        assert tool("mobile data") == "cellular"
+        if result_hook is not None:
+            result_hook("toy_birth", enhanced, {"similarity": 1}, output_dir)
+        return output_dir
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        fake_sequence,
+    )
+
+    output_dir = run_sage_with_registry(
+        SageRunConfig(
+            agent="Unhelpful",
+            user="GPT_4_o_2024_05_13",
+            scenario_names=("previous_scenario", "toy_birth"),
+            output_dir=tmp_path / "outputs",
+            registry_dir=store.root,
+        )
+    )
+
+    summary = json.loads((output_dir / "selection_summary.json").read_text())
+    assert summary["scenario_count"] == 2
+    assert summary["generated_tool_visible_scenarios"] == 2
+    assert summary["generated_tool_called_scenarios"] == 2
+
+
+def test_sage_runner_counts_failed_generated_tool_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_canonicalizer(tmp_path / "registry")
+
+    def fake_sequence(
+        config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        result_hook: Optional[ResultHook] = None,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / "run"
+        output_dir.mkdir()
+        scenario = Scenario(
+            starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        )
+        enhanced = scenario_transform("toy_birth", scenario, output_dir)
+        assert (
+            "canonicalize_connectivity_label"
+            in enhanced.starting_context.get_available_tools(scrambling_allowed=False)
+        )
+        trajectory = output_dir / "trajectories" / "toy_birth"
+        trajectory.mkdir(parents=True)
+        (trajectory / "conversation.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "role": "assistant",
+                        "content": "",
+                        "tool_calls": [
+                            {
+                                "type": "function",
+                                "function": {
+                                    "name": "canonicalize_connectivity_label",
+                                    "arguments": "{}",
+                                },
+                            }
+                        ],
+                    },
+                    {
+                        "role": "tool",
+                        "name": "canonicalize_connectivity_label",
+                        "content": (
+                            "TypeError: canonicalize_connectivity_label() "
+                            "missing 1 required positional argument: 'label'"
+                        ),
+                    },
+                ]
+            ),
+            encoding="utf-8",
+        )
+        if result_hook is not None:
+            result_hook("toy_birth", enhanced, {"similarity": 0.2}, output_dir)
+        return output_dir
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        fake_sequence,
+    )
+
+    output_dir = run_sage_with_registry(
+        SageRunConfig(
+            agent="Unhelpful",
+            user="GPT_4_o_2024_05_13",
+            scenario_names=("toy_birth",),
+            output_dir=tmp_path / "outputs",
+            registry_dir=store.root,
+        )
+    )
+
+    selection = json.loads((output_dir / "scenario_tool_selection.jsonl").read_text())
+    assert selection["selection_status"] == "generated_tool_attempt_failed"
+    assert selection["generated_tools_attempted"] == ["canonicalize_connectivity_label"]
+    assert selection["generated_tools_failed"] == ["canonicalize_connectivity_label"]
+    assert selection["generated_tools_called"] == []
+
+    summary = json.loads((output_dir / "selection_summary.json").read_text())
+    assert summary["generated_tool_attempted_scenarios"] == 1
+    assert summary["generated_tool_failed_scenarios"] == 1
+    assert summary["generated_tool_called_scenarios"] == 0

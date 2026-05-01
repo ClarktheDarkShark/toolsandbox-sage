@@ -13,6 +13,7 @@ SAFE_BUILTINS: dict[str, Any] = {
     "bool": bool,
     "dict": dict,
     "enumerate": enumerate,
+    "filter": filter,
     "float": float,
     "int": int,
     "isinstance": isinstance,
@@ -49,10 +50,13 @@ def compile_generated_tool(tool: GeneratedTool) -> SchemaResult:
 
     fn = namespace.get(tool.spec.tool_name)
     if not isinstance(fn, FunctionType):
-        # Fall back to the first function defined in the namespace.
-        fn = next((v for v in namespace.values() if isinstance(v, FunctionType)), None)
-    if not isinstance(fn, FunctionType):
         return SchemaResult(False, ("missing_expected_function",), None)
+    if fn.__name__ != tool.spec.tool_name:
+        return SchemaResult(
+            False,
+            (f"function_name_mismatch:{fn.__name__}!={tool.spec.tool_name}",),
+            None,
+        )
 
     annotations = getattr(fn, "__annotations__", {})
     expected_inputs = {item.name: item.annotation for item in tool.spec.inputs}

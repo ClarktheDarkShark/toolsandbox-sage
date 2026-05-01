@@ -15,6 +15,15 @@ def code_hash(code: str) -> str:
     return hashlib.sha256(code.encode("utf-8")).hexdigest()
 
 
+def has_current_validation_proof(entry: "RegistryEntry") -> bool:
+    """Return whether an accepted entry has claim-grade validation metadata."""
+    return (
+        entry.validation.accepted
+        and entry.validation.held_out_check_count > 0
+        and entry.validation.runtime_smoke_passed
+    )
+
+
 @dataclass(frozen=True)
 class RegistryEntry:
     tool: GeneratedTool
@@ -46,6 +55,9 @@ class RegistryEntry:
             "validation": {
                 "accepted": self.validation.accepted,
                 "errors": list(self.validation.errors),
+                "source_example_count": self.validation.source_example_count,
+                "held_out_check_count": self.validation.held_out_check_count,
+                "runtime_smoke_passed": self.validation.runtime_smoke_passed,
             },
             "birth_scenario": self.birth_scenario,
             "accepted_at": self.accepted_at,
@@ -63,6 +75,15 @@ class RegistryEntry:
             validation=ValidationResult(
                 accepted=bool(payload["validation"]["accepted"]),
                 errors=tuple(payload["validation"]["errors"]),
+                source_example_count=int(
+                    payload["validation"].get("source_example_count", 0)
+                ),
+                held_out_check_count=int(
+                    payload["validation"].get("held_out_check_count", 0)
+                ),
+                runtime_smoke_passed=bool(
+                    payload["validation"].get("runtime_smoke_passed", False)
+                ),
             ),
             birth_scenario=str(payload["birth_scenario"]),
             accepted_at=str(payload["accepted_at"]),

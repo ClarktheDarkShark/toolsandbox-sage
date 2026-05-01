@@ -4,6 +4,7 @@ from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, T
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.tool_invoker import invoke_registered_tool
+from sage_ts.validation.ast_safety import check_ast_safety
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 
 
@@ -65,3 +66,172 @@ def test_generated_tool_birth_reuse_and_success_flip(tmp_path: Path) -> None:
     assert entry is not None
     assert entry.reuse_count == 1
     assert entry.success_flips == 1
+
+
+def test_generated_tool_validation_allows_safe_filter_builtin() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="select_contact_by_constraint",
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            description="Select exactly one contact by a normalized field match.",
+            inputs=(
+                ToolInput(
+                    "records_payload",
+                    "dict",
+                    "Dictionary containing a records list of contact dictionaries.",
+                ),
+                ToolInput("field_name", "str", "Contact field to match."),
+                ToolInput("expected_value", "str", "Expected field value."),
+            ),
+            output_annotation="dict",
+            generalization_rationale=(
+                "Contact lookup tasks repeatedly need deterministic candidate selection "
+                "from search_contacts output before a downstream action."
+            ),
+            inadequacy_evidence=(
+                "The base contact search returns candidate rows but does not provide "
+                "a deterministic selector for exact normalized field matching."
+            ),
+        ),
+        code="""
+def select_contact_by_constraint(records_payload: dict, field_name: str, expected_value: str) -> dict:
+    matches = []
+    expected_value = expected_value.strip().lower() if field_name == 'name' else ''.join(filter(str.isdigit, expected_value))
+    for record in records_payload['records']:
+        if field_name == 'name':
+            if record['name'].strip().lower() == expected_value:
+                matches.append(record)
+        elif field_name == 'phone_number':
+            normalized_phone = ''.join(filter(str.isdigit, record['phone_number']))
+            if normalized_phone == expected_value:
+                matches.append(record)
+        elif field_name == 'relationship':
+            if record['relationship'].lower() == expected_value:
+                matches.append(record)
+    return matches[0] if len(matches) == 1 else {}
+""",
+    )
+
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {
+                    "records_payload": {
+                        "records": [
+                            {
+                                "name": "Ada Lovelace",
+                                "person_id": "a",
+                                "phone_number": "+1 (555) 0100",
+                            },
+                            {
+                                "name": "Grace Hopper",
+                                "person_id": "b",
+                                "phone_number": "+1 (555) 0200",
+                            },
+                        ]
+                    },
+                    "field_name": "phone_number",
+                    "expected_value": "15550200",
+                },
+                {
+                    "name": "Grace Hopper",
+                    "person_id": "b",
+                    "phone_number": "+1 (555) 0200",
+                },
+            ),
+            ToolExample(
+                {
+                    "records_payload": {
+                        "records": [
+                            {"person_id": "a", "relationship": "friend"},
+                            {"person_id": "b", "relationship": "friend"},
+                        ]
+                    },
+                    "field_name": "relationship",
+                    "expected_value": "friend",
+                },
+                {},
+            ),
+        ),
+    )
+
+    assert validation.accepted
+
+
+def test_generated_tool_validation_allows_safe_lambda_sort_key() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="select_record_by_timestamp_extreme",
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            description="Select the oldest or latest record by timestamp.",
+            inputs=(
+                ToolInput("records_payload", "dict", "Records payload."),
+                ToolInput("timestamp_key", "str", "Timestamp field."),
+                ToolInput("selection_mode", "str", "oldest or latest."),
+            ),
+            output_annotation="dict",
+            generalization_rationale=(
+                "Record-ranking tasks repeatedly need deterministic timestamp extrema."
+            ),
+            inadequacy_evidence=(
+                "Base search tools return candidates but not a reusable timestamp ranker."
+            ),
+        ),
+        code="""
+def select_record_by_timestamp_extreme(records_payload: dict, timestamp_key: str, selection_mode: str) -> dict:
+    records = records_payload.get('records', [])
+    valid = [record for record in records if isinstance(record.get(timestamp_key), (int, float))]
+    if not valid:
+        return {}
+    reverse = selection_mode.strip().lower() == 'latest'
+    return sorted(valid, key=lambda record: record[timestamp_key], reverse=reverse)[0]
+""",
+    )
+
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {
+                    "records_payload": {
+                        "records": [
+                            {"content": "old", "creation_timestamp": 10.0},
+                            {"content": "new", "creation_timestamp": 20.0},
+                        ]
+                    },
+                    "timestamp_key": "creation_timestamp",
+                    "selection_mode": "latest",
+                },
+                {"content": "new", "creation_timestamp": 20.0},
+            ),
+            ToolExample(
+                {
+                    "records_payload": {
+                        "records": [
+                            {"content": "old", "creation_timestamp": 10.0},
+                            {"content": "new", "creation_timestamp": 20.0},
+                        ]
+                    },
+                    "timestamp_key": "creation_timestamp",
+                    "selection_mode": "oldest",
+                },
+                {"content": "old", "creation_timestamp": 10.0},
+                held_out=True,
+            ),
+        ),
+    )
+
+    assert validation.accepted
+
+
+def test_generated_tool_validation_rejects_dangerous_call_inside_lambda() -> None:
+    safety = check_ast_safety(
+        """
+def bad_helper(records_payload: dict) -> dict:
+    return sorted(records_payload.get('records', []), key=lambda record: eval('1'))[0]
+"""
+    )
+
+    assert not safety.safe
+    assert "denied_call:eval" in safety.errors

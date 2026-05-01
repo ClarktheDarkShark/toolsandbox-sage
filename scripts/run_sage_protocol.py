@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+# mypy: ignore-errors
 """Run paired ToolSandbox SAGE mechanism/transfer/extended-reuse gates."""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -35,14 +37,40 @@ from sage_ts.campaign.artifacts import (
     snapshot_registry,
     update_task,
 )
-from sage_ts.config.splits import load_split_names
+from sage_ts.config.models import DEFAULT_MODEL, paired_model_metadata
+from sage_ts.config.splits import load_split_names, scenario_records
 from sage_ts.dashboard.exporters import open_dashboard, write_protocol_dashboard
 from sage_ts.evaluation.run_metrics import compare_runs
+from sage_ts.evaluation.task_strata import cohort_policy_report
 from sage_ts.generation.prompt_cache import PromptCache
 from sage_ts.generation.tool_generator import ToolGenerator
 from sage_ts.runtime.base_toolset import KNOWN_POLICIES, UPSTREAM_POLICY
 
-MODES = ("mechanism_40", "transfer_40", "extended_reuse_100")
+MODES = (
+    "mechanism_40",
+    "transfer_40",
+    "online_build_100",
+    "transfer_100",
+    "extended_reuse_100",
+    "promotion_250",
+    "full_benchmark",
+)
+
+
+def _manifest_type(manifest: Path) -> str:
+    try:
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    return str(payload.get("manifest_type", ""))
+
+
+def _generation_enabled_by_default(mode: str, manifest_type: str) -> bool:
+    """Default live generation for build/discovery lanes, not frozen transfer."""
+
+    if mode in {"mechanism_40", "online_build_100", "extended_reuse_100"}:
+        return True
+    return "discovery" in manifest_type.lower()
 
 
 def _timestamp() -> str:
@@ -107,6 +135,169 @@ def _status_run_dir(run_root: Path, arm: str, root: Path) -> Path | None:
     return _latest_run_dir(root)
 
 
+def _registry_tool_count(registry_dir: Path) -> int:
+    manifest_path = registry_dir / "registry_manifest.json"
+    if not manifest_path.exists():
+        return 0
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return 0
+    tools = manifest.get("tools")
+    return len(tools) if isinstance(tools, dict) else 0
+
+
+def _digest_file(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str, Any]:
+    """Snapshot registry state so failed gated runs cannot contaminate follow-ups."""
+    gate_dir = run_root / "registry_gate"
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = registry_dir / "registry_manifest.json"
+    snapshot_path = gate_dir / "registry_manifest_before_run.json"
+    existed = manifest_path.exists()
+    if existed:
+        shutil.copy2(manifest_path, snapshot_path)
+    metadata = {
+        "registry_dir": str(registry_dir),
+        "manifest_existed_before_run": existed,
+        "snapshot_path": str(snapshot_path) if existed else None,
+        "manifest_digest_before_run": _digest_file(manifest_path) if existed else None,
+    }
+    (gate_dir / "registry_gate_snapshot.json").write_text(
+        json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+    )
+    return metadata
+
+
+def _restore_registry_after_failed_gate(
+    *,
+    run_root: Path,
+    registry_dir: Path,
+    snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    """Preserve the failed registry, then restore the pre-run registry manifest."""
+    gate_dir = run_root / "registry_gate"
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = registry_dir / "registry_manifest.json"
+    failed_snapshot_path = gate_dir / "registry_manifest_failed_gate.json"
+    if manifest_path.exists():
+        shutil.copy2(manifest_path, failed_snapshot_path)
+
+    prior_snapshot = snapshot.get("snapshot_path")
+    prior_exists = bool(snapshot.get("manifest_existed_before_run"))
+    if prior_exists and isinstance(prior_snapshot, str):
+        registry_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(Path(prior_snapshot), manifest_path)
+    elif manifest_path.exists():
+        manifest_path.unlink()
+
+    result = {
+        "registry_dir": str(registry_dir),
+        "restored": True,
+        "manifest_existed_before_run": prior_exists,
+        "failed_snapshot_path": str(failed_snapshot_path)
+        if failed_snapshot_path.exists()
+        else None,
+        "restored_snapshot_path": prior_snapshot if prior_exists else None,
+    }
+    (gate_dir / "registry_gate_restore.json").write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
+    return result
+
+
+def _write_cohort_preflight(
+    run_root: Path,
+    *,
+    scenario_names: tuple[str, ...],
+    generation_enabled: bool,
+    registry_dir: Path,
+) -> dict[str, object]:
+    categories_by_name = {
+        record.name: record.categories for record in scenario_records()
+    }
+    report = cohort_policy_report(
+        scenario_names,
+        categories_by_name=categories_by_name,
+        generation_enabled=generation_enabled,
+        registry_tool_count=_registry_tool_count(registry_dir),
+    )
+    run_root.mkdir(parents=True, exist_ok=True)
+    (run_root / "cohort_preflight_report.json").write_text(
+        json.dumps(report, indent=2) + "\n", encoding="utf-8"
+    )
+    diversity_report = {
+        "scenario_count": report.get("scenario_count"),
+        "distinct_base_task_families": report.get("distinct_base_task_families"),
+        "required_distinct_base_task_families": report.get(
+            "required_distinct_base_task_families"
+        ),
+        "largest_family_share": report.get("largest_family_share"),
+        "family_counts": report.get("family_counts", {}),
+        "strata_counts": report.get("strata_counts", {}),
+        "warnings": report.get("warnings", []),
+        "decision_use": report.get("decision_use"),
+    }
+    (run_root / "cohort_diversity_report.json").write_text(
+        json.dumps(diversity_report, indent=2) + "\n", encoding="utf-8"
+    )
+    return report
+
+
+def _protocol_gate_decision(
+    comparison: dict[str, Any],
+    *,
+    scenario_count: int,
+) -> tuple[bool, list[str]]:
+    """Apply campaign viability gates; never pass on non-negative mean alone."""
+    reasons: list[str] = []
+    delta = float(comparison.get("mean_similarity_delta", 0.0) or 0.0)
+    exact_delta = int(comparison.get("exact_success_delta", 0) or 0)
+    gains = int(comparison.get("gain_count", 0) or 0)
+    regressions = int(comparison.get("regression_count", 0) or 0)
+    runtime_exceptions = int(comparison.get("runtime_exception_count", 0) or 0)
+    candidate = cast(dict[str, Any], comparison.get("candidate", {}))
+    called = int(candidate.get("generated_tool_called_scenarios", 0) or 0)
+    accepted = int(candidate.get("accepted_tool_count", 0) or 0)
+
+    if runtime_exceptions:
+        reasons.append("runtime_exceptions_present")
+    if delta <= 0:
+        reasons.append("non_positive_canonical_delta")
+    if gains <= regressions:
+        reasons.append("gains_do_not_exceed_regressions")
+
+    if scenario_count >= 30:
+        ratio = gains / max(regressions, 1)
+        called_share = called / scenario_count if scenario_count else 0.0
+        if delta < 0.08:
+            reasons.append("confirmation_delta_below_0_08")
+        if exact_delta <= 0:
+            reasons.append("exact_successes_not_improved")
+        if ratio < 1.4:
+            reasons.append("gain_regression_ratio_below_1_4")
+        if called_share < 0.25:
+            reasons.append("helper_call_share_below_25_percent")
+    elif scenario_count >= 12:
+        if exact_delta < 0:
+            reasons.append("exact_successes_regressed")
+        if accepted <= 0 and called < 3:
+            reasons.append("no_accepted_helper_and_fewer_than_3_helper_calls")
+
+    return not reasons, reasons
+
+
+def _resume_arm_dir(resume_run_root: Path | None, arm: str) -> Path | None:
+    if resume_run_root is None:
+        return None
+    return _status_run_dir(resume_run_root, arm, resume_run_root / arm)
+
+
 def _protocol_event(
     *,
     event: str,
@@ -132,7 +323,6 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
     run_root = Path(params["run_root"])
     artifact_root = Path(params["artifact_root"])
     control_root = Path(params["control_root"])
-    registry_dir = Path(params["registry_dir"])
     scenario_names = tuple(params["scenario_names"])
     response_cache_enabled = bool(params["response_cache_enabled"])
     _write_arm_status(
@@ -155,7 +345,7 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
             user=str(params["user"]),
             base_tool_policy=str(params["base_tool_policy"]),
             scenario_names=scenario_names,
-            registry_dir=registry_dir,
+            registry_dir=None,
             generation_enabled=False,
             generation_model=str(params["generation_model"]),
             recurrence_threshold=int(params["recurrence_threshold"]),
@@ -197,6 +387,9 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
                 processes=1,
                 run_type=f"{params['mode']}_control",
                 base_tool_policy=str(params["base_tool_policy"]),
+                resume_from_dir=Path(params["control_resume_dir"])
+                if params.get("control_resume_dir")
+                else None,
             ),
             progress_hook=progress,
             event_hook=event_hook,
@@ -320,6 +513,9 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 run_type=f"{params['mode']}_candidate",
                 recurrence_threshold=int(params["recurrence_threshold"]),
                 base_tool_policy=str(params["base_tool_policy"]),
+                resume_from_dir=Path(params["candidate_resume_dir"])
+                if params.get("candidate_resume_dir")
+                else None,
             ),
             generator=generator,
             progress_hook=progress,
@@ -442,9 +638,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=MODES, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--agent", default="gpt-5-mini")
+    parser.add_argument("--agent", default=DEFAULT_MODEL)
     parser.add_argument("--user", default="GPT_4_o_2024_05_13")
-    parser.add_argument("--generation-model", default="gpt-5-mini")
+    parser.add_argument("--generation-model", default=DEFAULT_MODEL)
     parser.add_argument("--recurrence-threshold", type=int, default=2)
     parser.add_argument(
         "--base-tool-policy",
@@ -488,27 +684,113 @@ def main() -> None:
         default="auto",
         help="Override candidate-side helper generation. Use off for frozen-registry validation.",
     )
+    parser.add_argument(
+        "--resume-run-root",
+        type=Path,
+        help="Seed each arm from a prior interrupted paired protocol run root.",
+    )
+    parser.add_argument(
+        "--allow-empty-birth-preflight",
+        action="store_true",
+        help=(
+            "Allow a generation-enabled run to proceed even when the cohort has "
+            "no current expected birth path and no retained-helper fit."
+        ),
+    )
+    parser.add_argument(
+        "--allow-contaminated-preflight",
+        action="store_true",
+        help="Allow stock/location/weather/API-contaminated cohorts for explicit diagnostics.",
+    )
     args = parser.parse_args()
 
     scenario_names = tuple(load_split_names(args.manifest, args.mode))
+    manifest_type = _manifest_type(args.manifest)
+    model_metadata = paired_model_metadata(
+        agent_model=args.agent,
+        generation_model=args.generation_model,
+        user_model=args.user,
+    )
     run_root = args.output_root / f"{args.mode}_{_timestamp()}"
     control_root = run_root / "control"
     candidate_root = run_root / "candidate"
     registry_dir = args.registry_dir or (run_root / "registry")
+    registry_gate_snapshot = _snapshot_registry_for_gate(run_root, registry_dir)
     control_dir: Path | None = None
     candidate_dir: Path | None = None
-    generation_enabled = args.mode in {"mechanism_40", "extended_reuse_100"}
+    control_resume_dir = _resume_arm_dir(args.resume_run_root, "control")
+    candidate_resume_dir = _resume_arm_dir(args.resume_run_root, "candidate")
+    generation_enabled = _generation_enabled_by_default(args.mode, manifest_type)
     if args.generation == "on":
         generation_enabled = True
     elif args.generation == "off":
         generation_enabled = False
+    cohort_preflight = _write_cohort_preflight(
+        run_root,
+        scenario_names=scenario_names,
+        generation_enabled=generation_enabled,
+        registry_dir=registry_dir,
+    )
     initialize_campaign(root=args.artifact_root, phase=args.mode)
     append_event(
         "phase_started",
         {
             "mode": args.mode,
+            "manifest_type": manifest_type,
             "run_root": str(run_root),
             "scenario_count": len(scenario_names),
+            "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
+            "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
+        },
+        root=args.artifact_root,
+    )
+    if cohort_preflight.get("should_block") and not args.allow_empty_birth_preflight:
+        append_event(
+            "gate_failed",
+            {
+                "mode": args.mode,
+                "gate": "cohort_preflight",
+                "run_root": str(run_root),
+                "reason": "generation_enabled_without_birth_path_or_registry_fit",
+                "cohort_preflight_report": str(
+                    run_root / "cohort_preflight_report.json"
+                ),
+            },
+            root=args.artifact_root,
+        )
+        raise SystemExit(
+            "Cohort preflight blocked this generation-enabled run: no expected "
+            "birth path, no retained-helper fit, and empty registry. See "
+            f"{run_root / 'cohort_preflight_report.json'}"
+        )
+    contaminated = cohort_preflight.get("contaminated_external_service_scenarios", [])
+    if contaminated and not args.allow_contaminated_preflight:
+        append_event(
+            "gate_failed",
+            {
+                "mode": args.mode,
+                "gate": "cohort_preflight",
+                "run_root": str(run_root),
+                "reason": "external_service_contamination",
+                "contaminated_external_service_scenarios": contaminated,
+                "cohort_preflight_report": str(
+                    run_root / "cohort_preflight_report.json"
+                ),
+            },
+            root=args.artifact_root,
+        )
+        raise SystemExit(
+            "Cohort preflight blocked this run because it contains external-service "
+            "contamination. Pass --allow-contaminated-preflight only for explicit "
+            f"diagnostics. See {run_root / 'cohort_preflight_report.json'}"
+        )
+    append_event(
+        "gate_passed",
+        {
+            "mode": args.mode,
+            "gate": "cohort_preflight",
+            "run_root": str(run_root),
+            "warnings": cohort_preflight.get("warnings", []),
         },
         root=args.artifact_root,
     )
@@ -516,11 +798,15 @@ def main() -> None:
         {
             "run_root": str(run_root),
             "mode": args.mode,
+            "manifest_type": manifest_type,
             "status": "running",
             "agent": args.agent,
+            "model_metadata": model_metadata,
             "generation_enabled": generation_enabled,
             "base_tool_policy": args.base_tool_policy,
             "scenario_count": len(scenario_names),
+            "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
+            "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
         },
         root=args.artifact_root,
     )
@@ -531,21 +817,34 @@ def main() -> None:
         phase="control",
         agent=args.agent,
         user=args.user,
+        model_metadata=model_metadata,
         generation_enabled=generation_enabled,
         base_tool_policy=args.base_tool_policy,
         scenario_count=len(scenario_names),
         registry_dir=registry_dir,
         artifact_root=args.artifact_root,
     )
-    should_open_dashboard = (
-        not args.no_dashboard_open
-        and os.environ.get("SAGE_TS_DASHBOARD_OPEN", "1") != "0"
-    )
-    dashboard_url = (
-        open_dashboard(dashboard_index, port=args.dashboard_port)
-        if should_open_dashboard
-        else None
-    )
+    # Dashboard visibility is part of the experiment surface. Keep it on by
+    # default for every run; only the explicit CLI flag should suppress it.
+    should_open_dashboard = not args.no_dashboard_open
+    dashboard_url = dashboard_task_focus_url = None
+    if should_open_dashboard:
+        dashboard_url = open_dashboard(dashboard_index, port=args.dashboard_port)
+        dashboard_task_focus_url = open_dashboard(
+            dashboard_index.with_name("task_focus.html"),
+            port=args.dashboard_port,
+        )
+        (run_root / "dashboard_urls.json").write_text(
+            json.dumps(
+                {
+                    "dashboard_url": dashboard_url,
+                    "dashboard_task_focus_url": dashboard_task_focus_url,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     response_cache_enabled = (
         not args.disable_openai_response_cache and args.cache_mode != "off"
     )
@@ -568,6 +867,7 @@ def main() -> None:
             phase=phase,
             agent=args.agent,
             user=args.user,
+            model_metadata=model_metadata,
             generation_enabled=generation_enabled,
             base_tool_policy=args.base_tool_policy,
             scenario_count=len(scenario_names),
@@ -617,6 +917,12 @@ def main() -> None:
             "scenario_names": list(scenario_names),
             "cache_mode": args.cache_mode,
             "response_cache_enabled": response_cache_enabled,
+            "control_resume_dir": str(control_resume_dir)
+            if control_resume_dir
+            else None,
+            "candidate_resume_dir": str(candidate_resume_dir)
+            if candidate_resume_dir
+            else None,
         }
         ctx = get_context("spawn")
         control_process = ctx.Process(
@@ -717,7 +1023,7 @@ def main() -> None:
             user=args.user,
             base_tool_policy=args.base_tool_policy,
             scenario_names=scenario_names,
-            registry_dir=registry_dir,
+            registry_dir=None,
             generation_enabled=False,
             generation_model=args.generation_model,
             recurrence_threshold=args.recurrence_threshold,
@@ -732,6 +1038,7 @@ def main() -> None:
                 processes=1,
                 run_type=f"{args.mode}_control",
                 base_tool_policy=args.base_tool_policy,
+                resume_from_dir=control_resume_dir,
             ),
             progress_hook=control_progress,
             event_hook=campaign_event,
@@ -791,6 +1098,7 @@ def main() -> None:
                 run_type=f"{args.mode}_candidate",
                 recurrence_threshold=args.recurrence_threshold,
                 base_tool_policy=args.base_tool_policy,
+                resume_from_dir=candidate_resume_dir,
             ),
             generator=generator,
             progress_hook=candidate_progress,
@@ -806,23 +1114,41 @@ def main() -> None:
             )
             write_cache_artifacts(args.artifact_root)
     comparison = compare_runs(control_dir, candidate_dir, registry_dir=registry_dir)
+    comparison["model_metadata"] = model_metadata
+    comparison["comparison_model_key"] = model_metadata["comparison_key"]
+    protocol_gate_passed, protocol_gate_reasons = _protocol_gate_decision(
+        comparison,
+        scenario_count=len(scenario_names),
+    )
+    comparison["protocol_gate_passed"] = protocol_gate_passed
+    comparison["protocol_gate_reasons"] = protocol_gate_reasons
     comparison_path = run_root / "paired_comparison.json"
     comparison_path.write_text(
         json.dumps(comparison, indent=2) + "\n", encoding="utf-8"
     )
-    gate_event = (
-        "gate_passed"
-        if float(comparison.get("mean_similarity_delta", 0.0)) >= 0
-        else "gate_failed"
-    )
+    registry_gate_restore: dict[str, Any] | None = None
+    if not protocol_gate_passed:
+        registry_gate_restore = _restore_registry_after_failed_gate(
+            run_root=run_root,
+            registry_dir=registry_dir,
+            snapshot=registry_gate_snapshot,
+        )
+    gate_event = "gate_passed" if protocol_gate_passed else "gate_failed"
     append_event(
         gate_event,
         {
             "mode": args.mode,
             "run_root": str(run_root),
             "mean_similarity_delta": comparison.get("mean_similarity_delta"),
+            "mean_outcome_similarity_delta": comparison.get(
+                "mean_outcome_similarity_delta"
+            ),
             "gain_count": comparison.get("gain_count"),
             "regression_count": comparison.get("regression_count"),
+            "outcome_gain_count": comparison.get("outcome_gain_count"),
+            "outcome_regression_count": comparison.get("outcome_regression_count"),
+            "protocol_gate_reasons": protocol_gate_reasons,
+            "registry_gate_restore": registry_gate_restore,
         },
         root=args.artifact_root,
     )
@@ -843,18 +1169,34 @@ def main() -> None:
     refresh_dashboard("comparison", "complete")
     manifest = {
         "mode": args.mode,
+        "manifest_type": manifest_type,
         "agent": args.agent,
         "user": args.user,
         "generation_model": args.generation_model,
+        "model_metadata": model_metadata,
+        "comparison_model_key": model_metadata["comparison_key"],
         "generation_enabled": generation_enabled,
         "base_tool_policy": args.base_tool_policy,
         "scenario_count": len(scenario_names),
         "control_dir": str(control_dir),
         "candidate_dir": str(candidate_dir),
         "registry_dir": str(registry_dir),
+        "registry_gate_snapshot": registry_gate_snapshot,
+        "registry_gate_restore": registry_gate_restore,
+        "registry_manifest_digest_after_run": _digest_file(
+            registry_dir / "registry_manifest.json"
+        ),
+        "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
+        "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
+        "resume_run_root": str(args.resume_run_root) if args.resume_run_root else None,
+        "control_resume_dir": str(control_resume_dir) if control_resume_dir else None,
+        "candidate_resume_dir": str(candidate_resume_dir)
+        if candidate_resume_dir
+        else None,
         "comparison_path": str(comparison_path),
         "dashboard_path": str(dashboard_index),
         "dashboard_url": dashboard_url,
+        "dashboard_task_focus_url": dashboard_task_focus_url,
         "parallel_arms": args.parallel_arms,
         "parallel_cache_policy": "per_arm" if args.parallel_arms else "shared_process",
         "openai_response_cache_enabled": response_cache_enabled,
@@ -862,6 +1204,12 @@ def main() -> None:
         "openai_response_cache_dir": str(args.openai_response_cache_dir),
         "control_openai_response_cache_dir": str(control_cache_dir),
         "candidate_openai_response_cache_dir": str(candidate_cache_dir),
+        "mean_similarity_delta": comparison.get("mean_similarity_delta"),
+        "mean_outcome_similarity_delta": comparison.get(
+            "mean_outcome_similarity_delta"
+        ),
+        "protocol_gate_passed": protocol_gate_passed,
+        "protocol_gate_reasons": protocol_gate_reasons,
     }
     manifest_path = run_root / "protocol_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -869,19 +1217,35 @@ def main() -> None:
         {
             "run_root": str(run_root),
             "mode": args.mode,
+            "manifest_type": manifest_type,
             "status": "complete",
             "agent": args.agent,
+            "model_metadata": model_metadata,
+            "comparison_model_key": model_metadata["comparison_key"],
             "generation_enabled": generation_enabled,
             "base_tool_policy": args.base_tool_policy,
             "scenario_count": len(scenario_names),
             "control_dir": str(control_dir),
             "candidate_dir": str(candidate_dir),
             "registry_dir": str(registry_dir),
+            "registry_gate_snapshot": registry_gate_snapshot,
+            "registry_gate_restore": registry_gate_restore,
+            "registry_manifest_digest_after_run": _digest_file(
+                registry_dir / "registry_manifest.json"
+            ),
+            "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
+            "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
             "comparison_path": str(comparison_path),
             "dashboard_path": str(dashboard_index),
             "dashboard_url": dashboard_url,
+            "dashboard_task_focus_url": dashboard_task_focus_url,
             "parallel_arms": args.parallel_arms,
             "mean_similarity_delta": comparison.get("mean_similarity_delta"),
+            "mean_outcome_similarity_delta": comparison.get(
+                "mean_outcome_similarity_delta"
+            ),
+            "protocol_gate_passed": protocol_gate_passed,
+            "protocol_gate_reasons": protocol_gate_reasons,
         },
         root=args.artifact_root,
     )

@@ -145,7 +145,8 @@ def test_sage_run_adapter_full_loop(
         scenario = Scenario(
             starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
         )
-        enhanced = scenario_transform("later_scenario", scenario, outdir)
+        scenario_name = "search_reminder_with_creation_recency_yesterday"
+        enhanced = scenario_transform(scenario_name, scenario, outdir)
         tools = enhanced.starting_context.get_available_tools(scrambling_allowed=False)
         assert _TOOL_NAME in tools, "tool must be injected"
         result = tools[_TOOL_NAME]("yesterday", float(10 * 86400))
@@ -155,7 +156,7 @@ def test_sage_run_adapter_full_loop(
         }
         invoked_tools.append(_TOOL_NAME)
         if result_hook is not None:
-            result_hook("later_scenario", enhanced, {"similarity": 1}, outdir)
+            result_hook(scenario_name, enhanced, {"similarity": 1}, outdir)
         return outdir
 
     monkeypatch.setattr(
@@ -167,7 +168,7 @@ def test_sage_run_adapter_full_loop(
         SageRunConfig(
             agent="Unhelpful",
             user="GPT_4_o_2024_05_13",
-            scenario_names=("later_scenario",),
+            scenario_names=("search_reminder_with_creation_recency_yesterday",),
             output_dir=tmp_path / "outputs",
             registry_dir=store.root,
         )
@@ -176,8 +177,8 @@ def test_sage_run_adapter_full_loop(
     assert invoked_tools == [_TOOL_NAME]
     entry = store.get(_TOOL_NAME)
     assert entry is not None
-    assert entry.reuse_count == 1
+    assert entry.reuse_count == 0
 
     reuse_event = json.loads((outdir / "reuse_events.jsonl").read_text())
     assert reuse_event["tool_name"] == _TOOL_NAME
-    assert reuse_event["scenario"] == "later_scenario"
+    assert reuse_event["scenario"] == "search_reminder_with_creation_recency_yesterday"

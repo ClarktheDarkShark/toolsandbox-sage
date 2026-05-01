@@ -19,6 +19,7 @@ from sage_ts.cache.openai_response_cache import (
 from sage_ts.cache.openai_response_cache import (
     write_metrics as write_openai_response_cache_metrics,
 )
+from sage_ts.config.models import DEFAULT_MODEL
 from sage_ts.config.splits import load_split_names
 from sage_ts.runtime.base_toolset import KNOWN_POLICIES, UPSTREAM_POLICY
 
@@ -28,7 +29,7 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--split", required=True)
     parser.add_argument("--registry", type=Path, required=True)
-    parser.add_argument("--agent", default="gpt-5-mini")
+    parser.add_argument("--agent", default=DEFAULT_MODEL)
     parser.add_argument("--user", default="GPT_4_o_2024_05_13")
     parser.add_argument(
         "--base-tool-policy",

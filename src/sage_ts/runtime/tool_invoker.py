@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sage_ts.registry.manifest import has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.schema_check import compile_generated_tool
 
@@ -18,6 +19,8 @@ def invoke_registered_tool(
     entry = store.get(tool_name)
     if entry is None or entry.retired:
         raise KeyError(f"registered tool not available: {tool_name}")
+    if not has_current_validation_proof(entry):
+        raise ValueError(f"registered tool lacks current validation proof: {tool_name}")
     compiled = compile_generated_tool(entry.tool)
     if compiled.function is None:
         raise ValueError(f"registered tool failed to compile: {tool_name}")

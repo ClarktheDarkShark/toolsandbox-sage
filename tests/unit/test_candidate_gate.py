@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate
 from sage_ts.generation.tool_spec import ToolFamily, ToolInput, ToolSpec
 
@@ -33,5 +35,16 @@ def test_state_precondition_helper_allows_next_action_micro_helper() -> None:
     decision = evaluate_candidate_gate(
         _state_spec("Return a concrete next_action and readiness predicate.")
     )
+
+    assert decision.allowed
+
+
+def test_state_precondition_helper_allows_trace_compatible_tool_call() -> None:
+    spec = replace(
+        _state_spec("Return the exact ToolSandbox setter name and arguments."),
+        tool_name="next_service_tool_call",
+    )
+
+    decision = evaluate_candidate_gate(spec)
 
     assert decision.allowed

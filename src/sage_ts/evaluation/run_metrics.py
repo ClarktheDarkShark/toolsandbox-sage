@@ -30,6 +30,15 @@ def _scenario_rows(run_dir: Path) -> list[dict[str, Any]]:
     return list(_read_json(source).get("per_scenario_results", []))
 
 
+def _optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, Any]:
     """Summarize one run using JSON artifacts only."""
     rows = _scenario_rows(run_dir)
@@ -47,7 +56,13 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
         _read_json(registry_dir / "registry_manifest.json") if registry_dir else {}
     )
     similarities = [float(row.get("similarity", 0.0)) for row in rows]
+    outcome_similarities = [
+        score
+        for row in rows
+        if (score := _optional_float(row.get("outcome_similarity"))) is not None
+    ]
     successful = [row for row in rows if float(row.get("similarity", 0.0)) >= 1.0]
+    outcome_successful = [score for score in outcome_similarities if score >= 1.0]
     exceptions = [row for row in rows if row.get("exception_type")]
     accepted_births = [event for event in birth_events if event.get("accepted") is True]
     registry_loads = [
@@ -66,6 +81,12 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
         event
         for event in selection
         if event.get("selection_status") == "generated_tool_called"
+    ]
+    attempted_selection = [
+        event for event in selection if event.get("generated_tools_attempted")
+    ]
+    failed_attempt_selection = [
+        event for event in selection if event.get("generated_tools_failed")
     ]
     ignored_selection = [
         event
@@ -92,6 +113,13 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
         "mean_similarity": sum(similarities) / len(similarities)
         if similarities
         else 0.0,
+        "outcome_score_available_count": len(outcome_similarities),
+        "outcome_success_count": len(outcome_successful),
+        "mean_outcome_similarity": (
+            sum(outcome_similarities) / len(outcome_similarities)
+            if outcome_similarities
+            else None
+        ),
         "total_turns": sum(int(row.get("turn_count", 0)) for row in rows),
         "exception_count": len(exceptions),
         "tool_generation_count": len(birth_events),
@@ -110,6 +138,8 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
         ),
         "visible_generated_tools": sorted(visible_generated),
         "generated_tool_visible_scenarios": len(visible_selection),
+        "generated_tool_attempted_scenarios": len(attempted_selection),
+        "generated_tool_failed_scenarios": len(failed_attempt_selection),
         "generated_tool_called_scenarios": len(called_selection),
         "generated_tool_visible_not_called_scenarios": len(ignored_selection),
         "generated_tool_selection_failures": [
@@ -117,12 +147,31 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
                 "scenario": event.get("scenario"),
                 "selection_status": event.get("selection_status"),
                 "generated_tools_visible": event.get("generated_tools_visible", []),
+                "generated_tools_attempted": event.get("generated_tools_attempted", []),
+                "generated_tools_failed": event.get("generated_tools_failed", []),
                 "generated_tools_called": event.get("generated_tools_called", []),
                 "similarity": event.get("similarity"),
+                "outcome_similarity": event.get("outcome_similarity"),
                 "exception_type": event.get("exception_type"),
             }
             for event in selection
             if event.get("failure_after_selection")
+            and event.get("selection_status") != "no_visible_generated_tools"
+        ],
+        "generated_tool_outcome_selection_failures": [
+            {
+                "scenario": event.get("scenario"),
+                "selection_status": event.get("selection_status"),
+                "generated_tools_visible": event.get("generated_tools_visible", []),
+                "generated_tools_attempted": event.get("generated_tools_attempted", []),
+                "generated_tools_failed": event.get("generated_tools_failed", []),
+                "generated_tools_called": event.get("generated_tools_called", []),
+                "similarity": event.get("similarity"),
+                "outcome_similarity": event.get("outcome_similarity"),
+                "exception_type": event.get("exception_type"),
+            }
+            for event in selection
+            if event.get("failure_after_outcome_selection")
             and event.get("selection_status") != "no_visible_generated_tools"
         ],
         "cache_metrics": {
@@ -133,6 +182,7 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
             {
                 "scenario": row.get("name"),
                 "similarity": row.get("similarity"),
+                "outcome_similarity": row.get("outcome_similarity"),
                 "exception_type": row.get("exception_type"),
                 "categories": row.get("categories", []),
             }
@@ -147,21 +197,62 @@ def compare_runs(
     candidate_dir: Path,
     *,
     registry_dir: Path | None = None,
+    require_complete_match: bool = True,
 ) -> dict[str, Any]:
     """Compare matched control/candidate result summaries by scenario name."""
-    control_rows = {str(row["name"]): row for row in _scenario_rows(control_dir)}
-    candidate_rows = {str(row["name"]): row for row in _scenario_rows(candidate_dir)}
-    shared = [name for name in control_rows if name in candidate_rows]
+    control_list = _scenario_rows(control_dir)
+    candidate_list = _scenario_rows(candidate_dir)
+    control_names = [str(row["name"]) for row in control_list]
+    candidate_names = [str(row["name"]) for row in candidate_list]
+    if control_names != candidate_names:
+        if not require_complete_match:
+            candidate_name_set = set(candidate_names)
+            shared_names = [
+                name for name in control_names if name in candidate_name_set
+            ]
+            control_list = [
+                row for row in control_list if str(row["name"]) in set(shared_names)
+            ]
+            candidate_by_name = {str(row["name"]): row for row in candidate_list}
+            candidate_list = [candidate_by_name[name] for name in shared_names]
+            control_names = shared_names
+            candidate_names = shared_names
+        else:
+            raise ValueError(
+                "paired_run_mismatch:"
+                f"control_count={len(control_names)};"
+                f"candidate_count={len(candidate_names)};"
+                f"control_only={sorted(set(control_names) - set(candidate_names))[:10]};"
+                f"candidate_only={sorted(set(candidate_names) - set(control_names))[:10]}"
+            )
+    control_rows = {str(row["name"]): row for row in control_list}
+    candidate_rows = {str(row["name"]): row for row in candidate_list}
+    shared = control_names
     deltas: list[dict[str, Any]] = []
     for name in shared:
         control_similarity = float(control_rows[name].get("similarity", 0.0))
         candidate_similarity = float(candidate_rows[name].get("similarity", 0.0))
+        control_outcome_similarity = _optional_float(
+            control_rows[name].get("outcome_similarity")
+        )
+        candidate_outcome_similarity = _optional_float(
+            candidate_rows[name].get("outcome_similarity")
+        )
+        outcome_delta = (
+            candidate_outcome_similarity - control_outcome_similarity
+            if control_outcome_similarity is not None
+            and candidate_outcome_similarity is not None
+            else None
+        )
         deltas.append(
             {
                 "scenario": name,
                 "control_similarity": control_similarity,
                 "candidate_similarity": candidate_similarity,
                 "delta": candidate_similarity - control_similarity,
+                "control_outcome_similarity": control_outcome_similarity,
+                "candidate_outcome_similarity": candidate_outcome_similarity,
+                "outcome_delta": outcome_delta,
                 "control_turns": control_rows[name].get("turn_count"),
                 "candidate_turns": candidate_rows[name].get("turn_count"),
             }
@@ -169,17 +260,76 @@ def compare_runs(
     gains = [row for row in deltas if row["delta"] > 0]
     regressions = [row for row in deltas if row["delta"] < 0]
     preserved = [row for row in deltas if row["delta"] == 0]
+    outcome_deltas = [row for row in deltas if row["outcome_delta"] is not None]
+    outcome_gains = [row for row in outcome_deltas if row["outcome_delta"] > 0]
+    outcome_regressions = [row for row in outcome_deltas if row["outcome_delta"] < 0]
+    outcome_preserved = [row for row in outcome_deltas if row["outcome_delta"] == 0]
+    control_summary = summarize_run(control_dir)
+    candidate_summary = summarize_run(candidate_dir, registry_dir=registry_dir)
+    control_exact_successes = sum(
+        1 for row in deltas if row["control_similarity"] >= 1.0
+    )
+    candidate_exact_successes = sum(
+        1 for row in deltas if row["candidate_similarity"] >= 1.0
+    )
     return {
-        "control": summarize_run(control_dir),
-        "candidate": summarize_run(candidate_dir, registry_dir=registry_dir),
+        "control": control_summary,
+        "candidate": candidate_summary,
         "scenario_count": len(shared),
+        "control_mean_similarity": (
+            sum(row["control_similarity"] for row in deltas) / len(deltas)
+            if deltas
+            else 0.0
+        ),
+        "candidate_mean_similarity": (
+            sum(row["candidate_similarity"] for row in deltas) / len(deltas)
+            if deltas
+            else 0.0
+        ),
         "mean_similarity_delta": (
             sum(row["delta"] for row in deltas) / len(deltas) if deltas else 0.0
+        ),
+        "control_exact_successes": control_exact_successes,
+        "candidate_exact_successes": candidate_exact_successes,
+        "exact_success_delta": candidate_exact_successes - control_exact_successes,
+        "runtime_exception_count": control_summary["exception_count"]
+        + candidate_summary["exception_count"],
+        "outcome_scenario_count": len(outcome_deltas),
+        "control_mean_outcome_similarity": (
+            sum(
+                float(row["control_outcome_similarity"])
+                for row in outcome_deltas
+                if row["control_outcome_similarity"] is not None
+            )
+            / len(outcome_deltas)
+            if outcome_deltas
+            else None
+        ),
+        "candidate_mean_outcome_similarity": (
+            sum(
+                float(row["candidate_outcome_similarity"])
+                for row in outcome_deltas
+                if row["candidate_outcome_similarity"] is not None
+            )
+            / len(outcome_deltas)
+            if outcome_deltas
+            else None
+        ),
+        "mean_outcome_similarity_delta": (
+            sum(float(row["outcome_delta"]) for row in outcome_deltas)
+            / len(outcome_deltas)
+            if outcome_deltas
+            else None
         ),
         "gain_count": len(gains),
         "regression_count": len(regressions),
         "preserved_count": len(preserved),
+        "outcome_gain_count": len(outcome_gains),
+        "outcome_regression_count": len(outcome_regressions),
+        "outcome_preserved_count": len(outcome_preserved),
         "gains": gains,
         "regressions": regressions,
+        "outcome_gains": outcome_gains,
+        "outcome_regressions": outcome_regressions,
         "deltas": deltas,
     }

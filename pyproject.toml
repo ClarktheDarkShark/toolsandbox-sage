@@ -110,7 +110,7 @@ exclude = ["data/"]
 addopts=""
 
 [[tool.mypy.overrides]]
-module = ["polars", "tqdm", "tqdm.*"]
+module = ["holidays", "polars", "rouge_score", "rouge_score.*", "tqdm", "tqdm.*"]
 ignore_missing_imports = true
 
 [tool.mypy]

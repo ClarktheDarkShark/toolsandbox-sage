@@ -1,0 +1,544 @@
+"""Task-stratum classification for ToolSandbox SAGE coverage audits."""
+
+from __future__ import annotations
+
+import re
+from collections import Counter
+from collections.abc import Iterable
+from typing import Any
+
+STRATA = (
+    "temporal_reminder_date_canonicalization",
+    "contact_message_search_disambiguation",
+    "record_filtering_ranking_latest_selection",
+    "direct_state_precondition_service_enablement",
+    "holiday_calendar_business_day_logic",
+    "stock_market_numeric_normalization",
+    "weather_location_current_city_distance",
+    "generic_multi_tool_composition",
+    "insufficient_information_clarification",
+    "other_uncovered_clusters",
+)
+
+
+HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
+    "days_between_timestamps": ("holiday_calendar_business_day_logic",),
+    "relative_day_time_to_timestamp": ("temporal_reminder_date_canonicalization",),
+    "recency_to_timestamp_bounds": (
+        "temporal_reminder_date_canonicalization",
+        "record_filtering_ranking_latest_selection",
+    ),
+    "select_latest_record_by_timestamp": (
+        "record_filtering_ranking_latest_selection",
+        "contact_message_search_disambiguation",
+    ),
+    "select_record_by_timestamp_extreme": (
+        "record_filtering_ranking_latest_selection",
+        "contact_message_search_disambiguation",
+    ),
+    "message_search_time_window": (
+        "contact_message_search_disambiguation",
+        "record_filtering_ranking_latest_selection",
+    ),
+    "next_service_tool_call": ("direct_state_precondition_service_enablement",),
+    "recover_from_tool_error": ("direct_state_precondition_service_enablement",),
+    "next_service_enablement_action": ("direct_state_precondition_service_enablement",),
+    "prepare_reminder_arguments_with_optional_location": (
+        "temporal_reminder_date_canonicalization",
+        "generic_multi_tool_composition",
+    ),
+}
+
+OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
+    "canonicalizer:relative_day_time_timestamp": ("relative_day_time_to_timestamp",),
+    "derived_value:days_between_timestamps": ("days_between_timestamps",),
+    "derived_value:recency_timestamp_bounds": ("recency_to_timestamp_bounds",),
+    "search_filter:select_record_by_timestamp_extreme": (
+        "select_record_by_timestamp_extreme",
+    ),
+    "derived_value:message_search_time_window": ("message_search_time_window",),
+    "search_filter:select_contact_field_by_constraint": (
+        "select_contact_field_by_constraint",
+    ),
+    "state_precondition:next_service_tool_call": ("next_service_tool_call",),
+    "state_precondition:recover_from_tool_error": ("recover_from_tool_error",),
+    "composite:prepare_reminder_arguments_with_optional_location": (
+        "prepare_reminder_arguments_with_optional_location",
+    ),
+}
+
+VARIANT_SUFFIXES = (
+    "_arg_description_scrambled",
+    "_arg_type_scrambled",
+    "_tool_description_scrambled",
+    "_tool_name_scrambled",
+    "_10_distraction_tools",
+    "_3_distraction_tools",
+    "_all_tools",
+)
+
+EXTERNAL_SERVICE_TOKENS = (
+    "weather",
+    "temperature",
+    "current_city",
+    "distance",
+    "lat_lon",
+    "current_location",
+    "location_name",
+    "location_around",
+    "address",
+    "stock",
+    "market",
+    "price",
+    "currency",
+    "convert_currency",
+    "exchange_rate",
+)
+
+DIRECT_SERVICE_HELPER_PREFIXES = (
+    "turn_on_wifi_low_battery_mode",
+    "turn_on_cellular_low_battery_mode",
+    "turn_on_location_low_battery_mode",
+)
+
+DOWNSTREAM_SERVICE_HELPER_PREFIXES = (
+    "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+    "find_current_city_low_battery_mode",
+    "find_distance_with_location_name_low_battery_mode",
+    "find_stock_symbol_with_company_name_low_battery_mode",
+    "find_temperature_f_with_location_and_time_diff_low_battery_mode",
+    "find_temperature_low_battery_mode",
+)
+
+CONTACT_CONSTRAINT_HELPER_PREFIXES = (
+    "search_phone_number_with_name",
+    "search_relationship_with_phone_number",
+    "search_name_with_relationship",
+    "update_contact_relationship_with_relationship",
+)
+
+
+def base_task_family(scenario_name: str) -> str:
+    """Collapse ToolSandbox robustness variants into a base task family."""
+    family = scenario_name
+    changed = True
+    while changed:
+        changed = False
+        for suffix in VARIANT_SUFFIXES:
+            if family.endswith(suffix):
+                family = family[: -len(suffix)]
+                changed = True
+    family = re.sub(r"_multiple_user_turn", "", family)
+    family = re.sub(r"_ambiguous", "", family)
+    if family.endswith("_alt"):
+        family = family[:-4]
+    return family
+
+
+def classify_task_strata(
+    scenario_name: str,
+    categories: Iterable[str] | None = None,
+) -> list[str]:
+    """Return all task strata that materially describe a scenario."""
+
+    name = scenario_name.lower()
+    category_set = {category.upper() for category in categories or ()}
+    strata: list[str] = []
+
+    has_reminder = "reminder" in name
+    has_message = "message" in name
+    has_contact = any(
+        token in name
+        for token in (
+            "contact",
+            "phone_number",
+            "relationship",
+            "sender",
+            "recipient",
+        )
+    )
+    has_temporal_language = any(
+        token in name
+        for token in (
+            "recency",
+            "yesterday",
+            "tomorrow",
+            "upcoming",
+            "latest",
+            "oldest",
+            "date",
+            "time",
+            "week_delta",
+            "weekday_delta",
+        )
+    )
+    if has_reminder and has_temporal_language:
+        strata.append("temporal_reminder_date_canonicalization")
+
+    if has_contact or has_message:
+        strata.append("contact_message_search_disambiguation")
+
+    if any(
+        token in name
+        for token in (
+            "latest",
+            "oldest",
+            "recency",
+            "search_",
+            "find_",
+            "filter",
+            "rank",
+        )
+    ):
+        strata.append("record_filtering_ranking_latest_selection")
+
+    if (
+        any(
+            token in name
+            for token in (
+                "wifi",
+                "cellular",
+                "low_battery",
+                "turn_on_location",
+                "location_service",
+                "service",
+            )
+        )
+        or "STATE_DEPENDENCY" in category_set
+    ):
+        strata.append("direct_state_precondition_service_enablement")
+
+    if any(token in name for token in ("holiday", "calendar", "business_day")):
+        strata.append("holiday_calendar_business_day_logic")
+
+    if any(token in name for token in ("stock", "market", "price")):
+        strata.append("stock_market_numeric_normalization")
+
+    if any(
+        token in name
+        for token in (
+            "weather",
+            "temperature",
+            "distance",
+            "current_city",
+            "address",
+            "lat_lon",
+            "location_name",
+        )
+    ):
+        strata.append("weather_location_current_city_distance")
+
+    if (
+        "MULTIPLE_TOOL_CALL" in category_set
+        or "MULTIPLE_USER_TURN" in category_set
+        or "multiple_user_turn" in name
+        or "all_tools" in name
+        or "distraction_tools" in name
+    ):
+        strata.append("generic_multi_tool_composition")
+
+    if "INSUFFICIENT_INFORMATION" in category_set or "insufficient_information" in name:
+        strata.append("insufficient_information_clarification")
+
+    if not strata:
+        strata.append("other_uncovered_clusters")
+
+    return strata
+
+
+def expected_helper_fit(
+    scenario_name: str, categories: Iterable[str] | None = None
+) -> list[str]:
+    """Estimate which current retained helpers could plausibly apply."""
+
+    name = scenario_name.lower()
+    strata = set(classify_task_strata(scenario_name, categories))
+    helpers: list[str] = []
+
+    if "insufficient_information" not in name and (
+        (
+            "temporal_reminder_date_canonicalization" in strata
+            and any(
+                token in name
+                for token in ("date", "time", "week_delta", "weekday_delta")
+            )
+        )
+        or name.startswith("modify_reminder_with_recency_latest")
+    ):
+        helpers.append("relative_day_time_to_timestamp")
+
+    bounded_recency = any(token in name for token in ("yesterday", "today", "upcoming"))
+    if (
+        "insufficient_information" not in name
+        and bounded_recency
+        and ("creation_recency" in name or "message" in name)
+    ):
+        helpers.append("recency_to_timestamp_bounds")
+
+    if "insufficient_information" not in name and name.startswith(
+        (
+            "modify_contact_with_message_recency",
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest",
+        )
+    ):
+        helpers.append("select_record_by_timestamp_extreme")
+    if "insufficient_information" not in name and name.startswith(
+        (
+            "modify_contact_with_message_recency",
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest",
+        )
+    ):
+        helpers.append("message_search_time_window")
+    if any(token in name for token in ("holiday", "business_day")):
+        helpers.append("days_between_timestamps")
+    if "insufficient_information" not in name and name.startswith(
+        "find_stock_symbol_with_company_name"
+    ):
+        helpers.append("extract_stock_symbol")
+    if "insufficient_information" not in name and name.startswith(
+        DIRECT_SERVICE_HELPER_PREFIXES
+    ):
+        helpers.append("next_service_tool_call")
+    if "insufficient_information" not in name and name.startswith(
+        DOWNSTREAM_SERVICE_HELPER_PREFIXES
+    ):
+        helpers.append("next_service_tool_call")
+        helpers.append("recover_from_tool_error")
+    if (
+        "insufficient_information" not in name
+        and "ambiguous" not in name
+        and name.startswith(CONTACT_CONSTRAINT_HELPER_PREFIXES)
+    ):
+        helpers.append("select_contact_field_by_constraint")
+    if (
+        "insufficient_information" not in name
+        and name.startswith("add_reminder_content_and_")
+        and "_time" in name
+        and "_location" in name
+    ):
+        helpers.append("prepare_reminder_arguments_with_optional_location")
+
+    return helpers
+
+
+def expected_birth_opportunities(
+    scenario_name: str,
+    categories: Iterable[str] | None = None,
+) -> list[str]:
+    """Estimate narrow adequacy-gate patterns that can currently birth a helper."""
+
+    name = scenario_name.lower()
+    category_set = {category.upper() for category in categories or ()}
+    if "INSUFFICIENT_INFORMATION" in category_set or "insufficient_information" in name:
+        return []
+
+    opportunities: list[str] = []
+    if "recency" in name and "CANONICALIZATION" in category_set:
+        opportunities.append("derived_value:recency_timestamp_bounds")
+    if name.startswith("modify_reminder_with_recency_latest"):
+        opportunities.append("canonicalizer:relative_day_time_timestamp")
+    if name.startswith(
+        (
+            "modify_contact_with_message_recency",
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest",
+        )
+    ):
+        opportunities.append("search_filter:select_record_by_timestamp_extreme")
+    if name.startswith(
+        (
+            "modify_contact_with_message_recency",
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest",
+        )
+    ):
+        opportunities.append("derived_value:message_search_time_window")
+    if "ambiguous" not in name and name.startswith(CONTACT_CONSTRAINT_HELPER_PREFIXES):
+        opportunities.append("search_filter:select_contact_field_by_constraint")
+    if name.startswith("find_days_till_holiday"):
+        opportunities.append("derived_value:days_between_timestamps")
+    if name.startswith("find_stock_symbol_with_company_name"):
+        opportunities.append("derived_value:extract_stock_symbol")
+    if name.startswith(DIRECT_SERVICE_HELPER_PREFIXES):
+        opportunities.append("state_precondition:next_service_tool_call")
+    if name.startswith(DOWNSTREAM_SERVICE_HELPER_PREFIXES):
+        opportunities.append("state_precondition:recover_from_tool_error")
+    if (
+        name.startswith("add_reminder_content_and_")
+        and "_time" in name
+        and "_location" in name
+    ):
+        opportunities.append(
+            "composite:prepare_reminder_arguments_with_optional_location"
+        )
+    return opportunities
+
+
+def cohort_policy_report(
+    scenario_names: Iterable[str],
+    *,
+    categories_by_name: dict[str, Iterable[str]] | None = None,
+    generation_enabled: bool,
+    registry_tool_count: int = 0,
+) -> dict[str, Any]:
+    """Summarize whether a run is likely to exercise retained-tool evolution."""
+
+    names = list(scenario_names)
+    categories_by_name = categories_by_name or {}
+    family_counts = Counter(base_task_family(name) for name in names)
+    strata_counts: Counter[str] = Counter()
+    helper_fit_counts: Counter[str] = Counter()
+    birth_opportunity_counts: Counter[str] = Counter()
+    contaminated: list[str] = []
+    insufficient: list[str] = []
+    per_scenario: list[dict[str, Any]] = []
+
+    for name in names:
+        categories = tuple(categories_by_name.get(name, ()))
+        helper_fit = expected_helper_fit(name, categories)
+        birth_opportunities = expected_birth_opportunities(name, categories)
+        strata_counts.update(classify_task_strata(name, categories))
+        helper_fit_counts.update(helper_fit or ["no_current_helper_fit"])
+        birth_opportunity_counts.update(
+            birth_opportunities or ["no_current_birth_opportunity"]
+        )
+        lower_name = name.lower()
+        if any(token in lower_name for token in EXTERNAL_SERVICE_TOKENS):
+            contaminated.append(name)
+        if "insufficient_information" in lower_name or "INSUFFICIENT_INFORMATION" in {
+            category.upper() for category in categories
+        }:
+            insufficient.append(name)
+        per_scenario.append(
+            {
+                "scenario": name,
+                "base_task_family": base_task_family(name),
+                "expected_helper_fit": helper_fit,
+                "expected_birth_opportunities": birth_opportunities,
+            }
+        )
+
+    scenario_count = len(names)
+    largest_family = max(family_counts.values(), default=0)
+    largest_family_share = largest_family / scenario_count if scenario_count else 0.0
+    if scenario_count >= 60:
+        required_families = 8
+    elif scenario_count >= 30:
+        required_families = 5
+    else:
+        required_families = min(scenario_count, 4)
+
+    has_birth_path = any(
+        key != "no_current_birth_opportunity" and count > 0
+        for key, count in birth_opportunity_counts.items()
+    )
+    has_helper_fit = any(
+        key != "no_current_helper_fit" and count > 0
+        for key, count in helper_fit_counts.items()
+    )
+    no_helper_fit_count = helper_fit_counts.get("no_current_helper_fit", 0)
+    helper_fit_scenario_count = scenario_count - no_helper_fit_count
+    helper_fit_share = (
+        helper_fit_scenario_count / scenario_count if scenario_count else 0.0
+    )
+    post_birth_reuse: dict[str, dict[str, Any]] = {}
+    for index, row in enumerate(per_scenario):
+        for opportunity in row["expected_birth_opportunities"]:
+            if not isinstance(opportunity, str):
+                continue
+            helper_names = OPPORTUNITY_HELPERS.get(opportunity, ())
+            if not helper_names:
+                continue
+            current = post_birth_reuse.setdefault(
+                opportunity,
+                {
+                    "helper_names": list(helper_names),
+                    "first_birth_index": index,
+                    "first_birth_scenario": row["scenario"],
+                    "later_fit_count": 0,
+                    "later_distinct_base_families": 0,
+                    "later_fit_scenarios": [],
+                },
+            )
+            if index < current["first_birth_index"]:
+                current["first_birth_index"] = index
+                current["first_birth_scenario"] = row["scenario"]
+
+    for opportunity, summary in post_birth_reuse.items():
+        helpers = set(summary["helper_names"])
+        first_index = int(summary["first_birth_index"])
+        later_scenarios: list[str] = []
+        later_families: set[str] = set()
+        for row in per_scenario[first_index + 1 :]:
+            helper_fit_set = set(row["expected_helper_fit"])
+            if helpers & helper_fit_set:
+                later_scenarios.append(str(row["scenario"]))
+                later_families.add(str(row["base_task_family"]))
+        summary["later_fit_count"] = len(later_scenarios)
+        summary["later_distinct_base_families"] = len(later_families)
+        summary["later_fit_scenarios"] = later_scenarios[:20]
+
+    has_post_birth_reuse_opportunity = any(
+        int(summary["later_fit_count"]) > 0 for summary in post_birth_reuse.values()
+    )
+    warnings = [
+        warning
+        for warning in (
+            "external_service_cases_present" if contaminated else "",
+            "too_few_base_families" if len(family_counts) < required_families else "",
+            "family_share_above_20_percent"
+            if scenario_count >= 30 and largest_family_share > 0.2
+            else "",
+            "no_expected_helper_fit" if not has_helper_fit else "",
+            "low_expected_helper_fit_share"
+            if scenario_count >= 12 and helper_fit_share < 0.5
+            else "",
+            "generation_enabled_but_no_expected_birth_path"
+            if generation_enabled and not has_birth_path
+            else "",
+            "generation_enabled_but_no_post_birth_reuse_opportunity"
+            if generation_enabled
+            and has_birth_path
+            and not has_post_birth_reuse_opportunity
+            else "",
+        )
+        if warning
+    ]
+    should_block = (
+        generation_enabled
+        and registry_tool_count == 0
+        and not has_birth_path
+        and not has_helper_fit
+    )
+    return {
+        "scenario_count": scenario_count,
+        "distinct_base_task_families": len(family_counts),
+        "required_distinct_base_task_families": required_families,
+        "largest_family_share": largest_family_share,
+        "family_counts": dict(family_counts.most_common()),
+        "strata_counts": dict(strata_counts.most_common()),
+        "expected_helper_fit_counts": dict(helper_fit_counts.most_common()),
+        "expected_helper_fit_share": helper_fit_share,
+        "expected_birth_opportunity_counts": dict(
+            birth_opportunity_counts.most_common()
+        ),
+        "contaminated_external_service_scenarios": contaminated,
+        "insufficient_information_scenarios": insufficient,
+        "generation_enabled": generation_enabled,
+        "registry_tool_count": registry_tool_count,
+        "has_expected_birth_path": has_birth_path,
+        "has_expected_helper_fit": has_helper_fit,
+        "has_post_birth_reuse_opportunity": has_post_birth_reuse_opportunity,
+        "post_birth_reuse_opportunities": post_birth_reuse,
+        "should_block": should_block,
+        "decision_use": (
+            "suitable_for_broad_value_decision"
+            if scenario_count >= 30
+            and len(family_counts) >= required_families
+            and largest_family_share <= 0.2
+            else "suitable_for_early_value_only"
+        ),
+        "warnings": warnings,
+    }

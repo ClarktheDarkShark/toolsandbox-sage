@@ -5,7 +5,10 @@ A collection of tools which simulates common functions used for searching over a
 Tools listed in this category are backed by RapidAPI hosted web service requests.
 """
 
+import hashlib
+import json
 import os
+from pathlib import Path
 from typing import Any, Optional, Union, cast
 
 import requests
@@ -23,6 +26,89 @@ from tool_sandbox.tools.setting import (
     get_location_service_status,
     get_wifi_status,
 )
+
+_RAPID_CACHE_MODES = {"off", "read_write", "read_only", "write_only"}
+_DEFAULT_RAPID_CACHE_PATH = Path(".secrets/rapid_api_cache.json")
+_DEFAULT_DISABLED_RAPID_HOSTS = frozenset({"currency-converter18.p.rapidapi.com"})
+
+
+def _rapid_cache_mode() -> str:
+    mode = os.environ.get("TOOLSANDBOX_RAPID_CACHE_MODE", "read_write").strip().lower()
+    if mode not in _RAPID_CACHE_MODES:
+        raise ValueError(
+            "TOOLSANDBOX_RAPID_CACHE_MODE must be one of "
+            f"{sorted(_RAPID_CACHE_MODES)}, found {mode!r}"
+        )
+    return mode
+
+
+def _rapid_cache_path() -> Path:
+    return Path(
+        os.environ.get("TOOLSANDBOX_RAPID_CACHE_PATH", str(_DEFAULT_RAPID_CACHE_PATH))
+    )
+
+
+def _disabled_rapid_hosts() -> set[str]:
+    configured = os.environ.get("TOOLSANDBOX_RAPID_DISABLED_HOSTS")
+    if configured is None:
+        return set(_DEFAULT_DISABLED_RAPID_HOSTS)
+    return {item.strip() for item in configured.split(",") if item.strip()}
+
+
+def _rapid_cache_key(
+    url: str, params: dict[str, Any], headers: dict[str, Any]
+) -> tuple[str, dict[str, Any]]:
+    request = {
+        "url": url,
+        "host": headers.get("X-RapidAPI-Host", ""),
+        "params": params,
+    }
+    request_json = json.dumps(request, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(request_json.encode("utf-8")).hexdigest(), request
+
+
+def _read_rapid_cache(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"entries": {}}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"entries": {}}
+    if not isinstance(payload, dict) or not isinstance(payload.get("entries"), dict):
+        return {"entries": {}}
+    return payload
+
+
+def _write_rapid_cache(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    os.replace(tmp_path, path)
+
+
+def _rapid_cache_lookup(key: str) -> Optional[dict[str, Any]]:
+    payload = _read_rapid_cache(_rapid_cache_path())
+    entry = payload.get("entries", {}).get(key)
+    if isinstance(entry, dict) and isinstance(entry.get("response"), dict):
+        return cast(dict[str, Any], entry["response"])
+    return None
+
+
+def _rapid_cache_store(
+    key: str,
+    request: dict[str, Any],
+    response: dict[str, Any],
+) -> None:
+    path = _rapid_cache_path()
+    payload = _read_rapid_cache(path)
+    entries = payload.setdefault("entries", {})
+    if not isinstance(entries, dict):
+        entries = {}
+        payload["entries"] = entries
+    entries[key] = {"request": request, "response": response}
+    _write_rapid_cache(path, payload)
 
 
 @typechecked
@@ -76,12 +162,31 @@ def rapid_api_get_request(
     """
     if not get_wifi_status():
         raise ConnectionError("Wifi is not enabled")
+    mode = _rapid_cache_mode()
+    key, request = _rapid_cache_key(url=url, params=params, headers=headers)
+    if mode in {"read_write", "read_only"}:
+        cached = _rapid_cache_lookup(key)
+        if cached is not None:
+            return cached
+    host = str(headers.get("X-RapidAPI-Host", ""))
+    if host in _disabled_rapid_hosts():
+        raise PermissionError(
+            f"RapidAPI host {host!r} is disabled for local experiments. "
+            "Use a cached response or remove the host from "
+            "TOOLSANDBOX_RAPID_DISABLED_HOSTS for an explicit diagnostic run."
+        )
+    if mode == "read_only":
+        raise PermissionError(
+            "RapidAPI cache miss in read_only mode. Populate the cache with "
+            "TOOLSANDBOX_RAPID_CACHE_MODE=read_write or use write_only/off for "
+            "an explicit live API run."
+        )
     if "RAPID_API_KEY" not in os.environ:
         raise PermissionError(
             "Please provide 'RAPID_API_KEY' in environment variable. "
             "You can find your API key by following https://docs.rapidapi.com/v1.0/docs/keys"
         )
-    return cast(
+    response = cast(
         dict[str, Any],
         requests.get(
             url=url,
@@ -89,6 +194,9 @@ def rapid_api_get_request(
             params=params,
         ).json(),
     )
+    if mode in {"read_write", "write_only"}:
+        _rapid_cache_store(key=key, request=request, response=response)
+    return response
 
 
 @register_as_tool(visible_to=(RoleType.AGENT,))

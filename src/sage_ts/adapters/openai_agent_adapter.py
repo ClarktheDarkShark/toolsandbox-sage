@@ -9,6 +9,12 @@ from typing import cast
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
+from sage_ts.config.models import (
+    DEFAULT_MODEL,
+    resolve_model_name,
+    supports_temperature,
+)
+
 
 @dataclass(frozen=True)
 class ChatRequest:
@@ -22,13 +28,11 @@ class OpenAIChatAdapter:
     model: str
 
     def __init__(self, model: str | None = None) -> None:
-        self.model = (
-            model or os.environ.get("SAGE_TS_MODEL", "gpt-5-mini") or "gpt-5-mini"
-        )
+        self.model = resolve_model_name(model or os.environ.get("SAGE_TS_MODEL"))
         self.client = OpenAI(base_url="https://api.openai.com/v1")
 
     def complete(self, request: ChatRequest) -> str:
-        model = request.model or self.model
+        model = resolve_model_name(request.model or self.model or DEFAULT_MODEL)
         messages = cast(
             list[ChatCompletionMessageParam],
             [
@@ -36,15 +40,15 @@ class OpenAIChatAdapter:
                 {"role": "user", "content": request.user},
             ],
         )
-        if model.startswith("gpt-5"):
-            response = self.client.chat.completions.create(
-                model=model, messages=messages
-            )
-        else:
+        if supports_temperature(model):
             response = self.client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=request.temperature,
+            )
+        else:
+            response = self.client.chat.completions.create(
+                model=model, messages=messages
             )
         content = cast(str, response.choices[0].message.content)
         if content is None:

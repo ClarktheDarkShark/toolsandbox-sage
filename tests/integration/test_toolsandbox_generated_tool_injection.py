@@ -5,7 +5,10 @@ from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, T
 from sage_ts.orchestration.toy_mechanism import canonicalizer_tool
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
-from sage_ts.runtime.toolsandbox_integration import with_registry_tools
+from sage_ts.runtime.toolsandbox_integration import (
+    compile_toolsandbox_tool,
+    with_registry_tools,
+)
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 from tool_sandbox.common.execution_context import (
     DatabaseNamespace,
@@ -37,36 +40,131 @@ def _registry_with_canonicalizer(tmp_path: Path) -> RegistryStore:
 
 def _registry_with_state_helper(tmp_path: Path) -> RegistryStore:
     spec = ToolSpec(
-        tool_name="next_service_enablement_action",
+        tool_name="next_service_tool_call",
         family=ToolFamily.STATE_PRECONDITION_HELPER,
-        description="Return a concrete next_action and readiness predicate.",
+        description="Return the exact next ToolSandbox tool call and readiness predicate.",
         inputs=(
             ToolInput("target_service", "str", "Requested service."),
             ToolInput("wifi_enabled", "bool", "Whether Wi-Fi is already enabled."),
+            ToolInput(
+                "cellular_enabled", "bool", "Whether cellular is already enabled."
+            ),
+            ToolInput(
+                "location_service_enabled",
+                "bool",
+                "Whether location service is already enabled.",
+            ),
+            ToolInput(
+                "low_battery_mode", "bool", "Whether low battery mode is enabled."
+            ),
         ),
         output_annotation="dict",
         generalization_rationale=(
             "Direct service-state scenarios repeatedly need a deterministic readiness "
-            "predicate and a single next action before finalizing."
+            "predicate and exact benchmark tool call before finalizing."
         ),
         inadequacy_evidence=(
             "Base tools expose raw service setters/getters but not a reusable "
-            "state-precondition decision helper."
+            "state-precondition decision helper that preserves trace compatibility."
         ),
     )
     code = """
-def next_service_enablement_action(target_service: str, wifi_enabled: bool) -> dict:
-    if target_service.lower() == "wifi" and not wifi_enabled:
-        return {"ready": False, "next_action": "set_wifi_status_true"}
-    return {"ready": True, "next_action": "none"}
+def next_service_tool_call(target_service: str, wifi_enabled: bool, cellular_enabled: bool, location_service_enabled: bool, low_battery_mode: bool) -> dict:
+    target = target_service.strip().lower()
+    state_by_target = {
+        "wifi": wifi_enabled,
+        "cellular": cellular_enabled,
+        "location": location_service_enabled,
+    }
+    if target not in state_by_target:
+        return {"ready": False, "tool_name": "", "arguments": {}, "target_service": target}
+    if state_by_target[target]:
+        return {"ready": True, "tool_name": "", "arguments": {}, "target_service": target}
+    if low_battery_mode:
+        return {"ready": False, "tool_name": "set_low_battery_mode_status", "arguments": {"on": False}, "target_service": target}
+    tool_by_target = {
+        "wifi": "set_wifi_status",
+        "cellular": "set_cellular_service_status",
+        "location": "set_location_service_status",
+    }
+    return {"ready": False, "tool_name": tool_by_target[target], "arguments": {"on": True}, "target_service": target}
 """
     tool = GeneratedTool(spec=spec, code=code)
     validation = validate_generated_tool(
         tool,
         examples=(
             ToolExample(
-                {"target_service": "wifi", "wifi_enabled": False},
-                {"ready": False, "next_action": "set_wifi_status_true"},
+                {
+                    "target_service": "wifi",
+                    "wifi_enabled": False,
+                    "cellular_enabled": True,
+                    "location_service_enabled": True,
+                    "low_battery_mode": True,
+                },
+                {
+                    "ready": False,
+                    "tool_name": "set_low_battery_mode_status",
+                    "arguments": {"on": False},
+                    "target_service": "wifi",
+                },
+            ),
+            ToolExample(
+                {
+                    "target_service": "cellular",
+                    "wifi_enabled": True,
+                    "cellular_enabled": False,
+                    "location_service_enabled": True,
+                    "low_battery_mode": False,
+                },
+                {
+                    "ready": False,
+                    "tool_name": "set_cellular_service_status",
+                    "arguments": {"on": True},
+                    "target_service": "cellular",
+                },
+                held_out=True,
+            ),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    return store
+
+
+def _registry_with_recency_bounds(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="recency_to_timestamp_bounds",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description="Convert a bounded recency label into timestamp bounds.",
+        inputs=(
+            ToolInput("recency_label", "str", "Bounded recency label."),
+            ToolInput("current_timestamp", "float", "Current Unix timestamp."),
+        ),
+        output_annotation="dict",
+        generalization_rationale=(
+            "Creation-recency search repeatedly needs deterministic timestamp bounds."
+        ),
+        inadequacy_evidence="The base tools expose timestamps but not recency bounds.",
+    )
+    code = """
+def recency_to_timestamp_bounds(recency_label: str, current_timestamp: float) -> dict:
+    if recency_label == "yesterday":
+        return {"lower_bound": current_timestamp - 86400.0, "upper_bound": current_timestamp}
+    return {"lower_bound": 0.0, "upper_bound": current_timestamp}
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {"recency_label": "yesterday", "current_timestamp": 172800.0},
+                {"lower_bound": 86400.0, "upper_bound": 172800.0},
+            ),
+            ToolExample(
+                {"recency_label": "today", "current_timestamp": 1000.0},
+                {"lower_bound": 0.0, "upper_bound": 1000.0},
+                held_out=True,
             ),
         ),
     )
@@ -127,11 +225,480 @@ def select_latest_record_by_timestamp(records_payload: dict, timestamp_key: str)
                 },
                 {"content": "new", "creation_timestamp": 20.0},
             ),
+            ToolExample(
+                {
+                    "records_payload": {
+                        "records": [
+                            {"content": "older", "creation_timestamp": 5.0},
+                            {"content": "newer", "creation_timestamp": 7.0},
+                        ]
+                    },
+                    "timestamp_key": "creation_timestamp",
+                },
+                {"content": "newer", "creation_timestamp": 7.0},
+                held_out=True,
+            ),
         ),
     )
     assert validation.accepted
     store = RegistryStore(tmp_path)
     store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    return store
+
+
+def _registry_with_timestamp_extreme_selector(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="select_record_by_timestamp_extreme",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description="Select the oldest or latest visible candidate by timestamp.",
+        inputs=(
+            ToolInput("records", "list", "Visible records returned by a search tool."),
+            ToolInput("timestamp_key", "str", "Timestamp field to compare."),
+            ToolInput("selection_mode", "str", "Either oldest or latest."),
+        ),
+        output_annotation="dict",
+        generalization_rationale=(
+            "Oldest/latest record tasks repeatedly require deterministic timestamp "
+            "ranking over visible search results before using original tools."
+        ),
+        inadequacy_evidence=(
+            "Base search tools return records but not a reusable min/max timestamp "
+            "selector for the returned candidates."
+        ),
+    )
+    code = """
+def select_record_by_timestamp_extreme(records: list, timestamp_key: str, selection_mode: str) -> dict:
+    choose_oldest = str(selection_mode).strip().lower() == "oldest"
+    best = {}
+    best_value = None
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        value = record.get(timestamp_key)
+        if not isinstance(value, (int, float)):
+            continue
+        numeric = float(value)
+        if best_value is None or (numeric < best_value if choose_oldest else numeric > best_value):
+            best_value = numeric
+            best = dict(record)
+    return best
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {
+                    "records": [
+                        {"content": "old", "creation_timestamp": 10.0},
+                        {"content": "new", "creation_timestamp": 20.0},
+                    ],
+                    "timestamp_key": "creation_timestamp",
+                    "selection_mode": "oldest",
+                },
+                {"content": "old", "creation_timestamp": 10.0},
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {"content": "old", "creation_timestamp": 10.0},
+                        {"content": "new", "creation_timestamp": 20.0},
+                    ],
+                    "timestamp_key": "creation_timestamp",
+                    "selection_mode": "latest",
+                },
+                {"content": "new", "creation_timestamp": 20.0},
+                held_out=True,
+            ),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    return store
+
+
+def _registry_with_message_search_window(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="message_search_time_window",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description="Create broad timestamp bounds for benchmark message search.",
+        inputs=(
+            ToolInput("anchor_timestamp", "float", "Current or anchor Unix timestamp."),
+            ToolInput("lookback_days", "int", "Days to include before the anchor."),
+        ),
+        output_annotation="dict",
+        generalization_rationale=(
+            "Message workflows repeatedly need safe timestamp criteria before "
+            "calling search_messages when no contact id or phone number is known."
+        ),
+        inadequacy_evidence=(
+            "search_messages requires at least one criterion, so unconstrained "
+            "latest/oldest message tasks need a reusable time-window helper."
+        ),
+    )
+    code = """
+def message_search_time_window(anchor_timestamp: float, lookback_days: int) -> dict:
+    days = int(lookback_days)
+    if days < 0:
+        days = 0
+    anchor = float(anchor_timestamp)
+    return {
+        "creation_timestamp_lowerbound": anchor - days * 86400.0,
+        "creation_timestamp_upperbound": anchor,
+    }
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {
+                    "anchor_timestamp": 864000.0,
+                    "lookback_days": 2,
+                },
+                {
+                    "creation_timestamp_lowerbound": 691200.0,
+                    "creation_timestamp_upperbound": 864000.0,
+                },
+            ),
+            ToolExample(
+                {
+                    "anchor_timestamp": 1000.0,
+                    "lookback_days": -1,
+                },
+                {
+                    "creation_timestamp_lowerbound": 1000.0,
+                    "creation_timestamp_upperbound": 1000.0,
+                },
+            ),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    return store
+
+
+def _registry_with_reminder_argument_prep(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="prepare_reminder_arguments_with_optional_location",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        description="Prepare add_reminder arguments while preserving benchmark side effects.",
+        inputs=(
+            ToolInput("content", "str", "Reminder content."),
+            ToolInput("current_timestamp", "float", "Current Unix timestamp."),
+            ToolInput("day_offset", "int", "Local-day offset."),
+            ToolInput("hour", "int", "Target local hour."),
+            ToolInput("minute", "int", "Target local minute."),
+            ToolInput("local_utc_offset_hours", "float", "Local UTC offset."),
+            ToolInput(
+                "location_available", "bool", "Whether coordinates are available."
+            ),
+            ToolInput("latitude", "float", "Latitude when available."),
+            ToolInput("longitude", "float", "Longitude when available."),
+            ToolInput(
+                "location_lookup_failed", "bool", "Whether lookup already failed."
+            ),
+        ),
+        output_annotation="dict",
+        generalization_rationale=(
+            "Reminder creation tasks need deterministic argument preparation while "
+            "still calling the original add_reminder ToolSandbox side-effect tool."
+        ),
+        inadequacy_evidence=(
+            "Agents repeatedly retry optional location lookup or prepare incorrect "
+            "timestamps before calling add_reminder."
+        ),
+    )
+    code = """
+def prepare_reminder_arguments_with_optional_location(content: str, current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float, location_available: bool, latitude: float, longitude: float, location_lookup_failed: bool) -> dict:
+    offset_seconds = local_utc_offset_hours * 3600
+    local_seconds = current_timestamp + offset_seconds
+    local_midnight = (local_seconds // 86400) * 86400
+    reminder_timestamp = local_midnight + day_offset * 86400 - offset_seconds + hour * 3600 + minute * 60
+    if not location_available or location_lookup_failed:
+        return {"add_reminder_kwargs": {"content": content, "reminder_timestamp": reminder_timestamp, "latitude": None, "longitude": None}, "should_call_add_reminder": True, "should_retry_location_lookup": False, "location_status": "omitted"}
+    return {"add_reminder_kwargs": {"content": content, "reminder_timestamp": reminder_timestamp, "latitude": latitude, "longitude": longitude}, "should_call_add_reminder": True, "should_retry_location_lookup": False, "location_status": "provided"}
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {
+                    "content": "Buy tickets",
+                    "current_timestamp": 0.0,
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": True,
+                },
+                {
+                    "add_reminder_kwargs": {
+                        "content": "Buy tickets",
+                        "reminder_timestamp": 147600.0,
+                        "latitude": None,
+                        "longitude": None,
+                    },
+                    "should_call_add_reminder": True,
+                    "should_retry_location_lookup": False,
+                    "location_status": "omitted",
+                },
+            ),
+            ToolExample(
+                {
+                    "content": "Call Sam",
+                    "current_timestamp": 864000.0,
+                    "day_offset": 0,
+                    "hour": 9,
+                    "minute": 30,
+                    "local_utc_offset_hours": 0.0,
+                    "location_available": False,
+                    "latitude": 51.5,
+                    "longitude": -0.12,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {
+                        "content": "Call Sam",
+                        "reminder_timestamp": 898200.0,
+                        "latitude": None,
+                        "longitude": None,
+                    },
+                    "should_call_add_reminder": True,
+                    "should_retry_location_lookup": False,
+                    "location_status": "omitted",
+                },
+                held_out=True,
+            ),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    return store
+
+
+def _registry_with_relative_time_helper(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="relative_day_time_to_timestamp",
+        family=ToolFamily.CANONICALIZER,
+        description="Convert relative local day/time into a timestamp.",
+        inputs=(
+            ToolInput("current_timestamp", "float", "Current timestamp."),
+            ToolInput("day_offset", "int", "Days forward from today."),
+            ToolInput("hour", "int", "Local hour."),
+            ToolInput("minute", "int", "Local minute."),
+            ToolInput("local_utc_offset_hours", "float", "Local UTC offset."),
+        ),
+        output_annotation="float",
+        generalization_rationale="Reminder updates repeatedly need this conversion.",
+        inadequacy_evidence="Agents miscompute local-day timestamp arithmetic.",
+    )
+    code = """
+def relative_day_time_to_timestamp(current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float) -> float:
+    return float(current_timestamp + day_offset * 86400 + hour * 3600 + minute * 60 - local_utc_offset_hours * 3600)
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {
+                    "current_timestamp": 1000.0,
+                    "day_offset": 1,
+                    "hour": 5,
+                    "minute": 30,
+                    "local_utc_offset_hours": 0.0,
+                },
+                107200.0,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1000.0,
+                    "day_offset": 0,
+                    "hour": 1,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                },
+                4600.0,
+                held_out=True,
+            ),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    return store
+
+
+def _registry_with_days_between_helper(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="days_between_timestamps",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description="Compute day and second difference between two timestamps.",
+        inputs=(
+            ToolInput("timestamp_0", "float", "Timestamp to subtract."),
+            ToolInput("timestamp_1", "float", "Timestamp to subtract from."),
+        ),
+        output_annotation="dict",
+        generalization_rationale=(
+            "Calendar-distance tasks repeatedly need deterministic day/second "
+            "differences after retrieving current and target timestamps."
+        ),
+        inadequacy_evidence=(
+            "The reduced base toolset removes timestamp_diff, leaving no direct "
+            "deterministic difference helper."
+        ),
+    )
+    code = """
+def days_between_timestamps(timestamp_0: float, timestamp_1: float) -> dict:
+    total_seconds = int(float(timestamp_1) - float(timestamp_0))
+    days = total_seconds // 86400
+    seconds = total_seconds - days * 86400
+    return {"days": days, "seconds": seconds}
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {"timestamp_0": 0.0, "timestamp_1": 90061.0},
+                {"days": 1, "seconds": 3661},
+            ),
+            ToolExample(
+                {"timestamp_0": 86400.0, "timestamp_1": 86400.0},
+                {"days": 0, "seconds": 0},
+                held_out=True,
+            ),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    return store
+
+
+def _registry_with_contact_constraint_helper(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="select_contact_field_by_constraint",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description="Select one contact by a normalized field constraint and return a requested field.",
+        inputs=(
+            ToolInput("records", "list", "Contact records."),
+            ToolInput("match_field", "str", "Field to match."),
+            ToolInput("expected_value", "str", "Expected field value."),
+            ToolInput(
+                "output_field", "str", "Field to return from the matched contact."
+            ),
+        ),
+        output_annotation="dict",
+        generalization_rationale="Contact lookup tasks repeatedly need one exact field from one record.",
+        inadequacy_evidence="Agents confuse contact candidates, phone formatting, and target fields.",
+    )
+    code = """
+def select_contact_field_by_constraint(records: list, match_field: str, expected_value: str, output_field: str) -> dict:
+    matches = []
+    expected = ''.join(filter(str.isdigit, expected_value)) if match_field == 'phone_number' else str(expected_value).strip().lower()
+    for record in records:
+        value = record.get(match_field)
+        normalized = ''.join(filter(str.isdigit, str(value))) if match_field == 'phone_number' else str(value).strip().lower()
+        if normalized == expected:
+            matches.append(record)
+    if len(matches) != 1 or output_field not in matches[0]:
+        return {}
+    return {'selected_record': matches[0], 'value': matches[0][output_field]}
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "person_id": "a",
+                            "name": "Ada Lovelace",
+                            "phone_number": "+1 (555) 0100",
+                        }
+                    ],
+                    "match_field": "phone_number",
+                    "expected_value": "15550100",
+                    "output_field": "person_id",
+                },
+                {
+                    "selected_record": {
+                        "person_id": "a",
+                        "name": "Ada Lovelace",
+                        "phone_number": "+1 (555) 0100",
+                    },
+                    "value": "a",
+                },
+            ),
+            ToolExample(
+                {
+                    "records": [],
+                    "match_field": "name",
+                    "expected_value": "Ada",
+                    "output_field": "phone_number",
+                },
+                {},
+            ),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(
+        RegistryEntry.accepted(
+            tool,
+            validation,
+            birth_scenario="remove_contact_by_phone_3_distraction_tools",
+        )
+    )
+    return store
+
+
+def _registry_with_stock_symbol_helper(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="extract_stock_symbol",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description="Extract a normalized stock symbol from a stock payload.",
+        inputs=(ToolInput("stock_payload", "dict", "search_stock payload."),),
+        output_annotation="str",
+        generalization_rationale="Stock lookup tasks need the symbol field only.",
+        inadequacy_evidence="Agents report extra fields or fail to strip exchange prefixes.",
+    )
+    code = """
+def extract_stock_symbol(stock_payload: dict) -> str:
+    value = stock_payload.get("symbol") if isinstance(stock_payload, dict) else ""
+    return str(value).split(":")[-1] if isinstance(value, str) else ""
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample({"stock_payload": {"symbol": "NASDAQ:AAPL"}}, "AAPL"),
+            ToolExample(
+                {"stock_payload": {"symbol": "AAPL"}},
+                "AAPL",
+                held_out=True,
+            ),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(
+        RegistryEntry.accepted(
+            tool,
+            validation,
+            birth_scenario="find_stock_symbol_with_company_name_3_distraction_tools",
+        )
+    )
     return store
 
 
@@ -182,17 +749,62 @@ def test_state_helpers_are_only_exposed_on_relevant_state_scenarios(
         store,
         scenario_name="modify_reminder_with_recency_latest",
     )
+    wifi_state = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="turn_on_wifi_low_battery_mode",
+    )
     direct_state = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="turn_on_location_low_battery_mode",
+    )
+    downstream_state = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="find_temperature_low_battery_mode",
+    )
+    insufficient_information = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="find_current_city_low_battery_mode_insufficient_information",
+    )
+
+    assert "next_service_tool_call" not in unrelated.starting_context.name_to_tool
+    assert "next_service_tool_call" in wifi_state.starting_context.name_to_tool
+    assert "next_service_tool_call" in direct_state.starting_context.name_to_tool
+    assert "next_service_tool_call" in downstream_state.starting_context.name_to_tool
+    assert (
+        "next_service_tool_call"
+        not in insufficient_information.starting_context.name_to_tool
+    )
+
+
+def test_state_helper_openai_description_includes_single_target_guidance(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_state_helper(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+    enhanced = with_registry_tools(
         scenario,
         store,
         scenario_name="turn_on_wifi_low_battery_mode",
     )
 
-    assert (
-        "next_service_enablement_action" not in unrelated.starting_context.name_to_tool
+    openai_tool = convert_to_openai_tool(
+        enhanced.starting_context.name_to_tool["next_service_tool_call"],
+        "next_service_tool_call",
+    )
+    description = openai_tool["function"]["description"]
+
+    assert "Use only for the single service you are actively trying to change." in (
+        description
     )
     assert (
-        "next_service_enablement_action" in direct_state.starting_context.name_to_tool
+        "Do not call this helper for multiple alternative services in parallel."
+        in description
     )
 
 
@@ -214,10 +826,377 @@ def test_latest_selector_only_exposed_on_latest_record_scenarios(
         store,
         scenario_name="search_message_with_recency_latest_10_distraction_tools",
     )
+    modify_contact = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="modify_contact_with_message_recency_10_distraction_tools",
+    )
 
     tool_name = "select_latest_record_by_timestamp"
     assert tool_name not in unrelated.starting_context.name_to_tool
-    assert tool_name in latest.starting_context.name_to_tool
+    assert tool_name not in latest.starting_context.name_to_tool
+    assert tool_name in modify_contact.starting_context.name_to_tool
+
+    openai_tool = convert_to_openai_tool(
+        modify_contact.starting_context.name_to_tool[tool_name], tool_name
+    )
+    properties = openai_tool["function"]["parameters"]["properties"]
+    assert properties["records_payload"]["type"] == "object"
+
+
+def test_latest_selector_hidden_on_insufficient_information_scenarios(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_latest_selector(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    insufficient = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="modify_reminder_with_recency_latest_insufficient_information",
+    )
+
+    assert (
+        "select_latest_record_by_timestamp"
+        not in insufficient.starting_context.name_to_tool
+    )
+
+
+def test_timestamp_extreme_selector_exposed_on_message_ranking_scenarios(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_timestamp_extreme_selector(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    unrelated = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_reminder_with_recency_yesterday",
+    )
+    oldest = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_message_with_recency_oldest_10_distraction_tools",
+    )
+    reminder_latest = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="modify_reminder_with_recency_latest_10_distraction_tools",
+    )
+    modify_contact = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="modify_contact_with_message_recency_10_distraction_tools",
+    )
+    multi_turn = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_message_with_recency_oldest_multiple_user_turn",
+    )
+    alt_variant = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_message_with_recency_oldest_alt",
+    )
+    latest_message = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_message_with_recency_latest_10_distraction_tools",
+    )
+
+    tool_name = "select_record_by_timestamp_extreme"
+    assert tool_name not in unrelated.starting_context.name_to_tool
+    assert tool_name in oldest.starting_context.name_to_tool
+    assert tool_name not in reminder_latest.starting_context.name_to_tool
+    assert tool_name not in modify_contact.starting_context.name_to_tool
+    assert tool_name not in multi_turn.starting_context.name_to_tool
+    assert tool_name not in alt_variant.starting_context.name_to_tool
+    assert tool_name in latest_message.starting_context.name_to_tool
+
+    openai_tool = convert_to_openai_tool(
+        latest_message.starting_context.name_to_tool[tool_name], tool_name
+    )
+    properties = openai_tool["function"]["parameters"]["properties"]
+    assert properties["records"]["type"] == "array"
+    assert properties["records"]["items"] == {}
+
+
+def test_message_search_window_only_exposed_on_contact_message_tasks(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_message_search_window(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    modify_contact = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="modify_contact_with_message_recency_10_distraction_tools",
+    )
+    raw_latest_message = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_message_with_recency_latest_10_distraction_tools",
+    )
+    unrelated = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="remove_contact_by_phone_10_distraction_tools",
+    )
+
+    tool_name = "message_search_time_window"
+    assert tool_name not in modify_contact.starting_context.name_to_tool
+    assert tool_name not in raw_latest_message.starting_context.name_to_tool
+    assert tool_name not in unrelated.starting_context.name_to_tool
+
+    compiled = compile_toolsandbox_tool(next(iter(store.load_entries().values())))
+    openai_tool = convert_to_openai_tool(compiled, tool_name)
+    properties = openai_tool["function"]["parameters"]["properties"]
+    assert properties["anchor_timestamp"]["type"] == "number"
+    assert properties["lookback_days"]["type"] == "integer"
+
+
+def test_reminder_argument_prep_only_exposed_on_add_reminder_time_location_tasks(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_reminder_argument_prep(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    unrelated_search = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_reminder_with_creation_recency_yesterday",
+    )
+    no_location = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="add_reminder_content_and_week_delta_and_time_3_distraction_tools",
+    )
+    insufficient = with_registry_tools(
+        scenario,
+        store,
+        scenario_name=(
+            "add_reminder_content_and_week_delta_and_time_and_location_insufficient_information"
+        ),
+    )
+    service_precondition = with_registry_tools(
+        scenario,
+        store,
+        scenario_name=(
+            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt"
+        ),
+    )
+    applicable = with_registry_tools(
+        scenario,
+        store,
+        scenario_name=(
+            "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools"
+        ),
+    )
+
+    tool_name = "prepare_reminder_arguments_with_optional_location"
+    assert tool_name not in unrelated_search.starting_context.name_to_tool
+    assert tool_name not in no_location.starting_context.name_to_tool
+    assert tool_name not in insufficient.starting_context.name_to_tool
+    assert tool_name not in service_precondition.starting_context.name_to_tool
+    assert tool_name in applicable.starting_context.name_to_tool
+
+
+def test_timestamp_extreme_selector_hidden_on_insufficient_information_scenarios(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_timestamp_extreme_selector(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    insufficient = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_message_with_recency_latest_insufficient_information",
+    )
+
+    assert (
+        "select_record_by_timestamp_extreme"
+        not in insufficient.starting_context.name_to_tool
+    )
+
+
+def test_relative_time_helper_only_exposed_on_relative_datetime_scenarios(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_relative_time_helper(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    unrelated = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_message_with_recency_oldest_all_tools",
+    )
+    relative = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="modify_reminder_with_recency_latest_10_distraction_tools",
+    )
+
+    tool_name = "relative_day_time_to_timestamp"
+    assert tool_name not in unrelated.starting_context.name_to_tool
+    assert tool_name in relative.starting_context.name_to_tool
+
+
+def test_recency_bounds_helper_only_exposed_on_creation_recency_tasks(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_recency_bounds(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    due_recency = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_reminder_with_recency_yesterday",
+    )
+    creation_recency = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_reminder_with_creation_recency_yesterday",
+    )
+    insufficient = with_registry_tools(
+        scenario,
+        store,
+        scenario_name=(
+            "search_reminder_with_creation_recency_yesterday_insufficient_information"
+        ),
+    )
+
+    tool_name = "recency_to_timestamp_bounds"
+    assert tool_name not in due_recency.starting_context.name_to_tool
+    assert tool_name in creation_recency.starting_context.name_to_tool
+    assert tool_name not in insufficient.starting_context.name_to_tool
+
+
+def test_calendar_distance_helper_only_exposed_on_holiday_scenarios(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_days_between_helper(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    unrelated = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_reminder_with_recency_yesterday",
+    )
+    holiday = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="find_days_till_holiday_3_distraction_tools",
+    )
+
+    tool_name = "days_between_timestamps"
+    assert tool_name not in unrelated.starting_context.name_to_tool
+    assert tool_name in holiday.starting_context.name_to_tool
+
+
+def test_contact_constraint_helper_is_suppressed_after_low_adoption(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_contact_constraint_helper(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    unrelated = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_reminder_with_recency_yesterday",
+    )
+    insufficient = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="remove_contact_by_phone_no_search_contacts_insufficient_information",
+    )
+    contact_lookup = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="remove_contact_by_phone_10_distraction_tools",
+    )
+    contact_search = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_phone_number_with_name_10_distraction_tools",
+    )
+    ambiguous = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="remove_contact_by_phone_ambiguous_10_distraction_tools",
+    )
+
+    tool_name = "select_contact_field_by_constraint"
+    assert tool_name not in unrelated.starting_context.name_to_tool
+    assert tool_name not in insufficient.starting_context.name_to_tool
+    assert tool_name not in contact_lookup.starting_context.name_to_tool
+    assert tool_name not in contact_search.starting_context.name_to_tool
+    assert tool_name not in ambiguous.starting_context.name_to_tool
+
+
+def test_stock_symbol_helper_only_exposed_on_stock_lookup(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_stock_symbol_helper(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    unrelated = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_reminder_with_recency_yesterday",
+    )
+    stock = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="find_stock_symbol_with_company_name_low_battery_mode",
+    )
+
+    tool_name = "extract_stock_symbol"
+    assert tool_name not in unrelated.starting_context.name_to_tool
+    assert tool_name in stock.starting_context.name_to_tool
+
+
+def test_unknown_helpers_are_only_provisional_for_birth_family(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_canonicalizer(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    unrelated = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_reminder_with_recency_yesterday",
+    )
+    same_birth_family = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="toy_birth_3_distraction_tools",
+    )
+
+    tool_name = "canonicalize_connectivity_label"
+    assert tool_name not in unrelated.starting_context.name_to_tool
+    assert tool_name in same_birth_family.starting_context.name_to_tool
 
 
 def test_registry_tools_execute_through_toolsandbox_console(tmp_path: Path) -> None:

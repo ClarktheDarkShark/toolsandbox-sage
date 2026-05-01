@@ -36,6 +36,7 @@ def main() -> None:
             control_dir=Path(manifest["control_dir"]),
             candidate_dir=Path(manifest["candidate_dir"]),
             registry_dir=Path(manifest["registry_dir"]),
+            model_metadata=manifest.get("model_metadata"),
             artifact_root=args.artifact_root,
         )
         print(path)

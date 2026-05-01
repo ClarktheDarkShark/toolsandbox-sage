@@ -11,7 +11,7 @@ from sage_ts.adequacy.inadequacy_classifier import CapabilityObservation
 from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import GeneratedTool
 from sage_ts.orchestration.checkpoints import append_jsonl
-from sage_ts.registry.manifest import RegistryEntry
+from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.sandbox_validator import validate_generated_tool
 
@@ -32,8 +32,8 @@ def suggested_tool_name(canonical_key: str) -> str | None:
         return "recency_to_timestamp_bounds"
     if suffix == "relative_day_time_timestamp":
         return "relative_day_time_to_timestamp"
-    if suffix == "service_next_action":
-        return "next_service_enablement_action"
+    if suffix in {"service_next_action", "next_service_tool_call"}:
+        return "next_service_tool_call"
     return suffix
 
 
@@ -46,6 +46,8 @@ class OnlineBirthController:
     event_hook: CampaignEventHook | None = None
     counts: Counter[str] = field(default_factory=Counter)
     generated_keys: set[str] = field(default_factory=set)
+    rejected_counts: Counter[str] = field(default_factory=Counter)
+    max_rejections_per_key: int = 2
 
     def _event(self, event: str, payload: dict[str, Any]) -> None:
         if self.event_hook is not None:
@@ -61,13 +63,31 @@ class OnlineBirthController:
             return
         if observation.canonical_key in self.generated_keys:
             return
+        if (
+            self.rejected_counts[observation.canonical_key]
+            >= self.max_rejections_per_key
+        ):
+            append_jsonl(
+                self.output_dir / "sage_run_events.jsonl",
+                {
+                    "event": "tool_birth_retry_suppressed",
+                    "canonical_key": observation.canonical_key,
+                    "rejection_count": self.rejected_counts[observation.canonical_key],
+                    "max_rejections_per_key": self.max_rejections_per_key,
+                },
+            )
+            return
         if self.counts[observation.canonical_key] < self.recurrence_threshold:
             return
 
         suggested_name = suggested_tool_name(observation.canonical_key)
         if suggested_name is not None:
             existing_entry = self.store.get(suggested_name)
-            if existing_entry is not None and not existing_entry.retired:
+            if (
+                existing_entry is not None
+                and not existing_entry.retired
+                and has_current_validation_proof(existing_entry)
+            ):
                 self.generated_keys.add(observation.canonical_key)
                 append_jsonl(
                     self.output_dir / "sage_run_events.jsonl",
@@ -87,18 +107,33 @@ class OnlineBirthController:
                     },
                 )
                 return
+            if existing_entry is not None and not has_current_validation_proof(
+                existing_entry
+            ):
+                append_jsonl(
+                    self.output_dir / "sage_run_events.jsonl",
+                    {
+                        "event": "tool_birth_existing_requires_revalidation",
+                        "canonical_key": observation.canonical_key,
+                        "tool_name": suggested_name,
+                        "registry_dir": str(self.store.root),
+                    },
+                )
 
         request = ToolGenerationRequest(
             scenario_name=observation.scenario_name,
             observation=observation.observation,
             allowed_families=observation.allowed_families,
             validation_examples=tuple(
-                {"inputs": item.inputs, "expected": item.expected}
+                {
+                    "inputs": item.inputs,
+                    "expected": item.expected,
+                    "held_out": item.held_out,
+                }
                 for item in observation.validation_examples
             ),
             suggested_tool_name=suggested_name,
         )
-        self.generated_keys.add(observation.canonical_key)
         self._event(
             "tool_birth_started",
             {
@@ -130,12 +165,14 @@ class OnlineBirthController:
                     "errors": [f"generation_error:{type(exc).__name__}:{exc}"],
                 },
             )
+            self.rejected_counts[observation.canonical_key] += 1
             self._event(
                 "tool_birth_rejected",
                 {
                     "canonical_key": observation.canonical_key,
                     "scenario": observation.scenario_name,
                     "error": f"{type(exc).__name__}:{exc}",
+                    "rejection_count": self.rejected_counts[observation.canonical_key],
                 },
             )
             return
@@ -148,6 +185,9 @@ class OnlineBirthController:
                 "family": tool.spec.family.value,
                 "accepted": validation.accepted,
                 "errors": list(validation.errors),
+                "source_example_count": validation.source_example_count,
+                "held_out_check_count": validation.held_out_check_count,
+                "runtime_smoke_passed": validation.runtime_smoke_passed,
             },
         )
         self._event(
@@ -157,9 +197,13 @@ class OnlineBirthController:
                 "tool_name": tool.spec.tool_name,
                 "scenario": observation.scenario_name,
                 "errors": list(validation.errors),
+                "source_example_count": validation.source_example_count,
+                "held_out_check_count": validation.held_out_check_count,
+                "runtime_smoke_passed": validation.runtime_smoke_passed,
             },
         )
         if validation.accepted:
+            self.generated_keys.add(observation.canonical_key)
             entry = RegistryEntry.accepted(
                 tool,
                 validation,
@@ -202,6 +246,7 @@ class OnlineBirthController:
                 },
             )
         else:
+            self.rejected_counts[observation.canonical_key] += 1
             self._event(
                 "tool_birth_rejected",
                 {
@@ -209,5 +254,6 @@ class OnlineBirthController:
                     "tool_name": tool.spec.tool_name,
                     "scenario": observation.scenario_name,
                     "errors": list(validation.errors),
+                    "rejection_count": self.rejected_counts[observation.canonical_key],
                 },
             )

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import shutil
 import subprocess
 import traceback
 from dataclasses import asdict, dataclass
@@ -16,6 +17,7 @@ import polars as pl
 from tqdm import tqdm
 
 from sage_ts.adapters.role_factory import make_agent, make_user
+from sage_ts.evaluation.outcome_score import compute_outcome_score
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY, apply_base_tool_policy
 from tool_sandbox.cli import write_result_summary
 from tool_sandbox.cli.utils import (
@@ -44,6 +46,7 @@ class ToolSandboxRunConfig:
     processes: int = 1
     run_type: str = "baseline"
     base_tool_policy: str = UPSTREAM_POLICY
+    resume_from_dir: Path | None = None
 
 
 def git_sha() -> str | None:
@@ -60,6 +63,9 @@ def write_run_manifest(config: ToolSandboxRunConfig) -> Path:
         **asdict(config),
         "output_dir": str(config.output_dir),
         "scenario_names": list(config.scenario_names),
+        "resume_from_dir": str(config.resume_from_dir)
+        if config.resume_from_dir
+        else None,
         "git_sha": git_sha(),
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -95,6 +101,38 @@ def _output_directory(config: ToolSandboxRunConfig) -> Path:
     )
 
 
+def _resume_rows(resume_from_dir: Path | None) -> list[dict[str, Any]]:
+    if resume_from_dir is None:
+        return []
+    for filename in ("result_summary.json", "live_result_summary.json"):
+        path = resume_from_dir / filename
+        if not path.is_file():
+            continue
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(payload, list):
+            return [row for row in payload if isinstance(row, dict)]
+        rows = payload.get("per_scenario_results")
+        if isinstance(rows, list):
+            return [row for row in rows if isinstance(row, dict)]
+    return []
+
+
+def _copy_resume_artifacts(
+    resume_from_dir: Path | None, output_directory: Path
+) -> None:
+    if resume_from_dir is None or not resume_from_dir.exists():
+        return
+    trajectories = resume_from_dir / "trajectories"
+    if trajectories.exists():
+        shutil.copytree(
+            trajectories,
+            output_directory / "trajectories",
+            dirs_exist_ok=True,
+        )
+    for path in resume_from_dir.glob("*.jsonl"):
+        shutil.copy2(path, output_directory / path.name)
+
+
 def run_one_scenario(
     name: str,
     scenario: Scenario,
@@ -114,6 +152,16 @@ def run_one_scenario(
             output_directory=output_directory,
             scenario_name=name,
         )
+        canonical_milestone_scores = {
+            int(index): float(score)
+            for index, (_, score) in result.evaluation_result.milestone_mapping.items()
+        }
+        outcome = compute_outcome_score(
+            scenario,
+            result.ending_context,
+            canonical_milestone_scores=canonical_milestone_scores,
+            minefield_similarity=result.evaluation_result.minefield_similarity,
+        )
         return {
             "name": name,
             "categories": scenario.categories,
@@ -125,6 +173,7 @@ def run_one_scenario(
             "turn_count": result.evaluation_result.turn_count,
             "milestone_mapping": result.evaluation_result.milestone_mapping,
             "minefield_mapping": result.evaluation_result.minefield_mapping,
+            **outcome,
         }
     except Exception as exc:
         return {
@@ -138,6 +187,11 @@ def run_one_scenario(
             "turn_count": scenario.max_messages,
             "milestone_mapping": {},
             "minefield_mapping": {},
+            "outcome_similarity": 0,
+            "outcome_milestone_similarity": 0,
+            "outcome_minefield_similarity": 0,
+            "outcome_check_count": 0,
+            "outcome_checks": [],
         }
     finally:
         for role in roles.values():
@@ -159,21 +213,38 @@ def run_scenario_sequence(
     write_run_manifest(config)
     output_directory = _output_directory(config)
     output_directory.mkdir(parents=True, exist_ok=True)
+    _copy_resume_artifacts(config.resume_from_dir, output_directory)
 
     name_to_scenario = resolve_scenarios(
         desired_scenario_names=list(config.scenario_names),
         preferred_tool_backend=DEFAULT_TOOL_BACKEND,
     )
-    ordered_items = [(name, name_to_scenario[name]) for name in config.scenario_names]
-    result_summary: list[dict[str, Any]] = []
+    prior_by_name = {
+        str(row.get("name")): row
+        for row in _resume_rows(config.resume_from_dir)
+        if row.get("name") in set(config.scenario_names)
+    }
+    result_summary: list[dict[str, Any]] = [
+        prior_by_name[name] for name in config.scenario_names if name in prior_by_name
+    ]
+    ordered_items = [
+        (name, name_to_scenario[name])
+        for name in config.scenario_names
+        if name not in prior_by_name
+    ]
     write_live_result_summary(
         output_directory=output_directory,
         result_summary=result_summary,
         status="running",
-        scenario_count=len(ordered_items),
+        scenario_count=len(config.scenario_names),
     )
     if progress_hook is not None:
-        progress_hook(output_directory, result_summary, "running", len(ordered_items))
+        progress_hook(
+            output_directory,
+            result_summary,
+            "running",
+            len(config.scenario_names),
+        )
     for name, scenario in tqdm(ordered_items, desc="Scenarios"):
         os.environ["SAGE_TS_CURRENT_SCENARIO"] = name
         os.environ["SAGE_TS_SCENARIO_ORDER_INDEX"] = str(len(result_summary))
@@ -185,9 +256,19 @@ def run_scenario_sequence(
                     "scenario": name,
                     "run_type": config.run_type,
                     "completed_count": len(result_summary),
-                    "scenario_count": len(ordered_items),
+                    "scenario_count": len(config.scenario_names),
                 },
             )
+        (output_directory / "currently_running.json").write_text(
+            json.dumps(
+                {
+                    "scenario": name,
+                    "completed_count": len(result_summary),
+                    "scenario_count": len(config.scenario_names),
+                }
+            ),
+            encoding="utf-8",
+        )
         base_scenario = apply_base_tool_policy(scenario, config.base_tool_policy)
         active_scenario = (
             scenario_transform(name, base_scenario, output_directory)
@@ -201,6 +282,9 @@ def run_scenario_sequence(
             user=config.user,
             output_directory=output_directory,
         )
+        _p = output_directory / "currently_running.json"
+        if _p.exists():
+            _p.unlink()
         if result_hook is not None:
             result = (
                 result_hook(name, active_scenario, result, output_directory) or result
@@ -217,18 +301,21 @@ def run_scenario_sequence(
                     "turn_count": result.get("turn_count"),
                     "exception_type": result.get("exception_type"),
                     "completed_count": len(result_summary),
-                    "scenario_count": len(ordered_items),
+                    "scenario_count": len(config.scenario_names),
                 },
             )
         write_live_result_summary(
             output_directory=output_directory,
             result_summary=result_summary,
             status="running",
-            scenario_count=len(ordered_items),
+            scenario_count=len(config.scenario_names),
         )
         if progress_hook is not None:
             progress_hook(
-                output_directory, result_summary, "running", len(ordered_items)
+                output_directory,
+                result_summary,
+                "running",
+                len(config.scenario_names),
             )
 
     write_result_summary(
@@ -240,10 +327,15 @@ def run_scenario_sequence(
         output_directory=output_directory,
         result_summary=result_summary,
         status="complete",
-        scenario_count=len(ordered_items),
+        scenario_count=len(config.scenario_names),
     )
     if progress_hook is not None:
-        progress_hook(output_directory, result_summary, "complete", len(ordered_items))
+        progress_hook(
+            output_directory,
+            result_summary,
+            "complete",
+            len(config.scenario_names),
+        )
     return output_directory
 
 

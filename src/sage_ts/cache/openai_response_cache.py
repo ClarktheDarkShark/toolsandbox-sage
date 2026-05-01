@@ -13,6 +13,10 @@ from typing import Any, Iterable, cast
 from openai import NOT_GIVEN, NotGiven
 from openai.types.chat import ChatCompletion
 
+from sage_ts.config.models import model_metadata
+from sage_ts.runtime.toolsandbox_integration import (
+    retained_tool_visibility_policy_digest,
+)
 from tool_sandbox.roles.openai_api_agent import OpenAIAPIAgent
 
 _ORIGINAL_MODEL_INFERENCE: Any = None
@@ -91,6 +95,11 @@ def configure_response_cache_context(
     recurrence_threshold: int | None,
     run_config_extra: dict[str, Any] | None = None,
 ) -> None:
+    agent_model = model_metadata(agent)
+    generation_model_metadata = (
+        model_metadata(generation_model) if generation_model is not None else None
+    )
+    os.environ["SAGE_TS_MODEL_VERSION"] = str(agent_model["comparison_key"])
     registry_digest = (
         digest_file(registry_dir / "registry_manifest.json")
         if registry_dir is not None
@@ -99,12 +108,13 @@ def configure_response_cache_context(
     os.environ["SAGE_TS_REGISTRY_DIGEST"] = registry_digest
     os.environ["SAGE_TS_REGISTRY_LOCK_DIGEST"] = registry_digest
     os.environ["SAGE_TS_RETAINED_TOOL_VISIBILITY_DIGEST"] = (
-        "scenario_relevance_filter_v1"
+        retained_tool_visibility_policy_digest()
     )
     run_config = {
         "mode": mode,
         "arm": arm,
         "agent": agent,
+        "agent_resolved_model": agent_model["resolved_model"],
         "user": user,
         "base_tool_policy": base_tool_policy,
         "scenario_names": list(scenario_names),
@@ -116,6 +126,11 @@ def configure_response_cache_context(
         {
             "generation_enabled": generation_enabled,
             "generation_model": generation_model,
+            "generation_resolved_model": (
+                generation_model_metadata["resolved_model"]
+                if generation_model_metadata is not None
+                else None
+            ),
             "recurrence_threshold": recurrence_threshold,
         }
     )

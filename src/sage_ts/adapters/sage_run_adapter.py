@@ -21,7 +21,7 @@ from sage_ts.orchestration.online_birth import (
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 from sage_ts.runtime.toolsandbox_integration import (
-    registry_entry_matches_scenario,
+    registry_entry_visibility_reason,
     with_registry_tools,
 )
 from tool_sandbox.common.scenario import Scenario
@@ -47,6 +47,75 @@ def _reuse_log_tools(output_directory: Path, scenario_name: str) -> list[str]:
     return tools
 
 
+def _selection_log_rows(output_directory: Path) -> list[dict[str, object]]:
+    path = output_directory / "scenario_tool_selection.jsonl"
+    if not path.exists():
+        return []
+    rows: list[dict[str, object]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def _conversation_generated_tool_attempts(
+    output_directory: Path,
+    scenario_name: str,
+    generated_tools: list[str],
+) -> tuple[list[str], list[str]]:
+    """Return generated tools attempted in the transcript, including failures."""
+    generated_tool_set = set(generated_tools)
+    if not generated_tool_set:
+        return [], []
+    path = output_directory / "trajectories" / scenario_name / "conversation.json"
+    if not path.exists():
+        return [], []
+    try:
+        messages = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return [], []
+    if not isinstance(messages, list):
+        return [], []
+
+    attempted: list[str] = []
+    failed: list[str] = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        tool_calls = message.get("tool_calls")
+        if isinstance(tool_calls, list):
+            for tool_call in tool_calls:
+                if not isinstance(tool_call, dict):
+                    continue
+                function = tool_call.get("function")
+                if not isinstance(function, dict):
+                    continue
+                tool_name = function.get("name")
+                if isinstance(tool_name, str) and tool_name in generated_tool_set:
+                    if tool_name not in attempted:
+                        attempted.append(tool_name)
+        if message.get("role") == "tool":
+            tool_name = message.get("name")
+            if not isinstance(tool_name, str) or tool_name not in generated_tool_set:
+                continue
+            if tool_name not in attempted:
+                attempted.append(tool_name)
+            content = str(message.get("content", ""))
+            if (
+                "Error:" in content
+                or content.startswith(("TypeError", "ValueError", "ValidationError"))
+                or "Traceback" in content
+            ) and tool_name not in failed:
+                failed.append(tool_name)
+    return attempted, failed
+
+
 @dataclass(frozen=True)
 class SageRunConfig:
     agent: str
@@ -57,6 +126,7 @@ class SageRunConfig:
     run_type: str = "sage_online"
     recurrence_threshold: int = 2
     base_tool_policy: str = UPSTREAM_POLICY
+    resume_from_dir: Path | None = None
 
 
 def run_sage_with_registry(
@@ -75,6 +145,7 @@ def run_sage_with_registry(
 
     birth_controller: OnlineBirthController | None = None
     registry_load_logged = False
+    mutate_registry_reuse_counts = generator is not None
 
     def transform(name: str, scenario: Scenario, output_directory: Path) -> Scenario:
         nonlocal birth_controller, registry_load_logged
@@ -118,7 +189,8 @@ def run_sage_with_registry(
             registry_load_logged = True
 
         def record_reuse(tool_name: str) -> None:
-            store.record_reuse(tool_name)
+            if mutate_registry_reuse_counts:
+                store.record_reuse(tool_name)
             called = called_generated_by_scenario.setdefault(name, [])
             if tool_name not in called:
                 called.append(tool_name)
@@ -143,10 +215,14 @@ def run_sage_with_registry(
 
         loaded_entries = store.load_entries()
         retained_tools_loaded = sorted(loaded_entries)
+        visibility_by_tool = {
+            tool_name: registry_entry_visibility_reason(entry, name)
+            for tool_name, entry in sorted(loaded_entries.items())
+        }
         shortlisted_generated_tools = [
             tool_name
-            for tool_name, entry in sorted(loaded_entries.items())
-            if registry_entry_matches_scenario(entry, name)
+            for tool_name, (is_visible, _reason) in visibility_by_tool.items()
+            if is_visible
         ]
         filtered_out_generated_tools = [
             tool_name
@@ -154,7 +230,9 @@ def run_sage_with_registry(
             if tool_name not in set(shortlisted_generated_tools)
         ]
         filtered_out_reasons = {
-            tool_name: "scenario_relevance_filter"
+            tool_name: visibility_by_tool.get(
+                tool_name, (False, "scenario_relevance_filter")
+            )[1]
             for tool_name in filtered_out_generated_tools
         }
         original_tool_order = list(scenario.starting_context.name_to_tool)
@@ -228,8 +306,16 @@ def run_sage_with_registry(
         for tool_name in _reuse_log_tools(output_directory, name):
             if tool_name not in generated_called:
                 generated_called.append(tool_name)
+        generated_attempted, generated_failed = _conversation_generated_tool_attempts(
+            output_directory,
+            name,
+            generated_visible,
+        )
         generated_not_called = [
             tool for tool in generated_visible if tool not in set(generated_called)
+        ]
+        generated_not_attempted = [
+            tool for tool in generated_visible if tool not in set(generated_attempted)
         ]
         raw_similarity = result.get("similarity", 0.0)
         try:
@@ -240,15 +326,32 @@ def run_sage_with_registry(
             )
         except ValueError:
             similarity = 0.0
+        raw_outcome_similarity = result.get("outcome_similarity")
+        try:
+            outcome_similarity = (
+                float(raw_outcome_similarity)
+                if isinstance(raw_outcome_similarity, (int, float, str))
+                else None
+            )
+        except ValueError:
+            outcome_similarity = None
         selection_status = (
             "generated_tool_called"
             if generated_called
+            else "generated_tool_attempt_failed"
+            if generated_failed
+            else "generated_tool_attempted_without_success"
+            if generated_attempted
             else "generated_tool_visible_not_called"
             if generated_visible
             else "no_visible_generated_tools"
         )
         if generated_called:
             selection_reason = "retained_tool_invoked"
+        elif generated_failed:
+            selection_reason = "retained_tool_call_failed"
+        elif generated_attempted:
+            selection_reason = "retained_tool_attempted_without_success_trace"
         elif generated_visible:
             selection_reason = "retained_tool_visible_but_model_did_not_call_it"
         else:
@@ -265,7 +368,13 @@ def run_sage_with_registry(
             "shortlisted_generated_tools": context.get(
                 "shortlisted_generated_tools", generated_visible
             ),
-            "chosen_retained_tool": generated_called[0] if generated_called else None,
+            "chosen_retained_tool": (
+                generated_called[0]
+                if generated_called
+                else generated_attempted[0]
+                if generated_attempted
+                else None
+            ),
             "priority_injection_changed_tool_order": context.get(
                 "priority_injection_changed_tool_order", False
             ),
@@ -273,18 +382,28 @@ def run_sage_with_registry(
                 "relevance_gating_hid_retained_tool", False
             ),
             "generated_tools_visible": generated_visible,
+            "generated_tools_attempted": generated_attempted,
+            "generated_tools_failed": generated_failed,
             "generated_tools_called": generated_called,
             "generated_tools_not_called": generated_not_called,
+            "generated_tools_not_attempted": generated_not_attempted,
             "visible_generated_tool_count": len(generated_visible),
+            "attempted_generated_tool_count": len(generated_attempted),
+            "failed_generated_tool_count": len(generated_failed),
             "called_generated_tool_count": len(generated_called),
             "selection_status": selection_status,
             "selection_reason": selection_reason,
             "not_called_reason": None
-            if generated_called or not generated_visible
+            if generated_called or generated_attempted or not generated_visible
             else "model_did_not_call_retained_tool",
             "similarity": similarity,
+            "outcome_similarity": outcome_similarity,
             "exception_type": result.get("exception_type"),
             "failure_after_selection": similarity < 1.0
+            or bool(result.get("exception_type")),
+            "failure_after_outcome_selection": (
+                outcome_similarity is not None and outcome_similarity < 1.0
+            )
             or bool(result.get("exception_type")),
         }
         append_jsonl(
@@ -315,6 +434,7 @@ def run_sage_with_registry(
             processes=1,
             run_type=config.run_type,
             base_tool_policy=config.base_tool_policy,
+            resume_from_dir=config.resume_from_dir,
         ),
         scenario_transform=transform,
         result_hook=after_result,
@@ -332,21 +452,26 @@ def run_sage_with_registry(
             "final_registry_size": len(final_registry_tools),
         },
     )
+    selection_rows = _selection_log_rows(output_directory)
     selection_summary = {
         "scenario_count": len(config.scenario_names),
         "registry_dir": str(config.registry_dir),
         "registry_tools": registry_tools,
         "final_registry_tools": final_registry_tools,
         "generated_tool_visible_scenarios": sum(
-            1 for tools in visible_generated_by_scenario.values() if tools
+            1 for row in selection_rows if row.get("generated_tools_visible")
         ),
         "generated_tool_called_scenarios": sum(
-            1 for tools in called_generated_by_scenario.values() if tools
+            1 for row in selection_rows if row.get("generated_tools_called")
+        ),
+        "generated_tool_attempted_scenarios": sum(
+            1 for row in selection_rows if row.get("generated_tools_attempted")
+        ),
+        "generated_tool_failed_scenarios": sum(
+            1 for row in selection_rows if row.get("generated_tools_failed")
         ),
         "relevance_gate_hidden_scenarios": sum(
-            1
-            for context in selection_context_by_scenario.values()
-            if context.get("relevance_gating_hid_retained_tool")
+            1 for row in selection_rows if row.get("relevance_gating_hid_retained_tool")
         ),
     }
     (output_directory / "selection_summary.json").write_text(

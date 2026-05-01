@@ -17,7 +17,7 @@ if [[ ! -f .secrets/env.sh ]]; then
 #!/usr/bin/env bash
 # Local only. Do not commit.
 export OPENAI_API_KEY="${OPENAI_API_KEY:-}"
-export SAGE_TS_MODEL="${SAGE_TS_MODEL:-gpt-5-mini}"
+export SAGE_TS_MODEL="${SAGE_TS_MODEL:-gpt-4o-mini}"
 EOF
   chmod 600 .secrets/env.sh
 fi
