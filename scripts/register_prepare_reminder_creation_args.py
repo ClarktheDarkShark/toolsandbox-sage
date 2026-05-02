@@ -123,15 +123,16 @@ SPEC = ToolSpec(
     tool_name="prepare_reminder_creation_args",
     family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
     description=(
-        "Use this as the normal final step immediately before add_reminder on "
-        "reminder-creation tasks once content and time are known. It prepares "
-        "add_reminder kwargs, preserves the original benchmark side-effect call, "
-        "and omits optional coordinates safely after optional location lookup has "
-        "failed or been skipped. Set location_required=True only when the user "
-        "explicitly requires a location. Set location_available=True only when "
-        "valid coordinates are already resolved. A mentioned location that has "
-        "not yet resolved is expressed as location_available=False; if it is not "
-        "required the helper will proceed without coordinates."
+        "CALL THIS HELPER instead of datetime_info_to_timestamp + add_reminder. "
+        "Call path: prepare_reminder_creation_args(...) → "
+        "add_reminder(**result['add_reminder_kwargs']). "
+        "After get_current_timestamp, call this helper directly with the time "
+        "fields — do not compute the timestamp manually first. "
+        "Returns add_reminder_kwargs ready to splat into add_reminder. "
+        "Set location_required=True only when the user explicitly requires a "
+        "location on the reminder. Optional or mentioned locations that have not "
+        "resolved use location_available=False; the helper proceeds without "
+        "coordinates rather than blocking the reminder."
     ),
     inputs=(
         ToolInput(
