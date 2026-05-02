@@ -14,7 +14,7 @@ from sage_ts.evaluation.task_strata import (
     base_task_family,
     classify_task_strata,
 )
-from sage_ts.generation.tool_spec import ToolFamily
+from sage_ts.generation.tool_spec import ToolFamily, ToolSpec
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.schema_check import compile_generated_tool
@@ -35,6 +35,22 @@ PYTHON_TYPES: dict[str, Any] = {
     "dict": dict,
     "list": list,
 }
+
+
+def _call_path_note(spec: ToolSpec) -> list[str]:
+    """General call-path note for any side-effect-preserving prep helper."""
+    if not spec.required_original_tool_calls:
+        return []
+    targets = ", ".join(spec.required_original_tool_calls)
+    kwargs_key = f"{spec.required_original_tool_calls[0]}_kwargs"
+    lines = [
+        "",
+        f"Call path: {spec.tool_name}(...) → {targets}(**result['{kwargs_key}'])",
+        f"Use this helper instead of assembling {targets} arguments manually.",
+        f"Only call {targets} after this helper returns should_call_add_reminder=True.",
+        "Do not call the target tool if this helper returns should_call_add_reminder=False.",
+    ]
+    return lines
 
 
 def _google_docstring(entry: RegistryEntry) -> str:
@@ -86,41 +102,34 @@ def _google_docstring(entry: RegistryEntry) -> str:
             [
                 "",
                 "Usage:",
-                "    Use this as the normal final step immediately before",
-                " add_reminder on reminder-creation tasks.",
-                "    When reminder content is known and you either already have",
-                " the exact reminder timestamp or enough relative-time fields,",
-                " call this helper instead of assembling add_reminder arguments",
-                " yourself.",
-                "    Prefer resolved_reminder_timestamp whenever you have already",
-                " derived the exact reminder time from current tool results or",
-                " existing benchmark timestamp context.",
-                "    In ToolSandbox reminder creation, plain relative times like",
-                " 'tomorrow at 5 PM' mean local device time by default.",
-                "    Do not ask the user whether that is in their local timezone",
-                " or for a UTC offset again when the current context is already",
-                " sufficient to resolve the reminder timestamp safely.",
-                "    This helper prepares add_reminder_kwargs only; it does not",
-                " create the reminder itself.",
-                "    Set location_required to true only when the user explicitly",
-                " requires the created reminder to include a location.",
-                "    Set location_available to true only when coordinates are",
-                " already resolved. A mentioned location that is still being",
-                " looked up is location_available=False.",
-                "    If optional location is unavailable or a lookup already",
-                " failed, proceed without coordinates rather than blocking",
-                " reminder creation.",
-                "    If this helper returns should_call_add_reminder=False, do",
-                " not call add_reminder yet.",
-                "    If should_call_add_reminder is True, call add_reminder with",
-                " add_reminder_kwargs unchanged.",
-                "    If should_retry_location_lookup is True, you may retry",
-                " location lookup but can also proceed with add_reminder",
-                " without coordinates.",
-                "    If should_call_add_reminder is False, use abstain_reason to",
-                " decide whether you need clarification rather than guessing.",
+                "    Call this helper as the FIRST step once you have the reminder",
+                " content and time info — before calling datetime_info_to_timestamp",
+                " or add_reminder directly.",
+                "    Call path: prepare_reminder_creation_args(...) →",
+                " add_reminder(**result['add_reminder_kwargs'])",
+                "    Do NOT call datetime_info_to_timestamp then add_reminder",
+                " manually; use this helper instead to prepare the kwargs.",
+                "    If you have already called datetime_info_to_timestamp and have",
+                " a timestamp, pass it as resolved_reminder_timestamp and set",
+                " time_fields_complete=False.",
+                "    For plain relative times ('tomorrow at 5 PM', 'next Friday'),",
+                " set time_fields_complete=True and supply day_offset, hour, minute,",
+                " local_utc_offset_hours. Use 0.0 for UTC offset when unknown.",
+                "    Do not ask the user for timezone confirmation when current",
+                " timestamp context is available; proceed with offset=0.0.",
+                "    Set location_required=True only when the user explicitly requires",
+                " a location on the reminder. A mentioned location is not required.",
+                "    If location_available=False or lookup failed and location is not",
+                " required, set latitude=0.0, longitude=0.0 and proceed without coords.",
+                "    If result['should_call_add_reminder'] is True, immediately call",
+                " add_reminder(**result['add_reminder_kwargs']) unchanged.",
+                "    If result['should_call_add_reminder'] is False, check",
+                " result['abstain_reason'] before deciding next action.",
             ]
         )
+    elif spec.required_original_tool_calls:
+        # General call-path note for any other side-effect-preserving prep helper
+        lines.extend(_call_path_note(spec))
     return "\n".join(lines)
 
 

@@ -1511,12 +1511,14 @@ def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
     assert tool_name in service_precondition.starting_context.name_to_tool
     assert tool_name in applicable.starting_context.name_to_tool
     reminder_helper = applicable.starting_context.name_to_tool[tool_name]
-    assert "normal final step immediately before" in (reminder_helper.__doc__ or "")
+    assert "FIRST step" in (reminder_helper.__doc__ or "")
     assert "add_reminder_kwargs" in (reminder_helper.__doc__ or "")
-    assert "timezone or UTC offset again" in (reminder_helper.__doc__ or "")
+    assert "timezone" in (reminder_helper.__doc__ or "")
     assert "tomorrow at 5 PM" in (reminder_helper.__doc__ or "")
-    assert "should_call_add_reminder=False" in (reminder_helper.__doc__ or "")
-    assert "should_retry_location_lookup" in (reminder_helper.__doc__ or "")
+    assert "should_call_add_reminder" in (reminder_helper.__doc__ or "")
+    # General call-path convention: helper replaces manual sequence
+    assert "datetime_info_to_timestamp" in (reminder_helper.__doc__ or "")
+    assert "add_reminder(**result" in (reminder_helper.__doc__ or "")
 
 
 def test_reminder_creation_args_routing_hides_on_modify_scenario(
