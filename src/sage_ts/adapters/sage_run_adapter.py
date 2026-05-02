@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -114,6 +115,80 @@ def _conversation_generated_tool_attempts(
             ) and tool_name not in failed:
                 failed.append(tool_name)
     return attempted, failed
+
+
+def _parse_tool_message_content(raw_content: object) -> object:
+    if isinstance(raw_content, (dict, list, int, float, bool)) or raw_content is None:
+        return raw_content
+    if not isinstance(raw_content, str):
+        return None
+    text = raw_content.strip()
+    if not text:
+        return ""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        try:
+            return ast.literal_eval(text)
+        except (ValueError, SyntaxError):
+            return text
+
+
+def _conversation_generated_tool_results(
+    output_directory: Path,
+    scenario_name: str,
+    generated_tools: list[str],
+) -> dict[str, list[object]]:
+    generated_tool_set = set(generated_tools)
+    if not generated_tool_set:
+        return {}
+    path = output_directory / "trajectories" / scenario_name / "conversation.json"
+    if not path.exists():
+        return {}
+    try:
+        messages = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(messages, list):
+        return {}
+
+    results: dict[str, list[object]] = {}
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        if message.get("role") != "tool":
+            continue
+        tool_name = message.get("name")
+        if not isinstance(tool_name, str) or tool_name not in generated_tool_set:
+            continue
+        results.setdefault(tool_name, []).append(
+            _parse_tool_message_content(message.get("content"))
+        )
+    return results
+
+
+def _helper_requires_side_effect_followup(helper_outputs: list[object]) -> bool:
+    if not helper_outputs:
+        return True
+    requires_followup = False
+    saw_explicit_flag = False
+    for item in helper_outputs:
+        if not isinstance(item, dict):
+            requires_followup = True
+            continue
+        if "should_call_add_reminder" in item:
+            saw_explicit_flag = True
+            if bool(item.get("should_call_add_reminder")):
+                requires_followup = True
+        elif "should_call" in item:
+            saw_explicit_flag = True
+            if bool(item.get("should_call")):
+                requires_followup = True
+        else:
+            requires_followup = True
+    if saw_explicit_flag:
+        return requires_followup
+    return True
 
 
 @dataclass(frozen=True)
@@ -418,6 +493,11 @@ def run_sage_with_registry(
             loaded_entries_for_check = store.load_entries()
             conv_path = output_directory / "trajectories" / name / "conversation.json"
             trajectory_tool_names: set[str] = set()
+            helper_outputs = _conversation_generated_tool_results(
+                output_directory,
+                name,
+                generated_called,
+            )
             if conv_path.exists():
                 try:
                     conv_messages = json.loads(conv_path.read_text(encoding="utf-8"))
@@ -439,6 +519,10 @@ def run_sage_with_registry(
             for helper_name in generated_called:
                 entry = loaded_entries_for_check.get(helper_name)
                 if entry is None:
+                    continue
+                if not _helper_requires_side_effect_followup(
+                    helper_outputs.get(helper_name, [])
+                ):
                     continue
                 required = entry.tool.spec.required_original_tool_calls
                 for req_tool in required:

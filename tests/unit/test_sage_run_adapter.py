@@ -6,7 +6,11 @@ from typing import Optional
 
 import pytest
 
-from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
+from sage_ts.adapters.sage_run_adapter import (
+    SageRunConfig,
+    _helper_requires_side_effect_followup,
+    run_sage_with_registry,
+)
 from sage_ts.adapters.toolsandbox_adapter import (
     ResultHook,
     ScenarioTransform,
@@ -18,6 +22,18 @@ from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
+
+
+def test_side_effect_followup_not_required_for_abstaining_helper() -> None:
+    assert not _helper_requires_side_effect_followup(
+        [{"should_call_add_reminder": False, "abstain_reason": "missing_time_info"}]
+    )
+
+
+def test_side_effect_followup_required_for_positive_helper_result() -> None:
+    assert _helper_requires_side_effect_followup(
+        [{"should_call_add_reminder": True, "add_reminder_kwargs": {"content": "x"}}]
+    )
 
 
 def _registry_with_canonicalizer(path: Path) -> RegistryStore:

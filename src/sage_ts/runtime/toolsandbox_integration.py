@@ -81,6 +81,25 @@ def _google_docstring(entry: RegistryEntry) -> str:
                 " the side effect itself.",
             ]
         )
+    if spec.tool_name == "prepare_reminder_creation_args":
+        lines.extend(
+            [
+                "",
+                "Usage:",
+                "    Use this before add_reminder when reminder content is known",
+                " and you already know either the exact reminder timestamp or the",
+                " complete relative time fields.",
+                "    This helper prepares add_reminder_kwargs only; it does not",
+                " create the reminder itself.",
+                "    If should_call_add_reminder is True, call add_reminder with",
+                " add_reminder_kwargs unchanged.",
+                "    If optional location is unavailable or a lookup already",
+                " failed, this helper can still tell you to proceed without",
+                " coordinates.",
+                "    If should_call_add_reminder is False, use abstain_reason to",
+                " decide whether you need clarification rather than guessing.",
+            ]
+        )
     return "\n".join(lines)
 
 

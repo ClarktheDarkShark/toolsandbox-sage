@@ -80,12 +80,13 @@ def _reminder_optional_location_argument_observation(
             "the original add_reminder ToolSandbox side-effect tool. The missing "
             "capability is not another side effect; it is deterministic argument "
             "preparation. Generate a small trace-compatible helper named "
-            "prepare_reminder_creation_args. Inputs: content, "
+            "prepare_reminder_creation_args and use it immediately before "
+            "add_reminder once reminder content and time are known. Inputs: content, "
             "resolved_reminder_timestamp, current_timestamp, day_offset, hour, "
             "minute, local_utc_offset_hours, location_required, "
             "location_available, latitude, longitude, and location_lookup_failed. "
             "Return a dict with add_reminder_kwargs, should_call_add_reminder, "
-            "location_status, abstain_reason, and timestamp_source. "
+            "abstain_reason, location_status, and timestamp_source. "
             "add_reminder_kwargs must be directly splattable into the original "
             "ToolSandbox add_reminder(content, reminder_timestamp, latitude, "
             "longitude) side-effect tool. If resolved_reminder_timestamp is "
@@ -129,8 +130,8 @@ def _reminder_optional_location_argument_observation(
                         "longitude": None,
                     },
                     "should_call_add_reminder": True,
-                    "location_status": "omitted_optional",
                     "abstain_reason": "",
+                    "location_status": "omitted_optional",
                     "timestamp_source": "relative_fields",
                 },
             ),
@@ -157,8 +158,8 @@ def _reminder_optional_location_argument_observation(
                         "longitude": None,
                     },
                     "should_call_add_reminder": True,
-                    "location_status": "omitted_optional",
                     "abstain_reason": "",
+                    "location_status": "omitted_optional",
                     "timestamp_source": "resolved",
                 },
                 held_out=True,
@@ -181,8 +182,8 @@ def _reminder_optional_location_argument_observation(
                 {
                     "add_reminder_kwargs": {},
                     "should_call_add_reminder": False,
-                    "location_status": "required_missing",
                     "abstain_reason": "required_location_unresolved",
+                    "location_status": "required_missing",
                     "timestamp_source": "relative_fields",
                 },
                 negative_applicability=True,

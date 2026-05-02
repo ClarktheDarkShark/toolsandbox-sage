@@ -54,16 +54,16 @@ def prepare_reminder_creation_args(
             return {
                 "add_reminder_kwargs": {},
                 "should_call_add_reminder": False,
-                "location_status": "omitted_optional",
                 "abstain_reason": "missing_time_info",
+                "location_status": "omitted_optional",
                 "timestamp_source": timestamp_source,
             }
         if int(hour) < 0 or int(hour) > 23 or int(minute) < 0 or int(minute) > 59:
             return {
                 "add_reminder_kwargs": {},
                 "should_call_add_reminder": False,
-                "location_status": "omitted_optional",
                 "abstain_reason": "malformed_time_info",
+                "location_status": "omitted_optional",
                 "timestamp_source": timestamp_source,
             }
         offset_seconds = float(local_utc_offset_hours) * 3600.0
@@ -88,8 +88,8 @@ def prepare_reminder_creation_args(
         return {
             "add_reminder_kwargs": {},
             "should_call_add_reminder": False,
-            "location_status": "required_missing",
             "abstain_reason": "required_location_unresolved",
+            "location_status": "required_missing",
             "timestamp_source": timestamp_source,
         }
     else:
@@ -104,8 +104,8 @@ def prepare_reminder_creation_args(
             "longitude": longitude_out,
         },
         "should_call_add_reminder": True,
-        "location_status": location_status,
         "abstain_reason": "",
+        "location_status": location_status,
         "timestamp_source": timestamp_source,
     }
 """
@@ -114,50 +114,101 @@ SPEC = ToolSpec(
     tool_name="prepare_reminder_creation_args",
     family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
     description=(
-        "Prepare add_reminder kwargs for reminder creation while preserving the "
-        "original benchmark side-effect call."
+        "Use this immediately before add_reminder when reminder content and time "
+        "are already known. It prepares add_reminder kwargs for reminder "
+        "creation, omits optional coordinates safely, and preserves the original "
+        "benchmark side-effect call."
     ),
     inputs=(
-        ToolInput("content", "str", "Reminder content."),
+        ToolInput(
+            "content",
+            "str",
+            "Exact reminder content to pass through to add_reminder.",
+        ),
         ToolInput(
             "resolved_reminder_timestamp",
             "float",
-            "Use this timestamp directly when it is greater than zero.",
+            "Exact Unix reminder timestamp when already known; pass 0 when the "
+            "helper should compute from relative time fields instead.",
         ),
-        ToolInput("current_timestamp", "float", "Current Unix timestamp."),
-        ToolInput("day_offset", "int", "Local-day offset."),
-        ToolInput("hour", "int", "Target local hour."),
-        ToolInput("minute", "int", "Target local minute."),
-        ToolInput("local_utc_offset_hours", "float", "Local UTC offset."),
+        ToolInput(
+            "current_timestamp",
+            "float",
+            "Current Unix timestamp used only when computing from relative time "
+            "fields.",
+        ),
+        ToolInput("day_offset", "int", "Local-day offset for the reminder date."),
+        ToolInput("hour", "int", "Target local reminder hour."),
+        ToolInput("minute", "int", "Target local reminder minute."),
+        ToolInput(
+            "local_utc_offset_hours",
+            "float",
+            "Local UTC offset used for relative-time conversion.",
+        ),
         ToolInput(
             "time_fields_complete",
             "bool",
-            "Whether the relative time fields are present and safe to use.",
+            "True only when day_offset, hour, minute, and local_utc_offset_hours "
+            "are fully known and safe to use for add_reminder.",
         ),
         ToolInput(
             "location_required",
             "bool",
-            "Whether the user explicitly requires a location on the reminder.",
+            "True only when the user explicitly requires the reminder to include "
+            "a location.",
         ),
-        ToolInput("location_available", "bool", "Whether coordinates are available."),
-        ToolInput("latitude", "float", "Latitude when available."),
-        ToolInput("longitude", "float", "Longitude when available."),
+        ToolInput(
+            "location_available",
+            "bool",
+            "True only when both latitude and longitude are already available.",
+        ),
+        ToolInput("latitude", "float", "Latitude when coordinates are available."),
+        ToolInput(
+            "longitude",
+            "float",
+            "Longitude when coordinates are available.",
+        ),
         ToolInput(
             "location_lookup_failed",
             "bool",
-            "Whether a location lookup was already attempted and failed.",
+            "True when optional location lookup already failed and the helper "
+            "should omit coordinates instead of blocking add_reminder.",
         ),
     ),
     output_annotation="dict",
     output_schema={
         "type": "object",
         "properties": {
-            "add_reminder_kwargs": {"type": "object"},
-            "should_call_add_reminder": {"type": "boolean"},
-            "location_status": {"type": "string"},
-            "abstain_reason": {"type": "string"},
-            "timestamp_source": {"type": "string"},
+            "add_reminder_kwargs": {
+                "type": "object",
+                "description": "Keyword arguments to pass unchanged into the "
+                "original add_reminder call.",
+            },
+            "should_call_add_reminder": {
+                "type": "boolean",
+                "description": "True when the agent should call add_reminder now.",
+            },
+            "abstain_reason": {
+                "type": "string",
+                "description": "Reason the helper says not to call add_reminder "
+                "yet. Empty when add_reminder should be called.",
+            },
+            "location_status": {
+                "type": "string",
+                "enum": ["provided", "omitted_optional", "required_missing"],
+            },
+            "timestamp_source": {
+                "type": "string",
+                "enum": ["resolved", "relative_fields", "none"],
+            },
         },
+        "required": [
+            "add_reminder_kwargs",
+            "should_call_add_reminder",
+            "abstain_reason",
+            "location_status",
+            "timestamp_source",
+        ],
     },
     positive_triggers=(
         "add_reminder",
@@ -173,13 +224,16 @@ SPEC = ToolSpec(
     preserves_side_effect_tools=("add_reminder",),
     required_original_tool_calls=("add_reminder",),
     abstain_behavior=(
-        "Return should_call_add_reminder=False when time information is missing or "
-        "malformed, or when location is explicitly required but unresolved."
+        "Use this right before add_reminder. Return should_call_add_reminder=False "
+        "when time information is missing or malformed, or when location is "
+        "explicitly required but unresolved. If should_call_add_reminder=True, "
+        "call add_reminder with add_reminder_kwargs unchanged."
     ),
     generalization_rationale=(
-        "Reminder creation tasks need deterministic argument preparation while "
-        "still calling the original add_reminder ToolSandbox side-effect tool for "
-        "both no-location and optional-location cases."
+        "Reminder creation tasks need a deterministic final preparation step "
+        "before add_reminder so the agent can stop re-asking for optional "
+        "location details, stop retrying failed location lookup, and still call "
+        "the original ToolSandbox side-effect tool."
     ),
     inadequacy_evidence=StructuredInadequacyEvidence(
         summary=(
