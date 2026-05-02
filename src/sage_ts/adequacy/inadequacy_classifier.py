@@ -98,9 +98,11 @@ def _reminder_optional_location_argument_observation(
             "local_seconds / 86400) * 86400; reminder_timestamp = local_midnight "
             "+ day_offset * 86400 - offset_seconds + hour * 3600 + minute * 60. "
             "Prefer resolved_reminder_timestamp whenever current benchmark "
-            "timestamp context already makes the reminder time clear; do not ask "
-            "the user for timezone or UTC offset again unless the request is "
-            "truly ambiguous. "
+            "timestamp context already makes the reminder time clear. In "
+            "ToolSandbox reminder creation, plain relative times like 'tomorrow "
+            "at 5 PM' mean local device time by default, so do not ask the user "
+            "for timezone or UTC offset again unless the request is truly "
+            "ambiguous. "
             "Set location_requested to true when the user mentioned a location "
             "that you would like to attach if resolution succeeds. Set "
             "location_required to true only when the user explicitly requires "
@@ -108,9 +110,14 @@ def _reminder_optional_location_argument_observation(
             "If optional location is unavailable or a lookup already failed, do "
             "not invent coordinates: include latitude None and longitude None in "
             "add_reminder_kwargs, set location_status to omitted_optional, and "
-            "still allow the original add_reminder call. Optional unresolved "
-            "location should not block reminder creation. If location is explicitly "
-            "required but unresolved, abstain instead of retrying blindly. This "
+            "still allow the original add_reminder call. If an optional location "
+            "is still being chosen or refined and lookup has not failed yet, "
+            "abstain with location_status lookup_pending and do not call "
+            "add_reminder yet instead of creating the reminder prematurely. "
+            "After that optional location is resolved or explicitly skipped, "
+            "call this helper again before add_reminder. If location is "
+            "explicitly required but "
+            "unresolved, abstain instead of retrying blindly. This "
             "helper must preserve the original ToolSandbox add_reminder call by "
             "preparing arguments only; it must not create or modify reminders "
             "itself."
@@ -218,17 +225,15 @@ def _reminder_optional_location_argument_observation(
                     "location_lookup_failed": False,
                 },
                 {
-                    "add_reminder_kwargs": {
-                        "content": "Buy chocolate milk at Whole Foods",
-                        "reminder_timestamp": 1777776000.0,
-                        "latitude": None,
-                        "longitude": None,
-                    },
-                    "should_call_add_reminder": True,
-                    "abstain_reason": "",
-                    "location_status": "omitted_optional",
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "abstain_reason": (
+                        "optional_location_lookup_pending_do_not_call_add_reminder"
+                    ),
+                    "location_status": "lookup_pending",
                     "timestamp_source": "resolved",
                 },
+                negative_applicability=True,
             ),
         ),
         generation_allowed=True,

@@ -191,6 +191,24 @@ def _helper_requires_side_effect_followup(helper_outputs: list[object]) -> bool:
     return True
 
 
+def _helper_forbids_side_effect_followup(helper_outputs: list[object]) -> bool:
+    if not helper_outputs:
+        return False
+    saw_explicit_flag = False
+    for item in helper_outputs:
+        if not isinstance(item, dict):
+            continue
+        if "should_call_add_reminder" in item:
+            saw_explicit_flag = True
+            if bool(item.get("should_call_add_reminder")):
+                return False
+        elif "should_call" in item:
+            saw_explicit_flag = True
+            if bool(item.get("should_call")):
+                return False
+    return saw_explicit_flag
+
+
 @dataclass(frozen=True)
 class SageRunConfig:
     agent: str
@@ -520,11 +538,16 @@ def run_sage_with_registry(
                 entry = loaded_entries_for_check.get(helper_name)
                 if entry is None:
                     continue
-                if not _helper_requires_side_effect_followup(
-                    helper_outputs.get(helper_name, [])
-                ):
-                    continue
+                helper_output_items = helper_outputs.get(helper_name, [])
                 required = entry.tool.spec.required_original_tool_calls
+                if _helper_forbids_side_effect_followup(helper_output_items):
+                    for req_tool in required:
+                        if req_tool in trajectory_tool_names:
+                            side_effect_failures.append(helper_name)
+                            break
+                    continue
+                if not _helper_requires_side_effect_followup(helper_output_items):
+                    continue
                 for req_tool in required:
                     if req_tool not in trajectory_tool_names:
                         side_effect_failures.append(helper_name)

@@ -8,6 +8,7 @@ import pytest
 
 from sage_ts.adapters.sage_run_adapter import (
     SageRunConfig,
+    _helper_forbids_side_effect_followup,
     _helper_requires_side_effect_followup,
     run_sage_with_registry,
 )
@@ -33,6 +34,19 @@ def test_side_effect_followup_not_required_for_abstaining_helper() -> None:
 def test_side_effect_followup_required_for_positive_helper_result() -> None:
     assert _helper_requires_side_effect_followup(
         [{"should_call_add_reminder": True, "add_reminder_kwargs": {"content": "x"}}]
+    )
+
+
+def test_side_effect_followup_forbidden_for_abstaining_helper() -> None:
+    assert _helper_forbids_side_effect_followup(
+        [
+            {
+                "should_call_add_reminder": False,
+                "abstain_reason": (
+                    "optional_location_lookup_pending_do_not_call_add_reminder"
+                ),
+            }
+        ]
     )
 
 

@@ -510,8 +510,8 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
             "Use this as the normal final step immediately before add_reminder "
             "on reminder-creation tasks once content and time are known. It "
             "prepares add_reminder kwargs, preserves the original benchmark "
-            "side-effect call, and omits optional coordinates safely instead of "
-            "blocking reminder creation."
+            "side-effect call, and omits optional coordinates safely after "
+            "optional location lookup has failed or been skipped."
         ),
         inputs=(
             ToolInput(
@@ -524,9 +524,11 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
                 "float",
                 "Preferred whenever available. Pass the exact Unix reminder "
                 "timestamp when it is already known from prior reasoning or "
-                "tool results. If current benchmark timestamp context already "
-                "makes the relative reminder time resolvable, prefer passing "
-                "the resolved timestamp instead of asking the user for "
+                "tool results. In ToolSandbox reminder creation, unspecified "
+                "relative times such as 'tomorrow at 5 PM' are local device "
+                "time by default. If current benchmark timestamp context "
+                "already makes the relative reminder time resolvable, prefer "
+                "passing the resolved timestamp instead of asking the user for "
                 "timezone or UTC offset again. Pass 0 only when the helper "
                 "must compute from relative time fields instead.",
             ),
@@ -544,8 +546,10 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
                 "float",
                 "Local UTC offset used for relative-time conversion. Use the "
                 "existing ToolSandbox local timestamp context when it is "
-                "already sufficient; do not ask the user for timezone again "
-                "unless the request is truly ambiguous.",
+                "already sufficient. For plain relative reminders with no "
+                "explicit timezone, treat the request as local device time and "
+                "do not ask the user for timezone again unless the request is "
+                "truly ambiguous.",
             ),
             ToolInput(
                 "time_fields_complete",
@@ -559,7 +563,9 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
                 "bool",
                 "True when the user mentioned a location and you would like to "
                 "attach it if resolution succeeds. Mentioned does not mean "
-                "required and does not block add_reminder.",
+                "required, but it does mean reminder creation should wait "
+                "while the user is still refining which optional location to "
+                "use.",
             ),
             ToolInput(
                 "location_required",
@@ -583,9 +589,9 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
                 "bool",
                 "True when optional location lookup already failed and the "
                 "helper should omit coordinates instead of blocking "
-                "add_reminder. False does not require waiting: optional "
-                "unresolved location may still be omitted if reminder creation "
-                "is otherwise ready.",
+                "add_reminder. False means an optional requested location is "
+                "still unresolved, so the helper should abstain until it is "
+                "resolved, explicitly skipped, or fails lookup.",
             ),
         ),
         output_annotation="dict",
@@ -623,12 +629,19 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
             "Use this as the standard last step right before add_reminder. "
             "Return should_call_add_reminder=False only when time information "
             "is missing or malformed or when a user explicitly requires a "
-            "location that is unresolved. Prefer "
+            "location that is unresolved or when an optional mentioned "
+            "location is still being resolved or refined. When "
+            "should_call_add_reminder is False, do not call add_reminder. Prefer "
             "resolved_reminder_timestamp whenever it is already available from "
-            "prior tool results or existing timestamp context, and do not ask "
-            "the user for timezone or UTC offset again when the current "
-            "ToolSandbox timestamp context is already sufficient. Optional "
-            "unresolved location should not block reminder creation. If "
+            "prior tool results or existing timestamp context. For plain "
+            "relative reminders like 'tomorrow at 5 PM', treat that time as "
+            "local device time and do not ask the user for timezone or UTC "
+            "offset again when the current ToolSandbox timestamp context is "
+            "already sufficient. If optional location lookup fails or the user "
+            "explicitly skips location, proceed without coordinates. If the "
+            "helper abstains because location is still pending, resolve or skip "
+            "that location and then call this helper again before "
+            "add_reminder. If "
             "should_call_add_reminder=True, call add_reminder with "
             "add_reminder_kwargs unchanged."
         ),
@@ -691,6 +704,14 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
             "should_call_add_reminder": False,
             "abstain_reason": "required_location_unresolved",
             "location_status": "required_missing",
+            "timestamp_source": timestamp_source,
+        }
+    elif bool(location_requested) and not bool(location_lookup_failed):
+        return {
+            "add_reminder_kwargs": {},
+            "should_call_add_reminder": False,
+            "abstain_reason": "optional_location_lookup_pending_do_not_call_add_reminder",
+            "location_status": "lookup_pending",
             "timestamp_source": timestamp_source,
         }
     else:
@@ -931,17 +952,13 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "location_lookup_failed": False,
                 },
                 {
-                    "add_reminder_kwargs": {
-                        "content": "Pick up package",
-                        "reminder_timestamp": 43200.0,
-                        "latitude": None,
-                        "longitude": None,
-                    },
-                    "should_call_add_reminder": True,
-                    "location_status": "omitted_optional",
-                    "abstain_reason": "",
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "location_status": "lookup_pending",
+                    "abstain_reason": "optional_location_lookup_pending_do_not_call_add_reminder",
                     "timestamp_source": "relative_fields",
                 },
+                negative_applicability=True,
             ),
             ToolExample(
                 {
@@ -961,17 +978,13 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "location_lookup_failed": False,
                 },
                 {
-                    "add_reminder_kwargs": {
-                        "content": "Buy chocolate milk at Whole Foods",
-                        "reminder_timestamp": 1777776000.0,
-                        "latitude": None,
-                        "longitude": None,
-                    },
-                    "should_call_add_reminder": True,
-                    "location_status": "omitted_optional",
-                    "abstain_reason": "",
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "location_status": "lookup_pending",
+                    "abstain_reason": "optional_location_lookup_pending_do_not_call_add_reminder",
                     "timestamp_source": "resolved",
                 },
+                negative_applicability=True,
             ),
         ),
     )
@@ -1552,6 +1565,10 @@ def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
     assert "normal final step immediately before" in (reminder_helper.__doc__ or "")
     assert "add_reminder_kwargs" in (reminder_helper.__doc__ or "")
     assert "timezone or UTC offset again" in (reminder_helper.__doc__ or "")
+    assert "tomorrow at 5 PM" in (reminder_helper.__doc__ or "")
+    assert "still being chosen or" in (reminder_helper.__doc__ or "")
+    assert "should_call_add_reminder=False" in (reminder_helper.__doc__ or "")
+    assert "location is pending" in (reminder_helper.__doc__ or "")
 
 
 def test_timestamp_extreme_selector_hidden_on_insufficient_information_scenarios(
