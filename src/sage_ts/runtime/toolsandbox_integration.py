@@ -195,6 +195,28 @@ def inject_registry_tools_into_context(
     return injected
 
 
+def _trigger_based_visibility(
+    entry: RegistryEntry,
+    scenario_name: str,
+) -> tuple[bool, str] | None:
+    """Check positive/negative trigger tokens against scenario_name.
+
+    Returns a visibility tuple if a trigger matches, or None if no match.
+    Called as a supplementary fallback after all hardcoded route checks.
+    """
+    name_lower = scenario_name.lower()
+    spec = entry.tool.spec
+    if spec.positive_triggers:
+        for token in spec.positive_triggers:
+            if token.lower() in name_lower:
+                return True, "positive_trigger_match"
+    if spec.negative_triggers:
+        for token in spec.negative_triggers:
+            if token.lower() in name_lower:
+                return False, "negative_trigger_suppressed"
+    return None
+
+
 def registry_entry_visibility_reason(
     entry: RegistryEntry,
     scenario_name: str | None,
@@ -206,7 +228,13 @@ def registry_entry_visibility_reason(
         return False, "legacy_validation_missing_current_proof"
 
     if not scenario_name:
-        return True, "missing_scenario_name"
+        # Allow explicit global-safe tools; suppress everything else.
+        if (
+            "global" in entry.tool.spec.positive_triggers
+            or "all_scenarios" in entry.tool.spec.positive_triggers
+        ):
+            return True, "global_safe_explicit"
+        return False, "missing_scenario_name_suppressed"
 
     name = scenario_name.lower()
     tool_name = entry.tool.spec.tool_name
@@ -308,6 +336,11 @@ def registry_entry_visibility_reason(
         ):
             return True, "stock_symbol_extraction_task"
         return False, "stock_symbol_requires_stock_lookup_task"
+
+    # Supplementary trigger-based fallback: checked after all hardcoded routes.
+    trigger_result = _trigger_based_visibility(entry, name)
+    if trigger_result is not None:
+        return trigger_result
 
     if entry.tool.spec.family != ToolFamily.STATE_PRECONDITION_HELPER:
         return _provisional_birth_family_visibility(entry, name)

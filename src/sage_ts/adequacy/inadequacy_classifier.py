@@ -597,6 +597,8 @@ class CapabilityObservation:
     visible_data_gaps: tuple[str, ...] = ()
     planner_failures: tuple[str, ...] = ()
     final_answer_route_mismatch: bool = False
+    # "heuristic" = scenario-name prefix only; "transcript_verified" = signal confirmed in transcript
+    evidence_source: str = "heuristic"
 
     def to_inadequacy_evidence(self) -> StructuredInadequacyEvidence:
         return StructuredInadequacyEvidence(
@@ -626,6 +628,7 @@ class CapabilityObservation:
             ],
             "generation_allowed": self.generation_allowed,
             "reason": self.reason,
+            "evidence_source": self.evidence_source,
             "inadequacy_evidence": self.to_inadequacy_evidence().to_json(),
         }
 

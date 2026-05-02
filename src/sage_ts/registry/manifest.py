@@ -97,7 +97,7 @@ class RegistryEntry:
     @classmethod
     def from_json(cls, payload: dict[str, Any]) -> "RegistryEntry":
         return cls(
-            schema_version=int(payload.get("schema_version", 0)),
+            schema_version=int(payload.get("schema_version", REGISTRY_SCHEMA_VERSION)),
             tool=GeneratedTool.from_json(payload["tool"]),
             validation=ValidationResult(
                 accepted=bool(payload["validation"]["accepted"]),

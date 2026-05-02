@@ -53,12 +53,65 @@ class OnlineBirthController:
         if self.event_hook is not None:
             self.event_hook(event, payload)
 
+    def _check_heuristic_signal(self, observation: CapabilityObservation) -> bool:
+        """Attempt lightweight transcript verification for heuristic observations.
+
+        Returns True if at least one claimed signal token is found in the
+        conversation transcript, False otherwise.  Verification failure is
+        logged but never blocks generation (labeling sprint, not blocking).
+        """
+        conv_path = (
+            self.output_dir
+            / "trajectories"
+            / observation.scenario_name
+            / "conversation.json"
+        )
+        if not conv_path.exists():
+            return False
+        try:
+            import json as _json
+
+            messages = _json.loads(conv_path.read_text(encoding="utf-8"))
+        except Exception:
+            return False
+        if not isinstance(messages, list):
+            return False
+        transcript_text = " ".join(
+            str(m.get("content", "")) + " " + str(m.get("name", ""))
+            for m in messages
+            if isinstance(m, dict)
+        ).lower()
+        for signal in observation.inadequacy_signals:
+            if (
+                signal.lower().replace("_", " ") in transcript_text
+                or signal.lower() in transcript_text
+            ):
+                return True
+        for tool in observation.failed_tool_calls:
+            if tool.lower() in transcript_text:
+                return True
+        return False
+
     def observe(self, observation: CapabilityObservation) -> None:
         append_jsonl(
             self.output_dir / "capability_observations.jsonl",
             observation.to_json(),
         )
         self.counts[observation.canonical_key] += 1
+        # Log heuristic observations that cannot be transcript-verified.
+        if observation.evidence_source == "heuristic":
+            verified = self._check_heuristic_signal(observation)
+            if not verified:
+                append_jsonl(
+                    self.output_dir / "sage_run_events.jsonl",
+                    {
+                        "event": "tool_birth_heuristic_unverified",
+                        "canonical_key": observation.canonical_key,
+                        "scenario": observation.scenario_name,
+                        "evidence_source": observation.evidence_source,
+                        "note": "scenario-name prefix heuristic could not be confirmed in transcript",
+                    },
+                )
         if not observation.generation_allowed:
             return
         if observation.canonical_key in self.generated_keys:

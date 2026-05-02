@@ -411,6 +411,51 @@ def run_sage_with_registry(
             selection_record,
         )
         append_jsonl(output_directory / "selection_trace.jsonl", selection_record)
+        # Side-effect preservation check: for helpers with required_original_tool_calls,
+        # verify those tool names appear in the downstream conversation trajectory.
+        side_effect_failures: list[str] = []
+        if generated_called:
+            loaded_entries_for_check = store.load_entries()
+            conv_path = output_directory / "trajectories" / name / "conversation.json"
+            trajectory_tool_names: set[str] = set()
+            if conv_path.exists():
+                try:
+                    conv_messages = json.loads(conv_path.read_text(encoding="utf-8"))
+                    for msg in conv_messages:
+                        if not isinstance(msg, dict):
+                            continue
+                        for tc in msg.get("tool_calls") or []:
+                            if isinstance(tc, dict):
+                                fn = tc.get("function", {})
+                                tname = fn.get("name")
+                                if isinstance(tname, str):
+                                    trajectory_tool_names.add(tname)
+                        if msg.get("role") == "tool" and isinstance(
+                            msg.get("name"), str
+                        ):
+                            trajectory_tool_names.add(msg["name"])
+                except Exception:
+                    pass
+            for helper_name in generated_called:
+                entry = loaded_entries_for_check.get(helper_name)
+                if entry is None:
+                    continue
+                required = entry.tool.spec.required_original_tool_calls
+                for req_tool in required:
+                    if req_tool not in trajectory_tool_names:
+                        side_effect_failures.append(helper_name)
+                        break
+        if side_effect_failures:
+            result["side_effect_preservation_failures"] = side_effect_failures
+            append_jsonl(
+                output_directory / "side_effect_preservation_report.jsonl",
+                {
+                    "scenario": name,
+                    "side_effect_preservation_failures": side_effect_failures,
+                    "generated_tools_called": generated_called,
+                },
+            )
+
         if birth_controller is None:
             return result
         observations = classify_scenario_observations(name, scenario, result)

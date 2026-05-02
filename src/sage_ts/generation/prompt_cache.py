@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +37,11 @@ class PromptCache:
 
     def put(self, key: str, response: str) -> None:
         path = self.root / f"{key}.json"
-        path.write_text(json.dumps({"response": response}, indent=2) + "\n")
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(
+            json.dumps({"response": response}, indent=2) + "\n", encoding="utf-8"
+        )
+        os.replace(tmp, path)
         self.writes += 1
 
     def metrics(self) -> dict[str, int | str]:

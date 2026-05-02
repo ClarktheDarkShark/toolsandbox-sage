@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import replace
 from pathlib import Path
 
@@ -26,7 +27,9 @@ class RegistryStore:
 
     def save_entries(self, entries: dict[str, RegistryEntry]) -> None:
         payload = {"tools": {name: entry.to_json() for name, entry in entries.items()}}
-        self.manifest_path.write_text(json.dumps(payload, indent=2) + "\n")
+        tmp = self.manifest_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        os.replace(tmp, self.manifest_path)
 
     def put(self, entry: RegistryEntry) -> None:
         entries = self.load_entries()

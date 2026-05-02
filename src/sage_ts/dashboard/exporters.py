@@ -1275,6 +1275,8 @@ def _partial_comparison(
         "outcome_gains": [],
         "outcome_regressions": [],
         "deltas": [],
+        "comparison_type": "intersection_only",
+        "claim_grade": False,
     }
 
 
