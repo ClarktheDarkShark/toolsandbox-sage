@@ -14,7 +14,7 @@ DEFAULT_INITIAL_PORTFOLIO = (
     "relative_day_time_to_timestamp",
     "days_between_timestamps",
     "select_record_by_timestamp_extreme",
-    "prepare_reminder_arguments_with_optional_location",
+    "prepare_reminder_creation_args",
     "select_contact_or_message_by_constraints",
 )
 

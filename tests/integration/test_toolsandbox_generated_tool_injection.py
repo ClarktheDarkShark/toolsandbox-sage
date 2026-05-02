@@ -7,6 +7,7 @@ from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.toolsandbox_integration import (
     compile_toolsandbox_tool,
+    inject_registry_tools_into_context,
     with_registry_tools,
 )
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
@@ -501,18 +502,36 @@ def message_search_time_window(anchor_timestamp: float, lookback_days: int) -> d
     return store
 
 
-def _registry_with_reminder_argument_prep(tmp_path: Path) -> RegistryStore:
+def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
     spec = ToolSpec(
-        tool_name="prepare_reminder_arguments_with_optional_location",
+        tool_name="prepare_reminder_creation_args",
         family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description="Prepare add_reminder arguments while preserving benchmark side effects.",
+        description=(
+            "Prepare add_reminder kwargs for reminder creation while preserving the "
+            "original benchmark side-effect call."
+        ),
         inputs=(
             ToolInput("content", "str", "Reminder content."),
+            ToolInput(
+                "resolved_reminder_timestamp",
+                "float",
+                "Use this timestamp directly when it is greater than zero.",
+            ),
             ToolInput("current_timestamp", "float", "Current Unix timestamp."),
             ToolInput("day_offset", "int", "Local-day offset."),
             ToolInput("hour", "int", "Target local hour."),
             ToolInput("minute", "int", "Target local minute."),
             ToolInput("local_utc_offset_hours", "float", "Local UTC offset."),
+            ToolInput(
+                "time_fields_complete",
+                "bool",
+                "Whether the relative time fields are present and safe to use.",
+            ),
+            ToolInput(
+                "location_required",
+                "bool",
+                "Whether the user explicitly requires a location on the reminder.",
+            ),
             ToolInput(
                 "location_available", "bool", "Whether coordinates are available."
             ),
@@ -528,36 +547,105 @@ def _registry_with_reminder_argument_prep(tmp_path: Path) -> RegistryStore:
             "properties": {
                 "add_reminder_kwargs": {"type": "object"},
                 "should_call_add_reminder": {"type": "boolean"},
-                "should_retry_location_lookup": {"type": "boolean"},
                 "location_status": {"type": "string"},
+                "abstain_reason": {"type": "string"},
+                "timestamp_source": {"type": "string"},
             },
         },
-        positive_triggers=("optional_info_treated_as_required",),
-        negative_triggers=("location_unavailable_but_reminder_can_still_be_added",),
+        positive_triggers=(
+            "add_reminder",
+            "optional_info_treated_as_required",
+            "relative_time_needs_typed_kwargs",
+        ),
+        negative_triggers=(
+            "modify_reminder",
+            "search_reminder",
+            "delete_reminder",
+            "insufficient_information",
+        ),
         preserves_side_effect_tools=("add_reminder",),
         required_original_tool_calls=("add_reminder",),
         abstain_behavior=(
-            "Prepare add_reminder kwargs only. Return omitted coordinates and do not "
-            "retry optional location lookup when enough information already exists."
+            "Prepare add_reminder kwargs only. Return should_call_add_reminder=False "
+            "when time information is missing or malformed, or when location is "
+            "required but unresolved."
         ),
         generalization_rationale=(
             "Reminder creation tasks need deterministic argument preparation while "
-            "still calling the original add_reminder ToolSandbox side-effect tool."
+            "still calling the original add_reminder ToolSandbox side-effect tool "
+            "for both no-location and optional-location cases."
         ),
         inadequacy_evidence=(
-            "Agents repeatedly retry optional location lookup or prepare incorrect "
-            "timestamps before calling add_reminder."
+            "Agents repeatedly retry optional location lookup, ask unnecessary "
+            "clarifications, or prepare incorrect timestamps before calling "
+            "add_reminder."
         ),
     )
     code = """
-def prepare_reminder_arguments_with_optional_location(content: str, current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float, location_available: bool, latitude: float, longitude: float, location_lookup_failed: bool) -> dict:
-    offset_seconds = local_utc_offset_hours * 3600
-    local_seconds = current_timestamp + offset_seconds
-    local_midnight = (local_seconds // 86400) * 86400
-    reminder_timestamp = local_midnight + day_offset * 86400 - offset_seconds + hour * 3600 + minute * 60
-    if not location_available or location_lookup_failed:
-        return {"add_reminder_kwargs": {"content": content, "reminder_timestamp": reminder_timestamp, "latitude": None, "longitude": None}, "should_call_add_reminder": True, "should_retry_location_lookup": False, "location_status": "omitted"}
-    return {"add_reminder_kwargs": {"content": content, "reminder_timestamp": reminder_timestamp, "latitude": latitude, "longitude": longitude}, "should_call_add_reminder": True, "should_retry_location_lookup": False, "location_status": "provided"}
+def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: float, current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float, time_fields_complete: bool, location_required: bool, location_available: bool, latitude: float, longitude: float, location_lookup_failed: bool) -> dict:
+    timestamp_source = "none"
+    if float(resolved_reminder_timestamp) > 0:
+        reminder_timestamp = float(resolved_reminder_timestamp)
+        timestamp_source = "resolved"
+    else:
+        if not time_fields_complete:
+            return {
+                "add_reminder_kwargs": {},
+                "should_call_add_reminder": False,
+                "location_status": "omitted_optional",
+                "abstain_reason": "missing_time_info",
+                "timestamp_source": timestamp_source,
+            }
+        if int(hour) < 0 or int(hour) > 23 or int(minute) < 0 or int(minute) > 59:
+            return {
+                "add_reminder_kwargs": {},
+                "should_call_add_reminder": False,
+                "location_status": "omitted_optional",
+                "abstain_reason": "malformed_time_info",
+                "timestamp_source": timestamp_source,
+            }
+        offset_seconds = float(local_utc_offset_hours) * 3600.0
+        local_seconds = float(current_timestamp) + offset_seconds
+        local_midnight = int(local_seconds // 86400.0) * 86400.0
+        reminder_timestamp = (
+            local_midnight
+            + int(day_offset) * 86400.0
+            - offset_seconds
+            + int(hour) * 3600.0
+            + int(minute) * 60.0
+        )
+        timestamp_source = "relative_fields"
+    coords_available = bool(location_available) and not (
+        float(latitude) == 0.0 or float(longitude) == 0.0
+    )
+    if coords_available:
+        latitude_out = float(latitude)
+        longitude_out = float(longitude)
+        location_status = "provided"
+    elif bool(location_required):
+        return {
+            "add_reminder_kwargs": {},
+            "should_call_add_reminder": False,
+            "location_status": "required_missing",
+            "abstain_reason": "required_location_unresolved",
+            "timestamp_source": timestamp_source,
+        }
+    else:
+        latitude_out = None
+        longitude_out = None
+        location_status = "omitted_optional"
+    return {
+        "add_reminder_kwargs": {
+            "content": content,
+            "reminder_timestamp": reminder_timestamp,
+            "latitude": latitude_out,
+            "longitude": longitude_out,
+        },
+        "should_call_add_reminder": True,
+        "location_status": location_status,
+        "abstain_reason": "",
+        "timestamp_source": timestamp_source,
+    }
 """
     tool = GeneratedTool(spec=spec, code=code)
     validation = validate_generated_tool(
@@ -566,11 +654,14 @@ def prepare_reminder_arguments_with_optional_location(content: str, current_time
             ToolExample(
                 {
                     "content": "Buy tickets",
+                    "resolved_reminder_timestamp": 0.0,
                     "current_timestamp": 0.0,
                     "day_offset": 1,
                     "hour": 17,
                     "minute": 0,
                     "local_utc_offset_hours": 0.0,
+                    "time_fields_complete": True,
+                    "location_required": False,
                     "location_available": False,
                     "latitude": 0.0,
                     "longitude": 0.0,
@@ -584,44 +675,52 @@ def prepare_reminder_arguments_with_optional_location(content: str, current_time
                         "longitude": None,
                     },
                     "should_call_add_reminder": True,
-                    "should_retry_location_lookup": False,
-                    "location_status": "omitted",
+                    "location_status": "omitted_optional",
+                    "abstain_reason": "",
+                    "timestamp_source": "relative_fields",
                 },
             ),
             ToolExample(
                 {
-                    "content": "Call Sam",
-                    "current_timestamp": 864000.0,
+                    "content": "Team meeting",
+                    "resolved_reminder_timestamp": 1777500000.0,
+                    "current_timestamp": 1777428906.0,
                     "day_offset": 0,
-                    "hour": 9,
-                    "minute": 30,
+                    "hour": 0,
+                    "minute": 0,
                     "local_utc_offset_hours": 0.0,
+                    "time_fields_complete": False,
+                    "location_required": False,
                     "location_available": False,
-                    "latitude": 51.5,
-                    "longitude": -0.12,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
                     "location_lookup_failed": False,
                 },
                 {
                     "add_reminder_kwargs": {
-                        "content": "Call Sam",
-                        "reminder_timestamp": 898200.0,
+                        "content": "Team meeting",
+                        "reminder_timestamp": 1777500000.0,
                         "latitude": None,
                         "longitude": None,
                     },
                     "should_call_add_reminder": True,
-                    "should_retry_location_lookup": False,
-                    "location_status": "omitted",
+                    "location_status": "omitted_optional",
+                    "abstain_reason": "",
+                    "timestamp_source": "resolved",
                 },
                 held_out=True,
             ),
             ToolExample(
                 {
                     "content": "Arrive early",
+                    "resolved_reminder_timestamp": 0.0,
                     "current_timestamp": 1777428906.194959,
                     "day_offset": 1,
                     "hour": 17,
                     "minute": 0,
                     "local_utc_offset_hours": -4.0,
+                    "time_fields_complete": True,
+                    "location_required": False,
                     "location_available": True,
                     "latitude": 37.3237926356735,
                     "longitude": -122.03961770355414,
@@ -635,10 +734,143 @@ def prepare_reminder_arguments_with_optional_location(content: str, current_time
                         "longitude": -122.03961770355414,
                     },
                     "should_call_add_reminder": True,
-                    "should_retry_location_lookup": False,
                     "location_status": "provided",
+                    "abstain_reason": "",
+                    "timestamp_source": "relative_fields",
+                },
+            ),
+            ToolExample(
+                {
+                    "content": "Whole Foods while low battery",
+                    "resolved_reminder_timestamp": 0.0,
+                    "current_timestamp": 864000.0,
+                    "day_offset": 0,
+                    "hour": 9,
+                    "minute": 30,
+                    "local_utc_offset_hours": 0.0,
+                    "time_fields_complete": True,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": True,
+                },
+                {
+                    "add_reminder_kwargs": {
+                        "content": "Whole Foods while low battery",
+                        "reminder_timestamp": 898200.0,
+                        "latitude": None,
+                        "longitude": None,
+                    },
+                    "should_call_add_reminder": True,
+                    "location_status": "omitted_optional",
+                    "abstain_reason": "",
+                    "timestamp_source": "relative_fields",
+                },
+            ),
+            ToolExample(
+                {
+                    "content": "Meet at park",
+                    "resolved_reminder_timestamp": 0.0,
+                    "current_timestamp": 0.0,
+                    "day_offset": 1,
+                    "hour": 14,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "time_fields_complete": True,
+                    "location_required": True,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": True,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "location_status": "required_missing",
+                    "abstain_reason": "required_location_unresolved",
+                    "timestamp_source": "relative_fields",
                 },
                 negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "Dentist",
+                    "resolved_reminder_timestamp": 0.0,
+                    "current_timestamp": 0.0,
+                    "day_offset": 0,
+                    "hour": 0,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "time_fields_complete": False,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "location_status": "omitted_optional",
+                    "abstain_reason": "missing_time_info",
+                    "timestamp_source": "none",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "Bad time",
+                    "resolved_reminder_timestamp": 0.0,
+                    "current_timestamp": 0.0,
+                    "day_offset": 0,
+                    "hour": 25,
+                    "minute": 61,
+                    "local_utc_offset_hours": 0.0,
+                    "time_fields_complete": True,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "location_status": "omitted_optional",
+                    "abstain_reason": "malformed_time_info",
+                    "timestamp_source": "none",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "Pick up package",
+                    "resolved_reminder_timestamp": 0.0,
+                    "current_timestamp": 0.0,
+                    "day_offset": 0,
+                    "hour": 12,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "time_fields_complete": True,
+                    "location_required": False,
+                    "location_available": True,
+                    "latitude": 0.0,
+                    "longitude": -122.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {
+                        "content": "Pick up package",
+                        "reminder_timestamp": 43200.0,
+                        "latitude": None,
+                        "longitude": None,
+                    },
+                    "should_call_add_reminder": True,
+                    "location_status": "omitted_optional",
+                    "abstain_reason": "",
+                    "timestamp_source": "relative_fields",
+                },
             ),
         ),
     )
@@ -903,13 +1135,17 @@ def extract_stock_symbol(stock_payload: dict) -> str:
 def test_registry_tools_are_available_to_toolsandbox_context(tmp_path: Path) -> None:
     store = _registry_with_canonicalizer(tmp_path)
     context = ExecutionContext(tool_allow_list=["end_conversation"])
-    scenario = Scenario(starting_context=context)
+    tool_name = "canonicalize_connectivity_label"
+    assert tool_name not in context.name_to_tool
 
     reused_tools: list[str] = []
-    enhanced = with_registry_tools(scenario, store, on_reuse=reused_tools.append)
+    enhanced = Scenario(starting_context=context)
+    inject_registry_tools_into_context(
+        enhanced.starting_context,
+        store.load_entries().values(),
+        on_reuse=reused_tools.append,
+    )
 
-    tool_name = "canonicalize_connectivity_label"
-    assert tool_name not in scenario.starting_context.name_to_tool
     assert tool_name in enhanced.starting_context.name_to_tool
     assert next(iter(enhanced.starting_context.name_to_tool)) == tool_name
     assert enhanced.starting_context.tool_allow_list is not None
@@ -1159,10 +1395,10 @@ def test_message_search_window_only_exposed_on_contact_message_tasks(
     assert properties["lookback_days"]["type"] == "integer"
 
 
-def test_reminder_argument_prep_only_exposed_on_add_reminder_time_location_tasks(
+def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
     tmp_path: Path,
 ) -> None:
-    store = _registry_with_reminder_argument_prep(tmp_path)
+    store = _registry_with_reminder_creation_args(tmp_path)
     scenario = Scenario(
         starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
     )
@@ -1184,6 +1420,11 @@ def test_reminder_argument_prep_only_exposed_on_add_reminder_time_location_tasks
             "add_reminder_content_and_week_delta_and_time_and_location_insufficient_information"
         ),
     )
+    modify = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="modify_reminder_with_recency_latest_alt",
+    )
     service_precondition = with_registry_tools(
         scenario,
         store,
@@ -1199,11 +1440,12 @@ def test_reminder_argument_prep_only_exposed_on_add_reminder_time_location_tasks
         ),
     )
 
-    tool_name = "prepare_reminder_arguments_with_optional_location"
+    tool_name = "prepare_reminder_creation_args"
     assert tool_name not in unrelated_search.starting_context.name_to_tool
-    assert tool_name not in no_location.starting_context.name_to_tool
+    assert tool_name in no_location.starting_context.name_to_tool
     assert tool_name not in insufficient.starting_context.name_to_tool
-    assert tool_name not in service_precondition.starting_context.name_to_tool
+    assert tool_name not in modify.starting_context.name_to_tool
+    assert tool_name in service_precondition.starting_context.name_to_tool
     assert tool_name in applicable.starting_context.name_to_tool
 
 
@@ -1401,9 +1643,10 @@ def test_registry_tools_execute_through_toolsandbox_console(tmp_path: Path) -> N
     store = _registry_with_canonicalizer(tmp_path)
     context = ExecutionContext(tool_allow_list=["end_conversation"])
     reused_tools: list[str] = []
-    enhanced = with_registry_tools(
-        Scenario(starting_context=context),
-        store,
+    enhanced = Scenario(starting_context=context)
+    inject_registry_tools_into_context(
+        enhanced.starting_context,
+        store.load_entries().values(),
         on_reuse=reused_tools.append,
     )
 
@@ -1433,7 +1676,11 @@ def test_registry_tools_execute_through_toolsandbox_console(tmp_path: Path) -> N
 def test_registry_tools_emit_toolsandbox_trace(tmp_path: Path) -> None:
     store = _registry_with_canonicalizer(tmp_path)
     context = ExecutionContext(tool_allow_list=["end_conversation"])
-    enhanced = with_registry_tools(Scenario(starting_context=context), store)
+    enhanced = Scenario(starting_context=context)
+    inject_registry_tools_into_context(
+        enhanced.starting_context,
+        store.load_entries().values(),
+    )
     tool = enhanced.starting_context.get_available_tools(scrambling_allowed=False)[
         "canonicalize_connectivity_label"
     ]
@@ -1475,7 +1722,11 @@ def test_generated_tools_support_toolsandbox_name_scrambling(tmp_path: Path) -> 
         tool_allow_list=["end_conversation"],
         tool_augmentation_list=[ScenarioCategories.TOOL_NAME_SCRAMBLED],
     )
-    enhanced = with_registry_tools(Scenario(starting_context=context), store)
+    enhanced = Scenario(starting_context=context)
+    inject_registry_tools_into_context(
+        enhanced.starting_context,
+        store.load_entries().values(),
+    )
 
     available_tools = enhanced.starting_context.get_available_tools(
         scrambling_allowed=True

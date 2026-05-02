@@ -43,7 +43,7 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
     "next_service_tool_call": ("direct_state_precondition_service_enablement",),
     "recover_from_tool_error": ("direct_state_precondition_service_enablement",),
     "next_service_enablement_action": ("direct_state_precondition_service_enablement",),
-    "prepare_reminder_arguments_with_optional_location": (
+    "prepare_reminder_creation_args": (
         "temporal_reminder_date_canonicalization",
         "generic_multi_tool_composition",
     ),
@@ -62,9 +62,7 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
     ),
     "state_precondition:next_service_tool_call": ("next_service_tool_call",),
     "state_precondition:recover_from_tool_error": ("recover_from_tool_error",),
-    "composite:prepare_reminder_arguments_with_optional_location": (
-        "prepare_reminder_arguments_with_optional_location",
-    ),
+    "composite:prepare_reminder_creation_args": ("prepare_reminder_creation_args",),
 }
 
 VARIANT_SUFFIXES = (
@@ -316,9 +314,8 @@ def expected_helper_fit(
         "insufficient_information" not in name
         and name.startswith("add_reminder_content_and_")
         and "_time" in name
-        and "_location" in name
     ):
-        helpers.append("prepare_reminder_arguments_with_optional_location")
+        helpers.append("prepare_reminder_creation_args")
 
     return helpers
 
@@ -365,14 +362,8 @@ def expected_birth_opportunities(
         opportunities.append("state_precondition:next_service_tool_call")
     if name.startswith(DOWNSTREAM_SERVICE_HELPER_PREFIXES):
         opportunities.append("state_precondition:recover_from_tool_error")
-    if (
-        name.startswith("add_reminder_content_and_")
-        and "_time" in name
-        and "_location" in name
-    ):
-        opportunities.append(
-            "composite:prepare_reminder_arguments_with_optional_location"
-        )
+    if name.startswith("add_reminder_content_and_") and "_time" in name:
+        opportunities.append("composite:prepare_reminder_creation_args")
     return opportunities
 
 

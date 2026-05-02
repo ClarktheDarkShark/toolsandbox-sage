@@ -30,11 +30,9 @@ def test_add_reminder_location_argument_prep_matches_birth_path() -> None:
         "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools"
     )
 
-    assert "prepare_reminder_arguments_with_optional_location" in expected_helper_fit(
+    assert "prepare_reminder_creation_args" in expected_helper_fit(scenario)
+    assert "composite:prepare_reminder_creation_args" in expected_birth_opportunities(
         scenario
-    )
-    assert "composite:prepare_reminder_arguments_with_optional_location" in (
-        expected_birth_opportunities(scenario)
     )
 
 

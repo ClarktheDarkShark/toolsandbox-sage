@@ -65,7 +65,6 @@ def _is_reminder_optional_location_argument_scenario(scenario_name: str) -> bool
         "insufficient_information" not in scenario_name
         and scenario_name.startswith("add_reminder_content_and_")
         and "_time" in scenario_name
-        and "_location" in scenario_name
     )
 
 
@@ -74,43 +73,49 @@ def _reminder_optional_location_argument_observation(
 ) -> CapabilityObservation:
     return CapabilityObservation(
         scenario_name=scenario_name,
-        canonical_key="composite:prepare_reminder_arguments_with_optional_location",
+        canonical_key="composite:prepare_reminder_creation_args",
         observation=(
             "Reminder creation tasks with relative date/time and optional location "
             "repeatedly fail after the agent has enough visible information to call "
             "the original add_reminder ToolSandbox side-effect tool. The missing "
             "capability is not another side effect; it is deterministic argument "
             "preparation. Generate a small trace-compatible helper named "
-            "prepare_reminder_arguments_with_optional_location. Inputs: content, "
-            "current_timestamp, day_offset, hour, minute, local_utc_offset_hours, "
+            "prepare_reminder_creation_args. Inputs: content, "
+            "resolved_reminder_timestamp, current_timestamp, day_offset, hour, "
+            "minute, local_utc_offset_hours, location_required, "
             "location_available, latitude, longitude, and location_lookup_failed. "
             "Return a dict with add_reminder_kwargs, should_call_add_reminder, "
-            "should_retry_location_lookup, and location_status. "
+            "location_status, abstain_reason, and timestamp_source. "
             "add_reminder_kwargs must be directly splattable into the original "
             "ToolSandbox add_reminder(content, reminder_timestamp, latitude, "
-            "longitude) side-effect tool. Use local-day timestamp arithmetic, not "
-            "current_timestamp plus raw hours. Formula: offset_seconds = "
-            "local_utc_offset_hours * 3600; local_seconds = current_timestamp + "
-            "offset_seconds; local_midnight = floor(local_seconds / 86400) * "
-            "86400; reminder_timestamp = local_midnight + day_offset * 86400 - "
-            "offset_seconds + hour * 3600 + minute * 60. If location_available is "
-            "false or a lookup already failed, do not invent coordinates: include "
-            "latitude None and longitude None in add_reminder_kwargs, set "
-            "location_status to omitted, and set should_retry_location_lookup "
-            "False. This helper must preserve the original ToolSandbox "
-            "add_reminder call by preparing arguments only; it must not create or "
-            "modify reminders itself."
+            "longitude) side-effect tool. If resolved_reminder_timestamp is "
+            "present, use it directly. Otherwise use local-day timestamp "
+            "arithmetic, not current_timestamp plus raw hours. Formula: "
+            "offset_seconds = local_utc_offset_hours * 3600; local_seconds = "
+            "current_timestamp + offset_seconds; local_midnight = floor("
+            "local_seconds / 86400) * 86400; reminder_timestamp = local_midnight "
+            "+ day_offset * 86400 - offset_seconds + hour * 3600 + minute * 60. "
+            "If optional location is unavailable or a lookup already failed, do "
+            "not invent coordinates: include latitude None and longitude None in "
+            "add_reminder_kwargs, set location_status to omitted_optional, and "
+            "still allow the original add_reminder call. If location is explicitly "
+            "required but unresolved, abstain instead of retrying blindly. This "
+            "helper must preserve the original ToolSandbox add_reminder call by "
+            "preparing arguments only; it must not create or modify reminders "
+            "itself."
         ),
         allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
         validation_examples=(
             ToolExample(
                 {
                     "content": "Buy tickets",
+                    "resolved_reminder_timestamp": None,
                     "current_timestamp": 0.0,
                     "day_offset": 1,
                     "hour": 17,
                     "minute": 0,
                     "local_utc_offset_hours": 0.0,
+                    "location_required": False,
                     "location_available": False,
                     "latitude": 0.0,
                     "longitude": 0.0,
@@ -124,64 +129,67 @@ def _reminder_optional_location_argument_observation(
                         "longitude": None,
                     },
                     "should_call_add_reminder": True,
-                    "should_retry_location_lookup": False,
-                    "location_status": "omitted",
+                    "location_status": "omitted_optional",
+                    "abstain_reason": "",
+                    "timestamp_source": "relative_fields",
                 },
             ),
             ToolExample(
                 {
-                    "content": "Arrive early",
-                    "current_timestamp": 1777428906.194959,
-                    "day_offset": 1,
-                    "hour": 17,
-                    "minute": 0,
-                    "local_utc_offset_hours": -4.0,
-                    "location_available": True,
-                    "latitude": 37.3237926356735,
-                    "longitude": -122.03961770355414,
-                    "location_lookup_failed": False,
-                },
-                {
-                    "add_reminder_kwargs": {
-                        "content": "Arrive early",
-                        "reminder_timestamp": 1777496400.0,
-                        "latitude": 37.3237926356735,
-                        "longitude": -122.03961770355414,
-                    },
-                    "should_call_add_reminder": True,
-                    "should_retry_location_lookup": False,
-                    "location_status": "provided",
-                },
-            ),
-            ToolExample(
-                {
-                    "content": "Call Sam",
-                    "current_timestamp": 864000.0,
+                    "content": "Team meeting",
+                    "resolved_reminder_timestamp": 1777500000.0,
+                    "current_timestamp": 1777428906.0,
                     "day_offset": 0,
-                    "hour": 9,
-                    "minute": 30,
+                    "hour": 0,
+                    "minute": 0,
                     "local_utc_offset_hours": 0.0,
+                    "location_required": False,
                     "location_available": False,
-                    "latitude": 51.5,
-                    "longitude": -0.12,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
                     "location_lookup_failed": False,
                 },
                 {
                     "add_reminder_kwargs": {
-                        "content": "Call Sam",
-                        "reminder_timestamp": 898200.0,
+                        "content": "Team meeting",
+                        "reminder_timestamp": 1777500000.0,
                         "latitude": None,
                         "longitude": None,
                     },
                     "should_call_add_reminder": True,
-                    "should_retry_location_lookup": False,
-                    "location_status": "omitted",
+                    "location_status": "omitted_optional",
+                    "abstain_reason": "",
+                    "timestamp_source": "resolved",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "content": "Meet at park",
+                    "resolved_reminder_timestamp": None,
+                    "current_timestamp": 0.0,
+                    "day_offset": 1,
+                    "hour": 14,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "location_required": True,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": True,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "location_status": "required_missing",
+                    "abstain_reason": "required_location_unresolved",
+                    "timestamp_source": "relative_fields",
                 },
                 negative_applicability=True,
             ),
         ),
         generation_allowed=True,
-        reason="reminder_optional_location_argument_preparation_failure",
+        reason="reminder_creation_argument_preparation_failure",
         inadequacy_signals=(
             "optional_info_treated_as_required",
             "visible_raw_data_lacking_deterministic_transform",

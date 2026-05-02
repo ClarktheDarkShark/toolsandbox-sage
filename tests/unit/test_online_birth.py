@@ -277,10 +277,7 @@ def test_add_reminder_optional_location_observation_prepares_side_effect_args() 
 
     assert len(observations) == 1
     observation = observations[0]
-    assert (
-        observation.canonical_key
-        == "composite:prepare_reminder_arguments_with_optional_location"
-    )
+    assert observation.canonical_key == "composite:prepare_reminder_creation_args"
     assert observation.allowed_families == (str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),)
     assert observation.generation_allowed
     assert "add_reminder" in observation.observation
@@ -293,8 +290,9 @@ def test_add_reminder_optional_location_observation_prepares_side_effect_args() 
             "longitude": None,
         },
         "should_call_add_reminder": True,
-        "should_retry_location_lookup": False,
-        "location_status": "omitted",
+        "location_status": "omitted_optional",
+        "abstain_reason": "",
+        "timestamp_source": "relative_fields",
     }
 
 

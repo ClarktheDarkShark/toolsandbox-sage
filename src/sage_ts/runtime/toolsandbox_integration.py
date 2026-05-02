@@ -286,6 +286,28 @@ def registry_entry_visibility_reason(
             return True, "reminder_argument_prep_add_reminder_time_location_task"
         return False, "reminder_argument_prep_requires_add_reminder_time_location_task"
 
+    if tool_name == "prepare_reminder_creation_args":
+        if is_insufficient:
+            return (
+                False,
+                "reminder_creation_args_suppressed_for_insufficient_information",
+            )
+        if not name.startswith("add_reminder_content_and_"):
+            return False, "reminder_creation_args_requires_add_reminder_creation_task"
+        if "_time" not in name:
+            return False, "reminder_creation_args_requires_time_information"
+        if any(
+            token in name
+            for token in (
+                "modify_reminder",
+                "search_reminder",
+                "update_reminder",
+                "delete_reminder",
+            )
+        ):
+            return False, "reminder_creation_args_suppressed_non_creation_task"
+        return True, "reminder_creation_args_add_reminder_creation_task"
+
     if tool_name == "message_search_time_window":
         return False, "message_search_window_suppressed_after_focused_regression"
 

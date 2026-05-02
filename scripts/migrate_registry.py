@@ -2,9 +2,13 @@
 
 Usage:
     python scripts/migrate_registry.py [registry_manifest.json ...]
+    python scripts/migrate_registry.py --check-only [registry_manifest.json ...]
 
 If no paths are provided, finds all registry_manifest.json files under the
 project root (excluding .git and __pycache__).
+
+--check-only: inspect manifests without writing anything; exits 1 if any active
+(non-retired) entry fails has_current_validation_proof.
 """
 
 from __future__ import annotations
@@ -15,6 +19,16 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+
+_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_ROOT / "src"))
+sys.path.insert(0, str(_ROOT))
+
+from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate  # noqa: E402
+from sage_ts.registry.manifest import (  # noqa: E402
+    RegistryEntry,
+    has_current_validation_proof,
+)
 
 REGISTRY_SCHEMA_VERSION = 2
 TOOL_SPEC_SCHEMA_VERSION = 2
@@ -101,6 +115,92 @@ def migrate_manifest(path: Path) -> dict[str, Any]:
     }
 
 
+def check_validation_proof(path: Path) -> list[dict[str, Any]]:
+    """Return active (non-retired) entries that fail has_current_validation_proof."""
+    raw = path.read_text(encoding="utf-8")
+    data = json.loads(raw)
+    tools = data.get("tools", {})
+    failing = []
+    for tool_name, entry in tools.items():
+        registry_entry = RegistryEntry.from_json(entry)
+        if registry_entry.retired:
+            continue
+        if not has_current_validation_proof(registry_entry):
+            reasons = _validation_proof_reasons(registry_entry)
+            failing.append(
+                {
+                    "tool_name": tool_name,
+                    "path": str(path),
+                    "schema_version": registry_entry.schema_version,
+                    "passes_validation_proof": False,
+                    "reasons": reasons,
+                }
+            )
+    return failing
+
+
+def _validation_proof_reasons(entry: RegistryEntry) -> list[str]:
+    reasons: list[str] = []
+    gate = evaluate_candidate_gate(entry.tool.spec)
+    if not entry.validation.accepted:
+        reasons.append("validation.accepted=False")
+    if entry.validation.held_out_check_count <= 0:
+        reasons.append("held_out_check_count=0")
+    requires_negative = entry.tool.spec.family.value in {
+        "state_precondition_helper",
+        "search_filter_ranking_helper",
+        "composite_workflow_helper",
+    }
+    if requires_negative and entry.validation.negative_applicability_count <= 0:
+        reasons.append("negative_applicability_count=0")
+    if not entry.validation.runtime_smoke_passed:
+        reasons.append("runtime_smoke_passed=False")
+    if entry.schema_version != REGISTRY_SCHEMA_VERSION:
+        reasons.append(
+            f"schema_version={entry.schema_version} != {REGISTRY_SCHEMA_VERSION}"
+        )
+    if entry.tool.spec.schema_version != TOOL_SPEC_SCHEMA_VERSION:
+        reasons.append(
+            "tool.spec.schema_version="
+            f"{entry.tool.spec.schema_version} != {TOOL_SPEC_SCHEMA_VERSION}"
+        )
+    if not entry.code_hash_verified:
+        reasons.append("code_hash_unverified")
+    if not gate.allowed:
+        reasons.append(f"candidate_gate:{gate.reason}")
+    return reasons
+
+
+def check_only_manifest(
+    path: Path, root: Path
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Inspect a manifest without writing. Returns (passing, failing) rows for active entries."""
+    raw = path.read_text(encoding="utf-8")
+    data = json.loads(raw)
+    tools = data.get("tools", {})
+    passing: list[dict[str, Any]] = []
+    failing: list[dict[str, Any]] = []
+    for tool_name, entry in tools.items():
+        registry_entry = RegistryEntry.from_json(entry)
+        retired = registry_entry.retired
+        schema_version = registry_entry.schema_version
+        reasons = [] if retired else _validation_proof_reasons(registry_entry)
+
+        row = {
+            "tool_name": tool_name,
+            "path": str(path.relative_to(root)),
+            "schema_version": schema_version,
+            "retired": retired,
+            "passes_validation_proof": not retired and not reasons,
+            "reasons": reasons,
+        }
+        if retired or not reasons:
+            passing.append(row)
+        else:
+            failing.append(row)
+    return passing, failing
+
+
 def check_quarantine(path: Path) -> list[dict[str, Any]]:
     """Return entries that still fail has_current_validation_proof after migration."""
     raw = path.read_text(encoding="utf-8")
@@ -108,30 +208,10 @@ def check_quarantine(path: Path) -> list[dict[str, Any]]:
     tools = data.get("tools", {})
     quarantined = []
     for tool_name, entry in tools.items():
-        reasons = []
-        validation = entry.get("validation", {})
-        if not validation.get("accepted", False):
-            reasons.append("validation.accepted=False")
-        if validation.get("held_out_check_count", 0) <= 0:
-            reasons.append("held_out_check_count=0")
-        if entry.get("schema_version", 0) != REGISTRY_SCHEMA_VERSION:
-            reasons.append(
-                f"schema_version={entry.get('schema_version', 'MISSING')} != {REGISTRY_SCHEMA_VERSION}"
-            )
-        tool = entry.get("tool", {})
-        spec = tool.get("spec", {}) if isinstance(tool, dict) else {}
-        if spec.get("schema_version", 0) != TOOL_SPEC_SCHEMA_VERSION:
-            reasons.append(
-                f"tool.spec.schema_version={spec.get('schema_version', 'MISSING')} != {TOOL_SPEC_SCHEMA_VERSION}"
-            )
-        code = tool.get("code", "") if isinstance(tool, dict) else ""
-        stored_hash = entry.get("code_hash")
-        if code and stored_hash and stored_hash != code_hash(code):
-            reasons.append("code_hash_mismatch")
-        if entry.get("retired", False):
+        registry_entry = RegistryEntry.from_json(entry)
+        reasons = _validation_proof_reasons(registry_entry)
+        if registry_entry.retired:
             reasons.append("retired=True")
-        if not validation.get("runtime_smoke_passed", False):
-            reasons.append("runtime_smoke_passed=False")
         if reasons:
             quarantined.append(
                 {"tool_name": tool_name, "path": str(path), "reasons": reasons}
@@ -149,14 +229,78 @@ def find_all_registries(root: Path) -> list[Path]:
     return sorted(results)
 
 
+def _display_path(path: Path, root: Path) -> str:
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
+
+
+def run_check_only(paths: list[Path], root: Path) -> int:
+    """Inspect all manifests without writing. Prints per-entry summary. Returns exit code."""
+    all_passing: list[dict[str, Any]] = []
+    all_failing: list[dict[str, Any]] = []
+    had_error = False
+
+    for path in paths:
+        try:
+            passing, failing = check_only_manifest(path, root)
+            all_passing.extend(passing)
+            all_failing.extend(failing)
+            rel = _display_path(path, root)
+            print(f"\nRegistry: {rel}  ({len(passing) + len(failing)} entries)")
+            for row in passing:
+                tag = "RETIRED " if row["retired"] else "PASS    "
+                print(
+                    f"  {tag} {row['tool_name']}  schema_version={row['schema_version']}"
+                )
+            for row in failing:
+                print(
+                    f"  FAIL     {row['tool_name']}  schema_version={row['schema_version']}"
+                    f"  reasons={row['reasons']}"
+                )
+        except Exception as exc:
+            had_error = True
+            print(f"  ERROR    {path}: {exc}", file=sys.stderr)
+
+    active_failing = [r for r in all_failing if not r.get("retired", False)]
+    active_passing = [r for r in all_passing if not r.get("retired", False)]
+    print(
+        f"\nCheck-only summary: {len(paths)} registries scanned, "
+        f"{len(active_passing)} active entries pass, "
+        f"{len(active_failing)} active entries FAIL has_current_validation_proof."
+    )
+    if active_failing:
+        print("FAIL: one or more active entries do not have current validation proof.")
+        return 1
+    if had_error:
+        print("FAIL: one or more registries could not be inspected.")
+        return 1
+    print("OK: all active entries pass has_current_validation_proof.")
+    return 0
+
+
 def main(argv: list[str]) -> None:
-    root = Path(__file__).resolve().parents[1]
+    # Parse --check-only flag first; remaining args are optional registry paths
+    check_only = "--check-only" in argv
+    remaining = [a for a in argv if a != "--check-only"]
 
-    if argv:
-        paths = [Path(p) for p in argv]
+    root = _ROOT
+
+    if remaining:
+        paths = [
+            (Path(p) if Path(p).is_absolute() else (root / p)).resolve()
+            for p in remaining
+        ]
     else:
-        paths = find_all_registries(root)
+        paths = [path.resolve() for path in find_all_registries(root)]
 
+    if check_only:
+        print(f"Found {len(paths)} registry manifests to check (read-only).")
+        exit_code = run_check_only(paths, root)
+        sys.exit(exit_code)
+
+    # --- Normal migration mode ---
     print(f"Found {len(paths)} registry manifests to migrate.")
 
     all_summaries = []
@@ -172,14 +316,14 @@ def main(argv: list[str]) -> None:
             total_entries += summary["total_entries"]
             if summary["migrated_count"] > 0:
                 print(
-                    f"  MIGRATED {path.relative_to(root)}: {summary['migrated_count']}/{summary['total_entries']} entries updated"
+                    f"  MIGRATED {_display_path(path, root)}: {summary['migrated_count']}/{summary['total_entries']} entries updated"
                 )
                 for tool, changes in summary["changes"].items():
                     for change in changes:
                         print(f"    {tool}: {change}")
             else:
                 print(
-                    f"  OK       {path.relative_to(root)}: {summary['total_entries']} entries already current"
+                    f"  OK       {_display_path(path, root)}: {summary['total_entries']} entries already current"
                 )
         except Exception as exc:
             print(f"  ERROR    {path}: {exc}", file=sys.stderr)
