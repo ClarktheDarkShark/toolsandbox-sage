@@ -83,7 +83,7 @@ def _reminder_optional_location_argument_observation(
             "prepare_reminder_creation_args and use it immediately before "
             "add_reminder once reminder content and time are known. Inputs: content, "
             "resolved_reminder_timestamp, current_timestamp, day_offset, hour, "
-            "minute, local_utc_offset_hours, location_required, "
+            "minute, local_utc_offset_hours, location_requested, location_required, "
             "location_available, latitude, longitude, and location_lookup_failed. "
             "Return a dict with add_reminder_kwargs, should_call_add_reminder, "
             "abstain_reason, location_status, and timestamp_source. "
@@ -96,11 +96,17 @@ def _reminder_optional_location_argument_observation(
             "current_timestamp + offset_seconds; local_midnight = floor("
             "local_seconds / 86400) * 86400; reminder_timestamp = local_midnight "
             "+ day_offset * 86400 - offset_seconds + hour * 3600 + minute * 60. "
+            "Set location_requested to true when the user mentioned a location "
+            "that you would like to attach if resolution succeeds. Set "
+            "location_required to true only when the user explicitly requires "
+            "the created reminder to include a location. "
             "If optional location is unavailable or a lookup already failed, do "
             "not invent coordinates: include latitude None and longitude None in "
             "add_reminder_kwargs, set location_status to omitted_optional, and "
             "still allow the original add_reminder call. If location is explicitly "
-            "required but unresolved, abstain instead of retrying blindly. This "
+            "required but unresolved, abstain instead of retrying blindly. If a "
+            "location was merely requested and has not yet been resolved, abstain "
+            "with location_status lookup_pending until lookup succeeds or fails. This "
             "helper must preserve the original ToolSandbox add_reminder call by "
             "preparing arguments only; it must not create or modify reminders "
             "itself."
@@ -116,6 +122,7 @@ def _reminder_optional_location_argument_observation(
                     "hour": 17,
                     "minute": 0,
                     "local_utc_offset_hours": 0.0,
+                    "location_requested": False,
                     "location_required": False,
                     "location_available": False,
                     "latitude": 0.0,
@@ -144,6 +151,7 @@ def _reminder_optional_location_argument_observation(
                     "hour": 0,
                     "minute": 0,
                     "local_utc_offset_hours": 0.0,
+                    "location_requested": False,
                     "location_required": False,
                     "location_available": False,
                     "latitude": 0.0,
@@ -173,6 +181,7 @@ def _reminder_optional_location_argument_observation(
                     "hour": 14,
                     "minute": 0,
                     "local_utc_offset_hours": 0.0,
+                    "location_requested": True,
                     "location_required": True,
                     "location_available": False,
                     "latitude": 0.0,
@@ -185,6 +194,31 @@ def _reminder_optional_location_argument_observation(
                     "abstain_reason": "required_location_unresolved",
                     "location_status": "required_missing",
                     "timestamp_source": "relative_fields",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "Buy chocolate milk at Whole Foods",
+                    "resolved_reminder_timestamp": 1777776000.0,
+                    "current_timestamp": 1777687768.0,
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "location_requested": True,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "abstain_reason": "optional_location_lookup_pending",
+                    "location_status": "lookup_pending",
+                    "timestamp_source": "resolved",
                 },
                 negative_applicability=True,
             ),

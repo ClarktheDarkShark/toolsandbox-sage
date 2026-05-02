@@ -521,8 +521,10 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
             ToolInput(
                 "resolved_reminder_timestamp",
                 "float",
-                "Exact Unix reminder timestamp when already known; pass 0 when "
-                "the helper should compute from relative time fields instead.",
+                "Preferred whenever available. Pass the exact Unix reminder "
+                "timestamp when it is already known from prior reasoning or "
+                "tool results; pass 0 only when the helper must compute from "
+                "relative time fields instead.",
             ),
             ToolInput(
                 "current_timestamp",
@@ -546,6 +548,13 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
                 "add_reminder.",
             ),
             ToolInput(
+                "location_requested",
+                "bool",
+                "True when the user mentioned a location and you would like to "
+                "attach it if resolution succeeds. Mentioned does not mean "
+                "required.",
+            ),
+            ToolInput(
                 "location_required",
                 "bool",
                 "True only when the user explicitly requires the reminder to "
@@ -567,7 +576,8 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
                 "bool",
                 "True when optional location lookup already failed and the "
                 "helper should omit coordinates instead of blocking "
-                "add_reminder.",
+                "add_reminder. False means a requested optional location may "
+                "still be worth resolving first.",
             ),
         ),
         output_annotation="dict",
@@ -604,8 +614,12 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
         abstain_behavior=(
             "Use this right before add_reminder. Return "
             "should_call_add_reminder=False when time information is missing or "
-            "malformed, or when location is explicitly required but unresolved. "
-            "If should_call_add_reminder=True, call add_reminder with "
+            "malformed, when a user explicitly requires a location that is "
+            "unresolved, or when an optional requested location has not been "
+            "resolved yet and lookup has not failed. Prefer "
+            "resolved_reminder_timestamp whenever it is already available from "
+            "prior tool results or existing timestamp context. If "
+            "should_call_add_reminder=True, call add_reminder with "
             "add_reminder_kwargs unchanged."
         ),
         generalization_rationale=(
@@ -621,7 +635,7 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
         ),
     )
     code = """
-def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: float, current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float, time_fields_complete: bool, location_required: bool, location_available: bool, latitude: float, longitude: float, location_lookup_failed: bool) -> dict:
+def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: float, current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float, time_fields_complete: bool, location_requested: bool, location_required: bool, location_available: bool, latitude: float, longitude: float, location_lookup_failed: bool) -> dict:
     timestamp_source = "none"
     if float(resolved_reminder_timestamp) > 0:
         reminder_timestamp = float(resolved_reminder_timestamp)
@@ -669,6 +683,14 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
             "location_status": "required_missing",
             "timestamp_source": timestamp_source,
         }
+    elif bool(location_requested) and not bool(location_lookup_failed):
+        return {
+            "add_reminder_kwargs": {},
+            "should_call_add_reminder": False,
+            "abstain_reason": "optional_location_lookup_pending",
+            "location_status": "lookup_pending",
+            "timestamp_source": timestamp_source,
+        }
     else:
         latitude_out = None
         longitude_out = None
@@ -700,6 +722,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "minute": 0,
                     "local_utc_offset_hours": 0.0,
                     "time_fields_complete": True,
+                    "location_requested": False,
                     "location_required": False,
                     "location_available": False,
                     "latitude": 0.0,
@@ -729,6 +752,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "minute": 0,
                     "local_utc_offset_hours": 0.0,
                     "time_fields_complete": False,
+                    "location_requested": False,
                     "location_required": False,
                     "location_available": False,
                     "latitude": 0.0,
@@ -759,6 +783,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "minute": 0,
                     "local_utc_offset_hours": -4.0,
                     "time_fields_complete": True,
+                    "location_requested": True,
                     "location_required": False,
                     "location_available": True,
                     "latitude": 37.3237926356735,
@@ -788,6 +813,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "minute": 30,
                     "local_utc_offset_hours": 0.0,
                     "time_fields_complete": True,
+                    "location_requested": True,
                     "location_required": False,
                     "location_available": False,
                     "latitude": 0.0,
@@ -817,6 +843,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "minute": 0,
                     "local_utc_offset_hours": 0.0,
                     "time_fields_complete": True,
+                    "location_requested": True,
                     "location_required": True,
                     "location_available": False,
                     "latitude": 0.0,
@@ -842,6 +869,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "minute": 0,
                     "local_utc_offset_hours": 0.0,
                     "time_fields_complete": False,
+                    "location_requested": False,
                     "location_required": False,
                     "location_available": False,
                     "latitude": 0.0,
@@ -867,6 +895,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "minute": 61,
                     "local_utc_offset_hours": 0.0,
                     "time_fields_complete": True,
+                    "location_requested": False,
                     "location_required": False,
                     "location_available": False,
                     "latitude": 0.0,
@@ -892,6 +921,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "minute": 0,
                     "local_utc_offset_hours": 0.0,
                     "time_fields_complete": True,
+                    "location_requested": True,
                     "location_required": False,
                     "location_available": True,
                     "latitude": 0.0,
@@ -899,17 +929,38 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "location_lookup_failed": False,
                 },
                 {
-                    "add_reminder_kwargs": {
-                        "content": "Pick up package",
-                        "reminder_timestamp": 43200.0,
-                        "latitude": None,
-                        "longitude": None,
-                    },
-                    "should_call_add_reminder": True,
-                    "location_status": "omitted_optional",
-                    "abstain_reason": "",
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "location_status": "lookup_pending",
+                    "abstain_reason": "optional_location_lookup_pending",
                     "timestamp_source": "relative_fields",
                 },
+            ),
+            ToolExample(
+                {
+                    "content": "Buy chocolate milk at Whole Foods",
+                    "resolved_reminder_timestamp": 1777776000.0,
+                    "current_timestamp": 1777687768.0,
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "time_fields_complete": True,
+                    "location_requested": True,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "location_status": "lookup_pending",
+                    "abstain_reason": "optional_location_lookup_pending",
+                    "timestamp_source": "resolved",
+                },
+                negative_applicability=True,
             ),
         ),
     )
