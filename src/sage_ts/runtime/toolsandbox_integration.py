@@ -102,23 +102,21 @@ def _google_docstring(entry: RegistryEntry) -> str:
                 " sufficient to resolve the reminder timestamp safely.",
                 "    This helper prepares add_reminder_kwargs only; it does not",
                 " create the reminder itself.",
-                "    Set location_requested to true when the user mentioned a",
-                " place that you would like to attach if lookup succeeds.",
                 "    Set location_required to true only when the user explicitly",
                 " requires the created reminder to include a location.",
-                "    If an optional mentioned location is still being chosen or",
-                " refined, wait: this helper can abstain until that location is",
-                " resolved, skipped, or fails lookup.",
+                "    Set location_available to true only when coordinates are",
+                " already resolved. A mentioned location that is still being",
+                " looked up is location_available=False.",
+                "    If optional location is unavailable or a lookup already",
+                " failed, proceed without coordinates rather than blocking",
+                " reminder creation.",
                 "    If this helper returns should_call_add_reminder=False, do",
                 " not call add_reminder yet.",
                 "    If should_call_add_reminder is True, call add_reminder with",
                 " add_reminder_kwargs unchanged.",
-                "    If optional location is unavailable or a lookup already",
-                " failed, proceed without coordinates rather than blocking",
-                " reminder creation.",
-                "    If this helper abstains because location is pending, finish",
-                " resolving or skipping that location and then call this helper",
-                " again before add_reminder.",
+                "    If should_retry_location_lookup is True, you may retry",
+                " location lookup but can also proceed with add_reminder",
+                " without coordinates.",
                 "    If should_call_add_reminder is False, use abstain_reason to",
                 " decide whether you need clarification rather than guessing.",
             ]
@@ -330,25 +328,22 @@ def registry_entry_visibility_reason(
 
     if tool_name == "prepare_reminder_creation_args":
         if is_insufficient:
-            return (
-                False,
-                "reminder_creation_args_suppressed_for_insufficient_information",
-            )
-        if not name.startswith("add_reminder_content_and_"):
-            return False, "reminder_creation_args_requires_add_reminder_creation_task"
-        if "_time" not in name:
-            return False, "reminder_creation_args_requires_time_information"
-        if any(
-            token in name
-            for token in (
-                "modify_reminder",
-                "search_reminder",
-                "update_reminder",
-                "delete_reminder",
-            )
-        ):
+            return False, "reminder_creation_args_suppressed_insufficient_information"
+        # General reminder-creation detection: scenario involves adding/creating a
+        # reminder and is not a modify/search/update/delete task.
+        creation_signals = ("add_reminder", "remind", "create_reminder", "set_reminder")
+        suppress_signals = (
+            "modify_reminder",
+            "search_reminder",
+            "update_reminder",
+            "delete_reminder",
+        )
+        if any(token in name for token in suppress_signals):
             return False, "reminder_creation_args_suppressed_non_creation_task"
-        return True, "reminder_creation_args_add_reminder_creation_task"
+        if any(token in name for token in creation_signals):
+            return True, "reminder_creation_args_reminder_creation_task"
+        # No creation signal detected — hide (safe default).
+        return False, "reminder_creation_args_no_creation_signal"
 
     if tool_name == "message_search_time_window":
         return False, "message_search_window_suppressed_after_focused_regression"
