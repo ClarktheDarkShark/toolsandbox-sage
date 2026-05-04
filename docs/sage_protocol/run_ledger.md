@@ -403,3 +403,13 @@
   - Repair: gate rejects opaque dict inputs for `state_precondition_helper`; generator and dependency observation now require scalar top-level state inputs.
   - Tests: targeted suite `61 passed`; frozen best3 registry check PASS; stale dependency candidate registry expected FAIL on `state_helper_opaque_dict_input_contract`.
   - Decision: `park dependency lane`; next action is shortfall mining for a different cluster or scalar-input successor.
+
+- `V2.0 dependency lucrative/force-call diagnostic` completed.
+  - Date: `2026-05-04T18:06:00-04:00`
+  - Diagnostic registry: `artifacts/registry_candidates/v2_0_dependency_lucrative20_20260504_174000/registry_manifest.json`
+  - Natural run: `outputs/v2_0_dependency_lucrative20_natural_20260504_174500/mechanism_40_20260504_174438`; dashboards opened at `/dashboard/index.html` and `/dashboard/task_focus.html`.
+  - Natural metrics: outcome `+0.0552`; canonical `+0.0681`; dependency helper visible/called/VNC `10 / 0 / 10`; protocol FAIL.
+  - Forced-after-error run: `outputs/v2_0_dependency_lucrative20_forced2_20260504_180000/mechanism_40_20260504_175421`; dashboards opened at `/dashboard/index.html` and `/dashboard/task_focus.html`.
+  - Forced metrics: outcome `-0.0002`; canonical `+0.0793`; dependency helper visible/called/VNC `10 / 8 / 2`; called-subset outcome `-0.0285`; runtime exceptions `0`; side-effect preservation failures `1`; protocol FAIL.
+  - Fixes: added diagnostic OpenAI force-after-error mode and diagnostic routing override for adoption-risk suppression; tested scalar-input dependency successor.
+  - Decision: `park dependency lane`; direct ToolSandbox route is better than this helper concept for now.

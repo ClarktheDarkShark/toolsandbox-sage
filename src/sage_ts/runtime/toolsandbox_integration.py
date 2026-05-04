@@ -6,6 +6,7 @@ import copy
 import hashlib
 import inspect
 import json
+import os
 import re
 from collections.abc import Iterable, MutableMapping
 from typing import Any, Callable, cast
@@ -617,6 +618,16 @@ def route_registry_entries(
                 is_visible = False
                 status = "hidden"
                 reason = "blocked_by_missing_downstream_original_tool"
+        forced_tool = os.environ.get("SAGE_DIAGNOSTIC_FORCE_TOOL_NAME", "").strip()
+        if (
+            forced_tool
+            and tool_name == forced_tool
+            and not is_visible
+            and reason == "blocked_by_visible_not_called_adoption_risk"
+        ):
+            is_visible = True
+            status = "shown"
+            reason = "diagnostic_force_overrode_adoption_risk"
         if is_visible:
             visible.append((score, tool_name, entry))
         decisions[tool_name] = RuntimeRoutingDecision(

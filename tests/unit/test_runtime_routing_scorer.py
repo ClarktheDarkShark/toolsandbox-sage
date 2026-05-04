@@ -338,3 +338,42 @@ def test_fair_chance_state_helper_stays_hidden_on_unrelated_task(
 
     assert not decision.visible
     assert decision.reason == "generic_relevance_score_insufficient"
+
+
+def test_diagnostic_force_can_override_adoption_risk_for_target_tool(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "evidence_routing")
+    monkeypatch.setenv(
+        "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME", "next_dependency_precondition_call"
+    )
+    monkeypatch.setattr(
+        routing_scorer,
+        "_latest_helper_contribution_summary",
+        lambda: {
+            "helpers": {
+                "next_dependency_precondition_call": {
+                    "visible_count": 10,
+                    "called_count": 0,
+                    "visible_not_called_count": 10,
+                    "called_subset": {"mean_outcome_delta": None},
+                }
+            }
+        },
+    )
+    entry = _state_dependency_entry()
+
+    selected, decisions = route_registry_entries(
+        {"next_dependency_precondition_call": entry},
+        "turn_on_wifi_low_battery_mode",
+        available_base_tools={"set_low_battery_mode_status"},
+    )
+
+    assert [item.tool.spec.tool_name for item in selected] == [
+        "next_dependency_precondition_call"
+    ]
+    assert decisions["next_dependency_precondition_call"].visible
+    assert (
+        decisions["next_dependency_precondition_call"].reason
+        == "diagnostic_force_overrode_adoption_risk"
+    )
