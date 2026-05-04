@@ -42,3 +42,21 @@
 - V2.0 cluster artifact: `artifacts/summaries/v2_0_shortfall_clusters/latest_shortfall_clusters.json`
 - V2.0 cluster decision: `candidate found`
 - V2.0 next step: build and run discovery-60 with generation ON in a copied candidate registry.
+
+## V2.0 Discovery-60 Status
+- Date: `2026-05-04T08:41:14.546936`
+- Last completed V2.0 step: `discovery_60_generation_on` and `candidate_triage`
+- V2.0 discovery run: `outputs/v2_0_discovery60_20260504_081357/mechanism_40_20260504_081640`
+- V2.0 discovery dashboards: `http://127.0.0.1:5520/outputs/v2_0_discovery60_20260504_081357/mechanism_40_20260504_081640/dashboard/index.html` and `http://127.0.0.1:5520/outputs/v2_0_discovery60_20260504_081357/mechanism_40_20260504_081640/dashboard/task_focus.html`
+- V2.0 candidate registry: `artifacts/registry_candidates/v2_0_discovery60_20260504_081357/registry_manifest.json`
+- Frozen best3 registry modified: `no`
+- Candidate registry restored after failed protocol gate: `yes`
+- Discovery outcome delta: `0.0015`
+- Discovery canonical/reference delta: `0.0289`
+- Discovery exact successes: `control=4`, `SAGE=2`
+- Discovery tool birth: `attempts=8`, `accepted=['next_dependency_precondition_call']`
+- Accepted-but-uncalled: `['next_dependency_precondition_call']`
+- Runtime exceptions: `0`
+- Helper side-effect incidents: `0`
+- V2.0 triage decision: `routing repair needed`
+- V2.0 next step: repair dependency-helper routing/affordance and grading-accounting metadata, then rerun a focused fair-chance diagnostic before confirmation-60.

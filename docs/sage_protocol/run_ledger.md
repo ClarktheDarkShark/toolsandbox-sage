@@ -365,3 +365,15 @@
   - Frozen best3 registry untouched: `artifacts/registry_frozen_best3_claim/registry_manifest.json`.
   - Decision: `candidate found`.
   - Next action: run V2.0 discovery-60 with generation ON using a copied candidate registry.
+
+- `V2.0 discovery-60 and candidate triage` completed.
+  - Date: `2026-05-04T08:41:14.547747`
+  - Run: `outputs/v2_0_discovery60_20260504_081357/mechanism_40_20260504_081640`
+  - Dashboards: `http://127.0.0.1:5520/outputs/v2_0_discovery60_20260504_081357/mechanism_40_20260504_081640/dashboard/index.html` and `http://127.0.0.1:5520/outputs/v2_0_discovery60_20260504_081357/mechanism_40_20260504_081640/dashboard/task_focus.html`
+  - Cohort quality: `pass`; distinct families `27`; no-current-helper-fit share `0.31666666666666665`.
+  - Control cache: `fresh`; cached `0`; fresh `60`; collected controls `60`.
+  - Metrics: outcome delta `0.0015`; canonical delta `0.0289`; exact `control=4` -> `SAGE=2`; runtime exceptions `0`.
+  - Tool birth: `8` attempts; accepted `['next_dependency_precondition_call']`; accepted-but-uncalled `['next_dependency_precondition_call']`.
+  - Candidate triage: no candidate advanced to confirmation; `next_dependency_precondition_call` is diagnostic only because called count was 0.
+  - Reports: `docs/sage_protocol/v2_0_discovery60_report.md`, `docs/sage_protocol/v2_0_candidate_triage_report.md`, `docs/sage_protocol/v2_0_confirmation60_report.md`.
+  - Decision: `routing repair needed`.
