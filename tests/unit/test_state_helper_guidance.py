@@ -9,6 +9,7 @@ from sage_ts.generation.tool_spec import (
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.runtime.toolsandbox_integration import _google_docstring
 from sage_ts.validation.sandbox_validator import ValidationResult
+from tool_sandbox.common.tool_conversion import convert_to_openai_tool
 
 
 def _state_helper_entry() -> RegistryEntry:
@@ -127,7 +128,55 @@ def test_generic_state_precondition_docstring_explains_affordance() -> None:
     assert "execute the returned original ToolSandbox tool" in docstring
     assert "does not perform the side effect" in docstring
     assert "canonical-route impact is reported separately" in docstring
-    assert "state expected visible keys: blocker_active, service_ready" in docstring
+    assert "Expected visible keys: blocker_active, service_ready." in docstring
+
+
+def test_generic_state_precondition_affordance_reaches_openai_schema() -> None:
+    base = _state_helper_entry()
+    entry = RegistryEntry.accepted(
+        GeneratedTool(
+            spec=ToolSpec(
+                tool_name="next_dependency_precondition_call",
+                family=ToolFamily.STATE_PRECONDITION_HELPER,
+                description="Plan the next visible dependency precondition call.",
+                inputs=(ToolInput("state", "dict", "Visible state."),),
+                output_annotation="dict",
+                positive_triggers=("service not ready with active blocker",),
+                negative_triggers=("already ready state", "insufficient state"),
+                generalization_rationale=(
+                    "Service dependency planning recurs across state tasks."
+                ),
+                inadequacy_evidence=StructuredInadequacyEvidence(
+                    summary="Agents miss precondition order.",
+                    signals=("state_precondition",),
+                ),
+            ),
+            code=(
+                "def next_dependency_precondition_call(state: dict) -> dict:\n"
+                "    return {'should_call': bool(state['service_ready']) and bool(state['blocker_active'])}\n"
+            ),
+        ),
+        base.validation,
+        birth_scenario="turn_on_wifi_low_battery_mode",
+    )
+
+    def fn(state: dict[str, object]) -> dict[str, object]:
+        return {}
+
+    fn.__name__ = "next_dependency_precondition_call"
+    fn.__doc__ = _google_docstring(entry)
+    fn.__annotations__ = {"state": dict, "return": dict}
+
+    schema = convert_to_openai_tool(fn, name="next_dependency_precondition_call")[
+        "function"
+    ]
+
+    assert "blocked by a visible service" in schema["description"]
+    assert "execute the returned original ToolSandbox tool" in schema["description"]
+    assert (
+        "Expected visible keys: blocker_active, service_ready."
+        in schema["parameters"]["properties"]["state"]["description"]
+    )
 
 
 def test_generic_downstream_helper_docstring_uses_actual_output_schema() -> None:

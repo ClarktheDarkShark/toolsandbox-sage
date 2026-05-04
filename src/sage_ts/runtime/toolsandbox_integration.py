@@ -79,9 +79,9 @@ def _call_path_note(spec: ToolSpec) -> list[str]:
     return lines
 
 
-def _dict_input_key_notes(entry: RegistryEntry) -> list[str]:
-    """Expose literal dict keys used by generated code as affordance hints."""
-    lines: list[str] = []
+def _dict_input_keys(entry: RegistryEntry) -> dict[str, tuple[str, ...]]:
+    """Return literal dict keys used by generated code as affordance hints."""
+    keys_by_input: dict[str, tuple[str, ...]] = {}
     code = entry.tool.code
     for item in entry.tool.spec.inputs:
         if item.annotation != "dict":
@@ -89,10 +89,8 @@ def _dict_input_key_notes(entry: RegistryEntry) -> list[str]:
         pattern = rf"{re.escape(item.name)}\[['\"]([^'\"]+)['\"]\]"
         keys = sorted(set(re.findall(pattern, code)))
         if keys:
-            lines.append(f"    {item.name} expected visible keys: {', '.join(keys)}.")
-    if lines:
-        return ["", "Generated dict input keys:", *lines]
-    return []
+            keys_by_input[item.name] = tuple(keys)
+    return keys_by_input
 
 
 def _google_docstring(entry: RegistryEntry) -> str:
@@ -107,10 +105,25 @@ def _google_docstring(entry: RegistryEntry) -> str:
             "the returned original ToolSandbox tool; do not treat the helper "
             "itself as completing the task."
         )
+    if spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
+        description = (
+            f"{description} Call this helper when the requested action appears "
+            "blocked by a visible service, device-state, or dependency "
+            "precondition. If it returns should_call=True, execute the returned "
+            "original ToolSandbox tool name with the returned arguments next. "
+            "The helper plans the next precondition call; it does not perform "
+            "the side effect or complete the task by itself."
+        )
+    dict_input_keys = _dict_input_keys(entry)
     lines = [description, "", "Args:"]
     for item in spec.inputs:
-        lines.append(f"    {item.name}: {item.description}")
-    lines.extend(_dict_input_key_notes(entry))
+        description = item.description
+        if item.name in dict_input_keys:
+            description = (
+                f"{description} Expected visible keys: "
+                f"{', '.join(dict_input_keys[item.name])}."
+            )
+        lines.append(f"    {item.name}: {description}")
     lines.extend(["", "Returns:", f"    {spec.output_annotation}"])
     if spec.positive_triggers:
         lines.extend(["", "Use when:"])
