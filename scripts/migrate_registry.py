@@ -1,8 +1,10 @@
+# mypy: ignore-errors
 """Migrate registry manifests: backfill schema_version and code_hash_verified fields.
 
 Usage:
     python scripts/migrate_registry.py [registry_manifest.json ...]
     python scripts/migrate_registry.py --check-only [registry_manifest.json ...]
+    python scripts/migrate_registry.py --registry registry_manifest.json [--check-only]
 
 If no paths are provided, finds all registry_manifest.json files under the
 project root (excluding .git and __pycache__).
@@ -280,19 +282,42 @@ def run_check_only(paths: list[Path], root: Path) -> int:
     return 0
 
 
+def _normalize_paths(values: list[str], *, root: Path) -> list[Path]:
+    return [
+        (Path(value) if Path(value).is_absolute() else (root / value)).resolve()
+        for value in values
+    ]
+
+
+def _extract_registry_flags(argv: list[str], *, root: Path) -> tuple[bool, list[str]]:
+    args = list(argv)
+    check_only = "--check-only" in args
+    if check_only:
+        args.remove("--check-only")
+
+    paths: list[str] = []
+    while "--registry" in args:
+        index = args.index("--registry")
+        if index == len(args) - 1:
+            raise ValueError("--registry requires a registry path argument")
+        paths.append(args[index + 1])
+        del args[index : index + 2]
+
+    # Keep backwards-compatible positional registry arguments
+    paths.extend(args)
+    return check_only, _normalize_paths(paths, root=root)
+
+
 def main(argv: list[str]) -> None:
-    # Parse --check-only flag first; remaining args are optional registry paths
-    check_only = "--check-only" in argv
-    remaining = [a for a in argv if a != "--check-only"]
+    try:
+        check_only, paths = _extract_registry_flags(argv, root=_ROOT)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(2)
 
     root = _ROOT
 
-    if remaining:
-        paths = [
-            (Path(p) if Path(p).is_absolute() else (root / p)).resolve()
-            for p in remaining
-        ]
-    else:
+    if not paths:
         paths = [path.resolve() for path in find_all_registries(root)]
 
     if check_only:

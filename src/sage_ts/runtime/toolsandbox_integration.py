@@ -17,6 +17,11 @@ from sage_ts.evaluation.task_strata import (
 from sage_ts.generation.tool_spec import ToolFamily, ToolSpec
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
+from sage_ts.runtime.routing_scorer import (
+    DEFAULT_MAX_RUNTIME_BUNDLE_SIZE,
+    RuntimeRoutingDecision,
+    score_registry_entry_for_scenario,
+)
 from sage_ts.validation.schema_check import compile_generated_tool
 from tool_sandbox.common import tool_conversion
 from tool_sandbox.common.execution_context import ExecutionContext, RoleType
@@ -102,25 +107,27 @@ def _google_docstring(entry: RegistryEntry) -> str:
             [
                 "",
                 "Usage:",
-                "    Call this helper as the FIRST step once you have the reminder",
-                " content and time info — before calling datetime_info_to_timestamp",
-                " or add_reminder directly.",
+                "    Call this helper as the LAST prep step immediately before",
+                " add_reminder once reminder content and time are already resolved,",
+                " or once relative time fields are complete.",
                 "    Call path: prepare_reminder_creation_args(...) →",
                 " add_reminder(**result['add_reminder_kwargs'])",
-                "    Do NOT call datetime_info_to_timestamp then add_reminder",
-                " manually; use this helper instead to prepare the kwargs.",
+                "    NEVER call datetime_info_to_timestamp and this helper in the",
+                " same turn. If you need a timestamp first, call",
+                " datetime_info_to_timestamp, wait for the result, then call this",
+                " helper in a later turn.",
                 "    If you have already called datetime_info_to_timestamp and have",
                 " a timestamp, pass it as resolved_reminder_timestamp and set",
                 " time_fields_complete=False.",
                 "    For plain relative times ('tomorrow at 5 PM', 'next Friday'),",
                 " set time_fields_complete=True and supply day_offset, hour, minute,",
-                " local_utc_offset_hours. Use 0.0 for UTC offset when unknown.",
-                "    Do not ask the user for timezone confirmation when current",
-                " timestamp context is available; proceed with offset=0.0.",
+                " local_utc_offset_hours only when that offset is explicitly known.",
                 "    Set location_required=True only when the user explicitly requires",
                 " a location on the reminder. A mentioned location is not required.",
                 "    If location_available=False or lookup failed and location is not",
                 " required, set latitude=0.0, longitude=0.0 and proceed without coords.",
+                "    If the user is still choosing or refining the location, set",
+                " location_refinement_in_progress=True so the helper abstains.",
                 "    If result['should_call_add_reminder'] is True, immediately call",
                 " add_reminder(**result['add_reminder_kwargs']) unchanged.",
                 "    If result['should_call_add_reminder'] is False, check",
@@ -213,13 +220,18 @@ def inject_registry_tools_into_context(
 ) -> list[str]:
     """Inject accepted generated helpers into a ToolSandbox execution context."""
     injected: list[str] = []
+    seen_tool_names: set[str] = set()
     compiled_by_name: dict[str, Callable[..., Any]] = {}
     for entry in entries:
         tool_name = entry.tool.spec.tool_name
-        if tool_name in context.name_to_tool:
-            raise ValueError(f"tool name already exists in ToolSandbox: {tool_name}")
-        compiled_tool = _compile_toolsandbox_tool(entry, on_reuse)
+        if tool_name in seen_tool_names or tool_name in context.name_to_tool:
+            continue
+        try:
+            compiled_tool = _compile_toolsandbox_tool(entry, on_reuse)
+        except Exception:
+            continue
         compiled_by_name[tool_name] = compiled_tool
+        seen_tool_names.add(tool_name)
         console_locals = cast(
             MutableMapping[str, Any],
             context.interactive_console.locals,
@@ -285,6 +297,10 @@ def registry_entry_visibility_reason(
             return True, "global_safe_explicit"
         return False, "missing_scenario_name_suppressed"
 
+    generic_route = score_registry_entry_for_scenario(entry, scenario_name)
+    if generic_route.status in {"shown", "hidden"}:
+        return generic_route.visible, generic_route.reason
+
     name = scenario_name.lower()
     tool_name = entry.tool.spec.tool_name
     scenario_strata = set(classify_task_strata(name))
@@ -310,6 +326,26 @@ def registry_entry_visibility_reason(
         if name.startswith("search_message_with_recency_") and bounded_recency:
             return True, "recency_bounds_search_task"
         return False, "recency_bounds_requires_bounded_recency_task"
+
+    if tool_name == "resolve_search_window_or_bounds":
+        if is_insufficient:
+            return False, "search_window_bounds_suppressed_for_insufficient_information"
+        if name.startswith("search_reminder_with_creation_recency_") and any(
+            token in name for token in ("yesterday", "today")
+        ):
+            return True, "search_window_bounds_creation_recency_task"
+        if name.startswith("search_reminder_with_recency_") and any(
+            token in name for token in ("yesterday", "today", "later_today", "upcoming")
+        ):
+            return True, "search_window_bounds_due_recency_task"
+        if name.startswith(
+            (
+                "search_message_with_recency_latest",
+                "search_message_with_recency_oldest",
+            )
+        ):
+            return True, "search_window_bounds_message_recency_task"
+        return False, "search_window_bounds_requires_bounded_search_task"
 
     if tool_name == "days_between_timestamps":
         if name.startswith("find_days_till_holiday"):
@@ -349,13 +385,37 @@ def registry_entry_visibility_reason(
         )
         if any(token in name for token in suppress_signals):
             return False, "reminder_creation_args_suppressed_non_creation_task"
+        if (
+            name.startswith("add_reminder_content_and_week_delta_and_time")
+            and "_location" not in name
+        ):
+            return (
+                False,
+                "reminder_creation_args_suppressed_relative_no_location_lane",
+            )
         if any(token in name for token in creation_signals):
-            return True, "reminder_creation_args_reminder_creation_task"
+            return True, "reminder_creation_args_narrow_creation_task"
         # No creation signal detected — hide (safe default).
         return False, "reminder_creation_args_no_creation_signal"
 
     if tool_name == "message_search_time_window":
-        return False, "message_search_window_suppressed_after_focused_regression"
+        if is_insufficient:
+            return (
+                False,
+                "message_search_window_suppressed_for_insufficient_information",
+            )
+        if name.startswith(
+            (
+                "modify_contact_with_message_recency",
+                "search_message_with_recency_latest",
+                "search_message_with_recency_oldest",
+            )
+        ):
+            return True, "message_search_window_message_search_time_window_flow"
+        return (
+            False,
+            "message_search_window_requires_explicit_message_recency_task",
+        )
 
     if tool_name == "message_search_args_for_contact":
         return (
@@ -440,6 +500,45 @@ def registry_entry_visibility_reason(
     return False, "state_helper_requires_direct_service_state_task"
 
 
+def route_registry_entries(
+    entries: dict[str, RegistryEntry],
+    scenario_name: str | None,
+    *,
+    max_bundle_size: int = DEFAULT_MAX_RUNTIME_BUNDLE_SIZE,
+) -> tuple[list[RegistryEntry], dict[str, RuntimeRoutingDecision]]:
+    """Select a bounded runtime helper bundle and explain each routing decision."""
+    decisions: dict[str, RuntimeRoutingDecision] = {}
+    visible: list[tuple[int, str, RegistryEntry]] = []
+    for tool_name, entry in sorted(entries.items()):
+        generic = score_registry_entry_for_scenario(entry, scenario_name)
+        is_visible, reason = registry_entry_visibility_reason(entry, scenario_name)
+        status = "shown" if is_visible else "hidden"
+        score = generic.score
+        if is_visible:
+            visible.append((score, tool_name, entry))
+        decisions[tool_name] = RuntimeRoutingDecision(
+            tool_name=tool_name,
+            visible=is_visible,
+            status=status,
+            reason=reason,
+            score=score,
+            matched_positive_triggers=generic.matched_positive_triggers,
+            matched_negative_triggers=generic.matched_negative_triggers,
+            matched_task_families=generic.matched_task_families,
+        )
+    visible.sort(key=lambda item: (-item[0], item[1]))
+    selected = visible[:max_bundle_size]
+    for score, tool_name, _entry in visible[max_bundle_size:]:
+        decisions[tool_name] = RuntimeRoutingDecision(
+            tool_name=tool_name,
+            visible=False,
+            status="deprioritized",
+            reason="blocked_by_context_budget",
+            score=score,
+        )
+    return [entry for _score, _tool_name, entry in selected], decisions
+
+
 def retained_tool_visibility_policy_digest() -> str:
     """Return a digest that changes when retained-tool routing policy changes."""
     payload = {
@@ -520,11 +619,10 @@ def with_registry_tools(
 ) -> Scenario:
     """Return a scenario copy whose starting context includes registry tools."""
     scenario_copy = copy.deepcopy(scenario)
-    entries = [
-        entry
-        for entry in store.load_entries().values()
-        if registry_entry_matches_scenario(entry, scenario_name)
-    ]
+    entries, _decisions = route_registry_entries(
+        store.load_entries(),
+        scenario_name,
+    )
     inject_registry_tools_into_context(
         scenario_copy.starting_context,
         entries,

@@ -72,7 +72,7 @@ def _sandbox_rows(execution_context: ExecutionContext) -> list[dict[str, Any]]:
         get_all_history_snapshots=True,
         drop_sandbox_message_index=False,
     ).to_dicts()
-    return cast(list[dict[str, Any]], rows)
+    return rows
 
 
 def _agent_messages(execution_context: ExecutionContext) -> list[str]:
@@ -82,7 +82,7 @@ def _agent_messages(execution_context: ExecutionContext) -> list[str]:
             content = _as_text(row.get("content")).strip()
             if content:
                 messages.append(content)
-    return messages
+    return [] if not messages else [messages[-1]]
 
 
 def _parse_tool_trace_value(tool_trace: Any) -> list[dict[str, Any]]:

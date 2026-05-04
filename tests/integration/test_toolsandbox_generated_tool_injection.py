@@ -238,6 +238,95 @@ def recency_to_timestamp_bounds(recency_label: str, current_timestamp: float) ->
     return store
 
 
+def _registry_with_resolve_search_window(tmp_path: Path) -> RegistryStore:
+    spec = ToolSpec(
+        tool_name="resolve_search_window_or_bounds",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description="Resolve reminder/message search windows into search kwargs.",
+        inputs=(
+            ToolInput("current_timestamp", "float", "Current Unix timestamp."),
+            ToolInput("phrase", "str", "Natural time phrase."),
+            ToolInput("target_domain", "str", "reminder or message."),
+            ToolInput(
+                "timestamp_intent", "str", "creation, reminder, or message_creation."
+            ),
+            ToolInput("direction", "str", "Normalized direction."),
+        ),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "target_tool_name": {"type": "string"},
+                "search_kwargs": {"type": "object"},
+                "should_call_search": {"type": "boolean"},
+            },
+        },
+        generalization_rationale="Search tasks need safe bounded kwargs before the original search call.",
+        inadequacy_evidence="The base search tools require explicit criteria.",
+    )
+    code = """
+def resolve_search_window_or_bounds(
+    current_timestamp: float,
+    phrase: str,
+    target_domain: str,
+    timestamp_intent: str,
+    direction: str,
+) -> dict:
+    if current_timestamp <= 0:
+        return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False}
+    if target_domain == "message":
+        return {
+            "target_tool_name": "search_messages",
+            "search_kwargs": {"creation_timestamp_upperbound": float(current_timestamp)},
+            "should_call_search": True,
+        }
+    return {
+        "target_tool_name": "search_reminder",
+        "search_kwargs": {"creation_timestamp_upperbound": float(current_timestamp)},
+        "should_call_search": True,
+    }
+"""
+    tool = GeneratedTool(spec=spec, code=code)
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {
+                    "current_timestamp": 1000.0,
+                    "phrase": "latest",
+                    "target_domain": "message",
+                    "timestamp_intent": "message_creation",
+                    "direction": "latest",
+                },
+                {
+                    "target_tool_name": "search_messages",
+                    "search_kwargs": {"creation_timestamp_upperbound": 1000.0},
+                    "should_call_search": True,
+                },
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 0.0,
+                    "phrase": "latest",
+                    "target_domain": "message",
+                    "timestamp_intent": "message_creation",
+                    "direction": "latest",
+                },
+                {
+                    "target_tool_name": "",
+                    "search_kwargs": {},
+                    "should_call_search": False,
+                },
+                held_out=True,
+            ),
+        ),
+    )
+    assert validation.accepted
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    return store
+
+
 def _registry_with_latest_selector(tmp_path: Path) -> RegistryStore:
     spec = ToolSpec(
         tool_name="select_latest_record_by_timestamp",
@@ -585,6 +674,12 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
                 "helper to abstain. When location is not required, a failed "
                 "lookup means the helper proceeds without coordinates.",
             ),
+            ToolInput(
+                "location_refinement_in_progress",
+                "bool",
+                "True when the user is still choosing or refining the location "
+                "and the reminder should not yet be created.",
+            ),
         ),
         output_annotation="dict",
         output_schema={
@@ -630,7 +725,9 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
             "time as local device time and do not ask the user for timezone or "
             "UTC offset again when the current ToolSandbox timestamp context "
             "is already sufficient. If optional location lookup fails or "
-            "location is not required, proceed without coordinates. If "
+            "location is not required, proceed without coordinates. If the user "
+            "is still refining the location or only partial coordinates are "
+            "available, abstain instead of creating the reminder. If "
             "should_call_add_reminder=True, call add_reminder with "
             "add_reminder_kwargs unchanged."
         ),
@@ -647,7 +744,7 @@ def _registry_with_reminder_creation_args(tmp_path: Path) -> RegistryStore:
         ),
     )
     code = """
-def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: float, current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float, time_fields_complete: bool, location_required: bool, location_available: bool, latitude: float, longitude: float, location_lookup_failed: bool) -> dict:
+def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: float, current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float, time_fields_complete: bool, location_required: bool, location_available: bool, latitude: float, longitude: float, location_lookup_failed: bool, location_refinement_in_progress: bool) -> dict:
     timestamp_source = "none"
     if float(resolved_reminder_timestamp) > 0:
         reminder_timestamp = float(resolved_reminder_timestamp)
@@ -680,15 +777,34 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
             + int(minute) * 60.0
         )
         timestamp_source = "relative_fields"
-    coords_valid = bool(location_available) and not (
-        float(latitude) == 0.0 and float(longitude) == 0.0
-    )
+    if bool(location_refinement_in_progress):
+        return {
+            "add_reminder_kwargs": {},
+            "should_call_add_reminder": False,
+            "should_retry_location_lookup": False,
+            "location_status": "refining",
+            "abstain_reason": "location_still_being_refined",
+            "timestamp_source": timestamp_source,
+        }
+    lat_zero = float(latitude) == 0.0
+    lon_zero = float(longitude) == 0.0
+    partial_coords = bool(location_available) and (lat_zero != lon_zero)
+    if partial_coords:
+        return {
+            "add_reminder_kwargs": {},
+            "should_call_add_reminder": False,
+            "should_retry_location_lookup": False,
+            "location_status": "partial",
+            "abstain_reason": "partial_location_coordinates",
+            "timestamp_source": timestamp_source,
+        }
+    coords_valid = bool(location_available) and not (lat_zero and lon_zero)
     if coords_valid:
         lat_out = float(latitude)
         lon_out = float(longitude)
         location_status = "provided"
         should_retry = False
-    elif bool(location_required) and bool(location_lookup_failed):
+    elif bool(location_required) and not bool(location_available):
         return {
             "add_reminder_kwargs": {},
             "should_call_add_reminder": False,
@@ -697,11 +813,6 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
             "abstain_reason": "required_location_unresolved",
             "timestamp_source": timestamp_source,
         }
-    elif bool(location_required) and not bool(location_available):
-        lat_out = None
-        lon_out = None
-        location_status = "retry"
-        should_retry = True
     else:
         lat_out = None
         lon_out = None
@@ -741,6 +852,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "latitude": 0.0,
                     "longitude": 0.0,
                     "location_lookup_failed": False,
+                    "location_refinement_in_progress": False,
                 },
                 {
                     "add_reminder_kwargs": {
@@ -772,6 +884,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "latitude": 0.0,
                     "longitude": 0.0,
                     "location_lookup_failed": False,
+                    "location_refinement_in_progress": False,
                 },
                 {
                     "add_reminder_kwargs": {
@@ -804,6 +917,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "latitude": 37.3237926356735,
                     "longitude": -122.03961770355414,
                     "location_lookup_failed": False,
+                    "location_refinement_in_progress": False,
                 },
                 {
                     "add_reminder_kwargs": {
@@ -835,6 +949,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "latitude": 0.0,
                     "longitude": 0.0,
                     "location_lookup_failed": True,
+                    "location_refinement_in_progress": False,
                 },
                 {
                     "add_reminder_kwargs": {
@@ -866,6 +981,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "latitude": 0.0,
                     "longitude": 0.0,
                     "location_lookup_failed": True,
+                    "location_refinement_in_progress": False,
                 },
                 {
                     "add_reminder_kwargs": {},
@@ -893,6 +1009,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "latitude": 0.0,
                     "longitude": 0.0,
                     "location_lookup_failed": False,
+                    "location_refinement_in_progress": False,
                 },
                 {
                     "add_reminder_kwargs": {},
@@ -920,6 +1037,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                     "latitude": 0.0,
                     "longitude": 0.0,
                     "location_lookup_failed": False,
+                    "location_refinement_in_progress": False,
                 },
                 {
                     "add_reminder_kwargs": {
@@ -1233,6 +1351,30 @@ def test_registry_tools_are_available_to_toolsandbox_context(tmp_path: Path) -> 
     assert parameters["required"] == ["label"]
 
 
+def test_registry_tool_injection_skips_name_collision(tmp_path: Path) -> None:
+    store = _registry_with_canonicalizer(tmp_path)
+    context = ExecutionContext(tool_allow_list=["end_conversation"])
+    existing = context.name_to_tool.setdefault(
+        "canonicalize_connectivity_label",
+        lambda label: f"preexisting:{label}",
+    )
+    context.interactive_console.locals["canonicalize_connectivity_label"] = existing
+    enhanced = Scenario(starting_context=context)
+
+    inject_registry_tools_into_context(
+        enhanced.starting_context,
+        store.load_entries().values(),
+    )
+
+    assert (
+        enhanced.starting_context.name_to_tool["canonicalize_connectivity_label"](
+            "Wi-Fi"
+        )
+        == "preexisting:Wi-Fi"
+    )
+    assert enhanced.starting_context.tool_allow_list == ["end_conversation"]
+
+
 def test_state_helpers_are_only_exposed_on_relevant_state_scenarios(
     tmp_path: Path,
 ) -> None:
@@ -1422,7 +1564,7 @@ def test_timestamp_extreme_selector_exposed_on_message_ranking_scenarios(
     assert properties["records"]["items"] == {}
 
 
-def test_message_search_window_only_exposed_on_contact_message_tasks(
+def test_message_search_window_available_on_message_recency_flows(
     tmp_path: Path,
 ) -> None:
     store = _registry_with_message_search_window(tmp_path)
@@ -1443,12 +1585,12 @@ def test_message_search_window_only_exposed_on_contact_message_tasks(
     unrelated = with_registry_tools(
         scenario,
         store,
-        scenario_name="remove_contact_by_phone_10_distraction_tools",
+        scenario_name="find_stock_symbol_with_company_name_3_distraction_tools",
     )
 
     tool_name = "message_search_time_window"
-    assert tool_name not in modify_contact.starting_context.name_to_tool
-    assert tool_name not in raw_latest_message.starting_context.name_to_tool
+    assert tool_name in modify_contact.starting_context.name_to_tool
+    assert tool_name in raw_latest_message.starting_context.name_to_tool
     assert tool_name not in unrelated.starting_context.name_to_tool
 
     compiled = compile_toolsandbox_tool(next(iter(store.load_entries().values())))
@@ -1471,10 +1613,15 @@ def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
         store,
         scenario_name="search_reminder_with_creation_recency_yesterday",
     )
-    no_location = with_registry_tools(
+    suppressed_relative_no_location = with_registry_tools(
         scenario,
         store,
         scenario_name="add_reminder_content_and_week_delta_and_time_3_distraction_tools",
+    )
+    absolute_date_time = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="add_reminder_content_and_date_and_time_3_distraction_tools",
     )
     insufficient = with_registry_tools(
         scenario,
@@ -1505,13 +1652,16 @@ def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
 
     tool_name = "prepare_reminder_creation_args"
     assert tool_name not in unrelated_search.starting_context.name_to_tool
-    assert tool_name in no_location.starting_context.name_to_tool
+    assert (
+        tool_name not in suppressed_relative_no_location.starting_context.name_to_tool
+    )
+    assert tool_name in absolute_date_time.starting_context.name_to_tool
     assert tool_name not in insufficient.starting_context.name_to_tool
     assert tool_name not in modify.starting_context.name_to_tool
     assert tool_name in service_precondition.starting_context.name_to_tool
     assert tool_name in applicable.starting_context.name_to_tool
     reminder_helper = applicable.starting_context.name_to_tool[tool_name]
-    assert "FIRST step" in (reminder_helper.__doc__ or "")
+    assert "LAST prep step immediately before" in (reminder_helper.__doc__ or "")
     assert "add_reminder_kwargs" in (reminder_helper.__doc__ or "")
     assert "timezone" in (reminder_helper.__doc__ or "")
     assert "tomorrow at 5 PM" in (reminder_helper.__doc__ or "")
@@ -1561,9 +1711,24 @@ def test_reminder_creation_args_routing_shows_on_add_reminder_scenario(
     result = with_registry_tools(
         scenario,
         store,
-        scenario_name="add_reminder_content_and_time_3_distraction_tools",
+        scenario_name="add_reminder_content_and_date_and_time_3_distraction_tools",
     )
     assert "prepare_reminder_creation_args" in result.starting_context.name_to_tool
+
+
+def test_reminder_creation_args_routing_hides_on_relative_no_location_scenario(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_reminder_creation_args(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+    result = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="add_reminder_content_and_week_delta_and_time_3_distraction_tools",
+    )
+    assert "prepare_reminder_creation_args" not in result.starting_context.name_to_tool
 
 
 def test_reminder_creation_args_routing_shows_on_create_reminder_scenario(
@@ -1602,6 +1767,7 @@ def test_reminder_creation_args_optional_mentioned_location_not_required(
         latitude=0.0,
         longitude=0.0,
         location_lookup_failed=False,
+        location_refinement_in_progress=False,
     )
     assert result["should_call_add_reminder"] is True
     assert result["location_status"] == "omitted"
@@ -1629,6 +1795,7 @@ def test_reminder_creation_args_optional_failed_location_proceeds_without_coords
         latitude=0.0,
         longitude=0.0,
         location_lookup_failed=True,
+        location_refinement_in_progress=False,
     )
     assert result["should_call_add_reminder"] is True
     assert result["location_status"] == "omitted"
@@ -1656,6 +1823,7 @@ def test_reminder_creation_args_required_unresolved_definitively_abstains(
         latitude=0.0,
         longitude=0.0,
         location_lookup_failed=True,
+        location_refinement_in_progress=False,
     )
     assert result["should_call_add_reminder"] is False
     assert result["abstain_reason"] == "required_location_unresolved"
@@ -1663,12 +1831,11 @@ def test_reminder_creation_args_required_unresolved_definitively_abstains(
     assert result["should_retry_location_lookup"] is False
 
 
-def test_reminder_creation_args_required_pending_signals_retry_and_proceeds(
+def test_reminder_creation_args_required_pending_abstains(
     tmp_path: Path,
 ) -> None:
     """location_available=False, location_required=True, location_lookup_failed=False
-    -> should_call_add_reminder=True, should_retry_location_lookup=True,
-    location_status="retry"."""
+    -> should_call_add_reminder=False, abstain_reason="required_location_unresolved"."""
     store = _registry_with_reminder_creation_args(tmp_path)
     fn = compile_toolsandbox_tool(next(iter(store.load_entries().values())))
     result = fn(
@@ -1685,10 +1852,38 @@ def test_reminder_creation_args_required_pending_signals_retry_and_proceeds(
         latitude=0.0,
         longitude=0.0,
         location_lookup_failed=False,
+        location_refinement_in_progress=False,
     )
-    assert result["should_call_add_reminder"] is True
-    assert result["should_retry_location_lookup"] is True
-    assert result["location_status"] == "retry"
+    assert result["should_call_add_reminder"] is False
+    assert result["should_retry_location_lookup"] is False
+    assert result["location_status"] == "required_but_missing"
+    assert result["abstain_reason"] == "required_location_unresolved"
+
+
+def test_reminder_creation_args_optional_location_refinement_abstains(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_reminder_creation_args(tmp_path)
+    fn = compile_toolsandbox_tool(next(iter(store.load_entries().values())))
+    result = fn(
+        content="Go to store",
+        resolved_reminder_timestamp=0.0,
+        current_timestamp=0.0,
+        day_offset=1,
+        hour=18,
+        minute=0,
+        local_utc_offset_hours=0.0,
+        time_fields_complete=True,
+        location_required=False,
+        location_available=False,
+        latitude=0.0,
+        longitude=0.0,
+        location_lookup_failed=False,
+        location_refinement_in_progress=True,
+    )
+    assert result["should_call_add_reminder"] is False
+    assert result["location_status"] == "refining"
+    assert result["abstain_reason"] == "location_still_being_refined"
 
 
 def test_timestamp_extreme_selector_hidden_on_insufficient_information_scenarios(
@@ -1764,6 +1959,42 @@ def test_recency_bounds_helper_only_exposed_on_creation_recency_tasks(
     tool_name = "recency_to_timestamp_bounds"
     assert tool_name not in due_recency.starting_context.name_to_tool
     assert tool_name in creation_recency.starting_context.name_to_tool
+    assert tool_name not in insufficient.starting_context.name_to_tool
+
+
+def test_resolve_search_window_helper_exposed_only_on_bounded_search_tasks(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_resolve_search_window(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    message_recency = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_message_with_recency_latest",
+    )
+    reminder_recency = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_reminder_with_creation_recency_yesterday",
+    )
+    reminder_creation = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="add_reminder_content_and_time",
+    )
+    insufficient = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="search_reminder_with_recency_upcoming_insufficient_information",
+    )
+
+    tool_name = "resolve_search_window_or_bounds"
+    assert tool_name in message_recency.starting_context.name_to_tool
+    assert tool_name in reminder_recency.starting_context.name_to_tool
+    assert tool_name not in reminder_creation.starting_context.name_to_tool
     assert tool_name not in insufficient.starting_context.name_to_tool
 
 

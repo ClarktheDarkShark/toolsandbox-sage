@@ -69,10 +69,14 @@ def test_raw_latest_message_matches_retrieval_window_and_selector() -> None:
     assert "record_filtering_ranking_latest_selection" in classify_task_strata(scenario)
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
     assert "message_search_time_window" in expected_helper_fit(scenario)
+    assert "resolve_search_window_or_bounds" in expected_helper_fit(scenario)
     assert "search_filter:select_record_by_timestamp_extreme" in (
         expected_birth_opportunities(scenario)
     )
     assert "derived_value:message_search_time_window" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "derived_value:resolve_search_window_or_bounds" in (
         expected_birth_opportunities(scenario)
     )
 
@@ -96,10 +100,14 @@ def test_oldest_message_matches_retrieval_window_and_selector() -> None:
 
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
     assert "message_search_time_window" in expected_helper_fit(scenario)
+    assert "resolve_search_window_or_bounds" in expected_helper_fit(scenario)
     assert "search_filter:select_record_by_timestamp_extreme" in (
         expected_birth_opportunities(scenario)
     )
     assert "derived_value:message_search_time_window" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "derived_value:resolve_search_window_or_bounds" in (
         expected_birth_opportunities(scenario)
     )
 
@@ -126,6 +134,21 @@ def test_recency_bounds_match_creation_recency_not_due_recency() -> None:
         "search_reminder_with_recency_yesterday"
     )
     assert "recency_to_timestamp_bounds" not in expected_helper_fit(
+        "search_reminder_with_creation_recency_yesterday_insufficient_information"
+    )
+
+
+def test_resolve_search_window_matches_reminder_and_message_recency() -> None:
+    assert "resolve_search_window_or_bounds" in expected_helper_fit(
+        "search_reminder_with_creation_recency_yesterday"
+    )
+    assert "resolve_search_window_or_bounds" in expected_helper_fit(
+        "search_reminder_with_recency_upcoming"
+    )
+    assert "resolve_search_window_or_bounds" in expected_helper_fit(
+        "search_message_with_recency_latest"
+    )
+    assert "resolve_search_window_or_bounds" not in expected_helper_fit(
         "search_reminder_with_creation_recency_yesterday_insufficient_information"
     )
 
@@ -294,3 +317,44 @@ def test_cohort_policy_report_warns_when_helper_fit_is_too_sparse() -> None:
 
     assert report["expected_helper_fit_share"] < 0.5
     assert "low_expected_helper_fit_share" in report["warnings"]
+
+
+def test_cohort_policy_report_fails_near_duplicate_dominated_20() -> None:
+    repeated = [
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+        "add_reminder_content_and_week_delta_and_time_and_location_10_distraction_tools",
+    ]
+    diverse_fill = [f"uncovered_task_family_{index}" for index in range(17)]
+    scenarios = repeated + diverse_fill
+
+    report = cohort_policy_report(
+        scenarios,
+        categories_by_name={scenario: [] for scenario in scenarios},
+        generation_enabled=False,
+        registry_tool_count=0,
+    )
+
+    assert report["should_block_quality"] is True
+    assert (
+        "near_duplicate_family_variants_above_limit" in report["quality_gate_failures"]
+    )
+    assert report["decision_use"] == "suitable_for_early_value_only"
+
+
+def test_cohort_policy_report_fails_broad_known_lane_overrepresentation() -> None:
+    scenarios = [
+        f"search_reminder_with_creation_recency_yesterday_variant_{index}"
+        for index in range(17)
+    ] + [f"uncovered_task_family_{index}" for index in range(3)]
+
+    report = cohort_policy_report(
+        scenarios,
+        categories_by_name={scenario: [] for scenario in scenarios},
+        generation_enabled=False,
+        registry_tool_count=2,
+    )
+
+    assert report["should_block_quality"] is True
+    assert "weak_negative_no_helper_coverage" in report["quality_gate_failures"]
+    assert "known_helper_lane_overrepresented" in report["quality_gate_failures"]

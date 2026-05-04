@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
+from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate
+from sage_ts.adequacy.failure_memory import generation_failure_memory_context
 from sage_ts.adequacy.inadequacy_classifier import CapabilityObservation
+from sage_ts.evaluation.task_strata import base_task_family, expected_helper_fit
 from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import GeneratedTool
 from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
-from sage_ts.validation.sandbox_validator import validate_generated_tool
+from sage_ts.validation.sandbox_validator import (
+    ValidationResult,
+    validate_generated_tool,
+)
 
 
 class GeneratedToolFactory(Protocol):
@@ -37,6 +43,28 @@ def suggested_tool_name(canonical_key: str) -> str | None:
     return suffix
 
 
+BROADER_HELPER_OVERLAPS = {
+    "derived_value:recency_timestamp_bounds": ("resolve_search_window_or_bounds",),
+    "derived_value:message_search_time_window": ("resolve_search_window_or_bounds",),
+}
+
+
+def existing_broader_helper(
+    canonical_key: str,
+    store: RegistryStore,
+) -> str | None:
+    """Return a proved retained helper that already covers this shortfall mechanism."""
+    for tool_name in BROADER_HELPER_OVERLAPS.get(canonical_key, ()):
+        entry = store.get(tool_name)
+        if (
+            entry is not None
+            and not entry.retired
+            and has_current_validation_proof(entry)
+        ):
+            return tool_name
+    return None
+
+
 @dataclass
 class OnlineBirthController:
     store: RegistryStore
@@ -45,9 +73,12 @@ class OnlineBirthController:
     recurrence_threshold: int = 2
     event_hook: CampaignEventHook | None = None
     counts: Counter[str] = field(default_factory=Counter)
+    scenarios_by_key: dict[str, set[str]] = field(default_factory=dict)
+    base_families_by_key: dict[str, set[str]] = field(default_factory=dict)
     generated_keys: set[str] = field(default_factory=set)
     rejected_counts: Counter[str] = field(default_factory=Counter)
     max_rejections_per_key: int = 2
+    failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
 
     def _event(self, event: str, payload: dict[str, Any]) -> None:
         if self.event_hook is not None:
@@ -92,12 +123,51 @@ class OnlineBirthController:
                 return True
         return False
 
+    def _cluster_context(self, observation: CapabilityObservation) -> dict[str, Any]:
+        scenarios = sorted(self.scenarios_by_key.get(observation.canonical_key, set()))
+        families = sorted(
+            self.base_families_by_key.get(observation.canonical_key, set())
+        )
+        non_diagnostic = (
+            len(scenarios) >= self.recurrence_threshold and len(families) >= 2
+        )
+        return {
+            "cluster_id": observation.canonical_key,
+            "failure_mechanism": observation.canonical_key,
+            "scenario_count": len(scenarios),
+            "scenarios": scenarios[:20],
+            "distinct_base_task_families": len(families),
+            "base_task_families": families[:20],
+            "near_duplicate_only": len(families) < 2,
+            "non_diagnostic_birth_allowed": non_diagnostic,
+            "repeated_failed_tool_calls": list(observation.repeated_failed_tool_calls),
+            "failed_tool_calls": list(observation.failed_tool_calls),
+            "inadequacy_signals": list(observation.inadequacy_signals),
+            "current_helper_fit": expected_helper_fit(observation.scenario_name),
+            "positive_applicability_example_count": sum(
+                1
+                for item in observation.validation_examples
+                if not item.negative_applicability
+            ),
+            "negative_applicability_example_count": sum(
+                1
+                for item in observation.validation_examples
+                if item.negative_applicability
+            ),
+        }
+
     def observe(self, observation: CapabilityObservation) -> None:
         append_jsonl(
             self.output_dir / "capability_observations.jsonl",
             observation.to_json(),
         )
         self.counts[observation.canonical_key] += 1
+        self.scenarios_by_key.setdefault(observation.canonical_key, set()).add(
+            observation.scenario_name
+        )
+        self.base_families_by_key.setdefault(observation.canonical_key, set()).add(
+            base_task_family(observation.scenario_name)
+        )
         # Log heuristic observations that cannot be transcript-verified.
         if observation.evidence_source == "heuristic":
             verified = self._check_heuristic_signal(observation)
@@ -173,6 +243,25 @@ class OnlineBirthController:
                     },
                 )
 
+        broader_tool_name = existing_broader_helper(
+            observation.canonical_key,
+            self.store,
+        )
+        if broader_tool_name is not None:
+            self.generated_keys.add(observation.canonical_key)
+            payload = {
+                "event": "tool_birth_skipped_existing_broader_helper",
+                "canonical_key": observation.canonical_key,
+                "tool_name": broader_tool_name,
+                "registry_dir": str(self.store.root),
+                "overlap_reason": (
+                    "proved retained helper already covers this shortfall mechanism"
+                ),
+            }
+            append_jsonl(self.output_dir / "sage_run_events.jsonl", payload)
+            self._event("tool_birth_skipped_existing_broader_helper", payload)
+            return
+
         request = ToolGenerationRequest(
             scenario_name=observation.scenario_name,
             observation=observation.observation,
@@ -187,6 +276,12 @@ class OnlineBirthController:
             ),
             suggested_tool_name=suggested_name,
             inadequacy_evidence=observation.to_inadequacy_evidence().to_json(),
+            failure_memory_context=generation_failure_memory_context(
+                self.failure_memory_path,
+                canonical_key=observation.canonical_key,
+                suggested_tool_name=suggested_name,
+            ),
+            shortfall_cluster_context=self._cluster_context(observation),
         )
         self._event(
             "tool_birth_started",
@@ -198,6 +293,22 @@ class OnlineBirthController:
         )
         try:
             tool = self.generator.generate(request)
+            cluster_context = self._cluster_context(observation)
+            if (
+                not cluster_context["non_diagnostic_birth_allowed"]
+                and not tool.spec.diagnostic_only
+            ):
+                tool = replace(
+                    tool,
+                    spec=replace(
+                        tool.spec,
+                        diagnostic_only=True,
+                        shortfall_cluster_evidence=(
+                            *tool.spec.shortfall_cluster_evidence,
+                            "diagnostic_only_near_duplicate_or_single_family_cluster",
+                        ),
+                    ),
+                )
             self._event(
                 "validation_started",
                 {
@@ -206,10 +317,20 @@ class OnlineBirthController:
                     "scenario": observation.scenario_name,
                 },
             )
-            validation = validate_generated_tool(
-                tool,
-                examples=observation.validation_examples,
+            memory_gate = evaluate_candidate_gate(
+                tool.spec,
+                failure_memory_path=self.failure_memory_path,
             )
+            if memory_gate.allowed:
+                validation = validate_generated_tool(
+                    tool,
+                    examples=observation.validation_examples,
+                )
+            else:
+                validation = ValidationResult(
+                    False,
+                    (memory_gate.reason,),
+                )
         except Exception as exc:
             append_jsonl(
                 self.output_dir / "tool_birth_events.jsonl",
@@ -237,6 +358,10 @@ class OnlineBirthController:
                 "canonical_key": observation.canonical_key,
                 "tool_name": tool.spec.tool_name,
                 "family": tool.spec.family.value,
+                "estimated_step_compression": tool.spec.estimated_step_compression,
+                "cross_task_applicability_count": tool.spec.cross_task_applicability_count,
+                "applicable_task_families": list(tool.spec.applicable_task_families),
+                "reason_tool_is_decisive": tool.spec.reason_tool_is_decisive,
                 "accepted": validation.accepted,
                 "errors": list(validation.errors),
                 "source_example_count": validation.source_example_count,
@@ -254,6 +379,9 @@ class OnlineBirthController:
                 "source_example_count": validation.source_example_count,
                 "held_out_check_count": validation.held_out_check_count,
                 "runtime_smoke_passed": validation.runtime_smoke_passed,
+                "estimated_step_compression": tool.spec.estimated_step_compression,
+                "cross_task_applicability_count": tool.spec.cross_task_applicability_count,
+                "applicable_task_families": list(tool.spec.applicable_task_families),
             },
         )
         if validation.accepted:

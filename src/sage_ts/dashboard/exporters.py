@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 import os
 import re
@@ -550,6 +551,76 @@ def _observed_lines_for_message(
     return deduped
 
 
+def _expected_check_fallback_lines(
+    expected_lines: list[Any],
+    messages: list[dict[str, Any]],
+    *,
+    limit: int = 2,
+) -> list[str]:
+    fragments: list[str] = []
+    for expected in expected_lines:
+        text = str(expected)
+        if not text:
+            continue
+        lowered = text.lower()
+        fragments.append(lowered)
+        if ":" in text:
+            after_colon = text.split(":", 1)[1].strip().lower()
+            if after_colon:
+                fragments.append(after_colon)
+        for quoted_text in re.findall(r"'([^']+)'", text):
+            if quoted_text.strip():
+                fragments.append(quoted_text.strip().lower())
+        match = re.match(r"([a-z_][a-z0-9_]*)\(", lowered)
+        if match:
+            fragments.append(f"{match.group(1)}(")
+    fragments = [
+        fragment
+        for i, fragment in enumerate(fragments)
+        if len(fragment) >= 4 and fragment not in fragments[:i]
+    ]
+    if not fragments:
+        return []
+
+    deduped: list[str] = []
+    for msg_index, message in enumerate(messages):
+        if message.get("role") != "assistant":
+            continue
+        content = _message_observation_content(message, limit=1200)
+        if not content:
+            continue
+        lowered = content.lower()
+        attempt: list[str] = []
+        if any(fragment in lowered for fragment in fragments):
+            attempt.append(content)
+        else:
+            for fragment in fragments:
+                ratio = difflib.SequenceMatcher(
+                    None,
+                    fragment,
+                    lowered,
+                ).quick_ratio()
+                if ratio >= 0.55:
+                    attempt.append(content)
+                    break
+        if not attempt:
+            continue
+        if msg_index + 1 < len(messages):
+            tool_message = messages[msg_index + 1]
+            if tool_message.get("role") == "tool":
+                tool_content = _message_observation_content(tool_message, limit=1200)
+                if tool_content:
+                    attempt.append(
+                        f"{tool_message.get('name', 'tool')}: {tool_content}"
+                    )
+        for line in attempt:
+            if line and line not in deduped:
+                deduped.append(line)
+        if len(deduped) >= limit:
+            break
+    return deduped[:limit]
+
+
 def _matched_check_details(
     messages: list[dict[str, Any]],
     *,
@@ -926,40 +997,53 @@ def _build_evaluation_payload(
             }
         )
     for check in checks:
-        if check["kind"] != "required" or check["status"] != "missed":
+        if check["kind"] != "required":
             continue
         expected_tool_names: list[str] = []
         for line in check["expected"]:
             match = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\(", str(line))
             if match:
                 expected_tool_names.append(match.group(1))
-        if not expected_tool_names:
-            if not check["observed"]:
-                check["observed"] = ["No matching evidence"]
-            continue
-        fallback_observed: list[str] = []
-        for msg_index, message in enumerate(messages):
-            content = str(message.get("content") or "")
-            if message.get("role") == "assistant" and any(
-                f"{tool_name}(" in content for tool_name in expected_tool_names
-            ):
-                current_attempt: list[str] = []
-                if "\n\n" in content:
-                    first, second = content.split("\n\n", 1)
-                    if first.strip() == second.strip():
-                        content = first
-                current_attempt.append(content)
-                if msg_index + 1 < len(messages):
-                    tool_message = messages[msg_index + 1]
-                    if (
-                        tool_message.get("role") == "tool"
-                        and tool_message.get("name") in expected_tool_names
-                    ):
-                        current_attempt.append(
-                            f"{tool_message['name']}: {tool_message.get('content') or '[empty]'}"
-                        )
-                fallback_observed = current_attempt
-        check["observed"] = fallback_observed or ["No matching evidence"]
+        # Try to preserve existing tool-attempt evidence for tool-expected milestones.
+        if check["status"] == "missed" and expected_tool_names:
+            fallback_observed: list[str] = []
+            for msg_index, message in enumerate(messages):
+                content = str(message.get("content") or "")
+                if message.get("role") == "assistant" and any(
+                    f"{tool_name}(" in content for tool_name in expected_tool_names
+                ):
+                    current_attempt: list[str] = []
+                    if "\n\n" in content:
+                        first, second = content.split("\n\n", 1)
+                        if first.strip() == second.strip():
+                            content = first
+                    current_attempt.append(content)
+                    if msg_index + 1 < len(messages):
+                        tool_message = messages[msg_index + 1]
+                        if (
+                            tool_message.get("role") == "tool"
+                            and tool_message.get("name") in expected_tool_names
+                        ):
+                            current_attempt.append(
+                                f"{tool_message['name']}: {tool_message.get('content') or '[empty]'}"
+                            )
+                    fallback_observed = current_attempt
+            if fallback_observed:
+                check["observed"] = fallback_observed
+                continue
+        # If the scorer gave a non-zero score but no line evidence was captured,
+        # try recovering assistant/tool traces that match the expected payload
+        # text closely.
+        if (
+            check["status"] in {"partial", "matched"}
+            and check["score"] is not None
+            and float(check["score"]) > 0
+            and check["observed"] == ["No matching evidence"]
+        ):
+            fallback_observed = _expected_check_fallback_lines(
+                check["expected"], messages
+            )
+            check["observed"] = fallback_observed or ["No matching evidence"]
     return {
         "final_score": final_score,
         "required_score": required_score,
@@ -1024,6 +1108,12 @@ def _task_focus_rows(
         phase = run_dir.relative_to(run_root).parts[0]
         milestones = _milestones_from_result(result or {}, raw_messages)
         minefields = _minefields_from_result(result or {}, raw_messages)
+        control_cache = (
+            result.get("control_cache", {}) if isinstance(result, dict) else {}
+        )
+        control_cache_source = (
+            result.get("control_cache_source") if isinstance(result, dict) else None
+        ) or (control_cache.get("source") if isinstance(control_cache, dict) else None)
         tasks.append(
             {
                 "id": f"{phase}:{run_dir.name}:{scenario}",
@@ -1041,6 +1131,8 @@ def _task_focus_rows(
                 if order.get(scenario) is None
                 else int(order[scenario]) + 1,
                 "generated_tools": generated_tools,
+                "control_cache_source": control_cache_source,
+                "control_cache": control_cache,
                 "similarity": None if result is None else result.get("similarity"),
                 "outcome_similarity": None
                 if result is None
@@ -1205,6 +1297,10 @@ def _scenario_table(
         s_score = float(s_row.get("similarity", 0.0)) if s_row else None
         c_outcome = _optional_float(c_row.get("outcome_similarity")) if c_row else None
         s_outcome = _optional_float(s_row.get("outcome_similarity")) if s_row else None
+        c_cache = c_row.get("control_cache") if isinstance(c_row, dict) else {}
+        c_cache_source = c_row.get("control_cache_source") or (
+            c_cache.get("source") if isinstance(c_cache, dict) else None
+        )
         delta = (
             (s_score - c_score) if c_score is not None and s_score is not None else None
         )
@@ -1235,6 +1331,8 @@ def _scenario_table(
                 "candidate_turns": s_row.get("turn_count"),
                 "control_exception": c_row.get("exception_type"),
                 "candidate_exception": s_row.get("exception_type"),
+                "control_cache_source": c_cache_source,
+                "control_cache": c_cache,
                 "reused_tools": sorted(reuse_by_scenario.get(name, set())),
                 "control_trace_url": _trace_url(dashboard_dir, control_dir, name),
                 "candidate_trace_url": _trace_url(dashboard_dir, candidate_dir, name),
@@ -1315,6 +1413,7 @@ def write_protocol_dashboard(
         "base_tool_policy": base_tool_policy,
         "scenario_count": scenario_count,
         "cohort_preflight": _read_json(run_root / "cohort_preflight_report.json"),
+        "control_cache": _read_json(run_root / "control_cache_report.json"),
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "control": comparison.get("control", {}),
         "candidate": comparison.get("candidate", {}),

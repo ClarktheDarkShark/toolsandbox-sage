@@ -16,6 +16,7 @@ from tool_sandbox.common.scenario import Scenario
 _TOOL_NAME = "recency_to_timestamp_bounds"
 _RELATIVE_TIME_TOOL_NAME = "relative_day_time_to_timestamp"
 _RECORD_SELECTOR_TOOL_NAME = "select_record_by_timestamp_extreme"
+_RESOLVE_WINDOW_TOOL_NAME = "resolve_search_window_or_bounds"
 
 
 @dataclass
@@ -34,7 +35,30 @@ class FakeRecencyGenerator:
                 ToolInput("current_timestamp", "float", "Current Unix timestamp."),
             ),
             output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "lower_bound": {"type": "number"},
+                    "upper_bound": {"type": "number"},
+                },
+            },
+            positive_triggers=("bounded_recency_search",),
+            negative_triggers=("ambiguous_recency_label",),
+            preserves_side_effect_tools=(
+                "search_messages",
+                "search_reminders",
+            ),
+            required_original_tool_calls=("search_messages",),
             generalization_rationale="Recency-to-bounds needed across reminder/message search.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=("reminder_search", "message_search"),
+            reason_tool_is_decisive=(
+                "It compresses phrase interpretation, time-bound construction, and "
+                "downstream search-argument preparation across search tasks."
+            ),
+            shortfall_cluster_evidence=("bounded_recency_search_failures",),
+            known_failure_mechanisms_addressed=("missing_timestamp_bounds",),
             inadequacy_evidence="Base toolset lacks a single recency→bounds helper.",
         )
         code = (
@@ -79,6 +103,12 @@ class FakeRecordSelectorGenerator:
             },
             positive_triggers=("visible_candidate_list_wrong_selected_record",),
             negative_triggers=("no_valid_timestamp_candidates",),
+            preserves_side_effect_tools=(
+                "search_messages",
+                "modify_contact",
+                "modify_reminder",
+            ),
+            required_original_tool_calls=("modify_contact",),
             abstain_behavior=(
                 "Return {} when there are no valid timestamped candidates or ties "
                 "make the selection ambiguous."
@@ -86,6 +116,19 @@ class FakeRecordSelectorGenerator:
             generalization_rationale=(
                 "Timestamp record selection is reused across search and modify tasks."
             ),
+            estimated_step_compression=3,
+            cross_task_applicability_count=3,
+            applicable_task_families=(
+                "message_search",
+                "contact_update",
+                "reminder_modify",
+            ),
+            reason_tool_is_decisive=(
+                "It compresses candidate inspection, timestamp comparison, and "
+                "record selection before the original side-effect tool is called."
+            ),
+            shortfall_cluster_evidence=("visible_candidate_selection_failures",),
+            known_failure_mechanisms_addressed=("wrong_timestamp_extreme_selected",),
             inadequacy_evidence=(
                 "The base tools return candidate records but do not select the "
                 "requested timestamp extreme."
@@ -109,6 +152,63 @@ class FakeRecordSelectorGenerator:
                 "reverse=reverse)[0]\n"
             )
         return GeneratedTool(spec=spec, code=code)
+
+
+def _resolve_search_window_tool() -> GeneratedTool:
+    spec = ToolSpec(
+        tool_name=_RESOLVE_WINDOW_TOOL_NAME,
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description=(
+            "Prepare bounded search kwargs from natural time phrases before "
+            "calling original reminder or message search tools."
+        ),
+        inputs=(
+            ToolInput("current_timestamp", "float", "Current Unix timestamp."),
+            ToolInput("phrase", "str", "Natural time phrase."),
+            ToolInput("target_domain", "str", "reminder or message."),
+        ),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "target_tool_name": {"type": "string"},
+                "search_kwargs": {"type": "object"},
+                "should_call_search": {"type": "boolean"},
+            },
+        },
+        positive_triggers=("bounded_time_search_needed",),
+        negative_triggers=("ambiguous_phrase",),
+        preserves_side_effect_tools=("search_messages", "search_reminder"),
+        required_original_tool_calls=("search_messages",),
+        abstain_behavior="Return should_call_search false for ambiguous phrases.",
+        generalization_rationale=(
+            "The same bounded search preparation is useful for reminder and "
+            "message retrieval tasks."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=("message_search_window", "reminder_search_window"),
+        reason_tool_is_decisive=(
+            "It compresses current-time lookup, phrase interpretation, bounds "
+            "construction, and downstream search-argument preparation."
+        ),
+        shortfall_cluster_evidence=("bounded_search_window_failures",),
+        known_failure_mechanisms_addressed=("empty_or_unbounded_search_kwargs",),
+        inadequacy_evidence={
+            "summary": "Repeated search tasks need deterministic timestamp bounds.",
+            "signals": ("repeated_failed_tool_call",),
+            "failed_tool_calls": ("search_messages",),
+            "repeated_failed_tool_calls": (),
+            "visible_data_gaps": ("missing search timestamp bounds",),
+            "planner_failures": (),
+            "final_answer_route_mismatch": False,
+        },
+    )
+    code = (
+        "def resolve_search_window_or_bounds(current_timestamp: float, phrase: str, target_domain: str) -> dict:\n"
+        "    return {'target_tool_name': 'search_messages', 'search_kwargs': {'creation_timestamp_upperbound': current_timestamp}, 'should_call_search': True}\n"
+    )
+    return GeneratedTool(spec=spec, code=code)
 
 
 def _latest_record_observation():
@@ -164,6 +264,8 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
     birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
     assert birth_event["accepted"] is True
     assert birth_event["tool_name"] == _TOOL_NAME
+    assert birth_event["estimated_step_compression"] == 3
+    assert birth_event["cross_task_applicability_count"] == 2
 
 
 def test_successful_recency_task_does_not_birth_from_task_type_alone() -> None:
@@ -229,6 +331,56 @@ def test_existing_registry_tool_skips_duplicate_birth(tmp_path: Path) -> None:
         "tool_birth_skipped_existing"
         in (tmp_path / "sage_run_events.jsonl").read_text()
     )
+
+
+def test_existing_broader_registry_tool_suppresses_narrow_birth(
+    tmp_path: Path,
+) -> None:
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
+    )
+    observations = classify_scenario_observations(
+        "search_message_with_recency_latest",
+        scenario,
+        {"similarity": 0},
+    )
+    recency = next(
+        observation
+        for observation in observations
+        if observation.canonical_key == "derived_value:recency_timestamp_bounds"
+    )
+
+    store = RegistryStore(tmp_path / "registry")
+    store.put(
+        RegistryEntry.accepted(
+            _resolve_search_window_tool(),
+            ValidationResult(
+                accepted=True,
+                errors=(),
+                source_example_count=1,
+                held_out_check_count=1,
+                runtime_smoke_passed=True,
+            ),
+            birth_scenario="seed",
+        )
+    )
+    generator = FakeRecencyGenerator()
+    controller = OnlineBirthController(
+        store=store,
+        generator=generator,
+        output_dir=tmp_path,
+        recurrence_threshold=2,
+    )
+
+    controller.observe(recency)
+    controller.observe(recency)
+
+    assert generator.calls == 0
+    assert store.get(_TOOL_NAME) is None
+    assert "derived_value:recency_timestamp_bounds" in controller.generated_keys
+    events = (tmp_path / "sage_run_events.jsonl").read_text()
+    assert "tool_birth_skipped_existing_broader_helper" in events
+    assert _RESOLVE_WINDOW_TOOL_NAME in events
 
 
 def test_modify_reminder_relative_datetime_observation_is_canonicalizer() -> None:
@@ -386,6 +538,46 @@ def test_rejected_birth_retry_is_capped(tmp_path: Path) -> None:
         "tool_birth_retry_suppressed"
         in (tmp_path / "sage_run_events.jsonl").read_text()
     )
+
+
+def test_near_duplicate_only_birth_is_marked_diagnostic(tmp_path: Path) -> None:
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL))]
+    )
+    first = next(
+        item
+        for item in classify_scenario_observations(
+            "modify_contact_with_message_recency",
+            scenario,
+            {"similarity": 0.0},
+        )
+        if item.canonical_key == "search_filter:select_record_by_timestamp_extreme"
+    )
+    second = next(
+        item
+        for item in classify_scenario_observations(
+            "modify_contact_with_message_recency_3_distraction_tools",
+            scenario,
+            {"similarity": 0.0},
+        )
+        if item.canonical_key == "search_filter:select_record_by_timestamp_extreme"
+    )
+    store = RegistryStore(tmp_path / "registry")
+    generator = FakeRecordSelectorGenerator()
+    controller = OnlineBirthController(
+        store=store,
+        generator=generator,
+        output_dir=tmp_path,
+        recurrence_threshold=2,
+        failure_memory_path=None,
+    )
+
+    controller.observe(first)
+    controller.observe(second)
+
+    entry = store.get(_RECORD_SELECTOR_TOOL_NAME)
+    assert entry is not None
+    assert entry.tool.spec.diagnostic_only is True
 
 
 def test_raw_latest_message_births_retrieval_window_and_selector() -> None:

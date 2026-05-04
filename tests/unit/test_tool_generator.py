@@ -29,6 +29,13 @@ class FakeCompleter:
                     ],
                     "output_annotation": "str",
                     "generalization_rationale": "Labels recur with superficial variants.",
+                    "estimated_step_compression": 3,
+                    "cross_task_applicability_count": 2,
+                    "applicable_task_families": ["labels", "messages"],
+                    "reason_tool_is_decisive": "It compresses normalization, comparison, and downstream argument preparation.",
+                    "diagnostic_only": False,
+                    "shortfall_cluster_evidence": ["label_normalization_failures"],
+                    "known_failure_mechanisms_addressed": ["surface_form_mismatch"],
                     "inadequacy_evidence": "Existing tools do not expose label normalization.",
                 },
                 "code": "def normalize_label(label: str) -> str:\n    return label.strip().lower()\n",
@@ -49,6 +56,8 @@ def test_tool_generator_uses_prompt_cache(tmp_path: Path) -> None:
     second = generator.generate(request)
 
     assert first.spec.tool_name == "normalize_label"
+    assert first.spec.estimated_step_compression == 3
+    assert first.spec.shortfall_cluster_evidence == ("label_normalization_failures",)
     assert second.spec.tool_name == "normalize_label"
     assert completer.calls == 1
 
@@ -62,3 +71,52 @@ def test_generation_request_includes_reusable_name_hint() -> None:
     )
 
     assert 'tool_name must be exactly "celsius_to_fahrenheit"' in request.prompt()
+
+
+def test_generation_request_includes_family_contract_guidance() -> None:
+    request = ToolGenerationRequest(
+        scenario_name="search_phone_number_with_name",
+        observation="Repeated contact selection failures.",
+        allowed_families=("search_filter_ranking_helper", "state_precondition_helper"),
+    )
+    prompt = request.prompt()
+
+    assert "If family is search_filter_ranking_helper" in prompt
+    assert "selected_record" in prompt
+    assert "If family is state_precondition_helper" in prompt
+    assert "set_low_battery_mode_status" in prompt
+    assert "tool_generation_v5" not in prompt
+
+
+def test_generation_request_requires_v2_contract_fields() -> None:
+    request = ToolGenerationRequest(
+        scenario_name="search_message_with_recency_latest",
+        observation="Repeated shortfalls cluster around latest-record selection.",
+        allowed_families=("search_filter_ranking_helper",),
+    )
+    prompt = request.prompt()
+
+    assert "diagnostic_only" in prompt
+    assert "shortfall_cluster_evidence" in prompt
+    assert "known_failure_mechanisms_addressed" in prompt
+
+
+def test_generation_request_includes_failure_memory_and_cluster_context() -> None:
+    request = ToolGenerationRequest(
+        scenario_name="search_message_with_recency_latest",
+        observation="Repeated shortfalls cluster around latest-record selection.",
+        allowed_families=("search_filter_ranking_helper",),
+        failure_memory_context={
+            "unresolved_relevant_failures": [{"mechanism_id": "wrong_record_selected"}]
+        },
+        shortfall_cluster_context={
+            "cluster_id": "search_filter:select_record_by_timestamp_extreme",
+            "non_diagnostic_birth_allowed": True,
+        },
+    )
+    prompt = request.prompt()
+
+    assert "Relevant unresolved failure memory" in prompt
+    assert "wrong_record_selected" in prompt
+    assert "Shortfall cluster context" in prompt
+    assert "non_diagnostic_birth_allowed" in prompt

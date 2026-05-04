@@ -1,0 +1,9 @@
+# Phase F — formal 250 and final package
+
+Registry:
+- `artifacts/registry_phaseE_portfolio/registry_manifest.json`
+
+Run:
+- `docs/sage_protocol/manifests/phase_F_formal_250.json`
+- use `--parallel-arms`
+- generation OFF

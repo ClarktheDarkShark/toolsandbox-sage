@@ -1,0 +1,63 @@
+PHASE E — MIXED PILOT + FORMAL 100
+
+Start only after Phase D pass.
+
+Objective:
+Find evidence that the portfolio scales past focused cohorts before 250.
+
+Step 1 — Mixed pilot:
+Run 60–100 mixed tasks.
+
+Use:
+- generation OFF
+- Phase E portfolio registry
+- matched control vs SAGE
+- same model/config
+- no code edits during runs
+
+Pilot pass gate:
+- outcome_similarity lift positive overall
+- outcome_similarity lift >= 10% on helper-applicable subset
+- canonical positive or route-mismatch-qualified
+- exact successes improve or neutral with strong mean lift
+- gains exceed regressions
+- side-effect violations = 0
+- runtime exceptions = 0
+- non-applicable subset not harmed
+
+If pilot fails:
+- do not run formal 100
+- make one general repair or return to Phase C/D
+
+Step 2 — Formal 100:
+Run exactly 100 mixed tasks, matched control vs SAGE.
+
+Formal 100 pass gate:
+- outcome_similarity relative lift >= 10%
+- canonical relative lift >= 10% OR route-mismatch-qualified explanation
+- confidence interval excludes zero for outcome_similarity lift
+- gains exceed regressions
+- exact successes improve or neutral with strong lift
+- side-effect violations = 0
+- runtime exceptions = 0
+- helpers actually called
+- non-applicable subset not harmed
+
+Report:
+docs/sage_protocol/phase_E_mixed_pilot_report.md
+
+docs/sage_protocol/phase_E_formal_100_validation_report.md
+
+If pass:
+Proceed to Phase F.
+
+If qualified:
+Proceed only if route-mismatch evidence is strong and final-state/task-completion evidence is clean.
+
+If fail:
+Do not start Phase F.
+
+Decision label after E:
+- pass
+- needs one general repair
+- blocked by evaluation or claim-safety issue

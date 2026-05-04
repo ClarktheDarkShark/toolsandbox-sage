@@ -102,6 +102,13 @@ class ToolSpec:
     required_original_tool_calls: tuple[str, ...] = ()
     abstain_behavior: str = ""
     generalization_rationale: str = ""
+    estimated_step_compression: int | None = None
+    cross_task_applicability_count: int | None = None
+    applicable_task_families: tuple[str, ...] = ()
+    reason_tool_is_decisive: str = ""
+    diagnostic_only: bool = False
+    shortfall_cluster_evidence: tuple[str, ...] = ()
+    known_failure_mechanisms_addressed: tuple[str, ...] = ()
     inadequacy_evidence: StructuredInadequacyEvidence = StructuredInadequacyEvidence(
         summary="",
         signals=(),
@@ -124,6 +131,15 @@ class ToolSpec:
             "required_original_tool_calls": list(self.required_original_tool_calls),
             "abstain_behavior": self.abstain_behavior,
             "generalization_rationale": self.generalization_rationale,
+            "estimated_step_compression": self.estimated_step_compression,
+            "cross_task_applicability_count": self.cross_task_applicability_count,
+            "applicable_task_families": list(self.applicable_task_families),
+            "reason_tool_is_decisive": self.reason_tool_is_decisive,
+            "diagnostic_only": self.diagnostic_only,
+            "shortfall_cluster_evidence": list(self.shortfall_cluster_evidence),
+            "known_failure_mechanisms_addressed": list(
+                self.known_failure_mechanisms_addressed
+            ),
             "inadequacy_evidence": evidence.to_json(),
         }
 
@@ -151,6 +167,28 @@ class ToolSpec:
             ),
             abstain_behavior=str(payload.get("abstain_behavior", "")),
             generalization_rationale=str(payload["generalization_rationale"]),
+            estimated_step_compression=(
+                int(payload["estimated_step_compression"])
+                if payload.get("estimated_step_compression") is not None
+                else None
+            ),
+            cross_task_applicability_count=(
+                int(payload["cross_task_applicability_count"])
+                if payload.get("cross_task_applicability_count") is not None
+                else None
+            ),
+            applicable_task_families=tuple(
+                str(item) for item in payload.get("applicable_task_families", ())
+            ),
+            reason_tool_is_decisive=str(payload.get("reason_tool_is_decisive", "")),
+            diagnostic_only=bool(payload.get("diagnostic_only", False)),
+            shortfall_cluster_evidence=tuple(
+                str(item) for item in payload.get("shortfall_cluster_evidence", ())
+            ),
+            known_failure_mechanisms_addressed=tuple(
+                str(item)
+                for item in payload.get("known_failure_mechanisms_addressed", ())
+            ),
             inadequacy_evidence=coerce_inadequacy_evidence(
                 payload.get("inadequacy_evidence", "")
             ),

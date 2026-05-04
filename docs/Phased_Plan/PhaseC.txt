@@ -1,0 +1,575 @@
+ACCELERATED PHASE C–F EXECUTION PLAN — DECISIVE TOOL PORTFOLIO TO FINAL VALIDATION
+
+Objective:
+Rapidly build and validate a 3–5 tool SAGE portfolio that provides decisive task-completion advantage, then complete portfolio ablation, mixed pilot, formal 100-task validation, formal 250-task stress validation, and final evidence packaging.
+
+Use this after starting Phase C.1.
+
+Core strategy:
+- Do not spend weeks perfecting one helper.
+- Build one decisive tool at a time.
+- Each candidate gets:
+  1. minimal implementation
+  2. focused tests
+  3. registry proof
+  4. 4–8 scenario replay
+  5. 12–20 scenario focused cohort
+  6. keep / one repair / suppress decision
+- Allow at most one general repair per candidate.
+- If a candidate still fails after one repair, suppress it and move to the next tool.
+- Goal is a strong 3–5 tool portfolio, not perfection on any one tool.
+
+Current candidate order:
+1. select_record_by_timestamp_extreme
+2. resolve_search_window_or_bounds
+3. prepare_reminder_creation_args extended into optional-location reminder handling
+4. select_contact_or_message_by_constraints
+5. next_service_precondition_call only if evidence improves or prior four tools do not produce enough lift
+
+Evaluation:
+- Primary metric: outcome_similarity / task completion
+- Secondary metric: canonical ToolSandbox score
+- Explanatory: route-mismatch analysis
+- Do not hide canonical failures.
+- Do not treat outcome_similarity as canonical benchmark success.
+- Do not count visible-but-not-called tools as useful reuse.
+- Do not count a tool unless it is actually called in relevant scenarios.
+
+Global rules:
+- Do not run 100/250 validation until portfolio ablation passes.
+- Do not patch scenario names.
+- Do not hardcode benchmark cases.
+- Do not revive failed legacy registry entries.
+- Do not weaken validation proof requirements.
+- Do not edit code during active benchmark runs.
+- Do not build multiple tools at once.
+- Do not create broad workflow macros.
+- Helpers must not replace required side-effect tools.
+- Side-effect tools must still be called downstream when required.
+- Every active helper must pass registry check-only.
+- Every run must record generation mode, registry path/hash, dashboard/task-focus links, scores, visible/called counts, side-effect violations, and runtime exceptions.
+
+Required decision labels after each candidate:
+- pass
+- needs one general repair
+- suppress/retire candidate
+- blocked by evaluation or claim-safety issue
+
+
+PHASE C.1 — SELECT RECORD BY TIMESTAMP EXTREME
+
+Status:
+Run this first.
+
+Tool:
+select_record_by_timestamp_extreme
+
+Purpose:
+Select the latest or oldest record from visible records using a timestamp field.
+
+Why this is decisive:
+It compresses:
+search records -> inspect timestamps -> choose latest/oldest -> use selected record
+into:
+search records -> select_record_by_timestamp_extreme -> answer or side-effect call
+
+It is more valuable than a thin timestamp helper because it fixes wrong-record selection and reduces repeated search/filter/rank reasoning.
+
+Must:
+- use only provided visible records
+- never search itself
+- never modify records
+- never perform side effects
+- return selected record/index/timestamp or abstain
+- preserve downstream side-effect tools
+- be hidden when no visible records exist
+- be hidden when no timestamp field exists
+
+Minimum tests:
+- latest record selected
+- oldest record selected
+- no records -> abstain
+- missing timestamp -> abstain
+- invalid mode -> abstain
+- deterministic tie behavior
+- required filters applied
+- input records not mutated
+- hidden on unrelated reminder creation/service/date-arithmetic tasks
+
+Focused replay:
+4–8 scenarios:
+- latest message
+- oldest message
+- latest reminder
+- oldest reminder
+- modify/update task requiring selection first
+- 2 negatives
+
+Cohort:
+12–20 diverse record-selection scenarios.
+
+Pass gate:
+- proof PASS
+- helper called in relevant positives
+- hidden in negatives
+- outcome_similarity positive
+- gains exceed regressions
+- side-effect violations = 0
+- runtime exceptions = 0
+
+Report:
+docs/sage_protocol/phase_C_select_record_by_timestamp_extreme_report.md
+
+If pass:
+Add to active candidate portfolio and continue to Phase C.2.
+
+If needs one general repair:
+Make one repair, rerun focused replay/cohort once, then decide.
+
+If suppress/retire:
+Do not add to active portfolio. Continue to Phase C.2 if evaluation framework is sound.
+
+
+PHASE C.2 — RESOLVE SEARCH WINDOW OR BOUNDS
+
+Tool:
+resolve_search_window_or_bounds
+
+Purpose:
+Convert natural time/search phrases into safe bounded search kwargs for ToolSandbox search tools.
+
+Target failures:
+- “yesterday”
+- “today”
+- “later today”
+- “upcoming”
+- “recent”
+- “last week”
+- “most recent”
+- “oldest”
+- repeated empty search calls
+- search called with no criteria
+- incorrect timestamp bounds
+- unnecessary clarification before search
+
+Why this is decisive:
+It compresses:
+get current timestamp -> reason about time phrase -> compute bounds -> call search -> retry with corrected bounds
+into:
+resolve_search_window_or_bounds -> search_* with typed bounds
+
+It should prepare search bounds, not merely compute a timestamp.
+
+Scope:
+Support:
+- reminder creation_timestamp bounds
+- reminder reminder_timestamp bounds
+- message creation_timestamp bounds
+- optional content keyword pass-through
+- mode: created | scheduled | sent | received | any_timestamp if supported
+
+Do not support:
+- arbitrary calendar math unrelated to search
+- side-effect calls
+- location search
+- contact updates
+- pure reminder creation
+
+Input sketch:
+- current_timestamp
+- phrase
+- target_domain: reminder | message
+- timestamp_intent: creation | reminder | message_creation
+- direction: past | future | today | yesterday | upcoming | recent | latest | oldest
+- content_keyword optional
+- lookback_days optional
+- timezone_offset optional
+
+Output sketch:
+- search_kwargs
+- should_call_search
+- target_tool_name
+- abstain_reason
+- interpretation
+- bounds_source
+
+Must:
+- never call search itself
+- never create/modify/send anything
+- return kwargs for original search tool
+- abstain if phrase cannot be resolved
+- preserve downstream search_* call
+- avoid no-criteria search calls
+
+Minimum tests:
+- yesterday reminder creation bounds
+- today reminder scheduled bounds
+- upcoming reminder bounds
+- recent message bounds
+- latest message broad window
+- missing current timestamp -> abstain
+- ambiguous phrase -> abstain
+- unrelated contact/service/reminder creation negatives
+- downstream search call preserved in side-effect/report checks if applicable
+
+Focused replay:
+4–8 scenarios:
+- yesterday reminders
+- upcoming reminders
+- later today reminders
+- most recent message
+- oldest/latest message
+- 2 negatives
+
+Cohort:
+12–20 diverse search-window scenarios across reminder and message search.
+
+Pass gate:
+- helper called in relevant positives
+- no no-criteria search calls caused by SAGE
+- failed search calls decrease
+- unnecessary clarification decreases
+- outcome_similarity positive
+- gains exceed regressions
+- hidden in negatives
+- runtime exceptions = 0
+
+Report:
+docs/sage_protocol/phase_C_resolve_search_window_or_bounds_report.md
+
+If pass:
+Add to active candidate portfolio and continue to Phase C.3.
+
+If weak:
+One general repair only. If still weak, suppress and continue.
+
+
+PHASE C.3 — EXTEND REMINDER CREATION INTO OPTIONAL-LOCATION REMINDER HANDLING
+
+Existing helper:
+prepare_reminder_creation_args
+
+Goal:
+Keep the working creation helper but extend or pair it only where it provides decisive advantage for optional-location reminder tasks.
+
+Do not make this a broad workflow macro.
+
+Preferred direction:
+Extend prepare_reminder_creation_args only if the extension remains clean.
+Otherwise create a narrow companion helper:
+handle_optional_location_for_reminder
+
+Target failures:
+- repeated failed location calls
+- location treated as required when optional
+- premature add_reminder before location refinement
+- unnecessary clarification about optional location
+- failed API/location services causing long loops
+- add_reminder skipped after valid time/content exists
+
+Decisive value:
+It should compress:
+resolve time -> try location -> fail -> retry service -> fail -> ask user -> retry -> eventually add reminder
+into:
+determine location status -> prepare reminder kwargs or abstain -> preserve add_reminder
+
+Must preserve:
+- add_reminder
+
+Must not:
+- call location APIs
+- invent coordinates
+- create reminders itself
+- modify reminders
+- replace add_reminder
+- treat optional location as required
+- fire while user is still refining location
+
+State model:
+- location not mentioned -> proceed without coordinates
+- optional location available -> include coordinates
+- optional location failed/unavailable/skipped -> proceed without coordinates
+- optional location still being refined -> abstain and wait
+- location explicitly required but unresolved -> abstain
+- partial coordinates -> abstain
+
+Required calling convention:
+- Never call datetime_info_to_timestamp and prepare_reminder_creation_args in the same turn.
+- If absolute timestamp is needed, call datetime_info_to_timestamp first, wait for result, then call helper.
+- If relative fields are complete, call helper directly with time_fields_complete=true.
+
+Minimum tests:
+- no-location reminder creation
+- optional location available
+- optional location failed
+- optional location skipped
+- optional location still being refined
+- required location unresolved
+- absolute timestamp path
+- relative fields path
+- forbidden parallel datetime/helper call
+- add_reminder follows successful helper
+- helper abstain not followed by add_reminder bypass
+- modify/search negatives hidden
+
+Focused replay:
+Use 4–8 reminder cases:
+- no-location creation
+- optional failed location
+- optional refinement
+- absolute date/time
+- relative date/time
+- modify/search negatives
+
+Cohort:
+12–20 reminder creation/location cases.
+
+Pass gate:
+- outcome_similarity positive
+- exact success neutral or improved
+- failed location calls decrease
+- unnecessary clarification decreases
+- helper called in relevant positives
+- add_reminder preserved
+- side-effect violations = 0
+- no broad visibility on modify/search
+
+Report:
+docs/sage_protocol/phase_C_prepare_reminder_optional_location_report.md
+
+If pass:
+Keep active.
+
+If still marginal:
+Keep only if it improves outcome and reduces turns/failed calls.
+Otherwise suppress for broad portfolio and keep diagnostic.
+
+
+PHASE C.4 — SELECT CONTACT OR MESSAGE BY CONSTRAINTS
+
+Tool:
+select_contact_or_message_by_constraints
+
+Purpose:
+Select the correct visible contact or message candidate from typed constraints.
+
+Target failures:
+- visible contact/message candidates exist but model chooses wrong one
+- model repeatedly asks for IDs user does not have
+- model calls search with no criteria
+- model fails to use visible search results
+- model updates wrong contact
+- model cannot identify latest/last person/message after search
+
+Why decisive:
+It compresses:
+search -> inspect candidates -> map constraints -> select ID -> call update/send/answer
+into:
+search -> select_contact_or_message_by_constraints -> update/send/answer
+
+Scope:
+Use only visible candidates already returned by base tools.
+
+Do not:
+- search itself
+- send messages
+- update contacts
+- modify records
+- guess when ambiguous
+- create contacts
+- infer hidden data
+
+Input sketch:
+- candidates: list[dict]
+- candidate_type: contact | message
+- constraints: dict
+  - name
+  - relationship
+  - phone_number
+  - sender/recipient
+  - content_keyword
+  - timestamp mode
+  - direction latest/oldest
+- require_unique: bool
+- ambiguity_policy: abstain | choose_if_exact
+
+Output sketch:
+- selected_record
+- selected_id
+- selected_index
+- should_use_selected_record
+- abstain_reason
+- matched_constraints
+- selection_reason
+
+Must:
+- abstain on ambiguity
+- abstain on no candidates
+- abstain when constraints insufficient
+- deterministically tie-break only when policy allows
+- preserve downstream original tools:
+  - modify_contact
+  - send_message
+  - search_messages
+  - search_contacts
+
+Minimum tests:
+- select exact contact by name
+- select contacts by relationship
+- select message by latest timestamp
+- select message by content keyword
+- ambiguous candidates -> abstain
+- no candidates -> abstain
+- insufficient constraints -> abstain
+- does not mutate input
+- hidden on unrelated reminder/service/date tasks
+- side-effect preservation for downstream modify/send
+
+Focused replay:
+4–8 contact/message scenarios:
+- update all friends
+- phone lookup by name
+- last person messaged
+- update contact after message search
+- send message after contact search
+- insufficient-info negative
+- unrelated negative
+
+Cohort:
+12–20 diverse contact/message scenarios with positives and negatives.
+
+Pass gate:
+- visible-and-called in relevant positives
+- no repeated no-criteria search loops
+- wrong-contact/message errors decrease
+- outcome_similarity positive
+- gains exceed regressions
+- hidden in insufficient-info negatives
+- side-effect violations = 0
+
+Report:
+docs/sage_protocol/phase_C_select_contact_or_message_by_constraints_report.md
+
+If pass:
+Add to active candidate portfolio.
+
+If visible but not called:
+One affordance/schema repair, rerun once.
+If still not called, suppress.
+
+
+PHASE C.5 — NEXT SERVICE PRECONDITION CALL, ONLY IF NEEDED
+
+Tool:
+next_service_precondition_call
+
+Condition to start:
+Start this only if:
+- portfolio has fewer than 3 strong tools after C.1–C.4, or
+- decisive-tool evidence says service-precondition failures are still major, or
+- Phase D pilot needs more coverage.
+
+Do not start just because it is on the list.
+
+Purpose:
+Given visible device state and desired action, return one concrete original ToolSandbox service-setting call.
+
+Target failures:
+- advisory text instead of action
+- repeated service/location/wifi/cellular failures
+- low-battery blocking a required service
+- model asks user to handle device state when tools exist
+- model calls tools in wrong order
+
+Must output:
+- next_tool_name
+- next_tool_args
+- should_call_tool
+- abstain_reason
+- precondition_reason
+
+Allowed tool outputs:
+- set_low_battery_mode_status
+- set_location_service_status
+- set_wifi_status
+- set_cellular_service_status
+- or abstain
+
+Must not:
+- return advice only
+- call tools itself
+- replace original service-setting tools
+- perform final task
+- touch reminder/message/contact state
+
+Minimum tests:
+- low battery blocks location -> suggest set_low_battery_mode_status false
+- location off -> suggest set_location_service_status true
+- wifi off blocks search -> suggest set_wifi_status true
+- cellular off blocks send -> suggest set_cellular_service_status true
+- already ready -> abstain
+- impossible/unknown state -> abstain
+- unrelated task -> hidden
+
+Focused replay:
+4–8 service-precondition cases.
+
+Cohort:
+12–20 only if replay passes.
+
+Pass gate:
+- concrete tool call output, not advice
+- downstream original service tool called
+- failed service calls decrease
+- outcome_similarity positive
+- gains exceed regressions
+- no broad pollution
+
+Report:
+docs/sage_protocol/phase_C_next_service_precondition_call_report.md
+
+If pass:
+Add to active candidate portfolio and continue.
+
+If weak:
+One general repair only. If still weak, suppress and move on.
+
+
+PHASE C COMPLETION GATE
+
+Phase C is complete when the active candidate portfolio has at least 3 and at most 5 helpers that satisfy:
+
+- registry proof PASS
+- 0 active FAIL entries
+- actual helper calls in relevant positives
+- hidden in negatives
+- focused replay evidence
+- focused cohort evidence
+- no side-effect violations
+- no runtime exceptions
+- outcome_similarity positive or neutral-positive
+- gains exceed regressions or regressions are clearly non-helper stochastic
+- no broad context pollution
+
+If fewer than 3 tools pass:
+- do not start Phase D
+- run the next candidate or revisit the most promising suppressed candidate with one general repair
+
+When Phase C is complete, write:
+docs/sage_protocol/phase_C_portfolio_candidates_report.md
+
+Include:
+- active helper list
+- proof status per helper
+- focused replay/cohort summary per helper
+- outcome_similarity delta per helper
+- canonical delta per helper
+- visible/called counts per helper
+- side-effect status
+- runtime exception status
+- recommended Phase D portfolio
+
+Decision label:
+pass
+needs one general repair
+blocked by evaluation or claim-safety issue

@@ -1,0 +1,31 @@
+# Current State
+
+- Date: 2026-05-03
+- Last completed step: `v2_architecture_readiness_20`
+- Last decision: `not ready: repair cluster birth`
+- Active v1 registry path: `artifacts/registry_phaseE_balanced_final/registry_manifest.json`
+- Active v1 registry hash: `385a0f7dbd65ce340f4edd97e26e89a67054cf1c661f01029692ca38547484b1`
+- Candidate readiness registry: `artifacts/registry_candidates/v2_architecture_readiness_20/registry_manifest.json`
+- V2 repairs implemented:
+  - claim-grade helper contribution export
+  - mechanical promotion evidence gate
+  - failure-memory integration into generation/gating/promotion
+  - generic runtime routing scorer with bounded bundle
+  - diverse shortfall-cluster aggregation before birth
+- Readiness-20 run: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_194428/`
+- Dashboard: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_194428/dashboard/index.html`
+- Task focus dashboard: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_194428/dashboard/task_focus.html`
+- Cohort quality: pass, `20` scenarios, `15` base families, largest duplicate family size `2`, no-current-helper-fit share `0.4`
+- Readiness metrics:
+  - canonical delta `-0.0631`
+  - outcome delta `-0.0563`
+  - exact successes `3 -> 2`
+  - tools proposed/accepted/rejected `5 / 0 / 5`
+  - visible/called/visible-not-called `15 / 6 / 9`
+  - runtime exceptions `0`
+  - side-effect incidents `0`
+- Tests: `73 passed`
+- Registry check: candidate readiness registry PASS
+- Primary blocker: cluster-birth/generation quality; generated specs missed downstream preservation or required triggers.
+- Secondary blocker: runtime routing still exposes retained helpers with visible-not-called pollution.
+- Next step: `Repair cluster-birth/generation contract and routing evidence use, then rerun readiness-20. Do not start full V2 campaign.`

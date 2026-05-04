@@ -1,0 +1,265 @@
+# Run Ledger
+
+## 2026-05-02
+
+- `Phase B` passed after calling-convention repair for `prepare_reminder_creation_args`.
+- `Phase C.1 v2` passed for `select_record_by_timestamp_extreme`.
+  - Registry: `artifacts/registry_phaseC_C1_candidate/registry_manifest.json`
+  - Run: `outputs/phase_C1_record_selection_replay_v2/transfer_40_20260502_215943/`
+  - Canonical delta: `+0.221`
+  - Outcome delta: `+0.267`
+  - Exact successes: `control=1`, `SAGE=5`
+  - Visible/called: `6/6`
+  - Visible-not-called: `0`
+  - Side-effect violations: `0`
+  - Runtime exceptions: `0`
+  - Decision: `keep`
+- `Phase C.2` passed for `resolve_search_window_or_bounds`.
+  - Registry: `artifacts/registry_phaseC_C2_candidate_v2/registry_manifest.json`
+  - Replay run: `outputs/phase_C2_search_window_replay_v2/transfer_40_20260502_223759/`
+  - Focused cohort: `outputs/phase_C2_search_window_cohort/transfer_40_20260502_224132/`
+  - Replay canonical delta: `+0.3889`
+  - Replay outcome delta: `+0.4868`
+  - Cohort canonical delta: `+0.1444`
+  - Cohort outcome delta: `+0.1682`
+  - Cohort exact successes: `control=4`, `SAGE=5`
+  - Resolve helper visible/called on cohort: `12/8`
+  - Resolve helper visible-not-called on cohort: `4`
+  - Runtime exceptions: `0`
+  - Side-effect violations: `0`
+  - Decision: `pass`
+- `Phase C.3` passed for narrowed `prepare_reminder_creation_args` after one repair.
+  - Registry: `artifacts/registry_phaseC_C3_candidate_v2/registry_manifest.json`
+  - Replay v1: `outputs/phase_C3_reminder_replay/transfer_40_20260502_230636/`
+  - Cohort v1: `outputs/phase_C3_reminder_cohort/transfer_40_20260502_231031/`
+  - Replay v2: `outputs/phase_C3_reminder_replay_v2/transfer_40_20260502_231813/`
+  - Cohort v2: `outputs/phase_C3_reminder_cohort_v2/transfer_40_20260502_232138/`
+  - Repaired replay canonical delta: `+0.1105`
+  - Repaired replay outcome delta: `+0.1398`
+  - Repaired cohort canonical delta: `+0.0970`
+  - Repaired cohort outcome delta: `+0.0850`
+  - Repaired cohort exact successes: `control=5`, `SAGE=6`
+  - Reminder helper visible/called on repaired cohort: `7/7`
+  - Reminder helper visible-not-called on repaired cohort: `0`
+  - Runtime exceptions: `0`
+  - Side-effect violations: `0`
+  - Decision: `pass`
+
+## 2026-05-03
+
+- `Phase D` passed for the full 3-helper portfolio.
+  - Full arm: `outputs/phase_D_full_v2/transfer_40_20260502_232844/`
+  - Prepare only: `outputs/phase_D_prepare_only/transfer_40_20260502_234029/`
+  - Select only: `outputs/phase_D_select_only/transfer_40_20260502_235136/`
+  - Resolve only: `outputs/phase_D_resolve_only/transfer_40_20260503_000343/`
+  - Without prepare: `outputs/phase_D_without_prepare/transfer_40_20260503_001553/`
+  - Without select: `outputs/phase_D_without_select/transfer_40_20260503_003009/`
+  - Without resolve: `outputs/phase_D_without_resolve/transfer_40_20260503_004302/`
+  - Full canonical delta: `+0.1755`
+  - Full outcome delta: `+0.1302`
+  - Full exact successes: `control=2`, `SAGE=5`
+  - Decision: `pass`
+  - Phase E frozen registry: `artifacts/registry_phaseE_portfolio/registry_manifest.json`
+- Next execution target: `Phase E — mixed pilot and formal 100`
+- `Phase E mixed pilot` failed on the broad mixed cohort.
+  - Full portfolio pilot: `outputs/phase_E_mixed_pilot/transfer_40_20260503_010141/`
+  - Select-only corrective pilot: `outputs/phase_E_mixed_pilot_select_only/transfer_40_20260503_012615/`
+  - Without-prepare corrective pilot: `outputs/phase_E_mixed_pilot_without_prepare/transfer_40_20260503_013711/`
+  - Full pilot outcome delta: `-0.1928`
+  - Select-only pilot outcome delta: `+0.0024` with `0` helper calls
+  - Without-prepare pilot outcome delta: `+0.0151` with `0` helper calls
+  - Formal 100 not started
+  - Phase F not started
+  - Decision: `needs one general repair`
+- `Decisive-tool experiment20` completed.
+  - Registry used for run: `artifacts/registry_phaseE_portfolio/registry_manifest.json`
+  - Run root: `outputs/decisive_tool_experiment20/mechanism_40_20260503_060322/`
+  - Canonical delta: `+0.1344`
+  - Outcome delta: `+0.1935`
+  - Exact successes: `control=1`, `SAGE=2`
+  - Proposed / accepted / rejected births: `7 / 2 / 5`
+  - Accepted births: `recency_to_timestamp_bounds`, `message_search_time_window`
+  - Accepted birth calls: `0`
+  - Retained helper calls: `resolve_search_window_or_bounds=6`, `select_record_by_timestamp_extreme=2`
+  - Runtime exceptions: `0`
+  - Decision: `needs one general gate repair`
+  - Report: `docs/sage_protocol/decisive_tool_experiment20_report.md`
+- `Decisive-tool experiment20_40_v2` completed after one gate repair.
+  - 20 run: `outputs/decisive_tool_experiment20_v2/mechanism_40_20260503_083141/`
+  - 40 run: `outputs/decisive_tool_experiment40_v2/mechanism_40_20260503_083555/`
+  - 20 canonical delta: `+0.1770`
+  - 20 outcome delta: `+0.1285`
+  - 20 exact successes: `control=0`, `SAGE=2`
+  - 20 births proposed / accepted / rejected: `8 / 1 / 7`
+  - 40 canonical delta: `+0.1239`
+  - 40 outcome delta: `+0.1830`
+  - 40 exact successes: `control=1`, `SAGE=4`
+  - 40 births proposed / accepted / rejected: `9 / 1 / 8`
+  - Accepted birth in both runs: `message_search_time_window`
+  - Accepted birth calls: `1` in 20, `1` in 40
+  - Decision: `useful decisive-tool signal`
+  - Report: `docs/sage_protocol/decisive_tool_experiment20_40_v2_report.md`
+
+- `Autonomous loop generation_contract20_v3` completed.
+  - Run: `outputs/autonomous_loop_generation_contract20_v3_resume/mechanism_40_20260503_095138/`
+  - Report: `docs/sage_protocol/autonomous_loop_generation_contract20_v3_report.md`
+  - Summary: `artifacts/summaries/autonomous_loop_generation_contract20_v3/summary.json`
+  - Canonical delta: `+0.0804`
+  - Outcome delta: `+0.1276`
+  - Outcome relative lift: `31.03%`
+  - Exact successes: `control=0`, `SAGE=1`
+  - Births proposed / accepted / rejected: `3 / 1 / 2`
+  - Accepted candidate: `next_service_tool_call`, parked in `artifacts/registry_candidates/autonomous_loop_generation_contract20_v3_service_candidate/registry_manifest.json`
+  - Accepted candidate visible/called: `4 / 0`
+  - Runtime exceptions: `0`
+  - Decision: `continue routing repair`
+
+- `Autonomous service routing diagnostic10` completed.
+  - Run: `outputs/autonomous_service_routing_diagnostic10/mechanism_40_20260503_100727/`
+  - Report: `docs/sage_protocol/autonomous_service_routing_diagnostic10_report.md`
+  - Summary: `artifacts/summaries/autonomous_service_routing_diagnostic10/summary.json`
+  - Generation: `off`
+  - Candidate registry: `artifacts/registry_candidates/autonomous_loop_generation_contract20_v3_service_candidate/registry_manifest.json`
+  - Canonical delta: `+0.0238`
+  - Outcome delta: `+0.0081`
+  - Exact successes: `control=0`, `SAGE=0`
+  - `next_service_tool_call` visible/called: `6 / 5`
+  - Service-positive outcome gains/regressions/preserved: `2 / 2 / 2`
+  - Runtime exceptions: `0`
+  - Decision: `continue validation repair`
+
+- `Decisive-tool experiment20 broad rerun` completed.
+  - Run: `outputs/decisive_tool_experiment20_broad_rerun/mechanism_40_20260503_102645/`
+  - Report: `docs/sage_protocol/decisive_tool_experiment20_report.md`
+  - Summary: `artifacts/summaries/decisive_tool_experiment20/summary.json`
+  - Generation: `on`
+  - Canonical delta: `+0.1036`
+  - Outcome delta: `+0.0171`
+  - Exact successes: `control=0`, `SAGE=2`
+  - Births proposed / accepted / rejected: `4 / 1 / 3`
+  - Accepted birth: `next_service_tool_call` diagnostic only; missing positive triggers and side-effect preservation failure
+  - Helper calls: `{'next_service_tool_call': 1, 'resolve_search_window_or_bounds': 6, 'select_record_by_timestamp_extreme': 2}`
+  - Runtime exceptions: `0`
+  - Active registry restored to 3 claim-safe helpers
+  - Decision: `needs one general gate repair`
+
+- `Decisive-tool experiment20 gate-repair rerun` completed.
+  - Main action: `discovery run`
+  - Report: `docs/sage_protocol/decisive_tool_experiment20_gate_repair_rerun_report.md`
+  - Summary: `artifacts/summaries/decisive_tool_experiment20_gate_repair_rerun/summary.json`
+  - Run: `outputs/decisive_tool_experiment20_gate_repair_rerun/mechanism_40_20260503_103917/`
+  - Dashboard: `outputs/decisive_tool_experiment20_gate_repair_rerun/mechanism_40_20260503_103917/dashboard/index.html`
+  - Task focus dashboard: `outputs/decisive_tool_experiment20_gate_repair_rerun/mechanism_40_20260503_103917/dashboard/task_focus.html`
+  - Generation: `on`
+  - Active registry: `artifacts/registry_phaseE_portfolio/registry_manifest.json`
+  - Frozen confirmation registry: `artifacts/registry_frozen_decisive_gate_confirmation/registry_manifest.json`
+  - Canonical delta: `+0.1671`
+  - Outcome delta: `+0.1408`
+  - Exact successes: `control=1`, `SAGE=3`
+  - Canonical gains / regressions / preserved: `13 / 4 / 3`
+  - Outcome gains / regressions / preserved: `7 / 4 / 9`
+  - Births proposed / accepted / rejected: `4 / 0 / 4`
+  - Rejected mechanisms: `missing_decisive_positive_triggers`, `search_filter_missing_tie_behavior`
+  - Retained helper visible/called: `8 / 8`
+  - Helper calls: `resolve_search_window_or_bounds=6`, `select_record_by_timestamp_extreme=2`
+  - Side-effect violations: `0`
+  - Runtime exceptions: `0`
+  - Decision: `freeze registry for confirmation`
+
+- `Phase E balanced formal 100` completed.
+  - Report: `docs/sage_protocol/phase_E_formal_100_validation_report.md`
+  - Summary: `artifacts/summaries/phase_E_balanced_formal_100/summary.json`
+  - Run: `outputs/phase_E_balanced_formal_100/validate_100_20260503_123038/`
+  - Dashboard: `outputs/phase_E_balanced_formal_100/validate_100_20260503_123038/dashboard/index.html`
+  - Task focus dashboard: `outputs/phase_E_balanced_formal_100/validate_100_20260503_123038/dashboard/task_focus.html`
+  - Generation: `off`
+  - Registry: `artifacts/registry_phaseE_balanced_final/registry_manifest.json`
+  - Registry hash: `385a0f7dbd65ce340f4edd97e26e89a67054cf1c661f01029692ca38547484b1`
+  - Canonical delta: `+0.0778` (`+10.3%` relative)
+  - Outcome delta: `+0.0798` (`+17.9%` relative)
+  - Exact successes: `control=10`, `SAGE=13`
+  - Outcome gains / regressions / preserved: `39 / 20 / 40`
+  - Canonical gains / regressions / preserved: `56 / 24 / 20`
+  - Helper visible/called: `61 / 52`
+  - Helper calls: `prepare_reminder_creation_args=15`, `resolve_search_window_or_bounds=37`
+  - Side-effect violations: `0`
+  - Runtime exceptions: `0`
+  - Decision: `qualified pass; proceed to Phase F`
+
+- `Phase F balanced formal 250` completed.
+  - Report: `docs/sage_protocol/phase_F_formal_250_and_final_package_report.md`
+  - Summary: `artifacts/summaries/phase_F_balanced_formal_250/summary.json`
+  - Run: `outputs/phase_F_balanced_formal_250/validate_250_20260503_125133/`
+  - Dashboard: `outputs/phase_F_balanced_formal_250/validate_250_20260503_125133/dashboard/index.html`
+  - Task focus dashboard: `outputs/phase_F_balanced_formal_250/validate_250_20260503_125133/dashboard/task_focus.html`
+  - Generation: `off`
+  - Registry: `artifacts/registry_phaseE_balanced_final/registry_manifest.json`
+  - Outcome delta: `+0.0002` (`+0.04%` relative)
+  - Canonical delta: `+0.0381` (`+5.09%` relative)
+  - Exact successes: `control=23`, `SAGE=22`
+  - Outcome gains / regressions / preserved: `70 / 66 / 110`
+  - Canonical gains / regressions / preserved: `118 / 71 / 61`
+  - Helper visible/called: `121 / 87`
+  - Helper calls: `prepare_reminder_creation_args=26`, `resolve_search_window_or_bounds=61`
+  - Failed helper attempts: `3`
+  - Side-effect violations: `0`
+  - Runtime exceptions: `0`
+  - Decision: `large evaluation failed`
+
+- `V2 architecture audit and partial repair` completed.
+  - Reports:
+    - `docs/sage_protocol/v2_architecture_audit_plan.md`
+    - `docs/sage_protocol/v2_architecture_depth_audit_report.md`
+    - `docs/sage_protocol/v2_cohort_quality_gate_report.md`
+    - `docs/sage_protocol/v2_generation_contract_report.md`
+    - `docs/sage_protocol/v2_gate_failure_memory_report.md`
+    - `docs/sage_protocol/v2_routing_runtime_bundle_report.md`
+    - `docs/sage_protocol/v2_reporting_contribution_report.md`
+    - `docs/sage_protocol/v2_architecture_readiness_20_report.md`
+  - Summary: `artifacts/summaries/v2_architecture_audit/summary.json`
+  - Code repairs: mechanical cohort quality gate; generated-tool V2 contract fields; gate rejection for decisive non-diagnostic specs without cluster/failure evidence.
+  - Tests: `PYTHONPATH=src:. pytest tests/unit/test_task_strata.py tests/unit/test_candidate_gate.py tests/unit/test_tool_generator.py tests/unit/test_online_birth.py -q` -> `61 passed`.
+  - Registry check: `PYTHONPATH=src:. python scripts/migrate_registry.py --check-only artifacts/registry_phaseE_balanced_final/registry_manifest.json` -> PASS.
+  - Existing formal 250 would now fail cohort quality for `near_duplicate_family_variants_above_limit` (`12` variants > max `8`).
+  - Decisions: `architecture partially sufficient`; `cohort gate ready`; `generation contract ready`; `gating needs repair`; `runtime bundle needs repair`; `reporting needs repair`; readiness-20 `blocked`.
+  - Next action: implement promotion evidence gate, failure-memory integration, generic runtime routing scorer, and contribution export before V2 readiness-20.
+
+- `V2 blocker-repair sprint` completed through readiness attempt.
+  - Contribution export report: `docs/sage_protocol/v2_contribution_export_repair_report.md`
+  - Promotion gate report: `docs/sage_protocol/v2_promotion_gate_repair_report.md`
+  - Failure memory report: `docs/sage_protocol/v2_failure_memory_integration_report.md`
+  - Runtime routing report: `docs/sage_protocol/v2_runtime_routing_scorer_report.md`
+  - Cluster birth report: `docs/sage_protocol/v2_shortfall_cluster_birth_report.md`
+  - Readiness-20 report: `docs/sage_protocol/v2_architecture_readiness_20_report.md`
+  - Summary: `artifacts/summaries/v2_architecture_readiness_20/summary.json`
+  - Tests: `PYTHONPATH=src:. pytest tests/unit/test_helper_contribution.py tests/unit/test_promotion_gate.py tests/unit/test_failure_memory_integration.py tests/unit/test_runtime_routing_scorer.py tests/unit/test_task_strata.py tests/unit/test_candidate_gate.py tests/unit/test_tool_generator.py tests/unit/test_online_birth.py -q` -> `73 passed`.
+  - Registry check: `PYTHONPATH=src:. python scripts/migrate_registry.py --check-only artifacts/registry_phaseE_balanced_final/registry_manifest.json` -> PASS.
+  - Readiness manifest: `artifacts/summaries/v2_architecture_readiness_20/cohort_manifest.json`.
+  - Cohort quality: PASS, `20` scenarios, `15` base families, largest duplicate family size `2`, no-current-helper-fit share `0.4`.
+  - Attempted run: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_193147/`.
+  - Run log: `artifacts/summaries/v2_architecture_readiness_20/run.log`.
+  - Run result: blocked before scenario execution because `OPENAI_API_KEY` is not set.
+  - Decision: `blocked`.
+  - Next action: set `OPENAI_API_KEY` and rerun readiness-20; do not launch full V2 campaign until it passes.
+
+- `V2 architecture readiness-20 rerun with conda OpenAI key` completed.
+  - Run: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_194428/`
+  - Dashboard: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_194428/dashboard/index.html`
+  - Task focus dashboard: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_194428/dashboard/task_focus.html`
+  - Report: `docs/sage_protocol/v2_architecture_readiness_20_report.md`
+  - Summary: `artifacts/summaries/v2_architecture_readiness_20/summary.json`
+  - Helper contribution: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_194428/helper_contribution_summary.json`
+  - Promotion gate result: `artifacts/summaries/v2_architecture_readiness_20/promotion_gate_result.json`
+  - Cohort quality: PASS, `20` scenarios, `15` base families, largest duplicate family size `2`, no-current-helper-fit share `0.4`.
+  - Canonical delta: `-0.0631`.
+  - Outcome delta: `-0.0563`.
+  - Exact successes: `control=3`, `SAGE=2`.
+  - Canonical gains/regressions/preserved: `6 / 8 / 6`.
+  - Outcome gains/regressions/preserved: `2 / 5 / 11`.
+  - Tools proposed/accepted/rejected: `5 / 0 / 5`.
+  - Rejections: `missing_downstream_tool_preservation`, `unresolved_failure_memory:search_filter_missing_tie_behavior`, `missing_decisive_positive_triggers`.
+  - Selection visible/called/visible-not-called: `15 / 6 / 9`.
+  - Runtime exceptions: `0`.
+  - Side-effect incidents: `0`.
+  - Decision: `not ready: repair cluster birth`.
+  - Next action: repair cluster-birth/generation quality and routing evidence use before rerunning readiness-20; do not launch full V2 campaign.

@@ -1,0 +1,169 @@
+{
+  "manifest_type": "phase_c3_focused_cohort",
+  "splits": {
+    "transfer_40": [
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools",
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "shift_timestamp",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "end_conversation",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "get_current_timestamp"
+        ]
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_3_distraction_tools",
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "add_reminder",
+          "timestamp_diff"
+        ]
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "search_location_around_lat_lon",
+          "search_lat_lon",
+          "modify_reminder",
+          "get_current_timestamp",
+          "search_stock",
+          "search_reminder",
+          "add_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ]
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools",
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "modify_reminder",
+          "set_low_battery_mode_status",
+          "get_current_location",
+          "set_wifi_status",
+          "add_reminder",
+          "get_wifi_status",
+          "get_current_timestamp",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "search_location_around_lat_lon",
+          "get_location_service_status",
+          "end_conversation",
+          "set_location_service_status",
+          "search_lat_lon",
+          "get_low_battery_mode_status"
+        ]
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_3_distraction_tools",
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "modify_reminder",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "end_conversation",
+          "add_reminder",
+          "search_stock",
+          "search_reminder",
+          "search_location_around_lat_lon",
+          "get_current_timestamp"
+        ]
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_3_distraction_tools",
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "timestamp_diff",
+          "add_reminder",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "timestamp_to_datetime_info"
+        ]
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_alt_3_distraction_tools",
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "search_reminder",
+          "unit_conversion",
+          "timestamp_diff",
+          "shift_timestamp",
+          "modify_reminder",
+          "get_current_timestamp"
+        ]
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools",
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "search_reminder",
+          "timestamp_diff",
+          "shift_timestamp",
+          "unit_conversion",
+          "get_current_timestamp",
+          "timestamp_to_datetime_info"
+        ]
+      }
+    ]
+  }
+}

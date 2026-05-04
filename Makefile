@@ -5,8 +5,9 @@ RUFF := $(PYTHON) -m ruff
 
 MANIFEST ?= outputs/splits/sage_campaign_splits.json
 MODEL ?= gpt-4o-mini
-LEGACY_MODEL ?= gpt-5-mini
-USER_MODEL ?= GPT_4_o_2024_05_13
+# MODEL ?= gpt-5-mini
+# USER_MODEL ?= GPT_4_o_2024_05_13
+USER_MODEL ?= gpt-4o-mini
 BASE_TOOL_POLICY ?= recency_reduced
 OUTPUT_ROOT ?= outputs/sage_protocol_campaign
 REGISTRY ?= outputs/sage_protocol_campaign/latest_registry
@@ -17,17 +18,24 @@ PORT ?= 5520
 CLAIM_PORTFOLIO_REGISTRY ?= outputs/claim_portfolio_registry
 DASHBOARD_OPEN ?= 1
 DASHBOARD_FLAGS := $(if $(filter 1,$(DASHBOARD_OPEN)),,--no-dashboard-open)
+
 CACHE_MODE ?= read_write
 CACHE_FLAGS := --cache-mode $(CACHE_MODE)
+
 PARALLEL_ARMS ?= 1
 PARALLEL_FLAGS := $(if $(filter 1,$(PARALLEL_ARMS)),--parallel-arms,)
+
 PROTOCOL_GENERATION ?= auto
 PROTOCOL_GENERATION_FLAGS := --generation $(PROTOCOL_GENERATION)
-FROZEN_GENERATION_FLAGS := --generation off
+
+FROZEN_GENERATION ?= off
+FROZEN_GENERATION_FLAGS := --generation $(FROZEN_GENERATION)
+
 RESUME_RUN_ROOT ?=
 RESUME_FLAGS := $(if $(RESUME_RUN_ROOT),--resume-run-root $(RESUME_RUN_ROOT),)
-MIN_GATE_SCENARIOS ?= 12
+
 CATEGORY ?= general
+
 ifeq ($(CATEGORY),state)
 CATEGORY_MANIFEST ?= outputs/splits/sage_state_precondition_splits.json
 else ifeq ($(CATEGORY),temperature)
@@ -43,18 +51,126 @@ CATEGORY_MANIFEST ?= outputs/splits/sage_campaign_splits.json
 else
 CATEGORY_MANIFEST ?= $(MANIFEST)
 endif
-SPLIT ?= extended_reuse_100
+
+# ---------------------------------------------------------------------
+# Explicit protocol splits by purpose and size.
+#
+# Current base manifest commonly has:
+#   extended_reuse_100
+#   mechanism_40
+#   transfer_40
+#
+# This Makefile derives smaller temporary manifests for smoke/viability
+# targets instead of silently aliasing one purpose to another.
+# ---------------------------------------------------------------------
+
+GENERATED_SPLIT_DIR ?= outputs/splits/generated
+
+SMOKE6_SPLIT ?= smoke_6
+SMOKE12_SPLIT ?= smoke_12
+
+VIABILITY12_SPLIT ?= viability_12
+MECHANISM12_SPLIT ?= mechanism_12
+MECHANISM40_SPLIT ?= mechanism_40
+MECHANISM60_SPLIT ?= mechanism_60
+
+TRANSFER40_SPLIT ?= transfer_40
+TRANSFER60_SPLIT ?= transfer_60
+TRANSFER100_SPLIT ?= extended_reuse_100
+
+CONFIRM100_SPLIT ?= extended_reuse_100
+VALIDATE100_SPLIT ?= extended_reuse_100
+VALIDATE250_SPLIT ?= validate_250
+
+SPLIT ?= $(VALIDATE250_SPLIT)
+
+# Source splits used to derive smaller or intermediate runs.
+SMOKE_SOURCE_MANIFEST ?= $(MANIFEST)
+SMOKE_SOURCE_SPLIT ?= transfer_40
+
+VIABILITY_SOURCE_MANIFEST ?= $(MANIFEST)
+VIABILITY_SOURCE_SPLIT ?= mechanism_40
+
+MECHANISM12_SOURCE_MANIFEST ?= $(MANIFEST)
+MECHANISM12_SOURCE_SPLIT ?= mechanism_40
+
+MECHANISM60_SOURCE_MANIFEST ?= $(MANIFEST)
+MECHANISM60_SOURCE_SPLIT ?= extended_reuse_100
+
+TRANSFER60_SOURCE_MANIFEST ?= $(MANIFEST)
+TRANSFER60_SOURCE_SPLIT ?= extended_reuse_100
+
+SMOKE6_MANIFEST ?= $(GENERATED_SPLIT_DIR)/smoke_6.json
+SMOKE12_MANIFEST ?= $(GENERATED_SPLIT_DIR)/smoke_12.json
+VIABILITY12_MANIFEST ?= $(GENERATED_SPLIT_DIR)/viability_12.json
+MECHANISM12_MANIFEST ?= $(GENERATED_SPLIT_DIR)/mechanism_12.json
+MECHANISM60_MANIFEST ?= $(GENERATED_SPLIT_DIR)/mechanism_60.json
+TRANSFER60_MANIFEST ?= $(GENERATED_SPLIT_DIR)/transfer_60.json
+
 GENERATION ?= 0
 GENERATION_FLAGS := $(if $(filter 1,$(GENERATION)),--enable-generation,)
+
 POC_MANIFEST ?= outputs/splits/relative_datetime_probe.json
 POC_PROTOCOL_MANIFEST ?= outputs/splits/relative_datetime_protocol.json
 RECENCY_TRANSFER_MANIFEST ?= outputs/splits/sage_campaign_splits.json
 RELATIVE_TIME_TRANSFER_MANIFEST ?= outputs/splits/relative_datetime_transfer.json
 
-.PHONY: test lint dashboard reproduce_poc transfer_recency transfer_relative_time smoke4 smoke12 viability12 mechanism40 transfer40 transfer60 confirm100 validate100 validate250 summarize cache_stats cache_validate freeze_registry campaign-init coverage_map top_tool_audit claim_portfolio_registry record_extreme_splits
+.PHONY: \
+	test \
+	lint \
+	dashboard \
+	campaign-init \
+	coverage_map \
+	top_tool_audit \
+	claim_portfolio_registry \
+	contact_splits \
+	holiday_splits \
+	record_extreme_splits \
+	reproduce_poc \
+	smoke6 \
+	smoke12 \
+	viability12 \
+	mechanism12 \
+	mechanism40 \
+	mechanism60 \
+	transfer_recency \
+	transfer_relative_time \
+	transfer40 \
+	transfer60 \
+	transfer100 \
+	confirm100 \
+	validate100 \
+	validate250 \
+	summarize \
+	cache_stats \
+	cache_validate \
+	freeze_registry
 
 define CHECK_GATE_SIZE
-	@$(RUN_PYTHON) -c "from pathlib import Path; from sage_ts.config.splits import load_split_names; manifest=Path('$(1)'); split='$(2)'; count=len(load_split_names(manifest, split)); minimum=int('$(MIN_GATE_SCENARIOS)'); print(f'{manifest} {split}: {count} scenarios (minimum {minimum})'); raise SystemExit(0 if count >= minimum else 2)"
+	@$(RUN_PYTHON) -c 'from pathlib import Path; from sage_ts.config.splits import load_split_names; manifest=Path("$(1)"); split="$(2)"; count=len(load_split_names(manifest, split)); minimum=int("$(3)"); print(f"{manifest} {split}: {count} scenarios (minimum {minimum})"); raise SystemExit(0 if count >= minimum else 2)'
+endef
+
+define WRITE_DERIVED_SPLIT
+	@$(RUN_PYTHON) -c 'import json; from pathlib import Path; src=Path("$(1)"); dst=Path("$(2)"); source_split="$(3)"; target_split="$(4)"; n=int("$(5)"); data=json.loads(src.read_text()); rows=list(data["splits"][source_split]); assert len(rows) >= n, f"{source_split} only has {len(rows)} rows; cannot derive {n}"; dst.parent.mkdir(parents=True, exist_ok=True); dst.write_text(json.dumps({"manifest_type":"derived_sage_protocol_split","source_manifest":str(src),"source_split":source_split,"splits":{target_split:rows[:n]}}, indent=2) + "\n"); print(f"Wrote {dst} with {n} scenarios as {target_split} from {source_split}")'
+endef
+
+define RUN_PROTOCOL
+	$(call CHECK_GATE_SIZE,$(1),$(2),$(4))
+	$(RUN_PYTHON) scripts/run_sage_protocol.py \
+		--mode $(2) \
+		--manifest $(1) \
+		--agent $(MODEL) \
+		--user $(USER_MODEL) \
+		--generation-model $(MODEL) \
+		--base-tool-policy $(BASE_TOOL_POLICY) \
+		--registry-dir $(REGISTRY) \
+		--output-root $(OUTPUT_ROOT) \
+		--dashboard-port $(PORT) \
+		$(CACHE_FLAGS) \
+		$(PARALLEL_FLAGS) \
+		$(3) \
+		$(RESUME_FLAGS) \
+		$(DASHBOARD_FLAGS)
 endef
 
 test:
@@ -98,58 +214,85 @@ dashboard:
 	$(RUN_PYTHON) scripts/export_dashboard_data.py --protocol-run-root $(RUN)
 	$(RUN_PYTHON) -c "from pathlib import Path; from sage_ts.dashboard.exporters import open_dashboard; d=Path('$(RUN)')/'dashboard'; print(open_dashboard(d/'index.html', port=$(PORT))); print(open_dashboard(d/'task_focus.html', port=$(PORT)))"
 
-mechanism40:
-	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),mechanism_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(RESUME_FLAGS) $(DASHBOARD_FLAGS)
+# ---------------------------------------------------------------------
+# Smoke runs
+# ---------------------------------------------------------------------
 
-smoke4:
-	@echo "smoke4 requires an explicit smoke_4 split; it no longer aliases to smoke12."
-	@exit 2
+smoke6:
+	$(call WRITE_DERIVED_SPLIT,$(SMOKE_SOURCE_MANIFEST),$(SMOKE6_MANIFEST),$(SMOKE_SOURCE_SPLIT),$(SMOKE6_SPLIT),6)
+	$(call RUN_PROTOCOL,$(SMOKE6_MANIFEST),$(SMOKE6_SPLIT),$(PROTOCOL_GENERATION_FLAGS),6)
 
 smoke12:
-	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(RESUME_FLAGS) $(DASHBOARD_FLAGS)
+	$(call WRITE_DERIVED_SPLIT,$(SMOKE_SOURCE_MANIFEST),$(SMOKE12_MANIFEST),$(SMOKE_SOURCE_SPLIT),$(SMOKE12_SPLIT),12)
+	$(call RUN_PROTOCOL,$(SMOKE12_MANIFEST),$(SMOKE12_SPLIT),$(PROTOCOL_GENERATION_FLAGS),12)
+
+# ---------------------------------------------------------------------
+# Viability / mechanism runs
+# ---------------------------------------------------------------------
 
 viability12:
-	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(RESUME_FLAGS) $(DASHBOARD_FLAGS)
+	$(call WRITE_DERIVED_SPLIT,$(VIABILITY_SOURCE_MANIFEST),$(VIABILITY12_MANIFEST),$(VIABILITY_SOURCE_SPLIT),$(VIABILITY12_SPLIT),12)
+	$(call RUN_PROTOCOL,$(VIABILITY12_MANIFEST),$(VIABILITY12_SPLIT),$(PROTOCOL_GENERATION_FLAGS),12)
+
+mechanism12:
+	$(call WRITE_DERIVED_SPLIT,$(MECHANISM12_SOURCE_MANIFEST),$(MECHANISM12_MANIFEST),$(MECHANISM12_SOURCE_SPLIT),$(MECHANISM12_SPLIT),12)
+	$(call RUN_PROTOCOL,$(MECHANISM12_MANIFEST),$(MECHANISM12_SPLIT),$(PROTOCOL_GENERATION_FLAGS),12)
+
+mechanism40:
+	$(call RUN_PROTOCOL,$(CATEGORY_MANIFEST),$(MECHANISM40_SPLIT),$(PROTOCOL_GENERATION_FLAGS),40)
+
+mechanism60:
+	$(call WRITE_DERIVED_SPLIT,$(MECHANISM60_SOURCE_MANIFEST),$(MECHANISM60_MANIFEST),$(MECHANISM60_SOURCE_SPLIT),$(MECHANISM60_SPLIT),60)
+	$(call RUN_PROTOCOL,$(MECHANISM60_MANIFEST),$(MECHANISM60_SPLIT),$(PROTOCOL_GENERATION_FLAGS),60)
+
+# ---------------------------------------------------------------------
+# POC reproduction
+# ---------------------------------------------------------------------
 
 reproduce_poc:
-	$(call CHECK_GATE_SIZE,$(POC_PROTOCOL_MANIFEST),mechanism_40)
 	@if [ -f "$(REGISTRY)/registry_manifest.json" ]; then \
 		echo "Refusing to reproduce POC into non-empty REGISTRY=$(REGISTRY). Pass a fresh REGISTRY=..."; \
 		exit 2; \
 	fi
-	@$(RUN_PYTHON) -c "import json; from pathlib import Path; src=Path('$(POC_MANIFEST)'); dst=Path('$(POC_PROTOCOL_MANIFEST)'); data=json.loads(src.read_text()); rows=data['splits']['relative_datetime_probe']; dst.parent.mkdir(parents=True, exist_ok=True); dst.write_text(json.dumps({'manifest_type':'sage_protocol_poc','splits':{'mechanism_40':rows}}, indent=2)+'\n')"
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode mechanism_40 --manifest $(POC_PROTOCOL_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(RESUME_FLAGS) $(DASHBOARD_FLAGS)
+	@$(RUN_PYTHON) -c 'import json; from pathlib import Path; src=Path("$(POC_MANIFEST)"); dst=Path("$(POC_PROTOCOL_MANIFEST)"); data=json.loads(src.read_text()); rows=data["splits"]["relative_datetime_probe"]; dst.parent.mkdir(parents=True, exist_ok=True); dst.write_text(json.dumps({"manifest_type":"sage_protocol_poc","splits":{"$(MECHANISM40_SPLIT)":rows}}, indent=2)+"\n"); print(f"Wrote {dst} with {len(rows)} scenarios as $(MECHANISM40_SPLIT)")'
+	$(call RUN_PROTOCOL,$(POC_PROTOCOL_MANIFEST),$(MECHANISM40_SPLIT),$(PROTOCOL_GENERATION_FLAGS),40)
+
+# ---------------------------------------------------------------------
+# Transfer runs
+# ---------------------------------------------------------------------
 
 transfer_recency:
-	$(call CHECK_GATE_SIZE,$(RECENCY_TRANSFER_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RECENCY_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(FROZEN_GENERATION_FLAGS) $(RESUME_FLAGS) $(DASHBOARD_FLAGS)
+	$(call RUN_PROTOCOL,$(RECENCY_TRANSFER_MANIFEST),$(TRANSFER40_SPLIT),$(FROZEN_GENERATION_FLAGS),40)
 
 transfer_relative_time:
-	$(call CHECK_GATE_SIZE,$(RELATIVE_TIME_TRANSFER_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(RELATIVE_TIME_TRANSFER_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(FROZEN_GENERATION_FLAGS) $(RESUME_FLAGS) $(DASHBOARD_FLAGS)
+	$(call RUN_PROTOCOL,$(RELATIVE_TIME_TRANSFER_MANIFEST),$(TRANSFER40_SPLIT),$(FROZEN_GENERATION_FLAGS),40)
 
 transfer40:
-	$(call CHECK_GATE_SIZE,$(CATEGORY_MANIFEST),transfer_40)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode transfer_40 --manifest $(CATEGORY_MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(RESUME_FLAGS) $(DASHBOARD_FLAGS)
+	$(call RUN_PROTOCOL,$(CATEGORY_MANIFEST),$(TRANSFER40_SPLIT),$(FROZEN_GENERATION_FLAGS),40)
 
 transfer60:
-	@echo "transfer60 requires an explicit transfer_60 split/protocol mode; it no longer aliases to transfer40."
-	@exit 2
+	$(call WRITE_DERIVED_SPLIT,$(TRANSFER60_SOURCE_MANIFEST),$(TRANSFER60_MANIFEST),$(TRANSFER60_SOURCE_SPLIT),$(TRANSFER60_SPLIT),60)
+	$(call RUN_PROTOCOL,$(TRANSFER60_MANIFEST),$(TRANSFER60_SPLIT),$(FROZEN_GENERATION_FLAGS),60)
+
+transfer100:
+	$(call RUN_PROTOCOL,$(MANIFEST),$(TRANSFER100_SPLIT),$(FROZEN_GENERATION_FLAGS),100)
+
+# ---------------------------------------------------------------------
+# Confirmation / validation runs
+# ---------------------------------------------------------------------
 
 confirm100:
-	$(call CHECK_GATE_SIZE,$(MANIFEST),extended_reuse_100)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode extended_reuse_100 --manifest $(MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(RESUME_FLAGS) $(DASHBOARD_FLAGS)
+	$(call RUN_PROTOCOL,$(MANIFEST),$(CONFIRM100_SPLIT),$(FROZEN_GENERATION_FLAGS),100)
 
 validate100:
-	$(call CHECK_GATE_SIZE,$(MANIFEST),extended_reuse_100)
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode extended_reuse_100 --manifest $(MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(RESUME_FLAGS) $(DASHBOARD_FLAGS)
+	$(call RUN_PROTOCOL,$(MANIFEST),$(VALIDATE100_SPLIT),$(FROZEN_GENERATION_FLAGS),100)
 
 validate250:
-	$(call CHECK_GATE_SIZE,$(MANIFEST),$(SPLIT))
-	$(RUN_PYTHON) scripts/run_sage_protocol.py --mode $(SPLIT) --manifest $(MANIFEST) --agent $(MODEL) --generation-model $(MODEL) --base-tool-policy $(BASE_TOOL_POLICY) --registry-dir $(REGISTRY) --output-root $(OUTPUT_ROOT) --dashboard-port $(PORT) $(CACHE_FLAGS) $(PARALLEL_FLAGS) $(PROTOCOL_GENERATION_FLAGS) $(RESUME_FLAGS) $(DASHBOARD_FLAGS)
+	$(call RUN_PROTOCOL,$(MANIFEST),$(VALIDATE250_SPLIT),$(FROZEN_GENERATION_FLAGS),250)
+
+# ---------------------------------------------------------------------
+# Reporting / utilities
+# ---------------------------------------------------------------------
 
 summarize:
 	@if [ -f "$(RUN)/protocol_manifest.json" ]; then \

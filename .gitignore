@@ -168,6 +168,9 @@ generated_tools/
 *.local.json
 *.local.yaml
 
+# Generated review bundles too large for git
+docs/sage_protocol/decisive_tool_review_bundle.md
+
 # Local notebooks and ad-hoc analysis
 notebooks/local/
 *.scratch.ipynb

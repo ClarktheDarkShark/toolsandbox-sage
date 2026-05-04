@@ -1,0 +1,62 @@
+PHASE D — RAPID PORTFOLIO ABLATION
+
+Start only after Phase C pass.
+
+Objective:
+Find the smallest positive portfolio.
+
+Use:
+1. control with no generated tools
+2. each helper alone
+3. full portfolio
+4. leave-one-out for each helper
+
+Use:
+- generation OFF
+- same cohort for all arms
+- same model/config
+- active claim-safe registries only
+- no code edits during runs
+
+Measure:
+- outcome_similarity delta
+- canonical delta
+- exact success
+- gains/regressions/preserved
+- per-tool visible/called counts
+- applicable subset delta
+- non-applicable subset delta
+- side-effect violations
+- runtime exceptions
+- route mismatches
+- called-but-harmful cases
+- visible-not-called cases
+
+Keep a tool if:
+- positive or neutral-positive alone
+- improves or preserves full portfolio
+- actually called
+- no context pollution
+- no side-effect issues
+
+Suppress a tool if:
+- broad visibility, low calls
+- harmful in non-applicable cases
+- improves only one narrow slice but hurts mixed run
+
+Phase D pass gate:
+- full portfolio beats control on outcome_similarity
+- canonical positive or route-mismatch-explained
+- gains exceed regressions
+- side-effect violations = 0
+- runtime exceptions = 0
+- non-applicable subset not harmed
+- at least 3 tools have actual calls and positive or neutral-positive contribution
+
+Report:
+docs/sage_protocol/phase_D_portfolio_ablation_report.md
+
+Decision label:
+- pass
+- needs one general repair
+- blocked by evaluation or claim-safety issue

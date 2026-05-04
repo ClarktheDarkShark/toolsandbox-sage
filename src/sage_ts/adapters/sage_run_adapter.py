@@ -22,7 +22,7 @@ from sage_ts.orchestration.online_birth import (
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 from sage_ts.runtime.toolsandbox_integration import (
-    registry_entry_visibility_reason,
+    route_registry_entries,
     with_registry_tools,
 )
 from tool_sandbox.common.scenario import Scenario
@@ -308,9 +308,13 @@ def run_sage_with_registry(
 
         loaded_entries = store.load_entries()
         retained_tools_loaded = sorted(loaded_entries)
+        _routed_entries, routing_decisions = route_registry_entries(
+            loaded_entries,
+            name,
+        )
         visibility_by_tool = {
-            tool_name: registry_entry_visibility_reason(entry, name)
-            for tool_name, entry in sorted(loaded_entries.items())
+            tool_name: (decision.visible, decision.reason)
+            for tool_name, decision in routing_decisions.items()
         }
         shortlisted_generated_tools = [
             tool_name
@@ -375,6 +379,10 @@ def run_sage_with_registry(
                 "relevance_gating_hid_retained_tool": bool(
                     filtered_out_generated_tools
                 ),
+                "routing_decisions": {
+                    tool_name: decision.to_json()
+                    for tool_name, decision in routing_decisions.items()
+                },
                 "tool_allow_list": list(
                     enhanced.starting_context.tool_allow_list or []
                 ),

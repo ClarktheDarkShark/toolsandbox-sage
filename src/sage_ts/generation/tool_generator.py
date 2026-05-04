@@ -32,6 +32,8 @@ class ToolGenerationRequest:
     validation_examples: tuple[dict[str, object], ...] = ()
     suggested_tool_name: str | None = None
     inadequacy_evidence: dict[str, object] | None = None
+    failure_memory_context: dict[str, object] | None = None
+    shortfall_cluster_context: dict[str, object] | None = None
 
     def prompt(self) -> str:
         families = ", ".join(self.allowed_families)
@@ -50,6 +52,22 @@ class ToolGenerationRequest:
             if self.inadequacy_evidence
             else ""
         )
+        failure_memory = (
+            f" Relevant unresolved failure memory: {json.dumps(self.failure_memory_context)}. "
+            "If this repeats a prior mechanism, set diagnostic_only=true unless the "
+            "design explicitly names the mechanism in known_failure_mechanisms_addressed "
+            "and explains the material repair in reason_tool_is_decisive."
+            if self.failure_memory_context
+            else ""
+        )
+        cluster_context = (
+            f" Shortfall cluster context: {json.dumps(self.shortfall_cluster_context)}. "
+            "If non_diagnostic_birth_allowed is false, set diagnostic_only=true. "
+            "If it is true, cite cluster_id or failure_mechanism in "
+            "shortfall_cluster_evidence."
+            if self.shortfall_cluster_context
+            else ""
+        )
         return (
             "Propose one deterministic Python helper tool as JSON with two top-level "
             'keys: "spec" and "code". '
@@ -61,11 +79,48 @@ class ToolGenerationRequest:
             "positive_triggers (list[str]), negative_triggers (list[str]), "
             "preserves_side_effect_tools (list[str]), "
             "required_original_tool_calls (list[str]), abstain_behavior (str), "
-            "generalization_rationale (str), inadequacy_evidence (object). "
+            "generalization_rationale (str), estimated_step_compression (int), "
+            "cross_task_applicability_count (int), "
+            "applicable_task_families (list[str]), reason_tool_is_decisive (str), "
+            "diagnostic_only (bool), shortfall_cluster_evidence (list[str]), "
+            "known_failure_mechanisms_addressed (list[str]), "
+            "inadequacy_evidence (object). "
             "inadequacy_evidence must include: summary (str), signals (list[str]), "
             "failed_tool_calls (list[str]), repeated_failed_tool_calls (list[str]), "
             "visible_data_gaps (list[str]), planner_failures (list[str]), "
             "final_answer_route_mismatch (bool). "
+            "Reject thin helpers: only propose a tool when it compresses at least 3 "
+            "reasoning/tool-use steps, applies across at least 2 task families, "
+            "preserves required downstream ToolSandbox tools, and does more than "
+            "replace a single existing base tool. "
+            "Use concrete scenario-family labels in applicable_task_families, "
+            "not helper-family labels such as canonicalizer, state_precondition_helper, "
+            "search_filter_ranking_helper, or timestamp_conversion. "
+            "Set diagnostic_only true only when the evidence is from a single task "
+            "or no recurring shortfall cluster is available. Claim-grade candidates "
+            "must set diagnostic_only false and include shortfall_cluster_evidence "
+            "naming at least one recurring mechanism plus "
+            "known_failure_mechanisms_addressed naming the concrete failure modes "
+            "the helper is intended to repair. "
+            "If family is search_filter_ranking_helper, output_schema must be a "
+            "JSON Schema object with type 'object' and properties including "
+            "selected_record. Include value or selected_id when the helper returns "
+            "a field/id. Include negative_triggers for no candidates, ambiguous "
+            "matches, missing fields, and insufficient constraints. The helper must "
+            "use only visible records/candidates passed as inputs and must abstain "
+            "with an empty dict when no unique safe selection exists. "
+            "If family is state_precondition_helper, output_schema must be a JSON "
+            "Schema object with type 'object' and properties exactly covering the "
+            "runtime contract: tool_name, arguments, should_call, and reason. "
+            "tool_name must have enum ['', 'set_wifi_status', "
+            "'set_cellular_service_status', 'set_location_service_status', "
+            "'set_low_battery_mode_status']. Include negative_triggers for already "
+            "ready state, unknown target service, and insufficient state. "
+            "If family is derived_value_calculator and output_annotation is dict, "
+            "output_schema must be a JSON Schema object with type 'object' and "
+            "properties for every returned key. It must preserve a downstream "
+            "original ToolSandbox call such as search_*, modify_*, send_*, set_*, "
+            "or add_* in required_original_tool_calls or preserves_side_effect_tools. "
             "Annotations must be exactly one of: str, int, float, bool, dict, list. "
             'If the output is a dictionary, output_annotation must be exactly "dict". '
             '"code" is a self-contained Python function string with exactly one '
@@ -79,7 +134,7 @@ class ToolGenerationRequest:
             f"{tool_name_hint} "
             f"Allowed families: {families}. "
             f"Scenario: {self.scenario_name}. Observation: {self.observation}."
-            f"{evidence}{examples}"
+            f"{evidence}{failure_memory}{cluster_context}{examples}"
         )
 
 
@@ -90,7 +145,7 @@ class ToolGenerator:
 
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
         prompt = request.prompt()
-        key = cache_key(self.completer.model, {"kind": "tool_generation_v4"}, prompt)
+        key = cache_key(self.completer.model, {"kind": "tool_generation_v6"}, prompt)
         response = self.cache.get(key)
         if response is None:
             response = self.completer.complete(
@@ -153,6 +208,28 @@ def parse_generated_tool_json(response: str) -> GeneratedTool:
         ),
         abstain_behavior=str(spec_payload.get("abstain_behavior", "")),
         generalization_rationale=str(spec_payload["generalization_rationale"]),
+        estimated_step_compression=(
+            int(spec_payload["estimated_step_compression"])
+            if spec_payload.get("estimated_step_compression") is not None
+            else None
+        ),
+        cross_task_applicability_count=(
+            int(spec_payload["cross_task_applicability_count"])
+            if spec_payload.get("cross_task_applicability_count") is not None
+            else None
+        ),
+        applicable_task_families=tuple(
+            str(item) for item in spec_payload.get("applicable_task_families", ())
+        ),
+        reason_tool_is_decisive=str(spec_payload.get("reason_tool_is_decisive", "")),
+        diagnostic_only=bool(spec_payload.get("diagnostic_only", False)),
+        shortfall_cluster_evidence=tuple(
+            str(item) for item in spec_payload.get("shortfall_cluster_evidence", ())
+        ),
+        known_failure_mechanisms_addressed=tuple(
+            str(item)
+            for item in spec_payload.get("known_failure_mechanisms_addressed", ())
+        ),
         inadequacy_evidence=StructuredInadequacyEvidence.from_json(
             dict(spec_payload.get("inadequacy_evidence", {}))
         )

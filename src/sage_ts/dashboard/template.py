@@ -294,11 +294,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         const dcls = Number(r.delta || 0) > 0 ? "good" : Number(r.delta || 0) < 0 ? "bad" : "";
         const artifacts = [r.control_trace_url ? `<a href="${r.control_trace_url}">control</a>` : "", r.candidate_trace_url ? `<a href="${r.candidate_trace_url}">sage</a>` : ""].filter(Boolean).join(" · ");
         const controlOutcome = present(r.control_outcome_similarity) ? `<div class="tiny">outcome ${pct(r.control_outcome_similarity)}</div>` : "";
+        const controlCache = r.control_cache_source === "cached" ? `<div class="tiny">control source: cached</div>` : "";
         const sageOutcome = present(r.candidate_outcome_similarity) ? `<div class="tiny">outcome ${pct(r.candidate_outcome_similarity)}</div>` : "";
         const deltaOutcome = present(r.outcome_delta) ? `<div class="tiny">outcome ${fmt(r.outcome_delta, 4)}</div>` : "";
         return `<tr class="${r.status || ""}">
           <td><div class="scenario-name">${esc(r.scenario)}</div><div class="tiny">${esc((r.categories || []).join(" · "))}</div></td>
-          <td class="score">${pct(r.control_similarity)}${controlOutcome}${r.control_exception ? `<div class="tiny bad">${esc(r.control_exception)}</div>` : ""}</td>
+          <td class="score">${pct(r.control_similarity)}${controlOutcome}${controlCache}${r.control_exception ? `<div class="tiny bad">${esc(r.control_exception)}</div>` : ""}</td>
           <td class="score">${pct(r.candidate_similarity)}${sageOutcome}${r.candidate_exception ? `<div class="tiny bad">${esc(r.candidate_exception)}</div>` : ""}</td>
           <td class="score ${dcls}">${fmt(r.delta, 4)}${deltaOutcome}</td>
           <td>${r.control_turns ?? "-"} → ${r.candidate_turns ?? "-"}</td>

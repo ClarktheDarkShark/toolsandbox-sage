@@ -114,6 +114,12 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
                 "similarity": 0.2,
                 "turn_count": 6,
                 "categories": ["CANONICALIZATION"],
+                "control_cache_source": "cached",
+                "control_cache": {
+                    "source": "cached",
+                    "compatible_count": 3,
+                    "canonical_variance": 0.01,
+                },
             },
             {"name": "b", "similarity": 1.0, "turn_count": 4, "categories": []},
         ],
@@ -174,6 +180,15 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
     assert data["model_metadata"]["agent"]["resolved_model"] == "gpt-4o-mini"
     assert data["comparison_model_key"].startswith("agent=gpt-4o-mini")
     assert data["scenarios"][0]["reused_tools"] == ["helper"]
+    assert data["scenarios"][0]["control_cache_source"] == "cached"
+    assert data["scenarios"][0]["control_cache"]["compatible_count"] == 3
+    task_focus = json.loads(
+        (index.parent / "task_focus_data.json").read_text(encoding="utf-8")
+    )
+    assert task_focus["tasks"][0]["control_cache_source"] == "cached"
+    assert "control source: cached" in (index.parent / "index.html").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_task_focus_exports_guardrail_evidence_and_left_aligned_tool_messages(
@@ -793,6 +808,95 @@ def test_task_focus_uses_attempted_tool_call_for_missed_required_tool_trace(
     assert check["observed"] == [
         'search_stock({"query": "Apple"})',
         "search_stock: PermissionError: missing API key",
+    ]
+
+
+def test_task_focus_fallback_matches_partial_milestone_from_expected_text(
+    tmp_path: Path,
+) -> None:
+    run_root = tmp_path / "run"
+    candidate = run_root / "candidate" / "candidate_run"
+    candidate.mkdir(parents=True, exist_ok=True)
+    (candidate / "live_result_summary.json").write_text(
+        json.dumps(
+            {
+                "per_scenario_results": [
+                    {
+                        "name": "partial_text_match_case",
+                        "categories": ["STATE_DEPENDENCY"],
+                        "milestone_similarity": 0.9140840412743819,
+                        "minefield_similarity": 0.0,
+                        "milestone_mapping": {"0": [1, 0.9140840412743819]},
+                        "minefield_mapping": {},
+                        "turn_count": 1,
+                    }
+                ]
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    trajectory = candidate / "trajectories" / "partial_text_match_case"
+    trajectory.mkdir(parents=True)
+    (trajectory / "conversation.json").write_text(
+        json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "content": 'The todo item you made yesterday is: **"Buy tickets for Merrily next week."**',
+                    "assistant_details": {
+                        "milestone_matches": [
+                            {
+                                "milestone_index": 0,
+                                "milestone_similarity": 0.9140840412743819,
+                                "milestone": {
+                                    "snapshot_constraints": [
+                                        {
+                                            "database_namespace": "SANDBOX",
+                                            "snapshot_constraint": "snapshot_similarity",
+                                            "target_dataframe": [
+                                                {
+                                                    "sender": "AGENT",
+                                                    "recipient": "USER",
+                                                    "content": "Buy tickets for Merrily next week.",
+                                                }
+                                            ],
+                                        }
+                                    ]
+                                },
+                            }
+                        ]
+                    },
+                },
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    registry = run_root / "registry"
+    registry.mkdir(parents=True)
+    index = write_protocol_dashboard(
+        run_root,
+        mode="transfer_40",
+        status="complete",
+        phase="paired",
+        agent="gpt-5-mini",
+        user="GPT_4_o_2024_05_13_05_02_2026_19_54_54",
+        generation_enabled=False,
+        base_tool_policy="upstream",
+        scenario_count=1,
+        candidate_dir=candidate,
+        registry_dir=registry,
+    )
+    task_focus = json.loads(
+        (index.parent / "task_focus_data.json").read_text(encoding="utf-8")
+    )
+
+    check = task_focus["tasks"][0]["evaluation"]["checks"][0]
+    assert check["status"] == "partial"
+    assert check["observed"] == [
+        'The todo item you made yesterday is: **"Buy tickets for Merrily next week."**'
     ]
 
 

@@ -28,6 +28,11 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "temporal_reminder_date_canonicalization",
         "record_filtering_ranking_latest_selection",
     ),
+    "resolve_search_window_or_bounds": (
+        "temporal_reminder_date_canonicalization",
+        "record_filtering_ranking_latest_selection",
+        "contact_message_search_disambiguation",
+    ),
     "select_latest_record_by_timestamp": (
         "record_filtering_ranking_latest_selection",
         "contact_message_search_disambiguation",
@@ -53,6 +58,9 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
     "canonicalizer:relative_day_time_timestamp": ("relative_day_time_to_timestamp",),
     "derived_value:days_between_timestamps": ("days_between_timestamps",),
     "derived_value:recency_timestamp_bounds": ("recency_to_timestamp_bounds",),
+    "derived_value:resolve_search_window_or_bounds": (
+        "resolve_search_window_or_bounds",
+    ),
     "search_filter:select_record_by_timestamp_extreme": (
         "select_record_by_timestamp_extreme",
     ),
@@ -273,6 +281,18 @@ def expected_helper_fit(
     ):
         helpers.append("recency_to_timestamp_bounds")
 
+    if (
+        "insufficient_information" not in name
+        and name.startswith("search_reminder_with_creation_recency_")
+        and any(token in name for token in ("yesterday", "today"))
+    ):
+        helpers.append("resolve_search_window_or_bounds")
+    if (
+        "insufficient_information" not in name
+        and name.startswith("search_reminder_with_recency_")
+        and any(token in name for token in ("yesterday", "today", "upcoming"))
+    ):
+        helpers.append("resolve_search_window_or_bounds")
     if "insufficient_information" not in name and name.startswith(
         (
             "modify_contact_with_message_recency",
@@ -289,6 +309,7 @@ def expected_helper_fit(
         )
     ):
         helpers.append("message_search_time_window")
+        helpers.append("resolve_search_window_or_bounds")
     if any(token in name for token in ("holiday", "business_day")):
         helpers.append("days_between_timestamps")
     if "insufficient_information" not in name and name.startswith(
@@ -314,6 +335,10 @@ def expected_helper_fit(
         "insufficient_information" not in name
         and name.startswith("add_reminder_content_and_")
         and "_time" in name
+        and not (
+            name.startswith("add_reminder_content_and_week_delta_and_time")
+            and "_location" not in name
+        )
     ):
         helpers.append("prepare_reminder_creation_args")
 
@@ -334,6 +359,14 @@ def expected_birth_opportunities(
     opportunities: list[str] = []
     if "recency" in name and "CANONICALIZATION" in category_set:
         opportunities.append("derived_value:recency_timestamp_bounds")
+    if name.startswith("search_reminder_with_creation_recency_") and any(
+        token in name for token in ("yesterday", "today")
+    ):
+        opportunities.append("derived_value:resolve_search_window_or_bounds")
+    if name.startswith("search_reminder_with_recency_") and any(
+        token in name for token in ("yesterday", "today", "upcoming")
+    ):
+        opportunities.append("derived_value:resolve_search_window_or_bounds")
     if name.startswith("modify_reminder_with_recency_latest"):
         opportunities.append("canonicalizer:relative_day_time_timestamp")
     if name.startswith(
@@ -344,6 +377,7 @@ def expected_birth_opportunities(
         )
     ):
         opportunities.append("search_filter:select_record_by_timestamp_extreme")
+        opportunities.append("derived_value:resolve_search_window_or_bounds")
     if name.startswith(
         (
             "modify_contact_with_message_recency",
@@ -362,7 +396,14 @@ def expected_birth_opportunities(
         opportunities.append("state_precondition:next_service_tool_call")
     if name.startswith(DOWNSTREAM_SERVICE_HELPER_PREFIXES):
         opportunities.append("state_precondition:recover_from_tool_error")
-    if name.startswith("add_reminder_content_and_") and "_time" in name:
+    if (
+        name.startswith("add_reminder_content_and_")
+        and "_time" in name
+        and not (
+            name.startswith("add_reminder_content_and_week_delta_and_time")
+            and "_location" not in name
+        )
+    ):
         opportunities.append("composite:prepare_reminder_creation_args")
     return opportunities
 
@@ -417,9 +458,23 @@ def cohort_policy_report(
     if scenario_count >= 60:
         required_families = 8
     elif scenario_count >= 30:
+        required_families = 6
+    elif scenario_count >= 20:
         required_families = 5
     else:
         required_families = min(scenario_count, 4)
+    if scenario_count >= 60:
+        max_family_share = 0.20
+        max_family_variants = 8
+    elif scenario_count >= 30:
+        max_family_share = 0.20
+        max_family_variants = 4
+    elif scenario_count >= 20:
+        max_family_share = 0.25
+        max_family_variants = 2
+    else:
+        max_family_share = 1.00
+        max_family_variants = scenario_count
 
     has_birth_path = any(
         key != "no_current_birth_opportunity" and count > 0
@@ -433,6 +488,18 @@ def cohort_policy_report(
     helper_fit_scenario_count = scenario_count - no_helper_fit_count
     helper_fit_share = (
         helper_fit_scenario_count / scenario_count if scenario_count else 0.0
+    )
+    no_helper_fit_share = (
+        no_helper_fit_count / scenario_count if scenario_count else 0.0
+    )
+    helper_lane_counts = {
+        key: count
+        for key, count in helper_fit_counts.items()
+        if key != "no_current_helper_fit"
+    }
+    largest_helper_lane = max(helper_lane_counts.values(), default=0)
+    largest_helper_lane_share = (
+        largest_helper_lane / scenario_count if scenario_count else 0.0
     )
     post_birth_reuse: dict[str, dict[str, Any]] = {}
     for index, row in enumerate(per_scenario):
@@ -479,8 +546,19 @@ def cohort_policy_report(
         for warning in (
             "external_service_cases_present" if contaminated else "",
             "too_few_base_families" if len(family_counts) < required_families else "",
-            "family_share_above_20_percent"
-            if scenario_count >= 30 and largest_family_share > 0.2
+            "family_share_above_limit"
+            if scenario_count >= 20 and largest_family_share > max_family_share
+            else "",
+            "near_duplicate_family_variants_above_limit"
+            if scenario_count >= 20 and largest_family > max_family_variants
+            else "",
+            "weak_negative_no_helper_coverage"
+            if scenario_count >= 20
+            and registry_tool_count > 0
+            and no_helper_fit_share < 0.2
+            else "",
+            "known_helper_lane_overrepresented"
+            if scenario_count >= 20 and largest_helper_lane_share > 0.6
             else "",
             "no_expected_helper_fit" if not has_helper_fit else "",
             "low_expected_helper_fit_share"
@@ -497,21 +575,50 @@ def cohort_policy_report(
         )
         if warning
     ]
-    should_block = (
+    quality_failures = [
+        failure
+        for failure in (
+            "too_few_base_families"
+            if scenario_count >= 20 and len(family_counts) < required_families
+            else "",
+            "family_share_above_limit"
+            if scenario_count >= 20 and largest_family_share > max_family_share
+            else "",
+            "near_duplicate_family_variants_above_limit"
+            if scenario_count >= 20 and largest_family > max_family_variants
+            else "",
+            "weak_negative_no_helper_coverage"
+            if scenario_count >= 20
+            and registry_tool_count > 0
+            and no_helper_fit_share < 0.2
+            else "",
+            "known_helper_lane_overrepresented"
+            if scenario_count >= 20 and largest_helper_lane_share > 0.6
+            else "",
+        )
+        if failure
+    ]
+    should_block_birth = (
         generation_enabled
         and registry_tool_count == 0
         and not has_birth_path
         and not has_helper_fit
     )
+    should_block_quality = bool(quality_failures)
     return {
         "scenario_count": scenario_count,
         "distinct_base_task_families": len(family_counts),
         "required_distinct_base_task_families": required_families,
         "largest_family_share": largest_family_share,
+        "max_allowed_family_share": max_family_share,
+        "largest_family_variant_count": largest_family,
+        "max_allowed_family_variants": max_family_variants,
         "family_counts": dict(family_counts.most_common()),
         "strata_counts": dict(strata_counts.most_common()),
         "expected_helper_fit_counts": dict(helper_fit_counts.most_common()),
         "expected_helper_fit_share": helper_fit_share,
+        "no_current_helper_fit_share": no_helper_fit_share,
+        "largest_helper_lane_share": largest_helper_lane_share,
         "expected_birth_opportunity_counts": dict(
             birth_opportunity_counts.most_common()
         ),
@@ -523,12 +630,17 @@ def cohort_policy_report(
         "has_expected_helper_fit": has_helper_fit,
         "has_post_birth_reuse_opportunity": has_post_birth_reuse_opportunity,
         "post_birth_reuse_opportunities": post_birth_reuse,
-        "should_block": should_block,
+        "should_block": should_block_birth,
+        "should_block_birth": should_block_birth,
+        "should_block_quality": should_block_quality,
+        "quality_gate_status": "fail" if should_block_quality else "pass",
+        "quality_gate_failures": quality_failures,
         "decision_use": (
             "suitable_for_broad_value_decision"
-            if scenario_count >= 30
+            if scenario_count >= 20
             and len(family_counts) >= required_families
-            and largest_family_share <= 0.2
+            and largest_family_share <= max_family_share
+            and not should_block_quality
             else "suitable_for_early_value_only"
         ),
         "warnings": warnings,

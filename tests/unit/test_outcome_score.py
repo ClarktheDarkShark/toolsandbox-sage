@@ -89,3 +89,50 @@ def test_outcome_score_uses_target_facts_for_route_independent_final_answer() ->
         "route",
         "answer",
     ]
+
+
+def test_outcome_score_only_uses_final_agent_to_user_message() -> None:
+    scenario_name = "find_days_till_holiday_3_distraction_tools"
+    scenario = resolve_scenarios(
+        desired_scenario_names=[scenario_name],
+        preferred_tool_backend=ToolBackend.DEFAULT,
+    )[scenario_name]
+    execution_context = ExecutionContext()
+    execution_context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.EXECUTION_ENVIRONMENT,
+                "recipient": RoleType.AGENT,
+                "content": str(1700000000.0),
+                "tool_trace": [
+                    json.dumps(
+                        {
+                            "tool_name": "get_current_timestamp",
+                            "arguments": {},
+                            "result": 1700000000.0,
+                        }
+                    )
+                ],
+            },
+            {
+                "sender": RoleType.AGENT,
+                "recipient": RoleType.USER,
+                "content": "There are 238 days until Christmas Day.",
+            },
+            {
+                "sender": RoleType.AGENT,
+                "recipient": RoleType.USER,
+                "content": "No clue.",
+            },
+        ],
+    )
+
+    outcome = compute_outcome_score(
+        scenario,
+        execution_context,
+        canonical_milestone_scores={0: 1.0, 1: 0.0, 2: 0.0, 3: 0.0},
+        minefield_similarity=0.0,
+    )
+
+    assert outcome["outcome_similarity"] == 0.0

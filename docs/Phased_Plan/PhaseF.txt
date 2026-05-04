@@ -1,0 +1,71 @@
+PHASE F — FORMAL 250 + FINAL PACKAGE
+
+Start only after Phase E pass or qualified pass.
+
+Objective:
+Run the formal 250-task stress and prepare final evidence package.
+
+Run:
+- 250 mixed tasks
+- matched control vs SAGE
+- generation OFF
+- same registry as Phase E unless one documented general repair was approved
+- no code edits during run
+
+250 pass gate:
+- outcome_similarity relative lift >= 10%
+- canonical relative lift >= 10% OR route-mismatch-qualified explanation
+- confidence interval excludes zero for outcome_similarity lift
+- exact successes improve or neutral with strong lift
+- gains clearly exceed regressions
+- side-effect violations = 0
+- runtime exceptions = 0
+- non-applicable subset not harmed
+- tools actually called in relevant scenarios
+
+If 250 fails:
+- do not patch immediately
+- produce failure taxonomy first:
+  - weak tool coverage
+  - routing pollution
+  - visible-not-called
+  - called-but-harmful
+  - stochastic model error
+  - canonical/outcome mismatch
+  - scoring/reporting bug
+  - side-effect issue
+  - cohort issue
+
+If 250 passes or qualifies:
+Create final package:
+artifacts/final_sage_praxis_package/
+
+Include:
+- active registry manifest/hash
+- tool validation ladder per helper
+- focused cohort evidence
+- frozen reuse evidence
+- portfolio ablation report
+- mixed pilot report
+- formal 100 report
+- formal 250 report
+- canonical vs outcome comparison
+- route mismatch analysis
+- side-effect preservation summary
+- confidence intervals
+- adjudication packet
+- limitations and non-claims
+- final claim summary
+
+Final claim rule:
+- If outcome and canonical both clear target: green claim.
+- If outcome clears target but canonical does not: route-mismatch-qualified claim.
+- Do not call route-mismatch-qualified result a canonical benchmark pass.
+
+Report:
+docs/sage_protocol/phase_F_formal_250_and_final_package_report.md
+
+Decision label:
+- pass
+- needs one general repair
+- blocked by evaluation or claim-safety issue

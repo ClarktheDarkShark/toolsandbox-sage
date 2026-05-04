@@ -270,11 +270,24 @@ def run_scenario_sequence(
             encoding="utf-8",
         )
         base_scenario = apply_base_tool_policy(scenario, config.base_tool_policy)
-        active_scenario = (
-            scenario_transform(name, base_scenario, output_directory)
-            if scenario_transform is not None
-            else base_scenario
-        )
+        active_scenario = base_scenario
+        if scenario_transform is not None:
+            try:
+                active_scenario = scenario_transform(
+                    name,
+                    base_scenario,
+                    output_directory,
+                )
+            except Exception:
+                if event_hook is not None:
+                    event_hook(
+                        "scenario_transform_failed",
+                        output_directory,
+                        {
+                            "scenario": name,
+                            "error": traceback.format_exc(),
+                        },
+                    )
         result = run_one_scenario(
             name,
             active_scenario,

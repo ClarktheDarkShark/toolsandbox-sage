@@ -40,19 +40,41 @@ from sage_ts.campaign.artifacts import (
 from sage_ts.config.models import DEFAULT_MODEL, paired_model_metadata
 from sage_ts.config.splits import load_split_names, scenario_records
 from sage_ts.dashboard.exporters import open_dashboard, write_protocol_dashboard
+from sage_ts.evaluation.control_baseline_cache import (
+    ControlBaselineCache,
+    build_control_cache_report,
+    plan_control_cache,
+    write_synthetic_control_run,
+)
+from sage_ts.evaluation.helper_contribution import write_helper_contribution_summary
 from sage_ts.evaluation.run_metrics import compare_runs
 from sage_ts.evaluation.task_strata import cohort_policy_report
 from sage_ts.generation.prompt_cache import PromptCache
 from sage_ts.generation.tool_generator import ToolGenerator
 from sage_ts.runtime.base_toolset import KNOWN_POLICIES, UPSTREAM_POLICY
 
+# Run modes are also split names. Keep these explicit so bad campaign labels
+# fail early, but support campaign-sized protocol runs directly.
 MODES = (
+    # Smoke / wiring checks
+    "smoke_6",
+    "smoke_12",
+    # Mechanism / tool-birth checks
+    "viability_12",
+    "mechanism_12",
     "mechanism_40",
-    "transfer_40",
+    "mechanism_60",
     "online_build_100",
+    # Frozen transfer checks
+    "transfer_40",
+    "transfer_60",
     "transfer_100",
+    # Confirmation / validation
     "extended_reuse_100",
+    "confirm_100",
+    "validate_100",
     "promotion_250",
+    "validate_250",
     "full_benchmark",
 )
 
@@ -66,15 +88,37 @@ def _manifest_type(manifest: Path) -> str:
 
 
 def _generation_enabled_by_default(mode: str, manifest_type: str) -> bool:
-    """Default live generation for build/discovery lanes, not frozen transfer."""
+    """Default live generation for build/discovery lanes, not frozen validation."""
 
-    if mode in {"mechanism_40", "online_build_100", "extended_reuse_100"}:
+    generation_modes = {
+        "smoke_6",
+        "smoke_12",
+        "viability_12",
+        "mechanism_12",
+        "mechanism_40",
+        "mechanism_60",
+        "online_build_100",
+        "extended_reuse_100",
+    }
+    if mode in generation_modes:
         return True
     return "discovery" in manifest_type.lower()
 
 
 def _is_frozen_transfer_mode(mode: str) -> bool:
-    return mode.startswith("transfer_")
+    """Modes that should default to generation disabled."""
+
+    frozen_modes = {
+        "transfer_40",
+        "transfer_60",
+        "transfer_100",
+        "confirm_100",
+        "validate_100",
+        "promotion_250",
+        "validate_250",
+        "full_benchmark",
+    }
+    return mode in frozen_modes
 
 
 def _timestamp() -> str:
@@ -683,6 +727,18 @@ def main() -> None:
         help="Run the matched control and SAGE arms concurrently in isolated processes.",
     )
     parser.add_argument(
+        "--control-cache",
+        choices=("off", "collect", "use-if-eligible", "refresh", "strict"),
+        default=os.environ.get("CONTROL_CACHE", "use-if-eligible"),
+        help="Control-arm baseline cache mode. Never applies to the SAGE/candidate arm.",
+    )
+    parser.add_argument(
+        "--control-cache-root",
+        type=Path,
+        default=Path("artifacts/baselines/control_task_baselines"),
+        help="Authoritative completed-control baseline cache root.",
+    )
+    parser.add_argument(
         "--generation",
         choices=("auto", "on", "off"),
         default="auto",
@@ -706,6 +762,14 @@ def main() -> None:
         action="store_true",
         help="Allow stock/location/weather/API-contaminated cohorts for explicit diagnostics.",
     )
+    parser.add_argument(
+        "--allow-low-quality-cohort",
+        action="store_true",
+        help=(
+            "Allow a cohort that fails mechanical diversity/near-duplicate checks. "
+            "Use only for explicit diagnostics, not broad claim runs."
+        ),
+    )
     args = parser.parse_args()
 
     scenario_names = tuple(load_split_names(args.manifest, args.mode))
@@ -722,15 +786,63 @@ def main() -> None:
     registry_gate_snapshot = _snapshot_registry_for_gate(run_root, registry_dir)
     control_dir: Path | None = None
     candidate_dir: Path | None = None
+    fresh_control_dir: Path | None = None
     control_resume_dir = _resume_arm_dir(args.resume_run_root, "control")
     candidate_resume_dir = _resume_arm_dir(args.resume_run_root, "candidate")
     generation_enabled = _generation_enabled_by_default(args.mode, manifest_type)
-    if _is_frozen_transfer_mode(args.mode):
-        generation_enabled = False
-    elif args.generation == "on":
+    if args.generation == "on":
         generation_enabled = True
     elif args.generation == "off":
         generation_enabled = False
+    elif _is_frozen_transfer_mode(args.mode):
+        generation_enabled = False
+    control_cache = ControlBaselineCache(args.control_cache_root)
+    control_cache_plan: dict[str, Any] | None = None
+    control_cache_report: dict[str, Any] = {
+        "mode": args.control_cache,
+        "control_source": "fresh",
+        "cached_control_tasks": 0,
+        "fresh_control_tasks": len(scenario_names),
+        "cached_scenarios": [],
+        "fresh_scenarios": list(scenario_names),
+        "cache_misses": {},
+        "cache_manifest_hash": control_cache.manifest_hash(),
+        "baseline_count_and_variance_per_cached_task": {},
+        "estimated_token_time_savings": {
+            "cached_tasks_skipped": 0,
+            "cached_control_turns_avoided": 0,
+            "token_savings": None,
+            "wall_time_seconds_savings": None,
+        },
+        "confidence_intervals_account_for_cached_control_variance": False,
+        "cohort_selection_influenced_by_cache": False,
+    }
+    if args.control_cache in {"use-if-eligible", "strict"}:
+        control_cache_plan = plan_control_cache(
+            cache=control_cache,
+            scenario_names=scenario_names,
+            agent=args.agent,
+            user=args.user,
+            base_tool_policy=args.base_tool_policy,
+            manifest_path=args.manifest,
+        )
+        control_cache_report = build_control_cache_report(
+            mode=args.control_cache,
+            cache=control_cache,
+            scenario_names=scenario_names,
+            cached_scenarios=list(control_cache_plan["cached_scenarios"]),
+            fresh_scenarios=list(control_cache_plan["fresh_scenarios"]),
+            miss_reasons=dict(control_cache_plan["miss_reasons"]),
+            lookups=dict(control_cache_plan["lookups"]),
+        )
+        if args.control_cache == "strict" and control_cache_plan["fresh_scenarios"]:
+            raise SystemExit(
+                "Control cache strict mode blocked this run: ineligible control "
+                f"baselines for {len(control_cache_plan['fresh_scenarios'])} tasks."
+            )
+    effective_parallel_arms = args.parallel_arms and not (
+        control_cache_plan is not None and control_cache_plan["cached_scenarios"]
+    )
     cohort_preflight = _write_cohort_preflight(
         run_root,
         scenario_names=scenario_names,
@@ -747,6 +859,12 @@ def main() -> None:
             "scenario_count": len(scenario_names),
             "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
             "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
+            "cohort_quality_gate_status": cohort_preflight.get("quality_gate_status"),
+            "control_cache_mode": args.control_cache,
+            "control_cache_source": control_cache_report.get("control_source"),
+            "control_cache_manifest_hash": control_cache_report.get(
+                "cache_manifest_hash"
+            ),
         },
         root=args.artifact_root,
     )
@@ -790,6 +908,31 @@ def main() -> None:
             "contamination. Pass --allow-contaminated-preflight only for explicit "
             f"diagnostics. See {run_root / 'cohort_preflight_report.json'}"
         )
+    if (
+        cohort_preflight.get("should_block_quality")
+        and not args.allow_low_quality_cohort
+    ):
+        append_event(
+            "gate_failed",
+            {
+                "mode": args.mode,
+                "gate": "cohort_quality",
+                "run_root": str(run_root),
+                "reason": "low_quality_cohort",
+                "quality_gate_failures": cohort_preflight.get(
+                    "quality_gate_failures", []
+                ),
+                "cohort_preflight_report": str(
+                    run_root / "cohort_preflight_report.json"
+                ),
+            },
+            root=args.artifact_root,
+        )
+        raise SystemExit(
+            "Cohort quality gate blocked this run. Use "
+            "--allow-low-quality-cohort only for explicit diagnostics, not broad "
+            f"claim runs. See {run_root / 'cohort_preflight_report.json'}"
+        )
     append_event(
         "gate_passed",
         {
@@ -813,6 +956,7 @@ def main() -> None:
             "scenario_count": len(scenario_names),
             "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
             "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
+            "cohort_quality_gate_status": cohort_preflight.get("quality_gate_status"),
         },
         root=args.artifact_root,
     )
@@ -856,10 +1000,10 @@ def main() -> None:
     )
     control_cache_dir = args.openai_response_cache_dir
     candidate_cache_dir = args.openai_response_cache_dir
-    if args.parallel_arms:
+    if effective_parallel_arms:
         control_cache_dir = args.openai_response_cache_dir / "control"
         candidate_cache_dir = args.openai_response_cache_dir / "candidate"
-    if response_cache_enabled and not args.parallel_arms:
+    if response_cache_enabled and not effective_parallel_arms:
         install_openai_response_cache(
             args.openai_response_cache_dir,
             mode=args.cache_mode,
@@ -899,7 +1043,7 @@ def main() -> None:
             root=args.artifact_root,
         )
 
-    if args.parallel_arms:
+    if effective_parallel_arms:
         append_event(
             "subtask_started",
             {
@@ -1007,9 +1151,27 @@ def main() -> None:
                 "run_root": str(run_root),
                 "control_dir": str(control_dir),
                 "candidate_dir": str(candidate_dir),
+                "control_cache_mode": args.control_cache,
+                "control_cache_source": control_cache_report.get("control_source"),
             },
             root=args.artifact_root,
         )
+        fresh_control_dir = control_dir
+        if args.control_cache in {"collect", "use-if-eligible", "refresh"}:
+            collected = control_cache.collect_run(
+                run_dir=fresh_control_dir,
+                config=ToolSandboxRunConfig(
+                    agent=args.agent,
+                    user=args.user,
+                    scenario_names=scenario_names,
+                    output_dir=control_root,
+                    processes=1,
+                    run_type=f"{args.mode}_control",
+                    base_tool_policy=args.base_tool_policy,
+                ),
+                manifest_path=args.manifest,
+            )
+            control_cache_report["collected_control_records"] = len(collected)
     else:
 
         def control_progress(
@@ -1022,41 +1184,91 @@ def main() -> None:
             control_dir = run_dir
             refresh_dashboard("control", status)
 
-        configure_response_cache_context(
-            mode=args.mode,
-            arm="control",
-            agent=args.agent,
-            user=args.user,
-            base_tool_policy=args.base_tool_policy,
-            scenario_names=scenario_names,
-            registry_dir=None,
-            generation_enabled=False,
-            generation_model=args.generation_model,
-            recurrence_threshold=args.recurrence_threshold,
-        )
-        reset_openai_response_cache_metrics()
-        control_dir = run_toolsandbox(
-            ToolSandboxRunConfig(
+        cached_rows_by_name: dict[str, dict[str, Any]] = {}
+        fresh_control_scenarios = scenario_names
+        if control_cache_plan is not None:
+            cached_rows_by_name = {
+                name: control_cache_plan["lookups"][name].row
+                for name in control_cache_plan["cached_scenarios"]
+                if control_cache_plan["lookups"][name].row is not None
+            }
+            fresh_control_scenarios = tuple(control_cache_plan["fresh_scenarios"])
+        if fresh_control_scenarios:
+            configure_response_cache_context(
+                mode=args.mode,
+                arm="control",
+                agent=args.agent,
+                user=args.user,
+                base_tool_policy=args.base_tool_policy,
+                scenario_names=fresh_control_scenarios,
+                registry_dir=None,
+                generation_enabled=False,
+                generation_model=args.generation_model,
+                recurrence_threshold=args.recurrence_threshold,
+            )
+            reset_openai_response_cache_metrics()
+            fresh_control_dir = run_toolsandbox(
+                ToolSandboxRunConfig(
+                    agent=args.agent,
+                    user=args.user,
+                    scenario_names=fresh_control_scenarios,
+                    output_dir=control_root,
+                    processes=1,
+                    run_type=f"{args.mode}_control",
+                    base_tool_policy=args.base_tool_policy,
+                    resume_from_dir=control_resume_dir
+                    if fresh_control_scenarios == scenario_names
+                    else None,
+                ),
+                progress_hook=control_progress,
+                event_hook=campaign_event,
+            )
+            control_dir = fresh_control_dir
+            if response_cache_enabled:
+                write_openai_response_cache_metrics(
+                    fresh_control_dir / "openai_response_cache_metrics.json"
+                )
+                write_cache_artifacts(args.artifact_root)
+            if args.control_cache in {"collect", "use-if-eligible", "refresh"}:
+                collected = control_cache.collect_run(
+                    run_dir=fresh_control_dir,
+                    config=ToolSandboxRunConfig(
+                        agent=args.agent,
+                        user=args.user,
+                        scenario_names=fresh_control_scenarios,
+                        output_dir=control_root,
+                        processes=1,
+                        run_type=f"{args.mode}_control",
+                        base_tool_policy=args.base_tool_policy,
+                    ),
+                    manifest_path=args.manifest,
+                )
+                control_cache_report["collected_control_records"] = len(collected)
+        if cached_rows_by_name:
+            control_dir = write_synthetic_control_run(
+                output_root=control_root,
+                run_type=args.mode,
                 agent=args.agent,
                 user=args.user,
                 scenario_names=scenario_names,
-                output_dir=control_root,
-                processes=1,
-                run_type=f"{args.mode}_control",
-                base_tool_policy=args.base_tool_policy,
-                resume_from_dir=control_resume_dir,
-            ),
-            progress_hook=control_progress,
-            event_hook=campaign_event,
-        )
-        if response_cache_enabled:
-            write_openai_response_cache_metrics(
-                control_dir / "openai_response_cache_metrics.json"
+                cached_rows_by_name=cached_rows_by_name,
+                fresh_run_dir=fresh_control_dir,
+                cache_report=control_cache_report,
             )
-            write_cache_artifacts(args.artifact_root)
+            control_progress(control_dir, [], "complete", len(scenario_names))
         append_event(
             "phase_completed",
-            {"mode": args.mode, "phase": "control", "run_dir": str(control_dir)},
+            {
+                "mode": args.mode,
+                "phase": "control",
+                "run_dir": str(control_dir),
+                "control_cache_mode": args.control_cache,
+                "control_cache_source": control_cache_report.get("control_source"),
+                "cached_control_tasks": control_cache_report.get(
+                    "cached_control_tasks"
+                ),
+                "fresh_control_tasks": control_cache_report.get("fresh_control_tasks"),
+            },
             root=args.artifact_root,
         )
         refresh_dashboard("candidate", "running")
@@ -1119,7 +1331,16 @@ def main() -> None:
                 candidate_dir / "openai_response_cache_metrics.json"
             )
             write_cache_artifacts(args.artifact_root)
+    control_cache_report_path = run_root / "control_cache_report.json"
+    control_cache_report_path.write_text(
+        json.dumps(control_cache_report, indent=2) + "\n", encoding="utf-8"
+    )
+    if control_dir is not None:
+        (control_dir / "control_cache_report.json").write_text(
+            json.dumps(control_cache_report, indent=2) + "\n", encoding="utf-8"
+        )
     comparison = compare_runs(control_dir, candidate_dir, registry_dir=registry_dir)
+    comparison["control_cache"] = control_cache_report
     comparison["model_metadata"] = model_metadata
     comparison["comparison_model_key"] = model_metadata["comparison_key"]
     protocol_gate_passed, protocol_gate_reasons = _protocol_gate_decision(
@@ -1132,6 +1353,19 @@ def main() -> None:
     comparison_path.write_text(
         json.dumps(comparison, indent=2) + "\n", encoding="utf-8"
     )
+    helper_contribution_path = run_root / "helper_contribution_summary.json"
+    helper_contribution = write_helper_contribution_summary(
+        control_dir,
+        candidate_dir,
+        helper_contribution_path,
+        registry_dir=registry_dir,
+    )
+    helper_artifact_dir = args.artifact_root / "summaries" / run_root.name
+    helper_artifact_dir.mkdir(parents=True, exist_ok=True)
+    helper_contribution_artifact_path = (
+        helper_artifact_dir / "helper_contribution_summary.json"
+    )
+    shutil.copy2(helper_contribution_path, helper_contribution_artifact_path)
     registry_gate_restore: dict[str, Any] | None = None
     if not protocol_gate_passed:
         registry_gate_restore = _restore_registry_after_failed_gate(
@@ -1166,11 +1400,11 @@ def main() -> None:
     snapshot_registry(
         registry_dir, name=f"{args.mode}_{run_root.name}", root=args.artifact_root
     )
-    if args.mode == "mechanism_40":
+    if args.mode in {"viability_12", "mechanism_12", "mechanism_40", "mechanism_60"}:
         update_task(
             "reproduce_clean_recency_birth", "completed", root=args.artifact_root
         )
-    elif args.mode == "transfer_40":
+    elif args.mode in {"transfer_40", "transfer_60", "transfer_100"}:
         update_task("frozen_registry_transfer", "completed", root=args.artifact_root)
     refresh_dashboard("comparison", "complete")
     manifest = {
@@ -1194,12 +1428,27 @@ def main() -> None:
         ),
         "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
         "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
+        "cohort_quality_gate_status": cohort_preflight.get("quality_gate_status"),
+        "cohort_quality_gate_failures": cohort_preflight.get(
+            "quality_gate_failures", []
+        ),
         "resume_run_root": str(args.resume_run_root) if args.resume_run_root else None,
         "control_resume_dir": str(control_resume_dir) if control_resume_dir else None,
         "candidate_resume_dir": str(candidate_resume_dir)
         if candidate_resume_dir
         else None,
         "comparison_path": str(comparison_path),
+        "control_cache_mode": args.control_cache,
+        "control_source": control_cache_report.get("control_source"),
+        "cached_control_tasks": control_cache_report.get("cached_control_tasks"),
+        "fresh_control_tasks": control_cache_report.get("fresh_control_tasks"),
+        "control_cache_report_path": str(control_cache_report_path),
+        "control_cache_manifest_hash": control_cache_report.get("cache_manifest_hash"),
+        "helper_contribution_summary_path": str(helper_contribution_path),
+        "helper_contribution_artifact_path": str(helper_contribution_artifact_path),
+        "accepted_but_uncalled_tools": helper_contribution.get(
+            "accepted_but_uncalled_tools", []
+        ),
         "dashboard_path": str(dashboard_index),
         "dashboard_url": dashboard_url,
         "dashboard_task_focus_url": dashboard_task_focus_url,
@@ -1241,7 +1490,24 @@ def main() -> None:
             ),
             "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
             "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
+            "cohort_quality_gate_status": cohort_preflight.get("quality_gate_status"),
+            "cohort_quality_gate_failures": cohort_preflight.get(
+                "quality_gate_failures", []
+            ),
             "comparison_path": str(comparison_path),
+            "control_cache_mode": args.control_cache,
+            "control_source": control_cache_report.get("control_source"),
+            "cached_control_tasks": control_cache_report.get("cached_control_tasks"),
+            "fresh_control_tasks": control_cache_report.get("fresh_control_tasks"),
+            "control_cache_report_path": str(control_cache_report_path),
+            "control_cache_manifest_hash": control_cache_report.get(
+                "cache_manifest_hash"
+            ),
+            "helper_contribution_summary_path": str(helper_contribution_path),
+            "helper_contribution_artifact_path": str(helper_contribution_artifact_path),
+            "accepted_but_uncalled_tools": helper_contribution.get(
+                "accepted_but_uncalled_tools", []
+            ),
             "dashboard_path": str(dashboard_index),
             "dashboard_url": dashboard_url,
             "dashboard_task_focus_url": dashboard_task_focus_url,
