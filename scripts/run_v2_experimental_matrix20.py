@@ -29,7 +29,12 @@ REGISTRY_MODE = os.environ.get("SAGE_V2_MATRIX_REGISTRY_MODE", "clean")
 SUMMARY_ROOT = Path(f"artifacts/summaries/{MATRIX_NAME}")
 OUTPUT_ROOT = Path(f"outputs/{MATRIX_NAME}")
 REGISTRY_ROOT = Path(f"artifacts/registry_candidates/{MATRIX_NAME}")
-SEED_REGISTRY = Path("artifacts/registry_candidates/v2_architecture_readiness_20")
+SEED_REGISTRY = Path(
+    os.environ.get(
+        "SAGE_V2_MATRIX_SEED_REGISTRY",
+        "artifacts/registry_candidates/v2_architecture_readiness_20",
+    )
+)
 SOURCE_MANIFEST = Path(
     "artifacts/summaries/v2_architecture_readiness_20/cohort_manifest.json"
 )
@@ -317,6 +322,9 @@ def _summarize_variant(
         },
         "outcome_delta": comparison.get("mean_outcome_similarity_delta"),
         "canonical_delta": comparison.get("mean_similarity_delta"),
+        "protocol_gate_passed": comparison.get("protocol_gate_passed"),
+        "protocol_gate_reasons": comparison.get("protocol_gate_reasons", []),
+        "route_mismatch_qualified": comparison.get("route_mismatch_qualified"),
         "exact_successes": {
             "control": comparison.get("control_exact_successes"),
             "sage": comparison.get("candidate_exact_successes"),
@@ -381,7 +389,6 @@ def _run_variant(variant: dict[str, str]) -> dict[str, Any]:
         "--parallel-arms",
         "--control-cache",
         "use-if-eligible",
-        "--no-dashboard-open",
     ]
     with log_path.open("w", encoding="utf-8") as log:
         log.write("COMMAND: " + " ".join(cmd) + "\n")
@@ -404,18 +411,15 @@ def _run_variant(variant: dict[str, str]) -> dict[str, Any]:
 
 
 def _select_combined_features(summaries: list[dict[str, Any]]) -> str:
-    by_id = {item["variant"]["id"]: item for item in summaries}
-    baseline = by_id.get("variant0_current_v2_baseline", {})
-    baseline_vnc = int(
-        baseline.get("helpers", {}).get("visible_not_called_count", 999999) or 999999
-    )
     features: set[str] = set()
     for item in summaries:
         variant_id = item["variant"]["id"]
         if variant_id == "variant0_current_v2_baseline" or item.get("failed"):
             continue
         outcome = item.get("outcome_delta")
-        accepted = int(item.get("birth", {}).get("tools_accepted", 0) or 0)
+        canonical = item.get("canonical_delta")
+        called = int(item.get("helpers", {}).get("called_count", 0) or 0)
+        visible = int(item.get("helpers", {}).get("visible_count", 0) or 0)
         vnc = int(
             item.get("helpers", {}).get("visible_not_called_count", 999999) or 999999
         )
@@ -423,12 +427,15 @@ def _select_combined_features(summaries: list[dict[str, Any]]) -> str:
         side = int(item.get("helpers", {}).get("side_effect_incidents", 0) or 0)
         if runtime or side:
             continue
-        useful = (
-            (isinstance(outcome, int | float) and outcome > 0)
-            or accepted > 0
-            or vnc < baseline_vnc
-        )
-        if not useful:
+        if called <= 0 or not isinstance(outcome, int | float) or outcome <= 0:
+            continue
+        if visible > 0 and vnc / visible > 0.5:
+            continue
+        if (
+            isinstance(canonical, int | float)
+            and canonical < 0
+            and not item.get("route_mismatch_qualified")
+        ):
             continue
         features.update(str(item["variant"]["features"]).split(","))
     features = {item for item in features if item and item in ALL_FEATURES}

@@ -41,10 +41,6 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "record_filtering_ranking_latest_selection",
         "contact_message_search_disambiguation",
     ),
-    "message_search_time_window": (
-        "contact_message_search_disambiguation",
-        "record_filtering_ranking_latest_selection",
-    ),
     "next_service_tool_call": ("direct_state_precondition_service_enablement",),
     "recover_from_tool_error": ("direct_state_precondition_service_enablement",),
     "next_service_enablement_action": ("direct_state_precondition_service_enablement",),
@@ -64,7 +60,6 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
     "search_filter:select_record_by_timestamp_extreme": (
         "select_record_by_timestamp_extreme",
     ),
-    "derived_value:message_search_time_window": ("message_search_time_window",),
     "search_filter:select_contact_field_by_constraint": (
         "select_contact_field_by_constraint",
     ),
@@ -116,12 +111,7 @@ DOWNSTREAM_SERVICE_HELPER_PREFIXES = (
     "find_temperature_low_battery_mode",
 )
 
-CONTACT_CONSTRAINT_HELPER_PREFIXES = (
-    "search_phone_number_with_name",
-    "search_relationship_with_phone_number",
-    "search_name_with_relationship",
-    "update_contact_relationship_with_relationship",
-)
+CONTACT_CONSTRAINT_HELPER_PREFIXES = ("update_contact_relationship_with_relationship",)
 
 
 def base_task_family(scenario_name: str) -> str:
@@ -298,17 +288,19 @@ def expected_helper_fit(
             "modify_contact_with_message_recency",
             "search_message_with_recency_latest",
             "search_message_with_recency_oldest",
+            "remove_reminder_with_recency_latest",
         )
     ):
         helpers.append("select_record_by_timestamp_extreme")
     if "insufficient_information" not in name and name.startswith(
         (
             "modify_contact_with_message_recency",
+            "modify_reminder_with_recency_latest",
+            "remove_reminder_with_recency_latest",
             "search_message_with_recency_latest",
             "search_message_with_recency_oldest",
         )
     ):
-        helpers.append("message_search_time_window")
         helpers.append("resolve_search_window_or_bounds")
     if any(token in name for token in ("holiday", "business_day")):
         helpers.append("days_between_timestamps")
@@ -369,13 +361,8 @@ def expected_birth_opportunities(
         opportunities.append("derived_value:resolve_search_window_or_bounds")
     if name.startswith("modify_reminder_with_recency_latest"):
         opportunities.append("canonicalizer:relative_day_time_timestamp")
-    if name.startswith(
-        (
-            "modify_contact_with_message_recency",
-            "search_message_with_recency_latest",
-            "search_message_with_recency_oldest",
-        )
-    ):
+        opportunities.append("derived_value:resolve_search_window_or_bounds")
+    if name.startswith("remove_reminder_with_recency_latest"):
         opportunities.append("search_filter:select_record_by_timestamp_extreme")
         opportunities.append("derived_value:resolve_search_window_or_bounds")
     if name.startswith(
@@ -385,7 +372,10 @@ def expected_birth_opportunities(
             "search_message_with_recency_oldest",
         )
     ):
-        opportunities.append("derived_value:message_search_time_window")
+        opportunities.append("search_filter:select_record_by_timestamp_extreme")
+        opportunities.append("derived_value:resolve_search_window_or_bounds")
+    # Do not count bounds-only message window helpers as claim-grade birth
+    # opportunities; latest/oldest failures need selection/action helpers.
     if "ambiguous" not in name and name.startswith(CONTACT_CONSTRAINT_HELPER_PREFIXES):
         opportunities.append("search_filter:select_contact_field_by_constraint")
     if name.startswith("find_days_till_holiday"):

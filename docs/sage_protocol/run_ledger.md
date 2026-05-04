@@ -319,3 +319,22 @@
   - Fair-chance winner: `variant5_contract_synthesis`, outcome `+0.0617`, canonical `+0.0979`, exact successes `0 -> 2`, helper visible/called/VNC `4 / 3 / 1`, side-effect/runtime `0 / 0`, protocol PASS.
   - Combined stack failed: outcome `-0.0756`, canonical `-0.0733`, helper visible/called/VNC `18 / 4 / 14`.
   - Decision: `rerun readiness-20 with two-stage confirmation`; do not start 60/100/250 yet.
+
+
+- `Formal best3-relative 100 and 250 validation` completed.
+  - Date: `2026-05-04T06:08:30.482096`
+  - Registry: `artifacts/registry_best3_resolve_select_relative/registry_manifest.json`
+  - Registry SHA-256: `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`
+  - Helpers: `relative_day_time_to_timestamp, resolve_search_window_or_bounds, select_record_by_timestamp_extreme`
+  - Formal 100 run: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428`
+  - Formal 100 outcome delta: `0.1347`; relative lift `33.58%`; exact `control=16` -> `SAGE=23`; protocol pass `True`.
+  - Formal 250 run: `outputs/v2_formal250_clean_20260504_034104_frozen_best3_relative_20260504_052217/validate_250_20260504_052222`
+  - Formal 250 outcome delta: `0.0806`; relative lift `20.52%`; exact `control=31` -> `SAGE=40`; protocol pass `True`.
+  - Formal 250 reference/canonical similarity delta: `0.0660`; route-mismatch-qualified `False`.
+  - Runtime exceptions: `0`; helper side-effect incidents: `0`.
+  - Dashboards opened: `outputs/v2_formal250_clean_20260504_034104_frozen_best3_relative_20260504_052217/validate_250_20260504_052222/dashboard/index.html` and `outputs/v2_formal250_clean_20260504_034104_frozen_best3_relative_20260504_052217/validate_250_20260504_052222/dashboard/task_focus.html`.
+  - Tests: targeted unit suite `109 passed, 2 warnings`; registry check `3 active entries pass`; py_compile PASS; `git diff --check` PASS.
+  - Report: `docs/sage_protocol/v2_final_tool_pipeline_campaign_report.md`
+  - Summary: `artifacts/summaries/v2_final_best3_formal_validation/summary.json`
+  - Decision: `formal 250 passed`.
+  - Next action: freeze/commit v1.0 evidence package; start V2.0 campaign on autonomous tool birth coverage.

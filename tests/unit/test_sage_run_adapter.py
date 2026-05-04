@@ -10,6 +10,7 @@ from sage_ts.adapters.sage_run_adapter import (
     SageRunConfig,
     _helper_forbids_side_effect_followup,
     _helper_requires_side_effect_followup,
+    _side_effect_followup_failures,
     run_sage_with_registry,
 )
 from sage_ts.adapters.toolsandbox_adapter import (
@@ -47,6 +48,59 @@ def test_side_effect_followup_forbidden_for_abstaining_helper() -> None:
                 ),
             }
         ]
+    )
+
+
+def test_side_effect_preservation_allows_prerequisite_after_abstain() -> None:
+    messages = [
+        {"role": "tool", "name": "prepare", "content": {"should_call": False}},
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "search_location_around_lat_lon"}}],
+        },
+        {"role": "tool", "name": "search_location_around_lat_lon", "content": "[]"},
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "add_reminder"}}],
+        },
+    ]
+
+    assert not _side_effect_followup_failures(
+        messages,
+        helper_name="prepare",
+        required_original_tool_calls=("add_reminder",),
+    )
+
+
+def test_side_effect_preservation_flags_direct_side_effect_after_abstain() -> None:
+    messages = [
+        {"role": "tool", "name": "prepare", "content": {"should_call": False}},
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "add_reminder"}}],
+        },
+    ]
+
+    assert _side_effect_followup_failures(
+        messages,
+        helper_name="prepare",
+        required_original_tool_calls=("add_reminder",),
+    )
+
+
+def test_side_effect_preservation_requires_next_call_after_success() -> None:
+    messages = [
+        {"role": "tool", "name": "prepare", "content": {"should_call": True}},
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "search_location_around_lat_lon"}}],
+        },
+    ]
+
+    assert _side_effect_followup_failures(
+        messages,
+        helper_name="prepare",
+        required_original_tool_calls=("add_reminder",),
     )
 
 

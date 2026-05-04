@@ -3,6 +3,7 @@ from scripts.run_sage_protocol import (
     _generation_enabled_by_default,
     _protocol_gate_decision,
     _restore_registry_after_failed_gate,
+    _route_mismatch_qualified,
     _snapshot_registry_for_gate,
 )
 
@@ -41,6 +42,77 @@ def test_protocol_gate_rejects_non_negative_mean_without_helper_value() -> None:
     assert passed is False
     assert "non_positive_canonical_delta" in reasons
     assert "gains_do_not_exceed_regressions" in reasons
+
+
+def test_protocol_gate_accepts_outcome_success_with_canonical_route_mismatch() -> None:
+    comparison = {
+        "mean_similarity_delta": -0.02,
+        "mean_outcome_similarity_delta": 0.08,
+        "exact_success_delta": 0,
+        "gain_count": 1,
+        "regression_count": 3,
+        "outcome_gain_count": 5,
+        "outcome_regression_count": 2,
+        "runtime_exception_count": 0,
+        "candidate": {
+            "accepted_tool_count": 1,
+            "generated_tool_called_scenarios": 3,
+        },
+    }
+
+    passed, reasons = _protocol_gate_decision(comparison, scenario_count=20)
+
+    assert _route_mismatch_qualified(comparison) is True
+    assert passed is True
+    assert reasons == []
+
+
+def test_protocol_gate_accepts_outcome_success_with_exact_canonical_accounting_loss() -> (
+    None
+):
+    comparison = {
+        "mean_similarity_delta": 0.02,
+        "mean_outcome_similarity_delta": 0.16,
+        "exact_success_delta": -1,
+        "gain_count": 2,
+        "regression_count": 4,
+        "outcome_gain_count": 6,
+        "outcome_regression_count": 2,
+        "runtime_exception_count": 0,
+        "candidate": {
+            "accepted_tool_count": 1,
+            "generated_tool_called_scenarios": 1,
+        },
+    }
+
+    passed, reasons = _protocol_gate_decision(comparison, scenario_count=20)
+
+    assert _route_mismatch_qualified(comparison) is True
+    assert passed is True
+    assert reasons == []
+
+
+def test_protocol_gate_rejects_negative_outcome_even_when_canonical_improves() -> None:
+    passed, reasons = _protocol_gate_decision(
+        {
+            "mean_similarity_delta": 0.05,
+            "mean_outcome_similarity_delta": -0.03,
+            "exact_success_delta": 1,
+            "gain_count": 5,
+            "regression_count": 1,
+            "outcome_gain_count": 1,
+            "outcome_regression_count": 4,
+            "runtime_exception_count": 0,
+            "candidate": {
+                "accepted_tool_count": 1,
+                "generated_tool_called_scenarios": 3,
+            },
+        },
+        scenario_count=20,
+    )
+
+    assert passed is False
+    assert "non_positive_outcome_delta" in reasons
 
 
 def test_protocol_gate_accepts_positive_discovery_with_real_helper_activity() -> None:

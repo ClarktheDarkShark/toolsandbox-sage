@@ -368,6 +368,13 @@ def registry_entry_visibility_reason(
             return True, "search_window_bounds_due_recency_task"
         if name.startswith(
             (
+                "modify_reminder_with_recency_latest",
+                "remove_reminder_with_recency_latest",
+            )
+        ):
+            return True, "search_window_bounds_reminder_recency_action_task"
+        if name.startswith(
+            (
                 "search_message_with_recency_latest",
                 "search_message_with_recency_oldest",
             )
@@ -427,22 +434,9 @@ def registry_entry_visibility_reason(
         return False, "reminder_creation_args_no_creation_signal"
 
     if tool_name == "message_search_time_window":
-        if is_insufficient:
-            return (
-                False,
-                "message_search_window_suppressed_for_insufficient_information",
-            )
-        if name.startswith(
-            (
-                "modify_contact_with_message_recency",
-                "search_message_with_recency_latest",
-                "search_message_with_recency_oldest",
-            )
-        ):
-            return True, "message_search_window_message_search_time_window_flow"
         return (
             False,
-            "message_search_window_requires_explicit_message_recency_task",
+            "message_search_window_suppressed_bounds_only_low_value_mechanism",
         )
 
     if tool_name == "message_search_args_for_contact":
@@ -466,18 +460,15 @@ def registry_entry_visibility_reason(
                 return True, "latest_message_record_selection_required"
             return False, "latest_record_suppressed_outside_message_search"
         if tool_name == "select_record_by_timestamp_extreme":
-            if (
-                "insufficient_information" not in name
-                and "multiple_user_turn" not in name
-                and "_alt" not in name
-                and name.startswith(
-                    (
-                        "search_message_with_recency_latest",
-                        "search_message_with_recency_oldest",
-                    )
+            if "insufficient_information" not in name and name.startswith(
+                (
+                    "modify_contact_with_message_recency",
+                    "remove_reminder_with_recency_latest",
+                    "search_message_with_recency_latest",
+                    "search_message_with_recency_oldest",
                 )
             ):
-                return True, "simple_message_timestamp_extreme_selection_required"
+                return True, "message_timestamp_extreme_selection_required"
             return False, "timestamp_extreme_suppressed_outside_message_ranking_tasks"
         if tool_name == "select_self_message_by_timestamp":
             return False, "self_message_selector_suppressed_empty_input_misuse"
@@ -543,9 +534,9 @@ def route_registry_entries(
         is_visible, reason = registry_entry_visibility_reason(entry, scenario_name)
         status = "shown" if is_visible else "hidden"
         score = generic.score
-        downstream_tools = set(entry.tool.spec.required_original_tool_calls) | set(
-            entry.tool.spec.preserves_side_effect_tools
-        )
+        downstream_tools = set(entry.tool.spec.required_original_tool_calls)
+        if not downstream_tools:
+            downstream_tools = set(entry.tool.spec.preserves_side_effect_tools)
         if is_visible and available_base_tools is not None and downstream_tools:
             missing = downstream_tools - available_base_tools
             if missing:

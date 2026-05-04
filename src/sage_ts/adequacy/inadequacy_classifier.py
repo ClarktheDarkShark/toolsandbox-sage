@@ -39,12 +39,7 @@ def _is_message_recency_extreme_scenario(scenario_name: str) -> bool:
 
 def _is_contact_constraint_scenario(scenario_name: str) -> bool:
     return "ambiguous" not in scenario_name and scenario_name.startswith(
-        (
-            "search_phone_number_with_name",
-            "search_relationship_with_phone_number",
-            "search_name_with_relationship",
-            "update_contact_relationship_with_relationship",
-        )
+        ("update_contact_relationship_with_relationship",)
     )
 
 
@@ -254,21 +249,15 @@ def _message_search_window_observation(scenario_name: str) -> CapabilityObservat
         scenario_name=scenario_name,
         canonical_key="derived_value:message_search_time_window",
         observation=(
-            "Contact/message recency tasks fail before ranking because the base "
-            "search_messages tool requires at least one concrete search criterion. "
-            "When the user asks for the latest or oldest contact they messaged but "
-            "does not know the contact id or phone number, the agent needs a "
-            "deterministic way to create broad timestamp bounds so it can call the "
-            "original search_messages benchmark tool and retrieve visible candidate "
-            "records. Generate a small trace-compatible helper named "
-            "message_search_time_window. Inputs: anchor_timestamp as a float Unix "
-            "timestamp and lookback_days as an integer number of days. Return a dict "
-            "with creation_timestamp_lowerbound and creation_timestamp_upperbound. "
-            "The lower bound is anchor_timestamp - lookback_days * 86400 and the "
-            "upper bound is anchor_timestamp. Clamp negative lookback_days to zero. "
-            "This helper must not inspect messages, contacts, hidden state, or "
-            "replace search_messages; it only produces benchmark-compatible "
-            "arguments for the original search tool."
+            "Contact/message recency tasks sometimes fail before ranking because "
+            "search_messages requires a concrete criterion. Prior experiments showed "
+            "that a bounds-only message_search_time_window helper is too thin: it "
+            "can be accepted and called but does not reliably improve final task "
+            "completion. Treat this as diagnostic shortfall evidence only. "
+            "Claim-grade generation for these tasks should prefer a composite "
+            "search/filter or record-selection candidate that preserves the original "
+            "search_messages call and then deterministically selects or prepares the "
+            "downstream action from visible records."
         ),
         allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
         validation_examples=(
@@ -304,8 +293,8 @@ def _message_search_window_observation(scenario_name: str) -> CapabilityObservat
                 negative_applicability=True,
             ),
         ),
-        generation_allowed=True,
-        reason="contact_message_search_requires_trace_compatible_time_bounds",
+        generation_allowed=False,
+        reason="diagnostic_only_bounds_helper_low_value",
         inadequacy_signals=(
             "repeated_failed_tool_call",
             "visible_raw_data_lacking_deterministic_transform",
@@ -329,9 +318,22 @@ def _latest_record_selection_observation(
             "helper named select_record_by_timestamp_extreme rather than a "
             "latest-only variant. Inputs: records as a list of record "
             "dictionaries copied directly from the visible search-tool result, "
-            "timestamp_key as the timestamp field to compare, and selection_mode as either 'latest' "
-            "or 'oldest'. Ignore records missing a numeric timestamp. Return the "
-            "full selected record, or an empty dict if no valid timestamp exists."
+            "timestamp_key as the timestamp field to compare, and selection_mode as "
+            "either 'latest' or 'oldest'. Ignore records missing a numeric "
+            "timestamp. The spec.output_schema must be a JSON Schema object with "
+            "properties selected_record, selected_index, selected_timestamp, and "
+            "abstain_reason. Return a dict with those keys; selected_record must be "
+            "the full visible record. Return selected_record {} plus a non-empty "
+            "abstain_reason when no record has a numeric timestamp, selection_mode "
+            "is invalid, or timestamp ties make the requested extreme ambiguous. "
+            "The spec.required_original_tool_calls must include search_messages "
+            "for message recency tasks and search_reminder for reminder recency "
+            "tasks when applicable. The spec.preserves_side_effect_tools must "
+            "include those original search tools and any downstream original "
+            "ToolSandbox side-effect tools that will consume the selected record, "
+            "such as modify_contact or modify_reminder. This helper must only "
+            "select from visible records passed as inputs; it must never search, "
+            "modify, send, or create records itself."
         ),
         allowed_families=(str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),),
         validation_examples=(
@@ -344,7 +346,12 @@ def _latest_record_selection_observation(
                     "timestamp_key": "creation_timestamp",
                     "selection_mode": "latest",
                 },
-                {"content": "newer", "creation_timestamp": 20.0},
+                {
+                    "selected_record": {"content": "newer", "creation_timestamp": 20.0},
+                    "selected_index": 1,
+                    "selected_timestamp": 20.0,
+                    "abstain_reason": "",
+                },
             ),
             ToolExample(
                 {
@@ -356,7 +363,12 @@ def _latest_record_selection_observation(
                     "timestamp_key": "reminder_timestamp",
                     "selection_mode": "latest",
                 },
-                {"content": "new", "reminder_timestamp": 15.0},
+                {
+                    "selected_record": {"content": "new", "reminder_timestamp": 15.0},
+                    "selected_index": 2,
+                    "selected_timestamp": 15.0,
+                    "abstain_reason": "",
+                },
             ),
             ToolExample(
                 {
@@ -364,7 +376,29 @@ def _latest_record_selection_observation(
                     "timestamp_key": "creation_timestamp",
                     "selection_mode": "latest",
                 },
-                {},
+                {
+                    "selected_record": {},
+                    "selected_index": -1,
+                    "selected_timestamp": 0.0,
+                    "abstain_reason": "no_numeric_timestamp",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {"content": "a", "creation_timestamp": 20.0},
+                        {"content": "b", "creation_timestamp": 20.0},
+                    ],
+                    "timestamp_key": "creation_timestamp",
+                    "selection_mode": "latest",
+                },
+                {
+                    "selected_record": {},
+                    "selected_index": -1,
+                    "selected_timestamp": 20.0,
+                    "abstain_reason": "ambiguous_tie",
+                },
                 negative_applicability=True,
             ),
         ),

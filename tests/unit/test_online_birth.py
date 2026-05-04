@@ -19,7 +19,10 @@ _RECORD_SELECTOR_TOOL_NAME = "select_record_by_timestamp_extreme"
 _RESOLVE_WINDOW_TOOL_NAME = "resolve_search_window_or_bounds"
 
 
-def test_generic_dependency_bundle_observation_uses_allowed_tool_structure() -> None:
+def test_generic_dependency_bundle_observation_uses_allowed_tool_structure(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "dependency_logic")
     scenario = Scenario(
         starting_context=ExecutionContext(
             tool_allow_list=[
@@ -151,6 +154,9 @@ class FakeRecordSelectorGenerator:
                 "type": "object",
                 "properties": {
                     "selected_record": {"type": "object"},
+                    "selected_index": {"type": "integer"},
+                    "selected_timestamp": {"type": "number"},
+                    "abstain_reason": {"type": "string"},
                 },
             },
             positive_triggers=("visible_candidate_list_wrong_selected_record",),
@@ -160,7 +166,7 @@ class FakeRecordSelectorGenerator:
                 "modify_contact",
                 "modify_reminder",
             ),
-            required_original_tool_calls=("modify_contact",),
+            required_original_tool_calls=("search_messages", "modify_contact"),
             abstain_behavior=(
                 "Return {} when there are no valid timestamped candidates or ties "
                 "make the selection ambiguous."
@@ -196,12 +202,22 @@ class FakeRecordSelectorGenerator:
             code = (
                 "def select_record_by_timestamp_extreme(records: list, "
                 "timestamp_key: str, selection_mode: str) -> dict:\n"
-                "    filtered = [item for item in records if timestamp_key in item]\n"
+                "    mode = selection_mode.strip().lower()\n"
+                "    if mode not in ('latest', 'oldest'):\n"
+                "        return {'selected_record': {}, 'selected_index': -1, 'selected_timestamp': 0.0, 'abstain_reason': 'invalid_selection_mode'}\n"
+                "    filtered = []\n"
+                "    for index, item in enumerate(records):\n"
+                "        value = item.get(timestamp_key) if isinstance(item, dict) else None\n"
+                "        if isinstance(value, (int, float)):\n"
+                "            filtered.append((index, item, float(value)))\n"
                 "    if not filtered:\n"
-                "        return {}\n"
-                "    reverse = selection_mode.strip().lower() == 'latest'\n"
-                "    return sorted(filtered, key=lambda item: item[timestamp_key], "
-                "reverse=reverse)[0]\n"
+                "        return {'selected_record': {}, 'selected_index': -1, 'selected_timestamp': 0.0, 'abstain_reason': 'no_numeric_timestamp'}\n"
+                "    reverse = mode == 'latest'\n"
+                "    ordered = sorted(filtered, key=lambda item: item[2], reverse=reverse)\n"
+                "    if len(ordered) > 1 and ordered[0][2] == ordered[1][2]:\n"
+                "        return {'selected_record': {}, 'selected_index': -1, 'selected_timestamp': ordered[0][2], 'abstain_reason': 'ambiguous_tie'}\n"
+                "    index, record, timestamp = ordered[0]\n"
+                "    return {'selected_record': record, 'selected_index': index, 'selected_timestamp': timestamp, 'abstain_reason': ''}\n"
             )
         return GeneratedTool(spec=spec, code=code)
 
@@ -295,7 +311,9 @@ def _latest_record_observation():
     )
 
 
-def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) -> None:
+def test_recency_observation_rejects_bounds_only_birth_after_recurrence(
+    tmp_path: Path,
+) -> None:
     scenario = Scenario(
         categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
     )
@@ -326,11 +344,12 @@ def test_recency_observation_requires_recurrence_before_birth(tmp_path: Path) ->
 
     controller.observe(recency)
     assert generator.calls == 1
-    assert store.get(_TOOL_NAME) is not None
+    assert store.get(_TOOL_NAME) is None
 
     birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
-    assert birth_event["accepted"] is True
+    assert birth_event["accepted"] is False
     assert birth_event["tool_name"] == _TOOL_NAME
+    assert birth_event["errors"] == ["bounds_only_derived_helper_low_value"]
     assert birth_event["estimated_step_compression"] == 3
     assert birth_event["cross_task_applicability_count"] == 2
 
@@ -348,7 +367,9 @@ def test_successful_recency_task_does_not_birth_from_task_type_alone() -> None:
     assert observations == ()
 
 
-def test_existing_registry_tool_skips_duplicate_birth(tmp_path: Path) -> None:
+def test_existing_bounds_only_registry_tool_does_not_skip_repaired_gate(
+    tmp_path: Path,
+) -> None:
     scenario = Scenario(
         categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
     )
@@ -392,12 +413,10 @@ def test_existing_registry_tool_skips_duplicate_birth(tmp_path: Path) -> None:
     controller.observe(observations[0])
     controller.observe(observations[0])
 
-    assert generator.calls == 0
+    assert generator.calls == 1
     assert store.get(_TOOL_NAME) is not None
-    assert (
-        "tool_birth_skipped_existing"
-        in (tmp_path / "sage_run_events.jsonl").read_text()
-    )
+    events = (tmp_path / "tool_birth_events.jsonl").read_text()
+    assert "bounds_only_derived_helper_low_value" in events
 
 
 def test_existing_broader_registry_tool_suppresses_narrow_birth(
@@ -542,8 +561,10 @@ def test_modify_contact_message_recency_requests_search_filter_helper() -> None:
         "selection_mode": "latest",
     }
     assert selector.validation_examples[0].expected == {
-        "content": "newer",
-        "creation_timestamp": 20.0,
+        "selected_record": {"content": "newer", "creation_timestamp": 20.0},
+        "selected_index": 1,
+        "selected_timestamp": 20.0,
+        "abstain_reason": "",
     }
 
 
@@ -673,7 +694,7 @@ def test_near_duplicate_only_birth_is_marked_diagnostic(tmp_path: Path) -> None:
     assert entry.tool.spec.diagnostic_only is True
 
 
-def test_raw_latest_message_births_retrieval_window_and_selector() -> None:
+def test_raw_latest_message_births_selector_and_marks_window_diagnostic() -> None:
     scenario = Scenario(
         categories=[ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL))]
     )
@@ -686,9 +707,15 @@ def test_raw_latest_message_births_retrieval_window_and_selector() -> None:
     keys = {observation.canonical_key for observation in observations}
     assert "search_filter:select_record_by_timestamp_extreme" in keys
     assert "derived_value:message_search_time_window" in keys
+    window = next(
+        observation
+        for observation in observations
+        if observation.canonical_key == "derived_value:message_search_time_window"
+    )
+    assert not window.generation_allowed
 
 
-def test_modify_contact_message_recency_births_message_search_window() -> None:
+def test_modify_contact_message_recency_marks_message_window_diagnostic() -> None:
     scenario = Scenario(
         categories=[ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL))]
     )
@@ -707,7 +734,8 @@ def test_modify_contact_message_recency_births_message_search_window() -> None:
         for observation in observations
         if observation.canonical_key == "derived_value:message_search_time_window"
     )
-    assert window_helper.generation_allowed
+    assert not window_helper.generation_allowed
+    assert window_helper.reason == "diagnostic_only_bounds_helper_low_value"
     assert window_helper.allowed_families == (str(ToolFamily.DERIVED_VALUE_CALCULATOR),)
     assert window_helper.validation_examples[0].inputs == {
         "anchor_timestamp": 864000.0,
@@ -745,7 +773,12 @@ def test_oldest_record_failure_births_trace_compatible_search_helpers() -> None:
 
     keys = {observation.canonical_key for observation in observations}
     assert "search_filter:select_record_by_timestamp_extreme" in keys
-    assert "derived_value:message_search_time_window" in keys
+    window = next(
+        observation
+        for observation in observations
+        if observation.canonical_key == "derived_value:message_search_time_window"
+    )
+    assert not window.generation_allowed
 
 
 def test_holiday_distance_failure_requests_timestamp_diff_helper() -> None:
@@ -793,11 +826,11 @@ def test_ambiguous_contact_lookup_failure_does_not_birth_helper() -> None:
     assert observations == ()
 
 
-def test_contact_search_failure_births_contact_selection_helper() -> None:
+def test_contact_update_failure_births_contact_selection_helper() -> None:
     scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
 
     observations = classify_scenario_observations(
-        "search_phone_number_with_name_3_distraction_tools",
+        "update_contact_relationship_with_relationship_3_distraction_tools",
         scenario,
         {"similarity": 0.5},
     )

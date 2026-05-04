@@ -1,26 +1,31 @@
 # Current State
 
 - Date: 2026-05-04
-- Last completed step: `v2_experimental_matrix20_plus_readiness_reruns`
-- Last decision: `repair generation then rerun matrix subset`
-- Primary matrix report: `docs/sage_protocol/v2_experimental_matrix20_report.md`
-- Primary matrix summary: `artifacts/summaries/v2_experimental_matrix20_clean/matrix_summary.json`
-- Corrected affected-variant summary: `artifacts/summaries/v2_experimental_matrix20_clean_repairfix/matrix_summary.json`
-- Winning matrix idea: `contract_synthesis`
-- Important correction: clean-registry matrix is primary evidence; retained helper reuse is not counted as new tool-generation success.
-- Routing repair: generic helper routing now hides tools when declared downstream original tools are unavailable in the current scenario.
-- Latest readiness run: `outputs/v2_readiness20_contract_synthesis_grading_routingfix/mechanism_40_20260503_224648/`
-- Latest dashboard: `outputs/v2_readiness20_contract_synthesis_grading_routingfix/mechanism_40_20260503_224648/dashboard/index.html`
-- Latest task focus dashboard: `outputs/v2_readiness20_contract_synthesis_grading_routingfix/mechanism_40_20260503_224648/dashboard/task_focus.html`
-- Best readiness evidence: `contract_synthesis` after routing repair produced called-subset outcome delta `+0.3947` with visible/called/VNC `2 / 1 / 1` and `0` side-effect/runtime incidents.
-- Readiness blocker: canonical delta remained negative and the grading-accounted variant was accepted-but-uncalled with negative outcome delta.
-- Do not start 60/100/250 yet.
-- Next step: repair generation/accounting affordance, then rerun a matrix subset focused on `contract_synthesis`, `grading_accounting`, and routing.
-- Tests: full unit `170 passed, 2 warnings`; targeted routing/generation/birth tests `47 passed`.
-- Registry checks: latest readiness candidate registries PASS check-only.
-- Tool adoption diagnosis: generated helper docs were misleading for non-reminder helpers; generic call-path guidance incorrectly referenced `should_call_add_reminder` and `<tool>_kwargs`. Fixed in `src/sage_ts/runtime/toolsandbox_integration.py`; full unit tests `171 passed, 2 warnings`.
-- Adoption diagnosis report: `docs/sage_protocol/v2_tool_adoption_diagnosis_report.md`.
-- Fair-chance confirmation summary: `artifacts/summaries/v2_fair_chance_confirmation20/confirmation_summary.json`.
-- Fair-chance winner: `variant5_contract_synthesis`, outcome `+0.0617`, canonical `+0.0979`, visible/called/VNC `4 / 3 / 1`, exact successes `0 -> 2`, side-effect/runtime `0 / 0`, protocol PASS.
-- Updated next step: rerun readiness-20 using two-stage evaluation: generation-ON discovery with `contract_synthesis`, then frozen generation-OFF confirmation from accepted tools before promotion/scaling.
-- Final validation after adoption diagnosis: scripts compile PASS; full unit tests `171 passed, 2 warnings`; replay and fair-chance winning registries PASS; `git diff --check` PASS.
+- Last completed step: `formal_250_best3_relative_validation`
+- Last decision: `formal 250 passed`
+- Primary metric: outcome/task-completion
+- Active frozen helpers: `relative_day_time_to_timestamp, resolve_search_window_or_bounds, select_record_by_timestamp_extreme`
+- Active registry: `artifacts/registry_best3_resolve_select_relative/registry_manifest.json`
+- Registry SHA-256: `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`
+- Formal 100 run: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428`
+- Formal 100 dashboard: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428/dashboard/index.html`
+- Formal 100 task focus dashboard: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428/dashboard/task_focus.html`
+- Formal 100 outcome delta: `0.1347`
+- Formal 100 relative outcome lift: `33.58%`
+- Formal 100 exact successes: `control=16`, `SAGE=23`
+- Formal 250 run: `outputs/v2_formal250_clean_20260504_034104_frozen_best3_relative_20260504_052217/validate_250_20260504_052222`
+- Formal 250 dashboard: `outputs/v2_formal250_clean_20260504_034104_frozen_best3_relative_20260504_052217/validate_250_20260504_052222/dashboard/index.html`
+- Formal 250 task focus dashboard: `outputs/v2_formal250_clean_20260504_034104_frozen_best3_relative_20260504_052217/validate_250_20260504_052222/dashboard/task_focus.html`
+- Formal 250 outcome delta: `0.0806`
+- Formal 250 relative outcome lift: `20.52%`
+- Formal 250 exact successes: `control=31`, `SAGE=40`
+- Formal 250 reference/canonical similarity delta: `0.0660`
+- Formal 250 protocol gate: `True`
+- Formal 250 route-mismatch-qualified: `False`
+- Formal 250 runtime exceptions: `0`
+- Helper side-effect incidents in contribution export: `0`
+- Control cache mode: `use-if-eligible`; formal 100/250 controls were fresh because no compatible cached controls were eligible for the new manifest hashes.
+- Summary artifact: `artifacts/summaries/v2_final_best3_formal_validation/summary.json`
+- Final package: `artifacts/final_sage_praxis_package/`
+- Main report: `docs/sage_protocol/v2_final_tool_pipeline_campaign_report.md`
+- Next step: commit the coherent v1.0 repair/validation package, then begin a separate V2.0 campaign focused on autonomous shortfall-cluster birth for no-current-helper-fit tasks.

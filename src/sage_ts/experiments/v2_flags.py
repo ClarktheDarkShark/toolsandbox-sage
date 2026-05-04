@@ -11,14 +11,10 @@ CANDIDATE_REPAIR = "candidate_repair"
 CONTRACT_SYNTHESIS = "contract_synthesis"
 EVIDENCE_ROUTING = "evidence_routing"
 
-CURRENT_REPAIRED_DEFAULTS = frozenset(
-    {
-        GRADING_ACCOUNTING,
-        DEPENDENCY_LOGIC,
-        LIVE_VALIDATION,
-        EVIDENCE_ROUTING,
-    }
-)
+# Evidence-backed current stack from the fair-chance confirmation run:
+# contract synthesis improved outcome, canonical score, exact success, and adoption.
+# Other matrix ideas remain opt-in until they show positive called-tool contribution.
+CURRENT_REPAIRED_DEFAULTS = frozenset({CONTRACT_SYNTHESIS})
 ALL_FEATURES = frozenset(
     {
         GRADING_ACCOUNTING,

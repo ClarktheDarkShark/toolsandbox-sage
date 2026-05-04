@@ -1,4 +1,8 @@
+import json
 from dataclasses import replace
+from pathlib import Path
+
+import pytest
 
 from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate
 from sage_ts.generation.tool_spec import (
@@ -103,7 +107,10 @@ def test_state_precondition_helper_allows_trace_compatible_tool_call() -> None:
     assert decision.allowed
 
 
-def test_search_helper_can_substitute_canonical_route_with_grading_accounting() -> None:
+def test_search_helper_can_substitute_canonical_route_with_grading_accounting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "grading_accounting")
     spec = ToolSpec(
         tool_name="select_visible_record",
         family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
@@ -155,6 +162,51 @@ def test_search_helper_can_substitute_canonical_route_with_grading_accounting() 
         decision.grading_classification
         == "outcome_preserving_but_canonical_substituting"
     )
+
+
+def test_search_filter_gate_accepts_ambiguity_abstention_without_literal_tie() -> None:
+    spec = ToolSpec(
+        tool_name="select_contact_field_by_constraint",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description="Select exactly one visible contact and abstain on ambiguity.",
+        inputs=(ToolInput("records", "list", "Visible contact records."),),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "selected_record": {"type": "object"},
+                "value": {"type": "string"},
+            },
+        },
+        positive_triggers=("contact_lookup_after_search_contacts",),
+        negative_triggers=("no_candidates", "ambiguous_matches"),
+        preserves_side_effect_tools=("search_contacts", "modify_contact"),
+        required_original_tool_calls=("search_contacts",),
+        abstain_behavior="Return {} when no unique safe selection exists.",
+        generalization_rationale=(
+            "Contact lookup and update tasks repeatedly need deterministic "
+            "visible-record field selection after search_contacts."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=("contact_lookup", "contact_update"),
+        reason_tool_is_decisive=(
+            "It compresses candidate inspection, constraint matching, and output "
+            "field extraction while preserving original search/update calls."
+        ),
+        shortfall_cluster_evidence=(
+            "search_filter:select_contact_field_by_constraint",
+        ),
+        known_failure_mechanisms_addressed=("search_filter_missing_tie_behavior",),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents repeatedly choose the wrong visible contact candidate.",
+            signals=("wrong_selected_record",),
+        ),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert decision.allowed
 
 
 def test_decisive_gate_rejects_thin_helper() -> None:
@@ -300,3 +352,150 @@ def test_decisive_gate_rejects_timestamp_only_derived_helper() -> None:
 
     assert not decision.allowed
     assert decision.reason == "missing_downstream_original_tool_call"
+
+
+def test_decisive_gate_rejects_bounds_only_search_helper_even_with_search_call() -> (
+    None
+):
+    spec = ToolSpec(
+        tool_name="generic_message_window",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description="Return timestamp lower and upper bounds before search.",
+        inputs=(ToolInput("anchor_timestamp", "float", "Current timestamp."),),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "creation_timestamp_lowerbound": {"type": "number"},
+                "creation_timestamp_upperbound": {"type": "number"},
+            },
+        },
+        positive_triggers=("message_recency_search_needs_bounds",),
+        negative_triggers=("ambiguous_recency",),
+        preserves_side_effect_tools=("search_messages",),
+        required_original_tool_calls=("search_messages",),
+        abstain_behavior="Return {} when the recency phrase is ambiguous.",
+        generalization_rationale=(
+            "Message and contact recency tasks sometimes need bounded searches."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=("message_lookup", "contact_update_after_message"),
+        reason_tool_is_decisive=(
+            "It compresses timestamp-bound setup before the original search call."
+        ),
+        shortfall_cluster_evidence=("message_recency_bounds_failures",),
+        known_failure_mechanisms_addressed=("missing_message_search_bounds",),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents repeatedly issue message searches without criteria.",
+            signals=("repeated_failed_tool_call",),
+        ),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert not decision.allowed
+    assert decision.reason == "bounds_only_derived_helper_low_value"
+
+
+def test_failure_memory_allows_tie_mechanism_when_spec_repairs_ambiguity(
+    tmp_path: Path,
+) -> None:
+    memory = tmp_path / "failure_memory.json"
+    memory.write_text(
+        json.dumps(
+            {
+                "entries": [
+                    {
+                        "mechanism_id": "search_filter_missing_tie_behavior",
+                        "candidate_name": "select_contact_field_by_constraint",
+                        "failure_symptoms": ["missing tie behavior"],
+                        "suspected_root_cause": "selector omitted tie abstention",
+                        "status": "active_failure",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    spec = ToolSpec(
+        tool_name="select_contact_field_by_constraint",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description=(
+            "Select exactly one visible contact; ambiguous matches and ties abstain."
+        ),
+        inputs=(ToolInput("records", "list", "Visible contact records."),),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "selected_record": {"type": "object"},
+                "value": {"type": "string"},
+            },
+        },
+        positive_triggers=("contact_lookup_after_search_contacts",),
+        negative_triggers=("no_candidates", "ambiguous_tie", "missing_output_field"),
+        preserves_side_effect_tools=("search_contacts", "modify_contact"),
+        required_original_tool_calls=("search_contacts",),
+        abstain_behavior=(
+            "Return {} when no candidates, no unique match, or a tie/ambiguity exists."
+        ),
+        generalization_rationale=(
+            "Contact lookup and contact-update tasks repeatedly need deterministic "
+            "visible-record field selection after search_contacts."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=("contact_lookup", "contact_update"),
+        reason_tool_is_decisive=(
+            "It compresses candidate inspection, constraint matching, and output "
+            "field extraction while explicitly abstaining on ambiguity."
+        ),
+        shortfall_cluster_evidence=(
+            "search_filter:select_contact_field_by_constraint",
+        ),
+        known_failure_mechanisms_addressed=("search_filter_missing_tie_behavior",),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents repeatedly choose the wrong visible contact candidate.",
+            signals=("wrong_selected_record",),
+        ),
+    )
+
+    decision = evaluate_candidate_gate(spec, failure_memory_path=memory)
+
+    assert decision.allowed
+
+
+def test_failure_memory_keeps_visible_not_called_mechanism_blocked_without_adoption_repair(
+    tmp_path: Path,
+) -> None:
+    memory = tmp_path / "failure_memory.json"
+    memory.write_text(
+        json.dumps(
+            {
+                "entries": [
+                    {
+                        "mechanism_id": "state_precondition_visible_not_called",
+                        "candidate_name": "next_service_tool_call",
+                        "failure_symptoms": ["visible but not called"],
+                        "suspected_root_cause": "routing/adoption weakness",
+                        "status": "active_failure",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    spec = replace(
+        _state_spec("Return a concrete next_action and readiness predicate."),
+        tool_name="next_service_tool_call",
+        known_failure_mechanisms_addressed=("state_precondition_visible_not_called",),
+    )
+
+    decision = evaluate_candidate_gate(spec, failure_memory_path=memory)
+
+    assert not decision.allowed
+    assert (
+        decision.reason
+        == "unresolved_failure_memory:state_precondition_visible_not_called"
+    )

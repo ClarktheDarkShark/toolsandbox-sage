@@ -99,15 +99,50 @@ def gate_failure_memory_reasons(
     if not entries:
         return []
     repair_text = repair_rationale.lower()
-    repaired = any(
-        token in repair_text
-        for token in ("repair", "fixed", "addresses", "avoids", "material")
-    )
+
+    def _materially_repairs(entry: dict[str, Any]) -> bool:
+        mechanism_id = str(entry.get("mechanism_id", "")).lower()
+        if "tie" in mechanism_id or "ambigu" in mechanism_id:
+            return any(
+                token in repair_text
+                for token in ("tie", "ambigu", "unique", "abstain", "no match")
+            )
+        if "visible_not_called" in mechanism_id:
+            return any(
+                token in repair_text
+                for token in (
+                    "visible-not-called",
+                    "visible not called",
+                    "adoption",
+                    "called-subset",
+                    "called subset",
+                    "routing",
+                    "suppress",
+                )
+            )
+        if "bounds" in mechanism_id or "narrow_search_window" in mechanism_id:
+            return any(
+                token in repair_text
+                for token in (
+                    "not just timestamp bounds",
+                    "selection",
+                    "selected_record",
+                    "downstream action",
+                    "search_kwargs",
+                )
+            )
+        return any(
+            token in repair_text
+            for token in ("repair", "fixed", "addresses", "addressing", "avoids")
+        )
+
+    unrepaired = [entry for entry in entries if not _materially_repairs(entry)]
+    repaired = len(unrepaired) < len(entries)
     if diagnostic_only and repaired:
         return []
-    if repaired and mechanisms:
+    if not unrepaired and mechanisms:
         return []
     return [
         f"unresolved_failure_memory:{entry.get('mechanism_id') or entry.get('candidate_name')}"
-        for entry in entries
+        for entry in unrepaired
     ]

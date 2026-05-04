@@ -209,6 +209,86 @@ def _helper_forbids_side_effect_followup(helper_outputs: list[object]) -> bool:
     return saw_explicit_flag
 
 
+def _assistant_tool_names(message: dict[str, object]) -> list[str]:
+    names: list[str] = []
+    tool_calls = message.get("tool_calls")
+    if not isinstance(tool_calls, list):
+        return names
+    for tool_call in tool_calls:
+        if not isinstance(tool_call, dict):
+            continue
+        function = tool_call.get("function")
+        if not isinstance(function, dict):
+            continue
+        tool_name = function.get("name")
+        if isinstance(tool_name, str):
+            names.append(tool_name)
+    return names
+
+
+def _next_assistant_tool_names(
+    messages: list[object],
+    *,
+    start_index: int,
+) -> list[str]:
+    for lookahead in messages[start_index + 1 :]:
+        if not isinstance(lookahead, dict):
+            continue
+        if lookahead.get("role") == "user":
+            return []
+        if lookahead.get("role") == "assistant" and lookahead.get("tool_calls"):
+            return _assistant_tool_names(lookahead)
+    return []
+
+
+def _side_effect_followup_failures(
+    messages: list[object],
+    *,
+    helper_name: str,
+    required_original_tool_calls: tuple[str, ...],
+) -> bool:
+    """Return True when a helper's declared follow-up contract is violated.
+
+    Abstaining helpers should not trigger their side-effect tool directly, but
+    they may resolve missing prerequisites first and call the side-effect later.
+    """
+
+    if not required_original_tool_calls:
+        return False
+    saw_helper_result = False
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict):
+            continue
+        if message.get("role") != "tool" or message.get("name") != helper_name:
+            continue
+        saw_helper_result = True
+        output = _parse_tool_message_content(message.get("content"))
+        next_tools = set(_next_assistant_tool_names(messages, start_index=index))
+        required = set(required_original_tool_calls)
+        if isinstance(output, dict):
+            if (
+                output.get("should_call_add_reminder") is False
+                or output.get("should_call") is False
+            ):
+                if required & next_tools:
+                    return True
+                continue
+            if (
+                output.get("should_call_add_reminder") is True
+                or output.get("should_call") is True
+            ):
+                if not (required & next_tools):
+                    return True
+                continue
+        later_tools: set[str] = set()
+        for later in messages[index + 1 :]:
+            if isinstance(later, dict) and later.get("role") == "assistant":
+                later_tools.update(_assistant_tool_names(later))
+        if not (required & later_tools):
+            return True
+    return not saw_helper_result
+
+
 @dataclass(frozen=True)
 class SageRunConfig:
     agent: str
@@ -522,48 +602,25 @@ def run_sage_with_registry(
         if generated_called:
             loaded_entries_for_check = store.load_entries()
             conv_path = output_directory / "trajectories" / name / "conversation.json"
-            trajectory_tool_names: set[str] = set()
-            helper_outputs = _conversation_generated_tool_results(
-                output_directory,
-                name,
-                generated_called,
-            )
+            conv_messages: list[object] = []
             if conv_path.exists():
                 try:
                     conv_messages = json.loads(conv_path.read_text(encoding="utf-8"))
-                    for msg in conv_messages:
-                        if not isinstance(msg, dict):
-                            continue
-                        for tc in msg.get("tool_calls") or []:
-                            if isinstance(tc, dict):
-                                fn = tc.get("function", {})
-                                tname = fn.get("name")
-                                if isinstance(tname, str):
-                                    trajectory_tool_names.add(tname)
-                        if msg.get("role") == "tool" and isinstance(
-                            msg.get("name"), str
-                        ):
-                            trajectory_tool_names.add(msg["name"])
+                    if not isinstance(conv_messages, list):
+                        conv_messages = []
                 except Exception:
                     pass
             for helper_name in generated_called:
                 entry = loaded_entries_for_check.get(helper_name)
                 if entry is None:
                     continue
-                helper_output_items = helper_outputs.get(helper_name, [])
-                required = entry.tool.spec.required_original_tool_calls
-                if _helper_forbids_side_effect_followup(helper_output_items):
-                    for req_tool in required:
-                        if req_tool in trajectory_tool_names:
-                            side_effect_failures.append(helper_name)
-                            break
-                    continue
-                if not _helper_requires_side_effect_followup(helper_output_items):
-                    continue
-                for req_tool in required:
-                    if req_tool not in trajectory_tool_names:
-                        side_effect_failures.append(helper_name)
-                        break
+                required = tuple(entry.tool.spec.required_original_tool_calls)
+                if _side_effect_followup_failures(
+                    conv_messages,
+                    helper_name=helper_name,
+                    required_original_tool_calls=required,
+                ):
+                    side_effect_failures.append(helper_name)
         if side_effect_failures:
             result["side_effect_preservation_failures"] = side_effect_failures
             append_jsonl(

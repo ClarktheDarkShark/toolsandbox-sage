@@ -1,12 +1,15 @@
 # mypy: ignore-errors
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from sage_ts.evaluation.control_baseline_cache import (
     ControlBaselineCache,
     build_control_cache_report,
+    initial_state_checksum,
+    scenario_checksum,
 )
 from sage_ts.evaluation.task_strata import cohort_policy_report
 
@@ -74,6 +77,40 @@ def test_record_creation_writes_manifest_index_and_record(tmp_path: Path) -> Non
     assert record["complete_run"] is True
     assert record["valid_for_cache"] is True
     assert record["final_state_hash_source"] == "execution_context.json"
+    index_row = json.loads(cache.index_path.read_text(encoding="utf-8").splitlines()[0])
+    assert index_row["complete_run"] is True
+
+
+def test_checksums_ignore_tool_allow_list_order() -> None:
+    def scenario(tools: list[str], shift: float = 0.0):
+        starting_context = SimpleNamespace(
+            tool_allow_list=tools,
+            to_dict=lambda: {
+                "tool_allow_list": tools,
+                "interactive_console": {"locals": {}},
+                "_dbs": {
+                    "SANDBOX": [
+                        {"row": 1, "creation_timestamp": 100.1 + shift},
+                        {"row": 2, "creation_timestamp": 110.1 + shift},
+                    ]
+                },
+            },
+        )
+        return SimpleNamespace(
+            categories=["B", "A"],
+            max_messages=1,
+            starting_context=starting_context,
+            evaluation="same",
+        )
+
+    first = scenario(["search_messages", "end_conversation", "get_current_timestamp"])
+    second = scenario(
+        ["get_current_timestamp", "search_messages", "end_conversation"],
+        shift=5.25,
+    )
+
+    assert scenario_checksum("task", first) == scenario_checksum("task", second)
+    assert initial_state_checksum(first) == initial_state_checksum(second)
 
 
 def test_eligibility_requires_three_compatible_completed_runs(tmp_path: Path) -> None:

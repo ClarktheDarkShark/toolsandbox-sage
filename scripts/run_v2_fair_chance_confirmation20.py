@@ -21,14 +21,26 @@ RUN_NAME = os.environ.get("SAGE_V2_CONFIRMATION_NAME", "v2_fair_chance_confirmat
 SUMMARY_ROOT = Path(f"artifacts/summaries/{RUN_NAME}")
 OUTPUT_ROOT = Path(f"outputs/{RUN_NAME}")
 REGISTRY_ROOT = Path(f"artifacts/registry_candidates/{RUN_NAME}")
+SOURCE_MATRIX_ROOT = Path(
+    os.environ.get(
+        "SAGE_V2_CONFIRMATION_MATRIX_ROOT",
+        "artifacts/summaries/v2_experimental_matrix20_clean",
+    )
+)
 MANIFEST = Path(
-    "artifacts/summaries/v2_experimental_matrix20_clean/cohort_manifest.json"
+    os.environ.get(
+        "SAGE_V2_CONFIRMATION_MANIFEST",
+        str(SOURCE_MATRIX_ROOT / "cohort_manifest.json"),
+    )
 )
 DIVERSITY = Path(
-    "artifacts/summaries/v2_experimental_matrix20_clean/cohort_diversity_report.json"
+    os.environ.get(
+        "SAGE_V2_CONFIRMATION_DIVERSITY",
+        str(SOURCE_MATRIX_ROOT / "cohort_diversity_report.json"),
+    )
 )
 
-VARIANTS = [
+DEFAULT_VARIANTS = [
     {
         "id": "variant0_current_v2_baseline",
         "features": "default",
@@ -65,6 +77,28 @@ VARIANTS = [
         "summary": "artifacts/summaries/v2_experimental_matrix20_clean_repairfix/variant7_combined_best_stack_summary.json",
     },
 ]
+
+
+def variants_from_source_matrix() -> list[dict[str, str]]:
+    matrix_path = SOURCE_MATRIX_ROOT / "matrix_summary.json"
+    if not matrix_path.exists():
+        return DEFAULT_VARIANTS
+    payload = read_json(matrix_path)
+    variants: list[dict[str, str]] = []
+    for item in payload.get("variants", []):
+        variant = item.get("variant", {}) if isinstance(item, dict) else {}
+        variant_id = str(variant.get("id", ""))
+        features = str(variant.get("features", "default"))
+        summary_path = SOURCE_MATRIX_ROOT / f"{variant_id}_summary.json"
+        if variant_id and summary_path.exists():
+            variants.append(
+                {
+                    "id": variant_id,
+                    "features": features,
+                    "summary": str(summary_path),
+                }
+            )
+    return variants or DEFAULT_VARIANTS
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -114,6 +148,7 @@ def summarize(
         "task_focus_path": str(run_root / "dashboard" / "task_focus.html"),
         "protocol_gate_passed": protocol.get("protocol_gate_passed"),
         "protocol_gate_reasons": protocol.get("protocol_gate_reasons"),
+        "route_mismatch_qualified": protocol.get("route_mismatch_qualified"),
         "control_cache": {
             "source": control_cache.get("control_source"),
             "cached": control_cache.get("cached_control_tasks"),
@@ -158,7 +193,7 @@ def main() -> None:
     shutil.copy2(DIVERSITY, SUMMARY_ROOT / "cohort_diversity_report.json")
     (SUMMARY_ROOT / "logs").mkdir()
     summaries = []
-    for variant in VARIANTS:
+    for variant in variants_from_source_matrix():
         src = source_registry(Path(variant["summary"]))
         src_payload = read_json(src)
         if not (src_payload.get("tools") or {}):
@@ -197,7 +232,6 @@ def main() -> None:
             "--parallel-arms",
             "--control-cache",
             "use-if-eligible",
-            "--no-dashboard-open",
         ]
         with log_path.open("w", encoding="utf-8") as log:
             log.write("COMMAND: " + " ".join(cmd) + "\n")

@@ -180,3 +180,13 @@ See `docs/sage_protocol/v2_tool_adoption_diagnosis_report.md`.
 Key update: late birth was materially undercounting generated tools. A fair-chance frozen confirmation pass with accepted tools available from turn 1 showed `variant5_contract_synthesis` is the only protocol-passing positive stack: outcome `+0.0617`, canonical `+0.0979`, helper visible/called/VNC `4 / 3 / 1`, exact successes `0 -> 2`, side-effect/runtime `0 / 0`.
 
 Updated decision: `rerun readiness-20 with two-stage confirmation`.
+
+## Formal Validation Addendum - 2026-05-04T06:08:30.482096
+
+After repairing helper affordance/routing and suppressing broad-harmful helpers, the winning validation portfolio was not the full combined matrix stack. It was the conservative best3 portfolio: `relative_day_time_to_timestamp`, `resolve_search_window_or_bounds`, and `select_record_by_timestamp_extreme`.
+
+- Formal 100 outcome lift: `33.58%`; exact `control=16` -> `SAGE=23`; protocol pass `True`.
+- Formal 250 outcome lift: `20.52%`; exact `control=31` -> `SAGE=40`; protocol pass `True`.
+- Formal 250 reference/canonical similarity delta: `0.0660`.
+- Runtime exceptions: `0`; helper side-effect incidents: `0`.
+- Decision update: `rerun readiness-20 with winning stack` is superseded by formal 100 and 250 pass on the winning stack.

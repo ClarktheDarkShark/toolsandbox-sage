@@ -75,6 +75,23 @@ DOWNSTREAM_TOOL_PREFIXES = (
     "send_",
     "set_",
 )
+BOUNDS_ONLY_OUTPUT_KEYS = frozenset(
+    {
+        "timestamp",
+        "lower_bound",
+        "upper_bound",
+        "timestamp_lowerbound",
+        "timestamp_upperbound",
+        "creation_timestamp_lowerbound",
+        "creation_timestamp_upperbound",
+        "creation_timestamp_lower_bound",
+        "creation_timestamp_upper_bound",
+        "reminder_timestamp_lowerbound",
+        "reminder_timestamp_upperbound",
+        "reminder_timestamp_lower_bound",
+        "reminder_timestamp_upper_bound",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -155,6 +172,23 @@ def _has_downstream_original_tool_call(spec: ToolSpec) -> bool:
         tool_name.startswith(DOWNSTREAM_TOOL_PREFIXES)
         for tool_name in spec.required_original_tool_calls
     )
+
+
+def _is_bounds_only_derived_helper(spec: ToolSpec) -> bool:
+    if spec.family != ToolFamily.DERIVED_VALUE_CALCULATOR:
+        return False
+    props = set(_output_schema_properties(spec))
+    if not props:
+        return False
+    if {
+        "search_kwargs",
+        "target_tool_name",
+        "selected_record",
+        "add_reminder_kwargs",
+    } & props:
+        return False
+    normalized = {key.lower() for key in props}
+    return normalized.issubset(BOUNDS_ONLY_OUTPUT_KEYS)
 
 
 def evaluate_candidate_gate(
@@ -274,9 +308,14 @@ def evaluate_candidate_gate(
             diagnostic_only=spec.diagnostic_only,
             repair_rationale=" ".join(
                 [
+                    spec.description,
+                    spec.abstain_behavior,
                     spec.reason_tool_is_decisive,
                     spec.generalization_rationale,
+                    *spec.positive_triggers,
+                    *spec.negative_triggers,
                     *spec.shortfall_cluster_evidence,
+                    *spec.known_failure_mechanisms_addressed,
                 ]
             ),
         )
@@ -317,6 +356,12 @@ def evaluate_candidate_gate(
                     "missing_downstream_original_tool_call",
                     grading_classification,
                 )
+        if _is_bounds_only_derived_helper(spec):
+            return GateDecision(
+                False,
+                "bounds_only_derived_helper_low_value",
+                grading_classification,
+            )
     if spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
         text = " ".join(
             [
@@ -396,9 +441,16 @@ def evaluate_candidate_gate(
             return GateDecision(
                 False, "search_filter_missing_output_contract", grading_classification
             )
-        if (
-            "tie" not in spec.description.lower()
-            and "tie" not in spec.abstain_behavior.lower()
+        ambiguity_text = " ".join(
+            [
+                spec.description,
+                spec.abstain_behavior,
+                *spec.negative_triggers,
+            ]
+        ).lower()
+        if not any(
+            token in ambiguity_text
+            for token in ("tie", "ambigu", "multiple match", "multiple-match")
         ):
             return GateDecision(
                 False, "search_filter_missing_tie_behavior", grading_classification

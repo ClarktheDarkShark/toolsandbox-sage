@@ -38,6 +38,14 @@ COMPATIBILITY_FIELDS = (
     "manifest_checksum",
     "base_tool_policy",
 )
+ORDER_INSENSITIVE_LIST_KEYS = frozenset(
+    {
+        "categories",
+        "tool_allow_list",
+        "tool_deny_list",
+        "tool_augmentation_list",
+    }
+)
 
 
 def _json_default(value: Any) -> Any:
@@ -58,6 +66,71 @@ def stable_json(value: Any) -> str:
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), default=_json_default
     )
+
+
+def _timestamp_anchor(value: Any) -> float | None:
+    timestamps: list[float] = []
+
+    def visit(item: Any, *, key: str | None = None) -> None:
+        if isinstance(item, dict):
+            for child_key, child_value in item.items():
+                visit(child_value, key=str(child_key))
+            return
+        if isinstance(item, (list, tuple, set)):
+            for child in item:
+                visit(child)
+            return
+        if (
+            key is not None
+            and key.endswith("timestamp")
+            and key != "sandbox_message_index"
+            and isinstance(item, int | float)
+            and item
+        ):
+            timestamps.append(float(item))
+
+    visit(value)
+    return min(timestamps) if timestamps else None
+
+
+def _canonicalize_for_checksum(
+    value: Any,
+    *,
+    key: str | None = None,
+    timestamp_anchor: float | None = None,
+) -> Any:
+    """Canonicalize semantically unordered fields before compatibility hashing."""
+    if isinstance(value, dict):
+        return {
+            str(item_key): _canonicalize_for_checksum(
+                item_value,
+                key=str(item_key),
+                timestamp_anchor=timestamp_anchor,
+            )
+            for item_key, item_value in sorted(
+                value.items(), key=lambda item: str(item[0])
+            )
+        }
+    if isinstance(value, (list, tuple, set)):
+        items = [
+            _canonicalize_for_checksum(item, timestamp_anchor=timestamp_anchor)
+            for item in value
+        ]
+        if key in ORDER_INSENSITIVE_LIST_KEYS:
+            return sorted(items, key=stable_json)
+        return items
+    if (
+        timestamp_anchor is not None
+        and key is not None
+        and key.endswith("timestamp")
+        and key != "sandbox_message_index"
+        and isinstance(value, int | float)
+        and value
+    ):
+        return round(float(value) - timestamp_anchor, 3)
+    if hasattr(value, "value"):
+        return value.value
+    return value
 
 
 def sha256_text(text: str) -> str:
@@ -135,18 +208,28 @@ def model_parameters_hash(*, agent: str, user: str, base_tool_policy: str) -> st
 def scenario_checksum(scenario_key: str, scenario: Scenario) -> str:
     payload = {
         "scenario_key": scenario_key,
-        "categories": [str(item) for item in getattr(scenario, "categories", [])],
+        "categories": sorted(str(item) for item in getattr(scenario, "categories", [])),
         "max_messages": getattr(scenario, "max_messages", None),
-        "tool_allow_list": getattr(scenario.starting_context, "tool_allow_list", None),
-        "evaluation_repr": repr(getattr(scenario, "evaluation", "")),
+        "tool_allow_list": _canonicalize_for_checksum(
+            getattr(scenario.starting_context, "tool_allow_list", None),
+            key="tool_allow_list",
+        ),
+        "evaluation_type": type(getattr(scenario, "evaluation", None)).__name__,
     }
     return sha256_text(stable_json(payload))
 
 
 def initial_state_checksum(scenario: Scenario) -> str:
     context = scenario.starting_context.to_dict()
+    timestamp_anchor = _timestamp_anchor(context)
     payload = {
-        key: value for key, value in context.items() if key != "interactive_console"
+        str(key): _canonicalize_for_checksum(
+            value,
+            key=str(key),
+            timestamp_anchor=timestamp_anchor,
+        )
+        for key, value in context.items()
+        if key != "interactive_console"
     }
     return sha256_text(stable_json(payload))
 
@@ -330,6 +413,7 @@ class ControlBaselineCache:
                         "scenario_key": scenario_key,
                         "compatibility_key": record["compatibility_key"],
                         "record_path": str(record_path),
+                        "complete_run": record["complete_run"],
                         "valid_for_cache": record["valid_for_cache"],
                         "timestamp": record["timestamp"],
                     },

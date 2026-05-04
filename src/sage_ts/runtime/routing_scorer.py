@@ -169,10 +169,15 @@ def score_registry_entry_for_scenario(
         for family in spec.applicable_task_families
         if _family_match(family, scenario_strata, scenario_lower)
     )
+    matched_spec_families = matched_families
     if matched_families:
         score += 3
     trigger_strata = set(HELPER_TRIGGERS.get(tool_name, ()))
-    if trigger_strata and scenario_strata & trigger_strata:
+    if (
+        trigger_strata
+        and scenario_strata & trigger_strata
+        and (matched_positive or matched_spec_families)
+    ):
         score += 2
         matched_families = tuple(
             sorted(set(matched_families) | (scenario_strata & trigger_strata))

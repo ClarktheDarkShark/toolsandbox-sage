@@ -297,42 +297,100 @@ def _write_cohort_preflight(
     return report
 
 
+def _optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _route_mismatch_qualified(comparison: dict[str, Any]) -> bool:
+    """True when outcome improves despite canonical/exact accounting disagreement."""
+    canonical_delta = float(comparison.get("mean_similarity_delta", 0.0) or 0.0)
+    outcome_delta = _optional_float(comparison.get("mean_outcome_similarity_delta"))
+    exact_delta = int(comparison.get("exact_success_delta", 0) or 0)
+    gains = int(comparison.get("gain_count", 0) or 0)
+    regressions = int(comparison.get("regression_count", 0) or 0)
+    outcome_gains = int(comparison.get("outcome_gain_count", 0) or 0)
+    outcome_regressions = int(comparison.get("outcome_regression_count", 0) or 0)
+    runtime_exceptions = int(comparison.get("runtime_exception_count", 0) or 0)
+    candidate = cast(dict[str, Any], comparison.get("candidate", {}))
+    called = int(candidate.get("generated_tool_called_scenarios", 0) or 0)
+    accepted = int(candidate.get("accepted_tool_count", 0) or 0)
+    canonical_or_exact_disagrees = (
+        canonical_delta <= 0 or gains <= regressions or exact_delta < 0
+    )
+    return (
+        runtime_exceptions == 0
+        and outcome_delta is not None
+        and outcome_delta > 0
+        and outcome_gains > outcome_regressions
+        and (called > 0 or accepted > 0)
+        and canonical_or_exact_disagrees
+    )
+
+
 def _protocol_gate_decision(
     comparison: dict[str, Any],
     *,
     scenario_count: int,
 ) -> tuple[bool, list[str]]:
-    """Apply campaign viability gates; never pass on non-negative mean alone."""
+    """Apply campaign viability gates with outcome primary and canonical reported."""
     reasons: list[str] = []
     delta = float(comparison.get("mean_similarity_delta", 0.0) or 0.0)
+    outcome_delta = _optional_float(comparison.get("mean_outcome_similarity_delta"))
     exact_delta = int(comparison.get("exact_success_delta", 0) or 0)
     gains = int(comparison.get("gain_count", 0) or 0)
     regressions = int(comparison.get("regression_count", 0) or 0)
+    outcome_gains = int(comparison.get("outcome_gain_count", 0) or 0)
+    outcome_regressions = int(comparison.get("outcome_regression_count", 0) or 0)
     runtime_exceptions = int(comparison.get("runtime_exception_count", 0) or 0)
     candidate = cast(dict[str, Any], comparison.get("candidate", {}))
     called = int(candidate.get("generated_tool_called_scenarios", 0) or 0)
     accepted = int(candidate.get("accepted_tool_count", 0) or 0)
+    route_mismatch = _route_mismatch_qualified(comparison)
+    outcome_qualified = (
+        runtime_exceptions == 0
+        and outcome_delta is not None
+        and outcome_delta > 0
+        and outcome_gains > outcome_regressions
+        and (called > 0 or accepted > 0)
+    )
 
     if runtime_exceptions:
         reasons.append("runtime_exceptions_present")
-    if delta <= 0:
+    if outcome_delta is not None:
+        if outcome_delta <= 0:
+            reasons.append("non_positive_outcome_delta")
+        if outcome_gains <= outcome_regressions:
+            reasons.append("outcome_gains_do_not_exceed_regressions")
+    elif delta <= 0:
+        reasons.append("outcome_score_unavailable_and_non_positive_canonical_delta")
+    if delta <= 0 and not (route_mismatch or outcome_qualified):
         reasons.append("non_positive_canonical_delta")
-    if gains <= regressions:
+    if gains <= regressions and not outcome_qualified:
         reasons.append("gains_do_not_exceed_regressions")
 
     if scenario_count >= 30:
-        ratio = gains / max(regressions, 1)
+        primary_delta = outcome_delta if outcome_delta is not None else delta
+        primary_gains = outcome_gains if outcome_delta is not None else gains
+        primary_regressions = (
+            outcome_regressions if outcome_delta is not None else regressions
+        )
+        ratio = primary_gains / max(primary_regressions, 1)
         called_share = called / scenario_count if scenario_count else 0.0
-        if delta < 0.08:
-            reasons.append("confirmation_delta_below_0_08")
-        if exact_delta <= 0:
+        if primary_delta < 0.08:
+            reasons.append("confirmation_outcome_delta_below_0_08")
+        if exact_delta <= 0 and not outcome_qualified:
             reasons.append("exact_successes_not_improved")
         if ratio < 1.4:
             reasons.append("gain_regression_ratio_below_1_4")
         if called_share < 0.25:
             reasons.append("helper_call_share_below_25_percent")
     elif scenario_count >= 12:
-        if exact_delta < 0:
+        if exact_delta < 0 and not outcome_qualified:
             reasons.append("exact_successes_regressed")
         if accepted <= 0 and called < 3:
             reasons.append("no_accepted_helper_and_fewer_than_3_helper_calls")
@@ -1343,6 +1401,7 @@ def main() -> None:
     comparison["control_cache"] = control_cache_report
     comparison["model_metadata"] = model_metadata
     comparison["comparison_model_key"] = model_metadata["comparison_key"]
+    comparison["route_mismatch_qualified"] = _route_mismatch_qualified(comparison)
     protocol_gate_passed, protocol_gate_reasons = _protocol_gate_decision(
         comparison,
         scenario_count=len(scenario_names),
@@ -1387,6 +1446,7 @@ def main() -> None:
             "regression_count": comparison.get("regression_count"),
             "outcome_gain_count": comparison.get("outcome_gain_count"),
             "outcome_regression_count": comparison.get("outcome_regression_count"),
+            "route_mismatch_qualified": comparison.get("route_mismatch_qualified"),
             "protocol_gate_reasons": protocol_gate_reasons,
             "registry_gate_restore": registry_gate_restore,
         },
@@ -1463,6 +1523,7 @@ def main() -> None:
         "mean_outcome_similarity_delta": comparison.get(
             "mean_outcome_similarity_delta"
         ),
+        "route_mismatch_qualified": comparison.get("route_mismatch_qualified"),
         "protocol_gate_passed": protocol_gate_passed,
         "protocol_gate_reasons": protocol_gate_reasons,
     }

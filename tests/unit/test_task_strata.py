@@ -54,8 +54,8 @@ def test_ambiguous_contact_lookup_is_not_birth_opportunity() -> None:
     assert expected_birth_opportunities(scenario) == []
 
 
-def test_contact_search_tasks_have_birth_opportunity_and_retained_fit() -> None:
-    scenario = "search_phone_number_with_name_3_distraction_tools"
+def test_contact_update_tasks_have_birth_opportunity_and_retained_fit() -> None:
+    scenario = "update_contact_relationship_with_relationship_3_distraction_tools"
 
     assert "select_contact_field_by_constraint" in expected_helper_fit(scenario)
     assert "search_filter:select_contact_field_by_constraint" in (
@@ -68,12 +68,8 @@ def test_raw_latest_message_matches_retrieval_window_and_selector() -> None:
 
     assert "record_filtering_ranking_latest_selection" in classify_task_strata(scenario)
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
-    assert "message_search_time_window" in expected_helper_fit(scenario)
     assert "resolve_search_window_or_bounds" in expected_helper_fit(scenario)
     assert "search_filter:select_record_by_timestamp_extreme" in (
-        expected_birth_opportunities(scenario)
-    )
-    assert "derived_value:message_search_time_window" in (
         expected_birth_opportunities(scenario)
     )
     assert "derived_value:resolve_search_window_or_bounds" in (
@@ -86,11 +82,7 @@ def test_modify_contact_message_recency_matches_trace_compatible_helpers() -> No
 
     assert "contact_message_search_disambiguation" in classify_task_strata(scenario)
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
-    assert "message_search_time_window" in expected_helper_fit(scenario)
     assert "search_filter:select_record_by_timestamp_extreme" in (
-        expected_birth_opportunities(scenario)
-    )
-    assert "derived_value:message_search_time_window" in (
         expected_birth_opportunities(scenario)
     )
 
@@ -99,12 +91,21 @@ def test_oldest_message_matches_retrieval_window_and_selector() -> None:
     scenario = "search_message_with_recency_oldest_10_distraction_tools"
 
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
-    assert "message_search_time_window" in expected_helper_fit(scenario)
     assert "resolve_search_window_or_bounds" in expected_helper_fit(scenario)
     assert "search_filter:select_record_by_timestamp_extreme" in (
         expected_birth_opportunities(scenario)
     )
-    assert "derived_value:message_search_time_window" in (
+    assert "derived_value:resolve_search_window_or_bounds" in (
+        expected_birth_opportunities(scenario)
+    )
+
+
+def test_remove_latest_reminder_matches_search_window_and_selector() -> None:
+    scenario = "remove_reminder_with_recency_latest_3_distraction_tools"
+
+    assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
+    assert "resolve_search_window_or_bounds" in expected_helper_fit(scenario)
+    assert "search_filter:select_record_by_timestamp_extreme" in (
         expected_birth_opportunities(scenario)
     )
     assert "derived_value:resolve_search_window_or_bounds" in (
@@ -271,7 +272,7 @@ def test_cohort_policy_report_tracks_post_birth_reuse_opportunity() -> None:
 
     assert report["has_post_birth_reuse_opportunity"] is True
     reuse = report["post_birth_reuse_opportunities"][
-        "derived_value:message_search_time_window"
+        "search_filter:select_record_by_timestamp_extreme"
     ]
     assert reuse["first_birth_scenario"] == "modify_contact_with_message_recency"
     assert reuse["later_fit_count"] == 2

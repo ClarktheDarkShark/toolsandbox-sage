@@ -1551,9 +1551,9 @@ def test_timestamp_extreme_selector_exposed_on_message_ranking_scenarios(
     assert tool_name not in unrelated.starting_context.name_to_tool
     assert tool_name in oldest.starting_context.name_to_tool
     assert tool_name not in reminder_latest.starting_context.name_to_tool
-    assert tool_name not in modify_contact.starting_context.name_to_tool
-    assert tool_name not in multi_turn.starting_context.name_to_tool
-    assert tool_name not in alt_variant.starting_context.name_to_tool
+    assert tool_name in modify_contact.starting_context.name_to_tool
+    assert tool_name in multi_turn.starting_context.name_to_tool
+    assert tool_name in alt_variant.starting_context.name_to_tool
     assert tool_name in latest_message.starting_context.name_to_tool
 
     openai_tool = convert_to_openai_tool(
@@ -1564,7 +1564,7 @@ def test_timestamp_extreme_selector_exposed_on_message_ranking_scenarios(
     assert properties["records"]["items"] == {}
 
 
-def test_message_search_window_available_on_message_recency_flows(
+def test_message_search_window_suppressed_as_bounds_only_low_value(
     tmp_path: Path,
 ) -> None:
     store = _registry_with_message_search_window(tmp_path)
@@ -1589,8 +1589,8 @@ def test_message_search_window_available_on_message_recency_flows(
     )
 
     tool_name = "message_search_time_window"
-    assert tool_name in modify_contact.starting_context.name_to_tool
-    assert tool_name in raw_latest_message.starting_context.name_to_tool
+    assert tool_name not in modify_contact.starting_context.name_to_tool
+    assert tool_name not in raw_latest_message.starting_context.name_to_tool
     assert tool_name not in unrelated.starting_context.name_to_tool
 
     compiled = compile_toolsandbox_tool(next(iter(store.load_entries().values())))
@@ -1980,6 +1980,11 @@ def test_resolve_search_window_helper_exposed_only_on_bounded_search_tasks(
         store,
         scenario_name="search_reminder_with_creation_recency_yesterday",
     )
+    reminder_action = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="remove_reminder_with_recency_latest",
+    )
     reminder_creation = with_registry_tools(
         scenario,
         store,
@@ -1994,6 +1999,7 @@ def test_resolve_search_window_helper_exposed_only_on_bounded_search_tasks(
     tool_name = "resolve_search_window_or_bounds"
     assert tool_name in message_recency.starting_context.name_to_tool
     assert tool_name in reminder_recency.starting_context.name_to_tool
+    assert tool_name in reminder_action.starting_context.name_to_tool
     assert tool_name not in reminder_creation.starting_context.name_to_tool
     assert tool_name not in insufficient.starting_context.name_to_tool
 

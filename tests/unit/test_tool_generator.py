@@ -2,6 +2,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
+
 from sage_ts.adapters.openai_agent_adapter import ChatRequest
 from sage_ts.generation.prompt_cache import PromptCache
 from sage_ts.generation.tool_generator import ToolGenerationRequest, ToolGenerator
@@ -79,7 +81,10 @@ def test_generation_request_includes_reusable_name_hint() -> None:
     assert 'tool_name must be exactly "celsius_to_fahrenheit"' in request.prompt()
 
 
-def test_generation_request_includes_family_contract_guidance() -> None:
+def test_generation_request_includes_family_contract_guidance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "dependency_logic")
     request = ToolGenerationRequest(
         scenario_name="search_phone_number_with_name",
         observation="Repeated contact selection failures.",
@@ -94,7 +99,10 @@ def test_generation_request_includes_family_contract_guidance() -> None:
     assert "tool_generation_v5" not in prompt
 
 
-def test_generation_request_requires_v2_contract_fields() -> None:
+def test_generation_request_requires_v2_contract_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "grading_accounting")
     request = ToolGenerationRequest(
         scenario_name="search_message_with_recency_latest",
         observation="Repeated shortfalls cluster around latest-record selection.",
