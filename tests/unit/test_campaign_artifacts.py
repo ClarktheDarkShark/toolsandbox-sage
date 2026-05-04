@@ -16,3 +16,17 @@ def test_duplicate_birth_skip_is_valid_campaign_event(tmp_path: Path) -> None:
     assert json.loads(latest.read_text(encoding="utf-8"))["tool_name"] == (
         "recency_to_timestamp_bounds"
     )
+
+
+def test_tool_repair_attempt_is_valid_campaign_event(tmp_path: Path) -> None:
+    row = append_event(
+        "tool_repair_attempted",
+        {"tool_name": "thin_helper", "accepted": False},
+        root=tmp_path,
+    )
+
+    assert row["event"] == "tool_repair_attempted"
+    latest = tmp_path / "events" / "latest.jsonl"
+    payload = json.loads(latest.read_text(encoding="utf-8"))
+    assert payload["tool_name"] == "thin_helper"
+    assert payload["accepted"] is False

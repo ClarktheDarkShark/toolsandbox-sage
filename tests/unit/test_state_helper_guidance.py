@@ -1,5 +1,11 @@
 from sage_ts.adequacy.inadequacy_classifier import _next_service_tool_call_observation
-from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
+from sage_ts.generation.tool_spec import (
+    GeneratedTool,
+    StructuredInadequacyEvidence,
+    ToolFamily,
+    ToolInput,
+    ToolSpec,
+)
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.runtime.toolsandbox_integration import _google_docstring
 from sage_ts.validation.sandbox_validator import ValidationResult
@@ -32,7 +38,10 @@ def _state_helper_entry() -> RegistryEntry:
             ),
             output_annotation="dict",
             generalization_rationale="State precondition handling recurs.",
-            inadequacy_evidence="Base tools do not expose a deterministic next step.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Base tools do not expose a deterministic next step.",
+                signals=("state_precondition",),
+            ),
         ),
         code="def next_service_tool_call(*args, **kwargs):\n    return {}\n",
     )
@@ -69,3 +78,55 @@ def test_next_service_tool_call_docstring_includes_usage_constraints() -> None:
         docstring
     )
     assert "answer only about that final target state" in docstring
+
+
+def test_generic_downstream_helper_docstring_uses_actual_output_schema() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="message_search_time_window",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            description="Compute timestamp bounds for message search.",
+            inputs=(
+                ToolInput("anchor_timestamp", "float", "Reference timestamp."),
+                ToolInput("lookback_days", "int", "Days to look back."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "creation_timestamp_lowerbound": {"type": "number"},
+                    "creation_timestamp_upperbound": {"type": "number"},
+                },
+            },
+            positive_triggers=("latest message", "oldest message"),
+            negative_triggers=("missing current timestamp",),
+            required_original_tool_calls=("search_messages",),
+            generalization_rationale="Message recency search recurs.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Manual timestamp bounds are error-prone.",
+                signals=("derived_value",),
+            ),
+        ),
+        code="def message_search_time_window(anchor_timestamp: float, lookback_days: int) -> dict:\n    return {}\n",
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="search_message_with_recency_oldest",
+    )
+
+    docstring = _google_docstring(entry)
+
+    assert "Use when:" in docstring
+    assert "latest message" in docstring
+    assert "Do not use when:" in docstring
+    assert "creation_timestamp_lowerbound" in docstring
+    assert "Then pass the relevant returned fields into search_messages." in docstring
+    assert "should_call_add_reminder" not in docstring
+    assert "search_messages_kwargs" not in docstring

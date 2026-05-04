@@ -47,14 +47,34 @@ def _call_path_note(spec: ToolSpec) -> list[str]:
     if not spec.required_original_tool_calls:
         return []
     targets = ", ".join(spec.required_original_tool_calls)
-    kwargs_key = f"{spec.required_original_tool_calls[0]}_kwargs"
-    lines = [
-        "",
-        f"Call path: {spec.tool_name}(...) → {targets}(**result['{kwargs_key}'])",
-        f"Use this helper instead of assembling {targets} arguments manually.",
-        f"Only call {targets} after this helper returns should_call_add_reminder=True.",
-        "Do not call the target tool if this helper returns should_call_add_reminder=False.",
-    ]
+    lines = ["", f"Downstream ToolSandbox tool to preserve: {targets}."]
+    output_schema = spec.output_schema or {}
+    output_properties = output_schema.get("properties", {})
+    if isinstance(output_properties, dict):
+        for target in spec.required_original_tool_calls:
+            kwargs_key = f"{target}_kwargs"
+            if kwargs_key in output_properties:
+                lines.extend(
+                    [
+                        f"Call path: {spec.tool_name}(...) -> {target}(**result['{kwargs_key}']).",
+                        f"Do not treat {spec.tool_name} as completing the task; call {target} next when safe.",
+                    ]
+                )
+                return lines
+        schema_keys = ", ".join(sorted(output_properties))
+        if schema_keys:
+            lines.extend(
+                [
+                    f"Call {spec.tool_name}(...) to compute these reusable fields: {schema_keys}.",
+                    f"Then pass the relevant returned fields into {targets}.",
+                ]
+            )
+    lines.extend(
+        [
+            f"Use this helper instead of manually deriving arguments for {targets}.",
+            f"Do not treat {spec.tool_name} as completing the task; call {targets} next when safe.",
+        ]
+    )
     return lines
 
 
@@ -74,6 +94,14 @@ def _google_docstring(entry: RegistryEntry) -> str:
     for item in spec.inputs:
         lines.append(f"    {item.name}: {item.description}")
     lines.extend(["", "Returns:", f"    {spec.output_annotation}"])
+    if spec.positive_triggers:
+        lines.extend(["", "Use when:"])
+        for trigger in spec.positive_triggers:
+            lines.append(f"    - {trigger}")
+    if spec.negative_triggers:
+        lines.extend(["", "Do not use when:"])
+        for trigger in spec.negative_triggers:
+            lines.append(f"    - {trigger}")
     if spec.tool_name == "next_service_tool_call":
         lines.extend(
             [
@@ -505,6 +533,7 @@ def route_registry_entries(
     scenario_name: str | None,
     *,
     max_bundle_size: int = DEFAULT_MAX_RUNTIME_BUNDLE_SIZE,
+    available_base_tools: set[str] | None = None,
 ) -> tuple[list[RegistryEntry], dict[str, RuntimeRoutingDecision]]:
     """Select a bounded runtime helper bundle and explain each routing decision."""
     decisions: dict[str, RuntimeRoutingDecision] = {}
@@ -514,6 +543,15 @@ def route_registry_entries(
         is_visible, reason = registry_entry_visibility_reason(entry, scenario_name)
         status = "shown" if is_visible else "hidden"
         score = generic.score
+        downstream_tools = set(entry.tool.spec.required_original_tool_calls) | set(
+            entry.tool.spec.preserves_side_effect_tools
+        )
+        if is_visible and available_base_tools is not None and downstream_tools:
+            missing = downstream_tools - available_base_tools
+            if missing:
+                is_visible = False
+                status = "hidden"
+                reason = "blocked_by_missing_downstream_original_tool"
         if is_visible:
             visible.append((score, tool_name, entry))
         decisions[tool_name] = RuntimeRoutingDecision(
@@ -619,9 +657,13 @@ def with_registry_tools(
 ) -> Scenario:
     """Return a scenario copy whose starting context includes registry tools."""
     scenario_copy = copy.deepcopy(scenario)
+    available_base_tools = set(
+        scenario_copy.starting_context.get_available_tools(scrambling_allowed=False)
+    )
     entries, _decisions = route_registry_entries(
         store.load_entries(),
         scenario_name,
+        available_base_tools=available_base_tools,
     )
     inject_registry_tools_into_context(
         scenario_copy.starting_context,

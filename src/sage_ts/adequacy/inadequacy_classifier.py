@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from sage_ts.experiments.v2_flags import DEPENDENCY_LOGIC, feature_enabled
 from sage_ts.generation.tool_spec import StructuredInadequacyEvidence, ToolFamily
 from sage_ts.validation.sandbox_validator import ToolExample
 from tool_sandbox.common.execution_context import ScenarioCategories
@@ -1001,7 +1002,7 @@ def classify_scenario_observations(
 
     if similarity < 1.0 and _is_direct_service_precondition_scenario(scenario_name):
         observations = [_next_service_tool_call_observation(scenario_name)]
-        if _generic_precondition_tools(scenario):
+        if feature_enabled(DEPENDENCY_LOGIC) and _generic_precondition_tools(scenario):
             observations.append(
                 _dependency_precondition_observation(
                     scenario_name,
@@ -1012,6 +1013,7 @@ def classify_scenario_observations(
 
     if (
         similarity < 1.0
+        and feature_enabled(DEPENDENCY_LOGIC)
         and _generic_precondition_tools(scenario)
         and _generic_downstream_action_tools(scenario)
     ):

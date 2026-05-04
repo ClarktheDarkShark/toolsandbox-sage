@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from sage_ts.evaluation.task_strata import HELPER_TRIGGERS, classify_task_strata
+from sage_ts.experiments.v2_flags import EVIDENCE_ROUTING, feature_enabled
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 
 DEFAULT_MAX_RUNTIME_BUNDLE_SIZE = 5
@@ -95,6 +96,8 @@ def _blocked_by_adoption_risk(
     matched_positive: tuple[str, ...],
     matched_families: tuple[str, ...],
 ) -> tuple[bool, str]:
+    if not feature_enabled(EVIDENCE_ROUTING):
+        return False, ""
     evidence = _helper_evidence(tool_name)
     if not evidence:
         return False, ""

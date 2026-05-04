@@ -46,6 +46,31 @@ def test_generic_dependency_bundle_observation_uses_allowed_tool_structure() -> 
     assert dependency.failed_tool_calls == ("set_example_service_status",)
 
 
+def test_dependency_bundle_feature_can_be_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "grading_accounting")
+    scenario = Scenario(
+        starting_context=ExecutionContext(
+            tool_allow_list=[
+                "set_example_service_status",
+                "search_records",
+                "send_message",
+            ]
+        )
+    )
+
+    observations = classify_scenario_observations(
+        "generic_dependency_bundle_case",
+        scenario,
+        {"similarity": 0.0},
+    )
+
+    assert not any(
+        observation.canonical_key
+        == "state_precondition:dependency_precondition_tool_call"
+        for observation in observations
+    )
+
+
 @dataclass
 class FakeRecencyGenerator:
     calls: int = 0
@@ -179,6 +204,21 @@ class FakeRecordSelectorGenerator:
                 "reverse=reverse)[0]\n"
             )
         return GeneratedTool(spec=spec, code=code)
+
+
+@dataclass
+class FakeRepairRecordSelectorGenerator(FakeRecordSelectorGenerator):
+    repair_calls: int = 0
+
+    def repair(
+        self,
+        request: ToolGenerationRequest,
+        rejected_tool: GeneratedTool,
+        errors: tuple[str, ...],
+    ) -> GeneratedTool:
+        self.repair_calls += 1
+        self.invalid_attempts = 0
+        return self.generate(request)
 
 
 def _resolve_search_window_tool() -> GeneratedTool:
@@ -565,6 +605,32 @@ def test_rejected_birth_retry_is_capped(tmp_path: Path) -> None:
         "tool_birth_retry_suppressed"
         in (tmp_path / "sage_run_events.jsonl").read_text()
     )
+
+
+def test_candidate_repair_pass_can_accept_initial_rejection(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "candidate_repair")
+    observation = _latest_record_observation()
+    store = RegistryStore(tmp_path / "registry")
+    generator = FakeRepairRecordSelectorGenerator(invalid_attempts=1)
+    controller = OnlineBirthController(
+        store=store,
+        generator=generator,
+        output_dir=tmp_path,
+        recurrence_threshold=1,
+        failure_memory_path=None,
+    )
+
+    controller.observe(observation)
+
+    assert generator.calls == 2
+    assert generator.repair_calls == 1
+    assert store.get(_RECORD_SELECTOR_TOOL_NAME) is not None
+    birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
+    assert birth_event["accepted"] is True
+    assert birth_event["repair_attempted"] is True
 
 
 def test_near_duplicate_only_birth_is_marked_diagnostic(tmp_path: Path) -> None:

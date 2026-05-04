@@ -308,9 +308,13 @@ def run_sage_with_registry(
 
         loaded_entries = store.load_entries()
         retained_tools_loaded = sorted(loaded_entries)
+        available_base_tools = set(
+            scenario.starting_context.get_available_tools(scrambling_allowed=False)
+        )
         _routed_entries, routing_decisions = route_registry_entries(
             loaded_entries,
             name,
+            available_base_tools=available_base_tools,
         )
         visibility_by_tool = {
             tool_name: (decision.visible, decision.reason)

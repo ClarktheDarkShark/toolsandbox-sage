@@ -8,6 +8,12 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from sage_ts.adapters.openai_agent_adapter import ChatRequest
+from sage_ts.experiments.v2_flags import (
+    CONTRACT_SYNTHESIS,
+    DEPENDENCY_LOGIC,
+    GRADING_ACCOUNTING,
+    feature_enabled,
+)
 from sage_ts.generation.prompt_cache import PromptCache, cache_key
 from sage_ts.generation.tool_spec import (
     GeneratedTool,
@@ -68,6 +74,46 @@ class ToolGenerationRequest:
             if self.shortfall_cluster_context
             else ""
         )
+        grading_contract = (
+            "canonical_route_substitution_risk (str: none|low|medium|high), "
+            "expected_milestone_calls_replaced (list[str]), "
+            "final_state_preservation_plan (str), grading_accounting_note (str), "
+            if feature_enabled(GRADING_ACCOUNTING)
+            else ""
+        )
+        grading_guidance = (
+            "Separate task correctness from benchmark route accounting: preserve "
+            "final state and original side-effect tools whenever side effects matter. "
+            "If the helper intentionally substitutes for expected intermediate "
+            "canonical milestone/base-tool calls, set canonical_route_substitution_risk "
+            "to low/medium/high, list those expected_milestone_calls_replaced, and "
+            "explain final_state_preservation_plan plus grading_accounting_note. "
+            "Do not claim canonical-preserving when a generated helper replaces a "
+            "required intermediate route; label it as outcome-preserving but "
+            "canonical-substituting. "
+            if feature_enabled(GRADING_ACCOUNTING)
+            else ""
+        )
+        dependency_contract = (
+            "tool_name must have an enum containing '' plus the original ToolSandbox "
+            "set_* or enable/disable precondition tools that may be returned. Include "
+            "negative_triggers for already ready state, unknown target dependency, "
+            "and insufficient state. "
+            if feature_enabled(DEPENDENCY_LOGIC)
+            else "tool_name must have exactly this enum: '', 'set_wifi_status', "
+            "'set_cellular_service_status', 'set_location_service_status', "
+            "and 'set_low_battery_mode_status'. Include negative_triggers for "
+            "already ready state, unknown target service, and insufficient state. "
+        )
+        synthesis_guidance = (
+            "For selection/planning helpers, synthesize explicit positive triggers, "
+            "negative triggers, no-match behavior, multiple-match behavior, tie or "
+            "ambiguity abstention behavior, and side-effect-risk behavior in the "
+            "description and abstain_behavior. Do not rely on implicit selection "
+            "rules. "
+            if feature_enabled(CONTRACT_SYNTHESIS)
+            else ""
+        )
         return (
             "Propose one deterministic Python helper tool as JSON with two top-level "
             'keys: "spec" and "code". '
@@ -84,9 +130,7 @@ class ToolGenerationRequest:
             "applicable_task_families (list[str]), reason_tool_is_decisive (str), "
             "diagnostic_only (bool), shortfall_cluster_evidence (list[str]), "
             "known_failure_mechanisms_addressed (list[str]), "
-            "canonical_route_substitution_risk (str: none|low|medium|high), "
-            "expected_milestone_calls_replaced (list[str]), "
-            "final_state_preservation_plan (str), grading_accounting_note (str), "
+            f"{grading_contract}"
             "inadequacy_evidence (object). "
             "inadequacy_evidence must include: summary (str), signals (list[str]), "
             "failed_tool_calls (list[str]), repeated_failed_tool_calls (list[str]), "
@@ -96,15 +140,8 @@ class ToolGenerationRequest:
             "reasoning/tool-use steps, applies across at least 2 task families, "
             "preserves required downstream ToolSandbox tools, and does more than "
             "replace a single existing base tool. "
-            "Separate task correctness from benchmark route accounting: preserve "
-            "final state and original side-effect tools whenever side effects matter. "
-            "If the helper intentionally substitutes for expected intermediate "
-            "canonical milestone/base-tool calls, set canonical_route_substitution_risk "
-            "to low/medium/high, list those expected_milestone_calls_replaced, and "
-            "explain final_state_preservation_plan plus grading_accounting_note. "
-            "Do not claim canonical-preserving when a generated helper replaces a "
-            "required intermediate route; label it as outcome-preserving but "
-            "canonical-substituting. "
+            f"{grading_guidance}"
+            f"{synthesis_guidance}"
             "Use concrete scenario-family labels in applicable_task_families, "
             "not helper-family labels such as canonicalizer, state_precondition_helper, "
             "search_filter_ranking_helper, or timestamp_conversion. "
@@ -124,10 +161,7 @@ class ToolGenerationRequest:
             "If family is state_precondition_helper, output_schema must be a JSON "
             "Schema object with type 'object' and properties exactly covering the "
             "runtime contract: tool_name, arguments, should_call, and reason. "
-            "tool_name must have an enum containing '' plus the original ToolSandbox "
-            "set_* or enable/disable precondition tools that may be returned. Include "
-            "negative_triggers for already ready state, unknown target dependency, "
-            "and insufficient state. "
+            f"{dependency_contract}"
             "If family is derived_value_calculator and output_annotation is dict, "
             "output_schema must be a JSON Schema object with type 'object' and "
             "properties for every returned key. It must preserve a downstream "
@@ -163,6 +197,35 @@ class ToolGenerator:
             response = self.completer.complete(
                 ChatRequest(
                     system="You generate safe deterministic Python helper tools.",
+                    user=prompt,
+                    model=self.completer.model,
+                )
+            )
+            self.cache.put(key, response)
+        return parse_generated_tool_json(response)
+
+    def repair(
+        self,
+        request: ToolGenerationRequest,
+        rejected_tool: GeneratedTool,
+        errors: tuple[str, ...],
+    ) -> GeneratedTool:
+        prompt = (
+            request.prompt()
+            + " The previous candidate was rejected. Repair it once without "
+            "weakening the gate. Keep the same deterministic purpose and suggested "
+            "tool name when provided. Rejection errors: "
+            + json.dumps(list(errors))
+            + ". Previous candidate JSON: "
+            + json.dumps(rejected_tool.to_json())
+            + ". Return only the repaired JSON object."
+        )
+        key = cache_key(self.completer.model, {"kind": "tool_repair_v1"}, prompt)
+        response = self.cache.get(key)
+        if response is None:
+            response = self.completer.complete(
+                ChatRequest(
+                    system="You repair rejected deterministic Python helper tools.",
                     user=prompt,
                     model=self.completer.model,
                 )

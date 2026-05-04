@@ -11,6 +11,12 @@ from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate
 from sage_ts.adequacy.failure_memory import generation_failure_memory_context
 from sage_ts.adequacy.inadequacy_classifier import CapabilityObservation
 from sage_ts.evaluation.task_strata import base_task_family, expected_helper_fit
+from sage_ts.experiments.v2_flags import (
+    CANDIDATE_REPAIR,
+    DEPENDENCY_LOGIC,
+    LIVE_VALIDATION,
+    feature_enabled,
+)
 from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import GeneratedTool
 from sage_ts.orchestration.checkpoints import append_jsonl
@@ -27,6 +33,15 @@ class GeneratedToolFactory(Protocol):
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool: ...
 
 
+class GeneratedToolRepairFactory(GeneratedToolFactory, Protocol):
+    def repair(
+        self,
+        request: ToolGenerationRequest,
+        rejected_tool: GeneratedTool,
+        errors: tuple[str, ...],
+    ) -> GeneratedTool: ...
+
+
 CampaignEventHook = Callable[[str, dict[str, Any]], None]
 
 
@@ -41,7 +56,10 @@ def suggested_tool_name(canonical_key: str) -> str | None:
         return "relative_day_time_to_timestamp"
     if suffix in {"service_next_action", "next_service_tool_call"}:
         return "next_service_tool_call"
-    if suffix == "dependency_precondition_tool_call":
+    if (
+        feature_enabled(DEPENDENCY_LOGIC)
+        and suffix == "dependency_precondition_tool_call"
+    ):
         return "next_dependency_precondition_call"
     return suffix
 
@@ -320,31 +338,40 @@ class OnlineBirthController:
                     "scenario": observation.scenario_name,
                 },
             )
-            memory_gate = evaluate_candidate_gate(
-                tool.spec,
-                failure_memory_path=self.failure_memory_path,
+            memory_gate, live_check, validation = self._gate_and_validate(
+                tool,
+                observation,
             )
-            if memory_gate.allowed:
-                live_check = run_lightweight_live_candidate_check(
-                    tool,
-                    observation.validation_examples,
+            repair_attempted = False
+            repair_errors: tuple[str, ...] = ()
+            repair_method = getattr(self.generator, "repair", None)
+            if (
+                not validation.accepted
+                and feature_enabled(CANDIDATE_REPAIR)
+                and callable(repair_method)
+            ):
+                repair_attempted = True
+                repair_errors = tuple(validation.errors)
+                repaired_tool = repair_method(request, tool, repair_errors)
+                repaired_gate, repaired_live_check, repaired_validation = (
+                    self._gate_and_validate(repaired_tool, observation)
                 )
-                if live_check.accepted:
-                    validation = validate_generated_tool(
-                        tool,
-                        examples=observation.validation_examples,
-                    )
-                else:
-                    validation = ValidationResult(
-                        False,
-                        live_check.errors,
-                    )
-            else:
-                live_check = None
-                validation = ValidationResult(
-                    False,
-                    (memory_gate.reason,),
+                self._event(
+                    "tool_repair_attempted",
+                    {
+                        "canonical_key": observation.canonical_key,
+                        "tool_name": tool.spec.tool_name,
+                        "repaired_tool_name": repaired_tool.spec.tool_name,
+                        "initial_errors": list(repair_errors),
+                        "repaired_errors": list(repaired_validation.errors),
+                        "accepted": repaired_validation.accepted,
+                    },
                 )
+                if repaired_validation.accepted or not validation.accepted:
+                    tool = repaired_tool
+                    memory_gate = repaired_gate
+                    live_check = repaired_live_check
+                    validation = repaired_validation
         except Exception as exc:
             append_jsonl(
                 self.output_dir / "tool_birth_events.jsonl",
@@ -393,6 +420,8 @@ class OnlineBirthController:
                 "lightweight_live_validation": (
                     live_check.to_json() if live_check is not None else None
                 ),
+                "repair_attempted": repair_attempted,
+                "repair_errors": list(repair_errors),
             },
         )
         self._event(
@@ -415,6 +444,7 @@ class OnlineBirthController:
                 "lightweight_live_validation": (
                     live_check.to_json() if live_check is not None else None
                 ),
+                "repair_attempted": repair_attempted,
             },
         )
         if validation.accepted:
@@ -472,3 +502,40 @@ class OnlineBirthController:
                     "rejection_count": self.rejected_counts[observation.canonical_key],
                 },
             )
+
+    def _gate_and_validate(
+        self,
+        tool: GeneratedTool,
+        observation: CapabilityObservation,
+    ) -> tuple[Any, Any, ValidationResult]:
+        memory_gate = evaluate_candidate_gate(
+            tool.spec,
+            failure_memory_path=self.failure_memory_path,
+        )
+        if not memory_gate.allowed:
+            return (
+                memory_gate,
+                None,
+                ValidationResult(False, (memory_gate.reason,)),
+            )
+        if feature_enabled(LIVE_VALIDATION):
+            live_check = run_lightweight_live_candidate_check(
+                tool,
+                observation.validation_examples,
+            )
+            if not live_check.accepted:
+                return (
+                    memory_gate,
+                    live_check,
+                    ValidationResult(False, live_check.errors),
+                )
+        else:
+            live_check = None
+        return (
+            memory_gate,
+            live_check,
+            validate_generated_tool(
+                tool,
+                examples=observation.validation_examples,
+            ),
+        )

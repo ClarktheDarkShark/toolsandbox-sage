@@ -1,37 +1,26 @@
 # Current State
 
 - Date: 2026-05-04
-- Last completed step: `v2_dependency_grading_experiment20`
-- Last decision: `rerun readiness-20`
-- Active v1 registry path: `artifacts/registry_phaseE_balanced_final/registry_manifest.json`
-- Active v1 registry hash: `385a0f7dbd65ce340f4edd97e26e89a67054cf1c661f01029692ca38547484b1`
-- Candidate dependency/grading registry: `artifacts/registry_candidates/v2_dependency_grading_experiment20/registry_manifest.json`
-- Candidate dependency/grading registry hash after run: `a57a920e7f636c4e59571969244c421af4740633eb1d176d8c0b6639ad502c4f`
-- Latest run: `outputs/v2_dependency_grading_experiment20/mechanism_40_20260503_203206/`
-- Dashboard: `outputs/v2_dependency_grading_experiment20/mechanism_40_20260503_203206/dashboard/index.html`
-- Task focus dashboard: `outputs/v2_dependency_grading_experiment20/mechanism_40_20260503_203206/dashboard/task_focus.html`
-- Latest report: `docs/sage_protocol/v2_dependency_grading_experiment_report.md`
-- Machine summary: `artifacts/summaries/v2_dependency_grading_experiment20/run_summary.json`
-- V2 repairs now implemented:
-  - claim-grade helper contribution export
-  - mechanical promotion evidence gate
-  - failure-memory integration into generation/gating/promotion
-  - generic runtime routing scorer with bounded bundle and visible-not-called suppression
-  - diverse shortfall-cluster aggregation before birth
-  - canonical-route substitution accounting in generated specs and gate decisions
-  - lightweight live candidate validation before registry acceptance
-  - generic dependency/precondition shortfall observation before birth
-- Latest diagnostic metrics:
-  - canonical delta `+0.0801`
-  - outcome delta `+0.0731`
-  - exact successes `1 -> 2`
-  - tools proposed/accepted/rejected `6 / 1 / 5`
-  - accepted candidate `next_dependency_precondition_call`
-  - accepted-but-uncalled tools `next_dependency_precondition_call`
-  - visible/called/visible-not-called `12 / 6 / 6`
-  - runtime exceptions `0`
-  - side-effect incidents `0`
-- Tests: `166 passed, 2 warnings`
-- Registry check: candidate dependency/grading registry PASS
-- Commit hygiene fix: `artifacts/baselines/control_task_baselines/index.jsonl` removed from git tracking; local cache index/records remain ignored runtime artifacts.
-- Next step: `Rerun readiness-20. Do not start 60/100/250 until readiness-20 passes.`
+- Last completed step: `v2_experimental_matrix20_plus_readiness_reruns`
+- Last decision: `repair generation then rerun matrix subset`
+- Primary matrix report: `docs/sage_protocol/v2_experimental_matrix20_report.md`
+- Primary matrix summary: `artifacts/summaries/v2_experimental_matrix20_clean/matrix_summary.json`
+- Corrected affected-variant summary: `artifacts/summaries/v2_experimental_matrix20_clean_repairfix/matrix_summary.json`
+- Winning matrix idea: `contract_synthesis`
+- Important correction: clean-registry matrix is primary evidence; retained helper reuse is not counted as new tool-generation success.
+- Routing repair: generic helper routing now hides tools when declared downstream original tools are unavailable in the current scenario.
+- Latest readiness run: `outputs/v2_readiness20_contract_synthesis_grading_routingfix/mechanism_40_20260503_224648/`
+- Latest dashboard: `outputs/v2_readiness20_contract_synthesis_grading_routingfix/mechanism_40_20260503_224648/dashboard/index.html`
+- Latest task focus dashboard: `outputs/v2_readiness20_contract_synthesis_grading_routingfix/mechanism_40_20260503_224648/dashboard/task_focus.html`
+- Best readiness evidence: `contract_synthesis` after routing repair produced called-subset outcome delta `+0.3947` with visible/called/VNC `2 / 1 / 1` and `0` side-effect/runtime incidents.
+- Readiness blocker: canonical delta remained negative and the grading-accounted variant was accepted-but-uncalled with negative outcome delta.
+- Do not start 60/100/250 yet.
+- Next step: repair generation/accounting affordance, then rerun a matrix subset focused on `contract_synthesis`, `grading_accounting`, and routing.
+- Tests: full unit `170 passed, 2 warnings`; targeted routing/generation/birth tests `47 passed`.
+- Registry checks: latest readiness candidate registries PASS check-only.
+- Tool adoption diagnosis: generated helper docs were misleading for non-reminder helpers; generic call-path guidance incorrectly referenced `should_call_add_reminder` and `<tool>_kwargs`. Fixed in `src/sage_ts/runtime/toolsandbox_integration.py`; full unit tests `171 passed, 2 warnings`.
+- Adoption diagnosis report: `docs/sage_protocol/v2_tool_adoption_diagnosis_report.md`.
+- Fair-chance confirmation summary: `artifacts/summaries/v2_fair_chance_confirmation20/confirmation_summary.json`.
+- Fair-chance winner: `variant5_contract_synthesis`, outcome `+0.0617`, canonical `+0.0979`, visible/called/VNC `4 / 3 / 1`, exact successes `0 -> 2`, side-effect/runtime `0 / 0`, protocol PASS.
+- Updated next step: rerun readiness-20 using two-stage evaluation: generation-ON discovery with `contract_synthesis`, then frozen generation-OFF confirmation from accepted tools before promotion/scaling.
+- Final validation after adoption diagnosis: scripts compile PASS; full unit tests `171 passed, 2 warnings`; replay and fair-chance winning registries PASS; `git diff --check` PASS.

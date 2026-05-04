@@ -288,3 +288,34 @@
   - Commit hygiene: `artifacts/baselines/control_task_baselines/index.jsonl` removed from git tracking so local cache rows do not commit broken pointers to ignored record files.
   - Decision: `rerun readiness-20`.
   - Next action: rerun readiness-20 with grading-accounting, live-validation, dependency-cluster, and routing changes; do not start 60/100/250 yet.
+
+- `V2 experimental matrix-20 and readiness reruns` completed.
+  - Report: `docs/sage_protocol/v2_experimental_matrix20_report.md`
+  - Primary clean matrix summary: `artifacts/summaries/v2_experimental_matrix20_clean/matrix_summary.json`
+  - Corrected candidate-repair/combined rerun summary: `artifacts/summaries/v2_experimental_matrix20_clean_repairfix/matrix_summary.json`
+  - Matrix design: clean empty candidate registry per variant; generation ON; 20 quality-gated scenarios; control cache `use-if-eligible` but all controls fresh in summaries.
+  - Matrix winner: `contract_synthesis` only.
+  - Best matrix result: `variant5_contract_synthesis`, outcome delta `+0.0932`, canonical delta `+0.0277`, accepted/called `message_search_time_window`, visible/called/VNC `8 / 1 / 7`, side-effect/runtime `0 / 0`.
+  - Bug fixed: `tool_repair_attempted` added as valid campaign event; corrected candidate-repair rerun remained non-winning.
+  - Routing repair: generated helpers are hidden if declared downstream original ToolSandbox tools are unavailable in the scenario.
+  - Readiness rerun 1: `outputs/v2_readiness20_contract_synthesis/mechanism_40_20260503_223710/`, outcome `+0.0946`, canonical `-0.0097`, visible/called/VNC `8 / 1 / 7`, protocol gate FAIL.
+  - Readiness rerun 2 after routing repair: `outputs/v2_readiness20_contract_synthesis_routingfix/mechanism_40_20260503_224320/`, outcome `+0.0626`, canonical `-0.0108`, visible/called/VNC `2 / 1 / 1`, called-subset outcome `+0.3947`, side-effect/runtime `0 / 0`, protocol gate FAIL.
+  - Readiness rerun 3 with grading accounting: `outputs/v2_readiness20_contract_synthesis_grading_routingfix/mechanism_40_20260503_224648/`, outcome `-0.1475`, canonical `+0.0442`, accepted-but-uncalled `message_search_time_window` and `recency_to_timestamp_bounds`, protocol gate FAIL.
+  - Decision: `repair generation then rerun matrix subset`; do not start 60/100/250.
+
+- `Generated-helper adoption diagnosis` completed.
+  - Evidence: `message_search_time_window` was visible but not called in `modify_contact_with_message_recency`; it was called only after repeated failed `search_messages(...=null)` attempts in the distraction variant.
+  - Root cause found: generic non-reminder helper docstrings advertised an impossible reminder-style call path using `should_call_add_reminder` and `<tool>_kwargs`.
+  - Fix: non-reminder helper docstrings now include positive/negative triggers and describe actual output-schema fields for downstream original ToolSandbox calls.
+  - Tests: `PYTHONPATH=src:. pytest tests/unit -q` -> `171 passed, 2 warnings`.
+
+- `V2 generated-tool adoption diagnosis and fair-chance confirmation` completed.
+  - Report: `docs/sage_protocol/v2_tool_adoption_diagnosis_report.md`
+  - Focused replay summary: `outputs/v2_tool_adoption_replay2/mechanism_40_20260503_225947/`
+  - Fair-chance summary: `artifacts/summaries/v2_fair_chance_confirmation20/confirmation_summary.json`
+  - Dashboards opened for all confirmation variants.
+  - Main fixes: downstream original-tool availability routing; generic helper docstring affordance repair; fair-chance confirmation runner.
+  - Focused replay: helper visible/called/VNC `2 / 1 / 1`, canonical `+0.2109`, protocol PASS.
+  - Fair-chance winner: `variant5_contract_synthesis`, outcome `+0.0617`, canonical `+0.0979`, exact successes `0 -> 2`, helper visible/called/VNC `4 / 3 / 1`, side-effect/runtime `0 / 0`, protocol PASS.
+  - Combined stack failed: outcome `-0.0756`, canonical `-0.0733`, helper visible/called/VNC `18 / 4 / 14`.
+  - Decision: `rerun readiness-20 with two-stage confirmation`; do not start 60/100/250 yet.

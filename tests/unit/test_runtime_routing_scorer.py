@@ -44,6 +44,32 @@ def test_route_registry_entries_bounds_runtime_bundle() -> None:
     assert sum(1 for item in decisions.values() if item.status == "deprioritized") == 1
 
 
+def test_route_registry_entries_requires_downstream_base_tool_availability() -> None:
+    entry = _entry()
+
+    selected, decisions = route_registry_entries(
+        {"select_visible_record": entry},
+        "visible_candidate_selection_for_contact",
+        available_base_tools={"search_contacts"},
+    )
+
+    assert selected == []
+    assert not decisions["select_visible_record"].visible
+    assert (
+        decisions["select_visible_record"].reason
+        == "blocked_by_missing_downstream_original_tool"
+    )
+
+    selected, decisions = route_registry_entries(
+        {"select_visible_record": entry},
+        "visible_candidate_selection_for_contact",
+        available_base_tools={"search_contacts", "modify_contact"},
+    )
+
+    assert [item.tool.spec.tool_name for item in selected] == ["select_visible_record"]
+    assert decisions["select_visible_record"].visible
+
+
 def test_routing_suppresses_visible_not_called_pollution(monkeypatch: Any) -> None:
     entry = _entry()
     monkeypatch.setattr(

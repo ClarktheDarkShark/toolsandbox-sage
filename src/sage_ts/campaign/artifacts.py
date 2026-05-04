@@ -24,6 +24,7 @@ EVENT_TYPES = {
     "tool_birth_started",
     "tool_birth_succeeded",
     "tool_birth_rejected",
+    "tool_repair_attempted",
     "tool_birth_skipped_existing",
     "tool_birth_skipped_existing_broader_helper",
     "validation_started",
