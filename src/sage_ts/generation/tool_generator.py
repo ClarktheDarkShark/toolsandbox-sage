@@ -98,12 +98,19 @@ class ToolGenerationRequest:
             "tool_name must have an enum containing '' plus the original ToolSandbox "
             "set_* or enable/disable precondition tools that may be returned. Include "
             "negative_triggers for already ready state, unknown target dependency, "
-            "and insufficient state. "
+            "and insufficient state. State/precondition helpers must not require an "
+            "opaque dict input such as dependency_state; expose concrete top-level "
+            "scalar inputs for every required visible state value instead, for "
+            "example target_action, blocked_reason, service_ready, blocker_active, "
+            "and blocker_kind. "
             if feature_enabled(DEPENDENCY_LOGIC)
             else "tool_name must have exactly this enum: '', 'set_wifi_status', "
             "'set_cellular_service_status', 'set_location_service_status', "
             "and 'set_low_battery_mode_status'. Include negative_triggers for "
             "already ready state, unknown target service, and insufficient state. "
+            "State/precondition helpers must not require an opaque dict input; "
+            "expose concrete top-level scalar inputs for every required visible "
+            "state value. "
         )
         synthesis_guidance = (
             "For selection/planning helpers, synthesize explicit positive triggers, "

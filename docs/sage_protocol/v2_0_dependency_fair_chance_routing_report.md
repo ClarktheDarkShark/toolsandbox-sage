@@ -93,3 +93,36 @@ The likely root cause is the generated contract: it requires the model to constr
 
 ## Exact Next Action
 Return to V2.0 shortfall mining and prioritize a different no-current-helper-fit cluster. Do not run confirmation-60 for `next_dependency_precondition_call` unless a successor candidate first shows actual later-task calls and non-harmful called-subset contribution in a focused diagnostic.
+
+## Additional Verification Run: Schema-Affordance Check
+- Date: `2026-05-04T17:34:40-04:00`
+- Run root: `outputs/v2_0_dependency_fair_chance20_schema_verify_20260504_172551/mechanism_40_20260504_172556`
+- Dashboards opened: `http://127.0.0.1:5520/outputs/v2_0_dependency_fair_chance20_schema_verify_20260504_172551/mechanism_40_20260504_172556/dashboard/index.html` and `http://127.0.0.1:5520/outputs/v2_0_dependency_fair_chance20_schema_verify_20260504_172551/mechanism_40_20260504_172556/dashboard/task_focus.html`
+- Summary: `artifacts/summaries/v2_0_dependency_fair_chance20_schema_verify_20260504_172551/schema_verify_summary.json`
+- Candidate cache: `0 hits / 130 misses / 130 writes`, so the candidate arm used live model calls and saw the updated OpenAI tool schema.
+- Metrics: outcome delta `+0.1593`; canonical delta `+0.0803`; exact successes `control=0 -> SAGE=3`; gains/regressions/preserved `9 / 5 / 6`; runtime exceptions `0`; protocol gate `PASS`.
+- `next_dependency_precondition_call`: visible `9`, called `0`, visible-not-called `9`, attempts `0`.
+- Other generated helpers were adopted: `select_record_by_timestamp_extreme` visible/called `2 / 2`; `resolve_search_window_or_bounds` visible/called `3 / 1`.
+
+## Additional Root Cause and Contract Repair
+The dependency helper is not blocked by hard-coded suppression, stale cache, missing OpenAI schema guidance, or lack of fair exposure. It is visible on strong matches but still not called.
+
+Trace inspection shows the acting model uses the original ToolSandbox setter/getter route directly: it observes the service failure, checks or changes the blocking state, and retries the original side-effect/action. The generated helper requires constructing an opaque `dependency_state` dictionary first, so it adds work rather than compressing a decisive repeated step.
+
+Framework-level repair:
+- Candidate gate now rejects future `state_precondition_helper` specs with opaque `dict` inputs using reason `state_helper_opaque_dict_input_contract`.
+- Dependency/precondition generation prompt now requires concrete top-level scalar state inputs instead of an opaque `dependency_state` object.
+- Dependency shortfall validation examples now use scalar inputs such as `service_ready`, `blocker_active`, `blocker_kind`, `target_action`, and `blocked_reason`.
+- Frozen best3 registry still passes check-only.
+- The stale candidate registry containing `next_dependency_precondition_call` now correctly fails check-only on `candidate_gate:state_helper_opaque_dict_input_contract`.
+
+## Additional Tests and Checks
+- `PYTHONPATH=src:. pytest tests/unit/test_candidate_gate.py tests/unit/test_tool_generator.py tests/unit/test_online_birth.py tests/unit/test_state_helper_guidance.py tests/unit/test_runtime_routing_scorer.py -q` -> PASS, `61 passed`.
+- `PYTHONPATH=src:. python scripts/migrate_registry.py --check-only artifacts/registry_frozen_best3_claim/registry_manifest.json` -> PASS, `3 active entries pass`.
+- `PYTHONPATH=src:. python scripts/migrate_registry.py --check-only artifacts/registry_candidates/v2_0_dependency_fair_chance20_schema_verify_20260504_172551/registry_manifest.json` -> expected FAIL, `next_dependency_precondition_call` rejected by current gate as `state_helper_opaque_dict_input_contract`.
+
+## Updated Decision Label
+`park dependency lane`
+
+## Updated Exact Next Action
+Do not run confirmation-60 for `next_dependency_precondition_call`. Return to V2.0 shortfall mining and let future dependency/precondition candidates proceed only if they use concrete scalar inputs and show actual later-task calls.

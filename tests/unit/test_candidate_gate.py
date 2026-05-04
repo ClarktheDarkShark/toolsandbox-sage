@@ -107,6 +107,26 @@ def test_state_precondition_helper_allows_trace_compatible_tool_call() -> None:
     assert decision.allowed
 
 
+def test_state_precondition_helper_rejects_opaque_dict_input_contract() -> None:
+    spec = replace(
+        _state_spec("Return the exact ToolSandbox setter name and arguments."),
+        inputs=(
+            ToolInput(
+                "dependency_state",
+                "dict",
+                "Opaque service readiness and blocker state.",
+            ),
+            ToolInput("target_action", "str", "Downstream action."),
+            ToolInput("blocked_reason", "str", "Observed blocking reason."),
+        ),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert not decision.allowed
+    assert decision.reason == "state_helper_opaque_dict_input_contract"
+
+
 def test_search_helper_can_substitute_canonical_route_with_grading_accounting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

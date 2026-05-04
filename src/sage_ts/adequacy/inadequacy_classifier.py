@@ -729,8 +729,10 @@ def _dependency_precondition_observation(
             "original ToolSandbox precondition setters plus downstream action tools, "
             "but the agent must infer which concrete precondition action is needed "
             "before the downstream action can succeed. Generate a deterministic "
-            "state dependency planner that accepts visible dependency_state, "
-            "target_action, and blocked_reason fields, returns one original "
+            "state dependency planner that accepts concrete top-level visible "
+            "state fields such as service_ready, blocker_active, blocker_kind, "
+            "target_action, and blocked_reason. Do not require an opaque "
+            "dependency_state dict. Return one original "
             "ToolSandbox precondition tool_name plus arguments, or abstains when "
             "the state is already ready, unknown, or ambiguous. It must preserve "
             "the returned original precondition tool call and must not perform the "
@@ -740,10 +742,9 @@ def _dependency_precondition_observation(
         validation_examples=(
             ToolExample(
                 {
-                    "dependency_state": {
-                        "service_ready": False,
-                        "blocker_active": True,
-                    },
+                    "service_ready": False,
+                    "blocker_active": True,
+                    "blocker_kind": "low_battery_mode",
                     "target_action": "downstream_action",
                     "blocked_reason": "blocked by active precondition",
                 },
@@ -756,10 +757,9 @@ def _dependency_precondition_observation(
             ),
             ToolExample(
                 {
-                    "dependency_state": {
-                        "service_ready": False,
-                        "blocker_active": False,
-                    },
+                    "service_ready": False,
+                    "blocker_active": False,
+                    "blocker_kind": "",
                     "target_action": "downstream_action",
                     "blocked_reason": "service disabled",
                 },
@@ -779,10 +779,9 @@ def _dependency_precondition_observation(
             ),
             ToolExample(
                 {
-                    "dependency_state": {
-                        "service_ready": True,
-                        "blocker_active": False,
-                    },
+                    "service_ready": True,
+                    "blocker_active": False,
+                    "blocker_kind": "",
                     "target_action": "downstream_action",
                     "blocked_reason": "",
                 },

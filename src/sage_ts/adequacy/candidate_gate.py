@@ -363,6 +363,12 @@ def evaluate_candidate_gate(
                 grading_classification,
             )
     if spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
+        if any(item.annotation == "dict" for item in spec.inputs):
+            return GateDecision(
+                False,
+                "state_helper_opaque_dict_input_contract",
+                grading_classification,
+            )
         text = " ".join(
             [
                 spec.tool_name,

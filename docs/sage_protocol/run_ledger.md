@@ -391,3 +391,15 @@
   - Tests: targeted V2 suite `62 passed`; frozen best3 and candidate registry check-only both PASS.
   - Decision: `park dependency lane`.
   - Next action: mine a different no-current-helper-fit cluster; do not run confirmation-60 for this candidate without later call evidence.
+
+- `V2.0 dependency schema-verification 20 and opaque-input repair` completed.
+  - Date: `2026-05-04T17:34:40-04:00`
+  - Run: `outputs/v2_0_dependency_fair_chance20_schema_verify_20260504_172551/mechanism_40_20260504_172556`
+  - Dashboards: `http://127.0.0.1:5520/outputs/v2_0_dependency_fair_chance20_schema_verify_20260504_172551/mechanism_40_20260504_172556/dashboard/index.html` and `http://127.0.0.1:5520/outputs/v2_0_dependency_fair_chance20_schema_verify_20260504_172551/mechanism_40_20260504_172556/dashboard/task_focus.html`
+  - Control cache: mixed, `15 cached / 5 fresh`; candidate arm cache `0 hits / 130 misses / 130 writes`.
+  - Metrics: outcome delta `+0.1593`; canonical delta `+0.0803`; exact `control=0 -> SAGE=3`; runtime exceptions `0`; protocol gate `PASS`.
+  - `next_dependency_precondition_call`: visible/called/VNC `9 / 0 / 9`; not called after fair routing and schema affordance repair.
+  - Root cause: opaque `dependency_state` dict input adds a pre-call construction burden and does not beat direct ToolSandbox setter/getter use.
+  - Repair: gate rejects opaque dict inputs for `state_precondition_helper`; generator and dependency observation now require scalar top-level state inputs.
+  - Tests: targeted suite `61 passed`; frozen best3 registry check PASS; stale dependency candidate registry expected FAIL on `state_helper_opaque_dict_input_contract`.
+  - Decision: `park dependency lane`; next action is shortfall mining for a different cluster or scalar-input successor.

@@ -96,6 +96,7 @@ def test_generation_request_includes_family_contract_guidance(
     assert "selected_record" in prompt
     assert "If family is state_precondition_helper" in prompt
     assert "tool_name must have an enum" in prompt
+    assert "must not require an opaque dict input" in prompt
     assert "tool_generation_v5" not in prompt
 
 
