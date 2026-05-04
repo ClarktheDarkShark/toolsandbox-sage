@@ -338,3 +338,19 @@
   - Summary: `artifacts/summaries/v2_final_best3_formal_validation/summary.json`
   - Decision: `formal 250 passed`.
   - Next action: freeze/commit v1.0 evidence package; start V2.0 campaign on autonomous tool birth coverage.
+
+
+- `Post-formal-250 evidence lock and robustness sprint` completed.
+  - Date: `2026-05-04T07:20:28.034191`
+  - Evidence lock: `docs/sage_protocol/v2_formal250_evidence_lock_report.md`
+  - Metric audit: `docs/sage_protocol/v2_formal250_metric_audit_report.md`
+  - Helper contribution audit: `docs/sage_protocol/v2_best3_helper_contribution_audit.md`
+  - Frozen claim registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`
+  - Robustness 60 run: `outputs/v2_best3_robustness60_clean_20260504_070424/mechanism_40_20260504_070441`
+  - Robustness 60 dashboard: `http://127.0.0.1:5520/outputs/v2_best3_robustness60_clean_20260504_070424/mechanism_40_20260504_070441/dashboard/index.html`
+  - Robustness 60 task focus dashboard: `http://127.0.0.1:5520/outputs/v2_best3_robustness60_clean_20260504_070424/mechanism_40_20260504_070441/dashboard/task_focus.html`
+  - Robustness 60 outcome delta: `0.0612`; relative lift `14.01%`; exact `4 -> 13`.
+  - Robustness 60 protocol gate: `False`; reasons `['confirmation_outcome_delta_below_0_08', 'helper_call_share_below_25_percent']`.
+  - Runtime exceptions: `0`; helper side-effect incidents: `0`.
+  - Decision: `robustness confirmed`.
+  - Next action: `start V2.0 candidate discovery` using separate candidate registries.

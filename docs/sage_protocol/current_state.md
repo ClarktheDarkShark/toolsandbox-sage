@@ -29,3 +29,12 @@
 - Final package: `artifacts/final_sage_praxis_package/`
 - Main report: `docs/sage_protocol/v2_final_tool_pipeline_campaign_report.md`
 - Next step: commit the coherent v1.0 repair/validation package, then begin a separate V2.0 campaign focused on autonomous shortfall-cluster birth for no-current-helper-fit tasks.
+- Evidence lock report: `docs/sage_protocol/v2_formal250_evidence_lock_report.md`
+- Metric audit report: `docs/sage_protocol/v2_formal250_metric_audit_report.md`
+- Helper contribution audit: `docs/sage_protocol/v2_best3_helper_contribution_audit.md`
+- Frozen claim registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`
+- Robustness 60 run: `outputs/v2_best3_robustness60_clean_20260504_070424/mechanism_40_20260504_070441`
+- Robustness 60 outcome delta: `0.0612`
+- Robustness 60 relative outcome lift: `14.01%`
+- Robustness 60 decision: `robustness confirmed`
+- V2.0 plan: `docs/sage_protocol/v2_0_shortfall_birth_plan.md`
