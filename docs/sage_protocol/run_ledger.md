@@ -354,3 +354,14 @@
   - Runtime exceptions: `0`; helper side-effect incidents: `0`.
   - Decision: `robustness confirmed`.
   - Next action: `start V2.0 candidate discovery` using separate candidate registries.
+
+
+- `V2.0 shortfall clustering phase` completed.
+  - Date: `2026-05-04T08:08:59.371464`
+  - Sources: formal 250 and robustness 60 paired comparisons/helper contribution summaries.
+  - Strong clusters: `5` of `9`.
+  - Report: `docs/sage_protocol/v2_0_shortfall_cluster_report.md`
+  - Artifact: `artifacts/summaries/v2_0_shortfall_clusters/latest_shortfall_clusters.json`
+  - Frozen best3 registry untouched: `artifacts/registry_frozen_best3_claim/registry_manifest.json`.
+  - Decision: `candidate found`.
+  - Next action: run V2.0 discovery-60 with generation ON using a copied candidate registry.

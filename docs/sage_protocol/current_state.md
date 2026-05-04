@@ -38,3 +38,7 @@
 - Robustness 60 relative outcome lift: `14.01%`
 - Robustness 60 decision: `robustness confirmed`
 - V2.0 plan: `docs/sage_protocol/v2_0_shortfall_birth_plan.md`
+- V2.0 shortfall cluster report: `docs/sage_protocol/v2_0_shortfall_cluster_report.md`
+- V2.0 cluster artifact: `artifacts/summaries/v2_0_shortfall_clusters/latest_shortfall_clusters.json`
+- V2.0 cluster decision: `candidate found`
+- V2.0 next step: build and run discovery-60 with generation ON in a copied candidate registry.
