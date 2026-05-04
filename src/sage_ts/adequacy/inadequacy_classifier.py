@@ -656,6 +656,121 @@ def _next_service_tool_call_observation(
     )
 
 
+def _tool_allow_list(scenario: Scenario) -> tuple[str, ...]:
+    tools = getattr(scenario.starting_context, "tool_allow_list", None) or ()
+    return tuple(str(tool) for tool in tools)
+
+
+def _generic_precondition_tools(scenario: Scenario) -> tuple[str, ...]:
+    return tuple(
+        tool
+        for tool in _tool_allow_list(scenario)
+        if tool.startswith("set_")
+        or tool.startswith("enable_")
+        or tool.startswith("disable_")
+    )
+
+
+def _generic_downstream_action_tools(scenario: Scenario) -> tuple[str, ...]:
+    return tuple(
+        tool
+        for tool in _tool_allow_list(scenario)
+        if tool.startswith(("send_", "search_", "modify_", "add_"))
+    )
+
+
+def _dependency_precondition_observation(
+    scenario_name: str,
+    scenario: Scenario,
+) -> CapabilityObservation:
+    precondition_tools = _generic_precondition_tools(scenario)
+    downstream_tools = _generic_downstream_action_tools(scenario)
+    tool_enum = ("", *precondition_tools[:6])
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="state_precondition:dependency_precondition_tool_call",
+        observation=(
+            "A repeated dependency-bundle shortfall is present: the task exposes "
+            "original ToolSandbox precondition setters plus downstream action tools, "
+            "but the agent must infer which concrete precondition action is needed "
+            "before the downstream action can succeed. Generate a deterministic "
+            "state dependency planner that accepts visible dependency_state, "
+            "target_action, and blocked_reason fields, returns one original "
+            "ToolSandbox precondition tool_name plus arguments, or abstains when "
+            "the state is already ready, unknown, or ambiguous. It must preserve "
+            "the returned original precondition tool call and must not perform the "
+            "downstream task itself."
+        ),
+        allowed_families=(str(ToolFamily.STATE_PRECONDITION_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "dependency_state": {
+                        "service_ready": False,
+                        "blocker_active": True,
+                    },
+                    "target_action": "downstream_action",
+                    "blocked_reason": "blocked by active precondition",
+                },
+                {
+                    "tool_name": tool_enum[1] if len(tool_enum) > 1 else "",
+                    "arguments": {"on": False},
+                    "should_call": bool(len(tool_enum) > 1),
+                    "reason": "disable active blocker before downstream action",
+                },
+            ),
+            ToolExample(
+                {
+                    "dependency_state": {
+                        "service_ready": False,
+                        "blocker_active": False,
+                    },
+                    "target_action": "downstream_action",
+                    "blocked_reason": "service disabled",
+                },
+                {
+                    "tool_name": (
+                        tool_enum[2]
+                        if len(tool_enum) > 2
+                        else tool_enum[1]
+                        if len(tool_enum) > 1
+                        else ""
+                    ),
+                    "arguments": {"on": True},
+                    "should_call": bool(len(tool_enum) > 1),
+                    "reason": "enable missing dependency before downstream action",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "dependency_state": {
+                        "service_ready": True,
+                        "blocker_active": False,
+                    },
+                    "target_action": "downstream_action",
+                    "blocked_reason": "",
+                },
+                {
+                    "tool_name": "",
+                    "arguments": {},
+                    "should_call": False,
+                    "reason": "dependency already ready",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=bool(precondition_tools),
+        reason="generic_dependency_precondition_bundle",
+        inadequacy_signals=(
+            "failed_base_tool_with_deterministic_fallback",
+            "precondition_bundle_before_downstream_action",
+        ),
+        failed_tool_calls=precondition_tools,
+        planner_failures=("choose one precondition setter before downstream action",),
+    )
+
+
 @dataclass(frozen=True)
 class CapabilityObservation:
     scenario_name: str
@@ -885,7 +1000,22 @@ def classify_scenario_observations(
         return (_stock_symbol_extraction_observation(scenario_name),)
 
     if similarity < 1.0 and _is_direct_service_precondition_scenario(scenario_name):
-        return (_next_service_tool_call_observation(scenario_name),)
+        observations = [_next_service_tool_call_observation(scenario_name)]
+        if _generic_precondition_tools(scenario):
+            observations.append(
+                _dependency_precondition_observation(
+                    scenario_name,
+                    scenario,
+                )
+            )
+        return tuple(observations)
+
+    if (
+        similarity < 1.0
+        and _generic_precondition_tools(scenario)
+        and _generic_downstream_action_tools(scenario)
+    ):
+        return (_dependency_precondition_observation(scenario_name, scenario),)
 
     if result.get("similarity") == 0:
         return (

@@ -36,6 +36,10 @@ class FakeCompleter:
                     "diagnostic_only": False,
                     "shortfall_cluster_evidence": ["label_normalization_failures"],
                     "known_failure_mechanisms_addressed": ["surface_form_mismatch"],
+                    "canonical_route_substitution_risk": "low",
+                    "expected_milestone_calls_replaced": ["manual_label_comparison"],
+                    "final_state_preservation_plan": "The helper returns a normalized label only; the caller still completes the final answer or side effect.",
+                    "grading_accounting_note": "Canonical intermediate route may differ, so report substitution separately from task outcome.",
                     "inadequacy_evidence": "Existing tools do not expose label normalization.",
                 },
                 "code": "def normalize_label(label: str) -> str:\n    return label.strip().lower()\n",
@@ -58,6 +62,8 @@ def test_tool_generator_uses_prompt_cache(tmp_path: Path) -> None:
     assert first.spec.tool_name == "normalize_label"
     assert first.spec.estimated_step_compression == 3
     assert first.spec.shortfall_cluster_evidence == ("label_normalization_failures",)
+    assert first.spec.canonical_route_substitution_risk == "low"
+    assert first.spec.expected_milestone_calls_replaced == ("manual_label_comparison",)
     assert second.spec.tool_name == "normalize_label"
     assert completer.calls == 1
 
@@ -84,7 +90,7 @@ def test_generation_request_includes_family_contract_guidance() -> None:
     assert "If family is search_filter_ranking_helper" in prompt
     assert "selected_record" in prompt
     assert "If family is state_precondition_helper" in prompt
-    assert "set_low_battery_mode_status" in prompt
+    assert "tool_name must have an enum" in prompt
     assert "tool_generation_v5" not in prompt
 
 
@@ -99,6 +105,8 @@ def test_generation_request_requires_v2_contract_fields() -> None:
     assert "diagnostic_only" in prompt
     assert "shortfall_cluster_evidence" in prompt
     assert "known_failure_mechanisms_addressed" in prompt
+    assert "canonical_route_substitution_risk" in prompt
+    assert "final_state_preservation_plan" in prompt
 
 
 def test_generation_request_includes_failure_memory_and_cluster_context() -> None:

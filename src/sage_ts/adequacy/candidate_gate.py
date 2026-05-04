@@ -45,6 +45,7 @@ STATE_ALLOWED_TOOL_NAMES = frozenset(
         "set_low_battery_mode_status",
     }
 )
+CANONICAL_SUBSTITUTION_RISK_LEVELS = frozenset({"none", "low", "medium", "high"})
 SINGLE_BASE_TOOL_REPLACEMENT_PHRASES = (
     "replace a single existing base tool",
     "replace one existing base tool",
@@ -79,6 +80,25 @@ DOWNSTREAM_TOOL_PREFIXES = (
 class GateDecision:
     allowed: bool
     reason: str
+    grading_classification: str = "unknown"
+
+
+def grading_accounting_classification(spec: ToolSpec) -> str:
+    """Classify whether a helper preserves or substitutes canonical route evidence."""
+    risk = spec.canonical_route_substitution_risk.strip().lower()
+    replaces = bool(spec.expected_milestone_calls_replaced)
+    has_final_state_plan = len(spec.final_state_preservation_plan.strip()) >= 20
+    side_effect_family = spec.family in {
+        ToolFamily.STATE_PRECONDITION_HELPER,
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+    }
+    if side_effect_family and not spec.preserves_side_effect_tools:
+        return "side_effect_unsafe"
+    if (risk and risk != "none") or replaces:
+        if has_final_state_plan:
+            return "outcome_preserving_but_canonical_substituting"
+        return "true_task_risky"
+    return "canonical_preserving"
 
 
 def _input_names(spec: ToolSpec) -> set[str]:
@@ -130,57 +150,110 @@ def evaluate_candidate_gate(
     *,
     failure_memory_path: Path | None = None,
 ) -> GateDecision:
+    grading_classification = grading_accounting_classification(spec)
     if spec.family not in ALLOWED_FAMILIES:
-        return GateDecision(False, f"unsupported_family:{spec.family}")
+        return GateDecision(
+            False, f"unsupported_family:{spec.family}", grading_classification
+        )
+    risk = spec.canonical_route_substitution_risk.strip().lower()
+    if risk not in CANONICAL_SUBSTITUTION_RISK_LEVELS:
+        return GateDecision(
+            False,
+            "invalid_canonical_route_substitution_risk",
+            grading_classification,
+        )
+    if risk != "none" and not spec.grading_accounting_note.strip():
+        return GateDecision(
+            False,
+            "missing_grading_accounting_note",
+            grading_classification,
+        )
+    if (
+        spec.expected_milestone_calls_replaced
+        and not spec.final_state_preservation_plan.strip()
+    ):
+        return GateDecision(
+            False,
+            "missing_final_state_preservation_plan",
+            grading_classification,
+        )
     if not spec.inputs:
-        return GateDecision(False, "missing_inputs")
+        return GateDecision(False, "missing_inputs", grading_classification)
     if len(spec.generalization_rationale.strip()) < 20:
-        return GateDecision(False, "weak_generalization_rationale")
+        return GateDecision(
+            False, "weak_generalization_rationale", grading_classification
+        )
     evidence = coerce_inadequacy_evidence(spec.inadequacy_evidence)
     if len(evidence.summary.strip()) < 20:
-        return GateDecision(False, "weak_inadequacy_evidence")
+        return GateDecision(False, "weak_inadequacy_evidence", grading_classification)
     if not evidence.signals:
-        return GateDecision(False, "missing_structured_inadequacy_signals")
+        return GateDecision(
+            False, "missing_structured_inadequacy_signals", grading_classification
+        )
     if (
         spec.output_annotation == "dict"
         and _requires_output_schema(spec)
         and spec.output_schema is None
     ):
-        return GateDecision(False, "missing_output_schema")
+        return GateDecision(False, "missing_output_schema", grading_classification)
     if (
         _requires_negative_applicability(spec)
         and not spec.negative_triggers
         and "insufficient_information" not in spec.abstain_behavior.lower()
     ):
-        return GateDecision(False, "missing_negative_triggers")
+        return GateDecision(False, "missing_negative_triggers", grading_classification)
     if _has_decisive_metadata(spec):
         if spec.estimated_step_compression is None:
-            return GateDecision(False, "missing_estimated_step_compression")
+            return GateDecision(
+                False, "missing_estimated_step_compression", grading_classification
+            )
         if spec.estimated_step_compression < 3:
-            return GateDecision(False, "step_compression_below_3")
+            return GateDecision(
+                False, "step_compression_below_3", grading_classification
+            )
         if spec.cross_task_applicability_count is None:
-            return GateDecision(False, "missing_cross_task_applicability_count")
+            return GateDecision(
+                False, "missing_cross_task_applicability_count", grading_classification
+            )
         if spec.cross_task_applicability_count < 2:
-            return GateDecision(False, "cross_task_applicability_below_2")
+            return GateDecision(
+                False, "cross_task_applicability_below_2", grading_classification
+            )
         if len(spec.applicable_task_families) < 2:
-            return GateDecision(False, "insufficient_applicable_task_families")
+            return GateDecision(
+                False, "insufficient_applicable_task_families", grading_classification
+            )
         if any(
             family.strip().lower() in GENERIC_TASK_FAMILY_LABELS
             for family in spec.applicable_task_families
         ):
-            return GateDecision(False, "generic_applicable_task_family")
+            return GateDecision(
+                False, "generic_applicable_task_family", grading_classification
+            )
         if not spec.positive_triggers:
-            return GateDecision(False, "missing_decisive_positive_triggers")
+            return GateDecision(
+                False, "missing_decisive_positive_triggers", grading_classification
+            )
         if not spec.negative_triggers:
-            return GateDecision(False, "missing_decisive_negative_triggers")
+            return GateDecision(
+                False, "missing_decisive_negative_triggers", grading_classification
+            )
         if spec.output_annotation == "dict" and spec.output_schema is None:
-            return GateDecision(False, "missing_decisive_output_schema")
+            return GateDecision(
+                False, "missing_decisive_output_schema", grading_classification
+            )
         if len(spec.reason_tool_is_decisive.strip()) < 20:
-            return GateDecision(False, "weak_decisive_rationale")
+            return GateDecision(
+                False, "weak_decisive_rationale", grading_classification
+            )
         if not spec.diagnostic_only and not spec.shortfall_cluster_evidence:
-            return GateDecision(False, "missing_shortfall_cluster_evidence")
+            return GateDecision(
+                False, "missing_shortfall_cluster_evidence", grading_classification
+            )
         if not spec.known_failure_mechanisms_addressed:
-            return GateDecision(False, "missing_known_failure_mechanisms")
+            return GateDecision(
+                False, "missing_known_failure_mechanisms", grading_classification
+            )
         memory_reasons = gate_failure_memory_reasons(
             failure_memory_path,
             tool_name=spec.tool_name,
@@ -195,7 +268,7 @@ def evaluate_candidate_gate(
             ),
         )
         if memory_reasons:
-            return GateDecision(False, memory_reasons[0])
+            return GateDecision(False, memory_reasons[0], grading_classification)
         decisive_text = " ".join(
             [
                 spec.description,
@@ -206,13 +279,31 @@ def evaluate_candidate_gate(
         if any(
             phrase in decisive_text for phrase in SINGLE_BASE_TOOL_REPLACEMENT_PHRASES
         ):
-            return GateDecision(False, "single_base_tool_replacement")
+            return GateDecision(
+                False, "single_base_tool_replacement", grading_classification
+            )
         if not (spec.preserves_side_effect_tools or spec.required_original_tool_calls):
-            return GateDecision(False, "missing_downstream_tool_preservation")
+            if (
+                grading_classification
+                != "outcome_preserving_but_canonical_substituting"
+            ):
+                return GateDecision(
+                    False,
+                    "missing_downstream_tool_preservation",
+                    grading_classification,
+                )
         if spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR and not (
             spec.preserves_side_effect_tools or _has_downstream_original_tool_call(spec)
         ):
-            return GateDecision(False, "missing_downstream_original_tool_call")
+            if (
+                grading_classification
+                != "outcome_preserving_but_canonical_substituting"
+            ):
+                return GateDecision(
+                    False,
+                    "missing_downstream_original_tool_call",
+                    grading_classification,
+                )
     if spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
         text = " ".join(
             [
@@ -223,60 +314,100 @@ def evaluate_candidate_gate(
             ]
         ).lower()
         if not any(token in text for token in STATE_ACTIONABLE_TOKENS):
-            return GateDecision(False, "state_helper_not_runtime_actionable")
+            return GateDecision(
+                False, "state_helper_not_runtime_actionable", grading_classification
+            )
         props = _output_schema_properties(spec)
         required = {"tool_name", "arguments", "should_call", "reason"}
         if not required.issubset(props):
-            return GateDecision(False, "state_helper_missing_output_contract")
+            return GateDecision(
+                False, "state_helper_missing_output_contract", grading_classification
+            )
         tool_name_schema = props.get("tool_name")
-        if not isinstance(tool_name_schema, dict) or set(
-            tool_name_schema.get("enum", ())
-        ) != set(STATE_ALLOWED_TOOL_NAMES):
-            return GateDecision(False, "state_helper_tool_name_enum_invalid")
+        if not isinstance(tool_name_schema, dict):
+            return GateDecision(
+                False, "state_helper_tool_name_enum_invalid", grading_classification
+            )
+        enum_values = {str(item) for item in tool_name_schema.get("enum", ())}
+        if "" not in enum_values or not all(
+            item == "" or item.startswith(("set_", "enable_", "disable_"))
+            for item in enum_values
+        ):
+            return GateDecision(
+                False, "state_helper_tool_name_enum_invalid", grading_classification
+            )
         emitted_tool_names = set(tool_name_schema.get("enum", ())) - {""}
         if not spec.preserves_side_effect_tools:
-            return GateDecision(False, "state_helper_missing_preserved_tool_contract")
+            return GateDecision(
+                False,
+                "state_helper_missing_preserved_tool_contract",
+                grading_classification,
+            )
         if not set(spec.required_original_tool_calls).issubset(
             set(spec.preserves_side_effect_tools)
         ):
-            return GateDecision(False, "state_helper_required_calls_not_preserved")
+            return GateDecision(
+                False,
+                "state_helper_required_calls_not_preserved",
+                grading_classification,
+            )
         if not emitted_tool_names.issubset(set(spec.preserves_side_effect_tools)):
-            return GateDecision(False, "state_helper_emitted_tools_not_preserved")
+            return GateDecision(
+                False,
+                "state_helper_emitted_tools_not_preserved",
+                grading_classification,
+            )
         if not emitted_tool_names.issubset(set(spec.required_original_tool_calls)):
-            return GateDecision(False, "state_helper_emitted_tools_not_required")
+            return GateDecision(
+                False, "state_helper_emitted_tools_not_required", grading_classification
+            )
     if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
         text = " ".join([spec.tool_name, spec.description]).lower()
         if not any(token in text for token in SEARCH_FILTER_ACTIONABLE_TOKENS):
-            return GateDecision(False, "search_filter_not_runtime_actionable")
+            return GateDecision(
+                False, "search_filter_not_runtime_actionable", grading_classification
+            )
         input_names = _input_names(spec)
         if not (
             {"records", "candidates"} & input_names
             or "records_payload" in input_names
             or "candidates_payload" in input_names
         ):
-            return GateDecision(False, "search_filter_missing_candidate_inputs")
+            return GateDecision(
+                False, "search_filter_missing_candidate_inputs", grading_classification
+            )
         props = _output_schema_properties(spec)
         if not (
             {"selected_record", "selected_id"} & set(props) or spec.abstain_behavior
         ):
-            return GateDecision(False, "search_filter_missing_output_contract")
+            return GateDecision(
+                False, "search_filter_missing_output_contract", grading_classification
+            )
         if (
             "tie" not in spec.description.lower()
             and "tie" not in spec.abstain_behavior.lower()
         ):
-            return GateDecision(False, "search_filter_missing_tie_behavior")
+            return GateDecision(
+                False, "search_filter_missing_tie_behavior", grading_classification
+            )
     if spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
         if not spec.preserves_side_effect_tools:
             return GateDecision(
-                False, "composite_helper_missing_preserved_side_effects"
+                False,
+                "composite_helper_missing_preserved_side_effects",
+                grading_classification,
             )
         if not spec.required_original_tool_calls:
             return GateDecision(
-                False, "composite_helper_missing_required_original_calls"
+                False,
+                "composite_helper_missing_required_original_calls",
+                grading_classification,
             )
         props = _output_schema_properties(spec)
         if not any(str(key).endswith("_kwargs") for key in props):
             return GateDecision(
-                False, "composite_helper_missing_prepared_kwargs_output"
+                False,
+                "composite_helper_missing_prepared_kwargs_output",
+                grading_classification,
             )
-    return GateDecision(True, "allowed")
+    return GateDecision(True, "allowed", grading_classification)

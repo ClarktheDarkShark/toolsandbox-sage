@@ -84,6 +84,9 @@ class ToolGenerationRequest:
             "applicable_task_families (list[str]), reason_tool_is_decisive (str), "
             "diagnostic_only (bool), shortfall_cluster_evidence (list[str]), "
             "known_failure_mechanisms_addressed (list[str]), "
+            "canonical_route_substitution_risk (str: none|low|medium|high), "
+            "expected_milestone_calls_replaced (list[str]), "
+            "final_state_preservation_plan (str), grading_accounting_note (str), "
             "inadequacy_evidence (object). "
             "inadequacy_evidence must include: summary (str), signals (list[str]), "
             "failed_tool_calls (list[str]), repeated_failed_tool_calls (list[str]), "
@@ -93,6 +96,15 @@ class ToolGenerationRequest:
             "reasoning/tool-use steps, applies across at least 2 task families, "
             "preserves required downstream ToolSandbox tools, and does more than "
             "replace a single existing base tool. "
+            "Separate task correctness from benchmark route accounting: preserve "
+            "final state and original side-effect tools whenever side effects matter. "
+            "If the helper intentionally substitutes for expected intermediate "
+            "canonical milestone/base-tool calls, set canonical_route_substitution_risk "
+            "to low/medium/high, list those expected_milestone_calls_replaced, and "
+            "explain final_state_preservation_plan plus grading_accounting_note. "
+            "Do not claim canonical-preserving when a generated helper replaces a "
+            "required intermediate route; label it as outcome-preserving but "
+            "canonical-substituting. "
             "Use concrete scenario-family labels in applicable_task_families, "
             "not helper-family labels such as canonicalizer, state_precondition_helper, "
             "search_filter_ranking_helper, or timestamp_conversion. "
@@ -112,10 +124,10 @@ class ToolGenerationRequest:
             "If family is state_precondition_helper, output_schema must be a JSON "
             "Schema object with type 'object' and properties exactly covering the "
             "runtime contract: tool_name, arguments, should_call, and reason. "
-            "tool_name must have enum ['', 'set_wifi_status', "
-            "'set_cellular_service_status', 'set_location_service_status', "
-            "'set_low_battery_mode_status']. Include negative_triggers for already "
-            "ready state, unknown target service, and insufficient state. "
+            "tool_name must have an enum containing '' plus the original ToolSandbox "
+            "set_* or enable/disable precondition tools that may be returned. Include "
+            "negative_triggers for already ready state, unknown target dependency, "
+            "and insufficient state. "
             "If family is derived_value_calculator and output_annotation is dict, "
             "output_schema must be a JSON Schema object with type 'object' and "
             "properties for every returned key. It must preserve a downstream "
@@ -145,7 +157,7 @@ class ToolGenerator:
 
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
         prompt = request.prompt()
-        key = cache_key(self.completer.model, {"kind": "tool_generation_v6"}, prompt)
+        key = cache_key(self.completer.model, {"kind": "tool_generation_v7"}, prompt)
         response = self.cache.get(key)
         if response is None:
             response = self.completer.complete(
@@ -230,6 +242,17 @@ def parse_generated_tool_json(response: str) -> GeneratedTool:
             str(item)
             for item in spec_payload.get("known_failure_mechanisms_addressed", ())
         ),
+        canonical_route_substitution_risk=str(
+            spec_payload.get("canonical_route_substitution_risk", "none")
+        ),
+        expected_milestone_calls_replaced=tuple(
+            str(item)
+            for item in spec_payload.get("expected_milestone_calls_replaced", ())
+        ),
+        final_state_preservation_plan=str(
+            spec_payload.get("final_state_preservation_plan", "")
+        ),
+        grading_accounting_note=str(spec_payload.get("grading_accounting_note", "")),
         inadequacy_evidence=StructuredInadequacyEvidence.from_json(
             dict(spec_payload.get("inadequacy_evidence", {}))
         )

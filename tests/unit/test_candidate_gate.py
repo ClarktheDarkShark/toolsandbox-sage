@@ -103,6 +103,60 @@ def test_state_precondition_helper_allows_trace_compatible_tool_call() -> None:
     assert decision.allowed
 
 
+def test_search_helper_can_substitute_canonical_route_with_grading_accounting() -> None:
+    spec = ToolSpec(
+        tool_name="select_visible_record",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description=(
+            "Select a visible candidate record by timestamp; tie cases abstain "
+            "instead of manual timestamp comparison."
+        ),
+        inputs=(ToolInput("records", "list", "Visible records."),),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {"selected_record": {"type": "object"}},
+        },
+        positive_triggers=("visible_candidate_selection",),
+        negative_triggers=("no_candidates", "ambiguous_tie"),
+        abstain_behavior="Return {} when no candidates or a tie/ambiguity exists.",
+        generalization_rationale=(
+            "Visible record selection recurs across answer and update tasks."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=("message_lookup", "reminder_lookup"),
+        reason_tool_is_decisive=(
+            "It compresses search result inspection, timestamp comparison, and "
+            "record choice across families."
+        ),
+        shortfall_cluster_evidence=("visible_record_selection_failures",),
+        known_failure_mechanisms_addressed=("wrong_visible_record_selected",),
+        canonical_route_substitution_risk="medium",
+        expected_milestone_calls_replaced=("manual_record_ranking_trace",),
+        final_state_preservation_plan=(
+            "The helper only selects from visible records and leaves any final "
+            "answer or downstream side-effect tool to the caller."
+        ),
+        grading_accounting_note=(
+            "Canonical route evidence may differ, so report as outcome-preserving "
+            "canonical substitution rather than canonical success."
+        ),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents repeatedly select the wrong visible candidate.",
+            signals=("wrong_selected_record",),
+        ),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert decision.allowed
+    assert (
+        decision.grading_classification
+        == "outcome_preserving_but_canonical_substituting"
+    )
+
+
 def test_decisive_gate_rejects_thin_helper() -> None:
     spec = replace(
         _state_spec("Return a concrete next_action and readiness predicate."),

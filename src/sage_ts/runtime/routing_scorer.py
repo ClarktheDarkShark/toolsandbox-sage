@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from sage_ts.evaluation.task_strata import HELPER_TRIGGERS, classify_task_strata
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 
 DEFAULT_MAX_RUNTIME_BUNDLE_SIZE = 5
+ROUTING_EVIDENCE_ROOT = Path("artifacts/summaries")
 
 
 @dataclass(frozen=True)
@@ -57,6 +61,66 @@ def _family_match(label: str, scenario_strata: set[str], scenario_name: str) -> 
         if label_parts and len(label_parts & stratum_parts) >= min(2, len(label_parts)):
             return True
     return False
+
+
+@lru_cache(maxsize=1)
+def _latest_helper_contribution_summary() -> dict[str, Any]:
+    candidates = sorted(
+        ROUTING_EVIDENCE_ROOT.glob("**/helper_contribution_summary.json"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for path in candidates:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return {}
+
+
+def _helper_evidence(tool_name: str) -> dict[str, Any]:
+    helpers = _latest_helper_contribution_summary().get("helpers", {})
+    if isinstance(helpers, dict):
+        data = helpers.get(tool_name, {})
+        return data if isinstance(data, dict) else {}
+    return {}
+
+
+def _blocked_by_adoption_risk(
+    tool_name: str,
+    *,
+    score: int,
+    matched_positive: tuple[str, ...],
+    matched_families: tuple[str, ...],
+) -> tuple[bool, str]:
+    evidence = _helper_evidence(tool_name)
+    if not evidence:
+        return False, ""
+    visible = int(evidence.get("visible_count", 0) or 0)
+    called = int(evidence.get("called_count", 0) or 0)
+    visible_not_called = int(evidence.get("visible_not_called_count", 0) or 0)
+    if visible < 3:
+        return False, ""
+    vnc_rate = visible_not_called / max(visible, 1)
+    if vnc_rate <= 0.5:
+        return False, ""
+    called_subset = evidence.get("called_subset", {})
+    called_outcome = (
+        called_subset.get("mean_outcome_delta")
+        if isinstance(called_subset, dict)
+        else None
+    )
+    has_positive_called_contribution = called > 0 and (
+        called_outcome is None or float(called_outcome) >= 0
+    )
+    strong_current_match = (
+        bool(matched_positive) and bool(matched_families) and score >= 7
+    )
+    if strong_current_match and has_positive_called_contribution:
+        return False, ""
+    return True, "blocked_by_visible_not_called_adoption_risk"
 
 
 def score_registry_entry_for_scenario(
@@ -114,6 +178,22 @@ def score_registry_entry_for_scenario(
         score += 1
     if spec.abstain_behavior:
         score += 1
+    blocked, block_reason = _blocked_by_adoption_risk(
+        tool_name,
+        score=score,
+        matched_positive=matched_positive,
+        matched_families=matched_families,
+    )
+    if blocked:
+        return RuntimeRoutingDecision(
+            tool_name,
+            False,
+            "hidden",
+            block_reason,
+            score,
+            matched_positive_triggers=matched_positive,
+            matched_task_families=matched_families,
+        )
     if score >= 3:
         return RuntimeRoutingDecision(
             tool_name,

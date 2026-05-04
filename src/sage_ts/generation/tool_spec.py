@@ -109,6 +109,10 @@ class ToolSpec:
     diagnostic_only: bool = False
     shortfall_cluster_evidence: tuple[str, ...] = ()
     known_failure_mechanisms_addressed: tuple[str, ...] = ()
+    canonical_route_substitution_risk: str = "none"
+    expected_milestone_calls_replaced: tuple[str, ...] = ()
+    final_state_preservation_plan: str = ""
+    grading_accounting_note: str = ""
     inadequacy_evidence: StructuredInadequacyEvidence = StructuredInadequacyEvidence(
         summary="",
         signals=(),
@@ -140,6 +144,12 @@ class ToolSpec:
             "known_failure_mechanisms_addressed": list(
                 self.known_failure_mechanisms_addressed
             ),
+            "canonical_route_substitution_risk": self.canonical_route_substitution_risk,
+            "expected_milestone_calls_replaced": list(
+                self.expected_milestone_calls_replaced
+            ),
+            "final_state_preservation_plan": self.final_state_preservation_plan,
+            "grading_accounting_note": self.grading_accounting_note,
             "inadequacy_evidence": evidence.to_json(),
         }
 
@@ -189,6 +199,17 @@ class ToolSpec:
                 str(item)
                 for item in payload.get("known_failure_mechanisms_addressed", ())
             ),
+            canonical_route_substitution_risk=str(
+                payload.get("canonical_route_substitution_risk", "none")
+            ),
+            expected_milestone_calls_replaced=tuple(
+                str(item)
+                for item in payload.get("expected_milestone_calls_replaced", ())
+            ),
+            final_state_preservation_plan=str(
+                payload.get("final_state_preservation_plan", "")
+            ),
+            grading_accounting_note=str(payload.get("grading_accounting_note", "")),
             inadequacy_evidence=coerce_inadequacy_evidence(
                 payload.get("inadequacy_evidence", "")
             ),

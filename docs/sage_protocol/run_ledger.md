@@ -263,3 +263,28 @@
   - Side-effect incidents: `0`.
   - Decision: `not ready: repair cluster birth`.
   - Next action: repair cluster-birth/generation quality and routing evidence use before rerunning readiness-20; do not launch full V2 campaign.
+
+- `V2 dependency/grading experimental sub-sprint` completed.
+  - Report: `docs/sage_protocol/v2_dependency_grading_experiment_report.md`
+  - Summary: `artifacts/summaries/v2_dependency_grading_experiment20/run_summary.json`
+  - Run: `outputs/v2_dependency_grading_experiment20/mechanism_40_20260503_203206/`
+  - Dashboard: `outputs/v2_dependency_grading_experiment20/mechanism_40_20260503_203206/dashboard/index.html`
+  - Task focus dashboard: `outputs/v2_dependency_grading_experiment20/mechanism_40_20260503_203206/dashboard/task_focus.html`
+  - Generation: `on`
+  - Registry: `artifacts/registry_candidates/v2_dependency_grading_experiment20/registry_manifest.json`
+  - Cohort quality: PASS, `20` scenarios, `15` base families, largest duplicate family size `2`.
+  - Canonical delta: `+0.0801`.
+  - Outcome delta: `+0.0731`.
+  - Exact successes: `control=1`, `SAGE=2`.
+  - Canonical gains/regressions/preserved: `8 / 6 / 6`.
+  - Outcome gains/regressions/preserved: `3 / 5 / 10`.
+  - Tools proposed/accepted/rejected: `6 / 1 / 5`.
+  - Accepted candidate: `next_dependency_precondition_call`; diagnostic only because accepted-but-uncalled in this run.
+  - Generated-helper visible/called/visible-not-called: `12 / 6 / 6`.
+  - Runtime exceptions: `0`.
+  - Side-effect incidents: `0`.
+  - Tests: `PYTHONPATH=src:. pytest tests/unit -q` -> `166 passed, 2 warnings`.
+  - Registry checks: readiness candidate registry PASS; dependency/grading candidate registry PASS.
+  - Commit hygiene: `artifacts/baselines/control_task_baselines/index.jsonl` removed from git tracking so local cache rows do not commit broken pointers to ignored record files.
+  - Decision: `rerun readiness-20`.
+  - Next action: rerun readiness-20 with grading-accounting, live-validation, dependency-cluster, and routing changes; do not start 60/100/250 yet.

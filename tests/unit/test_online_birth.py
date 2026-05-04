@@ -10,13 +10,40 @@ from sage_ts.orchestration.online_birth import OnlineBirthController
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.sandbox_validator import ValidationResult
-from tool_sandbox.common.execution_context import ScenarioCategories
+from tool_sandbox.common.execution_context import ExecutionContext, ScenarioCategories
 from tool_sandbox.common.scenario import Scenario
 
 _TOOL_NAME = "recency_to_timestamp_bounds"
 _RELATIVE_TIME_TOOL_NAME = "relative_day_time_to_timestamp"
 _RECORD_SELECTOR_TOOL_NAME = "select_record_by_timestamp_extreme"
 _RESOLVE_WINDOW_TOOL_NAME = "resolve_search_window_or_bounds"
+
+
+def test_generic_dependency_bundle_observation_uses_allowed_tool_structure() -> None:
+    scenario = Scenario(
+        starting_context=ExecutionContext(
+            tool_allow_list=[
+                "set_example_service_status",
+                "search_records",
+                "send_message",
+            ]
+        )
+    )
+
+    observations = classify_scenario_observations(
+        "generic_dependency_bundle_case",
+        scenario,
+        {"similarity": 0.0},
+    )
+
+    dependency = next(
+        observation
+        for observation in observations
+        if observation.canonical_key
+        == "state_precondition:dependency_precondition_tool_call"
+    )
+    assert dependency.generation_allowed
+    assert dependency.failed_tool_calls == ("set_example_service_status",)
 
 
 @dataclass

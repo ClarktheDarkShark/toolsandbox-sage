@@ -16,6 +16,7 @@ from sage_ts.generation.tool_spec import GeneratedTool
 from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
+from sage_ts.validation.live_candidate_check import run_lightweight_live_candidate_check
 from sage_ts.validation.sandbox_validator import (
     ValidationResult,
     validate_generated_tool,
@@ -40,6 +41,8 @@ def suggested_tool_name(canonical_key: str) -> str | None:
         return "relative_day_time_to_timestamp"
     if suffix in {"service_next_action", "next_service_tool_call"}:
         return "next_service_tool_call"
+    if suffix == "dependency_precondition_tool_call":
+        return "next_dependency_precondition_call"
     return suffix
 
 
@@ -322,11 +325,22 @@ class OnlineBirthController:
                 failure_memory_path=self.failure_memory_path,
             )
             if memory_gate.allowed:
-                validation = validate_generated_tool(
+                live_check = run_lightweight_live_candidate_check(
                     tool,
-                    examples=observation.validation_examples,
+                    observation.validation_examples,
                 )
+                if live_check.accepted:
+                    validation = validate_generated_tool(
+                        tool,
+                        examples=observation.validation_examples,
+                    )
+                else:
+                    validation = ValidationResult(
+                        False,
+                        live_check.errors,
+                    )
             else:
+                live_check = None
                 validation = ValidationResult(
                     False,
                     (memory_gate.reason,),
@@ -367,6 +381,18 @@ class OnlineBirthController:
                 "source_example_count": validation.source_example_count,
                 "held_out_check_count": validation.held_out_check_count,
                 "runtime_smoke_passed": validation.runtime_smoke_passed,
+                "grading_classification": memory_gate.grading_classification,
+                "canonical_route_substitution_risk": (
+                    tool.spec.canonical_route_substitution_risk
+                ),
+                "expected_milestone_calls_replaced": list(
+                    tool.spec.expected_milestone_calls_replaced
+                ),
+                "final_state_preservation_plan": tool.spec.final_state_preservation_plan,
+                "grading_accounting_note": tool.spec.grading_accounting_note,
+                "lightweight_live_validation": (
+                    live_check.to_json() if live_check is not None else None
+                ),
             },
         )
         self._event(
@@ -382,6 +408,13 @@ class OnlineBirthController:
                 "estimated_step_compression": tool.spec.estimated_step_compression,
                 "cross_task_applicability_count": tool.spec.cross_task_applicability_count,
                 "applicable_task_families": list(tool.spec.applicable_task_families),
+                "grading_classification": memory_gate.grading_classification,
+                "canonical_route_substitution_risk": (
+                    tool.spec.canonical_route_substitution_risk
+                ),
+                "lightweight_live_validation": (
+                    live_check.to_json() if live_check is not None else None
+                ),
             },
         )
         if validation.accepted:

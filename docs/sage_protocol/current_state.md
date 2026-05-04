@@ -1,31 +1,37 @@
 # Current State
 
-- Date: 2026-05-03
-- Last completed step: `v2_architecture_readiness_20`
-- Last decision: `not ready: repair cluster birth`
+- Date: 2026-05-04
+- Last completed step: `v2_dependency_grading_experiment20`
+- Last decision: `rerun readiness-20`
 - Active v1 registry path: `artifacts/registry_phaseE_balanced_final/registry_manifest.json`
 - Active v1 registry hash: `385a0f7dbd65ce340f4edd97e26e89a67054cf1c661f01029692ca38547484b1`
-- Candidate readiness registry: `artifacts/registry_candidates/v2_architecture_readiness_20/registry_manifest.json`
-- V2 repairs implemented:
+- Candidate dependency/grading registry: `artifacts/registry_candidates/v2_dependency_grading_experiment20/registry_manifest.json`
+- Candidate dependency/grading registry hash after run: `a57a920e7f636c4e59571969244c421af4740633eb1d176d8c0b6639ad502c4f`
+- Latest run: `outputs/v2_dependency_grading_experiment20/mechanism_40_20260503_203206/`
+- Dashboard: `outputs/v2_dependency_grading_experiment20/mechanism_40_20260503_203206/dashboard/index.html`
+- Task focus dashboard: `outputs/v2_dependency_grading_experiment20/mechanism_40_20260503_203206/dashboard/task_focus.html`
+- Latest report: `docs/sage_protocol/v2_dependency_grading_experiment_report.md`
+- Machine summary: `artifacts/summaries/v2_dependency_grading_experiment20/run_summary.json`
+- V2 repairs now implemented:
   - claim-grade helper contribution export
   - mechanical promotion evidence gate
   - failure-memory integration into generation/gating/promotion
-  - generic runtime routing scorer with bounded bundle
+  - generic runtime routing scorer with bounded bundle and visible-not-called suppression
   - diverse shortfall-cluster aggregation before birth
-- Readiness-20 run: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_194428/`
-- Dashboard: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_194428/dashboard/index.html`
-- Task focus dashboard: `outputs/v2_architecture_readiness_20/mechanism_40_20260503_194428/dashboard/task_focus.html`
-- Cohort quality: pass, `20` scenarios, `15` base families, largest duplicate family size `2`, no-current-helper-fit share `0.4`
-- Readiness metrics:
-  - canonical delta `-0.0631`
-  - outcome delta `-0.0563`
-  - exact successes `3 -> 2`
-  - tools proposed/accepted/rejected `5 / 0 / 5`
-  - visible/called/visible-not-called `15 / 6 / 9`
+  - canonical-route substitution accounting in generated specs and gate decisions
+  - lightweight live candidate validation before registry acceptance
+  - generic dependency/precondition shortfall observation before birth
+- Latest diagnostic metrics:
+  - canonical delta `+0.0801`
+  - outcome delta `+0.0731`
+  - exact successes `1 -> 2`
+  - tools proposed/accepted/rejected `6 / 1 / 5`
+  - accepted candidate `next_dependency_precondition_call`
+  - accepted-but-uncalled tools `next_dependency_precondition_call`
+  - visible/called/visible-not-called `12 / 6 / 6`
   - runtime exceptions `0`
   - side-effect incidents `0`
-- Tests: `73 passed`
-- Registry check: candidate readiness registry PASS
-- Primary blocker: cluster-birth/generation quality; generated specs missed downstream preservation or required triggers.
-- Secondary blocker: runtime routing still exposes retained helpers with visible-not-called pollution.
-- Next step: `Repair cluster-birth/generation contract and routing evidence use, then rerun readiness-20. Do not start full V2 campaign.`
+- Tests: `166 passed, 2 warnings`
+- Registry check: candidate dependency/grading registry PASS
+- Commit hygiene fix: `artifacts/baselines/control_task_baselines/index.jsonl` removed from git tracking; local cache index/records remain ignored runtime artifacts.
+- Next step: `Rerun readiness-20. Do not start 60/100/250 until readiness-20 passes.`
