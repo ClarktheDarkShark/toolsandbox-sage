@@ -1,11 +1,76 @@
+import json
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
+from sage_ts.generation.tool_spec import ToolFamily
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.runtime import routing_scorer
 from sage_ts.runtime.routing_scorer import score_registry_entry_for_scenario
 from sage_ts.runtime.toolsandbox_integration import route_registry_entries
 from tests.unit.test_promotion_gate import _entry
+
+
+def _state_dependency_entry() -> RegistryEntry:
+    base = _entry()
+    return RegistryEntry.accepted(
+        replace(
+            base.tool,
+            spec=replace(
+                base.tool.spec,
+                tool_name="next_dependency_precondition_call",
+                family=ToolFamily.STATE_PRECONDITION_HELPER,
+                description=(
+                    "Plan the next original service tool_call when visible state "
+                    "shows a dependency or precondition blocks the requested action."
+                ),
+                positive_triggers=(
+                    "service not ready with active blocker",
+                    "service not ready with missing dependency",
+                ),
+                negative_triggers=("already ready state", "insufficient state"),
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "tool_name": {
+                            "type": "string",
+                            "enum": ["", "set_low_battery_mode_status"],
+                        },
+                        "arguments": {"type": "object"},
+                        "should_call": {"type": "boolean"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["tool_name", "arguments", "should_call"],
+                },
+                abstain_behavior=(
+                    "Return should_call=False with a reason when state is ready, "
+                    "missing, or ambiguous."
+                ),
+                applicable_task_families=(
+                    "turn_on_wifi_low_battery_mode",
+                    "turn_on_cellular_low_battery_mode",
+                ),
+                shortfall_cluster_evidence=(
+                    "state_precondition:dependency_precondition_tool_call",
+                ),
+                known_failure_mechanisms_addressed=(
+                    "precondition_bundle_before_downstream_action",
+                ),
+                required_original_tool_calls=("set_low_battery_mode_status",),
+                preserves_side_effect_tools=("set_low_battery_mode_status",),
+                final_state_preservation_plan=(
+                    "The caller must execute the returned original ToolSandbox "
+                    "tool and verify the resulting service state."
+                ),
+                grading_accounting_note=(
+                    "Canonical route differences are reported separately from "
+                    "final task outcome."
+                ),
+            ),
+        ),
+        base.validation,
+        birth_scenario="turn_on_wifi_low_battery_mode",
+    )
 
 
 def test_generic_routing_shows_positive_trigger_and_hides_negative() -> None:
@@ -116,6 +181,55 @@ def test_route_registry_entries_treats_preserved_tools_as_conditional_when_requi
     assert decisions["select_visible_record"].visible
 
 
+def test_route_registry_entries_allows_one_available_emitted_downstream_tool() -> None:
+    base = _state_dependency_entry()
+    entry = replace(
+        base,
+        tool=replace(
+            base.tool,
+            spec=replace(
+                base.tool.spec,
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "tool_name": {
+                            "type": "string",
+                            "enum": [
+                                "",
+                                "set_low_battery_mode_status",
+                                "set_cellular_service_status",
+                            ],
+                        },
+                        "arguments": {"type": "object"},
+                        "should_call": {"type": "boolean"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["tool_name", "arguments", "should_call"],
+                },
+                required_original_tool_calls=(
+                    "set_low_battery_mode_status",
+                    "set_cellular_service_status",
+                ),
+                preserves_side_effect_tools=(
+                    "set_low_battery_mode_status",
+                    "set_cellular_service_status",
+                ),
+            ),
+        ),
+    )
+
+    selected, decisions = route_registry_entries(
+        {"next_dependency_precondition_call": entry},
+        "turn_on_wifi_low_battery_mode",
+        available_base_tools={"set_low_battery_mode_status"},
+    )
+
+    assert [item.tool.spec.tool_name for item in selected] == [
+        "next_dependency_precondition_call"
+    ]
+    assert decisions["next_dependency_precondition_call"].visible
+
+
 def test_routing_suppresses_visible_not_called_pollution(monkeypatch: Any) -> None:
     monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "evidence_routing")
     entry = _entry()
@@ -125,9 +239,9 @@ def test_routing_suppresses_visible_not_called_pollution(monkeypatch: Any) -> No
         lambda: {
             "helpers": {
                 "select_visible_record": {
-                    "visible_count": 5,
+                    "visible_count": 12,
                     "called_count": 0,
-                    "visible_not_called_count": 5,
+                    "visible_not_called_count": 12,
                     "called_subset": {"mean_outcome_delta": None},
                 }
             }
@@ -140,3 +254,87 @@ def test_routing_suppresses_visible_not_called_pollution(monkeypatch: Any) -> No
 
     assert not decision.visible
     assert decision.reason == "blocked_by_visible_not_called_adoption_risk"
+
+
+def test_routing_evidence_ignores_runtime_exception_runs(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    invalid_run = tmp_path / "outputs" / "invalid_run"
+    valid_run = tmp_path / "outputs" / "valid_run"
+    invalid_candidate = invalid_run / "candidate" / "arm"
+    valid_candidate = valid_run / "candidate" / "arm"
+    invalid_candidate.mkdir(parents=True)
+    valid_candidate.mkdir(parents=True)
+    (invalid_run / "paired_comparison.json").write_text(
+        json.dumps({"runtime_exception_count": 1}) + "\n"
+    )
+    (valid_run / "paired_comparison.json").write_text(
+        json.dumps({"runtime_exception_count": 0}) + "\n"
+    )
+    old_dir = tmp_path / "old"
+    new_dir = tmp_path / "new"
+    old_dir.mkdir()
+    new_dir.mkdir()
+    (old_dir / "helper_contribution_summary.json").write_text(
+        json.dumps(
+            {
+                "candidate_dir": str(valid_candidate),
+                "helpers": {"tool": {"visible_count": 1}},
+            }
+        )
+        + "\n"
+    )
+    (new_dir / "helper_contribution_summary.json").write_text(
+        json.dumps(
+            {
+                "candidate_dir": str(invalid_candidate),
+                "helpers": {"tool": {"visible_count": 9}},
+            }
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(routing_scorer, "ROUTING_EVIDENCE_ROOT", tmp_path)
+    routing_scorer._latest_helper_contribution_summary.cache_clear()
+
+    evidence = routing_scorer._latest_helper_contribution_summary()
+
+    assert evidence["helpers"]["tool"]["visible_count"] == 1
+    routing_scorer._latest_helper_contribution_summary.cache_clear()
+
+
+def test_routing_gives_new_cluster_born_state_helper_fair_chance(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "evidence_routing")
+    monkeypatch.setattr(
+        routing_scorer,
+        "_latest_helper_contribution_summary",
+        lambda: {"helpers": {}},
+    )
+    entry = _state_dependency_entry()
+
+    decision = score_registry_entry_for_scenario(
+        entry, "turn_on_wifi_low_battery_mode_3_distraction_tools"
+    )
+
+    assert decision.visible
+    assert decision.reason == "fair_chance_cluster_fit"
+    assert decision.fair_chance_candidate
+    assert decision.fair_chance_reason
+
+
+def test_fair_chance_state_helper_stays_hidden_on_unrelated_task(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "evidence_routing")
+    monkeypatch.setattr(
+        routing_scorer,
+        "_latest_helper_contribution_summary",
+        lambda: {"helpers": {}},
+    )
+    entry = _state_dependency_entry()
+
+    decision = score_registry_entry_for_scenario(entry, "find_days_till_holiday")
+
+    assert not decision.visible
+    assert decision.reason == "generic_relevance_score_insufficient"

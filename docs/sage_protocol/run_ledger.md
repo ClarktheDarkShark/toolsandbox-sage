@@ -377,3 +377,17 @@
   - Candidate triage: no candidate advanced to confirmation; `next_dependency_precondition_call` is diagnostic only because called count was 0.
   - Reports: `docs/sage_protocol/v2_0_discovery60_report.md`, `docs/sage_protocol/v2_0_candidate_triage_report.md`, `docs/sage_protocol/v2_0_confirmation60_report.md`.
   - Decision: `routing repair needed`.
+
+
+- `V2.0 dependency fair-chance routing repair` completed.
+  - Date: `2026-05-04T17:15:00`
+  - Report: `docs/sage_protocol/v2_0_dependency_fair_chance_routing_report.md`
+  - Candidate registry: `artifacts/registry_candidates/v2_0_dependency_fair_chance20_20260504_165041/registry_manifest.json`; frozen best3 registry untouched.
+  - Final diagnostic run: `outputs/v2_0_dependency_fair_chance20_20260504_165041/mechanism_40_20260504_170647`
+  - Dashboards: `http://127.0.0.1:5520/outputs/v2_0_dependency_fair_chance20_20260504_165041/mechanism_40_20260504_170647/dashboard/index.html` and `http://127.0.0.1:5520/outputs/v2_0_dependency_fair_chance20_20260504_165041/mechanism_40_20260504_170647/dashboard/task_focus.html`
+  - Cohort quality: `pass`; control cache `fresh 0 cached / 20 fresh`.
+  - Metrics: outcome delta `+0.0185`; canonical delta `+0.0553`; exact `0 -> 2`; runtime exceptions `0`; helper side-effect incidents `0`.
+  - `next_dependency_precondition_call`: visible/called/VNC `9 / 0 / 9`; fair-chance exposure worked but adoption failed after one additional affordance repair.
+  - Tests: targeted V2 suite `62 passed`; frozen best3 and candidate registry check-only both PASS.
+  - Decision: `park dependency lane`.
+  - Next action: mine a different no-current-helper-fit cluster; do not run confirmation-60 for this candidate without later call evidence.

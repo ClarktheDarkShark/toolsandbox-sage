@@ -6,6 +6,7 @@ import copy
 import hashlib
 import inspect
 import json
+import re
 from collections.abc import Iterable, MutableMapping
 from typing import Any, Callable, cast
 
@@ -78,6 +79,22 @@ def _call_path_note(spec: ToolSpec) -> list[str]:
     return lines
 
 
+def _dict_input_key_notes(entry: RegistryEntry) -> list[str]:
+    """Expose literal dict keys used by generated code as affordance hints."""
+    lines: list[str] = []
+    code = entry.tool.code
+    for item in entry.tool.spec.inputs:
+        if item.annotation != "dict":
+            continue
+        pattern = rf"{re.escape(item.name)}\[['\"]([^'\"]+)['\"]\]"
+        keys = sorted(set(re.findall(pattern, code)))
+        if keys:
+            lines.append(f"    {item.name} expected visible keys: {', '.join(keys)}.")
+    if lines:
+        return ["", "Generated dict input keys:", *lines]
+    return []
+
+
 def _google_docstring(entry: RegistryEntry) -> str:
     spec = entry.tool.spec
     description = spec.description
@@ -93,6 +110,7 @@ def _google_docstring(entry: RegistryEntry) -> str:
     lines = [description, "", "Args:"]
     for item in spec.inputs:
         lines.append(f"    {item.name}: {item.description}")
+    lines.extend(_dict_input_key_notes(entry))
     lines.extend(["", "Returns:", f"    {spec.output_annotation}"])
     if spec.positive_triggers:
         lines.extend(["", "Use when:"])
@@ -102,6 +120,30 @@ def _google_docstring(entry: RegistryEntry) -> str:
         lines.extend(["", "Do not use when:"])
         for trigger in spec.negative_triggers:
             lines.append(f"    - {trigger}")
+    if spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
+        lines.extend(
+            [
+                "",
+                "Dependency/precondition usage:",
+                "    Call this helper when the requested action appears blocked",
+                " by a visible service, device-state, or dependency precondition.",
+                "    Provide only visible state and the target action; do not",
+                " invent hidden service or device state.",
+                "    If the helper returns should_call=True, execute the returned original ToolSandbox tool name with the returned arguments next.",
+                "    The helper only plans the next precondition call; it does not perform the side effect or complete the user task by itself.",
+                "    Do not call it when state is already ready, inputs are",
+                " insufficient or ambiguous, or the task is unrelated to service",
+                " or dependency preconditions.",
+            ]
+        )
+        if spec.canonical_route_substitution_risk.strip().lower() != "none":
+            lines.extend(
+                [
+                    "    This helper may substitute for an expected canonical",
+                    " intermediate route. Preserve final state and side effects;",
+                    " canonical-route impact is reported separately.",
+                ]
+            )
     if spec.tool_name == "next_service_tool_call":
         lines.extend(
             [
@@ -535,10 +577,29 @@ def route_registry_entries(
         status = "shown" if is_visible else "hidden"
         score = generic.score
         downstream_tools = set(entry.tool.spec.required_original_tool_calls)
+        requires_any_downstream = False
+        output_schema = entry.tool.spec.output_schema or {}
+        output_props = output_schema.get("properties", {})
+        if isinstance(output_props, dict):
+            tool_name_schema = output_props.get("tool_name", {})
+            if isinstance(tool_name_schema, dict):
+                emitted = {
+                    str(item) for item in tool_name_schema.get("enum", ()) if str(item)
+                }
+                if emitted:
+                    downstream_tools = emitted
+                    requires_any_downstream = True
         if not downstream_tools:
             downstream_tools = set(entry.tool.spec.preserves_side_effect_tools)
         if is_visible and available_base_tools is not None and downstream_tools:
-            missing = downstream_tools - available_base_tools
+            if requires_any_downstream:
+                missing = (
+                    downstream_tools
+                    if not downstream_tools & available_base_tools
+                    else set()
+                )
+            else:
+                missing = downstream_tools - available_base_tools
             if missing:
                 is_visible = False
                 status = "hidden"
@@ -554,6 +615,8 @@ def route_registry_entries(
             matched_positive_triggers=generic.matched_positive_triggers,
             matched_negative_triggers=generic.matched_negative_triggers,
             matched_task_families=generic.matched_task_families,
+            fair_chance_candidate=generic.fair_chance_candidate,
+            fair_chance_reason=generic.fair_chance_reason,
         )
     visible.sort(key=lambda item: (-item[0], item[1]))
     selected = visible[:max_bundle_size]

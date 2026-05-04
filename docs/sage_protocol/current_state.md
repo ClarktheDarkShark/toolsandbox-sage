@@ -60,3 +60,24 @@
 - Helper side-effect incidents: `0`
 - V2.0 triage decision: `routing repair needed`
 - V2.0 next step: repair dependency-helper routing/affordance and grading-accounting metadata, then rerun a focused fair-chance diagnostic before confirmation-60.
+
+
+## V2.0 Dependency Fair-Chance Routing Status
+- Date: `2026-05-04T17:15:00`
+- Last completed V2.0 step: `dependency_fair_chance_routing_repair`
+- Candidate registry: `artifacts/registry_candidates/v2_0_dependency_fair_chance20_20260504_165041/registry_manifest.json`
+- Frozen best3 registry modified: `no`
+- Final diagnostic run: `outputs/v2_0_dependency_fair_chance20_20260504_165041/mechanism_40_20260504_170647`
+- Final diagnostic dashboards: `http://127.0.0.1:5520/outputs/v2_0_dependency_fair_chance20_20260504_165041/mechanism_40_20260504_170647/dashboard/index.html` and `http://127.0.0.1:5520/outputs/v2_0_dependency_fair_chance20_20260504_165041/mechanism_40_20260504_170647/dashboard/task_focus.html`
+- Diagnostic manifest: `artifacts/summaries/v2_0_dependency_fair_chance20_20260504_165041/cohort_manifest.json`
+- Diagnostic summary: `artifacts/summaries/v2_0_dependency_fair_chance20_20260504_165041/diagnostic_summary.json`
+- Outcome delta: `+0.0185`
+- Canonical/reference delta: `+0.0553`
+- Exact successes: `control=0`, `SAGE=2`
+- Runtime exceptions: `0`
+- Helper side-effect incidents: `0`
+- `next_dependency_precondition_call`: visible `9`, called `0`, visible-not-called `9`, attempts `0`
+- Fair-chance routing: `worked for exposure`; adoption still failed after dict-key affordance repair.
+- Report: `docs/sage_protocol/v2_0_dependency_fair_chance_routing_report.md`
+- Decision: `park dependency lane`
+- V2.0 next step: return to shortfall mining and prioritize another no-current-helper-fit cluster; do not run confirmation-60 for `next_dependency_precondition_call`.

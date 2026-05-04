@@ -71,6 +71,7 @@ def test_next_service_tool_call_docstring_includes_usage_constraints() -> None:
     docstring = _google_docstring(_state_helper_entry())
 
     assert "Usage:" in docstring
+    assert "Dependency/precondition usage:" in docstring
     assert "Use only for the single service you are actively trying to change." in (
         docstring
     )
@@ -78,6 +79,55 @@ def test_next_service_tool_call_docstring_includes_usage_constraints() -> None:
         docstring
     )
     assert "answer only about that final target state" in docstring
+
+
+def test_generic_state_precondition_docstring_explains_affordance() -> None:
+    base = _state_helper_entry()
+    entry = RegistryEntry.accepted(
+        GeneratedTool(
+            spec=ToolSpec(
+                tool_name="next_dependency_precondition_call",
+                family=ToolFamily.STATE_PRECONDITION_HELPER,
+                description="Plan the next visible dependency precondition call.",
+                inputs=(ToolInput("state", "dict", "Visible state."),),
+                output_annotation="dict",
+                positive_triggers=("service not ready with active blocker",),
+                negative_triggers=("already ready state", "insufficient state"),
+                required_original_tool_calls=("set_low_battery_mode_status",),
+                preserves_side_effect_tools=("set_low_battery_mode_status",),
+                canonical_route_substitution_risk="medium",
+                final_state_preservation_plan=(
+                    "Caller must execute the returned original tool and verify "
+                    "the final visible service state."
+                ),
+                grading_accounting_note=(
+                    "Canonical intermediate route may differ and is reported "
+                    "separately from task outcome."
+                ),
+                generalization_rationale=(
+                    "Service dependency planning recurs across state tasks."
+                ),
+                inadequacy_evidence=StructuredInadequacyEvidence(
+                    summary="Agents miss precondition order.",
+                    signals=("state_precondition",),
+                ),
+            ),
+            code=(
+                "def next_dependency_precondition_call(state: dict) -> dict:\n"
+                "    return {'should_call': bool(state['service_ready']) and bool(state['blocker_active'])}\n"
+            ),
+        ),
+        base.validation,
+        birth_scenario="turn_on_wifi_low_battery_mode",
+    )
+
+    docstring = _google_docstring(entry)
+
+    assert "Dependency/precondition usage:" in docstring
+    assert "execute the returned original ToolSandbox tool" in docstring
+    assert "does not perform the side effect" in docstring
+    assert "canonical-route impact is reported separately" in docstring
+    assert "state expected visible keys: blocker_active, service_ready" in docstring
 
 
 def test_generic_downstream_helper_docstring_uses_actual_output_schema() -> None:

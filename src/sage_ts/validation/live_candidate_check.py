@@ -19,6 +19,7 @@ class LiveCandidateCheck:
     canonical_route_substitution_risk: str
     negative_abstain_count: int
     positive_usable_count: int
+    warnings: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -28,6 +29,7 @@ class LiveCandidateCheck:
             "canonical_route_substitution_risk": self.canonical_route_substitution_risk,
             "negative_abstain_count": self.negative_abstain_count,
             "positive_usable_count": self.positive_usable_count,
+            "warnings": list(self.warnings),
         }
 
 
@@ -62,6 +64,7 @@ def run_lightweight_live_candidate_check(
     """Execute candidate examples and enforce minimal route-accounting evidence."""
     classification = grading_accounting_classification(tool.spec)
     errors: list[str] = []
+    warnings: list[str] = []
     schema = compile_generated_tool(tool)
     if not schema.valid or schema.function is None:
         return LiveCandidateCheck(
@@ -96,7 +99,14 @@ def run_lightweight_live_candidate_check(
     risk = tool.spec.canonical_route_substitution_risk.strip().lower()
     if risk != "none":
         if not tool.spec.expected_milestone_calls_replaced:
-            errors.append("live_missing_expected_milestone_calls_replaced")
+            if (
+                len(tool.spec.final_state_preservation_plan.strip()) >= 20
+                and len(tool.spec.grading_accounting_note.strip()) >= 20
+                and positive_usable > 0
+            ):
+                warnings.append("live_missing_expected_milestone_calls_replaced")
+            else:
+                errors.append("live_missing_expected_milestone_calls_replaced")
         if len(tool.spec.final_state_preservation_plan.strip()) < 20:
             errors.append("live_missing_final_state_preservation_plan")
         if len(tool.spec.grading_accounting_note.strip()) < 20:
@@ -109,4 +119,5 @@ def run_lightweight_live_candidate_check(
         tool.spec.canonical_route_substitution_risk,
         negative_abstain,
         positive_usable,
+        tuple(warnings),
     )

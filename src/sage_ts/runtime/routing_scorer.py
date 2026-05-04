@@ -10,10 +10,12 @@ from typing import Any
 
 from sage_ts.evaluation.task_strata import HELPER_TRIGGERS, classify_task_strata
 from sage_ts.experiments.v2_flags import EVIDENCE_ROUTING, feature_enabled
+from sage_ts.generation.tool_spec import ToolFamily
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 
 DEFAULT_MAX_RUNTIME_BUNDLE_SIZE = 5
 ROUTING_EVIDENCE_ROOT = Path("artifacts/summaries")
+FAIR_CHANCE_MAX_VISIBLE_WITHOUT_CALLS = 10
 
 
 @dataclass(frozen=True)
@@ -26,6 +28,8 @@ class RuntimeRoutingDecision:
     matched_positive_triggers: tuple[str, ...] = ()
     matched_negative_triggers: tuple[str, ...] = ()
     matched_task_families: tuple[str, ...] = ()
+    fair_chance_candidate: bool = False
+    fair_chance_reason: str = ""
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -37,6 +41,8 @@ class RuntimeRoutingDecision:
             "matched_positive_triggers": list(self.matched_positive_triggers),
             "matched_negative_triggers": list(self.matched_negative_triggers),
             "matched_task_families": list(self.matched_task_families),
+            "fair_chance_candidate": self.fair_chance_candidate,
+            "fair_chance_reason": self.fair_chance_reason,
         }
 
 
@@ -64,6 +70,23 @@ def _family_match(label: str, scenario_strata: set[str], scenario_name: str) -> 
     return False
 
 
+def _summary_has_runtime_exceptions(payload: dict[str, Any]) -> bool:
+    """Return whether a contribution summary points to an invalid runtime run."""
+    candidate_dir = payload.get("candidate_dir")
+    if not isinstance(candidate_dir, str) or not candidate_dir:
+        return False
+    candidate_path = Path(candidate_dir)
+    run_root = candidate_path.parent.parent
+    comparison_path = run_root / "paired_comparison.json"
+    if not comparison_path.exists():
+        return False
+    try:
+        comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return int(comparison.get("runtime_exception_count", 0) or 0) > 0
+
+
 @lru_cache(maxsize=1)
 def _latest_helper_contribution_summary() -> dict[str, Any]:
     candidates = sorted(
@@ -77,6 +100,8 @@ def _latest_helper_contribution_summary() -> dict[str, Any]:
         except (OSError, json.JSONDecodeError):
             continue
         if isinstance(payload, dict):
+            if _summary_has_runtime_exceptions(payload):
+                continue
             return payload
     return {}
 
@@ -89,14 +114,68 @@ def _helper_evidence(tool_name: str) -> dict[str, Any]:
     return {}
 
 
+def _is_fair_chance_candidate(entry: RegistryEntry, evidence: dict[str, Any]) -> bool:
+    """Return whether a new cluster-born helper deserves bounded first exposure."""
+    if not feature_enabled(EVIDENCE_ROUTING):
+        return False
+    spec = entry.tool.spec
+    if spec.diagnostic_only or not spec.shortfall_cluster_evidence:
+        return False
+    if entry.reuse_count > 0:
+        return False
+    if not evidence:
+        return True
+    visible = int(evidence.get("visible_count", 0) or 0)
+    called = int(evidence.get("called_count", 0) or 0)
+    return called == 0 and visible < FAIR_CHANCE_MAX_VISIBLE_WITHOUT_CALLS
+
+
+def _cluster_fit_reason(
+    entry: RegistryEntry,
+    *,
+    scenario_strata: set[str],
+    matched_positive: tuple[str, ...],
+    matched_families: tuple[str, ...],
+) -> str:
+    """Mechanism-level cluster fit that does not depend on specific tool names."""
+    spec = entry.tool.spec
+    if matched_positive or matched_families:
+        return "trigger_or_family_fit"
+    if spec.family == ToolFamily.STATE_PRECONDITION_HELPER and (
+        "direct_state_precondition_service_enablement" in scenario_strata
+    ):
+        evidence_text = " ".join(
+            (
+                spec.description,
+                spec.generalization_rationale,
+                " ".join(spec.shortfall_cluster_evidence),
+                " ".join(spec.known_failure_mechanisms_addressed),
+                " ".join(spec.positive_triggers),
+                " ".join(spec.applicable_task_families),
+            )
+        ).lower()
+        if any(
+            token in evidence_text
+            for token in ("dependency", "precondition", "service", "state")
+        ):
+            return "state_precondition_cluster_fit"
+    return ""
+
+
 def _blocked_by_adoption_risk(
     tool_name: str,
     *,
     score: int,
     matched_positive: tuple[str, ...],
     matched_families: tuple[str, ...],
+    fair_chance_candidate: bool = False,
+    cluster_fit: bool = False,
 ) -> tuple[bool, str]:
     if not feature_enabled(EVIDENCE_ROUTING):
+        return False, ""
+    if score < 3:
+        return False, ""
+    if fair_chance_candidate and cluster_fit:
         return False, ""
     evidence = _helper_evidence(tool_name)
     if not evidence:
@@ -172,6 +251,17 @@ def score_registry_entry_for_scenario(
     matched_spec_families = matched_families
     if matched_families:
         score += 3
+    evidence = _helper_evidence(tool_name)
+    fair_chance = _is_fair_chance_candidate(entry, evidence)
+    cluster_fit_reason = _cluster_fit_reason(
+        entry,
+        scenario_strata=scenario_strata,
+        matched_positive=matched_positive,
+        matched_families=matched_families,
+    )
+    if cluster_fit_reason:
+        score += 3 if fair_chance else 1
+        matched_families = tuple(sorted(set(matched_families) | {cluster_fit_reason}))
     trigger_strata = set(HELPER_TRIGGERS.get(tool_name, ()))
     if (
         trigger_strata
@@ -191,6 +281,8 @@ def score_registry_entry_for_scenario(
         score=score,
         matched_positive=matched_positive,
         matched_families=matched_families,
+        fair_chance_candidate=fair_chance,
+        cluster_fit=bool(cluster_fit_reason),
     )
     if blocked:
         return RuntimeRoutingDecision(
@@ -201,6 +293,20 @@ def score_registry_entry_for_scenario(
             score,
             matched_positive_triggers=matched_positive,
             matched_task_families=matched_families,
+            fair_chance_candidate=fair_chance,
+            fair_chance_reason=cluster_fit_reason if fair_chance else "",
+        )
+    if fair_chance and cluster_fit_reason and score >= 3:
+        return RuntimeRoutingDecision(
+            tool_name,
+            True,
+            "shown",
+            "fair_chance_cluster_fit",
+            score,
+            matched_positive_triggers=matched_positive,
+            matched_task_families=matched_families,
+            fair_chance_candidate=True,
+            fair_chance_reason=cluster_fit_reason,
         )
     if score >= 3:
         return RuntimeRoutingDecision(
@@ -211,6 +317,8 @@ def score_registry_entry_for_scenario(
             score,
             matched_positive_triggers=matched_positive,
             matched_task_families=matched_families,
+            fair_chance_candidate=fair_chance,
+            fair_chance_reason=cluster_fit_reason if fair_chance else "",
         )
     return RuntimeRoutingDecision(
         tool_name,
@@ -220,4 +328,6 @@ def score_registry_entry_for_scenario(
         score,
         matched_positive_triggers=matched_positive,
         matched_task_families=matched_families,
+        fair_chance_candidate=fair_chance,
+        fair_chance_reason=cluster_fit_reason if fair_chance else "",
     )
