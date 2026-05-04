@@ -69,6 +69,18 @@ def _messages_show_tool_error(
     return False
 
 
+def _messages_show_prior_tool_call(
+    openai_messages: object,
+    tool_names: set[str],
+) -> bool:
+    """Return whether any named base tool has already been called."""
+    if not tool_names:
+        return True
+    return any(
+        _message_already_called_tool(openai_messages, name) for name in tool_names
+    )
+
+
 class ConfigurableOpenAIAgent(OpenAIAPIAgent):
     def __init__(self, model_name: str) -> None:
         self.requested_model_name = model_name
@@ -90,12 +102,20 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
         force_after_error = os.environ.get(
             "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_ERROR", ""
         ).strip() in {"1", "true", "yes"}
+        force_after_base_tools = {
+            item.strip()
+            for item in os.environ.get(
+                "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_BASE_TOOL", ""
+            ).split(",")
+            if item.strip()
+        }
         available_names = _tool_names(openai_tools)
         should_force = (
             forced_tool
             and forced_tool in available_names
             and not _message_already_called_tool(openai_messages, forced_tool)
             and (not force_after_error or _messages_show_tool_error(openai_messages))
+            and _messages_show_prior_tool_call(openai_messages, force_after_base_tools)
         )
         if not should_force:
             return super().model_inference(openai_messages, openai_tools)

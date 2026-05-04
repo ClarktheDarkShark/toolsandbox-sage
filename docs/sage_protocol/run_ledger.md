@@ -413,3 +413,19 @@
   - Forced metrics: outcome `-0.0002`; canonical `+0.0793`; dependency helper visible/called/VNC `10 / 8 / 2`; called-subset outcome `-0.0285`; runtime exceptions `0`; side-effect preservation failures `1`; protocol FAIL.
   - Fixes: added diagnostic OpenAI force-after-error mode and diagnostic routing override for adoption-risk suppression; tested scalar-input dependency successor.
   - Decision: `park dependency lane`; direct ToolSandbox route is better than this helper concept for now.
+
+
+- `V2.0 selection-action discovery60 with fair-chance diagnostics` completed.
+  - Date: `2026-05-04T19:09:36`
+  - Manifest: `artifacts/summaries/v2_0_selection_action_discovery60_20260504_183108/cohort_manifest.json`
+  - Cohort quality: PASS; `60` scenarios; role split `20 / 25 / 15`; no-current-helper-fit share `55.00%`.
+  - Frozen best3 registry untouched: `artifacts/registry_frozen_best3_claim/registry_manifest.json`.
+  - Arm A best3-only: `outputs/v2_0_selection_action_best3_60_20260504_183302/mechanism_60_20260504_183306`; outcome `0.0989`; relative lift `18.96%`; canonical `0.1147`; exact `4 -> 8`; runtime/side-effect `0 / 0`.
+  - Arm B discovery: `outputs/v2_0_selection_action_discovery60_run_20260504_184633/mechanism_60_20260504_184638`; outcome `0.0245`; relative lift `4.35%`; canonical `0.0552`; exact `5 -> 9`; runtime/side-effect `0 / 0`.
+  - Candidate born: `select_contact_field_by_constraint`, diagnostic-only; natural visible/called/VNC `2 / 0 / 2`.
+  - Force-after-`search_contacts` diagnostic: `outputs/v2_0_selection_action_selector_force20_20260504_190448/mechanism_12_20260504_190512`; selector visible/called `8 / 4`; called-subset outcome `-0.0132`; overall outcome `-0.1074`; runtime/side-effect `0 / 0`.
+  - Fix added: diagnostic force can wait for a named base-tool call and can override explicit visible-not-called suppression only in force mode.
+  - Tests: `87 passed`; registry checks PASS for frozen best3, discovery candidate, and force diagnostic registries.
+  - Reports: `docs/sage_protocol/v2_0_selection_action_discovery60_report.md`, `docs/sage_protocol/v2_0_selection_action_candidate_triage.md`.
+  - Decision: `candidate concept negative`.
+  - Next action: park this candidate and mine the next uncovered no-current-helper-fit cluster; no confirmation60 for this candidate.

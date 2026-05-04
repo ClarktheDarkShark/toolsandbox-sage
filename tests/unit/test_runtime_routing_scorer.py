@@ -377,3 +377,42 @@ def test_diagnostic_force_can_override_adoption_risk_for_target_tool(
         decisions["next_dependency_precondition_call"].reason
         == "diagnostic_force_overrode_adoption_risk"
     )
+
+
+def test_diagnostic_force_can_override_name_specific_vnc_suppression(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "evidence_routing")
+    monkeypatch.setenv(
+        "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME", "select_contact_field_by_constraint"
+    )
+    base = _entry()
+    entry = RegistryEntry.accepted(
+        replace(
+            base.tool,
+            spec=replace(
+                base.tool.spec,
+                tool_name="select_contact_field_by_constraint",
+                family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+                required_original_tool_calls=("search_contacts",),
+                preserves_side_effect_tools=("search_contacts", "modify_contact"),
+            ),
+        ),
+        base.validation,
+        birth_scenario="update_contact_relationship_with_relationship",
+    )
+
+    selected, decisions = route_registry_entries(
+        {"select_contact_field_by_constraint": entry},
+        "update_contact_relationship_with_relationship_3_distraction_tools",
+        available_base_tools={"search_contacts", "modify_contact"},
+    )
+
+    assert [item.tool.spec.tool_name for item in selected] == [
+        "select_contact_field_by_constraint"
+    ]
+    assert decisions["select_contact_field_by_constraint"].visible
+    assert (
+        decisions["select_contact_field_by_constraint"].reason
+        == "diagnostic_force_overrode_adoption_risk"
+    )

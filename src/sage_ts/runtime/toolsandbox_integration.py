@@ -623,7 +623,10 @@ def route_registry_entries(
             forced_tool
             and tool_name == forced_tool
             and not is_visible
-            and reason == "blocked_by_visible_not_called_adoption_risk"
+            and (
+                reason == "blocked_by_visible_not_called_adoption_risk"
+                or "visible_not_called_pollution" in reason
+            )
         ):
             is_visible = True
             status = "shown"
