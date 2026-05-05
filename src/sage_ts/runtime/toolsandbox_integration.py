@@ -80,6 +80,59 @@ def _call_path_note(spec: ToolSpec) -> list[str]:
     return lines
 
 
+def _post_selection_composite_usage_note(spec: ToolSpec) -> list[str]:
+    """Affordance guidance for helpers that prepare one downstream side effect."""
+    input_names = {item.name for item in spec.inputs}
+    output_schema = spec.output_schema or {}
+    output_properties = output_schema.get("properties", {})
+    if not isinstance(output_properties, dict):
+        return []
+    if "downstream_tool_name" not in output_properties:
+        return []
+    if not any(str(key).endswith("_kwargs") for key in output_properties):
+        return []
+
+    lines = [
+        "",
+        "Post-selection usage:",
+        "    Use this helper only after the target record has already been",
+        " selected from visible ToolSandbox results.",
+    ]
+    if "selected_record" in input_names:
+        lines.extend(
+            [
+                "    Pass selected_record as the full selected record object from",
+                " the previous search/selector result; do not pass a summary string.",
+            ]
+        )
+    if "updates" in input_names:
+        lines.extend(
+            [
+                "    Pass updates as a dict of fields to change. Use {} only when",
+                " the downstream action requires no updates, such as remove/delete.",
+            ]
+        )
+    if "action_type" in input_names:
+        lines.extend(
+            [
+                "    Pass action_type as the intended downstream action category",
+                " such as modify_contact, remove_reminder, or send_message.",
+            ]
+        )
+    lines.extend(
+        [
+            f"    Do not call {spec.tool_name} with only action_type or user_intent.",
+            "    If selected_record or required update fields are unavailable,",
+            " do not call this helper; continue searching, selecting, or ask for",
+            " clarification.",
+            "    If should_call_tool is true, call the returned downstream_tool_name",
+            " with downstream_tool_kwargs next. This helper does not perform the",
+            " side effect.",
+        ]
+    )
+    return lines
+
+
 def _dict_input_keys(entry: RegistryEntry) -> dict[str, tuple[str, ...]]:
     """Return literal dict keys used by generated code as affordance hints."""
     keys_by_input: dict[str, tuple[str, ...]] = {}
@@ -92,6 +145,49 @@ def _dict_input_keys(entry: RegistryEntry) -> dict[str, tuple[str, ...]]:
         if keys:
             keys_by_input[item.name] = tuple(keys)
     return keys_by_input
+
+
+def _schema_default_value(schema: Any) -> Any:
+    if not isinstance(schema, dict):
+        return None
+    schema_type = schema.get("type")
+    if schema_type == "object":
+        return {}
+    if schema_type == "array":
+        return []
+    if schema_type == "boolean":
+        return False
+    if schema_type == "integer":
+        return 0
+    if schema_type == "number":
+        return 0.0
+    if schema_type == "string":
+        return ""
+    return None
+
+
+def _missing_argument_abstain_result(entry: RegistryEntry, error: TypeError) -> Any:
+    """Return a safe abstain payload for omitted required args, or re-raise."""
+    message = str(error)
+    if "missing" not in message or "required positional argument" not in message:
+        raise error
+    output_schema = entry.tool.spec.output_schema or {}
+    output_properties = output_schema.get("properties", {})
+    if entry.tool.spec.output_annotation != "dict" or not isinstance(
+        output_properties, dict
+    ):
+        raise error
+    if "abstain_reason" not in output_properties:
+        raise error
+
+    result = {
+        key: _schema_default_value(schema) for key, schema in output_properties.items()
+    }
+    for key in tuple(result):
+        if key.startswith("should_") or key in {"should_call", "should_call_tool"}:
+            result[key] = False
+    result["abstain_reason"] = "missing_required_helper_inputs"
+    return result
 
 
 def _google_docstring(entry: RegistryEntry) -> str:
@@ -219,6 +315,8 @@ def _google_docstring(entry: RegistryEntry) -> str:
             ]
         )
     elif spec.required_original_tool_calls:
+        if spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
+            lines.extend(_post_selection_composite_usage_note(spec))
         # General call-path note for any other side-effect-preserving prep helper
         lines.extend(_call_path_note(spec))
     return "\n".join(lines)
@@ -256,7 +354,10 @@ def _compile_toolsandbox_tool(
     _inner = raw_fn
 
     def _wrapped(*args: Any, **kwargs: Any) -> Any:
-        result = _inner(*args, **kwargs)
+        try:
+            result = _inner(*args, **kwargs)
+        except TypeError as error:
+            result = _missing_argument_abstain_result(entry, error)
         add_tool_trace(_wrapped, result, *args, **kwargs)
         if on_reuse is not None:
             on_reuse(_tool_name)
@@ -603,6 +704,17 @@ def route_registry_entries(
                 if emitted:
                     downstream_tools = emitted
                     requires_any_downstream = True
+            if (
+                entry.tool.spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER
+                and "downstream_tool_name" in output_props
+                and any(str(key).endswith("_kwargs") for key in output_props)
+            ):
+                # Generic side-effect argument preparers return one downstream
+                # ToolSandbox action, not all actions named in their preservation
+                # contract. Requiring every preserved action to be available hides
+                # valid candidate tools on narrower per-scenario tool allow-lists.
+                downstream_tools = set(entry.tool.spec.preserves_side_effect_tools)
+                requires_any_downstream = True
         if not downstream_tools:
             downstream_tools = set(entry.tool.spec.preserves_side_effect_tools)
         if is_visible and available_base_tools is not None and downstream_tools:

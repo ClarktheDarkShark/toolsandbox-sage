@@ -3,7 +3,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from sage_ts.generation.tool_spec import ToolFamily
+from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.runtime import routing_scorer
 from sage_ts.runtime.routing_scorer import score_registry_entry_for_scenario
@@ -179,6 +179,65 @@ def test_route_registry_entries_treats_preserved_tools_as_conditional_when_requi
 
     assert [item.tool.spec.tool_name for item in selected] == ["select_visible_record"]
     assert decisions["select_visible_record"].visible
+
+
+def test_route_registry_entries_allows_composite_one_of_many_downstream_tools() -> None:
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="prepare_side_effect_args_from_selected_record",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            positive_triggers=("modify_contact_with_message_recency",),
+            negative_triggers=("empty selected record",),
+            applicable_task_families=(
+                "modify_contact_with_message_recency",
+                "remove_reminder_with_recency_latest",
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            required_original_tool_calls=(
+                "modify_contact",
+                "remove_contact",
+                "modify_reminder",
+                "remove_reminder",
+            ),
+            preserves_side_effect_tools=(
+                "modify_contact",
+                "remove_contact",
+                "modify_reminder",
+                "remove_reminder",
+            ),
+        ),
+        code=(
+            "def prepare_side_effect_args_from_selected_record(records: list) -> dict:\n"
+            "    return {'downstream_tool_name': '', 'downstream_tool_kwargs': {}, "
+            "'should_call_tool': False, 'abstain_reason': 'test'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="modify_contact_with_message_recency",
+    )
+
+    selected, decisions = route_registry_entries(
+        {"prepare_side_effect_args_from_selected_record": entry},
+        "modify_contact_with_message_recency_3_distraction_tools",
+        available_base_tools={"search_messages", "modify_contact"},
+    )
+
+    assert [item.tool.spec.tool_name for item in selected] == [
+        "prepare_side_effect_args_from_selected_record"
+    ]
+    assert decisions["prepare_side_effect_args_from_selected_record"].visible
 
 
 def test_route_registry_entries_allows_one_available_emitted_downstream_tool() -> None:

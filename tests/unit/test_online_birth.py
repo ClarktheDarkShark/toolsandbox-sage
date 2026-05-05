@@ -727,6 +727,8 @@ def test_modify_contact_message_recency_marks_message_window_diagnostic() -> Non
 
     assert {observation.canonical_key for observation in observations} == {
         "search_filter:select_record_by_timestamp_extreme",
+        "search_filter:select_action_target_by_recency",
+        "composite:prepare_side_effect_args_from_selected_record",
         "derived_value:message_search_time_window",
     }
     window_helper = next(
@@ -802,7 +804,7 @@ def test_holiday_distance_failure_requests_timestamp_diff_helper() -> None:
     }
 
 
-def test_direct_contact_remove_by_phone_failure_does_not_birth_helper() -> None:
+def test_direct_contact_remove_by_phone_failure_births_constraint_helpers() -> None:
     scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
 
     observations = classify_scenario_observations(
@@ -811,7 +813,10 @@ def test_direct_contact_remove_by_phone_failure_does_not_birth_helper() -> None:
         {"similarity": 0.5},
     )
 
-    assert observations == ()
+    assert [item.canonical_key for item in observations] == [
+        "search_filter:select_visible_record_by_constraints",
+        "composite:prepare_side_effect_args_from_selected_record",
+    ]
 
 
 def test_ambiguous_contact_lookup_failure_does_not_birth_helper() -> None:
@@ -836,8 +841,23 @@ def test_contact_update_failure_births_contact_selection_helper() -> None:
     )
 
     assert [item.canonical_key for item in observations] == [
-        "search_filter:select_contact_field_by_constraint"
+        "search_filter:select_visible_record_by_constraints",
+        "composite:prepare_side_effect_args_from_selected_record",
     ]
+
+
+def test_recency_action_failure_births_action_target_and_arg_prep_helpers() -> None:
+    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
+
+    observations = classify_scenario_observations(
+        "remove_reminder_with_recency_latest_3_distraction_tools",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    keys = {item.canonical_key for item in observations}
+    assert "search_filter:select_action_target_by_recency" in keys
+    assert "composite:prepare_side_effect_args_from_selected_record" in keys
 
 
 def test_stock_symbol_failure_births_symbol_extraction_helper() -> None:

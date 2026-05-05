@@ -43,6 +43,46 @@ def _is_contact_constraint_scenario(scenario_name: str) -> bool:
     )
 
 
+def _is_visible_record_constraint_scenario(scenario_name: str) -> bool:
+    if "ambiguous" in scenario_name or "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith(
+        (
+            "remove_contact_by_phone",
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number",
+            "search_sender_phone_number_with_content",
+            "update_contact_relationship_with_relationship",
+        )
+    )
+
+
+def _is_recency_action_target_scenario(scenario_name: str) -> bool:
+    if "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith(
+        (
+            "modify_contact_with_message_recency",
+            "modify_reminder_with_recency_latest",
+            "remove_reminder_with_recency_latest",
+        )
+    )
+
+
+def _is_post_selection_side_effect_prep_scenario(scenario_name: str) -> bool:
+    if "ambiguous" in scenario_name or "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith(
+        (
+            "remove_contact_by_phone",
+            "update_contact_relationship_with_relationship",
+            "modify_contact_with_message_recency",
+            "modify_reminder_with_recency_latest",
+            "remove_reminder_with_recency_latest",
+        )
+    )
+
+
 def _is_direct_service_precondition_scenario(scenario_name: str) -> bool:
     return "insufficient_information" not in scenario_name and scenario_name.startswith(
         (
@@ -455,29 +495,30 @@ def _days_between_timestamps_observation(
 def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation:
     return CapabilityObservation(
         scenario_name=scenario_name,
-        canonical_key="search_filter:select_contact_field_by_constraint",
+        canonical_key="search_filter:select_visible_record_by_constraints",
         observation=(
-            "Repeated contact lookup scenarios require selecting one visible contact "
-            "candidate and extracting the exact field needed for the downstream "
-            "answer or original ToolSandbox action. Generate a small deterministic "
-            "search/filter helper named select_contact_field_by_constraint. "
-            "Inputs: records as a list of contact "
-            "dictionaries copied directly from the visible search_contacts result, "
-            "match_field as the contact field to match, expected_value as the "
-            "target value, and output_field as the field to return. "
-            "For phone_number matching, normalize both sides to digits. For "
-            "string fields, compare case-insensitively after trimming. Return "
-            "a dict containing selected_record and value, or an empty dict if "
-            "there is not exactly one match or the output field is missing. "
-            "The spec.output_schema must be a JSON Schema object with properties "
-            "selected_record and value. Include negative_triggers for no candidates, "
-            "ambiguous matches or ties, missing output field, and insufficient "
-            "constraints. The spec.required_original_tool_calls must include "
-            "search_contacts. The spec.preserves_side_effect_tools must include "
-            "search_contacts and should include modify_contact when the selected "
-            "contact will feed a downstream update. This helper only selects from "
-            "visible records and prepares evidence; it must not replace the original "
-            "ToolSandbox search_contacts or modify_contact calls."
+            "Repeated visible-record constraint tasks require selecting exactly one "
+            "contact, message, reminder, or generic record from candidates already "
+            "returned by original ToolSandbox search/read tools. Generate a "
+            "deterministic search/filter helper named "
+            "select_visible_record_by_constraints. Inputs: records as a list of "
+            "visible record dictionaries, constraints as a dict of explicit fields "
+            "or text/timestamp requirements copied from the user task, and "
+            "return_field as the optional field to extract. Match only visible "
+            "candidate data. Normalize phone-like values to digits and compare "
+            "strings case-insensitively. Return selected_record, selected_index, "
+            "selected_id, value, matched_constraints, tie_candidates, and "
+            "abstain_reason. Return an empty selected_record and non-empty "
+            "abstain_reason when there are no records, no match, multiple equal "
+            "matches, missing required fields, or insufficient constraints. The "
+            "spec.required_original_tool_calls must include the original search "
+            "tools that produce records such as search_contacts, search_messages, "
+            "or search_reminder. The spec.preserves_side_effect_tools must include "
+            "those search tools and any downstream original ToolSandbox action "
+            "that consumes the selected record, such as modify_contact, "
+            "remove_contact, send_message, modify_reminder, or remove_reminder. "
+            "This helper only selects from visible records; it must never search, "
+            "modify, remove, send, create, or guess before a side-effect action."
         ),
         allowed_families=(str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),),
         validation_examples=(
@@ -497,9 +538,8 @@ def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation
                             "relationship": "coworker",
                         },
                     ],
-                    "match_field": "phone_number",
-                    "expected_value": "15550200",
-                    "output_field": "person_id",
+                    "constraints": {"phone_number": "15550200"},
+                    "return_field": "person_id",
                 },
                 {
                     "selected_record": {
@@ -508,7 +548,12 @@ def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation
                         "phone_number": "+1 (555) 0200",
                         "relationship": "coworker",
                     },
+                    "selected_index": 1,
+                    "selected_id": "b",
                     "value": "b",
+                    "matched_constraints": ["phone_number"],
+                    "tie_candidates": [],
+                    "abstain_reason": "",
                 },
             ),
             ToolExample(
@@ -520,9 +565,8 @@ def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation
                             "phone_number": "+1 (555) 0100",
                         }
                     ],
-                    "match_field": "name",
-                    "expected_value": " ada lovelace ",
-                    "output_field": "phone_number",
+                    "constraints": {"name": " ada lovelace "},
+                    "return_field": "phone_number",
                 },
                 {
                     "selected_record": {
@@ -530,8 +574,14 @@ def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation
                         "person_id": "a",
                         "phone_number": "+1 (555) 0100",
                     },
+                    "selected_index": 0,
+                    "selected_id": "a",
                     "value": "+1 (555) 0100",
+                    "matched_constraints": ["name"],
+                    "tie_candidates": [],
+                    "abstain_reason": "",
                 },
+                held_out=True,
             ),
             ToolExample(
                 {
@@ -539,20 +589,243 @@ def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation
                         {"person_id": "a", "relationship": "friend"},
                         {"person_id": "b", "relationship": "friend"},
                     ],
-                    "match_field": "relationship",
-                    "expected_value": "friend",
-                    "output_field": "person_id",
+                    "constraints": {"relationship": "friend"},
+                    "return_field": "person_id",
                 },
-                {},
+                {
+                    "selected_record": {},
+                    "selected_index": -1,
+                    "selected_id": "",
+                    "value": "",
+                    "matched_constraints": ["relationship"],
+                    "tie_candidates": [
+                        {"person_id": "a", "relationship": "friend"},
+                        {"person_id": "b", "relationship": "friend"},
+                    ],
+                    "abstain_reason": "ambiguous_multiple_matches",
+                },
                 negative_applicability=True,
             ),
         ),
         generation_allowed=True,
-        reason="repeated_contact_candidate_selection_failure",
-        inadequacy_signals=("wrong_selected_record",),
+        reason="repeated_visible_record_constraint_selection_failure",
+        inadequacy_signals=("wrong_selected_record", "visible_info_unused"),
         visible_data_gaps=(
-            "visible contact candidates need deterministic field-constrained selection",
+            "visible candidates need deterministic constraint matching and ambiguity abstention",
         ),
+    )
+
+
+def _recency_action_target_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="search_filter:select_action_target_by_recency",
+        observation=(
+            "Repeated modify/remove/reply workflows fail after search because the "
+            "agent must choose the one visible target record that satisfies recency, "
+            "timestamp, and user constraints before calling an original ToolSandbox "
+            "side-effect tool. Generate a deterministic search/filter helper named "
+            "select_action_target_by_recency. Inputs: records as visible candidate "
+            "dictionaries, timestamp_key, selection_mode latest or oldest, "
+            "action_type such as modify_contact, modify_reminder, remove_reminder, "
+            "or remove_contact, and constraints as an optional dict. Return "
+            "selected_record, selected_index, selected_id, selected_timestamp, "
+            "action_type, downstream_tool_name, tie_candidates, and abstain_reason. "
+            "Abstain on no records, no numeric timestamp, invalid mode, ties, "
+            "constraints not met, or missing target id. The helper must preserve "
+            "the original search tool and downstream side-effect tool; it only "
+            "selects the target and labels the next action. It must never execute "
+            "modify/remove/send/add itself."
+        ),
+        allowed_families=(str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "reminder_id": "old",
+                            "content": "call Sam",
+                            "reminder_timestamp": 10.0,
+                        },
+                        {
+                            "reminder_id": "new",
+                            "content": "call Sam",
+                            "reminder_timestamp": 20.0,
+                        },
+                    ],
+                    "timestamp_key": "reminder_timestamp",
+                    "selection_mode": "latest",
+                    "action_type": "remove_reminder",
+                    "constraints": {"content": "call Sam"},
+                },
+                {
+                    "selected_record": {
+                        "reminder_id": "new",
+                        "content": "call Sam",
+                        "reminder_timestamp": 20.0,
+                    },
+                    "selected_index": 1,
+                    "selected_id": "new",
+                    "selected_timestamp": 20.0,
+                    "action_type": "remove_reminder",
+                    "downstream_tool_name": "remove_reminder",
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "m1",
+                            "sender_person_id": "p1",
+                            "creation_timestamp": 30.0,
+                        },
+                        {
+                            "message_id": "m2",
+                            "sender_person_id": "p2",
+                            "creation_timestamp": 50.0,
+                        },
+                    ],
+                    "timestamp_key": "creation_timestamp",
+                    "selection_mode": "latest",
+                    "action_type": "modify_contact",
+                    "constraints": {},
+                },
+                {
+                    "selected_record": {
+                        "message_id": "m2",
+                        "sender_person_id": "p2",
+                        "creation_timestamp": 50.0,
+                    },
+                    "selected_index": 1,
+                    "selected_id": "m2",
+                    "selected_timestamp": 50.0,
+                    "action_type": "modify_contact",
+                    "downstream_tool_name": "modify_contact",
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {"reminder_id": "a", "reminder_timestamp": 20.0},
+                        {"reminder_id": "b", "reminder_timestamp": 20.0},
+                    ],
+                    "timestamp_key": "reminder_timestamp",
+                    "selection_mode": "latest",
+                    "action_type": "modify_reminder",
+                    "constraints": {},
+                },
+                {
+                    "selected_record": {},
+                    "selected_index": -1,
+                    "selected_id": "",
+                    "selected_timestamp": 20.0,
+                    "action_type": "modify_reminder",
+                    "downstream_tool_name": "modify_reminder",
+                    "tie_candidates": [
+                        {"reminder_id": "a", "reminder_timestamp": 20.0},
+                        {"reminder_id": "b", "reminder_timestamp": 20.0},
+                    ],
+                    "abstain_reason": "ambiguous_timestamp_tie",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="repeated_recency_action_target_selection_failure",
+        inadequacy_signals=("wrong_selected_record", "side_effect_target_selection"),
+        visible_data_gaps=(
+            "visible records need deterministic target selection before side effect",
+        ),
+        planner_failures=("select target before modify/remove side-effect call",),
+    )
+
+
+def _post_selection_side_effect_args_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:prepare_side_effect_args_from_selected_record",
+        observation=(
+            "Several workflows reach or can deterministically identify the correct "
+            "visible target record, but then fail to prepare the exact kwargs for "
+            "the original ToolSandbox side-effect call. Generate a compact "
+            "composite helper named prepare_side_effect_args_from_selected_record. "
+            "Inputs: selected_record, action_type, updates, and user_intent. Return "
+            "downstream_tool_name, downstream_tool_kwargs, should_call_tool, and "
+            "abstain_reason. For supported actions, copy stable ids from the "
+            "selected record into kwargs and merge explicit updates only when the "
+            "required fields are present. Preserve the original side-effect tools "
+            "modify_contact, remove_contact, modify_reminder, remove_reminder, "
+            "send_message, or add_reminder as applicable. Abstain if selected_record "
+            "is empty, action_type is unsupported, required ids are missing, updates "
+            "are ambiguous, or the user did not provide enough information. This "
+            "helper prepares arguments only; it must not perform the side effect."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "selected_record": {"person_id": "p1", "name": "Ada"},
+                    "action_type": "modify_contact",
+                    "updates": {"relationship": "friend"},
+                    "user_intent": "update relationship",
+                },
+                {
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": "p1",
+                        "relationship": "friend",
+                    },
+                    "should_call_tool": True,
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "selected_record": {"reminder_id": "r1", "content": "old"},
+                    "action_type": "remove_reminder",
+                    "updates": {},
+                    "user_intent": "remove selected reminder",
+                },
+                {
+                    "downstream_tool_name": "remove_reminder",
+                    "downstream_tool_kwargs": {"reminder_id": "r1"},
+                    "should_call_tool": True,
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "selected_record": {},
+                    "action_type": "modify_reminder",
+                    "updates": {"content": "new"},
+                    "user_intent": "modify selected reminder",
+                },
+                {
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "should_call_tool": False,
+                    "abstain_reason": "missing_selected_record",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="post_selection_side_effect_argument_preparation_failure",
+        inadequacy_signals=("side_effect_argument_preparation_failure",),
+        visible_data_gaps=(
+            "selected record id and explicit updates must become downstream kwargs",
+        ),
+        planner_failures=("prepare kwargs before original side-effect tool call",),
     )
 
 
@@ -995,6 +1268,12 @@ def classify_scenario_observations(
             scenario_name
         ) or _is_message_recency_extreme_scenario(scenario_name):
             observations.append(_latest_record_selection_observation(scenario_name))
+        if _is_recency_action_target_scenario(scenario_name):
+            observations.append(_recency_action_target_observation(scenario_name))
+        if _is_post_selection_side_effect_prep_scenario(scenario_name):
+            observations.append(
+                _post_selection_side_effect_args_observation(scenario_name)
+            )
         if _is_message_search_window_scenario(
             scenario_name
         ) or _is_message_recency_extreme_scenario(scenario_name):
@@ -1016,14 +1295,41 @@ def classify_scenario_observations(
             scenario_name
         ) or _is_message_recency_extreme_scenario(scenario_name):
             observations.append(_latest_record_selection_observation(scenario_name))
+        if _is_recency_action_target_scenario(scenario_name):
+            observations.append(_recency_action_target_observation(scenario_name))
+        if _is_post_selection_side_effect_prep_scenario(scenario_name):
+            observations.append(
+                _post_selection_side_effect_args_observation(scenario_name)
+            )
         if _is_message_search_window_scenario(
             scenario_name
         ) or _is_message_recency_extreme_scenario(scenario_name):
             observations.append(_message_search_window_observation(scenario_name))
         return tuple(observations)
 
-    if similarity < 1.0 and _is_contact_constraint_scenario(scenario_name):
-        return (_contact_constraint_observation(scenario_name),)
+    if similarity < 1.0 and (
+        (
+            _is_recency_action_target_scenario(scenario_name)
+            or _is_post_selection_side_effect_prep_scenario(scenario_name)
+        )
+        and not _is_visible_record_constraint_scenario(scenario_name)
+    ):
+        observations = []
+        if _is_recency_action_target_scenario(scenario_name):
+            observations.append(_recency_action_target_observation(scenario_name))
+        if _is_post_selection_side_effect_prep_scenario(scenario_name):
+            observations.append(
+                _post_selection_side_effect_args_observation(scenario_name)
+            )
+        return tuple(observations)
+
+    if similarity < 1.0 and _is_visible_record_constraint_scenario(scenario_name):
+        observations = [_contact_constraint_observation(scenario_name)]
+        if _is_post_selection_side_effect_prep_scenario(scenario_name):
+            observations.append(
+                _post_selection_side_effect_args_observation(scenario_name)
+            )
+        return tuple(observations)
 
     if similarity < 1.0 and scenario_name.startswith("find_days_till_holiday"):
         return (_days_between_timestamps_observation(scenario_name),)

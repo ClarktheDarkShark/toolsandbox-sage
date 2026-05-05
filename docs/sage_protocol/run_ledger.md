@@ -429,3 +429,18 @@
   - Reports: `docs/sage_protocol/v2_0_selection_action_discovery60_report.md`, `docs/sage_protocol/v2_0_selection_action_candidate_triage.md`.
   - Decision: `candidate concept negative`.
   - Next action: park this candidate and mine the next uncovered no-current-helper-fit cluster; no confirmation60 for this candidate.
+
+- `V2.1 tool expansion discovery60` completed.
+  - Date: `2026-05-04T20:11:44-04:00`
+  - Manifest: `artifacts/summaries/v2_1_tool_expansion_discovery60_20260504_191835/cohort_manifest.json`
+  - Cohort quality: PASS; `60` scenarios; distinct families `20`; largest family share `0.10`; no-current-helper-fit share `25.00%`.
+  - Frozen best3 registry untouched: `artifacts/registry_frozen_best3_claim/registry_manifest.json`.
+  - Candidate registry: `artifacts/registry_candidates/v2_1_tool_expansion_discovery60_20260504_191835/registry_manifest.json`.
+  - Arm A best3-only: `outputs/v2_1_tool_expansion_best3_60_20260504_191835/mechanism_60_20260504_191910`; dashboard `/dashboard/index.html`; outcome `+0.1543`; canonical `+0.0527`; exact `6 -> 10`; runtime/side-effect `0 / 0`.
+  - Arm B discovery: `outputs/v2_1_tool_expansion_discovery60_run_20260504_191835/mechanism_60_20260504_192907`; dashboard `/dashboard/index.html`; outcome `+0.1586`; canonical `+0.1377`; exact `2 -> 9`; runtime/side-effect `0 / 0`.
+  - Tool birth: proposed `5`; accepted `prepare_side_effect_args_from_selected_record`; rejected `select_visible_record_by_constraints`, `select_action_target_by_recency`; accepted-but-uncalled `prepare_side_effect_args_from_selected_record`.
+  - Force diagnostics: after routing/affordance/abstain repairs final run `outputs/v2_1_tool_expansion_force_prepare_args12_abstain_20260504_201500/mechanism_12_20260504_200720`; candidate visible/called/VNC/failed `12 / 8 / 4 / 0`, but calls returned `missing_required_helper_inputs`, so no independent positive candidate evidence.
+  - Fixes: added V2.1 shortfall observations/triggers/generator guidance; fixed one-of-many downstream routing for composite helpers; added post-selection affordance and missing-argument abstain safety.
+  - Tests: `95 passed`; frozen best3 and V2.1 candidate registry checks PASS.
+  - Reports: `docs/sage_protocol/v2_1_tool_expansion_discovery60_report.md`, `docs/sage_protocol/v2_1_tool_expansion_candidate_triage.md`.
+  - Decision: `generation contract repair needed`; no confirmation60.

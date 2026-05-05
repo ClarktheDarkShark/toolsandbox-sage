@@ -36,29 +36,45 @@ def test_add_reminder_location_argument_prep_matches_birth_path() -> None:
     )
 
 
-def test_direct_contact_remove_by_phone_is_not_helper_opportunity() -> None:
+def test_direct_contact_remove_by_phone_matches_visible_record_constraint_helper() -> (
+    None
+):
     scenario = "remove_contact_by_phone_alt_3_distraction_tools"
 
     strata = classify_task_strata(scenario)
 
     assert "contact_message_search_disambiguation" in strata
     assert "direct_state_precondition_service_enablement" not in strata
-    assert "select_contact_field_by_constraint" not in expected_helper_fit(scenario)
-    assert expected_birth_opportunities(scenario) == []
+    assert "select_visible_record_by_constraints" in expected_helper_fit(scenario)
+    assert "prepare_side_effect_args_from_selected_record" in expected_helper_fit(
+        scenario
+    )
+    assert "search_filter:select_visible_record_by_constraints" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "composite:prepare_side_effect_args_from_selected_record" in (
+        expected_birth_opportunities(scenario)
+    )
 
 
 def test_ambiguous_contact_lookup_is_not_birth_opportunity() -> None:
     scenario = "remove_contact_by_phone_ambiguous_3_distraction_tools"
 
-    assert "select_contact_field_by_constraint" not in expected_helper_fit(scenario)
+    assert "select_visible_record_by_constraints" not in expected_helper_fit(scenario)
     assert expected_birth_opportunities(scenario) == []
 
 
 def test_contact_update_tasks_have_birth_opportunity_and_retained_fit() -> None:
     scenario = "update_contact_relationship_with_relationship_3_distraction_tools"
 
-    assert "select_contact_field_by_constraint" in expected_helper_fit(scenario)
-    assert "search_filter:select_contact_field_by_constraint" in (
+    assert "select_visible_record_by_constraints" in expected_helper_fit(scenario)
+    assert "prepare_side_effect_args_from_selected_record" in expected_helper_fit(
+        scenario
+    )
+    assert "search_filter:select_visible_record_by_constraints" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "composite:prepare_side_effect_args_from_selected_record" in (
         expected_birth_opportunities(scenario)
     )
 
@@ -82,7 +98,17 @@ def test_modify_contact_message_recency_matches_trace_compatible_helpers() -> No
 
     assert "contact_message_search_disambiguation" in classify_task_strata(scenario)
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
+    assert "select_action_target_by_recency" in expected_helper_fit(scenario)
+    assert "prepare_side_effect_args_from_selected_record" in expected_helper_fit(
+        scenario
+    )
     assert "search_filter:select_record_by_timestamp_extreme" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "search_filter:select_action_target_by_recency" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "composite:prepare_side_effect_args_from_selected_record" in (
         expected_birth_opportunities(scenario)
     )
 
@@ -104,8 +130,18 @@ def test_remove_latest_reminder_matches_search_window_and_selector() -> None:
     scenario = "remove_reminder_with_recency_latest_3_distraction_tools"
 
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
+    assert "select_action_target_by_recency" in expected_helper_fit(scenario)
+    assert "prepare_side_effect_args_from_selected_record" in expected_helper_fit(
+        scenario
+    )
     assert "resolve_search_window_or_bounds" in expected_helper_fit(scenario)
     assert "search_filter:select_record_by_timestamp_extreme" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "search_filter:select_action_target_by_recency" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "composite:prepare_side_effect_args_from_selected_record" in (
         expected_birth_opportunities(scenario)
     )
     assert "derived_value:resolve_search_window_or_bounds" in (

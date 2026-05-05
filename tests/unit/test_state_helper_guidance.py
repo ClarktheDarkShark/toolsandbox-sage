@@ -7,7 +7,10 @@ from sage_ts.generation.tool_spec import (
     ToolSpec,
 )
 from sage_ts.registry.manifest import RegistryEntry
-from sage_ts.runtime.toolsandbox_integration import _google_docstring
+from sage_ts.runtime.toolsandbox_integration import (
+    _google_docstring,
+    compile_toolsandbox_tool,
+)
 from sage_ts.validation.sandbox_validator import ValidationResult
 from tool_sandbox.common.tool_conversion import convert_to_openai_tool
 
@@ -229,3 +232,107 @@ def test_generic_downstream_helper_docstring_uses_actual_output_schema() -> None
     assert "Then pass the relevant returned fields into search_messages." in docstring
     assert "should_call_add_reminder" not in docstring
     assert "search_messages_kwargs" not in docstring
+
+
+def test_post_selection_composite_docstring_explains_required_inputs() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_side_effect_args_from_selected_record",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description=(
+                "Prepare arguments for one original ToolSandbox side-effect tool "
+                "after a visible record has been selected."
+            ),
+            inputs=(
+                ToolInput("selected_record", "dict", "Selected visible record."),
+                ToolInput("action_type", "str", "Intended downstream action."),
+                ToolInput("updates", "dict", "Fields to update."),
+                ToolInput("user_intent", "str", "Original user request."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("selected record needs downstream side effect",),
+            negative_triggers=("selected record unavailable",),
+            required_original_tool_calls=("modify_contact", "remove_reminder"),
+            preserves_side_effect_tools=("modify_contact", "remove_reminder"),
+            abstain_behavior=(
+                "Return should_call_tool=False with abstain_reason when selected_record, "
+                "action_type, or required updates are unavailable."
+            ),
+            generalization_rationale=(
+                "Post-selection side-effect argument preparation recurs."
+            ),
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "modify_contact_with_message_recency",
+                "remove_reminder_with_recency_latest",
+            ),
+            reason_tool_is_decisive=(
+                "It compresses selected-record inspection, action routing, and "
+                "downstream kwargs preparation while preserving original tools."
+            ),
+            shortfall_cluster_evidence=(
+                "composite:prepare_side_effect_args_from_selected_record",
+            ),
+            known_failure_mechanisms_addressed=(
+                "failed_side_effect_argument_preparation_after_selection",
+            ),
+            final_state_preservation_plan=(
+                "Caller must execute the returned original ToolSandbox tool."
+            ),
+            grading_accounting_note=(
+                "Helper prepares kwargs only; canonical and outcome are reported separately."
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Agents select a record but fail to prepare action kwargs.",
+                signals=("side_effect_argument_preparation",),
+            ),
+        ),
+        code=(
+            "def prepare_side_effect_args_from_selected_record("
+            "selected_record: dict, action_type: str, updates: dict, "
+            "user_intent: str) -> dict:\n"
+            "    return {'downstream_tool_name': action_type, "
+            "'downstream_tool_kwargs': updates, 'should_call_tool': True, "
+            "'abstain_reason': ''}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="modify_contact_with_message_recency",
+    )
+
+    docstring = _google_docstring(entry)
+
+    assert "Post-selection usage:" in docstring
+    assert "target record has already been" in docstring
+    assert "Pass selected_record as the full selected record object" in docstring
+    assert "Pass updates as a dict of fields to change." in docstring
+    assert "Do not call prepare_side_effect_args_from_selected_record with only" in (
+        docstring
+    )
+    assert "returned downstream_tool_name" in docstring
+    assert "downstream_tool_kwargs next" in docstring
+
+    fn = compile_toolsandbox_tool(entry)
+    result = fn(action_type="remove_reminder", user_intent="Remove latest reminder.")
+    assert result["should_call_tool"] is False
+    assert result["abstain_reason"] == "missing_required_helper_inputs"
+    assert result["downstream_tool_kwargs"] == {}

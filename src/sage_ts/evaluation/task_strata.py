@@ -41,6 +41,20 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "record_filtering_ranking_latest_selection",
         "contact_message_search_disambiguation",
     ),
+    "select_visible_record_by_constraints": (
+        "contact_message_search_disambiguation",
+        "record_filtering_ranking_latest_selection",
+    ),
+    "select_action_target_by_recency": (
+        "record_filtering_ranking_latest_selection",
+        "contact_message_search_disambiguation",
+        "temporal_reminder_date_canonicalization",
+    ),
+    "prepare_side_effect_args_from_selected_record": (
+        "generic_multi_tool_composition",
+        "contact_message_search_disambiguation",
+        "record_filtering_ranking_latest_selection",
+    ),
     "next_service_tool_call": ("direct_state_precondition_service_enablement",),
     "recover_from_tool_error": ("direct_state_precondition_service_enablement",),
     "next_service_enablement_action": ("direct_state_precondition_service_enablement",),
@@ -62,6 +76,15 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
     ),
     "search_filter:select_contact_field_by_constraint": (
         "select_contact_field_by_constraint",
+    ),
+    "search_filter:select_visible_record_by_constraints": (
+        "select_visible_record_by_constraints",
+    ),
+    "search_filter:select_action_target_by_recency": (
+        "select_action_target_by_recency",
+    ),
+    "composite:prepare_side_effect_args_from_selected_record": (
+        "prepare_side_effect_args_from_selected_record",
     ),
     "state_precondition:next_service_tool_call": ("next_service_tool_call",),
     "state_precondition:recover_from_tool_error": ("recover_from_tool_error",),
@@ -111,7 +134,27 @@ DOWNSTREAM_SERVICE_HELPER_PREFIXES = (
     "find_temperature_low_battery_mode",
 )
 
-CONTACT_CONSTRAINT_HELPER_PREFIXES = ("update_contact_relationship_with_relationship",)
+VISIBLE_RECORD_CONSTRAINT_PREFIXES = (
+    "remove_contact_by_phone",
+    "search_phone_number_with_name",
+    "search_relationship_with_phone_number",
+    "search_sender_phone_number_with_content",
+    "update_contact_relationship_with_relationship",
+)
+
+ACTION_TARGET_PREFIXES = (
+    "modify_contact_with_message_recency",
+    "modify_reminder_with_recency_latest",
+    "remove_reminder_with_recency_latest",
+)
+
+SIDE_EFFECT_PREP_PREFIXES = (
+    "remove_contact_by_phone",
+    "update_contact_relationship_with_relationship",
+    "modify_contact_with_message_recency",
+    "modify_reminder_with_recency_latest",
+    "remove_reminder_with_recency_latest",
+)
 
 
 def base_task_family(scenario_name: str) -> str:
@@ -320,9 +363,19 @@ def expected_helper_fit(
     if (
         "insufficient_information" not in name
         and "ambiguous" not in name
-        and name.startswith(CONTACT_CONSTRAINT_HELPER_PREFIXES)
+        and name.startswith(VISIBLE_RECORD_CONSTRAINT_PREFIXES)
     ):
-        helpers.append("select_contact_field_by_constraint")
+        helpers.append("select_visible_record_by_constraints")
+    if "insufficient_information" not in name and name.startswith(
+        ACTION_TARGET_PREFIXES
+    ):
+        helpers.append("select_action_target_by_recency")
+    if (
+        "insufficient_information" not in name
+        and "ambiguous" not in name
+        and name.startswith(SIDE_EFFECT_PREP_PREFIXES)
+    ):
+        helpers.append("prepare_side_effect_args_from_selected_record")
     if (
         "insufficient_information" not in name
         and name.startswith("add_reminder_content_and_")
@@ -376,8 +429,22 @@ def expected_birth_opportunities(
         opportunities.append("derived_value:resolve_search_window_or_bounds")
     # Do not count bounds-only message window helpers as claim-grade birth
     # opportunities; latest/oldest failures need selection/action helpers.
-    if "ambiguous" not in name and name.startswith(CONTACT_CONSTRAINT_HELPER_PREFIXES):
-        opportunities.append("search_filter:select_contact_field_by_constraint")
+    if (
+        "ambiguous" not in name
+        and "insufficient_information" not in name
+        and name.startswith(VISIBLE_RECORD_CONSTRAINT_PREFIXES)
+    ):
+        opportunities.append("search_filter:select_visible_record_by_constraints")
+    if "insufficient_information" not in name and name.startswith(
+        ACTION_TARGET_PREFIXES
+    ):
+        opportunities.append("search_filter:select_action_target_by_recency")
+    if (
+        "ambiguous" not in name
+        and "insufficient_information" not in name
+        and name.startswith(SIDE_EFFECT_PREP_PREFIXES)
+    ):
+        opportunities.append("composite:prepare_side_effect_args_from_selected_record")
     if name.startswith("find_days_till_holiday"):
         opportunities.append("derived_value:days_between_timestamps")
     if name.startswith("find_stock_symbol_with_company_name"):
