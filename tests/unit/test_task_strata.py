@@ -395,3 +395,42 @@ def test_cohort_policy_report_fails_broad_known_lane_overrepresentation() -> Non
     assert report["should_block_quality"] is True
     assert "weak_negative_no_helper_coverage" in report["quality_gate_failures"]
     assert "known_helper_lane_overrepresented" in report["quality_gate_failures"]
+
+
+def test_cohort_policy_report_uses_scale_aware_variant_cap_for_large_runs() -> None:
+    scenarios: list[str] = []
+    variants = [
+        "",
+        "_alt",
+        "_multiple_user_turn",
+        "_multiple_user_turn_alt",
+        "_3_distraction_tools",
+        "_alt_3_distraction_tools",
+        "_multiple_user_turn_3_distraction_tools",
+        "_multiple_user_turn_alt_3_distraction_tools",
+        "_10_distraction_tools",
+        "_alt_10_distraction_tools",
+        "_multiple_user_turn_10_distraction_tools",
+        "_multiple_user_turn_alt_10_distraction_tools",
+        "_all_tools",
+        "_alt_all_tools",
+        "_multiple_user_turn_all_tools",
+        "_multiple_user_turn_alt_all_tools",
+    ]
+    for family_index in range(30):
+        scenarios.extend(
+            f"large_family_{family_index}{variant}" for variant in variants
+        )
+    scenarios.extend(f"small_family_{index}" for index in range(20))
+
+    report = cohort_policy_report(
+        scenarios,
+        categories_by_name={scenario: [] for scenario in scenarios},
+        generation_enabled=False,
+        registry_tool_count=0,
+    )
+
+    assert len(scenarios) == 500
+    assert report["largest_family_variant_count"] == 16
+    assert report["max_allowed_family_variants"] == 25
+    assert report["quality_gate_status"] == "pass"

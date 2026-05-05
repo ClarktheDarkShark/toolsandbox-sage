@@ -484,3 +484,16 @@
   - Fixes: selected-record autofill from unique original search trace, routing hard-block precedence over provisional visibility, composite suppression on non-action tasks, low-friction composite generation prompt, selector normalization prompt/tests.
   - Tests: targeted suite `74 passed`; diagnostic and discovery registry checks PASS.
   - Decision: `best3 remains final portfolio`; current generated candidate parked.
+
+- `V2.1 scale validation to 100, 250, 500, and 1000+` completed.
+  - Date: `2026-05-05T04:45:00-04:00`
+  - Frozen registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+  - Reports: `docs/sage_protocol/v2_1_expanded_portfolio_100_report.md`, `docs/sage_protocol/v2_1_expanded_portfolio_250_report.md`, `docs/sage_protocol/v2_1_formal_500_report.md`, `docs/sage_protocol/v2_1_formal_1000_report.md`, `docs/sage_protocol/final_claim_summary.md`.
+  - 100 run: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428`; outcome lift `+33.58%`; canonical delta `+0.0911`; exact `16 -> 23`; protocol PASS.
+  - 250 run: `outputs/v2_formal250_clean_20260504_034104_frozen_best3_relative_20260504_052217/validate_250_20260504_052222`; outcome lift `+20.52%`; canonical delta `+0.0660`; exact `31 -> 40`; protocol PASS.
+  - 500 run: `outputs/v2_1_formal500_best3_parallel_20260504_232126/full_benchmark_20260504_232130`; outcome lift `+14.35%`; canonical delta `+0.0331`; exact `60 -> 76`; cohort quality PASS; protocol failed older absolute `+0.08` threshold.
+  - 1000+ run: `outputs/v2_1_formal1000_best3_full_20260505_004901/full_benchmark_20260505_004905`; scenarios `1032`; outcome lift `+14.05%`; canonical delta `+0.0342`; exact `159 -> 195`; cohort quality PASS; external-service cases present; protocol failed older absolute/helper-call-share thresholds.
+  - Dashboards opened for 100, 250, 500, and 1000+ dashboard and task-focus pages.
+  - Runtime exceptions: `0` at all scales. Helper side-effect incidents: `0` at all scales.
+  - Control cache mode: `use-if-eligible`; scale runs used fresh controls because manifest checksums differed under strict compatibility policy.
+  - Decision: `full-benchmark 1000+ positive; best3 remains final portfolio`.

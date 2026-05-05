@@ -520,7 +520,10 @@ def cohort_policy_report(
         required_families = 5
     else:
         required_families = min(scenario_count, 4)
-    if scenario_count >= 60:
+    if scenario_count >= 500:
+        max_family_share = 0.08
+        max_family_variants = max(8, int(scenario_count * 0.05))
+    elif scenario_count >= 60:
         max_family_share = 0.20
         max_family_variants = 8
     elif scenario_count >= 30:

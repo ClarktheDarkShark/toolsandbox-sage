@@ -1,0 +1,4077 @@
+{
+  "manifest_type": "v2_1_formal_1000plus_full_benchmark_best3_scale",
+  "strategy": "Frozen best3 scale validation manifest covering all available ToolSandbox scenarios; external-service cases are present and must be explicitly reported. Committed manifest is compacted to scenario names; ToolSandbox scenario metadata is resolved by the runner.",
+  "splits": {
+    "full_benchmark": [
+      {
+        "name": "add_contact_with_name_and_phone_number"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_10_distraction_tools"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_3_distraction_tools"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_alt"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_alt_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_alt"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_multiple_user_turn_alt_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_alt"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_alt_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_alt"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_alt_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_alt"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_alt_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_alt"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_multiple_user_turn_alt_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_alt"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_alt_all_tools"
+      },
+      {
+        "name": "cellular_off"
+      },
+      {
+        "name": "cellular_off_10_distraction_tools"
+      },
+      {
+        "name": "cellular_off_3_distraction_tools"
+      },
+      {
+        "name": "cellular_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "cellular_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "cellular_off_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "cellular_off_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "cellular_off_all_tools"
+      },
+      {
+        "name": "convert_currency"
+      },
+      {
+        "name": "convert_currency_10_distraction_tools"
+      },
+      {
+        "name": "convert_currency_3_distraction_tools"
+      },
+      {
+        "name": "convert_currency_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "convert_currency_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "convert_currency_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "convert_currency_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "convert_currency_all_tools"
+      },
+      {
+        "name": "convert_currency_canonicalize"
+      },
+      {
+        "name": "convert_currency_canonicalize_10_distraction_tools"
+      },
+      {
+        "name": "convert_currency_canonicalize_3_distraction_tools"
+      },
+      {
+        "name": "convert_currency_canonicalize_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "convert_currency_canonicalize_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "convert_currency_canonicalize_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "convert_currency_canonicalize_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "convert_currency_canonicalize_all_tools"
+      },
+      {
+        "name": "find_address_with_lat_lon"
+      },
+      {
+        "name": "find_address_with_lat_lon_10_distraction_tools"
+      },
+      {
+        "name": "find_address_with_lat_lon_3_distraction_tools"
+      },
+      {
+        "name": "find_address_with_lat_lon_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_address_with_lat_lon_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_address_with_lat_lon_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_address_with_lat_lon_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_address_with_lat_lon_all_tools"
+      },
+      {
+        "name": "find_current_city_insufficient_information"
+      },
+      {
+        "name": "find_current_city_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "find_current_city_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "find_current_city_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_current_city_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_current_city_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_current_city_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_current_city_insufficient_information_all_tools"
+      },
+      {
+        "name": "find_current_city_low_battery_mode"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_all_tools"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_alt"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_alt_all_tools"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_insufficient_information"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_current_city_low_battery_mode_insufficient_information_all_tools"
+      },
+      {
+        "name": "find_current_location_insufficient_information"
+      },
+      {
+        "name": "find_current_location_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "find_current_location_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "find_current_location_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_current_location_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_current_location_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_current_location_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_current_location_insufficient_information_all_tools"
+      },
+      {
+        "name": "find_current_location_low_battery_mode_insufficient_information"
+      },
+      {
+        "name": "find_current_location_low_battery_mode_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_current_location_low_battery_mode_insufficient_information_all_tools"
+      },
+      {
+        "name": "find_days_till_holiday"
+      },
+      {
+        "name": "find_days_till_holiday_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_all_tools"
+      },
+      {
+        "name": "find_days_till_holiday_alt"
+      },
+      {
+        "name": "find_days_till_holiday_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_alt_all_tools"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_all_tools"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_alt"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_alt_all_tools"
+      },
+      {
+        "name": "find_days_till_holiday_multiple_user_turn"
+      },
+      {
+        "name": "find_days_till_holiday_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_all_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_alt"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_alt_all_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_multiple_user_turn"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "find_distance_with_location_name"
+      },
+      {
+        "name": "find_distance_with_location_name_10_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_3_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_all_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_alt"
+      },
+      {
+        "name": "find_distance_with_location_name_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_alt_all_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_all_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_alt"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_insufficient_information_alt_all_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_low_battery_mode_multiple_user_turn"
+      },
+      {
+        "name": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_multiple_user_turn"
+      },
+      {
+        "name": "find_distance_with_location_name_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "find_distance_with_location_name_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_distance_with_location_name_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_all_tools"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_alt"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_min_temperature_weekday_insufficient_information_alt_all_tools"
+      },
+      {
+        "name": "find_phone_number_with_location_name"
+      },
+      {
+        "name": "find_phone_number_with_location_name_10_distraction_tools"
+      },
+      {
+        "name": "find_phone_number_with_location_name_3_distraction_tools"
+      },
+      {
+        "name": "find_phone_number_with_location_name_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_phone_number_with_location_name_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_phone_number_with_location_name_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_phone_number_with_location_name_all_tools"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_10_distraction_tools"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_3_distraction_tools"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_all_tools"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_all_tools"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_alt"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_stock_symbol_with_company_name_low_battery_mode_alt_all_tools"
+      },
+      {
+        "name": "find_temperature"
+      },
+      {
+        "name": "find_temperature_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_all_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location"
+      },
+      {
+        "name": "find_temperature_f_with_location_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_all_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_alt"
+      },
+      {
+        "name": "find_temperature_f_with_location_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_alt_all_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_multiple_user_turn"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_all_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_alt"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_insufficient_information_alt_all_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_all_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_alt"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_f_with_location_wifi_off_alt_all_tools"
+      },
+      {
+        "name": "find_temperature_low_battery_mode"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_all_tools"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_alt"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_alt_10_distraction_tools"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_alt_3_distraction_tools"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_temperature_low_battery_mode_alt_all_tools"
+      },
+      {
+        "name": "find_thanksgiving_timestamp"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_10_distraction_tools"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_3_distraction_tools"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_all_tools"
+      },
+      {
+        "name": "get_cellular"
+      },
+      {
+        "name": "get_cellular_10_distraction_tools"
+      },
+      {
+        "name": "get_cellular_3_distraction_tools"
+      },
+      {
+        "name": "get_cellular_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "get_cellular_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "get_cellular_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "get_cellular_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "get_cellular_all_tools"
+      },
+      {
+        "name": "get_wifi"
+      },
+      {
+        "name": "get_wifi_10_distraction_tools"
+      },
+      {
+        "name": "get_wifi_3_distraction_tools"
+      },
+      {
+        "name": "get_wifi_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "get_wifi_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "get_wifi_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "get_wifi_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "get_wifi_all_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency"
+      },
+      {
+        "name": "modify_contact_with_message_recency_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_all_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_all_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_all_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_all_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_alt"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_alt_all_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_10_distraction_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_3_distraction_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_all_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_alt"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_alt_10_distraction_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_alt_3_distraction_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_alt_all_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_all_tools"
+      },
+      {
+        "name": "remove_contact_by_phone"
+      },
+      {
+        "name": "remove_contact_by_phone_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_all_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_alt"
+      },
+      {
+        "name": "remove_contact_by_phone_alt_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_alt_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_alt_all_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_all_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_alt"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_alt_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_alt_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_ambiguous_alt_all_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_alt"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_multiple_user_turn_alt_all_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_all_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_alt"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_all_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_all_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_all_tools"
+      },
+      {
+        "name": "remove_contact_with_id"
+      },
+      {
+        "name": "remove_contact_with_id_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_with_id_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_with_id_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_with_id_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_with_id_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_contact_with_id_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_contact_with_id_all_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_10_distraction_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_3_distraction_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_all_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_alt"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_alt_10_distraction_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_alt_3_distraction_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_alt_all_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_all_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest"
+      },
+      {
+        "name": "search_message_with_recency_latest_10_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_3_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_all_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_alt"
+      },
+      {
+        "name": "search_message_with_recency_latest_alt_10_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_alt_3_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_alt_all_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_alt"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_multiple_user_turn_alt_all_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest"
+      },
+      {
+        "name": "search_message_with_recency_oldest_10_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_3_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_all_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_alt"
+      },
+      {
+        "name": "search_message_with_recency_oldest_alt_10_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_alt_3_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_alt_all_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_alt"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_multiple_user_turn_alt_all_tools"
+      },
+      {
+        "name": "search_name_with_relationship"
+      },
+      {
+        "name": "search_name_with_relationship_10_distraction_tools"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_name_with_relationship_all_tools"
+      },
+      {
+        "name": "search_phone_number_with_name"
+      },
+      {
+        "name": "search_phone_number_with_name_10_distraction_tools"
+      },
+      {
+        "name": "search_phone_number_with_name_3_distraction_tools"
+      },
+      {
+        "name": "search_phone_number_with_name_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_phone_number_with_name_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_phone_number_with_name_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_phone_number_with_name_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_phone_number_with_name_all_tools"
+      },
+      {
+        "name": "search_relationship_with_phone_number"
+      },
+      {
+        "name": "search_relationship_with_phone_number_10_distraction_tools"
+      },
+      {
+        "name": "search_relationship_with_phone_number_3_distraction_tools"
+      },
+      {
+        "name": "search_relationship_with_phone_number_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_relationship_with_phone_number_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_relationship_with_phone_number_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_relationship_with_phone_number_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_relationship_with_phone_number_all_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_all_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_all_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_all_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_all_tools"
+      },
+      {
+        "name": "search_sender_phone_number_with_content"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_10_distraction_tools"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_3_distraction_tools"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_all_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_all_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_all_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_all_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_all_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_alt"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_multiple_user_turn_alt_all_tools"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_all_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_all_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_all_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_all_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_all_tools"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_all_tools"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_all_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_all_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_all_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_multiple_user_turn"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_all_tools"
+      },
+      {
+        "name": "wifi_off"
+      },
+      {
+        "name": "wifi_off_10_distraction_tools"
+      },
+      {
+        "name": "wifi_off_3_distraction_tools"
+      },
+      {
+        "name": "wifi_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "wifi_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "wifi_off_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "wifi_off_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "wifi_off_all_tools"
+      }
+    ]
+  },
+  "cohort_diversity_report": {
+    "scenario_count": 1032,
+    "distinct_base_task_families": 77,
+    "required_distinct_base_task_families": 8,
+    "largest_family_share": 0.046511627906976744,
+    "max_allowed_family_share": 0.08,
+    "largest_family_variant_count": 48,
+    "max_allowed_family_variants": 51,
+    "family_counts": {
+      "remove_contact_by_phone": 48,
+      "add_reminder_content_and_date_and_time": 32,
+      "add_reminder_content_and_week_delta_and_time": 32,
+      "add_reminder_content_and_week_delta_and_time_and_location": 32,
+      "add_reminder_content_and_weekday_delta_and_time": 32,
+      "modify_contact_with_message_recency": 32,
+      "search_message_with_recency_latest": 32,
+      "search_message_with_recency_oldest": 32,
+      "send_message_with_contact_content_cellular_off": 32,
+      "find_days_till_holiday": 24,
+      "find_days_till_holiday_wifi_off": 24,
+      "find_distance_with_location_name": 24,
+      "update_contact_relationship_with_relationship": 24,
+      "find_current_city_low_battery_mode": 16,
+      "find_days_till_holiday_insufficient_information": 16,
+      "find_distance_with_location_name_insufficient_information": 16,
+      "find_min_temperature_weekday_insufficient_information": 16,
+      "find_stock_symbol_with_company_name_low_battery_mode": 16,
+      "find_temperature_f_with_location": 16,
+      "find_temperature_f_with_location_insufficient_information": 16,
+      "find_temperature_f_with_location_wifi_off": 16,
+      "find_temperature_low_battery_mode": 16,
+      "modify_contact_with_message_recency_insufficient_information": 16,
+      "modify_reminder_with_recency_latest": 16,
+      "remove_contact_by_phone_no_remove_contact_insufficient_information": 16,
+      "remove_contact_by_phone_no_search_contacts_insufficient_information": 16,
+      "remove_reminder_with_recency_latest": 16,
+      "send_message_with_contact_content_cellular_off_insufficient_information": 16,
+      "add_contact_with_name_and_phone_number": 8,
+      "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 8,
+      "cellular_off": 8,
+      "convert_currency": 8,
+      "convert_currency_canonicalize": 8,
+      "find_address_with_lat_lon": 8,
+      "find_current_city_insufficient_information": 8,
+      "find_current_city_low_battery_mode_insufficient_information": 8,
+      "find_current_location_insufficient_information": 8,
+      "find_current_location_low_battery_mode_insufficient_information": 8,
+      "find_distance_with_location_name_low_battery_mode": 8,
+      "find_phone_number_with_location_name": 8,
+      "find_stock_symbol_with_company_name": 8,
+      "find_temperature": 8,
+      "find_temperature_f_with_location_and_time_diff_low_battery_mode": 8,
+      "find_temperature_f_with_location_and_time_diff": 8,
+      "find_temperature_f_with_location_and_time_diff_wifi_off": 8,
+      "find_thanksgiving_timestamp": 8,
+      "get_cellular": 8,
+      "get_wifi": 8,
+      "modify_reminder_with_recency_latest_insufficient_information": 8,
+      "remove_contact_with_id": 8,
+      "remove_reminder_with_recency_latest_insufficient_information": 8,
+      "search_name_with_relationship": 8,
+      "search_phone_number_with_name": 8,
+      "search_relationship_with_phone_number": 8,
+      "search_reminder_with_creation_recency_yesterday": 8,
+      "search_reminder_with_creation_recency_yesterday_implicit": 8,
+      "search_reminder_with_creation_recency_yesterday_insufficient_information": 8,
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 8,
+      "search_reminder_with_recency_upcoming": 8,
+      "search_reminder_with_recency_upcoming_implicit": 8,
+      "search_reminder_with_recency_upcoming_insufficient_information": 8,
+      "search_reminder_with_recency_upcoming_insufficient_information_implicit": 8,
+      "search_reminder_with_recency_yesterday": 8,
+      "search_reminder_with_recency_yesterday_implicit": 8,
+      "search_reminder_with_recency_yesterday_insufficient_information": 8,
+      "search_reminder_with_recency_yesterday_insufficient_information_implicit": 8,
+      "search_sender_phone_number_with_content": 8,
+      "send_message_with_phone_number_and_content": 8,
+      "turn_on_cellular_low_battery_mode": 8,
+      "turn_on_cellular_low_battery_mode_implicit": 8,
+      "turn_on_location_low_battery_mode": 8,
+      "turn_on_location_low_battery_mode_implicit": 8,
+      "turn_on_wifi_low_battery_mode": 8,
+      "turn_on_wifi_low_battery_mode_implicit": 8,
+      "update_contact_relationship_with_relationship_twice": 8,
+      "update_contact_with_id_and_phone_number": 8,
+      "wifi_off": 8
+    },
+    "strata_counts": {
+      "generic_multi_tool_composition": 985,
+      "record_filtering_ranking_latest_selection": 624,
+      "contact_message_search_disambiguation": 344,
+      "temporal_reminder_date_canonicalization": 280,
+      "direct_state_precondition_service_enablement": 264,
+      "insufficient_information_clarification": 224,
+      "weather_location_current_city_distance": 208,
+      "holiday_calendar_business_day_logic": 64,
+      "stock_market_numeric_normalization": 24,
+      "other_uncovered_clusters": 2
+    },
+    "expected_helper_fit_counts": {
+      "no_current_helper_fit": 448,
+      "resolve_search_window_or_bounds": 176,
+      "relative_day_time_to_timestamp": 152,
+      "prepare_side_effect_args_from_selected_record": 128,
+      "next_service_tool_call": 120,
+      "select_record_by_timestamp_extreme": 112,
+      "prepare_reminder_creation_args": 104,
+      "select_visible_record_by_constraints": 88,
+      "recover_from_tool_error": 72,
+      "days_between_timestamps": 64,
+      "select_action_target_by_recency": 64,
+      "extract_stock_symbol": 24,
+      "recency_to_timestamp_bounds": 16
+    },
+    "expected_helper_fit_share": 0.5658914728682171,
+    "no_current_helper_fit_share": 0.43410852713178294,
+    "largest_helper_lane_share": 0.17054263565891473,
+    "expected_birth_opportunity_counts": {
+      "no_current_birth_opportunity": 496,
+      "derived_value:resolve_search_window_or_bounds": 176,
+      "composite:prepare_side_effect_args_from_selected_record": 128,
+      "derived_value:recency_timestamp_bounds": 112,
+      "search_filter:select_record_by_timestamp_extreme": 112,
+      "composite:prepare_reminder_creation_args": 104,
+      "search_filter:select_visible_record_by_constraints": 88,
+      "state_precondition:recover_from_tool_error": 72,
+      "search_filter:select_action_target_by_recency": 64,
+      "derived_value:days_between_timestamps": 48,
+      "state_precondition:next_service_tool_call": 48,
+      "derived_value:extract_stock_symbol": 24,
+      "canonicalizer:relative_day_time_timestamp": 16
+    },
+    "contaminated_external_service_scenarios": [
+      "convert_currency",
+      "convert_currency_10_distraction_tools",
+      "convert_currency_3_distraction_tools",
+      "convert_currency_3_distraction_tools_arg_description_scrambled",
+      "convert_currency_3_distraction_tools_arg_type_scrambled",
+      "convert_currency_3_distraction_tools_tool_description_scrambled",
+      "convert_currency_3_distraction_tools_tool_name_scrambled",
+      "convert_currency_all_tools",
+      "convert_currency_canonicalize",
+      "convert_currency_canonicalize_10_distraction_tools",
+      "convert_currency_canonicalize_3_distraction_tools",
+      "convert_currency_canonicalize_3_distraction_tools_arg_description_scrambled",
+      "convert_currency_canonicalize_3_distraction_tools_arg_type_scrambled",
+      "convert_currency_canonicalize_3_distraction_tools_tool_description_scrambled",
+      "convert_currency_canonicalize_3_distraction_tools_tool_name_scrambled",
+      "convert_currency_canonicalize_all_tools",
+      "find_address_with_lat_lon",
+      "find_address_with_lat_lon_10_distraction_tools",
+      "find_address_with_lat_lon_3_distraction_tools",
+      "find_address_with_lat_lon_3_distraction_tools_arg_description_scrambled",
+      "find_address_with_lat_lon_3_distraction_tools_arg_type_scrambled",
+      "find_address_with_lat_lon_3_distraction_tools_tool_description_scrambled",
+      "find_address_with_lat_lon_3_distraction_tools_tool_name_scrambled",
+      "find_address_with_lat_lon_all_tools",
+      "find_current_city_insufficient_information",
+      "find_current_city_insufficient_information_10_distraction_tools",
+      "find_current_city_insufficient_information_3_distraction_tools",
+      "find_current_city_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_current_city_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_current_city_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_current_city_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_current_city_insufficient_information_all_tools",
+      "find_current_city_low_battery_mode",
+      "find_current_city_low_battery_mode_10_distraction_tools",
+      "find_current_city_low_battery_mode_3_distraction_tools",
+      "find_current_city_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+      "find_current_city_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+      "find_current_city_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+      "find_current_city_low_battery_mode_3_distraction_tools_tool_name_scrambled",
+      "find_current_city_low_battery_mode_all_tools",
+      "find_current_city_low_battery_mode_alt",
+      "find_current_city_low_battery_mode_alt_10_distraction_tools",
+      "find_current_city_low_battery_mode_alt_3_distraction_tools",
+      "find_current_city_low_battery_mode_alt_3_distraction_tools_arg_description_scrambled",
+      "find_current_city_low_battery_mode_alt_3_distraction_tools_arg_type_scrambled",
+      "find_current_city_low_battery_mode_alt_3_distraction_tools_tool_description_scrambled",
+      "find_current_city_low_battery_mode_alt_3_distraction_tools_tool_name_scrambled",
+      "find_current_city_low_battery_mode_alt_all_tools",
+      "find_current_city_low_battery_mode_insufficient_information",
+      "find_current_city_low_battery_mode_insufficient_information_10_distraction_tools",
+      "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools",
+      "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_current_city_low_battery_mode_insufficient_information_all_tools",
+      "find_current_location_insufficient_information",
+      "find_current_location_insufficient_information_10_distraction_tools",
+      "find_current_location_insufficient_information_3_distraction_tools",
+      "find_current_location_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_current_location_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_current_location_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_current_location_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_current_location_insufficient_information_all_tools",
+      "find_current_location_low_battery_mode_insufficient_information",
+      "find_current_location_low_battery_mode_insufficient_information_10_distraction_tools",
+      "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools",
+      "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_current_location_low_battery_mode_insufficient_information_all_tools",
+      "find_distance_with_location_name",
+      "find_distance_with_location_name_10_distraction_tools",
+      "find_distance_with_location_name_3_distraction_tools",
+      "find_distance_with_location_name_3_distraction_tools_arg_description_scrambled",
+      "find_distance_with_location_name_3_distraction_tools_arg_type_scrambled",
+      "find_distance_with_location_name_3_distraction_tools_tool_description_scrambled",
+      "find_distance_with_location_name_3_distraction_tools_tool_name_scrambled",
+      "find_distance_with_location_name_all_tools",
+      "find_distance_with_location_name_alt",
+      "find_distance_with_location_name_alt_10_distraction_tools",
+      "find_distance_with_location_name_alt_3_distraction_tools",
+      "find_distance_with_location_name_alt_3_distraction_tools_arg_description_scrambled",
+      "find_distance_with_location_name_alt_3_distraction_tools_arg_type_scrambled",
+      "find_distance_with_location_name_alt_3_distraction_tools_tool_description_scrambled",
+      "find_distance_with_location_name_alt_3_distraction_tools_tool_name_scrambled",
+      "find_distance_with_location_name_alt_all_tools",
+      "find_distance_with_location_name_insufficient_information",
+      "find_distance_with_location_name_insufficient_information_10_distraction_tools",
+      "find_distance_with_location_name_insufficient_information_3_distraction_tools",
+      "find_distance_with_location_name_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_distance_with_location_name_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_distance_with_location_name_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_distance_with_location_name_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_distance_with_location_name_insufficient_information_all_tools",
+      "find_distance_with_location_name_insufficient_information_alt",
+      "find_distance_with_location_name_insufficient_information_alt_10_distraction_tools",
+      "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools",
+      "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "find_distance_with_location_name_insufficient_information_alt_all_tools",
+      "find_distance_with_location_name_low_battery_mode_multiple_user_turn",
+      "find_distance_with_location_name_low_battery_mode_multiple_user_turn_10_distraction_tools",
+      "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools",
+      "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+      "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_arg_type_scrambled",
+      "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+      "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+      "find_distance_with_location_name_low_battery_mode_multiple_user_turn_all_tools",
+      "find_distance_with_location_name_multiple_user_turn",
+      "find_distance_with_location_name_multiple_user_turn_10_distraction_tools",
+      "find_distance_with_location_name_multiple_user_turn_3_distraction_tools",
+      "find_distance_with_location_name_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+      "find_distance_with_location_name_multiple_user_turn_3_distraction_tools_arg_type_scrambled",
+      "find_distance_with_location_name_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+      "find_distance_with_location_name_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+      "find_distance_with_location_name_multiple_user_turn_all_tools",
+      "find_min_temperature_weekday_insufficient_information",
+      "find_min_temperature_weekday_insufficient_information_10_distraction_tools",
+      "find_min_temperature_weekday_insufficient_information_3_distraction_tools",
+      "find_min_temperature_weekday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_min_temperature_weekday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_min_temperature_weekday_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_min_temperature_weekday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_min_temperature_weekday_insufficient_information_all_tools",
+      "find_min_temperature_weekday_insufficient_information_alt",
+      "find_min_temperature_weekday_insufficient_information_alt_10_distraction_tools",
+      "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools",
+      "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "find_min_temperature_weekday_insufficient_information_alt_all_tools",
+      "find_phone_number_with_location_name",
+      "find_phone_number_with_location_name_10_distraction_tools",
+      "find_phone_number_with_location_name_3_distraction_tools",
+      "find_phone_number_with_location_name_3_distraction_tools_arg_description_scrambled",
+      "find_phone_number_with_location_name_3_distraction_tools_arg_type_scrambled",
+      "find_phone_number_with_location_name_3_distraction_tools_tool_description_scrambled",
+      "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+      "find_phone_number_with_location_name_all_tools",
+      "find_stock_symbol_with_company_name",
+      "find_stock_symbol_with_company_name_10_distraction_tools",
+      "find_stock_symbol_with_company_name_3_distraction_tools",
+      "find_stock_symbol_with_company_name_3_distraction_tools_arg_description_scrambled",
+      "find_stock_symbol_with_company_name_3_distraction_tools_arg_type_scrambled",
+      "find_stock_symbol_with_company_name_3_distraction_tools_tool_description_scrambled",
+      "find_stock_symbol_with_company_name_3_distraction_tools_tool_name_scrambled",
+      "find_stock_symbol_with_company_name_all_tools",
+      "find_stock_symbol_with_company_name_low_battery_mode",
+      "find_stock_symbol_with_company_name_low_battery_mode_10_distraction_tools",
+      "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools",
+      "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+      "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+      "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+      "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools_tool_name_scrambled",
+      "find_stock_symbol_with_company_name_low_battery_mode_all_tools",
+      "find_stock_symbol_with_company_name_low_battery_mode_alt",
+      "find_stock_symbol_with_company_name_low_battery_mode_alt_10_distraction_tools",
+      "find_stock_symbol_with_company_name_low_battery_mode_alt_3_distraction_tools",
+      "find_stock_symbol_with_company_name_low_battery_mode_alt_3_distraction_tools_arg_description_scrambled",
+      "find_stock_symbol_with_company_name_low_battery_mode_alt_3_distraction_tools_arg_type_scrambled",
+      "find_stock_symbol_with_company_name_low_battery_mode_alt_3_distraction_tools_tool_description_scrambled",
+      "find_stock_symbol_with_company_name_low_battery_mode_alt_3_distraction_tools_tool_name_scrambled",
+      "find_stock_symbol_with_company_name_low_battery_mode_alt_all_tools",
+      "find_temperature",
+      "find_temperature_10_distraction_tools",
+      "find_temperature_3_distraction_tools",
+      "find_temperature_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_all_tools",
+      "find_temperature_f_with_location",
+      "find_temperature_f_with_location_10_distraction_tools",
+      "find_temperature_f_with_location_3_distraction_tools",
+      "find_temperature_f_with_location_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_all_tools",
+      "find_temperature_f_with_location_alt",
+      "find_temperature_f_with_location_alt_10_distraction_tools",
+      "find_temperature_f_with_location_alt_3_distraction_tools",
+      "find_temperature_f_with_location_alt_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_alt_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_alt_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_alt_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_alt_all_tools",
+      "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn",
+      "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_10_distraction_tools",
+      "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools",
+      "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_all_tools",
+      "find_temperature_f_with_location_and_time_diff_multiple_user_turn",
+      "find_temperature_f_with_location_and_time_diff_multiple_user_turn_10_distraction_tools",
+      "find_temperature_f_with_location_and_time_diff_multiple_user_turn_3_distraction_tools",
+      "find_temperature_f_with_location_and_time_diff_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_and_time_diff_multiple_user_turn_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_and_time_diff_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_and_time_diff_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+      "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn",
+      "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_10_distraction_tools",
+      "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_3_distraction_tools",
+      "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn_all_tools",
+      "find_temperature_f_with_location_insufficient_information",
+      "find_temperature_f_with_location_insufficient_information_10_distraction_tools",
+      "find_temperature_f_with_location_insufficient_information_3_distraction_tools",
+      "find_temperature_f_with_location_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_insufficient_information_all_tools",
+      "find_temperature_f_with_location_insufficient_information_alt",
+      "find_temperature_f_with_location_insufficient_information_alt_10_distraction_tools",
+      "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools",
+      "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_insufficient_information_alt_all_tools",
+      "find_temperature_f_with_location_wifi_off",
+      "find_temperature_f_with_location_wifi_off_10_distraction_tools",
+      "find_temperature_f_with_location_wifi_off_3_distraction_tools",
+      "find_temperature_f_with_location_wifi_off_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_wifi_off_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_wifi_off_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_wifi_off_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_wifi_off_all_tools",
+      "find_temperature_f_with_location_wifi_off_alt",
+      "find_temperature_f_with_location_wifi_off_alt_10_distraction_tools",
+      "find_temperature_f_with_location_wifi_off_alt_3_distraction_tools",
+      "find_temperature_f_with_location_wifi_off_alt_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_wifi_off_alt_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_wifi_off_alt_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_wifi_off_alt_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_wifi_off_alt_all_tools",
+      "find_temperature_low_battery_mode",
+      "find_temperature_low_battery_mode_10_distraction_tools",
+      "find_temperature_low_battery_mode_3_distraction_tools",
+      "find_temperature_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_low_battery_mode_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_low_battery_mode_all_tools",
+      "find_temperature_low_battery_mode_alt",
+      "find_temperature_low_battery_mode_alt_10_distraction_tools",
+      "find_temperature_low_battery_mode_alt_3_distraction_tools",
+      "find_temperature_low_battery_mode_alt_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_low_battery_mode_alt_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_low_battery_mode_alt_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_low_battery_mode_alt_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_low_battery_mode_alt_all_tools"
+    ],
+    "insufficient_information_scenarios": [
+      "find_current_city_insufficient_information",
+      "find_current_city_insufficient_information_10_distraction_tools",
+      "find_current_city_insufficient_information_3_distraction_tools",
+      "find_current_city_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_current_city_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_current_city_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_current_city_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_current_city_insufficient_information_all_tools",
+      "find_current_city_low_battery_mode_insufficient_information",
+      "find_current_city_low_battery_mode_insufficient_information_10_distraction_tools",
+      "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools",
+      "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_current_city_low_battery_mode_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_current_city_low_battery_mode_insufficient_information_all_tools",
+      "find_current_location_insufficient_information",
+      "find_current_location_insufficient_information_10_distraction_tools",
+      "find_current_location_insufficient_information_3_distraction_tools",
+      "find_current_location_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_current_location_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_current_location_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_current_location_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_current_location_insufficient_information_all_tools",
+      "find_current_location_low_battery_mode_insufficient_information",
+      "find_current_location_low_battery_mode_insufficient_information_10_distraction_tools",
+      "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools",
+      "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_current_location_low_battery_mode_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_current_location_low_battery_mode_insufficient_information_all_tools",
+      "find_days_till_holiday_insufficient_information",
+      "find_days_till_holiday_insufficient_information_10_distraction_tools",
+      "find_days_till_holiday_insufficient_information_3_distraction_tools",
+      "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_days_till_holiday_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_days_till_holiday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_days_till_holiday_insufficient_information_all_tools",
+      "find_days_till_holiday_insufficient_information_alt",
+      "find_days_till_holiday_insufficient_information_alt_10_distraction_tools",
+      "find_days_till_holiday_insufficient_information_alt_3_distraction_tools",
+      "find_days_till_holiday_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "find_days_till_holiday_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "find_days_till_holiday_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "find_days_till_holiday_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "find_days_till_holiday_insufficient_information_alt_all_tools",
+      "find_distance_with_location_name_insufficient_information",
+      "find_distance_with_location_name_insufficient_information_10_distraction_tools",
+      "find_distance_with_location_name_insufficient_information_3_distraction_tools",
+      "find_distance_with_location_name_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_distance_with_location_name_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_distance_with_location_name_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_distance_with_location_name_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_distance_with_location_name_insufficient_information_all_tools",
+      "find_distance_with_location_name_insufficient_information_alt",
+      "find_distance_with_location_name_insufficient_information_alt_10_distraction_tools",
+      "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools",
+      "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "find_distance_with_location_name_insufficient_information_alt_all_tools",
+      "find_min_temperature_weekday_insufficient_information",
+      "find_min_temperature_weekday_insufficient_information_10_distraction_tools",
+      "find_min_temperature_weekday_insufficient_information_3_distraction_tools",
+      "find_min_temperature_weekday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_min_temperature_weekday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_min_temperature_weekday_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_min_temperature_weekday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_min_temperature_weekday_insufficient_information_all_tools",
+      "find_min_temperature_weekday_insufficient_information_alt",
+      "find_min_temperature_weekday_insufficient_information_alt_10_distraction_tools",
+      "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools",
+      "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "find_min_temperature_weekday_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "find_min_temperature_weekday_insufficient_information_alt_all_tools",
+      "find_temperature_f_with_location_insufficient_information",
+      "find_temperature_f_with_location_insufficient_information_10_distraction_tools",
+      "find_temperature_f_with_location_insufficient_information_3_distraction_tools",
+      "find_temperature_f_with_location_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_insufficient_information_all_tools",
+      "find_temperature_f_with_location_insufficient_information_alt",
+      "find_temperature_f_with_location_insufficient_information_alt_10_distraction_tools",
+      "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools",
+      "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "find_temperature_f_with_location_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "find_temperature_f_with_location_insufficient_information_alt_all_tools",
+      "modify_contact_with_message_recency_insufficient_information",
+      "modify_contact_with_message_recency_insufficient_information_10_distraction_tools",
+      "modify_contact_with_message_recency_insufficient_information_3_distraction_tools",
+      "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "modify_contact_with_message_recency_insufficient_information_all_tools",
+      "modify_contact_with_message_recency_insufficient_information_alt",
+      "modify_contact_with_message_recency_insufficient_information_alt_10_distraction_tools",
+      "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools",
+      "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "modify_contact_with_message_recency_insufficient_information_alt_all_tools",
+      "modify_reminder_with_recency_latest_insufficient_information",
+      "modify_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+      "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools",
+      "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "modify_reminder_with_recency_latest_insufficient_information_all_tools",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_all_tools",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_alt",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_10_distraction_tools",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_all_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_all_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_10_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_all_tools",
+      "remove_reminder_with_recency_latest_insufficient_information",
+      "remove_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+      "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools",
+      "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "remove_reminder_with_recency_latest_insufficient_information_all_tools",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_all_tools",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_10_distraction_tools",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_type_scrambled",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_all_tools",
+      "search_reminder_with_recency_upcoming_insufficient_information",
+      "search_reminder_with_recency_upcoming_insufficient_information_10_distraction_tools",
+      "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools",
+      "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "search_reminder_with_recency_upcoming_insufficient_information_all_tools",
+      "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+      "search_reminder_with_recency_upcoming_insufficient_information_implicit_10_distraction_tools",
+      "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools",
+      "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+      "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_type_scrambled",
+      "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+      "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled",
+      "search_reminder_with_recency_upcoming_insufficient_information_implicit_all_tools",
+      "search_reminder_with_recency_yesterday_insufficient_information",
+      "search_reminder_with_recency_yesterday_insufficient_information_10_distraction_tools",
+      "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools",
+      "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "search_reminder_with_recency_yesterday_insufficient_information_all_tools",
+      "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+      "search_reminder_with_recency_yesterday_insufficient_information_implicit_10_distraction_tools",
+      "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools",
+      "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+      "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_type_scrambled",
+      "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+      "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled",
+      "search_reminder_with_recency_yesterday_insufficient_information_implicit_all_tools",
+      "send_message_with_contact_content_cellular_off_insufficient_information",
+      "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools",
+      "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools",
+      "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "send_message_with_contact_content_cellular_off_insufficient_information_all_tools",
+      "send_message_with_contact_content_cellular_off_insufficient_information_alt",
+      "send_message_with_contact_content_cellular_off_insufficient_information_alt_10_distraction_tools",
+      "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools",
+      "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "send_message_with_contact_content_cellular_off_insufficient_information_alt_all_tools"
+    ],
+    "generation_enabled": false,
+    "registry_tool_count": 3,
+    "has_expected_birth_path": true,
+    "has_expected_helper_fit": true,
+    "has_post_birth_reuse_opportunity": true,
+    "post_birth_reuse_opportunities": {
+      "composite:prepare_reminder_creation_args": {
+        "helper_names": [
+          "prepare_reminder_creation_args"
+        ],
+        "first_birth_index": 8,
+        "first_birth_scenario": "add_reminder_content_and_date_and_time",
+        "later_fit_count": 103,
+        "later_distinct_base_families": 4,
+        "later_fit_scenarios": [
+          "add_reminder_content_and_date_and_time_10_distraction_tools",
+          "add_reminder_content_and_date_and_time_3_distraction_tools",
+          "add_reminder_content_and_date_and_time_3_distraction_tools_arg_description_scrambled",
+          "add_reminder_content_and_date_and_time_3_distraction_tools_arg_type_scrambled",
+          "add_reminder_content_and_date_and_time_3_distraction_tools_tool_description_scrambled",
+          "add_reminder_content_and_date_and_time_3_distraction_tools_tool_name_scrambled",
+          "add_reminder_content_and_date_and_time_all_tools",
+          "add_reminder_content_and_date_and_time_alt",
+          "add_reminder_content_and_date_and_time_alt_10_distraction_tools",
+          "add_reminder_content_and_date_and_time_alt_3_distraction_tools",
+          "add_reminder_content_and_date_and_time_alt_3_distraction_tools_arg_description_scrambled",
+          "add_reminder_content_and_date_and_time_alt_3_distraction_tools_arg_type_scrambled",
+          "add_reminder_content_and_date_and_time_alt_3_distraction_tools_tool_description_scrambled",
+          "add_reminder_content_and_date_and_time_alt_3_distraction_tools_tool_name_scrambled",
+          "add_reminder_content_and_date_and_time_alt_all_tools",
+          "add_reminder_content_and_date_and_time_multiple_user_turn",
+          "add_reminder_content_and_date_and_time_multiple_user_turn_10_distraction_tools",
+          "add_reminder_content_and_date_and_time_multiple_user_turn_3_distraction_tools",
+          "add_reminder_content_and_date_and_time_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+          "add_reminder_content_and_date_and_time_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+        ]
+      },
+      "state_precondition:recover_from_tool_error": {
+        "helper_names": [
+          "recover_from_tool_error"
+        ],
+        "first_birth_index": 72,
+        "first_birth_scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "later_fit_count": 71,
+        "later_distinct_base_families": 6,
+        "later_fit_scenarios": [
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_all_tools",
+          "find_current_city_low_battery_mode",
+          "find_current_city_low_battery_mode_10_distraction_tools",
+          "find_current_city_low_battery_mode_3_distraction_tools",
+          "find_current_city_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+          "find_current_city_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+          "find_current_city_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+          "find_current_city_low_battery_mode_3_distraction_tools_tool_name_scrambled",
+          "find_current_city_low_battery_mode_all_tools",
+          "find_current_city_low_battery_mode_alt",
+          "find_current_city_low_battery_mode_alt_10_distraction_tools",
+          "find_current_city_low_battery_mode_alt_3_distraction_tools",
+          "find_current_city_low_battery_mode_alt_3_distraction_tools_arg_description_scrambled",
+          "find_current_city_low_battery_mode_alt_3_distraction_tools_arg_type_scrambled"
+        ]
+      },
+      "derived_value:days_between_timestamps": {
+        "helper_names": [
+          "days_between_timestamps"
+        ],
+        "first_birth_index": 224,
+        "first_birth_scenario": "find_days_till_holiday",
+        "later_fit_count": 63,
+        "later_distinct_base_families": 3,
+        "later_fit_scenarios": [
+          "find_days_till_holiday_10_distraction_tools",
+          "find_days_till_holiday_3_distraction_tools",
+          "find_days_till_holiday_3_distraction_tools_arg_description_scrambled",
+          "find_days_till_holiday_3_distraction_tools_arg_type_scrambled",
+          "find_days_till_holiday_3_distraction_tools_tool_description_scrambled",
+          "find_days_till_holiday_3_distraction_tools_tool_name_scrambled",
+          "find_days_till_holiday_all_tools",
+          "find_days_till_holiday_alt",
+          "find_days_till_holiday_alt_10_distraction_tools",
+          "find_days_till_holiday_alt_3_distraction_tools",
+          "find_days_till_holiday_alt_3_distraction_tools_arg_description_scrambled",
+          "find_days_till_holiday_alt_3_distraction_tools_arg_type_scrambled",
+          "find_days_till_holiday_alt_3_distraction_tools_tool_description_scrambled",
+          "find_days_till_holiday_alt_3_distraction_tools_tool_name_scrambled",
+          "find_days_till_holiday_alt_all_tools",
+          "find_days_till_holiday_insufficient_information",
+          "find_days_till_holiday_insufficient_information_10_distraction_tools",
+          "find_days_till_holiday_insufficient_information_3_distraction_tools",
+          "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+          "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+        ]
+      },
+      "derived_value:recency_timestamp_bounds": {
+        "helper_names": [
+          "recency_to_timestamp_bounds"
+        ],
+        "first_birth_index": 504,
+        "first_birth_scenario": "modify_contact_with_message_recency",
+        "later_fit_count": 16,
+        "later_distinct_base_families": 2,
+        "later_fit_scenarios": [
+          "search_reminder_with_creation_recency_yesterday",
+          "search_reminder_with_creation_recency_yesterday_10_distraction_tools",
+          "search_reminder_with_creation_recency_yesterday_3_distraction_tools",
+          "search_reminder_with_creation_recency_yesterday_3_distraction_tools_arg_description_scrambled",
+          "search_reminder_with_creation_recency_yesterday_3_distraction_tools_arg_type_scrambled",
+          "search_reminder_with_creation_recency_yesterday_3_distraction_tools_tool_description_scrambled",
+          "search_reminder_with_creation_recency_yesterday_3_distraction_tools_tool_name_scrambled",
+          "search_reminder_with_creation_recency_yesterday_all_tools",
+          "search_reminder_with_creation_recency_yesterday_implicit",
+          "search_reminder_with_creation_recency_yesterday_implicit_10_distraction_tools",
+          "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools",
+          "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_arg_description_scrambled",
+          "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_arg_type_scrambled",
+          "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_tool_description_scrambled",
+          "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_tool_name_scrambled",
+          "search_reminder_with_creation_recency_yesterday_implicit_all_tools"
+        ]
+      },
+      "search_filter:select_record_by_timestamp_extreme": {
+        "helper_names": [
+          "select_record_by_timestamp_extreme"
+        ],
+        "first_birth_index": 504,
+        "first_birth_scenario": "modify_contact_with_message_recency",
+        "later_fit_count": 111,
+        "later_distinct_base_families": 4,
+        "later_fit_scenarios": [
+          "modify_contact_with_message_recency_10_distraction_tools",
+          "modify_contact_with_message_recency_3_distraction_tools",
+          "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_tool_description_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_tool_name_scrambled",
+          "modify_contact_with_message_recency_all_tools",
+          "modify_contact_with_message_recency_alt",
+          "modify_contact_with_message_recency_alt_10_distraction_tools",
+          "modify_contact_with_message_recency_alt_3_distraction_tools",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_arg_type_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_tool_description_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_tool_name_scrambled",
+          "modify_contact_with_message_recency_alt_all_tools",
+          "modify_contact_with_message_recency_multiple_user_turn",
+          "modify_contact_with_message_recency_multiple_user_turn_10_distraction_tools",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+        ]
+      },
+      "derived_value:resolve_search_window_or_bounds": {
+        "helper_names": [
+          "resolve_search_window_or_bounds"
+        ],
+        "first_birth_index": 504,
+        "first_birth_scenario": "modify_contact_with_message_recency",
+        "later_fit_count": 175,
+        "later_distinct_base_families": 11,
+        "later_fit_scenarios": [
+          "modify_contact_with_message_recency_10_distraction_tools",
+          "modify_contact_with_message_recency_3_distraction_tools",
+          "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_tool_description_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_tool_name_scrambled",
+          "modify_contact_with_message_recency_all_tools",
+          "modify_contact_with_message_recency_alt",
+          "modify_contact_with_message_recency_alt_10_distraction_tools",
+          "modify_contact_with_message_recency_alt_3_distraction_tools",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_arg_type_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_tool_description_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_tool_name_scrambled",
+          "modify_contact_with_message_recency_alt_all_tools",
+          "modify_contact_with_message_recency_multiple_user_turn",
+          "modify_contact_with_message_recency_multiple_user_turn_10_distraction_tools",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+        ]
+      },
+      "search_filter:select_action_target_by_recency": {
+        "helper_names": [
+          "select_action_target_by_recency"
+        ],
+        "first_birth_index": 504,
+        "first_birth_scenario": "modify_contact_with_message_recency",
+        "later_fit_count": 63,
+        "later_distinct_base_families": 3,
+        "later_fit_scenarios": [
+          "modify_contact_with_message_recency_10_distraction_tools",
+          "modify_contact_with_message_recency_3_distraction_tools",
+          "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_tool_description_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_tool_name_scrambled",
+          "modify_contact_with_message_recency_all_tools",
+          "modify_contact_with_message_recency_alt",
+          "modify_contact_with_message_recency_alt_10_distraction_tools",
+          "modify_contact_with_message_recency_alt_3_distraction_tools",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_arg_type_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_tool_description_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_tool_name_scrambled",
+          "modify_contact_with_message_recency_alt_all_tools",
+          "modify_contact_with_message_recency_multiple_user_turn",
+          "modify_contact_with_message_recency_multiple_user_turn_10_distraction_tools",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+        ]
+      },
+      "composite:prepare_side_effect_args_from_selected_record": {
+        "helper_names": [
+          "prepare_side_effect_args_from_selected_record"
+        ],
+        "first_birth_index": 504,
+        "first_birth_scenario": "modify_contact_with_message_recency",
+        "later_fit_count": 127,
+        "later_distinct_base_families": 6,
+        "later_fit_scenarios": [
+          "modify_contact_with_message_recency_10_distraction_tools",
+          "modify_contact_with_message_recency_3_distraction_tools",
+          "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_tool_description_scrambled",
+          "modify_contact_with_message_recency_3_distraction_tools_tool_name_scrambled",
+          "modify_contact_with_message_recency_all_tools",
+          "modify_contact_with_message_recency_alt",
+          "modify_contact_with_message_recency_alt_10_distraction_tools",
+          "modify_contact_with_message_recency_alt_3_distraction_tools",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_arg_type_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_tool_description_scrambled",
+          "modify_contact_with_message_recency_alt_3_distraction_tools_tool_name_scrambled",
+          "modify_contact_with_message_recency_alt_all_tools",
+          "modify_contact_with_message_recency_multiple_user_turn",
+          "modify_contact_with_message_recency_multiple_user_turn_10_distraction_tools",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+        ]
+      },
+      "canonicalizer:relative_day_time_timestamp": {
+        "helper_names": [
+          "relative_day_time_to_timestamp"
+        ],
+        "first_birth_index": 552,
+        "first_birth_scenario": "modify_reminder_with_recency_latest",
+        "later_fit_count": 15,
+        "later_distinct_base_families": 1,
+        "later_fit_scenarios": [
+          "modify_reminder_with_recency_latest_10_distraction_tools",
+          "modify_reminder_with_recency_latest_3_distraction_tools",
+          "modify_reminder_with_recency_latest_3_distraction_tools_arg_description_scrambled",
+          "modify_reminder_with_recency_latest_3_distraction_tools_arg_type_scrambled",
+          "modify_reminder_with_recency_latest_3_distraction_tools_tool_description_scrambled",
+          "modify_reminder_with_recency_latest_3_distraction_tools_tool_name_scrambled",
+          "modify_reminder_with_recency_latest_all_tools",
+          "modify_reminder_with_recency_latest_alt",
+          "modify_reminder_with_recency_latest_alt_10_distraction_tools",
+          "modify_reminder_with_recency_latest_alt_3_distraction_tools",
+          "modify_reminder_with_recency_latest_alt_3_distraction_tools_arg_description_scrambled",
+          "modify_reminder_with_recency_latest_alt_3_distraction_tools_arg_type_scrambled",
+          "modify_reminder_with_recency_latest_alt_3_distraction_tools_tool_description_scrambled",
+          "modify_reminder_with_recency_latest_alt_3_distraction_tools_tool_name_scrambled",
+          "modify_reminder_with_recency_latest_alt_all_tools"
+        ]
+      },
+      "search_filter:select_visible_record_by_constraints": {
+        "helper_names": [
+          "select_visible_record_by_constraints"
+        ],
+        "first_birth_index": 576,
+        "first_birth_scenario": "remove_contact_by_phone",
+        "later_fit_count": 87,
+        "later_distinct_base_families": 6,
+        "later_fit_scenarios": [
+          "remove_contact_by_phone_10_distraction_tools",
+          "remove_contact_by_phone_3_distraction_tools",
+          "remove_contact_by_phone_3_distraction_tools_arg_description_scrambled",
+          "remove_contact_by_phone_3_distraction_tools_arg_type_scrambled",
+          "remove_contact_by_phone_3_distraction_tools_tool_description_scrambled",
+          "remove_contact_by_phone_3_distraction_tools_tool_name_scrambled",
+          "remove_contact_by_phone_all_tools",
+          "remove_contact_by_phone_alt",
+          "remove_contact_by_phone_alt_10_distraction_tools",
+          "remove_contact_by_phone_alt_3_distraction_tools",
+          "remove_contact_by_phone_alt_3_distraction_tools_arg_description_scrambled",
+          "remove_contact_by_phone_alt_3_distraction_tools_arg_type_scrambled",
+          "remove_contact_by_phone_alt_3_distraction_tools_tool_description_scrambled",
+          "remove_contact_by_phone_alt_3_distraction_tools_tool_name_scrambled",
+          "remove_contact_by_phone_alt_all_tools",
+          "remove_contact_by_phone_multiple_user_turn",
+          "remove_contact_by_phone_multiple_user_turn_10_distraction_tools",
+          "remove_contact_by_phone_multiple_user_turn_3_distraction_tools",
+          "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+          "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+        ]
+      },
+      "state_precondition:next_service_tool_call": {
+        "helper_names": [
+          "next_service_tool_call"
+        ],
+        "first_birth_index": 936,
+        "first_birth_scenario": "turn_on_cellular_low_battery_mode",
+        "later_fit_count": 47,
+        "later_distinct_base_families": 6,
+        "later_fit_scenarios": [
+          "turn_on_cellular_low_battery_mode_10_distraction_tools",
+          "turn_on_cellular_low_battery_mode_3_distraction_tools",
+          "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+          "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+          "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+          "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_name_scrambled",
+          "turn_on_cellular_low_battery_mode_all_tools",
+          "turn_on_cellular_low_battery_mode_implicit",
+          "turn_on_cellular_low_battery_mode_implicit_10_distraction_tools",
+          "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools",
+          "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+          "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_arg_type_scrambled",
+          "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+          "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_name_scrambled",
+          "turn_on_cellular_low_battery_mode_implicit_all_tools",
+          "turn_on_location_low_battery_mode",
+          "turn_on_location_low_battery_mode_10_distraction_tools",
+          "turn_on_location_low_battery_mode_3_distraction_tools",
+          "turn_on_location_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+          "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled"
+        ]
+      }
+    },
+    "should_block": false,
+    "should_block_birth": false,
+    "should_block_quality": false,
+    "quality_gate_status": "pass",
+    "quality_gate_failures": [],
+    "decision_use": "suitable_for_broad_value_decision",
+    "warnings": [
+      "external_service_cases_present"
+    ]
+  }
+}
