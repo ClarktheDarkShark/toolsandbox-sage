@@ -73,6 +73,72 @@ def _summary(outcome_delta: float = 0.2, called_count: int = 2) -> dict:
     }
 
 
+def _derived_entry_with_prerequisites() -> RegistryEntry:
+    spec = ToolSpec(
+        tool_name="days_between_timestamps",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description="Compute deterministic elapsed days between two visible timestamps.",
+        inputs=(
+            ToolInput("timestamp_0", "float", "Start timestamp."),
+            ToolInput("timestamp_1", "float", "End timestamp."),
+        ),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {"days": {"type": "integer"}},
+        },
+        positive_triggers=("day distance between known timestamps",),
+        negative_triggers=("missing timestamp",),
+        preserves_side_effect_tools=(),
+        required_original_tool_calls=("get_current_timestamp", "search_holiday"),
+        abstain_behavior="Return {} when either timestamp is unavailable.",
+        generalization_rationale="Elapsed-day calculation recurs across holiday and deadline tasks.",
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=("holiday_distance", "deadline_distance"),
+        reason_tool_is_decisive="It compresses repeated timestamp arithmetic after prerequisite lookup tools.",
+        shortfall_cluster_evidence=("derived_value:days_between_timestamps",),
+        known_failure_mechanisms_addressed=(
+            "visible_raw_data_lacking_deterministic_transform",
+        ),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents repeatedly need deterministic day arithmetic after timestamp lookup.",
+            signals=("deterministic_transform_missing",),
+        ),
+    )
+    tool = GeneratedTool(
+        spec=spec,
+        code="def days_between_timestamps(timestamp_0: float, timestamp_1: float) -> dict:\n    return {'days': int((timestamp_1 - timestamp_0) // 86400)}\n",
+    )
+    return RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="seed",
+    )
+
+
+def _derived_summary() -> dict:
+    return {
+        "helpers": {
+            "days_between_timestamps": {
+                "called_count": 2,
+                "visible_count": 2,
+                "visible_not_called_count": 0,
+                "called_subset": {"mean_outcome_delta": 0.1},
+                "side_effect_incidents": [],
+                "runtime_incidents": [],
+            }
+        }
+    }
+
+
 def test_promotion_gate_allows_claim_safe_called_positive_tool() -> None:
     decision = evaluate_promotion_entry(_entry(), _summary())
 
@@ -99,3 +165,14 @@ def test_promotion_gate_parks_diagnostic_only_without_later_evidence() -> None:
 
     assert not decision.allowed
     assert "diagnostic_only_without_later_non_diagnostic_evidence" in decision.reasons
+
+
+def test_promotion_gate_allows_prerequisite_original_calls_without_side_effect_contract() -> (
+    None
+):
+    decision = evaluate_promotion_entry(
+        _derived_entry_with_prerequisites(), _derived_summary()
+    )
+
+    assert decision.allowed
+    assert "missing_downstream_side_effect_preservation" not in decision.reasons

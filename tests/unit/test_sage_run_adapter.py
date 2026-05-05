@@ -104,6 +104,23 @@ def test_side_effect_preservation_requires_next_call_after_success() -> None:
     )
 
 
+def test_side_effect_preservation_ignores_prerequisite_route_calls() -> None:
+    messages = [
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "get_current_timestamp"}}],
+        },
+        {"role": "tool", "name": "get_current_timestamp", "content": "1"},
+        {"role": "tool", "name": "days_between_timestamps", "content": {"days": 3}},
+    ]
+
+    assert not _side_effect_followup_failures(
+        messages,
+        helper_name="days_between_timestamps",
+        required_original_tool_calls=("get_current_timestamp", "search_holiday"),
+    )
+
+
 def _registry_with_canonicalizer(path: Path) -> RegistryStore:
     tool = canonicalizer_tool()
     validation = validate_generated_tool(

@@ -184,6 +184,10 @@ class ToolGenerationRequest:
             "On ambiguous ties, selected_record must be empty and tie_candidates "
             "must include every tied visible record, including the first matching "
             "record, and matched_constraints must still include field_name. "
+            "The exact ambiguity output contract is selected_index=-1, "
+            "selected_id='', value='', selected_record={}, and tie_candidates "
+            "containing ALL matching records; never leave the first match in "
+            "selected_id/value when abstaining for ambiguity. "
             "For recency action-target selectors, prefer inputs records: list, "
             "timestamp_key: str, selection_mode: str, action_type: str, and "
             "constraints: dict. Treat constraints as optional; the generated "
@@ -216,7 +220,12 @@ class ToolGenerationRequest:
             "abstain_reason. The function should safely handle omitted optional "
             "chaining inputs by using empty-dict defaults for selected_record and "
             "updates, abstaining when selected_record is unavailable. Remove/delete "
-            "actions may use empty updates. Modify/update actions must abstain "
+            "actions may use empty updates. Normalize common action aliases before "
+            "branching: remove/delete -> remove_contact when selected_record has "
+            "person_id, modify/update/change -> modify_contact when selected_record "
+            "has person_id, remove/delete -> remove_reminder when selected_record "
+            "has reminder_id, and modify/update/change -> modify_reminder when "
+            "selected_record has reminder_id. Modify/update actions must abstain "
             "unless updates contains at least one concrete field to change. The "
             "helper must prepare arguments only and preserve the original "
             "ToolSandbox side-effect call. "
@@ -276,9 +285,16 @@ class ToolGenerator:
             + json.dumps(list(errors))
             + ". Previous candidate JSON: "
             + json.dumps(rejected_tool.to_json())
-            + ". Return only the repaired JSON object."
+            + ". If a search-filter selector failed an ambiguity or negative "
+            "mismatch, the repaired code must return selected_index=-1, "
+            "selected_id='', value='', selected_record={}, and tie_candidates "
+            "containing every tied candidate when multiple records match. If a "
+            "post-selection side-effect preparer failed or abstained too often, "
+            "normalize action_type aliases such as remove/delete and modify/update "
+            "before branching, while preserving abstention on missing records or "
+            "ambiguous updates. Return only the repaired JSON object."
         )
-        key = cache_key(self.completer.model, {"kind": "tool_repair_v1"}, prompt)
+        key = cache_key(self.completer.model, {"kind": "tool_repair_v2"}, prompt)
         response = self.cache.get(key)
         if response is None:
             response = self.completer.complete(

@@ -9,6 +9,7 @@ from typing import Any, cast
 from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily
 from sage_ts.validation.ast_safety import check_ast_safety
+from sage_ts.validation.output_normalization import normalize_generated_tool_output
 from sage_ts.validation.schema_check import compile_generated_tool
 from tool_sandbox.common.execution_context import (
     DatabaseNamespace,
@@ -124,7 +125,9 @@ def _runtime_smoke(
             ],
         )
         with new_context(context):
-            result = schema.function(**example.inputs)
+            result = normalize_generated_tool_output(
+                tool, schema.function(**example.inputs), inputs=example.inputs
+            )
             add_tool_trace(schema.function, result, **example.inputs)
             sandbox = context.get_database(sandbox_namespace)
             traces = sandbox["tool_trace"][0]
@@ -195,8 +198,12 @@ def validate_generated_tool(
     )
     for label, example in all_examples:
         try:
-            actual = schema.function(**example.inputs)
-            replay = schema.function(**example.inputs)
+            actual = normalize_generated_tool_output(
+                tool, schema.function(**example.inputs), inputs=example.inputs
+            )
+            replay = normalize_generated_tool_output(
+                tool, schema.function(**example.inputs), inputs=example.inputs
+            )
         except Exception as exc:
             errors.append(f"{label}_error:{type(exc).__name__}:{exc}")
             continue

@@ -749,3 +749,55 @@ def test_search_filter_helper_defaults_optional_constraints() -> None:
 
     assert result["selected_id"] == "newer"
     assert result["abstain_reason"] == ""
+
+
+def test_constraint_selector_docstring_explains_post_search_call_path() -> None:
+    base = _state_helper_entry()
+    entry = RegistryEntry.accepted(
+        GeneratedTool(
+            spec=ToolSpec(
+                tool_name="select_visible_record_by_constraints",
+                family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+                description="Select one visible record by explicit constraint.",
+                inputs=(
+                    ToolInput("records", "list", "Visible search result records."),
+                    ToolInput("field_name", "str", "Visible field to match."),
+                    ToolInput("expected_value", "str", "Constraint value."),
+                    ToolInput("return_field", "str", "Field to return."),
+                ),
+                output_annotation="dict",
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "selected_record": {"type": "object"},
+                        "selected_id": {"type": "string"},
+                        "value": {"type": "string"},
+                        "tie_candidates": {"type": "array"},
+                        "abstain_reason": {"type": "string"},
+                    },
+                },
+                positive_triggers=("search result with explicit user constraint",),
+                negative_triggers=("ambiguous match",),
+                required_original_tool_calls=("search_contacts",),
+                preserves_side_effect_tools=("search_contacts", "modify_contact"),
+                abstain_behavior="Abstain on ambiguity.",
+                generalization_rationale="Constraint selection recurs across visible records.",
+                inadequacy_evidence=StructuredInadequacyEvidence(
+                    summary="Agents miss visible-record constraint matching.",
+                    signals=("wrong_selection",),
+                ),
+            ),
+            code="def select_visible_record_by_constraints(records: list, field_name: str, expected_value: str, return_field: str) -> dict:\n    return {}\n",
+        ),
+        base.validation,
+        birth_scenario="search_phone_number_with_name",
+    )
+
+    docstring = _google_docstring(entry)
+
+    assert "Visible-record constraint selection usage:" in docstring
+    assert (
+        "Use this helper immediately after an original search tool returns" in docstring
+    )
+    assert "Pass field_name as the visible field to match" in docstring
+    assert "use value/selected_record directly" in docstring

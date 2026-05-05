@@ -253,7 +253,12 @@ def _side_effect_followup_failures(
     they may resolve missing prerequisites first and call the side-effect later.
     """
 
-    if not required_original_tool_calls:
+    required_side_effect_calls = tuple(
+        tool_name
+        for tool_name in required_original_tool_calls
+        if tool_name.startswith(("add_", "modify_", "remove_", "send_", "set_"))
+    )
+    if not required_side_effect_calls:
         return False
     saw_helper_result = False
     for index, message in enumerate(messages):
@@ -264,7 +269,7 @@ def _side_effect_followup_failures(
         saw_helper_result = True
         output = _parse_tool_message_content(message.get("content"))
         next_tools = set(_next_assistant_tool_names(messages, start_index=index))
-        required = set(required_original_tool_calls)
+        required = set(required_side_effect_calls)
         if isinstance(output, dict):
             if (
                 output.get("should_call_add_reminder") is False

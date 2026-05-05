@@ -497,3 +497,20 @@
   - Runtime exceptions: `0` at all scales. Helper side-effect incidents: `0` at all scales.
   - Control cache mode: `use-if-eligible`; scale runs used fresh controls because manifest checksums differed under strict compatibility policy.
   - Decision: `full-benchmark 1000+ positive; best3 remains final portfolio`.
+
+
+- `V2.2 masked-best3 discovery and first candidate confirmation` completed.
+  - Date: `2026-05-05T08:20:00-04:00`
+  - Frozen best3 registry untouched: `artifacts/registry_frozen_best3_claim/registry_manifest.json`.
+  - Main discovery run: `outputs/v2_2_masked_best3_discovery60_20260505_064113/mechanism_60_20260505_064202`; generated/accepted candidates included `select_visible_record_by_constraints`, `prepare_side_effect_args_from_selected_record`, and `days_between_timestamps` across repair attempts.
+  - Callability repairs: selector ambiguity output normalization, side-effect route accounting, search-filter routing availability, and post-search selector affordance guidance.
+  - Selector fair-chance run: `outputs/v2_2_masked_best3_fairchance60_docfix_20260505_064113/mechanism_60_20260505_073523`; visible/called/VNC `34 / 0 / 34`.
+  - Selector force diagnostic: `outputs/v2_2_masked_best3_selector_force60_20260505_064113/mechanism_60_20260505_070818`; visible/called `34 / 29`, called-subset outcome `0.053338674217560895`; not promoted because natural calls stayed zero.
+  - Days confirmation run: `outputs/v2_2_days_between_confirmation60_resume_20260505_081500/mechanism_60_20260505_081108`; dashboard and task-focus opened on port `5592`.
+  - Days metrics: outcome `+0.0891`, canonical `-0.0600`, exact `4 -> 4`, helper visible/called/VNC `14 / 14 / 0`, called-subset outcome `0.10714285714285714`, side-effect/runtime `0 / 0`.
+  - Reporting repair: helper contribution export now flags called-subset route mismatch when outcome improves but canonical regresses.
+  - Tests: targeted suite `125 passed`; registry checks PASS for V2.2 discovery, days confirmation, and new-toolset registries.
+  - New toolset registry: `artifacts/registry_candidates/v2_2_new_toolset/registry_manifest.json` with `days_between_timestamps` only.
+  - Reports: `docs/sage_protocol/v2_2_masked_best3_discovery_report.md`, `docs/sage_protocol/v2_2_candidate_callability_report.md`, `docs/sage_protocol/v2_2_candidate_confirmation_report.md`, `docs/sage_protocol/v2_2_new_toolset_registry_report.md`, `docs/sage_protocol/v2_2_combined_portfolio_ablation_report.md`.
+  - Decision: `new toolset has 1 confirmed tool`.
+  - Next action: continue masked discovery only on a non-parked, tool-suitable cluster; do not run combined ablation or scale validation yet.

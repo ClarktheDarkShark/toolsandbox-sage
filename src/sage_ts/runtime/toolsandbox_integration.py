@@ -24,6 +24,7 @@ from sage_ts.runtime.routing_scorer import (
     RuntimeRoutingDecision,
     score_registry_entry_for_scenario,
 )
+from sage_ts.validation.output_normalization import normalize_generated_tool_output
 from sage_ts.validation.schema_check import compile_generated_tool
 from tool_sandbox.common import tool_conversion
 from tool_sandbox.common.execution_context import (
@@ -146,23 +147,46 @@ def _post_selection_composite_usage_note(spec: ToolSpec) -> list[str]:
 
 
 def _search_filter_action_usage_note(spec: ToolSpec) -> list[str]:
-    """Affordance guidance for selectors that choose a downstream action target."""
+    """Affordance guidance for selectors over visible search results."""
     output_schema = spec.output_schema or {}
     output_properties = output_schema.get("properties", {})
     if not isinstance(output_properties, dict):
         return []
-    if not {"selected_record", "downstream_tool_name"} <= set(output_properties):
+    if "selected_record" not in output_properties:
         return []
 
-    lines = [
-        "",
-        "Selection/action usage:",
-        "    Use this helper after an original search tool returns visible",
-        " candidate records and before choosing a target for modify, remove,",
-        " reply, send, or another downstream action.",
-        "    Pass records as the full list returned by the search tool; do not",
-        " summarize or invent records.",
-    ]
+    has_downstream_action = "downstream_tool_name" in output_properties
+    if has_downstream_action:
+        lines = [
+            "",
+            "Selection/action usage:",
+            "    Use this helper after an original search tool returns visible",
+            " candidate records and before choosing a target for modify, remove,",
+            " reply, send, or another downstream action.",
+            "    Pass records as the full list returned by the search tool; do not",
+            " summarize or invent records.",
+        ]
+    else:
+        lines = [
+            "",
+            "Visible-record constraint selection usage:",
+            "    Use this helper immediately after an original search tool returns",
+            " visible candidate records and the user asks for a field, contact,",
+            " message, reminder, or exact target selected by a visible constraint.",
+            "    This is useful before answering lookup questions such as phone",
+            " number/relationship/sender lookups and before modify/remove/send",
+            " actions that need one safe selected record.",
+            "    Pass records as the full list returned by the search tool; do not",
+            " summarize or invent records.",
+            "    Pass field_name as the visible field to match, expected_value as",
+            " the user constraint, and return_field as the field needed for the",
+            " answer or next ToolSandbox call, such as phone_number, relationship,",
+            " person_id, message_id, reminder_id, or id.",
+            "    If abstain_reason is empty, use value/selected_record directly",
+            " for the final answer or next original ToolSandbox action.",
+            "    If abstain_reason is non-empty, do not guess; search further or",
+            " ask for clarification before any side-effect action.",
+        ]
     input_names = {item.name for item in spec.inputs}
     if "timestamp_key" in input_names:
         lines.extend(
@@ -577,6 +601,7 @@ def _compile_toolsandbox_tool(
             result = _inner(*args, **kwargs)
         except TypeError as error:
             result = _missing_argument_abstain_result(entry, error)
+        result = normalize_generated_tool_output(entry.tool, result, inputs=kwargs)
         add_tool_trace(_wrapped, result, *args, **kwargs)
         if on_reuse is not None:
             on_reuse(_tool_name)
@@ -960,6 +985,16 @@ def route_registry_entries(
                 requires_any_downstream = True
         if not downstream_tools:
             downstream_tools = set(entry.tool.spec.preserves_side_effect_tools)
+        if entry.tool.spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
+            producer_tools = {
+                tool_name
+                for tool_name in downstream_tools
+                | set(entry.tool.spec.preserves_side_effect_tools)
+                if tool_name.startswith(("search_", "get_", "find_"))
+            }
+            if producer_tools:
+                downstream_tools = producer_tools
+                requires_any_downstream = True
         if is_visible and available_base_tools is not None and downstream_tools:
             if requires_any_downstream:
                 missing = (

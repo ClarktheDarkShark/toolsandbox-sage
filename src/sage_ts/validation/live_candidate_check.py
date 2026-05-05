@@ -7,6 +7,7 @@ from typing import Any
 
 from sage_ts.adequacy.candidate_gate import grading_accounting_classification
 from sage_ts.generation.tool_spec import GeneratedTool
+from sage_ts.validation.output_normalization import normalize_generated_tool_output
 from sage_ts.validation.sandbox_validator import ToolExample
 from sage_ts.validation.schema_check import compile_generated_tool
 
@@ -80,7 +81,9 @@ def run_lightweight_live_candidate_check(
     negative_abstain = 0
     for index, example in enumerate(examples):
         try:
-            result = schema.function(**example.inputs)
+            result = normalize_generated_tool_output(
+                tool, schema.function(**example.inputs), inputs=example.inputs
+            )
         except Exception as exc:
             errors.append(
                 f"live_example_{index}_runtime_error:{type(exc).__name__}:{exc}"

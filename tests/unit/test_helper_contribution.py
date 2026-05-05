@@ -90,3 +90,57 @@ def test_helper_contribution_splits_called_visible_and_hidden(tmp_path: Path) ->
     assert helper["visible_not_called_subset"]["outcome_regressions"] == 1
     assert summary["accepted_but_uncalled_tools"] == ["new_idle"]
     assert summary["helpers"]["new_idle"]["origin"] == "newly_generated"
+
+
+def test_helper_contribution_flags_called_subset_route_mismatch(tmp_path: Path) -> None:
+    control = tmp_path / "control"
+    candidate = tmp_path / "candidate"
+    registry = tmp_path / "registry"
+    _write_summary(
+        control,
+        [
+            {"name": "gain", "similarity": 1.0, "outcome_similarity": 0.0},
+            {"name": "second_gain", "similarity": 1.0, "outcome_similarity": 0.5},
+            {"name": "loss", "similarity": 1.0, "outcome_similarity": 1.0},
+        ],
+    )
+    _write_summary(
+        candidate,
+        [
+            {"name": "gain", "similarity": 0.4, "outcome_similarity": 1.0},
+            {"name": "second_gain", "similarity": 0.6, "outcome_similarity": 1.0},
+            {"name": "loss", "similarity": 0.7, "outcome_similarity": 0.5},
+        ],
+    )
+    (candidate / "scenario_tool_selection.jsonl").write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "scenario": scenario,
+                    "generated_tools_visible": ["helper"],
+                    "generated_tools_called": ["helper"],
+                    "generated_tools_attempted": ["helper"],
+                    "generated_tools_failed": [],
+                }
+            )
+            for scenario in ("gain", "second_gain", "loss")
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    registry.mkdir()
+    (registry / "registry_manifest.json").write_text(
+        json.dumps({"tools": {"helper": {}}}) + "\n",
+        encoding="utf-8",
+    )
+
+    summary = build_helper_contribution_summary(
+        control, candidate, registry_dir=registry
+    )
+
+    route = summary["helpers"]["helper"]["called_subset"]["route_mismatch_accounting"]
+    assert route["helper_substitution_likely"] is True
+    assert (
+        route["reason"]
+        == "called_subset_outcome_positive_but_canonical_negative_or_regressive"
+    )

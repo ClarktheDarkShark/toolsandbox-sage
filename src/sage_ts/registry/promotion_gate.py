@@ -12,6 +12,7 @@ from sage_ts.registry.store import RegistryStore
 
 UNRESOLVED_FAILURE_STATUSES = {"active_failure", "repaired_pending_test"}
 MAX_VISIBLE_NOT_CALLED_RATE = 0.5
+SIDE_EFFECT_TOOL_PREFIXES = ("add_", "modify_", "remove_", "send_", "set_")
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,14 @@ def evaluate_promotion_entry(
         reasons.append("missing_negative_triggers")
     if not spec.abstain_behavior.strip():
         reasons.append("missing_safe_abstain_behavior")
-    if spec.required_original_tool_calls and not spec.preserves_side_effect_tools:
+    required_side_effects = {
+        tool_name
+        for tool_name in spec.required_original_tool_calls
+        if tool_name.startswith(SIDE_EFFECT_TOOL_PREFIXES)
+    }
+    if required_side_effects and not required_side_effects.issubset(
+        set(spec.preserves_side_effect_tools)
+    ):
         reasons.append("missing_downstream_side_effect_preservation")
     called_count = int(helper_data.get("called_count", 0) or 0)
     visible_count = int(helper_data.get("visible_count", 0) or 0)

@@ -201,3 +201,21 @@
 - Final package updated: `artifacts/final_sage_praxis_package/`.
 - Decision: `full-benchmark 1000+ positive; best3 remains final portfolio`.
 - Next action: write final dissertation-facing narrative around frozen best3; keep V2.1 generated candidates parked unless future work proves additive natural adoption over best3.
+
+
+## V2.2 Masked-Best3 Campaign Status
+- Date: `2026-05-05T08:20:00-04:00`
+- Frozen best3 registry modified: `no`.
+- Masked tools: `relative_day_time_to_timestamp`, `resolve_search_window_or_bounds`, `select_record_by_timestamp_extreme`.
+- Main discovery manifest: `artifacts/summaries/v2_2_masked_best3_discovery60_20260505_064113/cohort_manifest.json`.
+- Main discovery run: `outputs/v2_2_masked_best3_discovery60_20260505_064113/mechanism_60_20260505_064202`.
+- Selector fair-chance run: `outputs/v2_2_masked_best3_fairchance60_docfix_20260505_064113/mechanism_60_20260505_073523`; `select_visible_record_by_constraints` visible/called/VNC `34 / 0 / 34` after routing/docstring repairs.
+- Selector force diagnostic: `outputs/v2_2_masked_best3_selector_force60_20260505_064113/mechanism_60_20260505_070818`; visible/called `34 / 29`, called-subset outcome `0.053338674217560895`; parked for natural-adoption failure.
+- Confirmed V2.2 tool: `days_between_timestamps`.
+- Confirmation run: `outputs/v2_2_days_between_confirmation60_resume_20260505_081500/mechanism_60_20260505_081108`; outcome delta `+0.0891`, canonical delta `-0.0600`, exact successes `4 -> 4`.
+- `days_between_timestamps` contribution: visible/called/VNC `14 / 14 / 0`, called-subset outcome `0.10714285714285714`, called-subset canonical `-0.2102519581336632`, helper-substitution route mismatch `True`.
+- New toolset registry: `artifacts/registry_candidates/v2_2_new_toolset/registry_manifest.json`.
+- New toolset count: `1 / 3` confirmed.
+- Reports: `docs/sage_protocol/v2_2_masked_best3_discovery_report.md`, `docs/sage_protocol/v2_2_candidate_callability_report.md`, `docs/sage_protocol/v2_2_candidate_confirmation_report.md`, `docs/sage_protocol/v2_2_new_toolset_registry_report.md`, `docs/sage_protocol/v2_2_combined_portfolio_ablation_report.md`.
+- Decision: `new toolset has 1 confirmed tool`.
+- Next action: do not combine portfolios yet; either continue masked discovery on a new tool-suitable non-best3 cluster or stop for review because selector, side-effect-prep, recency-action, and dependency/precondition lanes are parked by evidence.

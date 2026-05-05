@@ -85,18 +85,42 @@ def _subset_stats(
         row["outcome_delta"] for row in rows if row.get("outcome_delta") is not None
     ]
     outcome_values = [float(value) for value in outcome]
-    return {
+    canonical_gains = sum(1 for value in canonical if value > 0)
+    canonical_regressions = sum(1 for value in canonical if value < 0)
+    outcome_gains = sum(1 for value in outcome_values if value > 0)
+    outcome_regressions = sum(1 for value in outcome_values if value < 0)
+    canonical_mean = _mean(canonical)
+    outcome_mean = _mean(outcome_values)
+    stats = {
         "scenario_count": len(rows),
         "scenarios": sorted(name for name in scenarios if name in deltas_by_scenario),
-        "mean_canonical_delta": _mean(canonical),
-        "mean_outcome_delta": _mean(outcome_values),
-        "canonical_gains": sum(1 for value in canonical if value > 0),
-        "canonical_regressions": sum(1 for value in canonical if value < 0),
+        "mean_canonical_delta": canonical_mean,
+        "mean_outcome_delta": outcome_mean,
+        "canonical_gains": canonical_gains,
+        "canonical_regressions": canonical_regressions,
         "canonical_preserved": sum(1 for value in canonical if value == 0),
-        "outcome_gains": sum(1 for value in outcome_values if value > 0),
-        "outcome_regressions": sum(1 for value in outcome_values if value < 0),
+        "outcome_gains": outcome_gains,
+        "outcome_regressions": outcome_regressions,
         "outcome_preserved": sum(1 for value in outcome_values if value == 0),
     }
+    outcome_positive = outcome_mean is not None and outcome_mean > 0
+    canonical_disagrees = canonical_mean is not None and (
+        canonical_mean < 0 or canonical_regressions > canonical_gains
+    )
+    stats["route_mismatch_accounting"] = {
+        "helper_substitution_likely": bool(
+            stats["scenario_count"]
+            and outcome_positive
+            and canonical_disagrees
+            and outcome_gains > outcome_regressions
+        ),
+        "reason": (
+            "called_subset_outcome_positive_but_canonical_negative_or_regressive"
+            if stats["scenario_count"] and outcome_positive and canonical_disagrees
+            else "none"
+        ),
+    }
+    return stats
 
 
 def build_helper_contribution_summary(

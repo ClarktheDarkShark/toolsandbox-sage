@@ -96,8 +96,11 @@ def test_generation_request_includes_family_contract_guidance(
     assert "selected_record" in prompt
     assert "Normalize BOTH sides before comparing" in prompt
     assert "raw formatted phone strings" in prompt
+    assert "selected_index=-1" in prompt
+    assert "tie_candidates containing ALL matching records" in prompt
     assert "prefer low-friction call patterns" in prompt
     assert "autofill selected_record from the latest original search_*" in prompt
+    assert "Normalize common action aliases" in prompt
     assert "If family is state_precondition_helper" in prompt
     assert "tool_name must have an enum" in prompt
     assert "must not require an opaque dict input" in prompt
@@ -141,3 +144,30 @@ def test_generation_request_includes_failure_memory_and_cluster_context() -> Non
     assert "wrong_record_selected" in prompt
     assert "Shortfall cluster context" in prompt
     assert "non_diagnostic_birth_allowed" in prompt
+
+
+def test_repair_prompt_includes_selector_and_action_alias_contract(
+    tmp_path: Path,
+) -> None:
+    seen: list[str] = []
+
+    class RepairCompleter(FakeCompleter):
+        def complete(self, request: ChatRequest) -> str:
+            seen.append(request.user)
+            return super().complete(request)
+
+    generator = ToolGenerator(
+        completer=RepairCompleter(),
+        cache=PromptCache(tmp_path),
+    )
+    request = ToolGenerationRequest(
+        scenario_name="search_phone_number_with_name",
+        observation="Ambiguous selector failed tie abstention.",
+        allowed_families=("search_filter_ranking_helper",),
+    )
+    rejected = generator.generate(request)
+
+    generator.repair(request, rejected, ("negative_0_mismatch",))
+
+    assert any("selected_index=-1" in prompt for prompt in seen)
+    assert any("remove/delete" in prompt for prompt in seen)

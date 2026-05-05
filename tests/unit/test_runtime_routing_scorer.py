@@ -774,3 +774,56 @@ def test_diagnostic_force_can_override_name_specific_vnc_suppression(
         decisions["select_contact_field_by_constraint"].reason
         == "diagnostic_force_overrode_adoption_risk"
     )
+
+
+def test_search_filter_selector_requires_any_record_producer_not_all_domains() -> None:
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="select_visible_record_by_constraints",
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            description="Select one visible record from search candidates by constraint.",
+            inputs=base.tool.spec.inputs,
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                    "selected_id": {"type": "string"},
+                    "value": {"type": "string"},
+                    "tie_candidates": {"type": "array"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("search_phone_number_with_name",),
+            required_original_tool_calls=(
+                "search_contacts",
+                "search_messages",
+                "search_reminder",
+            ),
+            preserves_side_effect_tools=(
+                "search_contacts",
+                "search_messages",
+                "search_reminder",
+                "modify_contact",
+                "remove_reminder",
+            ),
+        ),
+        code="def select_visible_record_by_constraints(records: list) -> dict:\n    return {}\n",
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="search_phone_number_with_name",
+    )
+
+    selected, decisions = route_registry_entries(
+        {"select_visible_record_by_constraints": entry},
+        "search_phone_number_with_name_3_distraction_tools",
+        available_base_tools={"search_contacts"},
+    )
+
+    assert [item.tool.spec.tool_name for item in selected] == [
+        "select_visible_record_by_constraints"
+    ]
+    assert decisions["select_visible_record_by_constraints"].visible
