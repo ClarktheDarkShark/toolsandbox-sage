@@ -240,6 +240,179 @@ def test_route_registry_entries_allows_composite_one_of_many_downstream_tools() 
     assert decisions["prepare_side_effect_args_from_selected_record"].visible
 
 
+def test_route_registry_entries_allows_action_selector_one_of_many_downstream_tools() -> (
+    None
+):
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="select_action_target_by_recency",
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            positive_triggers=("modify_contact_with_message_recency",),
+            negative_triggers=("no records", "ambiguous timestamp tie"),
+            applicable_task_families=(
+                "modify_contact_with_message_recency",
+                "remove_reminder_with_recency_latest",
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                    "downstream_tool_name": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            required_original_tool_calls=(
+                "modify_contact",
+                "remove_contact",
+                "modify_reminder",
+                "remove_reminder",
+            ),
+            preserves_side_effect_tools=(
+                "modify_contact",
+                "remove_contact",
+                "modify_reminder",
+                "remove_reminder",
+            ),
+        ),
+        code=(
+            "def select_action_target_by_recency(records: list) -> dict:\n"
+            "    return {'selected_record': {}, 'downstream_tool_name': '', "
+            "'abstain_reason': 'test'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="modify_contact_with_message_recency",
+    )
+
+    selected, decisions = route_registry_entries(
+        {"select_action_target_by_recency": entry},
+        "modify_contact_with_message_recency_3_distraction_tools",
+        available_base_tools={"search_messages", "modify_contact"},
+    )
+
+    assert [item.tool.spec.tool_name for item in selected] == [
+        "select_action_target_by_recency"
+    ]
+    assert decisions["select_action_target_by_recency"].visible
+
+
+def test_recency_action_selector_hides_on_non_recency_contact_tasks() -> None:
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="select_action_target_by_recency",
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            description="Select an action target by recency from visible records.",
+            inputs=(
+                replace(base.tool.spec.inputs[0], name="records", annotation="list"),
+                replace(
+                    base.tool.spec.inputs[0], name="timestamp_key", annotation="str"
+                ),
+                replace(
+                    base.tool.spec.inputs[0], name="selection_mode", annotation="str"
+                ),
+                replace(base.tool.spec.inputs[0], name="action_type", annotation="str"),
+            ),
+            positive_triggers=("latest visible action target",),
+            negative_triggers=("no records", "ambiguous tie"),
+            applicable_task_families=(
+                "modify_contact_with_message_recency",
+                "remove_reminder_with_recency_latest",
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                    "downstream_tool_name": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            required_original_tool_calls=("modify_contact", "remove_reminder"),
+            preserves_side_effect_tools=("modify_contact", "remove_reminder"),
+        ),
+        code=(
+            "def select_action_target_by_recency(records: list, timestamp_key: str, "
+            "selection_mode: str, action_type: str) -> dict:\n"
+            "    return {'selected_record': {}, 'downstream_tool_name': '', "
+            "'abstain_reason': 'test'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="modify_contact_with_message_recency",
+    )
+
+    decision = score_registry_entry_for_scenario(entry, "remove_contact_by_phone")
+
+    assert not decision.visible
+    assert decision.reason == "recency_action_selector_requires_recency_action_task"
+
+
+def test_side_effect_selector_hides_on_insufficient_information() -> None:
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="select_action_target_by_recency",
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            description="Select an action target by recency from visible records.",
+            inputs=(
+                replace(base.tool.spec.inputs[0], name="records", annotation="list"),
+                replace(
+                    base.tool.spec.inputs[0], name="timestamp_key", annotation="str"
+                ),
+                replace(
+                    base.tool.spec.inputs[0], name="selection_mode", annotation="str"
+                ),
+                replace(base.tool.spec.inputs[0], name="action_type", annotation="str"),
+            ),
+            positive_triggers=("latest visible action target",),
+            negative_triggers=("no records", "ambiguous tie"),
+            applicable_task_families=(
+                "modify_contact_with_message_recency",
+                "remove_reminder_with_recency_latest",
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                    "downstream_tool_name": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            required_original_tool_calls=("modify_contact", "remove_reminder"),
+            preserves_side_effect_tools=("modify_contact", "remove_reminder"),
+        ),
+        code=(
+            "def select_action_target_by_recency(records: list, timestamp_key: str, "
+            "selection_mode: str, action_type: str) -> dict:\n"
+            "    return {'selected_record': {}, 'downstream_tool_name': '', "
+            "'abstain_reason': 'test'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="modify_contact_with_message_recency",
+    )
+
+    decision = score_registry_entry_for_scenario(
+        entry, "modify_contact_with_message_recency_insufficient_information"
+    )
+
+    assert not decision.visible
+    assert (
+        decision.reason
+        == "side_effect_selector_suppressed_for_insufficient_information"
+    )
+
+
 def test_route_registry_entries_allows_one_available_emitted_downstream_tool() -> None:
     base = _state_dependency_entry()
     entry = replace(

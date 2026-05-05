@@ -502,15 +502,19 @@ def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation
             "returned by original ToolSandbox search/read tools. Generate a "
             "deterministic search/filter helper named "
             "select_visible_record_by_constraints. Inputs: records as a list of "
-            "visible record dictionaries, constraints as a dict of explicit fields "
-            "or text/timestamp requirements copied from the user task, and "
-            "return_field as the optional field to extract. Match only visible "
+            "visible record dictionaries, field_name as the explicit visible field "
+            "to match, expected_value as the user-provided constraint value, and "
+            "return_field as the optional field to extract. Use top-level scalar "
+            "inputs instead of an opaque constraints dict so the acting model can "
+            "call the helper directly after a search result. Match only visible "
             "candidate data. Normalize phone-like values to digits and compare "
             "strings case-insensitively. Return selected_record, selected_index, "
             "selected_id, value, matched_constraints, tie_candidates, and "
             "abstain_reason. Return an empty selected_record and non-empty "
             "abstain_reason when there are no records, no match, multiple equal "
-            "matches, missing required fields, or insufficient constraints. The "
+            "matches, missing required fields, or insufficient constraints. On a "
+            "tie, tie_candidates must include every tied visible record, including "
+            "the first matching record; selected_record must remain empty. The "
             "spec.required_original_tool_calls must include the original search "
             "tools that produce records such as search_contacts, search_messages, "
             "or search_reminder. The spec.preserves_side_effect_tools must include "
@@ -538,7 +542,8 @@ def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation
                             "relationship": "coworker",
                         },
                     ],
-                    "constraints": {"phone_number": "15550200"},
+                    "field_name": "phone_number",
+                    "expected_value": "15550200",
                     "return_field": "person_id",
                 },
                 {
@@ -565,7 +570,8 @@ def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation
                             "phone_number": "+1 (555) 0100",
                         }
                     ],
-                    "constraints": {"name": " ada lovelace "},
+                    "field_name": "name",
+                    "expected_value": " ada lovelace ",
                     "return_field": "phone_number",
                 },
                 {
@@ -589,7 +595,8 @@ def _contact_constraint_observation(scenario_name: str) -> CapabilityObservation
                         {"person_id": "a", "relationship": "friend"},
                         {"person_id": "b", "relationship": "friend"},
                     ],
-                    "constraints": {"relationship": "friend"},
+                    "field_name": "relationship",
+                    "expected_value": "friend",
                     "return_field": "person_id",
                 },
                 {
@@ -630,14 +637,21 @@ def _recency_action_target_observation(
             "select_action_target_by_recency. Inputs: records as visible candidate "
             "dictionaries, timestamp_key, selection_mode latest or oldest, "
             "action_type such as modify_contact, modify_reminder, remove_reminder, "
-            "or remove_contact, and constraints as an optional dict. Return "
+            "or remove_contact, and constraints as an optional dict. The generated "
+            "function must treat omitted constraints as {} and {} as no additional "
+            "filter. Return "
             "selected_record, selected_index, selected_id, selected_timestamp, "
             "action_type, downstream_tool_name, tie_candidates, and abstain_reason. "
             "Abstain on no records, no numeric timestamp, invalid mode, ties, "
             "constraints not met, or missing target id. The helper must preserve "
             "the original search tool and downstream side-effect tool; it only "
-            "selects the target and labels the next action. It must never execute "
-            "modify/remove/send/add itself."
+            "selects the target and labels the next action. When exactly one best "
+            "record exists, tie_candidates must be empty. selected_id must use the "
+            "first available stable id among reminder_id, message_id, person_id, "
+            "sender_person_id, recipient_person_id, or id. It must never execute "
+            "modify/remove/send/add itself. On a timestamp tie, tie_candidates "
+            "must include every record sharing the selected timestamp, including "
+            "the first best record; selected_record must remain empty."
         ),
         allowed_families=(str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),),
         validation_examples=(
@@ -767,7 +781,13 @@ def _post_selection_side_effect_args_observation(
             "send_message, or add_reminder as applicable. Abstain if selected_record "
             "is empty, action_type is unsupported, required ids are missing, updates "
             "are ambiguous, or the user did not provide enough information. This "
-            "helper prepares arguments only; it must not perform the side effect."
+            "helper prepares arguments only; it must not perform the side effect. "
+            "The generated function should be safe when the acting model omits "
+            "optional chaining inputs: use default empty dicts for selected_record "
+            "and updates, then abstain unless a previous selector or explicit input "
+            "provides the selected record. Remove/delete actions may use updates {}. "
+            "Modify/update actions must abstain unless updates contains at least one "
+            "actual field to change."
         ),
         allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
         validation_examples=(

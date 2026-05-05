@@ -444,3 +444,29 @@
   - Tests: `95 passed`; frozen best3 and V2.1 candidate registry checks PASS.
   - Reports: `docs/sage_protocol/v2_1_tool_expansion_discovery60_report.md`, `docs/sage_protocol/v2_1_tool_expansion_candidate_triage.md`.
   - Decision: `generation contract repair needed`; no confirmation60.
+
+- `V2.1 tool callability repair` completed.
+  - Date: `2026-05-04T23:10:00-04:00`
+  - Frozen best3 registry untouched: `artifacts/registry_frozen_best3_claim/registry_manifest.json`.
+  - Candidate registry: `artifacts/registry_candidates/v2_1_tool_expansion_retry12_tiecontract_20260504_213000/registry_manifest.json`.
+  - Fixes: optional helper defaults for `constraints`, action-selector usage guidance, recency-action routing suppression on non-recency tasks, safe `all`/`any`, selector one-of-many downstream routing, post-selection trace chaining.
+  - Tests: `104 passed`; candidate registry check-only PASS.
+  - Force run: `outputs/v2_1_tool_expansion_select_action_force_search_reminder12_constraintsfix_20260504_223500/mechanism_12_20260504_210829`; outcome `+0.2223`; canonical `+0.1471`; exact `+2`; selector visible/called/VNC `9 / 5 / 4`; called-subset outcome `+0.6798`; runtime/side-effect `0 / 0`; protocol PASS.
+  - Natural run: `outputs/v2_1_tool_expansion_select_action_natural12_affordancefix_20260504_231000/mechanism_12_20260504_211708`; outcome `+0.1167`; canonical `+0.0511`; exact `+1`; selector visible/called/VNC `5 / 3 / 2`; called-subset outcome `+0.4828`; runtime/side-effect `0 / 0`; protocol PASS.
+  - Dashboards opened for both latest dashboard and task-focus URLs.
+  - Report: `docs/sage_protocol/v2_1_tool_callability_repair_report.md`.
+  - Decision: `candidate ready for confirmation60`.
+  - Next action: frozen confirmation-60 for best3 + `select_action_target_by_recency` vs frozen best3 only.
+
+- `V2.1 select_action_target_by_recency callability decision` completed.
+  - Date: `2026-05-04T23:55:00-04:00`
+  - Report: `docs/sage_protocol/v2_1_select_action_callability_report.md`
+  - Frozen best3 registry untouched.
+  - Confirmation registry: `artifacts/registry_candidates/v2_1_select_action_confirmation60_20260504_232500/registry_manifest.json`, SHA-256 `854ac053d6e3c0e96751cf3eddecd26f987f1d50484c68ea45cd3cd20ac82303`.
+  - Force diagnostic proved callability: visible/called/VNC `9 / 5 / 4`, called-subset outcome `+0.6798`, side-effect/runtime `0 / 0`.
+  - Natural diagnostic proved adoption after affordance repair: visible/called/VNC `5 / 3 / 2`, called-subset outcome `+0.4828`, side-effect/runtime `0 / 0`.
+  - Confirmation60 after insufficient-info suppression: `outputs/v2_1_select_action_confirmation60_insufficientfix_20260504_234500/mechanism_60_20260504_213336`; dashboard and task-focus opened.
+  - Confirmation60 overall: outcome `+0.0907`, canonical `+0.0612`, exact delta `+6`, protocol PASS.
+  - Selector contribution in confirmation60: visible/called/VNC `5 / 2 / 3`, called-subset outcome `-0.1667`, canonical `+0.1111`, side-effect/runtime `0 / 0`.
+  - Decision: `candidate concept negative; park candidate`.
+  - Next action: retain framework callability/routing fixes; mine next uncovered cluster rather than promoting this selector.

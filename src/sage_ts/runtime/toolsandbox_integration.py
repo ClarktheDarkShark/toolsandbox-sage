@@ -26,7 +26,12 @@ from sage_ts.runtime.routing_scorer import (
 )
 from sage_ts.validation.schema_check import compile_generated_tool
 from tool_sandbox.common import tool_conversion
-from tool_sandbox.common.execution_context import ExecutionContext, RoleType
+from tool_sandbox.common.execution_context import (
+    DatabaseNamespace,
+    ExecutionContext,
+    RoleType,
+    get_current_context,
+)
 from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_discovery import ToolBackend, get_scrambled_tool_names
 from tool_sandbox.common.utils import add_tool_trace
@@ -41,6 +46,13 @@ PYTHON_TYPES: dict[str, Any] = {
     "bool": bool,
     "dict": dict,
     "list": list,
+}
+
+OPTIONAL_HELPER_DEFAULTS: dict[str, Any] = {
+    "constraints": {},
+    "filters": {},
+    "required_filters": {},
+    "tie_break_fields": [],
 }
 
 
@@ -133,6 +145,59 @@ def _post_selection_composite_usage_note(spec: ToolSpec) -> list[str]:
     return lines
 
 
+def _search_filter_action_usage_note(spec: ToolSpec) -> list[str]:
+    """Affordance guidance for selectors that choose a downstream action target."""
+    output_schema = spec.output_schema or {}
+    output_properties = output_schema.get("properties", {})
+    if not isinstance(output_properties, dict):
+        return []
+    if not {"selected_record", "downstream_tool_name"} <= set(output_properties):
+        return []
+
+    lines = [
+        "",
+        "Selection/action usage:",
+        "    Use this helper after an original search tool returns visible",
+        " candidate records and before choosing a target for modify, remove,",
+        " reply, send, or another downstream action.",
+        "    Pass records as the full list returned by the search tool; do not",
+        " summarize or invent records.",
+    ]
+    input_names = {item.name for item in spec.inputs}
+    if "timestamp_key" in input_names:
+        lines.extend(
+            [
+                "    Pass timestamp_key as the visible timestamp field to rank",
+                " such as creation_timestamp or reminder_timestamp.",
+            ]
+        )
+    if "selection_mode" in input_names:
+        lines.extend(
+            [
+                "    Pass selection_mode='latest' for newest/most recent/last,",
+                " and selection_mode='oldest' for oldest/earliest/next upcoming",
+                " when ranking future timestamps from soonest to latest.",
+            ]
+        )
+    if "constraints" in input_names:
+        lines.extend(
+            [
+                "    constraints is optional. Omit it or pass {} when there are",
+                " no extra user constraints beyond recency/timestamp/action type.",
+            ]
+        )
+    lines.extend(
+        [
+            "    If abstain_reason is empty, use selected_record/selected_id for",
+            " the next original ToolSandbox action. This helper does not perform",
+            " the action.",
+            "    If abstain_reason is non-empty, do not guess before a side-effect",
+            " action; search further or ask for clarification.",
+        ]
+    )
+    return lines
+
+
 def _dict_input_keys(entry: RegistryEntry) -> dict[str, tuple[str, ...]]:
     """Return literal dict keys used by generated code as affordance hints."""
     keys_by_input: dict[str, tuple[str, ...]] = {}
@@ -187,6 +252,114 @@ def _missing_argument_abstain_result(entry: RegistryEntry, error: TypeError) -> 
         if key.startswith("should_") or key in {"should_call", "should_call_tool"}:
             result[key] = False
     result["abstain_reason"] = "missing_required_helper_inputs"
+    return result
+
+
+def _latest_generated_tool_result_with_key(key: str) -> dict[str, Any] | None:
+    """Read the current message tool trace and return the newest result with key."""
+    try:
+        sandbox = get_current_context().get_database(
+            namespace=DatabaseNamespace.SANDBOX,
+            get_all_history_snapshots=True,
+        )
+    except Exception:
+        return None
+    for row in reversed(sandbox.to_dicts()):
+        existing = row.get("tool_trace")
+        if existing is None:
+            continue
+        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
+        for item in reversed(traces):
+            try:
+                payload = json.loads(str(item))
+            except json.JSONDecodeError:
+                continue
+            result = payload.get("result")
+            if isinstance(result, dict) and key in result:
+                return result
+    return None
+
+
+def _with_chained_post_selection_arguments(
+    entry: RegistryEntry,
+    kwargs: dict[str, Any],
+) -> dict[str, Any]:
+    """Autofill mechanical chaining args from prior helper traces when safe."""
+    spec = entry.tool.spec
+    input_names = {item.name for item in spec.inputs}
+    if spec.family != ToolFamily.COMPOSITE_WORKFLOW_HELPER:
+        return kwargs
+    if "selected_record" not in input_names:
+        return kwargs
+
+    updated = dict(kwargs)
+    if not updated.get("selected_record"):
+        latest_selection = _latest_generated_tool_result_with_key("selected_record")
+        selected_record = (
+            latest_selection.get("selected_record")
+            if latest_selection is not None
+            else None
+        )
+        if isinstance(selected_record, dict) and selected_record:
+            updated["selected_record"] = selected_record
+    action_type = str(updated.get("action_type", "")).lower()
+    if "updates" in input_names and "updates" not in updated:
+        if action_type.startswith(("remove", "delete")):
+            updated["updates"] = {}
+    return updated
+
+
+def _with_optional_helper_defaults(
+    entry: RegistryEntry,
+    kwargs: dict[str, Any],
+) -> dict[str, Any]:
+    """Fill safe defaults for optional filter/list inputs omitted by the model."""
+    updated = dict(kwargs)
+    for item in entry.tool.spec.inputs:
+        if item.name in updated:
+            continue
+        if item.name not in OPTIONAL_HELPER_DEFAULTS:
+            continue
+        description = item.description.lower()
+        if "optional" not in description and item.name not in {
+            "constraints",
+            "required_filters",
+            "tie_break_fields",
+        }:
+            continue
+        updated[item.name] = copy.deepcopy(OPTIONAL_HELPER_DEFAULTS[item.name])
+    return updated
+
+
+def _missing_modify_update_abstain_result(
+    entry: RegistryEntry, kwargs: dict[str, Any]
+) -> Any:
+    """Avoid turning a mechanically filled selected record into unsafe no-op modify."""
+    if entry.tool.spec.family != ToolFamily.COMPOSITE_WORKFLOW_HELPER:
+        return None
+    input_names = {item.name for item in entry.tool.spec.inputs}
+    if "updates" not in input_names:
+        return None
+    action_type = str(kwargs.get("action_type", "")).lower()
+    if not action_type.startswith(("modify", "update")):
+        return None
+    updates = kwargs.get("updates")
+    if isinstance(updates, dict) and updates:
+        return None
+    output_schema = entry.tool.spec.output_schema or {}
+    output_properties = output_schema.get("properties", {})
+    if (
+        not isinstance(output_properties, dict)
+        or "abstain_reason" not in output_properties
+    ):
+        return None
+    result = {
+        key: _schema_default_value(schema) for key, schema in output_properties.items()
+    }
+    for key in tuple(result):
+        if key.startswith("should_") or key in {"should_call", "should_call_tool"}:
+            result[key] = False
+    result["abstain_reason"] = "missing_required_update_fields"
     return result
 
 
@@ -315,6 +488,8 @@ def _google_docstring(entry: RegistryEntry) -> str:
             ]
         )
     elif spec.required_original_tool_calls:
+        if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
+            lines.extend(_search_filter_action_usage_note(spec))
         if spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
             lines.extend(_post_selection_composite_usage_note(spec))
         # General call-path note for any other side-effect-preserving prep helper
@@ -354,6 +529,14 @@ def _compile_toolsandbox_tool(
     _inner = raw_fn
 
     def _wrapped(*args: Any, **kwargs: Any) -> Any:
+        kwargs = _with_chained_post_selection_arguments(entry, kwargs)
+        kwargs = _with_optional_helper_defaults(entry, kwargs)
+        missing_update_result = _missing_modify_update_abstain_result(entry, kwargs)
+        if missing_update_result is not None:
+            add_tool_trace(_wrapped, missing_update_result, *args, **kwargs)
+            if on_reuse is not None:
+                on_reuse(_tool_name)
+            return missing_update_result
         try:
             result = _inner(*args, **kwargs)
         except TypeError as error:
@@ -387,11 +570,20 @@ def _compile_toolsandbox_tool(
 
     # Rebuild the inspect.Signature so the agent role can introspect parameters.
     sig = inspect.signature(raw_fn)
+    signature_parameters = []
+    for p in sig.parameters.values():
+        replacement = p.replace(annotation=annotations.get(p.name, p.annotation))
+        if (
+            p.default is inspect.Parameter.empty
+            and p.name in OPTIONAL_HELPER_DEFAULTS
+            and any(item.name == p.name for item in entry.tool.spec.inputs)
+        ):
+            replacement = replacement.replace(
+                default=copy.deepcopy(OPTIONAL_HELPER_DEFAULTS[p.name])
+            )
+        signature_parameters.append(replacement)
     fn.__signature__ = sig.replace(  # type: ignore[attr-defined]
-        parameters=[
-            p.replace(annotation=annotations.get(p.name, p.annotation))
-            for p in sig.parameters.values()
-        ],
+        parameters=signature_parameters,
         return_annotation=annotations.get("return", inspect.Parameter.empty),
     )
     return fn
@@ -704,15 +896,18 @@ def route_registry_entries(
                 if emitted:
                     downstream_tools = emitted
                     requires_any_downstream = True
-            if (
-                entry.tool.spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER
-                and "downstream_tool_name" in output_props
-                and any(str(key).endswith("_kwargs") for key in output_props)
+            if "downstream_tool_name" in output_props and (
+                entry.tool.spec.family
+                in {
+                    ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+                    ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+                }
             ):
-                # Generic side-effect argument preparers return one downstream
-                # ToolSandbox action, not all actions named in their preservation
-                # contract. Requiring every preserved action to be available hides
-                # valid candidate tools on narrower per-scenario tool allow-lists.
+                # Action-target selectors and side-effect argument preparers return
+                # one downstream ToolSandbox action, not all actions named in
+                # their preservation contract. Requiring every preserved action to
+                # be available hides valid candidate tools on narrower per-scenario
+                # allow-lists.
                 downstream_tools = set(entry.tool.spec.preserves_side_effect_tools)
                 requires_any_downstream = True
         if not downstream_tools:

@@ -114,6 +114,10 @@ def _helper_evidence(tool_name: str) -> dict[str, Any]:
     return {}
 
 
+def _input_names(spec: Any) -> set[str]:
+    return {item.name for item in spec.inputs}
+
+
 def _is_fair_chance_candidate(entry: RegistryEntry, evidence: dict[str, Any]) -> bool:
     """Return whether a new cluster-born helper deserves bounded first exposure."""
     if not feature_enabled(EVIDENCE_ROUTING):
@@ -205,6 +209,31 @@ def _blocked_by_adoption_risk(
     return True, "blocked_by_visible_not_called_adoption_risk"
 
 
+def _is_recency_action_selector(spec_text: str, input_names: set[str]) -> bool:
+    return (
+        "timestamp_key" in input_names
+        and "selection_mode" in input_names
+        and "action_type" in input_names
+        and any(token in spec_text for token in ("recency", "latest", "oldest"))
+    )
+
+
+def _scenario_has_recency_action_signal(scenario_name: str) -> bool:
+    return any(
+        token in scenario_name
+        for token in (
+            "recency",
+            "latest",
+            "oldest",
+            "recent",
+            "upcoming",
+            "most_recent",
+            "last_",
+            "next_",
+        )
+    )
+
+
 def score_registry_entry_for_scenario(
     entry: RegistryEntry,
     scenario_name: str | None,
@@ -224,6 +253,15 @@ def score_registry_entry_for_scenario(
             tool_name, False, "hidden", "missing_scenario_name_suppressed", -10
         )
     scenario_lower = scenario_name.lower()
+    input_names = _input_names(spec)
+    spec_text = " ".join(
+        [
+            spec.tool_name,
+            spec.description,
+            *spec.positive_triggers,
+            *spec.applicable_task_families,
+        ]
+    ).lower()
     matched_negative = tuple(
         token for token in spec.negative_triggers if _token_match(token, scenario_lower)
     )
@@ -242,6 +280,28 @@ def score_registry_entry_for_scenario(
     )
     if matched_positive:
         score += 4
+    if _is_recency_action_selector(
+        spec_text, input_names
+    ) and not _scenario_has_recency_action_signal(scenario_lower):
+        return RuntimeRoutingDecision(
+            tool_name,
+            False,
+            "hidden",
+            "recency_action_selector_requires_recency_action_task",
+            -25,
+        )
+    if (
+        spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER
+        and "insufficient_information" in scenario_lower
+        and (spec.preserves_side_effect_tools or spec.required_original_tool_calls)
+    ):
+        return RuntimeRoutingDecision(
+            tool_name,
+            False,
+            "hidden",
+            "side_effect_selector_suppressed_for_insufficient_information",
+            -30,
+        )
     scenario_strata = set(classify_task_strata(scenario_name))
     matched_families = tuple(
         family

@@ -193,6 +193,76 @@ def select_contact_by_constraint(records_payload: dict, field_name: str, expecte
     assert validation.accepted
 
 
+def test_generated_tool_validation_allows_safe_all_any_builtins() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="records_all_have_field",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            description="Check whether visible records have required fields.",
+            inputs=(
+                ToolInput("records", "list", "Visible records."),
+                ToolInput("field_name", "str", "Required field."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "all_have_field": {"type": "boolean"},
+                    "any_have_field": {"type": "boolean"},
+                },
+            },
+            positive_triggers=("visible records need field validation",),
+            negative_triggers=("no records",),
+            preserves_side_effect_tools=("search_messages",),
+            required_original_tool_calls=("search_messages",),
+            abstain_behavior="Return false values when records are empty.",
+            generalization_rationale="Selector helpers need safe builtins.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=("record_selection", "message_selection"),
+            reason_tool_is_decisive="It validates candidate records before selection.",
+            shortfall_cluster_evidence=("search_filter:field_validation",),
+            known_failure_mechanisms_addressed=("selector_field_validation",),
+            inadequacy_evidence=_evidence(
+                "Generated selector code often needs all/any for constraints.",
+                "selector_field_validation",
+            ),
+        ),
+        code="""
+def records_all_have_field(records: list, field_name: str) -> dict:
+    return {
+        'all_have_field': bool(records) and all(field_name in record for record in records),
+        'any_have_field': any(field_name in record for record in records),
+    }
+""",
+    )
+
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {
+                    "records": [{"reminder_id": "a"}, {"reminder_id": "b"}],
+                    "field_name": "reminder_id",
+                },
+                {"all_have_field": True, "any_have_field": True},
+            ),
+            ToolExample(
+                {"records": [{"name": "Ada"}, {}], "field_name": "name"},
+                {"all_have_field": False, "any_have_field": True},
+                held_out=True,
+            ),
+            ToolExample(
+                {"records": [], "field_name": "name"},
+                {"all_have_field": False, "any_have_field": False},
+                negative_applicability=True,
+            ),
+        ),
+    )
+
+    assert validation.accepted
+
+
 def test_generated_tool_validation_allows_safe_lambda_sort_key() -> None:
     tool = GeneratedTool(
         spec=ToolSpec(

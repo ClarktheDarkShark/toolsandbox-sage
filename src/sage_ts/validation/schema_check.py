@@ -11,6 +11,8 @@ from sage_ts.generation.tool_spec import GeneratedTool
 
 SAFE_BUILTINS: dict[str, Any] = {
     "abs": abs,
+    "all": all,
+    "any": any,
     "bool": bool,
     "dict": dict,
     "enumerate": enumerate,

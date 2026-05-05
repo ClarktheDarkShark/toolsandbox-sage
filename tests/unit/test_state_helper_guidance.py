@@ -12,7 +12,14 @@ from sage_ts.runtime.toolsandbox_integration import (
     compile_toolsandbox_tool,
 )
 from sage_ts.validation.sandbox_validator import ValidationResult
+from tool_sandbox.common.execution_context import (
+    DatabaseNamespace,
+    ExecutionContext,
+    RoleType,
+    new_context,
+)
 from tool_sandbox.common.tool_conversion import convert_to_openai_tool
+from tool_sandbox.common.utils import add_tool_trace
 
 
 def _state_helper_entry() -> RegistryEntry:
@@ -336,3 +343,272 @@ def test_post_selection_composite_docstring_explains_required_inputs() -> None:
     assert result["should_call_tool"] is False
     assert result["abstain_reason"] == "missing_required_helper_inputs"
     assert result["downstream_tool_kwargs"] == {}
+
+
+def test_post_selection_composite_chains_selected_record_from_prior_trace() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_side_effect_args_from_selected_record",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare downstream side-effect kwargs after selection.",
+            inputs=(
+                ToolInput("selected_record", "dict", "Selected visible record."),
+                ToolInput("action_type", "str", "Intended downstream action."),
+                ToolInput("updates", "dict", "Fields to update."),
+                ToolInput("user_intent", "str", "Original user request."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("selected record needs downstream side effect",),
+            negative_triggers=("selected record unavailable",),
+            required_original_tool_calls=("remove_reminder", "modify_reminder"),
+            preserves_side_effect_tools=("remove_reminder", "modify_reminder"),
+            abstain_behavior=(
+                "Return should_call_tool=False when selected_record or required "
+                "updates are unavailable."
+            ),
+            generalization_rationale=(
+                "Post-selection side-effect argument preparation recurs."
+            ),
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "remove_reminder_with_recency_latest",
+                "modify_reminder_with_recency_latest",
+            ),
+            reason_tool_is_decisive=(
+                "It converts a selected record and action intent into original "
+                "ToolSandbox kwargs."
+            ),
+            shortfall_cluster_evidence=(
+                "composite:prepare_side_effect_args_from_selected_record",
+            ),
+            known_failure_mechanisms_addressed=(
+                "failed_side_effect_argument_preparation_after_selection",
+            ),
+            final_state_preservation_plan=(
+                "Caller executes the returned original ToolSandbox tool."
+            ),
+            grading_accounting_note=(
+                "Helper prepares kwargs only; side effects stay with base tools."
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Agents fail to prepare kwargs after selecting records.",
+                signals=("side_effect_argument_preparation",),
+            ),
+        ),
+        code=(
+            "def prepare_side_effect_args_from_selected_record("
+            "selected_record: dict, action_type: str, updates: dict, "
+            "user_intent: str) -> dict:\n"
+            "    if not selected_record:\n"
+            "        return {'downstream_tool_name': '', "
+            "'downstream_tool_kwargs': {}, 'should_call_tool': False, "
+            "'abstain_reason': 'missing_selected_record'}\n"
+            "    if action_type == 'remove_reminder' and selected_record.get('reminder_id'):\n"
+            "        return {'downstream_tool_name': 'remove_reminder', "
+            "'downstream_tool_kwargs': {'reminder_id': selected_record['reminder_id']}, "
+            "'should_call_tool': True, 'abstain_reason': ''}\n"
+            "    if action_type == 'modify_reminder' and selected_record.get('reminder_id'):\n"
+            "        return {'downstream_tool_name': 'modify_reminder', "
+            "'downstream_tool_kwargs': {'reminder_id': selected_record['reminder_id'], "
+            "**updates}, 'should_call_tool': True, 'abstain_reason': ''}\n"
+            "    return {'downstream_tool_name': '', 'downstream_tool_kwargs': {}, "
+            "'should_call_tool': False, 'abstain_reason': 'unsupported_action_type'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="remove_reminder_with_recency_latest",
+    )
+
+    def select_record_by_timestamp_extreme() -> dict[str, object]:
+        return {}
+
+    select_record_by_timestamp_extreme.__name__ = "select_record_by_timestamp_extreme"
+
+    context = ExecutionContext()
+    context.trace_tool = True
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.AGENT,
+                "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                "content": "test chained helper call",
+                "openai_tool_call_id": "test-call",
+                "openai_function_name": "select_record_by_timestamp_extreme",
+                "conversation_active": True,
+                "tool_call_exception": None,
+                "tool_trace": None,
+                "visible_to": [RoleType.AGENT, RoleType.EXECUTION_ENVIRONMENT],
+            }
+        ],
+    )
+    with new_context(context):
+        add_tool_trace(
+            select_record_by_timestamp_extreme,
+            {
+                "selected_record": {
+                    "reminder_id": "r1",
+                    "content": "Buy tickets",
+                }
+            },
+        )
+        context.add_to_database(
+            DatabaseNamespace.SANDBOX,
+            [
+                {
+                    "sender": RoleType.AGENT,
+                    "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                    "content": "test downstream prep helper call",
+                    "openai_tool_call_id": "test-call-2",
+                    "openai_function_name": (
+                        "prepare_side_effect_args_from_selected_record"
+                    ),
+                    "conversation_active": True,
+                    "tool_call_exception": None,
+                    "tool_trace": None,
+                    "visible_to": [RoleType.AGENT, RoleType.EXECUTION_ENVIRONMENT],
+                }
+            ],
+        )
+        fn = compile_toolsandbox_tool(entry)
+
+        remove_result = fn(
+            action_type="remove_reminder",
+            user_intent="Remove the selected reminder.",
+        )
+        assert remove_result == {
+            "downstream_tool_name": "remove_reminder",
+            "downstream_tool_kwargs": {"reminder_id": "r1"},
+            "should_call_tool": True,
+            "abstain_reason": "",
+        }
+
+        modify_result = fn(
+            action_type="modify_reminder",
+            user_intent="Modify the selected reminder.",
+        )
+        assert modify_result["should_call_tool"] is False
+        assert modify_result["abstain_reason"] == "missing_required_update_fields"
+
+
+def test_search_filter_helper_defaults_optional_constraints() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="select_action_target_by_recency",
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            description="Select a visible record for a downstream action by recency.",
+            inputs=(
+                ToolInput("records", "list", "Visible candidate records."),
+                ToolInput("timestamp_key", "str", "Timestamp field to compare."),
+                ToolInput("selection_mode", "str", "latest or oldest."),
+                ToolInput("action_type", "str", "Downstream action type."),
+                ToolInput("constraints", "dict", "Optional constraints to apply."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                    "selected_index": {"type": "integer"},
+                    "selected_id": {"type": "string"},
+                    "selected_timestamp": {"type": "number"},
+                    "action_type": {"type": "string"},
+                    "downstream_tool_name": {"type": "string"},
+                    "tie_candidates": {"type": "array"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("modify reminder by latest visible record",),
+            negative_triggers=("no records", "ambiguous timestamp tie"),
+            required_original_tool_calls=("modify_reminder", "remove_reminder"),
+            preserves_side_effect_tools=("modify_reminder", "remove_reminder"),
+            abstain_behavior="Return abstain_reason when no unambiguous target exists.",
+            generalization_rationale="Recency action target selection recurs.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "modify_reminder_with_recency_latest",
+                "remove_reminder_with_recency_latest",
+            ),
+            reason_tool_is_decisive=(
+                "It converts visible record filtering, recency ranking, and "
+                "downstream action targeting into one deterministic helper call."
+            ),
+            shortfall_cluster_evidence=(
+                "search_filter:select_action_target_by_recency",
+            ),
+            known_failure_mechanisms_addressed=(
+                "wrong_target_selection_before_side_effect_action",
+            ),
+            final_state_preservation_plan=(
+                "Caller must execute the downstream ToolSandbox side-effect tool."
+            ),
+            grading_accounting_note=(
+                "Helper selection is reported separately from final side effect."
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Agents fail to select the correct recency action target.",
+                signals=("record_selection",),
+            ),
+        ),
+        code=(
+            "def select_action_target_by_recency(records: list, timestamp_key: str, "
+            "selection_mode: str, action_type: str, constraints: dict) -> dict:\n"
+            "    valid_records = [r for r in records if all(r.get(k) == v for k, v in constraints.items())]\n"
+            "    selected = max(valid_records, key=lambda r: r[timestamp_key])\n"
+            "    return {'selected_record': selected, 'selected_index': records.index(selected), "
+            "'selected_id': selected.get('reminder_id', ''), "
+            "'selected_timestamp': selected[timestamp_key], 'action_type': action_type, "
+            "'downstream_tool_name': action_type, 'tie_candidates': [], 'abstain_reason': ''}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="modify_reminder_with_recency_latest",
+    )
+    docstring = _google_docstring(entry)
+    assert "Selection/action usage:" in docstring
+    assert "after an original search tool returns visible" in docstring
+    assert "constraints is optional" in docstring
+
+    fn = compile_toolsandbox_tool(entry)
+
+    result = fn(
+        records=[
+            {"reminder_id": "older", "reminder_timestamp": 1.0},
+            {"reminder_id": "newer", "reminder_timestamp": 2.0},
+        ],
+        timestamp_key="reminder_timestamp",
+        selection_mode="latest",
+        action_type="modify_reminder",
+    )
+
+    assert result["selected_id"] == "newer"
+    assert result["abstain_reason"] == ""
