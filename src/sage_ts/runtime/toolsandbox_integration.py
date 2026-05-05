@@ -280,11 +280,45 @@ def _latest_generated_tool_result_with_key(key: str) -> dict[str, Any] | None:
     return None
 
 
+def _latest_single_original_search_record() -> dict[str, Any] | None:
+    """Return the newest unambiguous record from an original search tool trace."""
+    try:
+        sandbox = get_current_context().get_database(
+            namespace=DatabaseNamespace.SANDBOX,
+            get_all_history_snapshots=True,
+        )
+    except Exception:
+        return None
+    for row in reversed(sandbox.to_dicts()):
+        existing = row.get("tool_trace")
+        if existing is None:
+            continue
+        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
+        for item in reversed(traces):
+            try:
+                payload = json.loads(str(item))
+            except json.JSONDecodeError:
+                continue
+            tool_name = str(payload.get("tool_name", ""))
+            if not tool_name.startswith("search_"):
+                continue
+            result = payload.get("result")
+            if (
+                isinstance(result, list)
+                and len(result) == 1
+                and isinstance(result[0], dict)
+            ):
+                return dict(result[0])
+            if isinstance(result, dict):
+                return dict(result)
+    return None
+
+
 def _with_chained_post_selection_arguments(
     entry: RegistryEntry,
     kwargs: dict[str, Any],
 ) -> dict[str, Any]:
-    """Autofill mechanical chaining args from prior helper traces when safe."""
+    """Autofill mechanical chaining args from prior traces when safe."""
     spec = entry.tool.spec
     input_names = {item.name for item in spec.inputs}
     if spec.family != ToolFamily.COMPOSITE_WORKFLOW_HELPER:
@@ -300,6 +334,8 @@ def _with_chained_post_selection_arguments(
             if latest_selection is not None
             else None
         )
+        if not isinstance(selected_record, dict) or not selected_record:
+            selected_record = _latest_single_original_search_record()
         if isinstance(selected_record, dict) and selected_record:
             updated["selected_record"] = selected_record
     action_type = str(updated.get("action_type", "")).lower()
@@ -878,11 +914,23 @@ def route_registry_entries(
     """Select a bounded runtime helper bundle and explain each routing decision."""
     decisions: dict[str, RuntimeRoutingDecision] = {}
     visible: list[tuple[int, str, RegistryEntry]] = []
+    generic_hard_blocks = {
+        "blocked_by_negative_trigger",
+        "blocked_by_visible_not_called_adoption_risk",
+        "recency_action_selector_requires_recency_action_task",
+        "side_effect_selector_suppressed_for_insufficient_information",
+        "side_effect_composite_suppressed_for_insufficient_information",
+        "post_selection_composite_requires_downstream_action_task",
+    }
     for tool_name, entry in sorted(entries.items()):
         generic = score_registry_entry_for_scenario(entry, scenario_name)
         is_visible, reason = registry_entry_visibility_reason(entry, scenario_name)
         status = "shown" if is_visible else "hidden"
         score = generic.score
+        if generic.status == "hidden" and generic.reason in generic_hard_blocks:
+            is_visible = False
+            status = "hidden"
+            reason = generic.reason
         downstream_tools = set(entry.tool.spec.required_original_tool_calls)
         requires_any_downstream = False
         output_schema = entry.tool.spec.output_schema or {}

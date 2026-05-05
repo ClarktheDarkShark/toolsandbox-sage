@@ -94,6 +94,10 @@ def test_generation_request_includes_family_contract_guidance(
 
     assert "If family is search_filter_ranking_helper" in prompt
     assert "selected_record" in prompt
+    assert "Normalize BOTH sides before comparing" in prompt
+    assert "raw formatted phone strings" in prompt
+    assert "prefer low-friction call patterns" in prompt
+    assert "autofill selected_record from the latest original search_*" in prompt
     assert "If family is state_precondition_helper" in prompt
     assert "tool_name must have an enum" in prompt
     assert "must not require an opaque dict input" in prompt

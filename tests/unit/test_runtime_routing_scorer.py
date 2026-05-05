@@ -413,6 +413,132 @@ def test_side_effect_selector_hides_on_insufficient_information() -> None:
     )
 
 
+def test_side_effect_composite_hides_on_insufficient_information() -> None:
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="prepare_side_effect_args_from_selected_record",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare kwargs for an original side-effect tool.",
+            inputs=(
+                replace(
+                    base.tool.spec.inputs[0], name="selected_record", annotation="dict"
+                ),
+                replace(base.tool.spec.inputs[0], name="action_type", annotation="str"),
+                replace(base.tool.spec.inputs[0], name="updates", annotation="dict"),
+                replace(base.tool.spec.inputs[0], name="user_intent", annotation="str"),
+            ),
+            positive_triggers=("selected record with required id",),
+            negative_triggers=("missing selected record",),
+            applicable_task_families=(
+                "remove_contact_by_phone",
+                "update_contact_relationship_with_relationship",
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            required_original_tool_calls=("remove_contact",),
+            preserves_side_effect_tools=("remove_contact",),
+        ),
+        code=(
+            "def prepare_side_effect_args_from_selected_record("
+            "selected_record: dict, action_type: str, updates: dict, "
+            "user_intent: str) -> dict:\n"
+            "    return {'downstream_tool_name': '', 'downstream_tool_kwargs': {}, "
+            "'should_call_tool': False, 'abstain_reason': 'test'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="remove_contact_by_phone",
+    )
+
+    decision = score_registry_entry_for_scenario(
+        entry, "remove_contact_by_phone_no_remove_contact_insufficient_information"
+    )
+
+    assert not decision.visible
+    assert (
+        decision.reason
+        == "side_effect_composite_suppressed_for_insufficient_information"
+    )
+
+
+def test_side_effect_composite_hides_without_downstream_action_signal() -> None:
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="prepare_side_effect_args_from_selected_record",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare kwargs for an original side-effect tool.",
+            inputs=(
+                replace(
+                    base.tool.spec.inputs[0], name="selected_record", annotation="dict"
+                ),
+                replace(base.tool.spec.inputs[0], name="action_type", annotation="str"),
+                replace(base.tool.spec.inputs[0], name="updates", annotation="dict"),
+                replace(base.tool.spec.inputs[0], name="user_intent", annotation="str"),
+            ),
+            positive_triggers=("selected record with required id",),
+            negative_triggers=("missing selected record",),
+            applicable_task_families=(
+                "remove_contact_by_phone",
+                "update_contact_relationship_with_relationship",
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            required_original_tool_calls=("remove_contact",),
+            preserves_side_effect_tools=("remove_contact",),
+        ),
+        code=(
+            "def prepare_side_effect_args_from_selected_record("
+            "selected_record: dict, action_type: str, updates: dict, "
+            "user_intent: str) -> dict:\n"
+            "    return {'downstream_tool_name': '', 'downstream_tool_kwargs': {}, "
+            "'should_call_tool': False, 'abstain_reason': 'test'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="remove_contact_by_phone",
+    )
+
+    decision = score_registry_entry_for_scenario(
+        entry, "search_name_with_relationship_3_distraction_tools"
+    )
+
+    assert not decision.visible
+    assert decision.reason == "post_selection_composite_requires_downstream_action_task"
+
+    _entries, decisions = route_registry_entries(
+        {"prepare_side_effect_args_from_selected_record": entry},
+        "search_name_with_relationship_3_distraction_tools",
+        available_base_tools={"search_contacts", "modify_contact", "remove_contact"},
+    )
+    assert not decisions["prepare_side_effect_args_from_selected_record"].visible
+    assert (
+        decisions["prepare_side_effect_args_from_selected_record"].reason
+        == "post_selection_composite_requires_downstream_action_task"
+    )
+
+
 def test_route_registry_entries_allows_one_available_emitted_downstream_tool() -> None:
     base = _state_dependency_entry()
     entry = replace(

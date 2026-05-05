@@ -470,3 +470,17 @@
   - Selector contribution in confirmation60: visible/called/VNC `5 / 2 / 3`, called-subset outcome `-0.1667`, canonical `+0.1111`, side-effect/runtime `0 / 0`.
   - Decision: `candidate concept negative; park candidate`.
   - Next action: retain framework callability/routing fixes; mine next uncovered cluster rather than promoting this selector.
+
+
+- `V2.1 gap closure discovery and candidate triage` completed.
+  - Date: `2026-05-04T23:05:00-04:00`
+  - Manifest: `artifacts/summaries/v2_1_gap_closure_20260504_221814/cohort_manifest.json`; cohort quality PASS; no-current-helper-fit share `41.67%`.
+  - Discovery60: `outputs/v2_1_gap_closure_discovery60_20260504_221814/mechanism_60_20260504_221901`; dashboards opened at `/dashboard/index.html` and `/dashboard/task_focus.html`.
+  - Discovery60 metrics: outcome `0.0088`; canonical `-0.0101`; exact `3 -> 3`; runtime exceptions `0`.
+  - Accepted candidate: `prepare_side_effect_args_from_selected_record`, visible/called/VNC `27 / 0 / 27`; no natural adoption.
+  - Force pre-autofill: `outputs/v2_1_gap_closure_force_prepare_args12_20260504_2230/mechanism_12_20260504_223723`; called `11/12`; outcome `0.0644`; route mismatch qualified `True`; trace review showed missing-input abstains.
+  - Force post-autofill: `outputs/v2_1_gap_closure_force_prepare_args12_post_autofill_20260504_2250/mechanism_12_20260504_224507`; called `12/12`; outcome `-0.0316`; valid remove-contact kwargs in 4 cases but mixed subset regressed.
+  - Natural post-routing diagnostic: `outputs/v2_1_gap_closure_natural_prepare_args12_post_routing_20260504_2300/mechanism_12_20260504_224921`; visible/called/VNC `12 / 0 / 12`; outcome `-0.0510`.
+  - Fixes: selected-record autofill from unique original search trace, routing hard-block precedence over provisional visibility, composite suppression on non-action tasks, low-friction composite generation prompt, selector normalization prompt/tests.
+  - Tests: targeted suite `74 passed`; diagnostic and discovery registry checks PASS.
+  - Decision: `best3 remains final portfolio`; current generated candidate parked.

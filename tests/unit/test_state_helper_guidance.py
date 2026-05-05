@@ -510,6 +510,143 @@ def test_post_selection_composite_chains_selected_record_from_prior_trace() -> N
         assert modify_result["abstain_reason"] == "missing_required_update_fields"
 
 
+def test_post_selection_composite_chains_selected_record_from_unique_search_trace() -> (
+    None
+):
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_side_effect_args_from_selected_record",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare downstream side-effect kwargs after selection.",
+            inputs=(
+                ToolInput("selected_record", "dict", "Selected visible record."),
+                ToolInput("action_type", "str", "Intended downstream action."),
+                ToolInput("updates", "dict", "Fields to update."),
+                ToolInput("user_intent", "str", "Original user request."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("selected record needs downstream side effect",),
+            negative_triggers=("selected record unavailable",),
+            required_original_tool_calls=("remove_contact",),
+            preserves_side_effect_tools=("remove_contact",),
+            abstain_behavior=(
+                "Return should_call_tool=False when selected_record is unavailable."
+            ),
+            generalization_rationale=(
+                "Post-selection side-effect argument preparation recurs."
+            ),
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "remove_contact_by_phone",
+                "remove_contact_by_name",
+            ),
+            reason_tool_is_decisive=(
+                "It converts a selected record and action intent into original "
+                "ToolSandbox kwargs."
+            ),
+            shortfall_cluster_evidence=(
+                "composite:prepare_side_effect_args_from_selected_record",
+            ),
+            known_failure_mechanisms_addressed=(
+                "failed_side_effect_argument_preparation_after_selection",
+            ),
+            final_state_preservation_plan=(
+                "Caller executes the returned original ToolSandbox tool."
+            ),
+            grading_accounting_note=(
+                "Helper prepares kwargs only; side effects stay with base tools."
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Agents fail to prepare kwargs after selecting records.",
+                signals=("side_effect_argument_preparation",),
+            ),
+        ),
+        code=(
+            "def prepare_side_effect_args_from_selected_record("
+            "selected_record: dict, action_type: str, updates: dict, "
+            "user_intent: str) -> dict:\n"
+            "    if not selected_record:\n"
+            "        return {'downstream_tool_name': '', "
+            "'downstream_tool_kwargs': {}, 'should_call_tool': False, "
+            "'abstain_reason': 'missing_selected_record'}\n"
+            "    if action_type == 'remove_contact' and selected_record.get('person_id'):\n"
+            "        return {'downstream_tool_name': 'remove_contact', "
+            "'downstream_tool_kwargs': {'person_id': selected_record['person_id']}, "
+            "'should_call_tool': True, 'abstain_reason': ''}\n"
+            "    return {'downstream_tool_name': '', 'downstream_tool_kwargs': {}, "
+            "'should_call_tool': False, 'abstain_reason': 'unsupported_action_type'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="remove_contact_by_phone",
+    )
+
+    def search_contacts() -> list[dict[str, object]]:
+        return []
+
+    search_contacts.__name__ = "search_contacts"
+
+    context = ExecutionContext()
+    context.trace_tool = True
+    with new_context(context):
+        context.add_to_database(
+            DatabaseNamespace.SANDBOX,
+            [
+                {
+                    "sender": RoleType.AGENT,
+                    "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                    "content": "test original search tool call",
+                    "openai_tool_call_id": "test-search-call",
+                    "openai_function_name": "search_contacts",
+                    "conversation_active": True,
+                    "tool_call_exception": None,
+                    "tool_trace": None,
+                    "visible_to": [RoleType.AGENT, RoleType.EXECUTION_ENVIRONMENT],
+                }
+            ],
+        )
+        add_tool_trace(
+            search_contacts,
+            [
+                {
+                    "person_id": "p1",
+                    "name": "Ada",
+                    "phone_number": "+15550000000",
+                }
+            ],
+        )
+        fn = compile_toolsandbox_tool(entry)
+        result = fn(
+            action_type="remove_contact",
+            user_intent="Remove the contact returned by search.",
+        )
+        assert result == {
+            "downstream_tool_name": "remove_contact",
+            "downstream_tool_kwargs": {"person_id": "p1"},
+            "should_call_tool": True,
+            "abstain_reason": "",
+        }
+
+
 def test_search_filter_helper_defaults_optional_constraints() -> None:
     tool = GeneratedTool(
         spec=ToolSpec(

@@ -291,16 +291,47 @@ def score_registry_entry_for_scenario(
             -25,
         )
     if (
-        spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER
+        spec.family
+        in {
+            ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        }
         and "insufficient_information" in scenario_lower
         and (spec.preserves_side_effect_tools or spec.required_original_tool_calls)
+    ):
+        reason = (
+            "side_effect_selector_suppressed_for_insufficient_information"
+            if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER
+            else "side_effect_composite_suppressed_for_insufficient_information"
+        )
+        return RuntimeRoutingDecision(
+            tool_name,
+            False,
+            "hidden",
+            reason,
+            -30,
+        )
+    if (
+        spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER
+        and "selected_record" in input_names
+        and not any(
+            token in scenario_lower
+            for token in (
+                "remove_",
+                "delete_",
+                "modify_",
+                "update_",
+                "send_",
+                "reply_",
+            )
+        )
     ):
         return RuntimeRoutingDecision(
             tool_name,
             False,
             "hidden",
-            "side_effect_selector_suppressed_for_insufficient_information",
-            -30,
+            "post_selection_composite_requires_downstream_action_task",
+            -20,
         )
     scenario_strata = set(classify_task_strata(scenario_name))
     matched_families = tuple(
