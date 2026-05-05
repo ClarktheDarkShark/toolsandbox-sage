@@ -510,6 +510,113 @@ def test_post_selection_composite_chains_selected_record_from_prior_trace() -> N
         assert modify_result["abstain_reason"] == "missing_required_update_fields"
 
 
+def test_derived_value_helper_chains_visible_payload_from_required_tool_trace() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="extract_stock_symbol",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            description="Extract a normalized stock symbol from a stock payload.",
+            inputs=(
+                ToolInput(
+                    "stock_payload",
+                    "dict",
+                    "Dictionary returned by search_stock.",
+                ),
+            ),
+            output_annotation="str",
+            positive_triggers=("stock payload contains a symbol",),
+            negative_triggers=("stock payload has no symbol",),
+            required_original_tool_calls=("search_stock",),
+            preserves_side_effect_tools=("search_stock",),
+            abstain_behavior="Return an empty string when no symbol is present.",
+            generalization_rationale="Stock symbol extraction recurs.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "find_stock_symbol_with_company_name",
+                "find_stock_symbol_with_company_name_low_battery_mode",
+            ),
+            reason_tool_is_decisive="It avoids manual symbol normalization errors.",
+            shortfall_cluster_evidence=("derived_value:extract_stock_symbol",),
+            known_failure_mechanisms_addressed=(
+                "visible_raw_data_lacking_deterministic_transform",
+            ),
+            canonical_route_substitution_risk="low",
+            final_state_preservation_plan="The original lookup result is unchanged.",
+            grading_accounting_note="Only deterministic extraction is substituted.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Agents fail to extract visible stock symbol fields.",
+                signals=("visible_raw_data_lacking_deterministic_transform",),
+            ),
+        ),
+        code=(
+            "def extract_stock_symbol(stock_payload: dict) -> str:\n"
+            "    return str(stock_payload.get('symbol', '')).split(':')[-1]\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="find_stock_symbol_with_company_name",
+    )
+
+    docstring = _google_docstring(entry)
+    assert "Deterministic extraction usage:" in docstring
+    assert "First call the original ToolSandbox tool: search_stock" in docstring
+
+    def search_stock() -> dict[str, object]:
+        return {}
+
+    search_stock.__name__ = "search_stock"
+
+    context = ExecutionContext()
+    context.trace_tool = True
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.AGENT,
+                "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                "content": "test stock lookup",
+                "openai_tool_call_id": "stock-call",
+                "openai_function_name": "search_stock",
+                "conversation_active": True,
+                "tool_call_exception": None,
+                "tool_trace": None,
+                "visible_to": [RoleType.AGENT, RoleType.EXECUTION_ENVIRONMENT],
+            }
+        ],
+    )
+    with new_context(context):
+        add_tool_trace(search_stock, {"symbol": "NASDAQ:AAPL", "name": "Apple Inc"})
+        context.add_to_database(
+            DatabaseNamespace.SANDBOX,
+            [
+                {
+                    "sender": RoleType.AGENT,
+                    "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                    "content": "test derived helper call",
+                    "openai_tool_call_id": "helper-call",
+                    "openai_function_name": "extract_stock_symbol",
+                    "conversation_active": True,
+                    "tool_call_exception": None,
+                    "tool_trace": None,
+                    "visible_to": [RoleType.AGENT, RoleType.EXECUTION_ENVIRONMENT],
+                }
+            ],
+        )
+        fn = compile_toolsandbox_tool(entry)
+
+        assert fn() == "AAPL"
+
+
 def test_post_selection_composite_chains_selected_record_from_unique_search_trace() -> (
     None
 ):

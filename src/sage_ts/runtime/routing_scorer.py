@@ -174,6 +174,7 @@ def _blocked_by_adoption_risk(
     matched_families: tuple[str, ...],
     fair_chance_candidate: bool = False,
     cluster_fit: bool = False,
+    allow_strong_selector_fair_chance: bool = False,
 ) -> tuple[bool, str]:
     if not feature_enabled(EVIDENCE_ROUTING):
         return False, ""
@@ -201,10 +202,15 @@ def _blocked_by_adoption_risk(
     has_positive_called_contribution = called > 0 and (
         called_outcome is None or float(called_outcome) >= 0
     )
+    has_negative_called_contribution = (
+        called > 0 and called_outcome is not None and (float(called_outcome) < 0)
+    )
     strong_current_match = (
         bool(matched_positive) and bool(matched_families) and score >= 7
     )
     if strong_current_match and has_positive_called_contribution:
+        return False, ""
+    if allow_strong_selector_fair_chance and not has_negative_called_contribution:
         return False, ""
     return True, "blocked_by_visible_not_called_adoption_risk"
 
@@ -374,6 +380,19 @@ def score_registry_entry_for_scenario(
         matched_families=matched_families,
         fair_chance_candidate=fair_chance,
         cluster_fit=bool(cluster_fit_reason),
+        allow_strong_selector_fair_chance=(
+            spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER
+            and "records" in input_names
+            and any(
+                tool_name.startswith(("search_", "find_", "get_"))
+                for tool_name in (
+                    tuple(spec.required_original_tool_calls)
+                    + tuple(spec.preserves_side_effect_tools)
+                )
+            )
+            and "trigger_or_family_fit" in matched_families
+            and score >= 7
+        ),
     )
     if blocked:
         return RuntimeRoutingDecision(

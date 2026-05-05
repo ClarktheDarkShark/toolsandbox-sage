@@ -338,6 +338,69 @@ def _latest_single_original_search_record() -> dict[str, Any] | None:
     return None
 
 
+def _latest_original_tool_payload(
+    tool_names: Iterable[str],
+) -> dict[str, Any] | None:
+    """Return the newest dict payload from one of the named original tools."""
+    wanted = set(tool_names)
+    if not wanted:
+        return None
+    try:
+        sandbox = get_current_context().get_database(
+            namespace=DatabaseNamespace.SANDBOX,
+            get_all_history_snapshots=True,
+        )
+    except Exception:
+        return None
+    for row in reversed(sandbox.to_dicts()):
+        existing = row.get("tool_trace")
+        if existing is None:
+            continue
+        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
+        for item in reversed(traces):
+            try:
+                payload = json.loads(str(item))
+            except json.JSONDecodeError:
+                continue
+            if str(payload.get("tool_name", "")) not in wanted:
+                continue
+            result = payload.get("result")
+            if isinstance(result, dict):
+                return dict(result)
+            if (
+                isinstance(result, list)
+                and len(result) == 1
+                and isinstance(result[0], dict)
+            ):
+                return dict(result[0])
+    return None
+
+
+def _with_chained_visible_payload_arguments(
+    entry: RegistryEntry,
+    kwargs: dict[str, Any],
+) -> dict[str, Any]:
+    """Autofill low-risk scalar-extraction helpers from prior raw tool output."""
+    spec = entry.tool.spec
+    if spec.family != ToolFamily.DERIVED_VALUE_CALCULATOR:
+        return kwargs
+    if len(spec.inputs) != 1 or spec.inputs[0].annotation != "dict":
+        return kwargs
+    input_name = spec.inputs[0].name
+    if kwargs.get(input_name):
+        return kwargs
+    payload = _latest_original_tool_payload(spec.required_original_tool_calls)
+    if payload is None and spec.required_original_tool_calls:
+        return kwargs
+    if payload is None:
+        payload = _latest_single_original_search_record()
+    if not isinstance(payload, dict) or not payload:
+        return kwargs
+    updated = dict(kwargs)
+    updated[input_name] = payload
+    return updated
+
+
 def _with_chained_post_selection_arguments(
     entry: RegistryEntry,
     kwargs: dict[str, Any],
@@ -547,6 +610,24 @@ def _google_docstring(entry: RegistryEntry) -> str:
                 " result['abstain_reason'] before deciding next action.",
             ]
         )
+    elif spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR and len(spec.inputs) == 1:
+        required = ", ".join(spec.required_original_tool_calls)
+        input_name = spec.inputs[0].name
+        if required:
+            lines.extend(
+                [
+                    "",
+                    "Deterministic extraction usage:",
+                    f"    First call the original ToolSandbox tool: {required}.",
+                    f"    Then call {spec.tool_name} with {input_name} set to the",
+                    " full dict/list item returned by that original tool.",
+                    "    If the prior payload is visible and the model omits this",
+                    " argument, SAGE may safely autofill it from the latest matching",
+                    " original tool trace.",
+                    "    Use the helper result for the final answer; it does not",
+                    " perform side effects or replace the original lookup call.",
+                ]
+            )
     elif spec.required_original_tool_calls:
         if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
             lines.extend(_search_filter_action_usage_note(spec))
@@ -589,6 +670,7 @@ def _compile_toolsandbox_tool(
     _inner = raw_fn
 
     def _wrapped(*args: Any, **kwargs: Any) -> Any:
+        kwargs = _with_chained_visible_payload_arguments(entry, kwargs)
         kwargs = _with_chained_post_selection_arguments(entry, kwargs)
         kwargs = _with_optional_helper_defaults(entry, kwargs)
         missing_update_result = _missing_modify_update_abstain_result(entry, kwargs)

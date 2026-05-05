@@ -872,6 +872,8 @@ def test_stock_symbol_failure_births_symbol_extraction_helper() -> None:
     assert [item.canonical_key for item in observations] == [
         "derived_value:extract_stock_symbol"
     ]
+    assert observations[0].validation_examples[-1].expected == ""
+    assert observations[0].validation_examples[-1].negative_applicability
 
 
 def test_direct_state_failure_births_trace_compatible_tool_call_helper() -> None:

@@ -614,6 +614,110 @@ def test_routing_suppresses_visible_not_called_pollution(monkeypatch: Any) -> No
     assert decision.reason == "blocked_by_visible_not_called_adoption_risk"
 
 
+def test_strong_selector_match_gets_actor_policy_fair_chance(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "evidence_routing")
+    base = _entry()
+    entry = RegistryEntry.accepted(
+        replace(
+            base.tool,
+            spec=replace(
+                base.tool.spec,
+                tool_name="select_visible_record_by_constraints",
+                applicable_task_families=(
+                    "search_phone_number_with_name",
+                    "search_relationship_with_phone_number",
+                ),
+                required_original_tool_calls=("search_contacts",),
+                preserves_side_effect_tools=("search_contacts", "modify_contact"),
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "selected_record": {"type": "object"},
+                        "abstain_reason": {"type": "string"},
+                    },
+                },
+            ),
+        ),
+        base.validation,
+        birth_scenario="search_phone_number_with_name",
+    )
+    monkeypatch.setattr(
+        routing_scorer,
+        "_latest_helper_contribution_summary",
+        lambda: {
+            "helpers": {
+                "select_visible_record_by_constraints": {
+                    "visible_count": 34,
+                    "called_count": 0,
+                    "visible_not_called_count": 34,
+                    "called_subset": {"mean_outcome_delta": None},
+                }
+            }
+        },
+    )
+
+    decision = score_registry_entry_for_scenario(
+        entry, "search_phone_number_with_name_3_distraction_tools"
+    )
+
+    assert decision.visible
+    assert decision.reason == "generic_relevance_score_passed"
+
+
+def test_strong_selector_match_still_blocks_harmful_called_history(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "evidence_routing")
+    base = _entry()
+    entry = RegistryEntry.accepted(
+        replace(
+            base.tool,
+            spec=replace(
+                base.tool.spec,
+                tool_name="select_visible_record_by_constraints",
+                applicable_task_families=(
+                    "search_phone_number_with_name",
+                    "search_relationship_with_phone_number",
+                ),
+                required_original_tool_calls=("search_contacts",),
+                preserves_side_effect_tools=("search_contacts", "modify_contact"),
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "selected_record": {"type": "object"},
+                        "abstain_reason": {"type": "string"},
+                    },
+                },
+            ),
+        ),
+        base.validation,
+        birth_scenario="search_phone_number_with_name",
+    )
+    monkeypatch.setattr(
+        routing_scorer,
+        "_latest_helper_contribution_summary",
+        lambda: {
+            "helpers": {
+                "select_visible_record_by_constraints": {
+                    "visible_count": 34,
+                    "called_count": 2,
+                    "visible_not_called_count": 32,
+                    "called_subset": {"mean_outcome_delta": -0.2},
+                }
+            }
+        },
+    )
+
+    decision = score_registry_entry_for_scenario(
+        entry, "search_phone_number_with_name_3_distraction_tools"
+    )
+
+    assert not decision.visible
+    assert decision.reason == "blocked_by_visible_not_called_adoption_risk"
+
+
 def test_routing_evidence_ignores_runtime_exception_runs(
     monkeypatch: Any, tmp_path: Path
 ) -> None:

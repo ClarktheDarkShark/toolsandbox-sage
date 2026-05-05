@@ -81,6 +81,32 @@ def test_generation_request_includes_reusable_name_hint() -> None:
     assert 'tool_name must be exactly "celsius_to_fahrenheit"' in request.prompt()
 
 
+def test_generation_request_preserves_negative_applicability_metadata() -> None:
+    request = ToolGenerationRequest(
+        scenario_name="find_stock_symbol_with_company_name",
+        observation="Extract a stock symbol only when the payload contains one.",
+        allowed_families=("derived_value_calculator",),
+        validation_examples=(
+            {
+                "inputs": {"stock_payload": {"symbol": "NASDAQ:AAPL"}},
+                "expected": "AAPL",
+                "held_out": False,
+                "negative_applicability": False,
+            },
+            {
+                "inputs": {"stock_payload": {"name": "Apple"}},
+                "expected": "",
+                "held_out": False,
+                "negative_applicability": True,
+            },
+        ),
+    )
+
+    prompt = request.prompt()
+
+    assert '"negative_applicability": true' in prompt
+
+
 def test_generation_request_includes_family_contract_guidance(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

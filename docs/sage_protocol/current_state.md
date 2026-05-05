@@ -219,3 +219,22 @@
 - Reports: `docs/sage_protocol/v2_2_masked_best3_discovery_report.md`, `docs/sage_protocol/v2_2_candidate_callability_report.md`, `docs/sage_protocol/v2_2_candidate_confirmation_report.md`, `docs/sage_protocol/v2_2_new_toolset_registry_report.md`, `docs/sage_protocol/v2_2_combined_portfolio_ablation_report.md`.
 - Decision: `new toolset has 1 confirmed tool`.
 - Next action: do not combine portfolios yet; either continue masked discovery on a new tool-suitable non-best3 cluster or stop for review because selector, side-effect-prep, recency-action, and dependency/precondition lanes are parked by evidence.
+
+## V2.2 Masked-Best3 Loop 2 Status
+- Date: `2026-05-05T17:30:00-04:00`
+- Frozen best3 registry modified: `no`.
+- Masked tools: `relative_day_time_to_timestamp`, `resolve_search_window_or_bounds`, `select_record_by_timestamp_extreme`.
+- Confirmed V2.2 tools before loop: `days_between_timestamps`.
+- Confirmed V2.2 tools after loop: `days_between_timestamps` only.
+- V2.2 new-toolset registry: `artifacts/registry_candidates/v2_2_new_toolset/registry_manifest.json`.
+- V2.2 new-toolset registry SHA-256: `cb70568c3613c2a11c68f6d6182375e099569bde103bc36637b957602df760cd`.
+- Gap atlas: `artifacts/summaries/v2_2_loop2_20260505_164027/latest_gap_atlas.json`.
+- Selector diagnostic run: `outputs/v2_2_selector_actor_policy20_rerun_20260505_155948/mechanism_40_20260505_155951`; outcome `-0.0263`; canonical `-0.0172`; exact `2 -> 2`; selector visible/called/VNC `16 / 0 / 16`; runtime/side-effect `0 / 0`; decision `selector lane parked`.
+- Discovery60 retry run: `outputs/v2_2_masked_best3_discovery_loop2_retry_20260505_164052/mechanism_60_20260505_164056`; outcome `+0.0335`; canonical `-0.0018`; exact `14 -> 11`; accepted `extract_stock_symbol`; accepted-but-uncalled `extract_stock_symbol`; runtime/side-effect `0 / 0`.
+- Extract-stock force diagnostic after trace-bridging: `outputs/v2_2_extract_stock_force20_after_bridge_20260505_171542/mechanism_40_20260505_171545`; visible/called/VNC/failed `4 / 2 / 2 / 2`; called-subset outcome `-0.5000`.
+- Extract-stock fair-chance diagnostic: `outputs/v2_2_extract_stock_fairchance20_20260505_172237/mechanism_40_20260505_172240`; outcome `+0.0534`; canonical `+0.0042`; exact `5 -> 6`; visible/called/VNC/failed `4 / 4 / 0 / 0`; called-subset outcome `-0.0772`; runtime/side-effect `0 / 0`; decision `candidate parked`.
+- Framework repairs retained: bounded selector actor policy, fair-chance routing for strong selector matches, stock negative-applicability metadata, derived-value actor policy, and trace-bridging for single-dict derived helpers.
+- Tests: targeted unit suite `115 passed`; V2.2 new-toolset registry check-only `PASS`.
+- Reports: `docs/sage_protocol/v2_2_gap_atlas_loop2_report.md`, `docs/sage_protocol/v2_2_selector_actor_policy_diagnostic20_report.md`, `docs/sage_protocol/v2_2_masked_best3_discovery_loop2_report.md`, `docs/sage_protocol/v2_2_new_toolset_registry_report.md`.
+- Decision: `continue masked discovery`.
+- Next action: continue masked discovery on a new non-best3, non-parked cluster; do not run confirmation60 for `extract_stock_symbol`; do not run combined ablation yet.

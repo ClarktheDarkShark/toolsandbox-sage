@@ -862,14 +862,18 @@ def _stock_symbol_extraction_observation(
             "'AAPL', but agents sometimes fail to normalize and report the symbol "
             "only. Generate a small deterministic helper named extract_stock_symbol. "
             "Input: stock_payload dict returned by search_stock. Return the symbol "
-            "string with any exchange prefix removed, or an empty string if the "
-            "payload does not contain a usable string symbol."
+            "string with any exchange prefix removed. Abstain with an empty string "
+            "if the payload does not contain a usable string symbol."
         ),
         allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
         validation_examples=(
             ToolExample({"stock_payload": {"symbol": "NASDAQ:AAPL"}}, "AAPL"),
             ToolExample({"stock_payload": {"symbol": "AAPL"}}, "AAPL"),
-            ToolExample({"stock_payload": {"name": "Apple"}}, ""),
+            ToolExample(
+                {"stock_payload": {"name": "Apple"}},
+                "",
+                negative_applicability=True,
+            ),
         ),
         generation_allowed=True,
         reason="stock_symbol_field_extraction_failure",

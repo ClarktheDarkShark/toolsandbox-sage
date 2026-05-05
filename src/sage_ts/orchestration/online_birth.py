@@ -292,6 +292,7 @@ class OnlineBirthController:
                     "inputs": item.inputs,
                     "expected": item.expected,
                     "held_out": item.held_out,
+                    "negative_applicability": item.negative_applicability,
                 }
                 for item in observation.validation_examples
             ),

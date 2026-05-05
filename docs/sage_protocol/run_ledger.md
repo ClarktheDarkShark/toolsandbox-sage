@@ -514,3 +514,18 @@
   - Reports: `docs/sage_protocol/v2_2_masked_best3_discovery_report.md`, `docs/sage_protocol/v2_2_candidate_callability_report.md`, `docs/sage_protocol/v2_2_candidate_confirmation_report.md`, `docs/sage_protocol/v2_2_new_toolset_registry_report.md`, `docs/sage_protocol/v2_2_combined_portfolio_ablation_report.md`.
   - Decision: `new toolset has 1 confirmed tool`.
   - Next action: continue masked discovery only on a non-parked, tool-suitable cluster; do not run combined ablation or scale validation yet.
+
+- `V2.2 masked-best3 discovery loop 2` completed.
+  - Date: `2026-05-05T17:30:00-04:00`
+  - Frozen best3 registry untouched: `artifacts/registry_frozen_best3_claim/registry_manifest.json`.
+  - Masked tools: `relative_day_time_to_timestamp`, `resolve_search_window_or_bounds`, `select_record_by_timestamp_extreme`.
+  - Confirmed V2.2 registry unchanged: `artifacts/registry_candidates/v2_2_new_toolset/registry_manifest.json`, SHA-256 `cb70568c3613c2a11c68f6d6182375e099569bde103bc36637b957602df760cd`; confirmed tools `1 / 3` with `days_between_timestamps` only.
+  - Gap atlas: `artifacts/summaries/v2_2_loop2_20260505_164027/latest_gap_atlas.json`; loop summary: `artifacts/summaries/v2_2_loop2_20260505_164027/loop2_summary.json`.
+  - Selector actor-policy diagnostic: `outputs/v2_2_selector_actor_policy20_rerun_20260505_155948/mechanism_40_20260505_155951`; dashboards opened at `http://127.0.0.1:5594/outputs/v2_2_selector_actor_policy20_rerun_20260505_155948/mechanism_40_20260505_155951/dashboard/index.html` and `/dashboard/task_focus.html`; outcome `-0.0263`; canonical `-0.0172`; exact `2 -> 2`; selector visible/called/VNC `16 / 0 / 16`; runtime/side-effect `0 / 0`; selector lane parked.
+  - Discovery60 retry: `outputs/v2_2_masked_best3_discovery_loop2_retry_20260505_164052/mechanism_60_20260505_164056`; dashboards opened at `http://127.0.0.1:5596/outputs/v2_2_masked_best3_discovery_loop2_retry_20260505_164052/mechanism_60_20260505_164056/dashboard/index.html` and `/dashboard/task_focus.html`; outcome `+0.0335`; canonical `-0.0018`; exact `14 -> 11`; accepted `extract_stock_symbol`, but natural calls `0 / 8`.
+  - Force-call after trace bridge: `outputs/v2_2_extract_stock_force20_after_bridge_20260505_171542/mechanism_40_20260505_171545`; dashboards opened at port `5598`; helper visible/called/VNC/failed `4 / 2 / 2 / 2`; called-subset outcome `-0.5000`.
+  - Natural fair-chance after derived actor policy: `outputs/v2_2_extract_stock_fairchance20_20260505_172237/mechanism_40_20260505_172240`; dashboards opened at port `5599`; outcome `+0.0534`; canonical `+0.0042`; exact `5 -> 6`; `extract_stock_symbol` visible/called/VNC/failed `4 / 4 / 0 / 0`; called-subset outcome `-0.0772`; runtime/side-effect `0 / 0`; candidate parked as concept-negative.
+  - Repairs: selector actor policy, evidence-aware fair-chance selector routing, negative-applicability propagation for live validation, derived-value actor policy, and trace-bridging for single-dict derived helpers.
+  - Tests: targeted unit suite `115 passed`; artifact builder compile PASS; V2.2 new-toolset registry check-only PASS.
+  - Reports: `docs/sage_protocol/v2_2_gap_atlas_loop2_report.md`, `docs/sage_protocol/v2_2_selector_actor_policy_diagnostic20_report.md`, `docs/sage_protocol/v2_2_masked_best3_discovery_loop2_report.md`, `docs/sage_protocol/v2_2_new_toolset_registry_report.md`.
+  - Decision: `continue masked discovery`; no confirmation60 for `extract_stock_symbol`; no combined ablation yet.
