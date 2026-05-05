@@ -109,6 +109,8 @@ def _selector_tool_names(openai_tools: object) -> set[str]:
         is_visible_record_selector = "records" in input_names and (
             "visible-record constraint selection" in description
             or "selection/action usage" in description
+            or "medium-grain workflow usage" in description
+            or "constraint-to-action" in description
             or "selected_record" in description
             or ("select" in name and "record" in description)
         )
@@ -251,7 +253,7 @@ def _selector_actor_policy_message(
             "search/get/find result returned candidate records and the task "
             "requires selecting one visible contact, message, reminder, or record "
             "by user constraints before answering or taking a downstream action, "
-            "call the selector before manually choosing. Do not call it without "
+            "call the helper before manually choosing. Do not call it without "
             "visible candidates, on insufficient-information tasks, or when its "
             "negative triggers match. If the selector abstains or reports a tie, "
             "do not guess before a side-effect action."

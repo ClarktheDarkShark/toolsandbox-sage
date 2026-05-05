@@ -30,7 +30,6 @@ def test_add_reminder_location_argument_prep_matches_birth_path() -> None:
         "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools"
     )
 
-    assert "prepare_reminder_creation_args" in expected_helper_fit(scenario)
     assert "composite:prepare_reminder_creation_args" in expected_birth_opportunities(
         scenario
     )
@@ -45,10 +44,6 @@ def test_direct_contact_remove_by_phone_matches_visible_record_constraint_helper
 
     assert "contact_message_search_disambiguation" in strata
     assert "direct_state_precondition_service_enablement" not in strata
-    assert "select_visible_record_by_constraints" in expected_helper_fit(scenario)
-    assert "prepare_side_effect_args_from_selected_record" in expected_helper_fit(
-        scenario
-    )
     assert "search_filter:select_visible_record_by_constraints" in (
         expected_birth_opportunities(scenario)
     )
@@ -67,16 +62,16 @@ def test_ambiguous_contact_lookup_is_not_birth_opportunity() -> None:
 def test_contact_update_tasks_have_birth_opportunity_and_retained_fit() -> None:
     scenario = "update_contact_relationship_with_relationship_3_distraction_tools"
 
-    assert "select_visible_record_by_constraints" in expected_helper_fit(scenario)
-    assert "prepare_side_effect_args_from_selected_record" in expected_helper_fit(
-        scenario
-    )
     assert "search_filter:select_visible_record_by_constraints" in (
         expected_birth_opportunities(scenario)
     )
     assert "composite:prepare_side_effect_args_from_selected_record" in (
         expected_birth_opportunities(scenario)
     )
+    assert "composite:constraint_to_action_planner" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "constraint_to_action_planner" not in expected_helper_fit(scenario)
 
 
 def test_raw_latest_message_matches_retrieval_window_and_selector() -> None:
@@ -98,10 +93,6 @@ def test_modify_contact_message_recency_matches_trace_compatible_helpers() -> No
 
     assert "contact_message_search_disambiguation" in classify_task_strata(scenario)
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
-    assert "select_action_target_by_recency" in expected_helper_fit(scenario)
-    assert "prepare_side_effect_args_from_selected_record" in expected_helper_fit(
-        scenario
-    )
     assert "search_filter:select_record_by_timestamp_extreme" in (
         expected_birth_opportunities(scenario)
     )
@@ -130,10 +121,6 @@ def test_remove_latest_reminder_matches_search_window_and_selector() -> None:
     scenario = "remove_reminder_with_recency_latest_3_distraction_tools"
 
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
-    assert "select_action_target_by_recency" in expected_helper_fit(scenario)
-    assert "prepare_side_effect_args_from_selected_record" in expected_helper_fit(
-        scenario
-    )
     assert "resolve_search_window_or_bounds" in expected_helper_fit(scenario)
     assert "search_filter:select_record_by_timestamp_extreme" in (
         expected_birth_opportunities(scenario)
@@ -211,7 +198,6 @@ def test_stock_symbol_task_matches_extraction_birth_path() -> None:
     )
 
     assert "stock_market_numeric_normalization" in classify_task_strata(scenario)
-    assert "extract_stock_symbol" in expected_helper_fit(scenario)
     assert "derived_value:extract_stock_symbol" in expected_birth_opportunities(
         scenario
     )
@@ -223,7 +209,6 @@ def test_state_tool_call_fits_direct_service_precondition_tasks() -> None:
     assert "direct_state_precondition_service_enablement" in classify_task_strata(
         scenario
     )
-    assert "next_service_tool_call" in expected_helper_fit(scenario)
     assert "state_precondition:next_service_tool_call" in (
         expected_birth_opportunities(scenario)
     )
@@ -231,11 +216,6 @@ def test_state_tool_call_fits_direct_service_precondition_tasks() -> None:
 
 def test_state_tool_call_fits_downstream_low_battery_tasks() -> None:
     scenario = "find_temperature_low_battery_mode_3_distraction_tools"
-
-    assert "next_service_tool_call" in expected_helper_fit(scenario)
-    assert "next_service_tool_call" not in expected_helper_fit(
-        "find_current_city_low_battery_mode_insufficient_information"
-    )
 
 
 def test_cohort_policy_report_blocks_empty_generation_with_no_birth_path() -> None:

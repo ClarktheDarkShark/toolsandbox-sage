@@ -146,6 +146,39 @@ def _post_selection_composite_usage_note(spec: ToolSpec) -> list[str]:
     return lines
 
 
+def _medium_grain_composite_usage_note(spec: ToolSpec) -> list[str]:
+    """Affordance guidance for search-result-to-action workflow helpers."""
+    input_names = {item.name for item in spec.inputs}
+    output_schema = spec.output_schema or {}
+    output_properties = output_schema.get("properties", {})
+    if not isinstance(output_properties, dict):
+        return []
+    if "records" not in input_names or "downstream_tool_name" not in output_properties:
+        return []
+    if "downstream_tool_kwargs" not in output_properties:
+        return []
+    return [
+        "",
+        "Medium-grain workflow usage:",
+        "    Use this helper after an original search/get tool returns visible",
+        " candidate records and the task requires selecting a target, answering",
+        " from a selected field, or preparing one downstream ToolSandbox action.",
+        "    Pass records as the full list returned by the prior ToolSandbox",
+        " result. If the payload is visible and you omit records, SAGE may",
+        " safely autofill it from the latest matching original search trace.",
+        "    Pass match_field and match_value as the visible constraint to match,",
+        " such as phone_number/name/relationship/sender/content.",
+        "    Pass action_type as answer_field, remove_contact, modify_contact,",
+        " or send_message. Pass update_fields only for required updates/content.",
+        "    If should_call_tool is true, call downstream_tool_name next with",
+        " downstream_tool_kwargs unchanged. This helper does not perform the",
+        " side effect.",
+        "    If abstain_reason is non-empty or tie_candidates is non-empty, do",
+        " not guess before a side-effect action; search further or ask for",
+        " clarification.",
+    ]
+
+
 def _search_filter_action_usage_note(spec: ToolSpec) -> list[str]:
     """Affordance guidance for selectors over visible search results."""
     output_schema = spec.output_schema or {}
@@ -338,6 +371,38 @@ def _latest_single_original_search_record() -> dict[str, Any] | None:
     return None
 
 
+def _latest_original_search_records() -> list[dict[str, Any]] | None:
+    """Return the newest visible list of records from an original search trace."""
+    try:
+        sandbox = get_current_context().get_database(
+            namespace=DatabaseNamespace.SANDBOX,
+            get_all_history_snapshots=True,
+        )
+    except Exception:
+        return None
+    for row in reversed(sandbox.to_dicts()):
+        existing = row.get("tool_trace")
+        if existing is None:
+            continue
+        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
+        for item in reversed(traces):
+            try:
+                payload = json.loads(str(item))
+            except json.JSONDecodeError:
+                continue
+            tool_name = str(payload.get("tool_name", ""))
+            if not tool_name.startswith(("search_", "find_", "get_")):
+                continue
+            result = payload.get("result")
+            if isinstance(result, list) and all(
+                isinstance(record, dict) for record in result
+            ):
+                return [dict(record) for record in result]
+            if isinstance(result, dict):
+                return [dict(result)]
+    return None
+
+
 def _latest_original_tool_payload(
     tool_names: Iterable[str],
 ) -> dict[str, Any] | None:
@@ -410,11 +475,15 @@ def _with_chained_post_selection_arguments(
     input_names = {item.name for item in spec.inputs}
     if spec.family != ToolFamily.COMPOSITE_WORKFLOW_HELPER:
         return kwargs
-    if "selected_record" not in input_names:
+    if not ({"selected_record", "records"} & input_names):
         return kwargs
 
     updated = dict(kwargs)
-    if not updated.get("selected_record"):
+    if "records" in input_names and not updated.get("records"):
+        records = _latest_original_search_records()
+        if records:
+            updated["records"] = records
+    if "selected_record" in input_names and not updated.get("selected_record"):
         latest_selection = _latest_generated_tool_result_with_key("selected_record")
         selected_record = (
             latest_selection.get("selected_record")
@@ -632,6 +701,7 @@ def _google_docstring(entry: RegistryEntry) -> str:
         if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
             lines.extend(_search_filter_action_usage_note(spec))
         if spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
+            lines.extend(_medium_grain_composite_usage_note(spec))
             lines.extend(_post_selection_composite_usage_note(spec))
         # General call-path note for any other side-effect-preserving prep helper
         lines.extend(_call_path_note(spec))

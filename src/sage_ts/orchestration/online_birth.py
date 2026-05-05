@@ -15,6 +15,7 @@ from sage_ts.experiments.v2_flags import (
     CANDIDATE_REPAIR,
     DEPENDENCY_LOGIC,
     LIVE_VALIDATION,
+    MEDIUM_GRAIN_SKILLS,
     feature_enabled,
 )
 from sage_ts.generation.tool_generator import ToolGenerationRequest
@@ -61,6 +62,11 @@ def suggested_tool_name(canonical_key: str) -> str | None:
         and suffix == "dependency_precondition_tool_call"
     ):
         return "next_dependency_precondition_call"
+    if (
+        feature_enabled(MEDIUM_GRAIN_SKILLS)
+        and suffix == "constraint_to_action_planner"
+    ):
+        return "constraint_to_action_planner"
     return suffix
 
 
@@ -149,8 +155,15 @@ class OnlineBirthController:
         families = sorted(
             self.base_families_by_key.get(observation.canonical_key, set())
         )
+        required_families = (
+            3
+            if feature_enabled(MEDIUM_GRAIN_SKILLS)
+            and observation.canonical_key == "composite:constraint_to_action_planner"
+            else 2
+        )
         non_diagnostic = (
-            len(scenarios) >= self.recurrence_threshold and len(families) >= 2
+            len(scenarios) >= self.recurrence_threshold
+            and len(families) >= required_families
         )
         return {
             "cluster_id": observation.canonical_key,
@@ -159,7 +172,8 @@ class OnlineBirthController:
             "scenarios": scenarios[:20],
             "distinct_base_task_families": len(families),
             "base_task_families": families[:20],
-            "near_duplicate_only": len(families) < 2,
+            "required_distinct_base_task_families": required_families,
+            "near_duplicate_only": len(families) < required_families,
             "non_diagnostic_birth_allowed": non_diagnostic,
             "repeated_failed_tool_calls": list(observation.repeated_failed_tool_calls),
             "failed_tool_calls": list(observation.failed_tool_calls),

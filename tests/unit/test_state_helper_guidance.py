@@ -908,3 +908,152 @@ def test_constraint_selector_docstring_explains_post_search_call_path() -> None:
     )
     assert "Pass field_name as the visible field to match" in docstring
     assert "use value/selected_record directly" in docstring
+
+
+def test_medium_grain_composite_docstring_and_records_trace_bridge() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="constraint_to_action_planner",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Select a visible record and prepare a downstream action plan.",
+            inputs=(
+                ToolInput("records", "list", "Visible search result records."),
+                ToolInput("match_field", "str", "Field to match."),
+                ToolInput("match_value", "str", "Value to match."),
+                ToolInput("action_type", "str", "answer_field or side-effect action."),
+                ToolInput("update_fields", "dict", "Optional update fields."),
+                ToolInput("return_field", "str", "Field to return."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                    "selected_id": {"type": "string"},
+                    "selected_index": {"type": "integer"},
+                    "value": {"type": "string"},
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "tie_candidates": {"type": "array"},
+                    "abstain_reason": {"type": "string"},
+                    "safety_notes": {"type": "string"},
+                },
+            },
+            positive_triggers=(
+                "visible records require constraint-to-action planning",
+            ),
+            negative_triggers=("no visible records", "ambiguous multiple matches"),
+            required_original_tool_calls=("search_contacts", "remove_contact"),
+            preserves_side_effect_tools=("search_contacts", "remove_contact"),
+            abstain_behavior="Abstain on no records, no match, ties, or unsafe action.",
+            generalization_rationale="Constraint-to-action workflows recur across contact tasks.",
+            estimated_step_compression=5,
+            cross_task_applicability_count=3,
+            applicable_task_families=(
+                "search_phone_number_with_name",
+                "remove_contact_by_phone",
+                "update_contact_relationship_with_relationship",
+            ),
+            reason_tool_is_decisive=(
+                "It combines constraint normalization, record selection, ambiguity "
+                "handling, and downstream kwargs preparation."
+            ),
+            shortfall_cluster_evidence=("composite:constraint_to_action_planner",),
+            known_failure_mechanisms_addressed=(
+                "visible_info_unused",
+                "side_effect_argument_preparation_failure",
+            ),
+            final_state_preservation_plan="Caller must execute returned original ToolSandbox action.",
+            grading_accounting_note="Helper prepares only the intermediate plan.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Agents fail to chain visible record selection into actions.",
+                signals=("visible_info_unused",),
+            ),
+        ),
+        code=(
+            "def constraint_to_action_planner(records: list, match_field: str, "
+            "match_value: str, action_type: str, update_fields: dict, "
+            "return_field: str) -> dict:\n"
+            "    matches = [r for r in records if str(r.get(match_field, '')).lower() == match_value.lower()]\n"
+            "    if len(matches) != 1:\n"
+            "        return {'selected_record': {}, 'selected_id': '', 'selected_index': -1, 'value': '', 'downstream_tool_name': '', 'downstream_tool_kwargs': {}, 'should_call_tool': False, 'tie_candidates': matches, 'abstain_reason': 'ambiguous_or_no_match', 'safety_notes': 'do not guess'}\n"
+            "    record = matches[0]\n"
+            "    selected_id = str(record.get('person_id', ''))\n"
+            "    return {'selected_record': record, 'selected_id': selected_id, 'selected_index': records.index(record), 'value': str(record.get(return_field, '')), 'downstream_tool_name': '', 'downstream_tool_kwargs': {}, 'should_call_tool': False, 'tie_candidates': [], 'abstain_reason': '', 'safety_notes': 'answer from value'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=2,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="search_phone_number_with_name",
+    )
+
+    docstring = _google_docstring(entry)
+    assert "Medium-grain workflow usage:" in docstring
+    assert "Pass records as the full list" in docstring
+
+    def search_contacts() -> list[dict[str, object]]:
+        return []
+
+    search_contacts.__name__ = "search_contacts"
+    context = ExecutionContext()
+    context.trace_tool = True
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.AGENT,
+                "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                "content": "search visible contacts",
+                "openai_tool_call_id": "search-call",
+                "openai_function_name": "search_contacts",
+                "conversation_active": True,
+                "tool_call_exception": None,
+                "tool_trace": None,
+                "visible_to": [RoleType.AGENT, RoleType.EXECUTION_ENVIRONMENT],
+            }
+        ],
+    )
+    with new_context(context):
+        add_tool_trace(
+            search_contacts,
+            [
+                {"person_id": "p1", "name": "Ada", "phone_number": "555"},
+            ],
+        )
+        context.add_to_database(
+            DatabaseNamespace.SANDBOX,
+            [
+                {
+                    "sender": RoleType.AGENT,
+                    "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                    "content": "helper call",
+                    "openai_tool_call_id": "helper-call",
+                    "openai_function_name": "constraint_to_action_planner",
+                    "conversation_active": True,
+                    "tool_call_exception": None,
+                    "tool_trace": None,
+                    "visible_to": [RoleType.AGENT, RoleType.EXECUTION_ENVIRONMENT],
+                }
+            ],
+        )
+        fn = compile_toolsandbox_tool(entry)
+        result = fn(
+            match_field="name",
+            match_value="ada",
+            action_type="answer_field",
+            update_fields={},
+            return_field="phone_number",
+        )
+
+    assert result["selected_id"] == "p1"
+    assert result["value"] == "555"
+    assert result["abstain_reason"] == ""

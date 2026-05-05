@@ -10,6 +10,7 @@ LIVE_VALIDATION = "live_validation"
 CANDIDATE_REPAIR = "candidate_repair"
 CONTRACT_SYNTHESIS = "contract_synthesis"
 EVIDENCE_ROUTING = "evidence_routing"
+MEDIUM_GRAIN_SKILLS = "medium_grain_skills"
 
 # Evidence-backed current stack from the fair-chance confirmation run:
 # contract synthesis improved outcome, canonical score, exact success, and adoption.
@@ -23,6 +24,7 @@ ALL_FEATURES = frozenset(
         CANDIDATE_REPAIR,
         CONTRACT_SYNTHESIS,
         EVIDENCE_ROUTING,
+        MEDIUM_GRAIN_SKILLS,
     }
 )
 

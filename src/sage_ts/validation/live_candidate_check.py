@@ -46,6 +46,8 @@ def _abstained(value: Any) -> bool:
     if value in (None, "", {}, []):
         return True
     if isinstance(value, dict):
+        if value.get("abstain_reason"):
+            return True
         if (
             value.get("should_call") is False
             or value.get("should_call_search") is False
@@ -53,7 +55,13 @@ def _abstained(value: Any) -> bool:
             return True
         if value.get("should_call_add_reminder") is False:
             return True
-        if value.get("abstain_reason"):
+        if (
+            value.get("should_call_tool") is False
+            and not value.get("selected_record")
+            and not value.get("selected_id")
+            and not value.get("value")
+            and not value.get("downstream_tool_name")
+        ):
             return True
     return False
 
@@ -94,7 +102,7 @@ def run_lightweight_live_candidate_check(
                 negative_abstain += 1
             else:
                 errors.append(f"live_example_{index}_negative_not_abstained")
-        elif _usable_output(result):
+        elif _usable_output(result) and not _abstained(result):
             positive_usable += 1
         else:
             errors.append(f"live_example_{index}_positive_unusable_output")

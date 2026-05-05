@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from sage_ts.experiments.v2_flags import DEPENDENCY_LOGIC, feature_enabled
+from sage_ts.experiments.v2_flags import (
+    DEPENDENCY_LOGIC,
+    MEDIUM_GRAIN_SKILLS,
+    feature_enabled,
+)
 from sage_ts.generation.tool_spec import StructuredInadequacyEvidence, ToolFamily
 from sage_ts.validation.sandbox_validator import ToolExample
 from tool_sandbox.common.execution_context import ScenarioCategories
@@ -79,6 +83,25 @@ def _is_post_selection_side_effect_prep_scenario(scenario_name: str) -> bool:
             "modify_contact_with_message_recency",
             "modify_reminder_with_recency_latest",
             "remove_reminder_with_recency_latest",
+        )
+    )
+
+
+def _is_medium_grain_constraint_action_scenario(scenario_name: str) -> bool:
+    if (
+        "ambiguous" in scenario_name
+        or "insufficient_information" in scenario_name
+        or not feature_enabled(MEDIUM_GRAIN_SKILLS)
+    ):
+        return False
+    return scenario_name.startswith(
+        (
+            "remove_contact_by_phone",
+            "update_contact_relationship_with_relationship",
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number",
+            "search_sender_phone_number_with_content",
+            "search_name_with_relationship",
         )
     )
 
@@ -849,6 +872,198 @@ def _post_selection_side_effect_args_observation(
     )
 
 
+def _constraint_to_action_planner_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:constraint_to_action_planner",
+        observation=(
+            "A medium-grain shortfall cluster spans contact/message constraint "
+            "selection, visible-record resolution, and safe downstream action "
+            "planning. Small selectors were valid but naturally uncalled, and "
+            "side-effect-only preparers were too brittle because they required a "
+            "separately selected record. Generate a deterministic medium-grain "
+            "composite helper named constraint_to_action_planner that accepts "
+            "simple callable inputs: records list copied directly from a visible "
+            "search/get result, match_field string, match_value string, action_type "
+            "string, update_fields dict, and return_field string. It must normalize "
+            "record values and constraints internally, select exactly one visible "
+            "record when unambiguous, detect ties, and prepare the downstream "
+            "ToolSandbox kwargs when safe. It must not execute final side-effect "
+            "tools. Return selected_record, selected_id, selected_index, value, "
+            "downstream_tool_name, downstream_tool_kwargs, should_call_tool, "
+            "tie_candidates, abstain_reason, and safety_notes. Supported action "
+            "types include answer_field, remove_contact, modify_contact, and "
+            "send_message. remove_contact requires person_id; modify_contact "
+            "requires person_id plus non-empty update_fields; send_message requires "
+            "phone_number and content in update_fields. answer_field should return "
+            "the requested return_field value with should_call_tool false. Abstain "
+            "on no records, missing match_field/match_value, no match, multiple "
+            "equal matches, missing ids, missing update fields, unsupported action, "
+            "or insufficient information. This skill compresses search-result "
+            "inspection, constraint normalization, target selection, ambiguity "
+            "handling, and downstream-kwargs preparation while preserving original "
+            "ToolSandbox search and side-effect calls."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "person_id": "p1",
+                            "name": "Ada Lovelace",
+                            "phone_number": "+1 (555) 0100",
+                            "relationship": "friend",
+                        },
+                        {
+                            "person_id": "p2",
+                            "name": "Grace Hopper",
+                            "phone_number": "+1 (555) 0200",
+                            "relationship": "coworker",
+                        },
+                    ],
+                    "match_field": "phone_number",
+                    "match_value": "15550200",
+                    "action_type": "remove_contact",
+                    "update_fields": {},
+                    "return_field": "person_id",
+                },
+                {
+                    "selected_record": {
+                        "person_id": "p2",
+                        "name": "Grace Hopper",
+                        "phone_number": "+1 (555) 0200",
+                        "relationship": "coworker",
+                    },
+                    "selected_id": "p2",
+                    "selected_index": 1,
+                    "value": "p2",
+                    "downstream_tool_name": "remove_contact",
+                    "downstream_tool_kwargs": {"person_id": "p2"},
+                    "should_call_tool": True,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": "call downstream ToolSandbox side-effect next",
+                },
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "person_id": "p1",
+                            "name": "Ada Lovelace",
+                            "phone_number": "+1 (555) 0100",
+                            "relationship": "coworker",
+                        }
+                    ],
+                    "match_field": "name",
+                    "match_value": "ada lovelace",
+                    "action_type": "modify_contact",
+                    "update_fields": {"relationship": "friend"},
+                    "return_field": "person_id",
+                },
+                {
+                    "selected_record": {
+                        "person_id": "p1",
+                        "name": "Ada Lovelace",
+                        "phone_number": "+1 (555) 0100",
+                        "relationship": "coworker",
+                    },
+                    "selected_id": "p1",
+                    "selected_index": 0,
+                    "value": "p1",
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": "p1",
+                        "relationship": "friend",
+                    },
+                    "should_call_tool": True,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": "call downstream ToolSandbox side-effect next",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "person_id": "p1",
+                            "name": "Ada Lovelace",
+                            "phone_number": "+1 (555) 0100",
+                        }
+                    ],
+                    "match_field": "name",
+                    "match_value": "ada lovelace",
+                    "action_type": "answer_field",
+                    "update_fields": {},
+                    "return_field": "phone_number",
+                },
+                {
+                    "selected_record": {
+                        "person_id": "p1",
+                        "name": "Ada Lovelace",
+                        "phone_number": "+1 (555) 0100",
+                    },
+                    "selected_id": "p1",
+                    "selected_index": 0,
+                    "value": "+1 (555) 0100",
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "should_call_tool": False,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": "answer from value; no side effect needed",
+                },
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {"person_id": "p1", "relationship": "friend"},
+                        {"person_id": "p2", "relationship": "friend"},
+                    ],
+                    "match_field": "relationship",
+                    "match_value": "friend",
+                    "action_type": "modify_contact",
+                    "update_fields": {"relationship": "coworker"},
+                    "return_field": "person_id",
+                },
+                {
+                    "selected_record": {},
+                    "selected_id": "",
+                    "selected_index": -1,
+                    "value": "",
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "should_call_tool": False,
+                    "tie_candidates": [
+                        {"person_id": "p1", "relationship": "friend"},
+                        {"person_id": "p2", "relationship": "friend"},
+                    ],
+                    "abstain_reason": "ambiguous_multiple_matches",
+                    "safety_notes": "do not guess before side-effect action",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="medium_grain_constraint_to_action_workflow_failure",
+        inadequacy_signals=(
+            "visible_info_unused",
+            "wrong_selected_record",
+            "side_effect_argument_preparation_failure",
+        ),
+        visible_data_gaps=(
+            "visible records plus scalar constraints must become a safe target and downstream kwargs",
+        ),
+        planner_failures=(
+            "chain search result inspection, constraint matching, ambiguity handling, and action prep",
+        ),
+    )
+
+
 def _stock_symbol_extraction_observation(
     scenario_name: str,
 ) -> CapabilityObservation:
@@ -1298,6 +1513,10 @@ def classify_scenario_observations(
             observations.append(
                 _post_selection_side_effect_args_observation(scenario_name)
             )
+        if _is_medium_grain_constraint_action_scenario(scenario_name):
+            observations.append(
+                _constraint_to_action_planner_observation(scenario_name)
+            )
         if _is_message_search_window_scenario(
             scenario_name
         ) or _is_message_recency_extreme_scenario(scenario_name):
@@ -1308,6 +1527,9 @@ def classify_scenario_observations(
         scenario_name
     ):
         return (_reminder_optional_location_argument_observation(scenario_name),)
+
+    if similarity < 1.0 and _is_medium_grain_constraint_action_scenario(scenario_name):
+        return (_constraint_to_action_planner_observation(scenario_name),)
 
     if similarity < 1.0 and (
         _is_latest_record_scenario(scenario_name)
@@ -1324,6 +1546,10 @@ def classify_scenario_observations(
         if _is_post_selection_side_effect_prep_scenario(scenario_name):
             observations.append(
                 _post_selection_side_effect_args_observation(scenario_name)
+            )
+        if _is_medium_grain_constraint_action_scenario(scenario_name):
+            observations.append(
+                _constraint_to_action_planner_observation(scenario_name)
             )
         if _is_message_search_window_scenario(
             scenario_name
@@ -1345,6 +1571,10 @@ def classify_scenario_observations(
             observations.append(
                 _post_selection_side_effect_args_observation(scenario_name)
             )
+        if _is_medium_grain_constraint_action_scenario(scenario_name):
+            observations.append(
+                _constraint_to_action_planner_observation(scenario_name)
+            )
         return tuple(observations)
 
     if similarity < 1.0 and _is_visible_record_constraint_scenario(scenario_name):
@@ -1352,6 +1582,10 @@ def classify_scenario_observations(
         if _is_post_selection_side_effect_prep_scenario(scenario_name):
             observations.append(
                 _post_selection_side_effect_args_observation(scenario_name)
+            )
+        if _is_medium_grain_constraint_action_scenario(scenario_name):
+            observations.append(
+                _constraint_to_action_planner_observation(scenario_name)
             )
         return tuple(observations)
 

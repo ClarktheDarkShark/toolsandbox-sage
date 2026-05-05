@@ -151,6 +151,25 @@ def test_generation_request_requires_v2_contract_fields(
     assert "final_state_preservation_plan" in prompt
 
 
+def test_generation_request_includes_medium_grain_guidance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "SAGE_V2_EXPERIMENT_FEATURES",
+        "contract_synthesis,medium_grain_skills",
+    )
+    request = ToolGenerationRequest(
+        scenario_name="remove_contact_by_phone",
+        observation="Generate a constraint-to-action planner.",
+        allowed_families=("composite_workflow_helper",),
+    )
+    prompt = request.prompt()
+
+    assert "Medium-grain skill experiment guidance" in prompt
+    assert "records: list, match_field: str" in prompt
+    assert "Do not split this into a thin selector" in prompt
+
+
 def test_generation_request_includes_failure_memory_and_cluster_context() -> None:
     request = ToolGenerationRequest(
         scenario_name="search_message_with_recency_latest",

@@ -190,3 +190,143 @@ def test_selector_validation_uses_normalized_ambiguity_output() -> None:
     result = validate_generated_tool(tool, examples)
 
     assert result.accepted, result.errors
+
+
+def _composite_constraint_action_tool() -> GeneratedTool:
+    return GeneratedTool(
+        spec=ToolSpec(
+            tool_name="constraint_to_action_planner",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Select a visible record and prepare a downstream action.",
+            inputs=(
+                ToolInput("records", "list", "Visible records."),
+                ToolInput("match_field", "str", "Field to match."),
+                ToolInput("match_value", "str", "Value to match."),
+                ToolInput("action_type", "str", "Action type."),
+                ToolInput("update_fields", "dict", "Update fields."),
+                ToolInput("return_field", "str", "Return field."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                    "selected_id": {"type": "string"},
+                    "selected_index": {"type": "integer"},
+                    "value": {"type": "string"},
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "tie_candidates": {"type": "array"},
+                    "abstain_reason": {"type": "string"},
+                    "safety_notes": {"type": "string"},
+                },
+            },
+            positive_triggers=(
+                "visible records require constraint-to-action planning",
+            ),
+            negative_triggers=("no records", "ambiguous multiple matches"),
+            preserves_side_effect_tools=("modify_contact", "remove_contact"),
+            required_original_tool_calls=("modify_contact", "remove_contact"),
+            abstain_behavior="Abstain on no records, no match, or ambiguity.",
+            generalization_rationale="Constraint-to-action planning recurs across tasks.",
+            estimated_step_compression=4,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "remove_contact_by_phone",
+                "modify_contact_by_name",
+            ),
+            reason_tool_is_decisive=(
+                "It combines normalization, selection, tie handling, and action prep."
+            ),
+            shortfall_cluster_evidence=("composite:constraint_to_action_planner",),
+            known_failure_mechanisms_addressed=(
+                "visible_info_unused",
+                "side_effect_argument_preparation_failure",
+            ),
+            final_state_preservation_plan="Caller executes the original side-effect tool.",
+            grading_accounting_note="Helper route is accounted separately from outcome.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Agents fail visible-record action planning.",
+                signals=("visible_info_unused",),
+            ),
+        ),
+        code="def constraint_to_action_planner(records: list, match_field: str, match_value: str, action_type: str, update_fields: dict, return_field: str) -> dict:\n    return {}\n",
+    )
+
+
+def test_composite_output_normalization_fills_safe_defaults() -> None:
+    tool = _composite_constraint_action_tool()
+    inputs = {
+        "records": [
+            {"person_id": "p1", "name": "Ada Lovelace", "relationship": "coworker"}
+        ],
+        "match_field": "name",
+        "match_value": "ada lovelace",
+        "action_type": "modify_contact",
+        "update_fields": {"relationship": "friend"},
+        "return_field": "person_id",
+    }
+    raw = {
+        "selected_record": {
+            "person_id": "p1",
+            "name": "Ada Lovelace",
+            "relationship": "coworker",
+        },
+        "selected_id": "p1",
+        "selected_index": 0,
+        "value": "",
+        "downstream_tool_name": "modify_contact",
+        "downstream_tool_kwargs": {"person_id": "p1", "relationship": "friend"},
+        "should_call_tool": True,
+        "tie_candidates": [],
+        "abstain_reason": "",
+        "safety_notes": "",
+    }
+
+    normalized = normalize_generated_tool_output(tool, raw, inputs=inputs)
+
+    assert normalized["value"] == "p1"
+    assert normalized["safety_notes"] == "call downstream ToolSandbox side-effect next"
+
+
+def test_composite_output_normalization_enforces_ambiguity_abstention() -> None:
+    tool = _composite_constraint_action_tool()
+    inputs = {
+        "records": [
+            {"person_id": "p1", "relationship": "friend"},
+            {"person_id": "p2", "relationship": "friend"},
+        ],
+        "match_field": "relationship",
+        "match_value": "friend",
+        "action_type": "modify_contact",
+        "update_fields": {"relationship": "coworker"},
+        "return_field": "person_id",
+    }
+    raw = {
+        "selected_record": {"person_id": "p1", "relationship": "friend"},
+        "selected_id": "p1",
+        "selected_index": 0,
+        "value": "p1",
+        "downstream_tool_name": "modify_contact",
+        "downstream_tool_kwargs": {"person_id": "p1"},
+        "should_call_tool": True,
+        "tie_candidates": [{"person_id": "p2", "relationship": "friend"}],
+        "abstain_reason": "ambiguous_multiple_matches",
+        "safety_notes": "",
+    }
+
+    normalized = normalize_generated_tool_output(tool, raw, inputs=inputs)
+
+    assert normalized["selected_record"] == {}
+    assert normalized["selected_index"] == -1
+    assert normalized["selected_id"] == ""
+    assert normalized["value"] == ""
+    assert normalized["downstream_tool_name"] == ""
+    assert normalized["downstream_tool_kwargs"] == {}
+    assert normalized["should_call_tool"] is False
+    assert normalized["tie_candidates"] == [
+        {"person_id": "p1", "relationship": "friend"},
+        {"person_id": "p2", "relationship": "friend"},
+    ]
+    assert normalized["safety_notes"] == "do not guess before side-effect action"

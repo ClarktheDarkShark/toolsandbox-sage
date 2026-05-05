@@ -53,6 +53,30 @@ def _derived_tool(name: str = "extract_stock_symbol") -> dict[str, Any]:
     }
 
 
+def _medium_grain_tool(name: str = "constraint_to_action_planner") -> dict[str, Any]:
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": (
+                "Medium-grain workflow usage: select a visible record and prepare "
+                "safe downstream kwargs."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "records": {"type": "array"},
+                    "match_field": {"type": "string"},
+                    "match_value": {"type": "string"},
+                    "action_type": {"type": "string"},
+                    "update_fields": {"type": "object"},
+                    "return_field": {"type": "string"},
+                },
+            },
+        },
+    }
+
+
 def test_selector_actor_policy_appears_after_candidate_records() -> None:
     messages = [
         {"role": "user", "content": "What is Taylor's phone number?"},
@@ -74,7 +98,7 @@ def test_selector_actor_policy_appears_after_candidate_records() -> None:
     assert policy is not None
     assert policy["role"] == "system"
     assert SELECTOR_ACTOR_POLICY_SENTINEL in policy["content"]
-    assert "call the selector before manually choosing" in policy["content"]
+    assert "call the helper before manually choosing" in policy["content"]
     assert "Do not call it without visible candidates" in policy["content"]
 
 
@@ -112,6 +136,22 @@ def test_selector_actor_policy_ignores_empty_search_results() -> None:
     messages = [{"role": "tool", "name": "search_contacts", "content": "[]"}]
 
     assert _selector_actor_policy_message(messages, [_selector_tool()]) is None
+
+
+def test_medium_grain_workflow_receives_selector_actor_policy() -> None:
+    messages = [
+        {
+            "role": "tool",
+            "name": "search_contacts",
+            "content": "[{'person_id': 'p1', 'phone_number': '15550100'}]",
+        }
+    ]
+
+    policy = _selector_actor_policy_message(messages, [_medium_grain_tool()])
+
+    assert policy is not None
+    assert "constraint_to_action_planner" in policy["content"]
+    assert "call the helper before manually choosing" in policy["content"]
 
 
 def test_derived_actor_policy_appears_after_structured_payload() -> None:

@@ -876,6 +876,42 @@ def test_stock_symbol_failure_births_symbol_extraction_helper() -> None:
     assert observations[0].validation_examples[-1].negative_applicability
 
 
+def test_medium_grain_constraint_action_observation_is_opt_in(
+    monkeypatch,
+) -> None:
+    scenario = Scenario(starting_context=ExecutionContext())
+
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "contract_synthesis")
+    disabled = classify_scenario_observations(
+        "update_contact_relationship_with_relationship_3_distraction_tools",
+        scenario,
+        {"similarity": 0.0},
+    )
+    assert not any(
+        item.canonical_key == "composite:constraint_to_action_planner"
+        for item in disabled
+    )
+
+    monkeypatch.setenv(
+        "SAGE_V2_EXPERIMENT_FEATURES",
+        "contract_synthesis,medium_grain_skills",
+    )
+    enabled = classify_scenario_observations(
+        "update_contact_relationship_with_relationship_3_distraction_tools",
+        scenario,
+        {"similarity": 0.0},
+    )
+    medium = next(
+        item
+        for item in enabled
+        if item.canonical_key == "composite:constraint_to_action_planner"
+    )
+    assert medium.generation_allowed
+    assert medium.allowed_families == ("composite_workflow_helper",)
+    assert len(medium.validation_examples) >= 4
+    assert any(item.negative_applicability for item in medium.validation_examples)
+
+
 def test_direct_state_failure_births_trace_compatible_tool_call_helper() -> None:
     scenario = Scenario(
         categories=[ScenarioCategories(str(ScenarioCategories.STATE_DEPENDENCY))]

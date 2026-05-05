@@ -529,3 +529,15 @@
   - Tests: targeted unit suite `115 passed`; artifact builder compile PASS; V2.2 new-toolset registry check-only PASS.
   - Reports: `docs/sage_protocol/v2_2_gap_atlas_loop2_report.md`, `docs/sage_protocol/v2_2_selector_actor_policy_diagnostic20_report.md`, `docs/sage_protocol/v2_2_masked_best3_discovery_loop2_report.md`, `docs/sage_protocol/v2_2_new_toolset_registry_report.md`.
   - Decision: `continue masked discovery`; no confirmation60 for `extract_stock_symbol`; no combined ablation yet.
+
+
+- `V2.3 medium-grain deterministic skill experiment` completed.
+  - Date: `2026-05-05T19:05:00-04:00`
+  - Frozen best3 registry untouched.
+  - Initial discovery60: `outputs/v2_3_medium_grain_discovery60_20260505_175722/mechanism_60_20260505_175755`; dashboards opened at `http://127.0.0.1:5602/outputs/v2_3_medium_grain_discovery60_20260505_175722/mechanism_60_20260505_175755/dashboard/index.html` and `http://127.0.0.1:5602/outputs/v2_3_medium_grain_discovery60_20260505_175722/mechanism_60_20260505_175755/dashboard/task_focus.html`; outcome `-0.0006`; canonical `0.0031`; exact delta `2`; accepted tools `0`.
+  - Repairs: medium-grain feature flag, diverse cluster observation, generator preservation guidance, actor-policy/docstring affordance, trace bridge for `records`, live validation rejection for positive abstains, composite output normalization.
+  - Diagnostic20: `outputs/v2_3_medium_grain_diag20_20260505_184209/mechanism_60_20260505_184213`; dashboards opened at `http://127.0.0.1:5604/outputs/v2_3_medium_grain_diag20_20260505_184209/mechanism_60_20260505_184213/dashboard/index.html` and `http://127.0.0.1:5604/outputs/v2_3_medium_grain_diag20_20260505_184209/mechanism_60_20260505_184213/dashboard/task_focus.html`; accepted `constraint_to_action_planner`; visible/called/VNC `6 / 0 / 6`; outcome `0.1715`; canonical `0.0085`; exact delta `1`; runtime/side-effect `0 / 0`.
+  - Force20: `outputs/v2_3_medium_grain_force20_20260505_184848/mechanism_60_20260505_184852`; dashboards opened at `http://127.0.0.1:5605/outputs/v2_3_medium_grain_force20_20260505_184848/mechanism_60_20260505_184852/dashboard/index.html` and `http://127.0.0.1:5605/outputs/v2_3_medium_grain_force20_20260505_184848/mechanism_60_20260505_184852/dashboard/task_focus.html`; forced after `search_contacts`; visible/called/VNC `15 / 13 / 2`; called-subset outcome `-0.13126404560161367`; called-subset canonical `-0.13004658549699968`; side-effect/runtime `9 / 0`.
+  - Tests: targeted V2.3 unit suite `127 passed`; artifact builder compile PASS; candidate, V2.2 new-toolset, and frozen best3 registry checks PASS.
+  - Reports: `docs/sage_protocol/v2_3_medium_grain_skill_experiment_report.md`, `docs/sage_protocol/v2_3_medium_grain_candidate_triage.md`, `docs/sage_protocol/v2_3_medium_grain_confirmation_report.md`.
+  - Decision: `medium-grain skill concept negative`; no confirmation60; candidate parked.

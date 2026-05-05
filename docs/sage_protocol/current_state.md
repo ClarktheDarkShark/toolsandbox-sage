@@ -238,3 +238,16 @@
 - Reports: `docs/sage_protocol/v2_2_gap_atlas_loop2_report.md`, `docs/sage_protocol/v2_2_selector_actor_policy_diagnostic20_report.md`, `docs/sage_protocol/v2_2_masked_best3_discovery_loop2_report.md`, `docs/sage_protocol/v2_2_new_toolset_registry_report.md`.
 - Decision: `continue masked discovery`.
 - Next action: continue masked discovery on a new non-best3, non-parked cluster; do not run confirmation60 for `extract_stock_symbol`; do not run combined ablation yet.
+
+
+## V2.3 Medium-Grain Deterministic Skill Experiment
+- Date: `2026-05-05T19:05:00-04:00`
+- Frozen best3 registry modified: `no`.
+- Masked tools: `relative_day_time_to_timestamp`, `resolve_search_window_or_bounds`, `select_record_by_timestamp_extreme`.
+- Initial discovery60: `outputs/v2_3_medium_grain_discovery60_20260505_175722/mechanism_60_20260505_175755`; outcome `-0.0006`; canonical `0.0031`; exact delta `2`; generated candidates accepted `0`.
+- Framework repairs: medium-grain feature flag, diverse cluster observation, generator downstream-preservation guidance, composite docstring affordance, records trace-bridging, live-positive-abstain rejection, composite output normalization.
+- Diagnostic20 acceptance run: `outputs/v2_3_medium_grain_diag20_20260505_184209/mechanism_60_20260505_184213`; accepted `constraint_to_action_planner`; outcome `0.1715`; canonical `0.0085`; exact delta `1`; visible/called/VNC `6 / 0 / 6`; runtime/side-effect `0 / 0`.
+- Force-call diagnostic: `outputs/v2_3_medium_grain_force20_20260505_184848/mechanism_60_20260505_184852`; visible/called/VNC `15 / 13 / 2`; called-subset outcome `-0.13126404560161367`; canonical `-0.13004658549699968`; side-effect/runtime `9 / 0`.
+- Reports: `docs/sage_protocol/v2_3_medium_grain_skill_experiment_report.md`, `docs/sage_protocol/v2_3_medium_grain_candidate_triage.md`, `docs/sage_protocol/v2_3_medium_grain_confirmation_report.md`.
+- Decision: `medium-grain skill concept negative`.
+- Next action: park `constraint_to_action_planner`; continue masked discovery on a different non-best3 cluster or redesign medium-grain contracts to separate answer-only resolution from side-effect action planning.

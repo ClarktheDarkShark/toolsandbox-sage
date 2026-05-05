@@ -12,6 +12,7 @@ from sage_ts.experiments.v2_flags import (
     CONTRACT_SYNTHESIS,
     DEPENDENCY_LOGIC,
     GRADING_ACCOUNTING,
+    MEDIUM_GRAIN_SKILLS,
     feature_enabled,
 )
 from sage_ts.generation.prompt_cache import PromptCache, cache_key
@@ -121,6 +122,26 @@ class ToolGenerationRequest:
             if feature_enabled(CONTRACT_SYNTHESIS)
             else ""
         )
+        medium_grain_guidance = (
+            "Medium-grain skill experiment guidance: when the observation asks for "
+            "a constraint-to-action, visible-record workflow, prefer a single "
+            "composite_workflow_helper that accepts records: list, match_field: str, "
+            "match_value: str, action_type: str, update_fields: dict, and "
+            "return_field: str. Do not split this into a thin selector plus a "
+            "separate side-effect preparer. The helper must normalize constraints "
+            "internally, including stripping non-digits from both sides for phone "
+            "or number fields, select exactly one visible record, abstain on ties "
+            "or missing data, and return downstream_tool_name plus "
+            "downstream_tool_kwargs for the preserved original ToolSandbox action. "
+            "It must also support answer_field by returning value with "
+            "should_call_tool=false and empty downstream kwargs. The spec must "
+            "name every returned original side-effect tool in both "
+            "preserves_side_effect_tools and required_original_tool_calls; for "
+            "contact actions this includes modify_contact, remove_contact, and "
+            "send_message when those action types are supported. "
+            if feature_enabled(MEDIUM_GRAIN_SKILLS)
+            else ""
+        )
         return (
             "Propose one deterministic Python helper tool as JSON with two top-level "
             'keys: "spec" and "code". '
@@ -149,6 +170,7 @@ class ToolGenerationRequest:
             "replace a single existing base tool. "
             f"{grading_guidance}"
             f"{synthesis_guidance}"
+            f"{medium_grain_guidance}"
             "Use concrete scenario-family labels in applicable_task_families, "
             "not helper-family labels such as canonicalizer, state_precondition_helper, "
             "search_filter_ranking_helper, or timestamp_conversion. "
@@ -289,6 +311,12 @@ class ToolGenerator:
             "mismatch, the repaired code must return selected_index=-1, "
             "selected_id='', value='', selected_record={}, and tie_candidates "
             "containing every tied candidate when multiple records match. If a "
+            "constraint-to-action composite helper failed a phone or no-match "
+            "example, normalize phone/number fields by stripping non-digits from "
+            "both the visible record value and match_value before comparison. "
+            "If it returns downstream_tool_name/downstream_tool_kwargs, include "
+            "that downstream original ToolSandbox action in both "
+            "preserves_side_effect_tools and required_original_tool_calls. If a "
             "post-selection side-effect preparer failed or abstained too often, "
             "normalize action_type aliases such as remove/delete and modify/update "
             "before branching, while preserving abstention on missing records or "

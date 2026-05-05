@@ -55,6 +55,11 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "contact_message_search_disambiguation",
         "record_filtering_ranking_latest_selection",
     ),
+    "constraint_to_action_planner": (
+        "generic_multi_tool_composition",
+        "contact_message_search_disambiguation",
+        "record_filtering_ranking_latest_selection",
+    ),
     "next_service_tool_call": ("direct_state_precondition_service_enablement",),
     "recover_from_tool_error": ("direct_state_precondition_service_enablement",),
     "next_service_enablement_action": ("direct_state_precondition_service_enablement",),
@@ -86,6 +91,7 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
     "composite:prepare_side_effect_args_from_selected_record": (
         "prepare_side_effect_args_from_selected_record",
     ),
+    "composite:constraint_to_action_planner": ("constraint_to_action_planner",),
     "state_precondition:next_service_tool_call": ("next_service_tool_call",),
     "state_precondition:recover_from_tool_error": ("recover_from_tool_error",),
     "composite:prepare_reminder_creation_args": ("prepare_reminder_creation_args",),
@@ -140,6 +146,7 @@ VISIBLE_RECORD_CONSTRAINT_PREFIXES = (
     "search_relationship_with_phone_number",
     "search_sender_phone_number_with_content",
     "update_contact_relationship_with_relationship",
+    "search_name_with_relationship",
 )
 
 ACTION_TARGET_PREFIXES = (
@@ -347,46 +354,6 @@ def expected_helper_fit(
         helpers.append("resolve_search_window_or_bounds")
     if any(token in name for token in ("holiday", "business_day")):
         helpers.append("days_between_timestamps")
-    if "insufficient_information" not in name and name.startswith(
-        "find_stock_symbol_with_company_name"
-    ):
-        helpers.append("extract_stock_symbol")
-    if "insufficient_information" not in name and name.startswith(
-        DIRECT_SERVICE_HELPER_PREFIXES
-    ):
-        helpers.append("next_service_tool_call")
-    if "insufficient_information" not in name and name.startswith(
-        DOWNSTREAM_SERVICE_HELPER_PREFIXES
-    ):
-        helpers.append("next_service_tool_call")
-        helpers.append("recover_from_tool_error")
-    if (
-        "insufficient_information" not in name
-        and "ambiguous" not in name
-        and name.startswith(VISIBLE_RECORD_CONSTRAINT_PREFIXES)
-    ):
-        helpers.append("select_visible_record_by_constraints")
-    if "insufficient_information" not in name and name.startswith(
-        ACTION_TARGET_PREFIXES
-    ):
-        helpers.append("select_action_target_by_recency")
-    if (
-        "insufficient_information" not in name
-        and "ambiguous" not in name
-        and name.startswith(SIDE_EFFECT_PREP_PREFIXES)
-    ):
-        helpers.append("prepare_side_effect_args_from_selected_record")
-    if (
-        "insufficient_information" not in name
-        and name.startswith("add_reminder_content_and_")
-        and "_time" in name
-        and not (
-            name.startswith("add_reminder_content_and_week_delta_and_time")
-            and "_location" not in name
-        )
-    ):
-        helpers.append("prepare_reminder_creation_args")
-
     return helpers
 
 
@@ -445,6 +412,21 @@ def expected_birth_opportunities(
         and name.startswith(SIDE_EFFECT_PREP_PREFIXES)
     ):
         opportunities.append("composite:prepare_side_effect_args_from_selected_record")
+    if (
+        "ambiguous" not in name
+        and "insufficient_information" not in name
+        and name.startswith(
+            (
+                "remove_contact_by_phone",
+                "update_contact_relationship_with_relationship",
+                "search_phone_number_with_name",
+                "search_relationship_with_phone_number",
+                "search_sender_phone_number_with_content",
+                "search_name_with_relationship",
+            )
+        )
+    ):
+        opportunities.append("composite:constraint_to_action_planner")
     if name.startswith("find_days_till_holiday"):
         opportunities.append("derived_value:days_between_timestamps")
     if name.startswith("find_stock_symbol_with_company_name"):
