@@ -70,3 +70,16 @@ Do not run additive60 for `resolve_location_lookup_field`. Preserve `format_calc
 
 ## Updated Decision Label
 `continue gap-closure loop`
+
+## Candidate 4: `prepare_direct_contact_action_args` Flat-Scalar Direct Action
+- Candidate registry: `artifacts/summaries/v2_5_tool_foundry_v2_5_loop5_flat_scalar_phonefix_20260506_143127/candidate_batch_registry/registry_manifest.json`
+- Registry SHA-256: `9d34a2a816a6dd99a2b8b30351587825f14633859c852a5f731dd94a8f502cf3`
+- Natural micro run: `outputs/v2_5_micro_direct_flat_scalar_cached_20260506_143229/mechanism_40_20260506_143232`
+- Natural dashboards: `http://127.0.0.1:5640/outputs/v2_5_micro_direct_flat_scalar_cached_20260506_143229/mechanism_40_20260506_143232/dashboard/index.html`, `http://127.0.0.1:5640/outputs/v2_5_micro_direct_flat_scalar_cached_20260506_143229/mechanism_40_20260506_143232/dashboard/task_focus.html`
+- Natural visible/called/VNC: `8 / 0 / 8`; visible-not-called subset outcome `+0.0652`; not tool-driven.
+- Force-call run: `outputs/v2_5_micro_direct_flat_scalar_force_20260506_143725/mechanism_40_20260506_143730`
+- Force dashboards: `http://127.0.0.1:5641/outputs/v2_5_micro_direct_flat_scalar_force_20260506_143725/mechanism_40_20260506_143730/dashboard/index.html`, `http://127.0.0.1:5641/outputs/v2_5_micro_direct_flat_scalar_force_20260506_143725/mechanism_40_20260506_143730/dashboard/task_focus.html`
+- Force visible/called/VNC: `8 / 8 / 0`; called-subset outcome `-0.0816`; called-subset canonical `-0.0026`; gains/regressions/preserved `2 / 2 / 4`.
+- Actual force-call outputs were usable and side-effect preserving, e.g. `add_contact` kwargs, `remove_contact` person_id kwargs, `send_message_with_phone_number` kwargs, and `modify_contact` phone kwargs.
+- Side-effect/runtime incidents: `0 / 0`.
+- Decision: `candidate design negative`; the flat-scalar direct-action design is callably implemented but not additive in called-subset outcome.

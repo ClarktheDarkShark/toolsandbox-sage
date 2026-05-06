@@ -890,6 +890,94 @@ def test_post_selection_composite_chains_selected_record_from_unique_search_trac
         }
 
 
+def test_direct_scalar_composite_docstring_and_defaults_are_callable() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_direct_contact_action_args",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare direct contact action kwargs from scalar inputs.",
+            inputs=(
+                ToolInput("action_type", "str", "Direct action type."),
+                ToolInput("contact_name", "str", "Optional contact name."),
+                ToolInput("phone_number", "str", "Optional phone number."),
+                ToolInput("relationship", "str", "Optional relationship."),
+                ToolInput("record_id", "str", "Optional visible person id."),
+                ToolInput("target_field", "str", "Optional modify target field."),
+                ToolInput("new_value", "str", "Optional modify value."),
+                ToolInput("message_text", "str", "Optional message content."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("add_contact_with_name_and_phone_number",),
+            negative_triggers=("selected-record-only workflows",),
+            preserves_side_effect_tools=("add_contact",),
+            required_original_tool_calls=("add_contact",),
+            abstain_behavior="Abstain when required scalar fields are missing.",
+            generalization_rationale="Direct contact actions recur with scalar inputs.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "add_contact_with_name_and_phone_number",
+                "send_message_with_phone_number_and_content",
+            ),
+            reason_tool_is_decisive="It prepares exact safe kwargs before the original side-effect tool.",
+            shortfall_cluster_evidence=("direct_side_effect_no_helper",),
+            known_failure_mechanisms_addressed=("opaque_payload_callability_failure",),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Direct side-effect kwargs are sometimes brittle.",
+                signals=("side_effect_argument_preparation",),
+            ),
+        ),
+        code=(
+            "def prepare_direct_contact_action_args(action_type: str, "
+            "contact_name: str, phone_number: str, relationship: str, "
+            "record_id: str, target_field: str, new_value: str, "
+            "message_text: str) -> dict:\n"
+            "    if action_type != 'add_contact' or not contact_name or not phone_number:\n"
+            "        return {'downstream_tool_name': '', 'downstream_tool_kwargs': {}, "
+            "'should_call_tool': False, 'abstain_reason': 'missing_required_fields'}\n"
+            "    return {'downstream_tool_name': 'add_contact', "
+            "'downstream_tool_kwargs': {'name': contact_name, 'phone_number': phone_number}, "
+            "'should_call_tool': True, 'abstain_reason': ''}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="add_contact_with_name_and_phone_number",
+    )
+
+    docstring = _google_docstring(entry)
+    assert "Direct scalar action-prep usage:" in docstring
+    assert "It is not a selector." in docstring
+    assert "Post-selection usage:" not in docstring
+
+    fn = compile_toolsandbox_tool(entry)
+    schema = convert_to_openai_tool(fn, name="prepare_direct_contact_action_args")[
+        "function"
+    ]["parameters"]
+    assert set(schema.get("required", ())) == {"action_type"}
+
+    result = fn(action_type="add_contact", contact_name="Ada")
+    assert result["should_call_tool"] is False
+    assert result["abstain_reason"] == "missing_required_fields"
+
+
 def test_search_filter_helper_defaults_optional_constraints() -> None:
     tool = GeneratedTool(
         spec=ToolSpec(

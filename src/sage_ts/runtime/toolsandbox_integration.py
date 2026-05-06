@@ -54,6 +54,15 @@ OPTIONAL_HELPER_DEFAULTS: dict[str, Any] = {
     "filters": {},
     "required_filters": {},
     "tie_break_fields": [],
+    "contact_name": "",
+    "phone_number": "",
+    "email": "",
+    "relationship": "",
+    "target_field": "",
+    "new_value": "",
+    "message_text": "",
+    "record_id": "",
+    "person_id": "",
 }
 
 
@@ -104,6 +113,8 @@ def _post_selection_composite_usage_note(spec: ToolSpec) -> list[str]:
         return []
     if not any(str(key).endswith("_kwargs") for key in output_properties):
         return []
+    if "selected_record" not in input_names and "records" not in input_names:
+        return []
 
     lines = [
         "",
@@ -144,6 +155,50 @@ def _post_selection_composite_usage_note(spec: ToolSpec) -> list[str]:
         ]
     )
     return lines
+
+
+def _direct_scalar_action_usage_note(spec: ToolSpec) -> list[str]:
+    """Affordance guidance for direct scalar side-effect argument helpers."""
+    input_names = {item.name for item in spec.inputs}
+    output_schema = spec.output_schema or {}
+    output_properties = output_schema.get("properties", {})
+    if not isinstance(output_properties, dict):
+        return []
+    if "downstream_tool_name" not in output_properties:
+        return []
+    if "downstream_tool_kwargs" not in output_properties:
+        return []
+    if "action_type" not in input_names:
+        return []
+    if "selected_record" in input_names or "records" in input_names:
+        return []
+    scalar_inputs = sorted(
+        name
+        for name in input_names
+        if name
+        not in {
+            "action_type",
+            "user_intent",
+        }
+    )
+    if not scalar_inputs:
+        return []
+    return [
+        "",
+        "Direct scalar action-prep usage:",
+        "    Use this helper only when the user directly supplied the scalar",
+        " fields needed for the contact/message action. It is not a selector.",
+        "    Pass action_type as add_contact, remove_contact, modify_contact,",
+        " or send_message. Pass only visible user-provided scalar fields such",
+        f" as {', '.join(scalar_inputs)}.",
+        "    Optional scalar fields may be omitted; the helper must abstain if",
+        " required fields for the chosen action are still missing.",
+        "    If should_call_tool is true, call downstream_tool_name next with",
+        " downstream_tool_kwargs unchanged. This helper only prepares kwargs",
+        " and does not perform the side effect.",
+        "    Do not use this helper for relationship, recency, search, or",
+        " selected-record workflows where the target must first be found.",
+    ]
 
 
 def _medium_grain_composite_usage_note(spec: ToolSpec) -> list[str]:
@@ -526,6 +581,15 @@ def _with_optional_helper_defaults(
             "constraints",
             "required_filters",
             "tie_break_fields",
+            "contact_name",
+            "phone_number",
+            "email",
+            "relationship",
+            "target_field",
+            "new_value",
+            "message_text",
+            "record_id",
+            "person_id",
         }:
             continue
         updated[item.name] = copy.deepcopy(OPTIONAL_HELPER_DEFAULTS[item.name])
@@ -712,6 +776,7 @@ def _google_docstring(entry: RegistryEntry) -> str:
         if spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
             lines.extend(_medium_grain_composite_usage_note(spec))
             lines.extend(_post_selection_composite_usage_note(spec))
+            lines.extend(_direct_scalar_action_usage_note(spec))
         # General call-path note for any other side-effect-preserving prep helper
         lines.extend(_call_path_note(spec))
     return "\n".join(lines)

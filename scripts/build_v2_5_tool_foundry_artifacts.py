@@ -527,6 +527,118 @@ def _designs() -> list[CandidateDesign]:
             negative_applicability=True,
         ),
     )
+    direct_side_effect_flat_examples = (
+        ToolExample(
+            {
+                "action_type": "add_contact",
+                "contact_name": "Stephen Sondheim",
+                "phone_number": "+1 (987) 654-3210",
+                "relationship": "",
+                "record_id": "",
+                "message_text": "",
+                "target_field": "",
+                "new_value": "",
+                "email": "",
+            },
+            {
+                "downstream_tool_name": "add_contact",
+                "downstream_tool_kwargs": {
+                    "name": "Stephen Sondheim",
+                    "phone_number": "+19876543210",
+                },
+                "should_call_tool": True,
+                "abstain_reason": "",
+            },
+        ),
+        ToolExample(
+            {
+                "action_type": "update_contact",
+                "contact_name": "",
+                "phone_number": "+1 987 654 3210",
+                "relationship": "",
+                "record_id": "550e8400-e29b-41d4-a716-446655440000",
+                "message_text": "",
+                "target_field": "",
+                "new_value": "",
+                "email": "",
+            },
+            {
+                "downstream_tool_name": "modify_contact",
+                "downstream_tool_kwargs": {
+                    "person_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "phone_number": "+19876543210",
+                },
+                "should_call_tool": True,
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "action_type": "send_message",
+                "contact_name": "",
+                "phone_number": "+1 (245) 334-4098",
+                "relationship": "",
+                "record_id": "",
+                "message_text": "How's the new album coming along",
+                "target_field": "",
+                "new_value": "",
+                "email": "",
+            },
+            {
+                "downstream_tool_name": "send_message_with_phone_number",
+                "downstream_tool_kwargs": {
+                    "phone_number": "+12453344098",
+                    "content": "How's the new album coming along",
+                },
+                "should_call_tool": True,
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "action_type": "remove_contact",
+                "contact_name": "",
+                "phone_number": "",
+                "relationship": "",
+                "record_id": "550e8400-e29b-41d4-a716-446655440000",
+                "message_text": "",
+                "target_field": "",
+                "new_value": "",
+                "email": "",
+            },
+            {
+                "downstream_tool_name": "remove_contact",
+                "downstream_tool_kwargs": {
+                    "person_id": "550e8400-e29b-41d4-a716-446655440000",
+                },
+                "should_call_tool": True,
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "action_type": "add_contact",
+                "contact_name": "No Phone",
+                "phone_number": "",
+                "relationship": "",
+                "record_id": "",
+                "message_text": "",
+                "target_field": "",
+                "new_value": "",
+                "email": "",
+            },
+            {
+                "downstream_tool_name": "",
+                "downstream_tool_kwargs": {},
+                "should_call_tool": False,
+                "abstain_reason": "missing_required_fields",
+            },
+            negative_applicability=True,
+        ),
+    )
     return [
         CandidateDesign(
             design_id="temperature_unit_answer_resolver",
@@ -771,6 +883,90 @@ def _designs() -> list[CandidateDesign]:
                 "find_current_city_insufficient_information",
             ),
         ),
+        CandidateDesign(
+            design_id="direct_contact_action_flat_scalar_preparer",
+            cluster_id="direct_side_effect_no_helper",
+            tool_name="prepare_direct_contact_action_args",
+            design_type="flat-scalar side-effect kwargs preparer",
+            allowed_family=str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),
+            deterministic_value=4,
+            input_simplicity=4,
+            natural_adoption_likelihood=4,
+            side_effect_safety=4,
+            negative_case_safety=4,
+            expected_additive_value=3,
+            canonical_only_risk=1,
+            best3_duplication_risk=1,
+            visible_not_called_pollution_risk=1,
+            expected_direct_route_advantage=(
+                "Uses top-level scalar inputs instead of an opaque payload, so the "
+                "acting model can call the helper with the exact user-provided "
+                "action fields and receive safe original ToolSandbox kwargs."
+            ),
+            likely_direct_base_tool_route=(
+                "parse visible scalar fields -> select the side-effect tool -> "
+                "normalize phone/id/content kwargs -> call original side-effect tool"
+            ),
+            observation=(
+                "Design a deterministic direct-action preparation helper named "
+                "prepare_direct_contact_action_args. This is a material repair of "
+                "the failed dict-payload prepare_direct_contact_action_kwargs design: "
+                "DO NOT use action_payload, payload, selected_record, records, or "
+                "opaque dict inputs. Use only top-level scalar inputs: action_type: str, "
+                "contact_name: str, phone_number: str, email: str, relationship: str, "
+                "target_field: str, new_value: str, message_text: str, record_id: str. "
+                "All scalar fields except action_type are optional and may be omitted "
+                "or blank; the code must safely default missing optional values to ''. "
+                "Supported actions and aliases: add/add_contact requires contact_name "
+                "and phone_number and returns add_contact kwargs with name, "
+                "phone_number, and relationship only when relationship is nonblank; "
+                "remove/remove_contact/delete requires record_id and returns "
+                "remove_contact kwargs with person_id=record_id; update/update_contact/"
+                "modify_contact/modify_phone requires record_id plus either "
+                "phone_number or target_field='phone_number' with new_value, and "
+                "returns modify_contact kwargs with person_id and phone_number; "
+                "send/send_message requires phone_number and message_text and returns "
+                "send_message_with_phone_number kwargs with phone_number and content. "
+                "Normalize phone numbers by preserving a leading plus sign and stripping "
+                "spaces, dashes, parentheses, and dots; every returned phone_number "
+                "must keep the leading '+' when the user input included one. Never "
+                "return digit-only phone numbers for plus-prefixed inputs. Never infer "
+                "missing ids, names, "
+                "phone numbers, relationships, or message content. Abstain with "
+                "should_call_tool=false and abstain_reason='missing_required_fields' "
+                "when required scalar fields are blank. Abstain on unsupported actions, "
+                "relationship/recency/search/selected-record workflows, ambiguity, or "
+                "insufficient-information tasks. Return exactly downstream_tool_name, "
+                "downstream_tool_kwargs, should_call_tool, and abstain_reason. It must "
+                "not call or execute add_contact, remove_contact, modify_contact, or "
+                "send_message_with_phone_number; it only prepares kwargs and requires "
+                "the acting model to call the returned original ToolSandbox tool next. "
+                "Include positive triggers for add_contact_with_name_and_phone_number, "
+                "remove_contact_with_id, update_contact_with_id_and_phone_number, and "
+                "send_message_with_phone_number_and_content. Include negative triggers "
+                "for selected-record-only workflows, missing scalar fields, "
+                "insufficient_information, relationship selection, recency selection, "
+                "and contact search tasks. The spec must list add_contact, "
+                "remove_contact, modify_contact, and send_message_with_phone_number in "
+                "both required_original_tool_calls and preserves_side_effect_tools. Set "
+                "canonical_route_substitution_risk='none' and "
+                "expected_milestone_calls_replaced=[] because the helper preserves the "
+                "original final side-effect calls."
+            ),
+            validation_examples=direct_side_effect_flat_examples,
+            scenario_prefixes=(
+                "add_contact_with_name_and_phone_number",
+                "remove_contact_with_id",
+                "update_contact_with_id_and_phone_number",
+                "send_message_with_phone_number_and_content",
+            ),
+            negative_prefixes=(
+                "remove_contact_by_phone_no_search_contacts_insufficient_information",
+                "send_message_with_recipient_name_no_search_tools_insufficient_information",
+                "search_message_with_recency_latest",
+                "find_current_city_insufficient_information",
+            ),
+        ),
     ]
 
 
@@ -964,6 +1160,22 @@ def _request_for_design(design: CandidateDesign) -> ToolGenerationRequest:
         }
         for example in design.validation_examples
     ]
+    failed_designs = [
+        {
+            "design_id": design_id,
+            **payload,
+        }
+        for design_id, payload in FAILED_CANDIDATE_DESIGNS.items()
+        if (
+            design.cluster_id == "direct_side_effect_no_helper"
+            and design_id.startswith("direct_")
+        )
+    ]
+    parked_evidence = [
+        payload["evidence"]
+        for cluster, payload in PARKED_MECHANISMS.items()
+        if cluster in {design.cluster_id, "broad_external_service_answer_extraction"}
+    ]
     return ToolGenerationRequest(
         scenario_name=design.scenario_prefixes[0],
         observation=design.observation,
@@ -988,13 +1200,10 @@ def _request_for_design(design: CandidateDesign) -> ToolGenerationRequest:
             "cluster_id": design.cluster_id,
             "candidate_design_type": design.design_type,
             "non_diagnostic_birth_allowed": True,
-            "distinct_base_task_families": 2,
+            "distinct_base_task_families": len(set(design.scenario_prefixes)),
             "base_task_families": list(design.scenario_prefixes),
-            "prior_failed_designs": [
-                PARKED_MECHANISMS["broad_external_service_answer_extraction"][
-                    "evidence"
-                ]
-            ],
+            "prior_failed_designs": failed_designs,
+            "prior_parked_evidence": parked_evidence,
             "material_repair": design.expected_direct_route_advantage,
         },
     )

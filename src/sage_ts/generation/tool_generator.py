@@ -251,6 +251,13 @@ class ToolGenerationRequest:
             "unless updates contains at least one concrete field to change. The "
             "helper must prepare arguments only and preserve the original "
             "ToolSandbox side-effect call. "
+            "For any direct contact/message side-effect helper that prepares "
+            "phone_number kwargs, phone normalization must preserve ToolSandbox "
+            "phone validity: strip spaces/dashes/parentheses/dots, keep an existing "
+            "leading '+', and if the visible user input starts with '+' then the "
+            "returned phone_number must also start with '+'. Do not return "
+            "digit-only phone numbers when validation examples expect an "
+            "E.164-style leading plus. "
             "If family is derived_value_calculator and output_annotation is dict, "
             "output_schema must be a JSON Schema object with type 'object' and "
             "properties for every returned key. It must preserve a downstream "
@@ -320,7 +327,11 @@ class ToolGenerator:
             "post-selection side-effect preparer failed or abstained too often, "
             "normalize action_type aliases such as remove/delete and modify/update "
             "before branching, while preserving abstention on missing records or "
-            "ambiguous updates. Return only the repaired JSON object."
+            "ambiguous updates. If a direct contact/message action helper failed a "
+            "phone-number validation example, repair phone normalization so an input "
+            "with a leading '+' returns a phone_number with the same leading '+', "
+            "with spaces/dashes/parentheses/dots removed. Return only the repaired "
+            "JSON object."
         )
         key = cache_key(self.completer.model, {"kind": "tool_repair_v2"}, prompt)
         response = self.cache.get(key)
