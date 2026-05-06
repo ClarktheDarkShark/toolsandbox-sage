@@ -615,3 +615,15 @@
 - Gap reduction proxy `22.22%`.
 - Decision label: `candidate pack ready for confirmation60`.
 - Next action: run confirmation60 generation OFF with the frozen Candidate Pack 1 registry against best3-only.
+
+## V2.5 Candidate Pack 1 Confirmation60 - 2026-05-06 16:07
+- Frozen best3 registry unchanged.
+- Confirmation manifest: `artifacts/summaries/v2_5_candidate_pack1_distance_confirmation60/cohort_manifest.json`; quality `pass`; best3 no-current-helper-fit proxy `0.600`.
+- Best3 run: `outputs/v2_5_confirmation60_pack1_best3_20260506_152240/mechanism_60_20260506_152245`; outcome `0.4272`; canonical `0.7876`; protocol gate `False`.
+- Pack run: `outputs/v2_5_confirmation60_pack1_distance_20260506_154608/mechanism_60_20260506_154613`; outcome `0.5068`; canonical `0.7707`; protocol gate `True`.
+- Pack vs best3 outcome delta `+0.0796`; canonical delta `-0.0170`; exact successes `10 -> 10`.
+- `format_calculated_distance_km` visible/called/VNC `8 / 7 / 1`; called-subset outcome vs best3 `+0.1429`; called-subset outcome vs control `+0.0000`.
+- Runtime/helper side-effect incidents `0 / 0`.
+- Gap reduction proxy `19.44%`.
+- Decision label: `expanded portfolio ready for 100`.
+- Next action: run frozen100 with best3 vs Candidate Pack 1 before any frozen250.
