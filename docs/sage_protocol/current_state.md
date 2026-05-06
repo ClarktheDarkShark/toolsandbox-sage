@@ -313,3 +313,10 @@
 - Last report: `docs/sage_protocol/v2_5_micro_value_test_report.md`.
 - Decision label: `continue gap-closure loop`.
 - Next action: continue V2.5 with a materially different high-gap cluster, preferably a narrow scalar direct-side-effect argument-preparation design that preserves original side-effect tools and is distinct from selected-record-only prep.
+
+## V2.5 Direct Side-Effect Dict-Payload Diagnostic - 2026-05-06
+- Candidate: `prepare_direct_contact_action_kwargs` in `artifacts/summaries/v2_5_tool_foundry_v2_5_loop4_direct_aliasfix_20260506_134732/candidate_batch_registry/registry_manifest.json`, SHA `4fe3c539a8326e3c8e37cd5f47b2b83fe740ba9d6cf0756dae0ef6c93b6d4411`.
+- Natural run: `outputs/v2_5_micro_direct_action_cached_20260506_134827/mechanism_40_20260506_134832`; visible/called/VNC `8 / 0 / 8`; not tool-driven.
+- Force run: `outputs/v2_5_micro_direct_action_force_20260506_135241/mechanism_40_20260506_135245`; visible/called/VNC `8 / 8 / 0`; calls used `{}` and returned `missing_required_helper_inputs`; called-subset outcome `-0.1155`; side-effect preservation incidents `1`.
+- Decision: park the dict-payload design as callability/value/safety failure. The direct-side-effect cluster is not exhausted; next materially different repair is a flat-scalar interface.
+- Decision label: `continue gap-closure loop`.

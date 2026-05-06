@@ -119,6 +119,14 @@ DEFERRED_MICRO_POSITIVE_MECHANISMS: dict[str, dict[str, str]] = {
     }
 }
 
+FAILED_CANDIDATE_DESIGNS: dict[str, dict[str, str]] = {
+    "direct_contact_action_kwargs_preparer": {
+        "blocker": "callability/value/safety failure for dict-payload interface",
+        "evidence": "V2.5 force-call diagnostic called prepare_direct_contact_action_kwargs 8/8, but the actor supplied {}, producing missing_required_helper_inputs; called-subset outcome was -0.1155 and one side-effect preservation incident was reported.",
+        "next_material_repair": "Try a materially different flat-scalar interface rather than action_payload: dict.",
+    }
+}
+
 _SCENARIOS: list[ScenarioRecord] | None = None
 
 
@@ -451,6 +459,74 @@ def _designs() -> list[CandidateDesign]:
             negative_applicability=True,
         ),
     )
+    direct_side_effect_examples = (
+        ToolExample(
+            {
+                "action_payload": {
+                    "action_type": "add_contact",
+                    "name": "Stephen Sondheim",
+                    "phone_number": "+19876543210",
+                }
+            },
+            {
+                "downstream_tool_name": "add_contact",
+                "downstream_tool_kwargs": {
+                    "name": "Stephen Sondheim",
+                    "phone_number": "+19876543210",
+                },
+                "should_call_tool": True,
+                "abstain_reason": "",
+            },
+        ),
+        ToolExample(
+            {
+                "action_payload": {
+                    "action_type": "update_contact",
+                    "person_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "phone_number": "+19876543210",
+                }
+            },
+            {
+                "downstream_tool_name": "modify_contact",
+                "downstream_tool_kwargs": {
+                    "person_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "phone_number": "+19876543210",
+                },
+                "should_call_tool": True,
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "action_payload": {
+                    "action_type": "send_message",
+                    "phone_number": "+12453344098",
+                    "content": "How's the new album coming along",
+                }
+            },
+            {
+                "downstream_tool_name": "send_message_with_phone_number",
+                "downstream_tool_kwargs": {
+                    "phone_number": "+12453344098",
+                    "content": "How's the new album coming along",
+                },
+                "should_call_tool": True,
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {"action_payload": {"action_type": "add_contact", "name": "No Phone"}},
+            {
+                "downstream_tool_name": "",
+                "downstream_tool_kwargs": {},
+                "should_call_tool": False,
+                "abstain_reason": "missing_required_fields",
+            },
+            negative_applicability=True,
+        ),
+    )
     return [
         CandidateDesign(
             design_id="temperature_unit_answer_resolver",
@@ -628,6 +704,73 @@ def _designs() -> list[CandidateDesign]:
                 "get_wifi",
             ),
         ),
+        CandidateDesign(
+            design_id="direct_contact_action_kwargs_preparer",
+            cluster_id="direct_side_effect_no_helper",
+            tool_name="prepare_direct_contact_action_kwargs",
+            design_type="scalar side-effect kwargs preparer",
+            allowed_family=str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),
+            deterministic_value=4,
+            input_simplicity=3,
+            natural_adoption_likelihood=3,
+            side_effect_safety=4,
+            negative_case_safety=4,
+            expected_additive_value=3,
+            canonical_only_risk=1,
+            best3_duplication_risk=1,
+            visible_not_called_pollution_risk=2,
+            expected_direct_route_advantage=(
+                "Compiles explicit user-provided scalar action fields into the exact "
+                "original ToolSandbox side-effect kwargs while preserving the final "
+                "side-effect call."
+            ),
+            likely_direct_base_tool_route=(
+                "parse user scalars -> choose add/modify/remove/send side-effect tool "
+                "-> construct kwargs -> call original side-effect tool"
+            ),
+            observation=(
+                "Design a deterministic preparation helper named "
+                "prepare_direct_contact_action_kwargs. It accepts one flat dictionary "
+                "input action_payload: dict containing user-visible scalar fields. It "
+                "must support only these action_type values and aliases: add/add_contact, "
+                "remove/remove_contact/delete by person_id, update/update_contact/"
+                "modify_phone by person_id plus phone_number, and send/send_message by "
+                "phone_number plus content. It returns exactly downstream_tool_name, "
+                "downstream_tool_kwargs, should_call_tool, and abstain_reason. It must "
+                "never call or execute add_contact, remove_contact, modify_contact, or "
+                "send_message_with_phone_number. It only prepares kwargs and requires the "
+                "acting model to call the returned original ToolSandbox tool next when "
+                "should_call_tool is true. It must normalize phone numbers by preserving "
+                "a leading plus sign and stripping spaces/dashes/parentheses. It must "
+                "abstain on missing action_type, unsupported action, missing required "
+                "fields, ambiguous payload, or insufficient-information tasks. It must "
+                "not infer missing ids, names, phone numbers, or message content. This "
+                "is materially different from the parked selected-record side-effect "
+                "prep lane because it only handles direct scalar tasks where the user "
+                "already supplied the target id/phone/name/content. Include positive "
+                "triggers for add_contact_with_name_and_phone_number, "
+                "remove_contact_with_id, update_contact_with_id_and_phone_number, and "
+                "send_message_with_phone_number_and_content. Include negative triggers "
+                "for selected-record-only workflows, missing scalar fields, "
+                "insufficient_information, and relationship/recency selection tasks. "
+                "The spec must list add_contact, remove_contact, modify_contact, and "
+                "send_message_with_phone_number in both required_original_tool_calls and "
+                "preserves_side_effect_tools."
+            ),
+            validation_examples=direct_side_effect_examples,
+            scenario_prefixes=(
+                "add_contact_with_name_and_phone_number",
+                "remove_contact_with_id",
+                "update_contact_with_id_and_phone_number",
+                "send_message_with_phone_number_and_content",
+            ),
+            negative_prefixes=(
+                "remove_contact_by_phone_no_search_contacts_insufficient_information",
+                "send_message_with_recipient_name_no_search_tools_insufficient_information",
+                "search_message_with_recency_latest",
+                "find_current_city_insufficient_information",
+            ),
+        ),
     ]
 
 
@@ -762,6 +905,7 @@ def _intermediate_step(cluster: str) -> str:
         "distance_answer_resolution": "format visible distance scalar with safe precision and unit",
         "currency_answer_normalization": "format visible converted amount with target currency code",
         "location_field_answer_resolution": "extract an address or phone-number field from a visible location lookup payload",
+        "direct_side_effect_no_helper": "compile explicit user-provided scalar action fields into original side-effect tool kwargs",
     }.get(cluster, "no simple deterministic intermediate isolated")
 
 
@@ -771,6 +915,7 @@ def _negative_case_note(cluster: str) -> str:
         "distance_answer_resolution": "insufficient location, missing distance scalar, non-distance tasks",
         "currency_answer_normalization": "missing converted amount/currency code, non-currency tasks",
         "location_field_answer_resolution": "insufficient location payload, unsupported field, missing address/phone, non-location tasks",
+        "direct_side_effect_no_helper": "missing action type, missing required scalar fields, selected-record-only workflows, insufficient-information side-effect tasks",
     }.get(cluster, "insufficient-information and unrelated no-helper cases")
 
 
@@ -782,11 +927,18 @@ def feasibility_payload(atlas: dict[str, Any]) -> dict[str, Any]:
             "reject_exhausted_or_parked_cluster"
             if design.cluster_id in PARKED_MECHANISMS
             or design.cluster_id in DEFERRED_MICRO_POSITIVE_MECHANISMS
+            or design.design_id in FAILED_CANDIDATE_DESIGNS
             else "advance_to_generation"
             if design.feasibility_score >= 35 and design.expected_additive_value >= 2
             else "reject_before_generation"
         )
-        rows.append({**asdict_with_score(design), "feasibility_decision": status})
+        rows.append(
+            {
+                **asdict_with_score(design),
+                "feasibility_decision": status,
+                "failed_design": FAILED_CANDIDATE_DESIGNS.get(design.design_id),
+            }
+        )
     return {
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "atlas_decision": atlas["decision_label"],

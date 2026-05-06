@@ -596,3 +596,9 @@
 - Location force-after-lookup: `outputs/v2_5_micro_location_field_force_after_lookup_20260506_133440/mechanism_40_20260506_133444`; dashboards opened at port `5637`; visible/called/VNC `4 / 4 / 0`; called-subset outcome `0.0`; canonical `+0.0368`; runtime/side-effect `0 / 0`; protocol PASS but candidate parked for primary-metric value failure.
 - Control cache was task-level mixed/cached across runs and worked task-by-task; latest force run used `18 cached / 2 fresh`.
 - Decision: `continue gap-closure loop`.
+
+## 2026-05-06 - V2.5 Direct Side-Effect Dict-Payload Candidate
+- Generated `prepare_direct_contact_action_kwargs` from `direct_side_effect_no_helper`; registry check-only PASS at `artifacts/summaries/v2_5_tool_foundry_v2_5_loop4_direct_aliasfix_20260506_134732/candidate_batch_registry/registry_manifest.json`.
+- Natural micro: `outputs/v2_5_micro_direct_action_cached_20260506_134827/mechanism_40_20260506_134832`; dashboards opened on port `5638`; controls `19 cached / 1 fresh`; helper visible/called/VNC `8 / 0 / 8`.
+- Force micro: `outputs/v2_5_micro_direct_action_force_20260506_135241/mechanism_40_20260506_135245`; dashboards opened on port `5639`; controls `19 cached / 1 fresh`; helper visible/called/VNC `8 / 8 / 0`; called-subset outcome `-0.1155`; side-effect incidents `1`.
+- Decision: dict-payload design negative; next candidate should use flat scalar inputs if direct-side-effect lane is retried.

@@ -55,3 +55,18 @@ The insufficient-information distance cases are rubric-compliant abstain/clarifi
 
 ## Exact Next Action
 Do not run additive60 for `resolve_location_lookup_field`. Preserve `format_calculated_distance_km` as narrow micro-positive evidence, then continue the foundry loop with the next materially different high-gap design. The next best target is a safe direct-side-effect argument-preparation design with scalar inputs, distinct from the parked selected-record-only side-effect prep lane.
+
+## Candidate 3: `prepare_direct_contact_action_kwargs`
+- Registry: `artifacts/summaries/v2_5_tool_foundry_v2_5_loop4_direct_aliasfix_20260506_134732/candidate_batch_registry/registry_manifest.json`
+- Natural micro run: `outputs/v2_5_micro_direct_action_cached_20260506_134827/mechanism_40_20260506_134832`
+- Dashboards: `http://127.0.0.1:5638/outputs/v2_5_micro_direct_action_cached_20260506_134827/mechanism_40_20260506_134832/dashboard/index.html`, `http://127.0.0.1:5638/outputs/v2_5_micro_direct_action_cached_20260506_134827/mechanism_40_20260506_134832/dashboard/task_focus.html`
+- Natural visible/called/VNC: `8 / 0 / 8`; VNC called-subset proxy outcome `-0.0798`; aggregate lift was not tool-driven.
+- Force run: `outputs/v2_5_micro_direct_action_force_20260506_135241/mechanism_40_20260506_135245`
+- Dashboards: `http://127.0.0.1:5639/outputs/v2_5_micro_direct_action_force_20260506_135241/mechanism_40_20260506_135245/dashboard/index.html`, `http://127.0.0.1:5639/outputs/v2_5_micro_direct_action_force_20260506_135241/mechanism_40_20260506_135245/dashboard/task_focus.html`
+- Force visible/called/VNC: `8 / 8 / 0`; calls supplied `{}` and returned `missing_required_helper_inputs`.
+- Force called-subset outcome delta: `-0.1155`; canonical delta: `-0.0933`.
+- Runtime/side-effect incidents: `0 / 1`.
+- Decision: park this dict-payload design. Do not park the full direct-side-effect cluster; try a materially different flat-scalar interface if this lane is revisited.
+
+## Updated Decision Label
+`continue gap-closure loop`
