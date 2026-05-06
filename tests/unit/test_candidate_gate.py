@@ -418,6 +418,60 @@ def test_decisive_gate_rejects_bounds_only_search_helper_even_with_search_call()
     assert decision.reason == "bounds_only_derived_helper_low_value"
 
 
+def test_decisive_gate_accepts_calculator_result_formatter() -> None:
+    spec = ToolSpec(
+        tool_name="format_calculated_distance_km",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description=(
+            "Format visible numeric distance output from calculate_lat_lon_distance."
+        ),
+        inputs=(
+            ToolInput(
+                "distance_km", "float", "Visible calculated distance in kilometers."
+            ),
+            ToolInput(
+                "target_unit", "str", "Requested output unit; defaults to kilometers."
+            ),
+            ToolInput("precision", "int", "Answer precision."),
+        ),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "answer_value": {"type": "string"},
+                "answer_unit": {"type": "string"},
+                "source_unit": {"type": "string"},
+                "abstain_reason": {"type": "string"},
+            },
+        },
+        positive_triggers=("calculate_lat_lon_distance result is visible",),
+        negative_triggers=("insufficient_information", "missing_distance_km"),
+        required_original_tool_calls=("calculate_lat_lon_distance",),
+        abstain_behavior="Return abstain_reason when distance_km is missing or target unit is unsupported.",
+        generalization_rationale=(
+            "Distance answer tasks repeatedly need deterministic formatting after "
+            "the original calculator returns a scalar."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=("distance_answer", "distance_verification"),
+        reason_tool_is_decisive=(
+            "It compresses scalar normalization, precision handling, and final "
+            "distance answer formatting while preserving the original calculator."
+        ),
+        shortfall_cluster_evidence=("distance_answer_resolution",),
+        known_failure_mechanisms_addressed=("final_answer_formatting_error",),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents often calculate distance but fail final answer formatting.",
+            signals=("visible_raw_data_lacking_deterministic_transform",),
+        ),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert decision.allowed
+
+
 def test_failure_memory_allows_tie_mechanism_when_spec_repairs_ambiguity(
     tmp_path: Path,
 ) -> None:

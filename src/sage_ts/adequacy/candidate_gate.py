@@ -70,10 +70,13 @@ GENERIC_TASK_FAMILY_LABELS = frozenset(
 )
 DOWNSTREAM_TOOL_PREFIXES = (
     "add_",
+    "calculate_",
+    "convert_",
     "modify_",
     "search_",
     "send_",
     "set_",
+    "unit_conversion",
 )
 BOUNDS_ONLY_OUTPUT_KEYS = frozenset(
     {

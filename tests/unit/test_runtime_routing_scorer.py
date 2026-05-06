@@ -3,9 +3,9 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily
+from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput
 from sage_ts.registry.manifest import RegistryEntry
-from sage_ts.runtime import routing_scorer
+from sage_ts.runtime import routing_scorer, toolsandbox_integration
 from sage_ts.runtime.routing_scorer import score_registry_entry_for_scenario
 from sage_ts.runtime.toolsandbox_integration import route_registry_entries
 from tests.unit.test_promotion_gate import _entry
@@ -470,6 +470,214 @@ def test_side_effect_composite_hides_on_insufficient_information() -> None:
         decision.reason
         == "side_effect_composite_suppressed_for_insufficient_information"
     )
+
+
+def test_derived_calculator_with_original_call_hides_on_insufficient_information() -> (
+    None
+):
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="format_calculated_distance_km",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            description=(
+                "Format visible calculate_lat_lon_distance output in kilometers."
+            ),
+            inputs=(
+                ToolInput("distance_km", "float", "Calculated distance in km."),
+                ToolInput("target_unit", "str", "Requested output unit."),
+                ToolInput("precision", "int", "Decimal precision."),
+            ),
+            positive_triggers=(
+                "find_distance_with_location_name",
+                "calculate_lat_lon_distance result visible",
+            ),
+            negative_triggers=(
+                "current_location_unavailable",
+                "missing_distance_km",
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "answer_value": {"type": "string"},
+                    "answer_unit": {"type": "string"},
+                    "source_unit": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            applicable_task_families=("distance_answer", "distance_verification"),
+            required_original_tool_calls=("calculate_lat_lon_distance",),
+            preserves_side_effect_tools=(),
+        ),
+        code=(
+            "def format_calculated_distance_km(distance_km: float, "
+            "target_unit: str, precision: int) -> dict:\n"
+            "    return {'answer_value': str(distance_km), "
+            "'answer_unit': 'kilometers', 'abstain_reason': ''}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="find_distance_with_location_name",
+    )
+
+    decision = score_registry_entry_for_scenario(
+        entry, "find_distance_with_location_name_insufficient_information"
+    )
+
+    assert not decision.visible
+    assert (
+        decision.reason == "derived_calculator_suppressed_for_insufficient_information"
+    )
+
+    _selected, decisions = route_registry_entries(
+        {"format_calculated_distance_km": entry},
+        "find_distance_with_location_name_insufficient_information",
+        available_base_tools={"calculate_lat_lon_distance"},
+    )
+    assert not decisions["format_calculated_distance_km"].visible
+    assert (
+        decisions["format_calculated_distance_km"].reason
+        == "derived_calculator_suppressed_for_insufficient_information"
+    )
+
+
+def test_derived_calculator_with_original_call_requires_trigger_match() -> None:
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="format_calculated_distance_km",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            description=(
+                "Format visible calculate_lat_lon_distance output in kilometers."
+            ),
+            inputs=(
+                ToolInput("distance_km", "float", "Calculated distance in km."),
+                ToolInput("target_unit", "str", "Requested output unit."),
+                ToolInput("precision", "int", "Decimal precision."),
+            ),
+            positive_triggers=(
+                "find_distance_with_location_name",
+                "calculate_lat_lon_distance result visible",
+            ),
+            negative_triggers=("missing_distance_km",),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "answer_value": {"type": "string"},
+                    "answer_unit": {"type": "string"},
+                    "source_unit": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            applicable_task_families=("distance_answer", "distance_verification"),
+            required_original_tool_calls=("calculate_lat_lon_distance",),
+            preserves_side_effect_tools=(),
+        ),
+        code=(
+            "def format_calculated_distance_km(distance_km: float, "
+            "target_unit: str, precision: int) -> dict:\n"
+            "    return {'answer_value': str(distance_km), "
+            "'answer_unit': 'kilometers', 'abstain_reason': ''}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="find_distance_with_location_name",
+    )
+
+    selected, decisions = route_registry_entries(
+        {"format_calculated_distance_km": entry},
+        "search_message_with_recency_latest_10_distraction_tools",
+        available_base_tools={"calculate_lat_lon_distance", "search_messages"},
+    )
+
+    assert selected == []
+    assert not decisions["format_calculated_distance_km"].visible
+    assert (
+        decisions["format_calculated_distance_km"].reason
+        == "derived_calculator_requires_trigger_or_family_match"
+    )
+
+
+def test_derived_payload_bridge_autofills_single_dict_among_scalar_inputs(
+    monkeypatch: Any,
+) -> None:
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="resolve_location_lookup_field",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            inputs=(
+                ToolInput("location_payload", "dict", "Visible lookup payload."),
+                ToolInput("requested_field", "str", "address or phone_number."),
+            ),
+            required_original_tool_calls=("search_location_around_lat_lon",),
+        ),
+        code=(
+            "def resolve_location_lookup_field(location_payload: dict, "
+            "requested_field: str) -> dict:\n"
+            "    return {'answer_value': '', 'answer_field': requested_field, "
+            "'abstain_reason': ''}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="find_phone_number_with_location_name",
+    )
+    monkeypatch.setattr(
+        toolsandbox_integration,
+        "_latest_original_tool_payload",
+        lambda tool_names: {"phone_number": "+14089961010"},
+    )
+
+    kwargs = toolsandbox_integration._with_chained_visible_payload_arguments(
+        entry, {"requested_field": "phone_number"}
+    )
+
+    assert kwargs["location_payload"] == {"phone_number": "+14089961010"}
+    assert kwargs["requested_field"] == "phone_number"
+
+
+def test_original_scalar_payload_bridge_wraps_result(monkeypatch: Any) -> None:
+    traces = [
+        json.dumps(
+            {
+                "tool_name": "search_lat_lon",
+                "result": "Apple Park 1 Apple Park Way Cupertino, CA 95014 United States",
+            }
+        )
+    ]
+
+    class _Existing:
+        def to_list(self) -> list[str]:
+            return traces
+
+    class _Sandbox:
+        def to_dicts(self) -> list[dict[str, Any]]:
+            return [{"tool_trace": _Existing()}]
+
+    class _Context:
+        def get_database(self, **_kwargs: Any) -> _Sandbox:
+            return _Sandbox()
+
+    monkeypatch.setattr(
+        toolsandbox_integration,
+        "get_current_context",
+        lambda: _Context(),
+    )
+
+    payload = toolsandbox_integration._latest_original_tool_payload({"search_lat_lon"})
+
+    assert payload == {
+        "result": "Apple Park 1 Apple Park Way Cupertino, CA 95014 United States"
+    }
 
 
 def test_side_effect_composite_hides_without_downstream_action_signal() -> None:

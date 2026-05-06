@@ -318,6 +318,18 @@ def score_registry_entry_for_scenario(
             -30,
         )
     if (
+        spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR
+        and "insufficient_information" in scenario_lower
+        and spec.required_original_tool_calls
+    ):
+        return RuntimeRoutingDecision(
+            tool_name,
+            False,
+            "hidden",
+            "derived_calculator_suppressed_for_insufficient_information",
+            -30,
+        )
+    if (
         spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER
         and "selected_record" in input_names
         and not any(

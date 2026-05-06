@@ -135,7 +135,25 @@ def _derived_value_tool_names(openai_tools: object) -> set[str]:
         if isinstance(parameters, dict):
             properties = parameters.get("properties", {})
         input_names = set(properties) if isinstance(properties, dict) else set()
-        if not isinstance(name, str) or len(input_names) != 1:
+        if not isinstance(name, str) or not input_names:
+            continue
+        input_types = (
+            {prop.get("type") for prop in properties.values() if isinstance(prop, dict)}
+            if isinstance(properties, dict)
+            else set()
+        )
+        has_payload_input = bool(input_types & {"object", "array"})
+        scalar_only_extra_inputs = input_types <= {
+            "object",
+            "array",
+            "string",
+            "number",
+            "integer",
+            "boolean",
+        }
+        if len(input_names) != 1 and not (
+            has_payload_input and scalar_only_extra_inputs
+        ):
             continue
         is_extractor = any(
             token in f"{name} {description}"
@@ -185,9 +203,22 @@ def _tool_content_has_structured_payload(content: object) -> bool:
     text = str(content or "").strip()
     if not text or text.lower() in {"[]", "{}", "null", "none"}:
         return False
-    if not text.startswith(("[", "{")):
-        return False
     lower = text.lower()
+    if any(
+        token in lower
+        for token in (
+            "no matching",
+            "not found",
+            "no result",
+            "no records",
+            "empty result",
+            "permissionerror",
+            "tool_call_exception",
+        )
+    ):
+        return False
+    if not text.startswith(("[", "{")):
+        return True
     return any(
         token in lower
         for token in (
@@ -285,7 +316,9 @@ def _derived_actor_policy_message(
             "ToolSandbox tool returned the raw structured payload needed by this "
             "helper and the user asks for a scalar/normalized answer from that "
             "payload, call the helper before manually copying or normalizing the "
-            "field. Pass the full prior tool payload as the helper's dict input. "
+            "field. If the helper has a dict payload input, the runtime may "
+            "autofill that input from the latest original tool result; provide any "
+            "remaining scalar selector inputs such as requested_field or target_unit. "
             "Do not call it before the original lookup/result tool has returned, "
             "on unrelated tasks, or when required fields are absent."
         ),

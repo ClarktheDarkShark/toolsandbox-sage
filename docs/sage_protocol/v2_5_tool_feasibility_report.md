@@ -6,11 +6,12 @@ Score candidate designs before generation to avoid repeating known adoption, cal
 
 | Design | Cluster | Type | Score | Decision | Main advantage |
 |---|---|---|---:|---|---|
-| `resolve_temperature_answer_unit` | `temperature_unit_answer_resolution` | `answer-only scalar calculator` | 68 | `advance_to_generation` | Avoids manual Celsius/Fahrenheit conversion and answer formatting after visible weather payloads. |
-| `prepare_temperature_conversion_args` | `temperature_unit_answer_resolution` | `argument preparer for canonical unit conversion` | 66 | `advance_to_generation` | Prepares correct unit_conversion kwargs from visible weather payloads while preserving the original unit_conversion call. |
-| `format_distance_answer` | `distance_answer_resolution` | `scalar answer formatter` | 55 | `reject_before_generation` | Normalizes numeric distance precision and unit text after calculate_lat_lon_distance. |
-| `normalize_currency_answer` | `currency_answer_normalization` | `scalar answer formatter` | 55 | `reject_before_generation` | Formats visible convert_currency output with correct currency code and precision. |
+| `resolve_location_lookup_field` | `location_field_answer_resolution` | `narrow visible payload field resolver` | 70 | `reject_exhausted_or_parked_cluster` | Extracts only address or phone-number fields from visible location lookup payloads, avoiding broad service-answer extraction errors. |
+| `resolve_temperature_answer_unit` | `temperature_unit_answer_resolution` | `answer-only scalar calculator` | 68 | `reject_exhausted_or_parked_cluster` | Avoids manual Celsius/Fahrenheit conversion and answer formatting after visible weather payloads. |
+| `prepare_temperature_conversion_args` | `temperature_unit_answer_resolution` | `argument preparer for canonical unit conversion` | 66 | `reject_exhausted_or_parked_cluster` | Prepares correct unit_conversion kwargs from visible weather payloads while preserving the original unit_conversion call. |
+| `format_calculated_distance_km` | `distance_answer_resolution` | `unit-safe scalar answer formatter` | 55 | `reject_exhausted_or_parked_cluster` | Formats calculate_lat_lon_distance output as kilometers by default and only converts units when explicitly requested, preventing freeform-unit mistakes. |
+| `normalize_currency_answer` | `currency_answer_normalization` | `scalar answer formatter` | 51 | `reject_before_generation` | Formats visible convert_currency output with correct currency code and precision. |
 
 ## Decision Label
 
-`candidate designs ready`
+`needs new gap atlas`

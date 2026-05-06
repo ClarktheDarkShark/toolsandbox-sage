@@ -301,3 +301,15 @@
 - Scalar repaired helper micro: `outputs/v2_5_micro_temperature_scalar_repair_cached_20260506_114758/mechanism_40_20260506_114803`; outcome delta `-0.0579`; canonical delta `+0.0080`; exact `4 -> 7`; helper visible/called/VNC `8 / 5 / 3`; called-subset outcome `-0.1428`; runtime/side-effect `0 / 0`.
 - Decision: `candidate concept negative` for the temperature unit answer lane; do not run additive60 for these candidates.
 - Next action: park temperature answer/conversion candidates and continue V2.5 only if a different non-parked cluster has credible additive-over-best3 potential.
+
+## V2.5 Foundry Loop 2-3 Checkpoint - 2026-05-06
+- Protected best3 registry remains unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`.
+- Distance candidate: `format_calculated_distance_km` accepted in candidate registry and naturally called on relevant positives. Repaired routing hides it on insufficient-information/minefield cases and unrelated triggerless tasks.
+- Distance evidence: natural micro `outputs/v2_5_micro_distance_unitsafe_routingfix_cached_20260506_125948/mechanism_40_20260506_125953`; helper visible/called/VNC `4 / 4 / 0`; called-subset outcome `+0.5556`; best3+distance vs best3-only same-manifest outcome `+0.0447`. Status: micro-positive but too narrow to close gap alone.
+- Location-field candidate: `resolve_location_lookup_field` accepted after payload-bridge repair. Natural adoption remained weak; force-after-lookup proved callability but not primary outcome value.
+- Location evidence: force run `outputs/v2_5_micro_location_field_force_after_lookup_20260506_133440/mechanism_40_20260506_133444`; visible/called/VNC `4 / 4 / 0`; called-subset outcome `0.0`; canonical `+0.0368`; runtime/side-effect `0 / 0`. Status: parked as canonical-only/value failure.
+- User insufficient-information finding incorporated: distance helpers must hide/abstain when current location is unavailable; calculating numeric distance in those scenarios is a minefield violation, not a scoring bug.
+- Current summary artifact: `artifacts/summaries/v2_5_tool_foundry_loop2_3_micro_summary/summary.json`.
+- Last report: `docs/sage_protocol/v2_5_micro_value_test_report.md`.
+- Decision label: `continue gap-closure loop`.
+- Next action: continue V2.5 with a materially different high-gap cluster, preferably a narrow scalar direct-side-effect argument-preparation design that preserves original side-effect tools and is distinct from selected-record-only prep.

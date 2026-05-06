@@ -98,10 +98,25 @@ PARKED_MECHANISMS: dict[str, dict[str, str]] = {
         "blocker": "value failure",
         "evidence": "V2.4 extract_service_answer_field called 5 times but called-subset outcome -0.1804.",
     },
+    "temperature_unit_answer_resolution": {
+        "blocker": "value failure after callability repair",
+        "evidence": "V2.5 scalar resolve_temperature_answer_unit was naturally called 5/8 visible positives, but called-subset outcome was -0.1428.",
+    },
+    "location_field_answer_resolution": {
+        "blocker": "canonical-only/value failure after fair callability test",
+        "evidence": "V2.5 resolve_location_lookup_field was valid and force-called 4/4 after lookup, but called-subset outcome delta was 0.0 while canonical improved; address backend output differed from target and phone answer was reformatted by the actor.",
+    },
     "days_between_calendar_distance": {
         "blocker": "non-additive over best3",
         "evidence": "V2.2 Best4 frozen100 underperformed best3.",
     },
+}
+
+DEFERRED_MICRO_POSITIVE_MECHANISMS: dict[str, dict[str, str]] = {
+    "distance_answer_resolution": {
+        "status": "micro-positive narrow candidate",
+        "evidence": "V2.5 format_calculated_distance_km was called 4/4 on relevant positives, VNC 0, called-subset outcome +0.5556, and best3+distance beat best3 by +0.0447 on the same micro manifest. Coverage is too narrow to close the gap alone.",
+    }
 }
 
 _SCENARIOS: list[ScenarioRecord] | None = None
@@ -345,20 +360,31 @@ def _designs() -> list[CandidateDesign]:
     )
     distance_examples = (
         ToolExample(
-            {"distance_value": 12.3456, "unit": "miles", "precision": 1},
-            {"answer_value": "12.3", "answer_unit": "miles", "abstain_reason": ""},
+            {"distance_km": 67.856, "target_unit": "", "precision": 2},
+            {
+                "answer_value": "67.86",
+                "answer_unit": "kilometers",
+                "source_unit": "kilometers",
+                "abstain_reason": "",
+            },
         ),
         ToolExample(
-            {"distance_value": 8.0, "unit": "kilometers", "precision": 0},
-            {"answer_value": "8", "answer_unit": "kilometers", "abstain_reason": ""},
+            {"distance_km": 1.609344, "target_unit": "miles", "precision": 2},
+            {
+                "answer_value": "1.00",
+                "answer_unit": "miles",
+                "source_unit": "kilometers",
+                "abstain_reason": "",
+            },
             held_out=True,
         ),
         ToolExample(
-            {"distance_value": 0.0, "unit": "", "precision": 1},
+            {"distance_km": None, "target_unit": "kilometers", "precision": 2},
             {
                 "answer_value": "",
                 "answer_unit": "",
-                "abstain_reason": "missing_distance_or_unit",
+                "source_unit": "kilometers",
+                "abstain_reason": "missing_distance_km",
             },
             negative_applicability=True,
         ),
@@ -379,6 +405,48 @@ def _designs() -> list[CandidateDesign]:
                 "answer_value": "",
                 "answer_unit": "",
                 "abstain_reason": "missing_amount_or_currency",
+            },
+            negative_applicability=True,
+        ),
+    )
+    location_field_examples = (
+        ToolExample(
+            {
+                "location_payload": {
+                    "result": "Apple Park 1 Apple Park Way Cupertino, CA 95014 United States",
+                },
+                "requested_field": "address",
+            },
+            {
+                "answer_value": "Apple Park 1 Apple Park Way Cupertino, CA 95014 United States",
+                "answer_field": "address",
+                "abstain_reason": "",
+            },
+        ),
+        ToolExample(
+            {
+                "location_payload": {
+                    "phone_number": "+14089961010",
+                    "name": "Apple Park",
+                },
+                "requested_field": "phone_number",
+            },
+            {
+                "answer_value": "+14089961010",
+                "answer_field": "phone_number",
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "location_payload": {"name": "Apple Park"},
+                "requested_field": "phone_number",
+            },
+            {
+                "answer_value": "",
+                "answer_field": "phone_number",
+                "abstain_reason": "missing_requested_field",
             },
             negative_applicability=True,
         ),
@@ -442,10 +510,10 @@ def _designs() -> list[CandidateDesign]:
             ),
         ),
         CandidateDesign(
-            design_id="distance_answer_formatter",
+            design_id="distance_answer_km_formatter",
             cluster_id="distance_answer_resolution",
-            tool_name="format_distance_answer",
-            design_type="scalar answer formatter",
+            tool_name="format_calculated_distance_km",
+            design_type="unit-safe scalar answer formatter",
             allowed_family=str(ToolFamily.DERIVED_VALUE_CALCULATOR),
             deterministic_value=3,
             input_simplicity=5,
@@ -456,10 +524,10 @@ def _designs() -> list[CandidateDesign]:
             canonical_only_risk=2,
             best3_duplication_risk=0,
             visible_not_called_pollution_risk=2,
-            expected_direct_route_advantage="Normalizes numeric distance precision and unit text after calculate_lat_lon_distance.",
+            expected_direct_route_advantage="Formats calculate_lat_lon_distance output as kilometers by default and only converts units when explicitly requested, preventing freeform-unit mistakes.",
             likely_direct_base_tool_route="search_lat_lon/search_location_around_lat_lon -> calculate_lat_lon_distance -> answer",
             observation=(
-                "Design a deterministic answer formatter named format_distance_answer. It accepts distance_value: float, unit: str, and precision: int. It returns answer_value, answer_unit, and abstain_reason. It must only format visible numeric distance output and must not call location services or execute side effects."
+                "Design a deterministic unit-safe answer formatter named format_calculated_distance_km. It accepts distance_km: float, target_unit: str, and precision: int. The distance_km input is the visible scalar returned by the original ToolSandbox calculate_lat_lon_distance tool, whose output unit is kilometers. Do not accept a freeform source unit. Default or normalize target_unit to kilometers when target_unit is blank/None or when the user did not explicitly request miles; convert to miles only when target_unit is miles/mi. Return exactly answer_value, answer_unit, source_unit, and abstain_reason. answer_value must be a fixed-decimal string using the requested precision, including trailing zeros when precision requires them; do not use str(round(...)) for the final string. If distance_km is None or cannot be parsed, return answer_value='', answer_unit='', source_unit='kilometers', abstain_reason='missing_distance_km'. If target_unit is unsupported after blank/None has been normalized to kilometers, abstain_reason='unsupported_target_unit'. The helper must not call location services, must not compute distance itself, and must never answer insufficient-information tasks where current location or target location is unavailable. Include positive_triggers for calculate_lat_lon_distance result visible and find_distance_with_location_name tasks. Include negative_triggers for insufficient_information, current_location_unavailable, missing_distance_km, and distance request without calculated distance. The spec must list calculate_lat_lon_distance in required_original_tool_calls because the distance scalar must still come from that original ToolSandbox calculation. Set canonical_route_substitution_risk='none' and expected_milestone_calls_replaced=[] because the helper preserves the canonical distance calculation and only formats/converts the final answer."
             ),
             validation_examples=distance_examples,
             scenario_prefixes=("find_distance_with_location_name",),
@@ -480,7 +548,7 @@ def _designs() -> list[CandidateDesign]:
             natural_adoption_likelihood=3,
             side_effect_safety=5,
             negative_case_safety=4,
-            expected_additive_value=2,
+            expected_additive_value=1,
             canonical_only_risk=2,
             best3_duplication_risk=0,
             visible_not_called_pollution_risk=2,
@@ -495,6 +563,69 @@ def _designs() -> list[CandidateDesign]:
                 "get_wifi",
                 "add_contact_with_name_and_phone_number",
                 "find_current_city_insufficient_information",
+            ),
+        ),
+        CandidateDesign(
+            design_id="location_field_answer_resolver",
+            cluster_id="location_field_answer_resolution",
+            tool_name="resolve_location_lookup_field",
+            design_type="narrow visible payload field resolver",
+            allowed_family=str(ToolFamily.DERIVED_VALUE_CALCULATOR),
+            deterministic_value=4,
+            input_simplicity=4,
+            natural_adoption_likelihood=4,
+            side_effect_safety=5,
+            negative_case_safety=4,
+            expected_additive_value=4,
+            canonical_only_risk=1,
+            best3_duplication_risk=0,
+            visible_not_called_pollution_risk=2,
+            expected_direct_route_advantage=(
+                "Extracts only address or phone-number fields from visible location "
+                "lookup payloads, avoiding broad service-answer extraction errors."
+            ),
+            likely_direct_base_tool_route=(
+                "search_lat_lon/search_location_around_lat_lon -> manually identify "
+                "address or phone field -> answer"
+            ),
+            observation=(
+                "Design a deterministic answer-only helper named resolve_location_lookup_field. "
+                "It accepts location_payload: dict and requested_field: str. The runtime may "
+                "autofill location_payload from the latest original lookup trace; search_lat_lon "
+                "returns a string and is bridged as {'result': address_text}, while "
+                "search_location_around_lat_lon returns a list of dictionaries and is bridged to "
+                "the first visible result dictionary. It must support only requested_field values "
+                "address and phone_number. The acting model should call it after the original "
+                "ToolSandbox search_lat_lon or search_location_around_lat_lon tool returns a "
+                "visible result and pass requested_field='address' or 'phone_number'. It returns "
+                "exactly answer_value, answer_field, abstain_reason. For address it must check "
+                "address, formatted_address, full_address, and result string fields. For "
+                "phone_number it must check phone_number, phone, formatted_phone_number, "
+                "formatted_phone, and international_phone_number fields. Do not test only "
+                "`requested_field in location_payload`; map requested fields through the alias "
+                "lists first. It must abstain on missing payload, unsupported "
+                "field, missing requested field, multiple conflicting values, or "
+                "insufficient-information tasks. It must not call location services itself, "
+                "must not fabricate fields, and must not execute side effects. Include positive "
+                "triggers for find_address_with_lat_lon and find_phone_number_with_location_name "
+                "after a visible location lookup result. Include negative triggers for "
+                "insufficient_information, missing_location_payload, unsupported_requested_field, "
+                "non-location-answer tasks, and ambiguous/conflicting field values. The spec "
+                "must list search_lat_lon and search_location_around_lat_lon in "
+                "required_original_tool_calls because the payload must still come from original "
+                "ToolSandbox lookup calls. This materially repairs the parked broad "
+                "extract_service_answer_field design by limiting scope to two concrete fields "
+                "and refusing all other service-answer extraction."
+            ),
+            validation_examples=location_field_examples,
+            scenario_prefixes=(
+                "find_address_with_lat_lon",
+                "find_phone_number_with_location_name",
+            ),
+            negative_prefixes=(
+                "find_current_city_insufficient_information",
+                "find_distance_with_location_name_insufficient_information",
+                "get_wifi",
             ),
         ),
     ]
@@ -515,6 +646,7 @@ def build_gap_atlas() -> dict[str, Any]:
         regressions = [item for item in items if item["outcome_regression"]]
         no_fit = [item for item in items if not item["expected_helper_fit"]]
         prior = PARKED_MECHANISMS.get(cluster)
+        deferred = DEFERRED_MICRO_POSITIVE_MECHANISMS.get(cluster)
         if prior is None and cluster == "best3_covered":
             prior = {
                 "blocker": "best3-covered",
@@ -527,7 +659,9 @@ def build_gap_atlas() -> dict[str, Any]:
         )
         status = (
             "candidate_ranked"
-            if candidate_designs and prior is None
+            if candidate_designs and prior is None and deferred is None
+            else "deferred_micro_positive"
+            if deferred is not None
             else "excluded_or_parked"
             if prior
             else "support_or_negative_not_primary"
@@ -553,6 +687,7 @@ def build_gap_atlas() -> dict[str, Any]:
                 "best3_regressions": len(regressions),
                 "no_current_helper_fit_count": len(no_fit),
                 "prior_blocker": prior,
+                "deferred_candidate": deferred,
                 "deterministic_intermediate_step": _intermediate_step(cluster),
                 "likely_direct_base_tool_route": candidate_designs[
                     0
@@ -626,6 +761,7 @@ def _intermediate_step(cluster: str) -> str:
         "temperature_unit_answer_resolution": "extract visible weather temperature, resolve requested unit, and format the answer",
         "distance_answer_resolution": "format visible distance scalar with safe precision and unit",
         "currency_answer_normalization": "format visible converted amount with target currency code",
+        "location_field_answer_resolution": "extract an address or phone-number field from a visible location lookup payload",
     }.get(cluster, "no simple deterministic intermediate isolated")
 
 
@@ -634,6 +770,7 @@ def _negative_case_note(cluster: str) -> str:
         "temperature_unit_answer_resolution": "insufficient location/weather payload, missing temperature field, non-temperature tasks",
         "distance_answer_resolution": "insufficient location, missing distance scalar, non-distance tasks",
         "currency_answer_normalization": "missing converted amount/currency code, non-currency tasks",
+        "location_field_answer_resolution": "insufficient location payload, unsupported field, missing address/phone, non-location tasks",
     }.get(cluster, "insufficient-information and unrelated no-helper cases")
 
 
@@ -642,8 +779,11 @@ def feasibility_payload(atlas: dict[str, Any]) -> dict[str, Any]:
     rows = []
     for design in designs:
         status = (
-            "advance_to_generation"
-            if design.feasibility_score >= 35 and design.expected_additive_value >= 3
+            "reject_exhausted_or_parked_cluster"
+            if design.cluster_id in PARKED_MECHANISMS
+            or design.cluster_id in DEFERRED_MICRO_POSITIVE_MECHANISMS
+            else "advance_to_generation"
+            if design.feasibility_score >= 35 and design.expected_additive_value >= 2
             else "reject_before_generation"
         )
         rows.append({**asdict_with_score(design), "feasibility_decision": status})
@@ -903,23 +1043,38 @@ def build_micro_manifest(design: CandidateDesign, summary_dir: Path) -> dict[str
     family_counts: Counter[str] = Counter()
     selected: list[ScenarioRecord] = []
     role_by_name: dict[str, str] = {}
-    for record in _select_records(design.scenario_prefixes, 8, already, family_counts):
-        selected.append(record)
-        role_by_name[record.name] = "candidate_positive"
+    positive_count = (
+        4
+        if design.cluster_id
+        in {"distance_answer_resolution", "location_field_answer_resolution"}
+        else 8
+    )
     for record in _select_records(
-        (
-            "add_reminder_content_and_date_and_time",
-            "search_reminder_with_recency_yesterday",
-            "search_message_with_recency_latest",
-        ),
-        6,
-        already,
-        family_counts,
+        design.scenario_prefixes, positive_count, already, family_counts
     ):
         selected.append(record)
+        role_by_name[record.name] = "candidate_positive"
+    support_prefixes = (
+        "add_reminder_content_and_date_and_time",
+        "search_reminder_with_recency_yesterday",
+        "search_message_with_recency_latest",
+        "add_contact_with_name_and_phone_number",
+    )
+    for record in _select_records(support_prefixes, 8, already, family_counts):
+        selected.append(record)
         role_by_name[record.name] = "best3_or_known_helper_control"
+    negative_prefixes = (
+        *design.negative_prefixes,
+        "find_current_city_insufficient_information",
+        "find_temperature_f_with_location_insufficient_information",
+    )
+    negative_count = 20 - len(selected)
     for record in _select_records(
-        design.negative_prefixes, 6, already, family_counts, include_insufficient=True
+        negative_prefixes,
+        negative_count,
+        already,
+        family_counts,
+        include_insufficient=True,
     ):
         selected.append(record)
         role_by_name[record.name] = "negative_or_no_helper"

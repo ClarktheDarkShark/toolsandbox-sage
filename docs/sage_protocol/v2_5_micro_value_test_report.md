@@ -1,81 +1,57 @@
 # V2.5 Micro Value Test Report
 
 ## Objective
-Test whether the first V2.5 tool-foundry candidates are callable, tool-driven, and plausibly additive over frozen best3 before any additive60 run.
+Test V2.5 foundry candidates for callability, adoption, safety, and additive-over-best3 potential before any additive60 run.
 
 ## Files Changed
-- `src/sage_ts/evaluation/control_baseline_cache.py`
-- `tests/unit/test_control_baseline_cache.py`
 - `scripts/build_v2_5_tool_foundry_artifacts.py`
-- `artifacts/registry_candidates/v2_5_temperature_answer_scalar/registry_manifest.json`
-- `docs/sage_protocol/v2_5_*`
+- `src/sage_ts/adequacy/candidate_gate.py`
+- `src/sage_ts/runtime/routing_scorer.py`
+- `src/sage_ts/runtime/toolsandbox_integration.py`
+- `src/sage_ts/adapters/openai_toolsandbox_roles.py`
+- `tests/unit/test_candidate_gate.py`
+- `tests/unit/test_runtime_routing_scorer.py`
+- `tests/unit/test_openai_toolsandbox_roles.py`
 
-## Cache Repair
-Control cache compatibility is now task-level. `manifest_checksum` is still stored for provenance, but no longer resets eligibility. Compatibility still requires matching scenario checksum, initial-state checksum, model metadata, model parameters, prompt hashes, runner/scorer/ToolSandbox versions, and base-tool policy.
+## Machine Summary
+- `artifacts/summaries/v2_5_tool_foundry_loop2_3_micro_summary/summary.json`
 
-Evidence after repair:
-- Best3-only micro: control source `mixed`, cached/fresh `17 / 3`.
-- Payload answer-helper micro: control source `mixed`, cached/fresh `17 / 3`.
-- Scalar repaired helper micro: control source `mixed`, cached/fresh `19 / 1`.
+## Candidate 1: `format_calculated_distance_km`
+- Registry: `artifacts/summaries/v2_5_tool_foundry_v2_5_loop2_distance_unitsafe_fixedfmt_20260506_124758/candidate_batch_registry/registry_manifest.json`
+- Natural micro run: `outputs/v2_5_micro_distance_unitsafe_routingfix_cached_20260506_125948/mechanism_40_20260506_125953`
+- Dashboards: `http://127.0.0.1:5633/outputs/v2_5_micro_distance_unitsafe_routingfix_cached_20260506_125948/mechanism_40_20260506_125953/dashboard/index.html`, `http://127.0.0.1:5633/outputs/v2_5_micro_distance_unitsafe_routingfix_cached_20260506_125948/mechanism_40_20260506_125953/dashboard/task_focus.html`
+- Candidate vs control outcome delta: `+0.2643`; canonical delta: `+0.0743`; exact successes: `4 -> 7`.
+- Helper visible/called/VNC: `4 / 4 / 0`.
+- Called-subset outcome delta: `+0.5556`; canonical delta: `+0.0072`.
+- Best3+distance vs best3-only same-manifest outcome delta: `+0.0447`; gains/regressions/preserved: `4 / 2 / 8`.
+- Runtime/side-effect incidents: `0 / 0`.
+- Decision: micro-positive but narrow. Keep as candidate evidence; do not claim gap closure from this alone.
 
-## Candidate Batch
-- Batch summary: `artifacts/summaries/v2_5_tool_foundry_v2_5_tool_foundry_scalar_temp_20260506_114557/candidate_batch_summary.json`
-- Batch registry: `artifacts/summaries/v2_5_tool_foundry_v2_5_tool_foundry_scalar_temp_20260506_114557/candidate_batch_registry/registry_manifest.json`
-- Tools proposed / accepted / rejected: `2 / 2 / 0`
-- Accepted: `resolve_temperature_answer_unit`, `prepare_temperature_conversion_args`
+## Insufficient-Information Distance Finding
+The insufficient-information distance cases are rubric-compliant abstain/clarification tasks. Computing distance when current location is unavailable is a minefield action. The repaired routing hides derived calculators with required original producer calls on insufficient-information tasks, and `format_calculated_distance_km` was hidden on those negatives in the repaired runs.
 
-## Micro Runs
+## Candidate 2: `resolve_location_lookup_field`
+- Registry: `artifacts/summaries/v2_5_tool_foundry_v2_5_loop3_location_bridge_20260506_132151/candidate_batch_registry/registry_manifest.json`
+- Natural policy-repair run: `outputs/v2_5_micro_location_field_policyrepair_cached_20260506_133006/mechanism_40_20260506_133010`
+- Dashboards: `http://127.0.0.1:5636/outputs/v2_5_micro_location_field_policyrepair_cached_20260506_133006/mechanism_40_20260506_133010/dashboard/index.html`, `http://127.0.0.1:5636/outputs/v2_5_micro_location_field_policyrepair_cached_20260506_133006/mechanism_40_20260506_133010/dashboard/task_focus.html`
+- Natural visible/called/VNC: `4 / 1 / 3`; called-subset outcome delta: `0.0`; canonical delta: `+0.0548`.
+- Force-after-lookup run: `outputs/v2_5_micro_location_field_force_after_lookup_20260506_133440/mechanism_40_20260506_133444`
+- Dashboards: `http://127.0.0.1:5637/outputs/v2_5_micro_location_field_force_after_lookup_20260506_133440/mechanism_40_20260506_133444/dashboard/index.html`, `http://127.0.0.1:5637/outputs/v2_5_micro_location_field_force_after_lookup_20260506_133440/mechanism_40_20260506_133444/dashboard/task_focus.html`
+- Force visible/called/VNC: `4 / 4 / 0`; called-subset outcome delta: `0.0`; canonical delta: `+0.0368`.
+- Runtime/side-effect incidents: `0 / 0`.
+- Trace diagnosis: callability was fixed. The remaining failure is value/output alignment. Address lookup returns `One Apple Park Way...` while the target expects `Apple Park 1 Apple Park Way... United States`; phone values are extracted correctly but the actor reformats `+14089961010` as `+1 (408) 996-1010`, so primary outcome stays 0 despite canonical gain.
+- Decision: park current location-field design as canonical-only/value failure.
 
-### Best3-only comparison
-- Run: `outputs/v2_5_micro_temperature_best3_only_cached_20260506_113421/mechanism_40_20260506_113425`
-- Dashboards: `http://127.0.0.1:5629/outputs/v2_5_micro_temperature_best3_only_cached_20260506_113421/mechanism_40_20260506_113425/dashboard/index.html`, `http://127.0.0.1:5629/outputs/v2_5_micro_temperature_best3_only_cached_20260506_113421/mechanism_40_20260506_113425/dashboard/task_focus.html`
-- Control cache: `mixed`, cached/fresh `17 / 3`
-- Outcome delta: `+0.0272`
-- Canonical delta: `+0.0532`
-- Exact successes: `4 -> 6`
-- Outcome gains/regressions/preserved: `6 / 6 / 4`
-
-### Payload-shaped `resolve_temperature_answer_unit`
-- Run: `outputs/v2_5_micro_temperature_answer_only_cached_20260506_112638/mechanism_40_20260506_112641`
-- Dashboards: `http://127.0.0.1:5628/outputs/v2_5_micro_temperature_answer_only_cached_20260506_112638/mechanism_40_20260506_112641/dashboard/index.html`, `http://127.0.0.1:5628/outputs/v2_5_micro_temperature_answer_only_cached_20260506_112638/mechanism_40_20260506_112641/dashboard/task_focus.html`
-- Control cache: `mixed`, cached/fresh `17 / 3`
-- Outcome delta: `+0.0916`
-- Canonical delta: `+0.0829`
-- Exact successes: `4 -> 7`
-- Helper visible/called/VNC: `8 / 1 / 7`
-- Called-subset outcome delta: `+0.3333`
-- Blocker: callability/adoption. Trace showed the actor called the helper with only `target_unit`, omitting required `weather_payload`.
-
-### Scalar repaired `resolve_temperature_answer_unit`
-- Registry: `artifacts/registry_candidates/v2_5_temperature_answer_scalar/registry_manifest.json`
-- Registry SHA-256: `854ec5fec66002dc14f64c60247e517c7f73b06a2cd63f1236f9be84afa5922a`
-- Run: `outputs/v2_5_micro_temperature_scalar_repair_cached_20260506_114758/mechanism_40_20260506_114803`
-- Dashboards: `http://127.0.0.1:5630/outputs/v2_5_micro_temperature_scalar_repair_cached_20260506_114758/mechanism_40_20260506_114803/dashboard/index.html`, `http://127.0.0.1:5630/outputs/v2_5_micro_temperature_scalar_repair_cached_20260506_114758/mechanism_40_20260506_114803/dashboard/task_focus.html`
-- Control cache: `mixed`, cached/fresh `19 / 1`
-- Outcome delta: `-0.0579`
-- Canonical delta: `+0.0080`
-- Exact successes: `4 -> 7`
-- Outcome gains/regressions/preserved: `4 / 10 / 2`
-- Helper visible/called/VNC: `8 / 5 / 3`
-- Called-subset outcome delta: `-0.1428`
-- Called-subset canonical delta: `-0.4033`
-- Runtime exceptions: `0`
-- Helper side-effect incidents: `0`
-
-## Interpretation
-The scalar repair solved the callability blocker: the tool was naturally called with correct scalar arguments and returned usable conversions. Once callability was fair, the concept failed the primary metric. The helper is therefore a value failure, not merely a routing failure.
-
-The outcome/canonical mismatch is documented: the helper can replace `unit_conversion`, but route substitution does not rescue a negative called-subset outcome. This candidate should not advance to additive60.
-
-## Tests And Checks
-- `PYTHONPATH=src:. pytest tests/unit/test_control_baseline_cache.py tests/unit/test_candidate_gate.py tests/unit/test_tool_generator.py tests/unit/test_online_birth.py -q` -> `61 passed`
-- `PYTHONPATH=src:. pytest tests/unit/test_dashboard_exporters.py -q` -> `11 passed`
-- `PYTHONPATH=src:. python -m py_compile scripts/build_v2_5_tool_foundry_artifacts.py src/sage_ts/evaluation/control_baseline_cache.py src/sage_ts/dashboard/task_focus_template.py` -> `PASS`
-- `PYTHONPATH=src:. python scripts/migrate_registry.py --check-only artifacts/registry_candidates/v2_5_temperature_answer_scalar/registry_manifest.json` -> `PASS`
-- `PYTHONPATH=src:. python scripts/migrate_registry.py --check-only artifacts/summaries/v2_5_tool_foundry_v2_5_tool_foundry_scalar_temp_20260506_114557/candidate_batch_registry/registry_manifest.json` -> `PASS`
+## Framework Repairs Proven
+- Candidate gate now accepts derived calculators that preserve deterministic original producer calls such as `calculate_*` and `convert_*`.
+- Runtime routing hides derived calculators on insufficient-information minefield tasks.
+- Runtime routing prevents derived calculators with original producer calls from broad triggerless exposure.
+- Runtime bridge can autofill a single dict payload input even when scalar selector inputs are also present.
+- Runtime bridge wraps scalar original tool results as `{"result": value}`.
+- Derived actor policy now recognizes one payload input plus scalar selector inputs.
 
 ## Decision Label
-`candidate concept negative`
+`continue gap-closure loop`
 
 ## Exact Next Action
-Park the temperature unit answer lane. Continue V2.5 only with a different non-parked cluster that has higher additive-over-best3 potential; do not run additive60 for `resolve_temperature_answer_unit` or `prepare_temperature_conversion_args`.
+Do not run additive60 for `resolve_location_lookup_field`. Preserve `format_calculated_distance_km` as narrow micro-positive evidence, then continue the foundry loop with the next materially different high-gap design. The next best target is a safe direct-side-effect argument-preparation design with scalar inputs, distinct from the parked selected-record-only side-effect prep lane.

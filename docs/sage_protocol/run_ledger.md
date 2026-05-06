@@ -584,3 +584,15 @@
   - Payload helper cached micro: `outputs/v2_5_micro_temperature_answer_only_cached_20260506_112638/mechanism_40_20260506_112641`; dashboard/task-focus opened; control source mixed `17 / 3`; outcome `+0.0916`; helper visible/called/VNC `8 / 1 / 7`; callability blocker was omitted `weather_payload`.
   - Scalar repaired helper cached micro: `outputs/v2_5_micro_temperature_scalar_repair_cached_20260506_114758/mechanism_40_20260506_114803`; dashboard/task-focus opened; control source mixed `19 / 1`; outcome `-0.0579`; canonical `+0.0080`; exact `4 -> 7`; helper visible/called/VNC `8 / 5 / 3`; called-subset outcome `-0.1428`; runtime/side-effect `0 / 0`.
   - Decision: `candidate concept negative`; park temperature answer/conversion lane and do not run additive60 for it.
+
+## 2026-05-06 - V2.5 Foundry Loop 2-3 Micro Diagnostics
+- Repaired derived-calculator gating/routing for producer-call preservation, insufficient-information suppression, and trigger/family exposure limits.
+- Repaired derived payload callability bridge: scalar original results are wrapped as `{"result": value}` and a single dict payload input can be autofilled even when scalar selector inputs are present.
+- Repaired derived actor policy for payload-plus-scalar helpers.
+- Generated candidate registry: `artifacts/summaries/v2_5_tool_foundry_v2_5_loop3_location_bridge_20260506_132151/candidate_batch_registry/registry_manifest.json`, SHA `9e28d0c3c08ab7a774585a7ffbb708b432defecf34a0f5b98f8bf14bf8af8765`, check-only PASS.
+- Distance micro: `outputs/v2_5_micro_distance_unitsafe_routingfix_cached_20260506_125948/mechanism_40_20260506_125953`; dashboards opened at port `5633`; helper visible/called/VNC `4 / 4 / 0`; called-subset outcome `+0.5556`; runtime/side-effect `0 / 0`.
+- Distance best3 comparison: `outputs/v2_5_micro_distance_best3_only_cached_20260506_130801/mechanism_40_20260506_130805`; dashboards opened at port `5634`; controls all cached `20 / 0`; best3+distance vs best3 outcome `+0.0447` on same manifest.
+- Location natural policy run: `outputs/v2_5_micro_location_field_policyrepair_cached_20260506_133006/mechanism_40_20260506_133010`; dashboards opened at port `5636`; visible/called/VNC `4 / 1 / 3`; called-subset outcome `0.0`.
+- Location force-after-lookup: `outputs/v2_5_micro_location_field_force_after_lookup_20260506_133440/mechanism_40_20260506_133444`; dashboards opened at port `5637`; visible/called/VNC `4 / 4 / 0`; called-subset outcome `0.0`; canonical `+0.0368`; runtime/side-effect `0 / 0`; protocol PASS but candidate parked for primary-metric value failure.
+- Control cache was task-level mixed/cached across runs and worked task-by-task; latest force run used `18 cached / 2 fresh`.
+- Decision: `continue gap-closure loop`.

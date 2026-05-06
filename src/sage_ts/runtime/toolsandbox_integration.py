@@ -439,6 +439,8 @@ def _latest_original_tool_payload(
                 )
                 if isinstance(first, dict):
                     return dict(first)
+            if isinstance(result, (str, int, float, bool)):
+                return {"result": result}
     return None
 
 
@@ -450,9 +452,10 @@ def _with_chained_visible_payload_arguments(
     spec = entry.tool.spec
     if spec.family != ToolFamily.DERIVED_VALUE_CALCULATOR:
         return kwargs
-    if len(spec.inputs) != 1 or spec.inputs[0].annotation != "dict":
+    dict_inputs = [item for item in spec.inputs if item.annotation == "dict"]
+    if len(dict_inputs) != 1:
         return kwargs
-    input_name = spec.inputs[0].name
+    input_name = dict_inputs[0].name
     if kwargs.get(input_name):
         return kwargs
     payload = _latest_original_tool_payload(spec.required_original_tool_calls)
@@ -863,14 +866,14 @@ def _trigger_based_visibility(
     """
     name_lower = scenario_name.lower()
     spec = entry.tool.spec
-    if spec.positive_triggers:
-        for token in spec.positive_triggers:
-            if token.lower() in name_lower:
-                return True, "positive_trigger_match"
     if spec.negative_triggers:
         for token in spec.negative_triggers:
             if token.lower() in name_lower:
                 return False, "negative_trigger_suppressed"
+    if spec.positive_triggers:
+        for token in spec.positive_triggers:
+            if token.lower() in name_lower:
+                return True, "positive_trigger_match"
     return None
 
 
@@ -1052,6 +1055,13 @@ def registry_entry_visibility_reason(
             return True, "stock_symbol_extraction_task"
         return False, "stock_symbol_requires_stock_lookup_task"
 
+    if (
+        entry.tool.spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR
+        and entry.tool.spec.required_original_tool_calls
+        and generic_route.status == "defer"
+    ):
+        return False, "derived_calculator_requires_trigger_or_family_match"
+
     # Supplementary trigger-based fallback: checked after all hardcoded routes.
     trigger_result = _trigger_based_visibility(entry, name)
     if trigger_result is not None:
@@ -1103,6 +1113,7 @@ def route_registry_entries(
         "recency_action_selector_requires_recency_action_task",
         "side_effect_selector_suppressed_for_insufficient_information",
         "side_effect_composite_suppressed_for_insufficient_information",
+        "derived_calculator_suppressed_for_insufficient_information",
         "post_selection_composite_requires_downstream_action_task",
     }
     for tool_name, entry in sorted(entries.items()):
