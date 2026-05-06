@@ -268,3 +268,22 @@
 - Best4 vs best3 formal100 candidate outcome difference: `-0.0672`; exact-success difference `-4`.
 - Decision: `best4 not additive`; do not run Best4 frozen250; keep best3 as final validated portfolio. `days_between_timestamps` remains a confirmed narrow V2.2 standalone tool, not promoted into the main portfolio.
 - Reports: `docs/sage_protocol/v2_2_best4_candidate_registry_report.md`, `docs/sage_protocol/v2_2_best4_ablation60_report.md`, `docs/sage_protocol/v2_2_best4_frozen100_report.md`.
+
+
+## V2.4 Additive-Only Gap Closure Status
+- Date: `2026-05-06T10:15:00-04:00`
+- Frozen best3 registry modified: `no`.
+- Frozen best3 registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`.
+- Frozen best3 SHA-256: `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+- `days_between_timestamps` remains confirmed standalone only; Best4 is not additive and no Best4 frozen250 was run.
+- Additive gap atlas: `artifacts/summaries/v2_4_additive_gap_atlas/latest_gap_atlas.json`.
+- Selected non-parked cluster: `external_service_answer_extraction`.
+- Discovery manifest: `artifacts/summaries/v2_4_additive_discovery60_20260506_095428/cohort_manifest.json`; cohort quality `PASS`; external-service contamination allowed and reported; no low-quality override used.
+- Discovery run: `outputs/v2_4_additive_discovery60_20260506_095428/mechanism_60_20260506_095500`.
+- Candidate born: `extract_service_answer_field`.
+- Candidate adoption: visible/called/VNC `49 / 5 / 44`.
+- Discovery metrics: outcome delta `+0.0031`; relative outcome lift `+1.20%`; canonical delta `+0.0127`; exact `8 -> 7`; runtime/side-effect `0 / 0`.
+- Candidate called-subset outcome: `-0.1804`; called-subset canonical `+0.1609`.
+- Decision: `candidate concept negative`; no additive confirmation60; best3 remains final validated portfolio.
+- Reports: `docs/sage_protocol/v2_4_additive_gap_atlas_report.md`, `docs/sage_protocol/v2_4_additive_discovery60_report.md`, `docs/sage_protocol/v2_4_additive_confirmation60_report.md`.
+- Next action: stop additive promotion for this candidate; only resume discovery after a fresh atlas identifies a materially different non-parked mechanism with plausible additivity over best3.

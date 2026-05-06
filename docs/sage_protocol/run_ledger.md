@@ -556,3 +556,19 @@
   - Frozen100 Best4: `outputs/v2_2_best4_frozen100_20260506_075831/validate_100_20260506_084140`; dashboard/task-focus opened; control source mixed (`72` cached, `28` fresh); outcome `+0.0679`; canonical `+0.0696`; exact `14 -> 19`; days visible/called/VNC `3 / 3 / 0`; days called-subset outcome `+0.1111`; runtime/side-effect `0 / 0`.
   - Preserved best3 formal100 comparison: outcome `+0.1347`; canonical `+0.0911`; exact `16 -> 23`.
   - Decision: `best4 not additive`; do not run Best4 frozen250; best3 remains final validated portfolio.
+
+
+- `V2.4 additive-only gap closure` completed.
+  - Date: `2026-05-06T10:15:00-04:00`
+  - Protected best3 registry untouched: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+  - State update: `days_between_timestamps` remains standalone only; Best4 not additive; no Best4 frozen250.
+  - Gap atlas: `artifacts/summaries/v2_4_additive_gap_atlas/latest_gap_atlas.json`; selected cluster `external_service_answer_extraction`.
+  - Discovery setup: `artifacts/summaries/v2_4_additive_discovery60_20260506_095428/setup_summary.json`; manifest `artifacts/summaries/v2_4_additive_discovery60_20260506_095428/cohort_manifest.json`; quality gate `PASS`; `--allow-contaminated-preflight` used for explicit external-service diagnostic; no low-quality override.
+  - First pass: `outputs/v2_4_additive_discovery60_20260506_093603/mechanism_60_20260506_093702`; accepted candidate had placeholder `search_service_payload` and was hidden; treated as framework blocker.
+  - Repairs: concrete producer-name birth evidence, placeholder original-tool contract rejection, derived multi-producer routing as any-match, list-result trace bridging.
+  - Tests: targeted suite `116 passed`; registry check-only `PASS` for frozen best3 and clean V2.4 candidate registry.
+  - Fair rerun: `outputs/v2_4_additive_discovery60_20260506_095428/mechanism_60_20260506_095500`; dashboards `http://127.0.0.1:5623/outputs/v2_4_additive_discovery60_20260506_095428/mechanism_60_20260506_095500/dashboard/index.html` and `http://127.0.0.1:5623/outputs/v2_4_additive_discovery60_20260506_095428/mechanism_60_20260506_095500/dashboard/task_focus.html`.
+  - Metrics: outcome `+0.0031` (+1.20% relative), canonical `+0.0127`, exact `8 -> 7`, gains/regressions/preserved outcome `5/8/31`, canonical `18/17/25`, runtime/side-effect `0 / 0`.
+  - Candidate `extract_service_answer_field`: visible/called/VNC `49 / 5 / 44`, called-subset outcome `-0.1804`, called-subset canonical `+0.1609`.
+  - Decision: `candidate concept negative`; no confirmation60; best3 remains final validated portfolio.
+  - Reports: `docs/sage_protocol/v2_4_additive_gap_atlas_report.md`, `docs/sage_protocol/v2_4_additive_discovery60_report.md`, `docs/sage_protocol/v2_4_additive_confirmation60_report.md`.

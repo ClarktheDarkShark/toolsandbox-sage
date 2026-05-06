@@ -1099,6 +1099,123 @@ def _stock_symbol_extraction_observation(
     )
 
 
+def _is_external_answer_extraction_scenario(scenario_name: str) -> bool:
+    if "insufficient_information" in scenario_name:
+        return False
+    if "stock_symbol" in scenario_name or "low_battery" in scenario_name:
+        return False
+    return scenario_name.startswith(
+        (
+            "find_distance_with_location_name",
+            "find_address_with_lat_lon",
+            "find_phone_number_with_location_name",
+            "find_temperature",
+            "find_temperature_f_with_location",
+            "convert_currency",
+            "convert_currency_canonicalize",
+        )
+    )
+
+
+def _external_service_answer_extraction_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="derived_value:extract_service_answer_field",
+        observation=(
+            "External lookup and conversion tasks repeatedly expose a visible "
+            "ToolSandbox result payload, but the agent can still lose task "
+            "completion by manually copying, normalizing, or selecting the wrong "
+            "answer field from that payload. Generate a deterministic answer-only "
+            "helper named extract_service_answer_field. Input: service_payload dict "
+            "copied from a visible result row or dictionary returned by an original "
+            "ToolSandbox lookup/conversion tool. Return a dict with answer_value, "
+            "answer_kind, answer_unit, and abstain_reason. Recognize common visible "
+            "fields such as phone_number, address, current_temperature, "
+            "temperature, distance, converted_amount, convertedAmount, amount, and "
+            "value. Return answer_value as a string and preserve any visible unit "
+            "field as answer_unit when present. Abstain with an empty answer_value "
+            "when no supported scalar answer field is present. This helper must "
+            "not call external services itself, must not perform side effects, and "
+            "must not replace the original ToolSandbox lookup or conversion call; "
+            "it only extracts the final answer from visible output after that "
+            "original call returns. Its required_original_tool_calls and "
+            "preserves_side_effect_tools must use concrete ToolSandbox producer "
+            "names from this list only: search_location_around_lat_lon, "
+            "search_weather_around_lat_lon, search_lat_lon, "
+            "calculate_lat_lon_distance, convert_currency, and unit_conversion. "
+            "Do not invent placeholder producer names such as search_service_payload."
+        ),
+        allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "service_payload": {
+                        "name": "Main Branch",
+                        "phone_number": "+1 (555) 0100",
+                    }
+                },
+                {
+                    "answer_value": "+1 (555) 0100",
+                    "answer_kind": "phone_number",
+                    "answer_unit": "",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "service_payload": {
+                        "current_temperature": 21.5,
+                        "temperature_unit": "Celsius",
+                    }
+                },
+                {
+                    "answer_value": "21.5",
+                    "answer_kind": "current_temperature",
+                    "answer_unit": "Celsius",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {"service_payload": {"address": "1 Main St, Springfield"}},
+                {
+                    "answer_value": "1 Main St, Springfield",
+                    "answer_kind": "address",
+                    "answer_unit": "",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {"service_payload": {"name": "Main Branch", "category": "library"}},
+                {
+                    "answer_value": "",
+                    "answer_kind": "",
+                    "answer_unit": "",
+                    "abstain_reason": "no_supported_answer_field",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="visible_external_payload_answer_field_extraction_failure",
+        inadequacy_signals=("visible_raw_data_lacking_deterministic_transform",),
+        visible_data_gaps=(
+            "visible service result payload contains answer fields requiring deterministic extraction",
+        ),
+        failed_tool_calls=(
+            "search_location_around_lat_lon",
+            "search_weather_around_lat_lon",
+            "search_lat_lon",
+            "calculate_lat_lon_distance",
+            "convert_currency",
+            "unit_conversion",
+        ),
+        final_answer_route_mismatch=True,
+    )
+
+
 def _next_service_tool_call_observation(
     scenario_name: str,
 ) -> CapabilityObservation:
@@ -1596,6 +1713,9 @@ def classify_scenario_observations(
         "find_stock_symbol_with_company_name"
     ):
         return (_stock_symbol_extraction_observation(scenario_name),)
+
+    if similarity < 1.0 and _is_external_answer_extraction_scenario(scenario_name):
+        return (_external_service_answer_extraction_observation(scenario_name),)
 
     if similarity < 1.0 and _is_direct_service_precondition_scenario(scenario_name):
         observations = [_next_service_tool_call_observation(scenario_name)]

@@ -67,11 +67,13 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "temporal_reminder_date_canonicalization",
         "generic_multi_tool_composition",
     ),
+    "extract_service_answer_field": ("weather_location_current_city_distance",),
 }
 
 OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
     "canonicalizer:relative_day_time_timestamp": ("relative_day_time_to_timestamp",),
     "derived_value:days_between_timestamps": ("days_between_timestamps",),
+    "derived_value:extract_service_answer_field": ("extract_service_answer_field",),
     "derived_value:recency_timestamp_bounds": ("recency_to_timestamp_bounds",),
     "derived_value:resolve_search_window_or_bounds": (
         "resolve_search_window_or_bounds",
@@ -431,6 +433,18 @@ def expected_birth_opportunities(
         opportunities.append("derived_value:days_between_timestamps")
     if name.startswith("find_stock_symbol_with_company_name"):
         opportunities.append("derived_value:extract_stock_symbol")
+    if name.startswith(
+        (
+            "find_distance_with_location_name",
+            "find_address_with_lat_lon",
+            "find_phone_number_with_location_name",
+            "find_temperature",
+            "find_temperature_f_with_location",
+            "convert_currency",
+            "convert_currency_canonicalize",
+        )
+    ):
+        opportunities.append("derived_value:extract_service_answer_field")
     if name.startswith(DIRECT_SERVICE_HELPER_PREFIXES):
         opportunities.append("state_precondition:next_service_tool_call")
     if name.startswith(DOWNSTREAM_SERVICE_HELPER_PREFIXES):

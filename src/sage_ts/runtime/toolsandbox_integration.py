@@ -432,12 +432,13 @@ def _latest_original_tool_payload(
             result = payload.get("result")
             if isinstance(result, dict):
                 return dict(result)
-            if (
-                isinstance(result, list)
-                and len(result) == 1
-                and isinstance(result[0], dict)
-            ):
-                return dict(result[0])
+            if isinstance(result, list):
+                first = next(
+                    (item for item in result if isinstance(item, dict) and item),
+                    None,
+                )
+                if isinstance(first, dict):
+                    return dict(first)
     return None
 
 
@@ -457,6 +458,11 @@ def _with_chained_visible_payload_arguments(
     payload = _latest_original_tool_payload(spec.required_original_tool_calls)
     if payload is None and spec.required_original_tool_calls:
         return kwargs
+    if isinstance(payload, list):
+        payload = next(
+            (item for item in payload if isinstance(item, dict) and item),
+            None,
+        )
     if payload is None:
         payload = _latest_single_original_search_record()
     if not isinstance(payload, dict) or not payload:
@@ -1135,6 +1141,15 @@ def route_registry_entries(
                 # allow-lists.
                 downstream_tools = set(entry.tool.spec.preserves_side_effect_tools)
                 requires_any_downstream = True
+        if (
+            entry.tool.spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR
+            and len(downstream_tools) > 1
+        ):
+            # Generic derived extractors may preserve one of several producer
+            # lookups depending on the scenario. Requiring all producers to be
+            # available hides valid cross-family extractors before they get a
+            # fair callability chance.
+            requires_any_downstream = True
         if not downstream_tools:
             downstream_tools = set(entry.tool.spec.preserves_side_effect_tools)
         if entry.tool.spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:

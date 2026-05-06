@@ -6,7 +6,10 @@ from pathlib import Path
 from sage_ts.adequacy.inadequacy_classifier import classify_scenario_observations
 from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
-from sage_ts.orchestration.online_birth import OnlineBirthController
+from sage_ts.orchestration.online_birth import (
+    OnlineBirthController,
+    _original_tool_contract_errors,
+)
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.sandbox_validator import ValidationResult
@@ -874,6 +877,79 @@ def test_stock_symbol_failure_births_symbol_extraction_helper() -> None:
     ]
     assert observations[0].validation_examples[-1].expected == ""
     assert observations[0].validation_examples[-1].negative_applicability
+
+
+def test_external_payload_failure_births_answer_extraction_helper() -> None:
+    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
+
+    observations = classify_scenario_observations(
+        "find_temperature_f_with_location_3_distraction_tools_arg_description_scrambled",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    assert [item.canonical_key for item in observations] == [
+        "derived_value:extract_service_answer_field"
+    ]
+    observation = observations[0]
+    assert observation.generation_allowed
+    assert observation.allowed_families == (str(ToolFamily.DERIVED_VALUE_CALCULATOR),)
+    assert observation.validation_examples[-1].negative_applicability
+    assert observation.validation_examples[-1].expected["abstain_reason"] == (
+        "no_supported_answer_field"
+    )
+
+
+def test_external_payload_contract_rejects_placeholder_original_tool() -> None:
+    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
+    observation = classify_scenario_observations(
+        "find_temperature_f_with_location_3_distraction_tools_arg_description_scrambled",
+        scenario,
+        {"similarity": 0.5},
+    )[0]
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="extract_service_answer_field",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            description="Extract visible service answer payload fields.",
+            inputs=(ToolInput("service_payload", "dict", "Visible service payload."),),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "answer_value": {"type": "string"},
+                    "answer_kind": {"type": "string"},
+                    "answer_unit": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("service_payload contains answer field",),
+            negative_triggers=("service_payload lacks answer field",),
+            required_original_tool_calls=("search_service_payload",),
+            preserves_side_effect_tools=("search_service_payload",),
+            abstain_behavior="Return empty answer fields when unsupported.",
+            generalization_rationale="Visible service payload extraction recurs.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "find_temperature_f_with_location",
+                "find_phone_number_with_location_name",
+            ),
+            reason_tool_is_decisive=(
+                "It prevents manual field-copying mistakes after original lookups."
+            ),
+            shortfall_cluster_evidence=("derived_value:extract_service_answer_field",),
+            known_failure_mechanisms_addressed=(
+                "visible_raw_data_lacking_deterministic_transform",
+            ),
+            inadequacy_evidence=observation.to_inadequacy_evidence(),
+        ),
+        code="def extract_service_answer_field(service_payload: dict) -> dict:\n    return {}\n",
+    )
+
+    assert _original_tool_contract_errors(tool, observation) == (
+        "placeholder_downstream_original_tool:search_service_payload",
+    )
 
 
 def test_medium_grain_constraint_action_observation_is_opt_in(

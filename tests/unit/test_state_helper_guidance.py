@@ -617,6 +617,142 @@ def test_derived_value_helper_chains_visible_payload_from_required_tool_trace() 
         assert fn() == "AAPL"
 
 
+def test_derived_value_helper_chains_first_visible_record_from_list_trace() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="extract_service_answer_field",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            description="Extract a scalar answer from a visible service payload.",
+            inputs=(
+                ToolInput(
+                    "service_payload",
+                    "dict",
+                    "Dictionary returned by a lookup or one visible result row.",
+                ),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "answer_value": {"type": "string"},
+                    "answer_kind": {"type": "string"},
+                    "answer_unit": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("visible service payload contains phone_number",),
+            negative_triggers=("service payload has no supported answer field",),
+            required_original_tool_calls=(
+                "search_location_around_lat_lon",
+                "search_weather_around_lat_lon",
+            ),
+            preserves_side_effect_tools=(
+                "search_location_around_lat_lon",
+                "search_weather_around_lat_lon",
+            ),
+            abstain_behavior="Return empty answer fields when no supported field exists.",
+            generalization_rationale=(
+                "Several external lookup tasks expose structured payloads that "
+                "need deterministic scalar answer extraction."
+            ),
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "find_phone_number_with_location_name",
+                "find_temperature_f_with_location",
+            ),
+            reason_tool_is_decisive=(
+                "It prevents manual answer-field copying errors after original "
+                "lookup tools return visible payloads."
+            ),
+            shortfall_cluster_evidence=("derived_value:extract_service_answer_field",),
+            known_failure_mechanisms_addressed=(
+                "visible_raw_data_lacking_deterministic_transform",
+            ),
+            canonical_route_substitution_risk="low",
+            final_state_preservation_plan=(
+                "The original lookup result is preserved; the helper only reads "
+                "visible payload fields."
+            ),
+            grading_accounting_note=(
+                "Manual field extraction is substituted but lookup calls remain visible."
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Agents fail to extract visible answer fields from service payloads.",
+                signals=("visible_raw_data_lacking_deterministic_transform",),
+            ),
+        ),
+        code=(
+            "def extract_service_answer_field(service_payload: dict) -> dict:\n"
+            "    value = service_payload.get('phone_number', '')\n"
+            "    return {'answer_value': str(value), 'answer_kind': 'phone_number' if value else '', 'answer_unit': '', 'abstain_reason': '' if value else 'no_supported_answer_field'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="find_phone_number_with_location_name",
+    )
+
+    def search_location_around_lat_lon() -> list[dict[str, object]]:
+        return []
+
+    search_location_around_lat_lon.__name__ = "search_location_around_lat_lon"
+
+    context = ExecutionContext()
+    context.trace_tool = True
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.AGENT,
+                "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                "content": "test location lookup",
+                "openai_tool_call_id": "location-call",
+                "openai_function_name": "search_location_around_lat_lon",
+                "conversation_active": True,
+                "tool_call_exception": None,
+                "tool_trace": None,
+                "visible_to": [RoleType.AGENT, RoleType.EXECUTION_ENVIRONMENT],
+            }
+        ],
+    )
+    with new_context(context):
+        add_tool_trace(
+            search_location_around_lat_lon,
+            [
+                {"name": "Main Branch", "phone_number": "+1 555 0100"},
+                {"name": "Other Branch", "phone_number": "+1 555 0199"},
+            ],
+        )
+        context.add_to_database(
+            DatabaseNamespace.SANDBOX,
+            [
+                {
+                    "sender": RoleType.AGENT,
+                    "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                    "content": "test derived helper call",
+                    "openai_tool_call_id": "helper-call",
+                    "openai_function_name": "extract_service_answer_field",
+                    "conversation_active": True,
+                    "tool_call_exception": None,
+                    "tool_trace": None,
+                    "visible_to": [RoleType.AGENT, RoleType.EXECUTION_ENVIRONMENT],
+                }
+            ],
+        )
+        fn = compile_toolsandbox_tool(entry)
+
+        assert fn()["answer_value"] == "+1 555 0100"
+
+
 def test_post_selection_composite_chains_selected_record_from_unique_search_trace() -> (
     None
 ):

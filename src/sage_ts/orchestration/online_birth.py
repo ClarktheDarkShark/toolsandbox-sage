@@ -76,6 +76,9 @@ BROADER_HELPER_OVERLAPS = {
 }
 
 
+PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
+
+
 def existing_broader_helper(
     canonical_key: str,
     store: RegistryStore,
@@ -90,6 +93,41 @@ def existing_broader_helper(
         ):
             return tool_name
     return None
+
+
+def _original_tool_contract_errors(
+    tool: GeneratedTool,
+    observation: CapabilityObservation,
+) -> tuple[str, ...]:
+    """Reject placeholder or non-observed ToolSandbox producer contracts.
+
+    Candidate specs must preserve concrete original ToolSandbox calls. A broad
+    generated helper is allowed to list several possible producer tools, but it
+    cannot invent a placeholder such as ``search_service_payload`` that will
+    never be present in a scenario allow-list.
+    """
+    observed = set(observation.failed_tool_calls) | set(
+        observation.repeated_failed_tool_calls
+    )
+    if not observed:
+        return ()
+    declared = set(tool.spec.required_original_tool_calls) | set(
+        tool.spec.preserves_side_effect_tools
+    )
+    if not declared:
+        return ()
+    lowered_observed = {item.lower() for item in observed}
+    placeholder = sorted(
+        item
+        for item in declared
+        if item.lower() not in lowered_observed
+        and any(token in item.lower() for token in PLACEHOLDER_ORIGINAL_TOOL_TOKENS)
+    )
+    if placeholder:
+        return ("placeholder_downstream_original_tool:" + ",".join(placeholder),)
+    if not (declared & observed):
+        return ("missing_observed_original_tool_preservation",)
+    return ()
 
 
 @dataclass
@@ -532,6 +570,13 @@ class OnlineBirthController:
                 memory_gate,
                 None,
                 ValidationResult(False, (memory_gate.reason,)),
+            )
+        original_contract_errors = _original_tool_contract_errors(tool, observation)
+        if original_contract_errors:
+            return (
+                memory_gate,
+                None,
+                ValidationResult(False, original_contract_errors),
             )
         if feature_enabled(LIVE_VALIDATION):
             live_check = run_lightweight_live_candidate_check(

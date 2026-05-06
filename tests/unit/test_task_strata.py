@@ -203,6 +203,15 @@ def test_stock_symbol_task_matches_extraction_birth_path() -> None:
     )
 
 
+def test_external_service_answer_tasks_match_answer_extraction_birth_path() -> None:
+    scenario = "find_temperature_f_with_location_3_distraction_tools"
+
+    assert "weather_location_current_city_distance" in classify_task_strata(scenario)
+    assert "derived_value:extract_service_answer_field" in (
+        expected_birth_opportunities(scenario)
+    )
+
+
 def test_state_tool_call_fits_direct_service_precondition_tasks() -> None:
     scenario = "turn_on_wifi_low_battery_mode_3_distraction_tools"
 
