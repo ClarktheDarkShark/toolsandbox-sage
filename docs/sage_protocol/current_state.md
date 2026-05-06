@@ -345,3 +345,14 @@
 - Gap reduction proxy `19.44%`.
 - Decision label: `expanded portfolio ready for 100`.
 - Next action: run frozen100 with best3 vs Candidate Pack 1 before any frozen250.
+
+## V2.5 Candidate Pack 1 Frozen100 - 2026-05-06 17:08
+- Frozen best3 registry unchanged.
+- Manifest: `artifacts/summaries/v2_5_gap_closure_100_pack1_distance/cohort_manifest.json`; quality `pass`; external-service contamination explicitly allowed because this was a distance/location-service candidate validation; no low-quality override used.
+- Best3 run: `outputs/v2_5_gap_closure_100_best3_20260506_161059/validate_100_20260506_161104`; outcome `0.5181`; canonical `0.7902`; exact `20`.
+- Pack run: `outputs/v2_5_gap_closure_100_distance_20260506_164021/validate_100_20260506_164026`; outcome `0.5120`; canonical `0.7844`; exact `18`.
+- Pack vs best3 outcome delta `-0.0061`; canonical delta `-0.0059`.
+- `format_calculated_distance_km` visible/called/VNC `16 / 7 / 9`; called-subset outcome vs best3 `+0.1429`; helper side-effect/runtime `0 / 0`.
+- Gap reduction proxy `10.94%` met, but outcome/exact guardrail failed; no frozen250 for this pack.
+- Decision label: `continue gap-closure loop`.
+- Next action: rebuild gap atlas and test a materially different candidate pack; distance remains useful-but-not-promoted.
