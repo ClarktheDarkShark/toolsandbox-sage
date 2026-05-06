@@ -251,3 +251,20 @@
 - Reports: `docs/sage_protocol/v2_3_medium_grain_skill_experiment_report.md`, `docs/sage_protocol/v2_3_medium_grain_candidate_triage.md`, `docs/sage_protocol/v2_3_medium_grain_confirmation_report.md`.
 - Decision: `medium-grain skill concept negative`.
 - Next action: park `constraint_to_action_planner`; continue masked discovery on a different non-best3 cluster or redesign medium-grain contracts to separate answer-only resolution from side-effect action planning.
+
+## V2.2 Best4 Additivity Check Status
+- Date: `2026-05-06T09:05:00-04:00`
+- Frozen best3 registry modified: `no`.
+- Best4 candidate registry: `artifacts/registry_candidates/v2_2_best4_candidate/registry_manifest.json`.
+- Best4 registry SHA-256: `e497d29b7b31b89b9368af7c9327679086a881f8e9c62a182ca07b25f18f7834`.
+- Ablation60 manifest: `artifacts/summaries/v2_2_best4_ablation60_20260506_075831/cohort_manifest.json`; quality gate `PASS`; no external-service contamination; no-current-helper-fit share `0.40`.
+- Ablation60 best3-only run: `outputs/v2_2_best4_ablation60_best3_20260506_075831/mechanism_60_20260506_075938`; outcome delta `+0.0504`; canonical delta `+0.0858`; exact `3 -> 5`; runtime/side-effect `0 / 0`.
+- Ablation60 days-only run: `outputs/v2_2_best4_ablation60_days_only_20260506_075831/mechanism_60_20260506_081058`; outcome delta `+0.0261`; canonical delta `+0.0191`; exact `1 -> 4`; days visible/called/VNC `8 / 8 / 0`; runtime/side-effect `0 / 0`.
+- Ablation60 best4 run: `outputs/v2_2_best4_ablation60_best4_20260506_075831/mechanism_60_20260506_082133`; raw outcome delta `-0.0103`; canonical delta `-0.0030`; exact `3 -> 4`; days visible/called/VNC `8 / 8 / 0`; runtime/side-effect `0 / 0`.
+- Ablation common-control recalculation: Best4 candidate mean exceeded best3 by `+0.0118` over `52` numeric-outcome scenarios, so frozen100 was run as a conservative follow-up.
+- Frozen100 Best4 run: `outputs/v2_2_best4_frozen100_20260506_075831/validate_100_20260506_084140`; dashboard `http://127.0.0.1:5614/outputs/v2_2_best4_frozen100_20260506_075831/validate_100_20260506_084140/dashboard/index.html`; task focus `http://127.0.0.1:5614/outputs/v2_2_best4_frozen100_20260506_075831/validate_100_20260506_084140/dashboard/task_focus.html`.
+- Frozen100 Best4 metrics: outcome delta `+0.0679`; canonical delta `+0.0696`; exact `14 -> 19`; runtime/side-effect `0 / 0`.
+- Preserved best3 formal100 comparison: outcome delta `+0.1347`; canonical delta `+0.0911`; exact `16 -> 23`.
+- Best4 vs best3 formal100 candidate outcome difference: `-0.0672`; exact-success difference `-4`.
+- Decision: `best4 not additive`; do not run Best4 frozen250; keep best3 as final validated portfolio. `days_between_timestamps` remains a confirmed narrow V2.2 standalone tool, not promoted into the main portfolio.
+- Reports: `docs/sage_protocol/v2_2_best4_candidate_registry_report.md`, `docs/sage_protocol/v2_2_best4_ablation60_report.md`, `docs/sage_protocol/v2_2_best4_frozen100_report.md`.

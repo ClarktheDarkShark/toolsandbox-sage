@@ -34,3 +34,12 @@
 ## Decision Label
 
 `new toolset has 1 confirmed tool`
+
+
+## Best4 Additivity Check Update
+
+- Best4 candidate registry: `artifacts/registry_candidates/v2_2_best4_candidate/registry_manifest.json`
+- Ablation60 report: `docs/sage_protocol/v2_2_best4_ablation60_report.md`
+- Frozen100 report: `docs/sage_protocol/v2_2_best4_frozen100_report.md`
+- Result: `days_between_timestamps` remains confirmed as a narrow standalone V2.2 tool, but Best4 did not beat preserved best3 on formal100.
+- Decision: do not promote `days_between_timestamps` into the main frozen portfolio; do not run Best4 frozen250.

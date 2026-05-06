@@ -541,3 +541,18 @@
   - Tests: targeted V2.3 unit suite `127 passed`; artifact builder compile PASS; candidate, V2.2 new-toolset, and frozen best3 registry checks PASS.
   - Reports: `docs/sage_protocol/v2_3_medium_grain_skill_experiment_report.md`, `docs/sage_protocol/v2_3_medium_grain_candidate_triage.md`, `docs/sage_protocol/v2_3_medium_grain_confirmation_report.md`.
   - Decision: `medium-grain skill concept negative`; no confirmation60; candidate parked.
+
+- `V2.2 Best4 additivity check` completed.
+  - Date: `2026-05-06T09:05:00-04:00`
+  - Frozen best3 registry untouched.
+  - Best4 candidate registry: `artifacts/registry_candidates/v2_2_best4_candidate/registry_manifest.json`, SHA-256 `e497d29b7b31b89b9368af7c9327679086a881f8e9c62a182ca07b25f18f7834`.
+  - Registry checks: Best4, days-only, and frozen best3 all PASS.
+  - Ablation60 manifest: `artifacts/summaries/v2_2_best4_ablation60_20260506_075831/cohort_manifest.json`; cohort quality PASS; largest family share `0.0833`; no-current-helper-fit share `0.40`; external contamination `0`.
+  - Ablation60 best3-only: `outputs/v2_2_best4_ablation60_best3_20260506_075831/mechanism_60_20260506_075938`; dashboard/task-focus opened; outcome `+0.0504`; canonical `+0.0858`; exact `3 -> 5`; runtime/side-effect `0 / 0`.
+  - Ablation60 days-only: `outputs/v2_2_best4_ablation60_days_only_20260506_075831/mechanism_60_20260506_081058`; dashboard/task-focus opened; outcome `+0.0261`; canonical `+0.0191`; exact `1 -> 4`; days visible/called/VNC `8 / 8 / 0`; runtime/side-effect `0 / 0`.
+  - Ablation60 best4: `outputs/v2_2_best4_ablation60_best4_20260506_075831/mechanism_60_20260506_082133`; dashboard/task-focus opened; raw outcome `-0.0103`; canonical `-0.0030`; exact `3 -> 4`; days visible/called/VNC `8 / 8 / 0`; runtime/side-effect `0 / 0`.
+  - Common-control recalculation across ablation arms: Best4 candidate mean exceeded Best3 by `+0.0118` over `52` numeric-outcome scenarios, so frozen100 follow-up was run.
+  - Cached-control rerun attempt: `outputs/v2_2_best4_ablation60_best3_cached_20260506_075831/`; interrupted because partial cached-control synthesis did not reach candidate execution in a reasonable window; not used for decision.
+  - Frozen100 Best4: `outputs/v2_2_best4_frozen100_20260506_075831/validate_100_20260506_084140`; dashboard/task-focus opened; control source mixed (`72` cached, `28` fresh); outcome `+0.0679`; canonical `+0.0696`; exact `14 -> 19`; days visible/called/VNC `3 / 3 / 0`; days called-subset outcome `+0.1111`; runtime/side-effect `0 / 0`.
+  - Preserved best3 formal100 comparison: outcome `+0.1347`; canonical `+0.0911`; exact `16 -> 23`.
+  - Decision: `best4 not additive`; do not run Best4 frozen250; best3 remains final validated portfolio.
