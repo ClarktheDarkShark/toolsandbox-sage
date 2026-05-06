@@ -35,7 +35,6 @@ COMPATIBILITY_FIELDS = (
     "runner_version",
     "scorer_version",
     "toolsandbox_version",
-    "manifest_checksum",
     "base_tool_policy",
 )
 ORDER_INSENSITIVE_LIST_KEYS = frozenset(
@@ -276,6 +275,19 @@ def compatibility_key(context: dict[str, Any]) -> str:
     )
 
 
+def _record_matches_context(record: dict[str, Any], context: dict[str, Any]) -> bool:
+    """Return whether a stored baseline is task-compatible with this run.
+
+    Historical records include a manifest checksum in their stored compatibility
+    key. V2.5 uses task-level baseline reuse, so compatibility is checked from
+    the record fields directly and intentionally ignores manifest checksum.
+    """
+    for field in COMPATIBILITY_FIELDS:
+        if stable_json(record.get(field)) != stable_json(context.get(field)):
+            return False
+    return True
+
+
 def _variance(values: list[float]) -> float:
     if len(values) < 2:
         return 0.0
@@ -436,10 +448,18 @@ class ControlBaselineCache:
         key = compatibility_key(context)
         records: list[dict[str, Any]] = []
         for row in self._index_rows():
-            if row.get("compatibility_key") != key or not row.get("valid_for_cache"):
+            if not row.get("valid_for_cache"):
+                continue
+            if row.get("compatibility_key") != key and row.get(
+                "scenario_key"
+            ) != context.get("scenario_key"):
                 continue
             record = _read_json(Path(str(row["record_path"])), {})
-            if record.get("valid_for_cache") and record.get("complete_run"):
+            if (
+                record.get("valid_for_cache")
+                and record.get("complete_run")
+                and _record_matches_context(record, context)
+            ):
                 records.append(record)
         return records
 

@@ -143,6 +143,19 @@ def test_incompatibility_after_model_scorer_or_scenario_change(tmp_path: Path) -
     assert not cache.lookup(_context(name="different-task")).eligible
 
 
+def test_manifest_checksum_change_does_not_reset_task_level_eligibility(
+    tmp_path: Path,
+) -> None:
+    cache = ControlBaselineCache(tmp_path / "cache")
+    ctx = _context()
+    for _ in range(3):
+        _add(cache, ctx, _row(), tmp_path)
+
+    changed_manifest = {**ctx, "manifest_checksum": "different-manifest"}
+
+    assert cache.lookup(changed_manifest).eligible
+
+
 def test_runtime_exception_records_are_ineligible(tmp_path: Path) -> None:
     cache = ControlBaselineCache(tmp_path / "cache")
     ctx = _context()

@@ -44,10 +44,10 @@ TASK_FOCUS_HTML = r"""<!doctype html>
     .task:hover { background: rgba(120,200,255,.05); }
     .task.selected { background: rgba(120,200,255,.09); border-left-color: var(--blue); }
     .task.running { opacity: .75; }
-    .t-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 5px; }
-    .t-title { display: flex; align-items: flex-start; gap: 6px; min-width: 0; flex: 1; }
+    .t-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .t-title { display: block; min-width: 0; margin-top: 5px; }
     .task-num { flex: 0 0 auto; border: 1px solid rgba(120,200,255,.35); border-radius: 999px; padding: 1px 6px; color: var(--blue); font-size: 9px; font-weight: 900; letter-spacing: .04em; line-height: 1.25; white-space: nowrap; }
-    .t-name { font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; flex: 1; }
+    .t-name { display: block; font-size: 11px; line-height: 1.32; overflow-wrap: break-word; word-break: normal; }
     .status-pair { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
     .status-pair .pill { font-size: 9px; padding: 1px 5px; }
     .pill { border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; font-size: 10px; color: var(--muted); white-space: nowrap; }
@@ -238,7 +238,7 @@ TASK_FOCUS_HTML = r"""<!doctype html>
     }
 
     function taskTitleHtml(entry, title) {
-      return `${taskNumberHtml(entry)}<span class="t-name">${esc(title || "")}</span>`;
+      return `<span class="t-name">${esc(title || "")}</span>`;
     }
 
     function detailTitleHtml(entry, title) {
@@ -324,7 +324,8 @@ TASK_FOCUS_HTML = r"""<!doctype html>
           const cStatus = c.status || "pending";
           const sStatus = s.status || "pending";
           return `<button class="task${sel?" selected":""}" data-id="${esc(entry.id)}">
-            <div class="t-row"><span class="t-title">${taskTitleHtml(entry, entry.short_name||entry.scenario)}</span><span class="status-pair"><span class="pill ${esc(cStatus)}">B ${esc(cStatus)}</span><span class="pill ${esc(sStatus)}">S ${esc(sStatus)}</span></span></div>
+            <div class="t-row">${taskNumberHtml(entry)}<span class="status-pair"><span class="pill ${esc(cStatus)}">B ${esc(cStatus)}</span><span class="pill ${esc(sStatus)}">S ${esc(sStatus)}</span></span></div>
+            <div class="t-title">${taskTitleHtml(entry, entry.short_name||entry.scenario)}</div>
             <div class="score-pair">
               <span class="sc">B ${fmt(c.similarity)}</span>
               <span class="sc${tools.length?" hit":""}">S ${fmt(s.similarity)}</span>
@@ -334,7 +335,8 @@ TASK_FOCUS_HTML = r"""<!doctype html>
         }
         /* Single-arm entry */
         return `<button class="task${sel?" selected":""}${entry.status==="running"?" running":""}" data-id="${esc(entry.id)}">
-          <div class="t-row"><span class="t-title">${taskTitleHtml(entry, entry.short_name||entry.scenario)}</span><span class="pill ${esc(entry.status)}">${esc(entry.status)}</span></div>
+          <div class="t-row">${taskNumberHtml(entry)}<span class="pill ${esc(entry.status)}">${esc(entry.status)}</span></div>
+          <div class="t-title">${taskTitleHtml(entry, entry.short_name||entry.scenario)}</div>
           <div class="t-score">score ${fmt(entry.similarity)} · ${entry.turn_count||"—"} turns</div>
           ${(entry.generated_tools||[]).map(t=>`<span class="tbadge">${esc(t)}</span>`).join("")}
         </button>`;

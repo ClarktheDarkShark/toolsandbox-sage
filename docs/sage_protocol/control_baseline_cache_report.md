@@ -63,3 +63,15 @@ No commit was created because the worktree contains many pre-existing unrelated 
 
 ## Decision Label
 control baseline cache ready
+
+## V2.5 Task-Level Cache Repair
+Updated on 2026-05-06: control cache compatibility is now task-level rather than manifest-level. `manifest_checksum` remains recorded for audit/provenance, but eligibility no longer resets just because the same task appears in a new manifest.
+
+The cache still requires matching scenario checksum, initial-state checksum, model metadata, model parameters, prompt hashes, runner/scorer/ToolSandbox versions, and base-tool policy. Candidate/SAGE arms are still never cached.
+
+Verification run evidence:
+- `outputs/v2_5_micro_temperature_best3_only_cached_20260506_113421/mechanism_40_20260506_113425`: mixed controls, cached/fresh `17 / 3`.
+- `outputs/v2_5_micro_temperature_answer_only_cached_20260506_112638/mechanism_40_20260506_112641`: mixed controls, cached/fresh `17 / 3`.
+- `outputs/v2_5_micro_temperature_scalar_repair_cached_20260506_114758/mechanism_40_20260506_114803`: mixed controls, cached/fresh `19 / 1`.
+
+Decision label remains: `control baseline cache ready`.

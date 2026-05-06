@@ -287,3 +287,17 @@
 - Decision: `candidate concept negative`; no additive confirmation60; best3 remains final validated portfolio.
 - Reports: `docs/sage_protocol/v2_4_additive_gap_atlas_report.md`, `docs/sage_protocol/v2_4_additive_discovery60_report.md`, `docs/sage_protocol/v2_4_additive_confirmation60_report.md`.
 - Next action: stop additive promotion for this candidate; only resume discovery after a fresh atlas identifies a materially different non-parked mechanism with plausible additivity over best3.
+
+## V2.5 Tool-Foundry Micro Status
+- Date: `2026-05-06T12:05:00-04:00`
+- Frozen best3 registry modified: `no`.
+- Control cache repair: task-level baseline reuse implemented; `manifest_checksum` no longer resets compatibility. Cache still requires matching task/scenario checksum, initial-state checksum, model/prompt/scorer/runner/ToolSandbox/base-policy fields.
+- Cache verification: V2.5 micro runs used mixed controls with cached/fresh counts `17/3`, `17/3`, and `19/1`.
+- Foundry artifact: `artifacts/summaries/v2_5_tool_foundry_v2_5_tool_foundry_scalar_temp_20260506_114557/candidate_batch_summary.json`.
+- Candidate batch: proposed/accepted/rejected `2 / 2 / 0`; accepted `resolve_temperature_answer_unit`, `prepare_temperature_conversion_args`.
+- Repaired scalar registry: `artifacts/registry_candidates/v2_5_temperature_answer_scalar/registry_manifest.json`, SHA-256 `854ec5fec66002dc14f64c60247e517c7f73b06a2cd63f1236f9be84afa5922a`.
+- Best3-only micro: `outputs/v2_5_micro_temperature_best3_only_cached_20260506_113421/mechanism_40_20260506_113425`; outcome delta `+0.0272`; canonical delta `+0.0532`; exact `4 -> 6`; control source mixed `17 cached / 3 fresh`.
+- Payload answer-helper micro: `outputs/v2_5_micro_temperature_answer_only_cached_20260506_112638/mechanism_40_20260506_112641`; outcome delta `+0.0916`; helper visible/called/VNC `8 / 1 / 7`; callability blocker identified.
+- Scalar repaired helper micro: `outputs/v2_5_micro_temperature_scalar_repair_cached_20260506_114758/mechanism_40_20260506_114803`; outcome delta `-0.0579`; canonical delta `+0.0080`; exact `4 -> 7`; helper visible/called/VNC `8 / 5 / 3`; called-subset outcome `-0.1428`; runtime/side-effect `0 / 0`.
+- Decision: `candidate concept negative` for the temperature unit answer lane; do not run additive60 for these candidates.
+- Next action: park temperature answer/conversion candidates and continue V2.5 only if a different non-parked cluster has credible additive-over-best3 potential.
