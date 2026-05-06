@@ -920,6 +920,30 @@ def test_task_focus_resolves_arm_roots_and_renders_paired_compare(
         json.dumps({"scenario_names": ["paired_case"]}) + "\n",
         encoding="utf-8",
     )
+    (run_root / "control_arm_status.json").write_text(
+        json.dumps(
+            {
+                "arm": "control",
+                "status": "complete",
+                "completed_count": 1,
+                "scenario_count": 1,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (run_root / "candidate_arm_status.json").write_text(
+        json.dumps(
+            {
+                "arm": "candidate",
+                "status": "running",
+                "completed_count": 0,
+                "scenario_count": 1,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     _write_live_summary(
         control,
         [
@@ -989,7 +1013,16 @@ def test_task_focus_resolves_arm_roots_and_renders_paired_compare(
     pair = task_focus["pairs"][0]
     assert pair["control"]["scenario"] == "paired_case"
     assert pair["candidate"]["scenario"] == "paired_case"
+    assert task_focus["arm_progress"]["control"]["status"] == "complete"
+    assert task_focus["arm_progress"]["control"]["completed_count"] == 1
+    assert task_focus["arm_progress"]["control"]["scenario_count"] == 1
+    assert task_focus["arm_progress"]["candidate"]["status"] == "running"
+    assert task_focus["arm_progress"]["candidate"]["completed_count"] == 0
+    assert task_focus["arm_progress"]["candidate"]["scenario_count"] == 1
 
     html = (index.parent / "task_focus.html").read_text(encoding="utf-8")
     assert "paired-check-grid" in html
     assert "paired-chat" in html
+    assert "Baseline Progress" in html
+    assert "SAGE Progress" in html
+    assert "status-pair" in html

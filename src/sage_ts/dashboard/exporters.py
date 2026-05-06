@@ -1180,6 +1180,41 @@ def _task_focus_rows(
     return tasks
 
 
+def _arm_progress_status(
+    run_root: Path,
+    arm: str,
+    summary: dict[str, Any],
+    scenario_count: Any,
+) -> dict[str, Any]:
+    """Return explicit arm progress for live paired dashboards.
+
+    The Task Focus dashboard needs to show baseline and SAGE progress
+    separately. During active runs, the runner writes arm status files before a
+    final result summary exists; after completion, the summary is the fallback.
+    """
+    status_path = run_root / f"{arm}_arm_status.json"
+    status = _read_json(status_path)
+    planned = status.get("scenario_count")
+    if planned is None:
+        planned = summary.get("planned_scenario_count")
+    if planned is None:
+        planned = scenario_count
+    completed = status.get("completed_count")
+    if completed is None:
+        completed = summary.get("scenario_count")
+    return {
+        "arm": arm,
+        "status": status.get("status")
+        or summary.get("run_status")
+        or ("complete" if summary.get("scenario_count") else "pending"),
+        "completed_count": int(completed or 0),
+        "scenario_count": int(planned or 0),
+        "run_dir": status.get("run_dir") or summary.get("run_dir"),
+        "updated_at": status.get("updated_at"),
+        "error": status.get("error"),
+    }
+
+
 def _write_task_focus_dashboard(
     dashboard_dir: Path,
     run_root: Path,
@@ -1226,6 +1261,20 @@ def _write_task_focus_dashboard(
     if active is None and tasks:
         active = tasks[-1]
     current = data.get("candidate") or data.get("control") or {}
+    control_summary = data.get("control", {})
+    candidate_summary = data.get("candidate", {})
+    control_arm_status = _arm_progress_status(
+        run_root,
+        "control",
+        control_summary,
+        data.get("scenario_count"),
+    )
+    candidate_arm_status = _arm_progress_status(
+        run_root,
+        "candidate",
+        candidate_summary,
+        data.get("scenario_count"),
+    )
     payload = {
         "updated_at": data.get("updated_at"),
         "run_root": str(run_root),
@@ -1263,6 +1312,10 @@ def _write_task_focus_dashboard(
             "current_mean_similarity": current.get("mean_similarity"),
             "current_turns": current.get("total_turns"),
             "current_exceptions": current.get("exception_count"),
+        },
+        "arm_progress": {
+            "control": control_arm_status,
+            "candidate": candidate_arm_status,
         },
         "active_task_id": None if active is None else active["id"],
         "tasks": tasks,

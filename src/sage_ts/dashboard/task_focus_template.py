@@ -48,6 +48,8 @@ TASK_FOCUS_HTML = r"""<!doctype html>
     .t-title { display: flex; align-items: flex-start; gap: 6px; min-width: 0; flex: 1; }
     .task-num { flex: 0 0 auto; border: 1px solid rgba(120,200,255,.35); border-radius: 999px; padding: 1px 6px; color: var(--blue); font-size: 9px; font-weight: 900; letter-spacing: .04em; line-height: 1.25; white-space: nowrap; }
     .t-name { font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; flex: 1; }
+    .status-pair { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+    .status-pair .pill { font-size: 9px; padding: 1px 5px; }
     .pill { border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; font-size: 10px; color: var(--muted); white-space: nowrap; }
     .pill.complete { color: var(--good); border-color: rgba(86,208,132,.35); }
     .pill.running { color: var(--warn); border-color: rgba(255,210,106,.35); }
@@ -243,6 +245,21 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       return `${taskNumberHtml(entry, "detail-task-num")}<span>${esc(title || "")}</span>`;
     }
 
+    function armProgressFor(name, fallbackDone) {
+      const p = data?.arm_progress?.[name] || {};
+      const done = Number.isFinite(Number(p.completed_count)) ? Number(p.completed_count) : Number(fallbackDone || 0);
+      const total = Number.isFinite(Number(p.scenario_count)) && Number(p.scenario_count) > 0 ? Number(p.scenario_count) : Number(data?.summary?.scenario_count || 0);
+      return {
+        done,
+        total,
+        status: p.status || (done && total && done >= total ? "complete" : "pending"),
+      };
+    }
+
+    function progressText(p) {
+      return `${p.done}/${p.total || "?"}`;
+    }
+
     /* ── Top metrics ── */
     function renderTop() {
       const s = data?.summary || {};
@@ -258,6 +275,8 @@ TASK_FOCUS_HTML = r"""<!doctype html>
         const oc = s.control_mean_outcome_similarity;
         const os = s.candidate_mean_outcome_similarity;
         const od = present(oc) && present(os) ? Number(os) - Number(oc) : null;
+        const cp = armProgressFor("control", s.control_completed);
+        const sp = armProgressFor("candidate", s.candidate_completed);
         cards = [
           {l:"Baseline Score", v:fmt(s.control_mean_similarity), n:`${s.control_completed||0} done`},
           {l:"SAGE Score", v:fmt(s.candidate_mean_similarity), n:`${s.candidate_completed||0} done`},
@@ -265,22 +284,25 @@ TASK_FOCUS_HTML = r"""<!doctype html>
           ...(od===null?[]:[{l:"Outcome Delta", v:fmtD(od), n:`${fmt(oc)} → ${fmt(os)}`, cls:od>0?"good":od<0?"bad":""}]),
           {l:"Tools Born", v:`${s.accepted_tools||0}`, n:`${s.reuse_count||0} reuse calls`},
           {l:"Tool Attempts", v:`${s.generated_tool_attempted_scenarios||0}`, n:`${s.generated_tool_called_scenarios||0} called · ${s.generated_tool_failed_scenarios||0} failed`},
-          {l:"Progress", v:`${Math.max(s.candidate_completed||0,s.control_completed||0)}/${s.scenario_count||"?"}`, n:"scenarios"},
+          {l:"Baseline Progress", v:progressText(cp), n:cp.status},
+          {l:"SAGE Progress", v:progressText(sp), n:sp.status},
         ];
       } else if (arm === "candidate") {
+        const sp = armProgressFor("candidate", s.candidate_completed);
         cards = [
           {l:"SAGE Score", v:fmt(s.candidate_mean_similarity), n:`${s.candidate_completed||0} done`},
           {l:"Tools Born", v:`${s.accepted_tools||0}`, n:"accepted"},
           {l:"Reuse Calls", v:`${s.reuse_count||0}`, n:"generated tool uses"},
           {l:"Tool Attempts", v:`${s.generated_tool_attempted_scenarios||0}`, n:`${s.generated_tool_called_scenarios||0} called · ${s.generated_tool_failed_scenarios||0} failed`},
           {l:"Turns", v:`${s.current_turns||0}`, n:"total"},
-          {l:"Progress", v:`${s.candidate_completed||0}/${s.scenario_count||"?"}`, n:"scenarios"},
+          {l:"SAGE Progress", v:progressText(sp), n:sp.status},
         ];
       } else {
+        const cp = armProgressFor("control", s.control_completed);
         cards = [
           {l:"Baseline Score", v:fmt(s.control_mean_similarity), n:`${s.control_completed||0} done`},
           {l:"Turns", v:`${s.current_turns||0}`, n:"total"},
-          {l:"Progress", v:`${s.control_completed||0}/${s.scenario_count||"?"}`, n:"scenarios"},
+          {l:"Baseline Progress", v:progressText(cp), n:cp.status},
           {l:"Exceptions", v:`${s.current_exceptions||0}`, n:"errors"},
           {l:"Status", v:esc(data?.status||"—"), n:esc(data?.phase||"")},
         ];
@@ -299,9 +321,10 @@ TASK_FOCUS_HTML = r"""<!doctype html>
           /* Paired entry */
           const c = entry.control || {}, s = entry.candidate || {};
           const tools = s.generated_tools || [];
-          const status = s.status || c.status || "pending";
+          const cStatus = c.status || "pending";
+          const sStatus = s.status || "pending";
           return `<button class="task${sel?" selected":""}" data-id="${esc(entry.id)}">
-            <div class="t-row"><span class="t-title">${taskTitleHtml(entry, entry.short_name||entry.scenario)}</span><span class="pill ${esc(status)}">${esc(status)}</span></div>
+            <div class="t-row"><span class="t-title">${taskTitleHtml(entry, entry.short_name||entry.scenario)}</span><span class="status-pair"><span class="pill ${esc(cStatus)}">B ${esc(cStatus)}</span><span class="pill ${esc(sStatus)}">S ${esc(sStatus)}</span></span></div>
             <div class="score-pair">
               <span class="sc">B ${fmt(c.similarity)}</span>
               <span class="sc${tools.length?" hit":""}">S ${fmt(s.similarity)}</span>
@@ -502,6 +525,8 @@ TASK_FOCUS_HTML = r"""<!doctype html>
           </div>
           <div class="tags">
             ${cats.map(c=>`<span class="pill">${esc(c)}</span>`).join("")}
+            <span class="pill">baseline ${esc(c.status || "pending")}</span>
+            <span class="pill">sage ${esc(s.status || "pending")}</span>
             <span class="pill">baseline ${esc(String(c.turn_count ?? "—"))} turns</span>
             <span class="pill">sage ${esc(String(s.turn_count ?? "—"))} turns</span>
           </div>`;
