@@ -239,6 +239,22 @@ def test_task_focus_balanced_summary_uses_only_complete_pairs() -> None:
     assert summary["balanced_outcome_delta"] == pytest.approx(0.1)
 
 
+def test_task_focus_arm_progress_prefers_run_scenario_count_over_subset_plan() -> None:
+    progress = exporters._arm_progress_status(
+        Path("run"),
+        "control",
+        {
+            "scenario_count": 290,
+            "planned_scenario_count": 321,
+            "run_status": "running",
+        },
+        500,
+    )
+
+    assert progress["completed_count"] == 290
+    assert progress["scenario_count"] == 500
+
+
 def test_task_focus_exports_guardrail_evidence_and_left_aligned_tool_messages(
     tmp_path: Path,
 ) -> None:

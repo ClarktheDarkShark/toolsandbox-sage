@@ -1,11 +1,11 @@
 # Current State
 
-- Date: 2026-05-04
-- Last completed step: `formal_250_best3_relative_validation`
-- Last decision: `formal 250 passed`
+- Date: 2026-05-07
+- Last completed step: `v2_6_evidence_lock_original250_and_expanded500_validation`
+- Last decision: `expanded portfolio scale-positive; best3 broad claim preserved`
 - Primary metric: outcome/task-completion
 - Active frozen helpers: `relative_day_time_to_timestamp, resolve_search_window_or_bounds, select_record_by_timestamp_extreme`
-- Active registry: `artifacts/registry_best3_resolve_select_relative/registry_manifest.json`
+- Active registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`
 - Registry SHA-256: `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`
 - Formal 100 run: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428`
 - Formal 100 dashboard: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428/dashboard/index.html`
@@ -417,3 +417,18 @@
 - Helper contribution on expanded frozen250: `plan_contact_lookup_query` visible/called/VNC `24 / 15 / 9`, called outcome `+0.6527`; `extract_contact_field_from_search_result` `24 / 7 / 17`, called outcome `+0.6904`; `plan_contact_search_from_scalar_constraint` `74 / 12 / 62`, called outcome `+0.4279`; all new helpers side-effect/runtime `0 / 0`.
 - Decision label: `gap closure target met` for matched gap-enriched frozen250.
 - Exact next action: lock V2.6 matched-gap evidence in final package; if making a broader formal claim, run an original-formal-manifest 250 or 500/1032 expanded validation with the same frozen registry.
+
+
+## V2.6 Evidence Lock And Broader Expanded Validation
+- Date: `2026-05-07`
+- Protected best3 registry unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+- Expanded V2.6 registry: `artifacts/registry_candidates/v2_6_expanded_contact_scalar_pack/registry_manifest.json`, SHA-256 `ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582`.
+- Expanded tools: best3 plus `plan_contact_lookup_query`, `extract_contact_field_from_search_result`, `plan_contact_search_from_scalar_constraint`.
+- Matched gap-enriched frozen250 evidence locked: `docs/sage_protocol/v2_6_matched_gap_evidence_lock_report.md`; outcome `0.6040 -> 0.6235`; no-current-helper-fit `55.2% -> 45.6%`; relative gap reduction `17.39%`; runtime/side-effect `0 / 0`; protocol PASS.
+- Contact-scalar routing audit: `docs/sage_protocol/v2_6_contact_scalar_routing_audit.md`; generic family-match repair reduced scalar planner overexposure without tool-name suppression; decision `routing repaired for original250`.
+- Original formal250 expanded clean rerun: `outputs/v2_6_original_formal250_expanded_rerun/validate_250_20260507_082209`; dashboards opened on port `5682`; control cache `250 cached / 0 fresh`; outcome `0.5986`; expanded vs preserved best3 outcome `+0.1249`; exact `40 -> 41`; feedback no-current-helper-fit `52.0% -> 46.0%`; runtime/side-effect `0 / 0`; protocol PASS.
+- Expanded 500 run: `outputs/v2_6_expanded_500/full_benchmark_20260507_090922`; dashboards opened on port `5683`; control cache mixed `179 cached / 321 fresh`; outcome `0.6822`; expanded vs preserved best3 500 outcome `+0.1299`; exact `76 -> 96`; feedback no-current-helper-fit `67.6% -> 62.8%`; runtime/side-effect `0 / 0`; protocol PASS.
+- Final package updated under `artifacts/final_sage_praxis_package/`; final claim separates frozen best3 broad evidence from V2.6 matched gap-closure and expanded scale-positive evidence.
+- 1032 expanded run deferred: 500 provides broad non-external scale evidence, while 1032 would add substantial live-candidate cost over sparse/external lanes not targeted by contact-scalar helpers.
+- Decision: `expanded portfolio scale-positive; best3 broad claim preserved`.
+- Next action: optional current-code best3 500 rerun or expanded 1032 only if publication scope requires stronger matched-code comparison; otherwise preserve current final package.

@@ -1196,9 +1196,9 @@ def _arm_progress_status(
     status = _read_json(status_path)
     planned = status.get("scenario_count")
     if planned is None:
-        planned = summary.get("planned_scenario_count")
-    if planned is None:
         planned = scenario_count
+    if planned is None:
+        planned = summary.get("planned_scenario_count")
     completed = status.get("completed_count")
     if completed is None:
         completed = summary.get("scenario_count")

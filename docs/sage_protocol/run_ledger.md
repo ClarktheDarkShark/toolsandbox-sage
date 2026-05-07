@@ -702,3 +702,17 @@
 - Caveat: this is a matched gap-enriched frozen250 success, not a direct claim that the original formal250 absolute no-fit reference `44.4% -> <=40.0%` was met on the original formal cohort.
 - Decision label: `gap closure target met`.
 - Exact next action: lock final V2.6 matched-gap evidence; optionally run original-formal-manifest 250 or 500/1032 expanded validation if a broader final claim is required.
+
+## 2026-05-07 - V2.6 Evidence Lock, Original250 Expanded Validation, and Expanded500
+- Protected best3 registry unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+- Expanded registry: `artifacts/registry_candidates/v2_6_expanded_contact_scalar_pack/registry_manifest.json`, SHA-256 `ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582`.
+- Matched-gap evidence lock report: `docs/sage_protocol/v2_6_matched_gap_evidence_lock_report.md`; matched250 outcome `0.6040 -> 0.6235`; no-current-helper-fit `55.2% -> 45.6%`; relative gap reduction `17.39%`; runtime/side-effect `0 / 0`; protocol PASS.
+- Routing audit and repair: `docs/sage_protocol/v2_6_contact_scalar_routing_audit.md`; `_family_match` now ignores connector words and requires stronger meaningful-part overlap; scalar contact planner hidden on unrelated contact/message tasks and shown on declared scalar-contact lookup/remove/search families.
+- Original formal250 expanded run: `outputs/v2_6_original_formal250_expanded_rerun/validate_250_20260507_082209`; dashboards opened/checked on port `5682`; cache `250 / 0`; outcome `0.5986`; expanded vs preserved best3 outcome `+0.1249`; canonical vs best3 `+0.0137`; exact `40 -> 41`; feedback no-fit `52.0% -> 46.0%`; runtime/side-effect `0 / 0`; protocol PASS.
+- Original formal250 report: `docs/sage_protocol/v2_6_original_formal250_expanded_report.md`; decision `expanded portfolio generalizes to original250`.
+- Expanded500 run: `outputs/v2_6_expanded_500/full_benchmark_20260507_090922`; dashboards opened/checked on port `5683`; cache mixed `179 / 321`; outcome `0.6822`; expanded vs preserved best3 500 outcome `+0.1299`; canonical vs best3 `+0.0326`; exact `76 -> 96`; feedback no-fit `67.6% -> 62.8%`; runtime/side-effect `0 / 0`; protocol PASS.
+- Expanded500 report: `docs/sage_protocol/v2_6_expanded_500_report.md`; decision `expanded portfolio scale-positive`.
+- Feedback packets exported for original250 expanded and expanded500 under `artifacts/summaries/v2_6_feedback_packets/`.
+- Final package updated: `artifacts/final_sage_praxis_package/`; added V2.6 reports, `final_evidence_index.md`, and updated limitations.
+- Tests/registry checks: `PYTHONPATH=src:. pytest tests/unit/test_task_strata.py tests/unit/test_candidate_gate.py tests/unit/test_tool_generator.py tests/unit/test_online_birth.py tests/unit/test_runtime_routing_scorer.py tests/unit/test_v2_6_feedback_packets.py tests/unit/test_dashboard_exporters.py -q` -> `130 passed`; expanded registry check-only PASS; frozen best3 registry check-only PASS.
+- Decision label: `expanded portfolio scale-positive; best3 broad claim preserved`.

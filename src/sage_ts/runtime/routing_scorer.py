@@ -16,6 +16,24 @@ from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proo
 DEFAULT_MAX_RUNTIME_BUNDLE_SIZE = 5
 ROUTING_EVIDENCE_ROOT = Path("artifacts/summaries")
 FAIR_CHANCE_MAX_VISIBLE_WITHOUT_CALLS = 10
+FAMILY_MATCH_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "at",
+        "by",
+        "for",
+        "from",
+        "in",
+        "of",
+        "on",
+        "or",
+        "the",
+        "to",
+        "with",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -56,16 +74,25 @@ def _token_match(token: str, scenario_name: str) -> bool:
     )
 
 
+def _family_parts(value: str) -> set[str]:
+    return {
+        part
+        for part in value.replace("-", "_").split("_")
+        if part and part not in FAMILY_MATCH_STOPWORDS
+    }
+
+
 def _family_match(label: str, scenario_strata: set[str], scenario_name: str) -> bool:
     label = label.strip().lower()
     if not label:
         return False
     if _token_match(label, scenario_name):
         return True
-    label_parts = {part for part in label.replace("-", "_").split("_") if part}
+    label_parts = _family_parts(label)
     for stratum in scenario_strata:
-        stratum_parts = {part for part in stratum.split("_") if part}
-        if label_parts and len(label_parts & stratum_parts) >= min(2, len(label_parts)):
+        stratum_parts = _family_parts(stratum)
+        shared_part_threshold = 2 if len(label_parts) <= 2 else 3
+        if label_parts and len(label_parts & stratum_parts) >= shared_part_threshold:
             return True
     return False
 

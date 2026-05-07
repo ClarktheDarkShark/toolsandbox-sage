@@ -117,6 +117,91 @@ def test_helper_trigger_strata_do_not_expose_without_specific_match() -> None:
     assert decision.reason == "generic_relevance_score_insufficient"
 
 
+def test_family_matching_ignores_connector_words_for_contact_scalar_planner(
+    monkeypatch: Any,
+) -> None:
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="plan_contact_search_from_scalar_constraint",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description=(
+                "Plan a safe search_contacts call from a scalar contact "
+                "constraint such as name, phone number, or relationship."
+            ),
+            inputs=(
+                ToolInput(
+                    "constraint_field",
+                    "str",
+                    "name, phone_number, or relationship.",
+                ),
+                ToolInput("constraint_value", "str", "Visible scalar constraint."),
+            ),
+            positive_triggers=(
+                "valid phone number provided",
+                "valid name provided",
+                "valid relationship provided",
+            ),
+            negative_triggers=(
+                "missing contact constraint",
+                "unknown constraint field",
+            ),
+            applicable_task_families=(
+                "remove_contact_by_phone",
+                "search_phone_number_with_name",
+                "search_relationship_with_phone_number",
+                "send_message_with_contact_content_cellular_off",
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_call_search": {"type": "boolean"},
+                    "search_tool_name": {"type": "string"},
+                    "search_kwargs": {"type": "object"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            required_original_tool_calls=("search_contacts",),
+            preserves_side_effect_tools=("search_contacts",),
+            abstain_behavior=(
+                "Return should_call_search=False when the scalar contact "
+                "constraint is missing, ambiguous, or not supported."
+            ),
+        ),
+        code=(
+            "def plan_contact_search_from_scalar_constraint("
+            "constraint_field: str, constraint_value: str) -> dict:\n"
+            "    return {'should_call_search': False, 'search_tool_name': '', "
+            "'search_kwargs': {}, 'abstain_reason': 'test'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="remove_contact_by_phone",
+    )
+    monkeypatch.setattr(routing_scorer, "_helper_evidence", lambda _tool_name: {})
+
+    unrelated_contact_create = score_registry_entry_for_scenario(
+        entry, "add_contact_with_name_and_phone_number"
+    )
+    unrelated_message_recency = score_registry_entry_for_scenario(
+        entry, "search_message_with_recency_latest"
+    )
+    related_remove = score_registry_entry_for_scenario(entry, "remove_contact_by_phone")
+    related_lookup = score_registry_entry_for_scenario(
+        entry, "search_relationship_with_phone_number"
+    )
+
+    assert not unrelated_contact_create.visible
+    assert unrelated_contact_create.reason == "generic_relevance_score_insufficient"
+    assert not unrelated_message_recency.visible
+    assert unrelated_message_recency.reason == "generic_relevance_score_insufficient"
+    assert related_remove.visible
+    assert related_lookup.visible
+
+
 def test_route_registry_entries_bounds_runtime_bundle() -> None:
     entries = {
         f"tool_{index}": replace(
