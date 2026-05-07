@@ -1,0 +1,35 @@
+{
+  "schema_version": "sage_protocol_heuristics_v1",
+  "purpose": "Versioned documentation of methodology-critical heuristics used by current final evidence. This file makes implementation-defined rules auditable without changing protected evidence.",
+  "task_strata": {
+    "implementation": "src/sage_ts/evaluation/task_strata.py",
+    "description": "Scenario-name and category based task-family classification used for cohort quality, expected helper fit, and gap reports.",
+    "status": "protocol-defined heuristic, not independent benchmark label"
+  },
+  "helper_fit_taxonomy": {
+    "implementation": "src/sage_ts/evaluation/task_strata.py::expected_helper_fit and src/sage_ts/evaluation/feedback_packets.py::build_feedback_packets",
+    "no_current_helper_fit_definition": "A task is marked no-current-helper-fit when no expected helper from the taxonomy intersects with retained tools loaded for the scenario; if no helpers are loaded, it falls back to whether the taxonomy expects any helper at all.",
+    "interpretation": "No-current-helper-fit can indicate no expected helper, helper hidden, or helper absent from the current registry; it is a coverage proxy, not proof that no useful tool could exist."
+  },
+  "routing": {
+    "implementation": "src/sage_ts/runtime/routing_scorer.py",
+    "default_max_runtime_bundle_size": 5,
+    "fair_chance_max_visible_without_calls": 10,
+    "final_run_evidence_policy": "Final frozen runs must set routing evidence to disabled or pinned; mtime-selected latest helper-contribution evidence is diagnostic/discovery behavior only."
+  },
+  "cohort_quality": {
+    "implementation": "src/sage_ts/evaluation/task_strata.py::cohort_policy_report",
+    "principle": "Block low-diversity, near-duplicate-dominated, or contaminated cohorts unless an explicit diagnostic override is used."
+  },
+  "protocol_gate_vs_final_claim": {
+    "old_protocol_gate": "Absolute +0.08 outcome/canonical-style gate used in earlier campaign automation.",
+    "final_claim_criteria": "Outcome/task-completion is primary; relative task-completion lift and paired comparisons are reported, canonical/reference similarity is secondary, and safety must remain clean."
+  },
+  "generated_tool_adoption": {
+    "interpretation": "Accepted-but-uncalled, visible-not-called, or force-call-only tools are blocker diagnoses. They must not be collapsed into no-value conclusions without routing, schema, affordance, callability, safety, and value evidence."
+  },
+  "cache_policy": {
+    "openai_response_cache": "Provider response cache controlled separately by scripts/run_sage_protocol.py --cache-mode.",
+    "task_level_control_cache": "Control arm may reuse eligible task-level baseline records with >=3 compatible completed controls; cached controls are score-complete, but synthetic rows may be trace-incomplete unless historical trajectories are available."
+  }
+}

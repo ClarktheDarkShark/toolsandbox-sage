@@ -150,6 +150,40 @@ def _trace_summary(conversation: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _control_trace_completeness(
+    *,
+    control_cache_source: str | None,
+    control_conversation: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Describe whether control feedback has usable trace-level evidence."""
+    source = (control_cache_source or "").strip().lower()
+    has_trace = bool(control_conversation)
+    if source == "cached" and not has_trace:
+        return {
+            "status": "score_complete_trace_incomplete",
+            "reason": (
+                "Task-level control baseline cache stores aggregate scores for "
+                "cached tasks, but this synthetic control row has no historical "
+                "conversation trajectory."
+            ),
+            "control_cache_source": "cached",
+            "has_control_conversation": False,
+        }
+    if has_trace:
+        return {
+            "status": "trace_complete",
+            "reason": "control_conversation_available",
+            "control_cache_source": source or None,
+            "has_control_conversation": True,
+        }
+    return {
+        "status": "trace_unknown_or_missing",
+        "reason": "control_conversation_missing",
+        "control_cache_source": source or None,
+        "has_control_conversation": False,
+    }
+
+
 def _helper_call_evidence(
     conversation: list[dict[str, Any]], helper_names: set[str]
 ) -> list[dict[str, Any]]:
@@ -395,9 +429,17 @@ def build_feedback_packets(
         vnc_tools = list(selection_row.get("generated_tools_not_called") or [])
         failed_tools = list(selection_row.get("generated_tools_failed") or [])
         helper_names = set(visible_tools) | set(called_tools) | set(failed_tools)
+        task_focus_pair = task_focus_pairs.get(scenario, {})
+        control_cache_source = (task_focus_pair.get("control") or {}).get(
+            "control_cache_source"
+        ) or control_row.get("control_cache_source")
         control_conversation = _conversation(control_dir, scenario)
         candidate_conversation = _conversation(candidate_dir, scenario)
         control_trace = _trace_summary(control_conversation)
+        control_trace_completeness = _control_trace_completeness(
+            control_cache_source=control_cache_source,
+            control_conversation=control_conversation,
+        )
         sage_trace = _trace_summary(candidate_conversation)
         helper_outputs = _helper_call_evidence(candidate_conversation, helper_names)
         expected_fit = expected_helper_fit(scenario, categories)
@@ -431,7 +473,6 @@ def build_feedback_packets(
             mechanism=mechanism,
             side_effect_risk=side_effect_risky,
         )
-        task_focus_pair = task_focus_pairs.get(scenario, {})
         packet = {
             "schema_version": "v2_6_task_feedback_packet_v1",
             "run_id": run_id,
@@ -447,6 +488,7 @@ def build_feedback_packets(
             "user_request_summary": user_request,
             "expected_final_answer_or_state": expected_final,
             "control_trace_summary": control_trace,
+            "control_trace_completeness": control_trace_completeness,
             "sage_trace_summary": sage_trace,
             "scores": {
                 "control_outcome_similarity": delta_row.get(
@@ -496,9 +538,7 @@ def build_feedback_packets(
             "likely_failure_mechanism": mechanism,
             "feedback_sufficiency": feedback_sufficiency,
             "task_focus_pair": {
-                "control_cache_source": (task_focus_pair.get("control") or {}).get(
-                    "control_cache_source"
-                ),
+                "control_cache_source": control_cache_source,
                 "display_index": task_focus_pair.get("display_index"),
             },
         }
@@ -546,10 +586,20 @@ def summarize_feedback_packets(packets: list[dict[str, Any]]) -> dict[str, Any]:
     visible_not_called = [
         packet for packet in packets if packet.get("visible_not_called_tools")
     ]
+    trace_incomplete = [
+        packet
+        for packet in packets
+        if packet.get("control_trace_completeness", {}).get("status")
+        == "score_complete_trace_incomplete"
+    ]
     return {
         "packet_count": len(packets),
         "no_current_helper_fit_count": len(no_fit),
         "no_current_helper_fit_share": len(no_fit) / len(packets) if packets else None,
+        "score_complete_trace_incomplete_control_count": len(trace_incomplete),
+        "score_complete_trace_incomplete_control_share": (
+            len(trace_incomplete) / len(packets) if packets else None
+        ),
         "helper_called_packet_count": len(called),
         "visible_not_called_packet_count": len(visible_not_called),
         "feedback_insufficient_count": len(insufficient),

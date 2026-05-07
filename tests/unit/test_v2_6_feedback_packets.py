@@ -143,6 +143,7 @@ def test_build_feedback_packets_extracts_trace_routing_and_helper_outputs(
         == "generic_relevance_score_passed"
     )
     assert packet["feedback_sufficiency"]["sufficient_for_tool_birth"] is True
+    assert packet["control_trace_completeness"]["status"] == "trace_unknown_or_missing"
 
     summary = summarize_feedback_packets(packets)
     assert summary["packet_count"] == 1
@@ -162,6 +163,7 @@ def test_write_feedback_packets_outputs_jsonl_and_summary(tmp_path: Path) -> Non
         "exception_type": None,
         "turn_count": 2,
         "outcome_checks": [],
+        "control_cache_source": "cached",
     }
     _write_json(control_dir / "result_summary.json", {"per_scenario_results": [result]})
     _write_json(sage_dir / "result_summary.json", {"per_scenario_results": [result]})
@@ -197,9 +199,14 @@ def test_write_feedback_packets_outputs_jsonl_and_summary(tmp_path: Path) -> Non
     )
     assert packet["feedback_sufficiency"]["identifies_negative_or_abstain_case"] is True
     assert packet["feedback_sufficiency"]["sufficient_for_tool_birth"] is True
+    assert (
+        packet["control_trace_completeness"]["status"]
+        == "score_complete_trace_incomplete"
+    )
     summary = json.loads(
         (path.parent / "feedback_summary.json").read_text(encoding="utf-8")
     )
+    assert summary["score_complete_trace_incomplete_control_count"] == 1
     assert (
         summary["top_no_fit_mechanisms"]["safe_insufficient_information_abstention"]
         == 1

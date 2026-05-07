@@ -12,6 +12,7 @@ Required fields:
 - `user_request_summary`: first user request from the trace, or scenario-derived fallback.
 - `expected_final_answer_or_state`: available outcome targets and included outcome checks.
 - `control_trace_summary`, `sage_trace_summary`: tool-call names, arguments, output previews, final assistant preview, and turn counts.
+- `control_trace_completeness`: whether the control trace is `trace_complete`, `score_complete_trace_incomplete`, or `trace_unknown_or_missing`. Cached task-level control rows remain score-complete for metric arithmetic, but may be trace-incomplete for feedback interpretation.
 - `scores`: control/SAGE outcome, control/SAGE canonical, deltas, exact-success flags, and gain/regression/preserved label.
 - `expected_helper_fit`, `expected_birth_opportunities`, `no_current_helper_fit`: helper coverage estimate using the existing task-strata rules and loaded registry tools when available.
 - `helper_visible_tools`, `helper_called_tools`, `visible_not_called_tools`, `failed_helper_attempts`: adoption/accounting state.

@@ -121,6 +121,52 @@ def _is_frozen_transfer_mode(mode: str) -> bool:
     return mode in frozen_modes
 
 
+DIAGNOSTIC_FORCE_ENV_VARS = (
+    "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME",
+    "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_ERROR",
+    "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_BASE_TOOL",
+)
+
+
+def _active_diagnostic_force_env(env: dict[str, str] | None = None) -> dict[str, str]:
+    env = env or os.environ
+    return {
+        name: value
+        for name in DIAGNOSTIC_FORCE_ENV_VARS
+        if (value := str(env.get(name, "")).strip())
+    }
+
+
+def _redacted_run_affecting_sage_env() -> dict[str, str]:
+    blocked_tokens = ("API", "KEY", "TOKEN", "SECRET")
+    values: dict[str, str] = {}
+    for name, value in sorted(os.environ.items()):
+        if not name.startswith("SAGE_"):
+            continue
+        if any(token in name.upper() for token in blocked_tokens):
+            values[name] = "<redacted>"
+        else:
+            values[name] = value
+    return values
+
+
+def _resolve_routing_evidence_mode(requested: str, *, frozen_final_run: bool) -> str:
+    requested = requested.strip().lower()
+    if requested == "default":
+        return "disabled" if frozen_final_run else "auto"
+    if requested in {"auto", "disabled", "pinned"}:
+        return requested
+    raise ValueError(f"unsupported_routing_evidence_mode:{requested}")
+
+
+def _apply_routing_evidence_env(mode: str, path: Path | None) -> None:
+    os.environ["SAGE_ROUTING_EVIDENCE_MODE"] = mode
+    if path is not None:
+        os.environ["SAGE_ROUTING_EVIDENCE_PATH"] = str(path)
+    else:
+        os.environ.pop("SAGE_ROUTING_EVIDENCE_PATH", None)
+
+
 def _timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -803,6 +849,31 @@ def main() -> None:
         help="Override candidate-side helper generation. Use off for frozen-registry validation.",
     )
     parser.add_argument(
+        "--routing-evidence-mode",
+        choices=("default", "auto", "disabled", "pinned"),
+        default=os.environ.get("SAGE_ROUTING_EVIDENCE_MODE", "default"),
+        help=(
+            "Helper-contribution evidence mode for runtime routing. Final frozen "
+            "runs resolve default to disabled; diagnostics/discovery resolve "
+            "default to auto."
+        ),
+    )
+    parser.add_argument(
+        "--routing-evidence-path",
+        type=Path,
+        default=(
+            Path(os.environ["SAGE_ROUTING_EVIDENCE_PATH"])
+            if os.environ.get("SAGE_ROUTING_EVIDENCE_PATH")
+            else None
+        ),
+        help="Pinned helper_contribution_summary.json used when routing evidence mode is pinned.",
+    )
+    parser.add_argument(
+        "--diagnostic-force-allowed",
+        action="store_true",
+        help="Allow SAGE_DIAGNOSTIC_FORCE_* env vars for explicit diagnostic runs only.",
+    )
+    parser.add_argument(
         "--resume-run-root",
         type=Path,
         help="Seed each arm from a prior interrupted paired protocol run root.",
@@ -854,6 +925,33 @@ def main() -> None:
         generation_enabled = False
     elif _is_frozen_transfer_mode(args.mode):
         generation_enabled = False
+    frozen_final_run = _is_frozen_transfer_mode(args.mode) and not generation_enabled
+    if _is_frozen_transfer_mode(args.mode) and args.generation == "on":
+        raise SystemExit(
+            "Final/frozen protocol modes must not run with --generation on. "
+            "Use a mechanism/discovery mode for tool birth diagnostics."
+        )
+    active_force_env = _active_diagnostic_force_env()
+    if frozen_final_run and active_force_env and not args.diagnostic_force_allowed:
+        raise SystemExit(
+            "Diagnostic force-call environment is set during a frozen final run: "
+            f"{', '.join(sorted(active_force_env))}. Unset these variables or pass "
+            "--diagnostic-force-allowed only for explicit diagnostics."
+        )
+    routing_evidence_mode = _resolve_routing_evidence_mode(
+        args.routing_evidence_mode,
+        frozen_final_run=frozen_final_run,
+    )
+    if routing_evidence_mode == "pinned":
+        if args.routing_evidence_path is None:
+            raise SystemExit(
+                "--routing-evidence-mode pinned requires --routing-evidence-path"
+            )
+        if not args.routing_evidence_path.exists():
+            raise SystemExit(
+                f"Pinned routing evidence path not found: {args.routing_evidence_path}"
+            )
+    _apply_routing_evidence_env(routing_evidence_mode, args.routing_evidence_path)
     control_cache = ControlBaselineCache(args.control_cache_root)
     control_cache_plan: dict[str, Any] | None = None
     control_cache_report: dict[str, Any] = {
@@ -923,6 +1021,10 @@ def main() -> None:
             "control_cache_manifest_hash": control_cache_report.get(
                 "cache_manifest_hash"
             ),
+            "routing_evidence_mode": routing_evidence_mode,
+            "routing_evidence_path": str(args.routing_evidence_path)
+            if args.routing_evidence_path
+            else None,
         },
         root=args.artifact_root,
     )
@@ -1015,6 +1117,7 @@ def main() -> None:
             "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
             "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
             "cohort_quality_gate_status": cohort_preflight.get("quality_gate_status"),
+            "routing_evidence_mode": routing_evidence_mode,
         },
         root=args.artifact_root,
     )
@@ -1506,6 +1609,16 @@ def main() -> None:
         "control_cache_manifest_hash": control_cache_report.get("cache_manifest_hash"),
         "helper_contribution_summary_path": str(helper_contribution_path),
         "helper_contribution_artifact_path": str(helper_contribution_artifact_path),
+        "routing_evidence_mode": routing_evidence_mode,
+        "routing_evidence_path": str(args.routing_evidence_path)
+        if args.routing_evidence_path
+        else None,
+        "routing_evidence_path_digest": _digest_file(args.routing_evidence_path)
+        if args.routing_evidence_path
+        else None,
+        "diagnostic_force_allowed": args.diagnostic_force_allowed,
+        "active_diagnostic_force_env": sorted(active_force_env),
+        "run_affecting_sage_env": _redacted_run_affecting_sage_env(),
         "accepted_but_uncalled_tools": helper_contribution.get(
             "accepted_but_uncalled_tools", []
         ),
@@ -1566,6 +1679,10 @@ def main() -> None:
             ),
             "helper_contribution_summary_path": str(helper_contribution_path),
             "helper_contribution_artifact_path": str(helper_contribution_artifact_path),
+            "routing_evidence_mode": routing_evidence_mode,
+            "routing_evidence_path": str(args.routing_evidence_path)
+            if args.routing_evidence_path
+            else None,
             "accepted_but_uncalled_tools": helper_contribution.get(
                 "accepted_but_uncalled_tools", []
             ),

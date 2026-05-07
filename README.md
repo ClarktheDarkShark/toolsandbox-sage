@@ -52,7 +52,26 @@ Local secrets should be kept out of Git. Use `.secrets/` or environment variable
 
 ## Current Evidence Snapshot
 
-The current SAGE prototype has demonstrated the full mechanical loop for temporal and calendar-style helpers: birth, validation, registry persistence, runtime injection, later reuse, matched control comparison, and dashboard-backed artifact inspection. Broad validation remains an active research campaign: the next goal is a claim-grade 3-5 tool portfolio that improves real ToolSandbox outcomes across multiple task strata without broad context pollution.
+The protected broad validated portfolio is frozen best3:
+
+- `relative_day_time_to_timestamp`
+- `resolve_search_window_or_bounds`
+- `select_record_by_timestamp_extreme`
+
+Best3 has positive broad validation at 100, 250, 500, and 1,032 scenarios, with the formal250 run showing a `+20.52%` relative outcome/task-completion lift. Outcome/task completion is the primary claim metric; canonical/reference similarity is secondary.
+
+The V2.6 expanded contact-scalar portfolio is separate secondary evidence. It is current-code non-harmful and modestly outcome-positive on original250 and non-external500, and it shows strong matched gap-enriched closure, but it is not framed as an unconditional broad replacement for best3.
+
+Pre-final hardening artifacts:
+
+- Final-run preflight: `scripts/preflight_final_run.py`
+- Preflight config: `docs/sage_protocol/final_run_preflight_config.json`
+- Versioned methodology heuristics: `docs/sage_protocol/protocol_heuristics_v1.json`
+- Statistical analysis script: `scripts/write_final_statistical_analysis.py`
+- Statistical report: `docs/sage_protocol/final_statistical_analysis_report.md`
+- Chapter 3 methodology prep: `docs/sage_protocol/chapter3_methodology_prep.md`
+
+Before any future frozen final run, use generation OFF, control cache `use-if-eligible`, and explicit routing evidence mode (`disabled` or `pinned`). Diagnostic force-call environment variables are blocked for frozen final runs unless explicit diagnostic mode is selected.
 
 ---
 

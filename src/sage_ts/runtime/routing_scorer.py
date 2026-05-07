@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -15,6 +16,8 @@ from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proo
 
 DEFAULT_MAX_RUNTIME_BUNDLE_SIZE = 5
 ROUTING_EVIDENCE_ROOT = Path("artifacts/summaries")
+ROUTING_EVIDENCE_MODE_ENV = "SAGE_ROUTING_EVIDENCE_MODE"
+ROUTING_EVIDENCE_PATH_ENV = "SAGE_ROUTING_EVIDENCE_PATH"
 FAIR_CHANCE_MAX_VISIBLE_WITHOUT_CALLS = 10
 FAMILY_MATCH_STOPWORDS = frozenset(
     {
@@ -114,21 +117,48 @@ def _summary_has_runtime_exceptions(payload: dict[str, Any]) -> bool:
     return int(comparison.get("runtime_exception_count", 0) or 0) > 0
 
 
+def _routing_evidence_mode() -> str:
+    raw = os.environ.get(ROUTING_EVIDENCE_MODE_ENV, "auto").strip().lower()
+    if raw in {"", "auto", "latest"}:
+        return "auto"
+    if raw in {"disabled", "off", "none"}:
+        return "disabled"
+    if raw in {"pinned", "path"}:
+        return "pinned"
+    return "auto"
+
+
+def _read_helper_contribution_summary(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    if _summary_has_runtime_exceptions(payload):
+        return {}
+    return payload
+
+
 @lru_cache(maxsize=1)
 def _latest_helper_contribution_summary() -> dict[str, Any]:
+    mode = _routing_evidence_mode()
+    if mode == "disabled":
+        return {}
+    if mode == "pinned":
+        raw_path = os.environ.get(ROUTING_EVIDENCE_PATH_ENV, "").strip()
+        if not raw_path:
+            return {}
+        return _read_helper_contribution_summary(Path(raw_path).expanduser())
+
     candidates = sorted(
         ROUTING_EVIDENCE_ROOT.glob("**/helper_contribution_summary.json"),
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )
     for path in candidates:
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if isinstance(payload, dict):
-            if _summary_has_runtime_exceptions(payload):
-                continue
+        payload = _read_helper_contribution_summary(path)
+        if payload:
             return payload
     return {}
 

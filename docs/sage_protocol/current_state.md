@@ -1,12 +1,20 @@
 # Current State
 
 - Date: 2026-05-07
-- Last completed step: `v2_6_evidence_lock_original250_and_expanded500_validation`
-- Last decision: `expanded portfolio scale-positive; best3 broad claim preserved`
+- Last completed step: `pre_final_hardening_chapter3_readiness`
+- Last decision: `final preflight ready; best3 broad claim preserved; V2.6 expanded evidence remains secondary`
 - Primary metric: outcome/task-completion
 - Active frozen helpers: `relative_day_time_to_timestamp, resolve_search_window_or_bounds, select_record_by_timestamp_extreme`
 - Active registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`
 - Registry SHA-256: `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`
+- Final-run preflight: `scripts/preflight_final_run.py`
+- Final-run preflight config: `docs/sage_protocol/final_run_preflight_config.json`
+- Final statistical analysis report: `docs/sage_protocol/final_statistical_analysis_report.md`
+- Final statistical analysis JSON: `artifacts/summaries/final_statistical_analysis/analysis.json`
+- Chapter 3 methodology prep: `docs/sage_protocol/chapter3_methodology_prep.md`
+- Versioned methodology heuristics: `docs/sage_protocol/protocol_heuristics_v1.json`
+- Final frozen run requirements: generation OFF, control cache `use-if-eligible`, routing evidence `disabled` or explicitly `pinned`, no diagnostic force-call env vars, no low-quality override.
+- Cache/feedback trace caveat: cached controls are score-complete for metrics, but cached-only synthetic rows are labeled trace-incomplete in feedback packets when historical trajectories are unavailable.
 - Formal 100 run: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428`
 - Formal 100 dashboard: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428/dashboard/index.html`
 - Formal 100 task focus dashboard: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428/dashboard/task_focus.html`

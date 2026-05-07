@@ -72,6 +72,8 @@ The frozen best3 portfolio remains the broad, locked claim portfolio.
 
 V2.6 adds secondary evidence that contact-scalar helpers can close a targeted helper-fit gap and can generalize non-harmfully to current-code original250 and non-external500 validation. The expanded portfolio should be described as safe, current-code-positive, and gap-improving, but not as a replacement for the protected best3 broad claim because the broader 500 helper-fit reduction is `7.10%`, below the 10% target.
 
+The final statistical supplement `docs/sage_protocol/final_statistical_analysis_report.md` reports paired bootstrap confidence intervals and paired randomization tests from the stored artifacts. Those intervals condition on stored baseline artifacts; task-level cached-control variance is summarized separately and should not be overclaimed as fully modeled stochastic uncertainty.
+
 ## Decision Label
 
 `expanded portfolio non-harmful but variance-limited; best3 broad claim preserved`

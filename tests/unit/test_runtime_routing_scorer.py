@@ -1151,6 +1151,48 @@ def test_routing_evidence_ignores_runtime_exception_runs(
     routing_scorer._latest_helper_contribution_summary.cache_clear()
 
 
+def test_routing_evidence_can_be_disabled_for_final_runs(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "helper_contribution_summary.json").write_text(
+        json.dumps({"helpers": {"tool": {"visible_count": 9}}}) + "\n"
+    )
+    monkeypatch.setattr(routing_scorer, "ROUTING_EVIDENCE_ROOT", tmp_path)
+    monkeypatch.setenv("SAGE_ROUTING_EVIDENCE_MODE", "disabled")
+    routing_scorer._latest_helper_contribution_summary.cache_clear()
+
+    assert routing_scorer._latest_helper_contribution_summary() == {}
+    routing_scorer._latest_helper_contribution_summary.cache_clear()
+
+
+def test_routing_evidence_can_be_pinned_to_explicit_summary(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    older = tmp_path / "older"
+    newer = tmp_path / "newer"
+    pinned = tmp_path / "pinned_summary.json"
+    older.mkdir()
+    newer.mkdir()
+    (older / "helper_contribution_summary.json").write_text(
+        json.dumps({"helpers": {"tool": {"visible_count": 1}}}) + "\n"
+    )
+    (newer / "helper_contribution_summary.json").write_text(
+        json.dumps({"helpers": {"tool": {"visible_count": 99}}}) + "\n"
+    )
+    pinned.write_text(json.dumps({"helpers": {"tool": {"visible_count": 7}}}) + "\n")
+    monkeypatch.setattr(routing_scorer, "ROUTING_EVIDENCE_ROOT", tmp_path)
+    monkeypatch.setenv("SAGE_ROUTING_EVIDENCE_MODE", "pinned")
+    monkeypatch.setenv("SAGE_ROUTING_EVIDENCE_PATH", str(pinned))
+    routing_scorer._latest_helper_contribution_summary.cache_clear()
+
+    evidence = routing_scorer._latest_helper_contribution_summary()
+
+    assert evidence["helpers"]["tool"]["visible_count"] == 7
+    routing_scorer._latest_helper_contribution_summary.cache_clear()
+
+
 def test_routing_gives_new_cluster_born_state_helper_fair_chance(
     monkeypatch: Any,
 ) -> None:

@@ -11,6 +11,9 @@
 - The locked matched gap250 evidence remains valid, but a current-code matched gap250 rerun was deferred because the higher-value missing evidence was original250 and non-external500 matched validation.
 - A 1032 expanded current-code validation was deferred because 500 provides broad non-external scale evidence and 1032 includes sparse/external lanes not specifically targeted by contact-scalar tools.
 - Outcome/task-completion remains primary. Canonical/reference score is secondary and can diverge when helper substitution, route mismatch, or stochastic trajectory differences occur.
+- Final frozen runs must explicitly disable or pin routing contribution evidence. Earlier diagnostic/discovery behavior allowed routing to consult latest helper-contribution summaries by mtime, which is not acceptable for future final claims.
+- Task-level cached controls are score-complete for metric arithmetic, but cached-only synthetic control rows can be trace-incomplete. Feedback packets now label this as `score_complete_trace_incomplete`; trace-level control interpretation should not be overclaimed for those rows.
+- Methodology-critical helper-fit, task-strata, and routing thresholds remain protocol-defined heuristics. They are version-documented in `docs/sage_protocol/protocol_heuristics_v1.json`, but not fully externalized into executable config.
 
 ## Future Work
 
@@ -20,3 +23,4 @@
 - Extend feedback packets to distinguish static no-current-helper-fit, dynamic helper-hidden no-fit, and helper-visible-but-not-called adoption gaps.
 - Run expanded 1032 only if the research narrative requires broad full-benchmark validation beyond non-external500 evidence.
 - If pursuing publication-grade expanded-portfolio claims, preregister whether success means targeted gap closure, broad helper-fit reduction, broad outcome lift, or all three; the current evidence supports the first two only in limited forms.
+- Before any future large final run, run `scripts/preflight_final_run.py` with generation OFF, control cache `use-if-eligible`, and routing evidence `disabled` or `pinned`.

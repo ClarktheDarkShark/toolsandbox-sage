@@ -736,3 +736,28 @@
 - Reports written: `docs/sage_protocol/v2_6_current_code_original250_matched_report.md`, `docs/sage_protocol/v2_6_current_code_500_matched_report.md`, `docs/sage_protocol/v2_6_current_code_evidence_synthesis.md`.
 - Gap250 current-code rerun deferred because locked matched-gap evidence already exists; expanded 1032 current-code validation deferred for cost/scope because 500 provides broad non-external evidence and 1032 includes sparse/external lanes outside contact-scalar scope.
 - Decision label: `expanded portfolio non-harmful but variance-limited`.
+
+## 2026-05-07 - Pre-Final Hardening And Chapter 3 Readiness
+
+- Objective: convert the final audit findings into final-run preflight hardening, reproducibility guardrails, statistical-readiness artifacts, cache/trace documentation, and Chapter 3 methodology preparation.
+- Protected assets preserved: `artifacts/registry_frozen_best3_claim/registry_manifest.json`; locked best3/formal evidence; expanded V2.6 registry.
+- Code changes:
+  - Added final-run preflight: `scripts/preflight_final_run.py`.
+  - Added statistical analysis generator: `scripts/write_final_statistical_analysis.py`.
+  - Updated `scripts/run_sage_protocol.py` to block diagnostic force-call env leakage for frozen final runs, resolve final routing evidence to disabled by default, support pinned/disabled routing evidence, and record run-affecting `SAGE_*` env vars in `protocol_manifest.json`.
+  - Updated `src/sage_ts/runtime/routing_scorer.py` to support explicit routing evidence modes: `auto`, `disabled`, and `pinned`.
+  - Updated `src/sage_ts/evaluation/feedback_packets.py` to label cached-control trace completeness.
+- Documentation/artifacts:
+  - Final-run readiness report: `docs/sage_protocol/final_run_readiness_report.md`.
+  - Final preflight config: `docs/sage_protocol/final_run_preflight_config.json`.
+  - Versioned methodology heuristics: `docs/sage_protocol/protocol_heuristics_v1.json`.
+  - Statistical report: `docs/sage_protocol/final_statistical_analysis_report.md`.
+  - Statistical JSON: `artifacts/summaries/final_statistical_analysis/analysis.json`.
+  - Chapter 3 methodology prep: `docs/sage_protocol/chapter3_methodology_prep.md`.
+  - Trace-audited feedback exports: `artifacts/summaries/v2_6_feedback_packets_trace_audit/`.
+- Validation so far:
+  - `PYTHONPATH=src:. pytest tests/unit/test_final_run_preflight.py tests/unit/test_runtime_routing_scorer.py tests/unit/test_v2_6_feedback_packets.py -q` -> `36 passed`.
+  - `PYTHONPATH=src:. python scripts/write_final_statistical_analysis.py` -> PASS.
+  - Development preflight with `--allow-dirty` -> PASS; clean-tree preflight should be rerun after commit with report output outside the repo.
+- Decision: `final preflight ready; chapter 3 methodology package ready`.
+- Next action: run full targeted validation, registry checks, `git diff --check`, commit, clean-tree preflight, and push.

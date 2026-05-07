@@ -1,0 +1,47 @@
+{
+  "feedback_insufficient_count": 8,
+  "feedback_insufficient_share": 0.016,
+  "helper_called_packet_count": 152,
+  "mechanism_counts": {
+    "candidate_regression_with_existing_helper_fit": 16,
+    "contact_lookup_or_answer_field_resolution": 94,
+    "external_service_answer_or_abstain_resolution": 36,
+    "helper_visible_not_called_adoption": 39,
+    "message_search_selection_or_answer_resolution": 24,
+    "no_current_helper_fit_unclassified": 96,
+    "preserved_or_low_signal": 61,
+    "safe_insufficient_information_abstention": 119,
+    "side_effect_target_or_argument_preparation": 15
+  },
+  "no_current_helper_fit_count": 314,
+  "no_current_helper_fit_share": 0.628,
+  "packet_count": 500,
+  "score_complete_trace_incomplete_control_count": 467,
+  "score_complete_trace_incomplete_control_share": 0.934,
+  "surface_domain_counts": {
+    "calendar": 35,
+    "contacts": 163,
+    "device_service": 64,
+    "general": 8,
+    "location_distance": 16,
+    "messages": 24,
+    "reminders": 190
+  },
+  "task_strata_counts": {
+    "contact_message_search_disambiguation": 187,
+    "direct_state_precondition_service_enablement": 123,
+    "generic_multi_tool_composition": 469,
+    "holiday_calendar_business_day_logic": 35,
+    "insufficient_information_clarification": 119,
+    "record_filtering_ranking_latest_selection": 267,
+    "temporal_reminder_date_canonicalization": 190
+  },
+  "top_no_fit_mechanisms": {
+    "contact_lookup_or_answer_field_resolution": 67,
+    "external_service_answer_or_abstain_resolution": 16,
+    "helper_visible_not_called_adoption": 16,
+    "no_current_helper_fit_unclassified": 96,
+    "safe_insufficient_information_abstention": 119
+  },
+  "visible_not_called_packet_count": 100
+}

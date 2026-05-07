@@ -62,6 +62,28 @@
 - Gap250 current-code rerun: deferred; locked matched-gap evidence already exists.
 - Expanded 1032 current-code validation: deferred; current-code 500 gives broad non-external evidence and 1032 contains sparse/external lanes outside contact-scalar scope.
 
+## Pre-Final Readiness And Statistical Supplements
+
+- Final code/pipeline/methodology audit: `docs/sage_protocol/final_code_pipeline_methodology_audit.md`
+- Final-run readiness report: `docs/sage_protocol/final_run_readiness_report.md`
+- Final-run preflight script: `scripts/preflight_final_run.py`
+- Final-run preflight config: `docs/sage_protocol/final_run_preflight_config.json`
+- Final-run preflight config SHA-256: `14bebe06ea40604954c7bdcd737efff87dec7fdc2c3aa1d71f89d5f4e726ce8a`
+- Versioned methodology heuristics: `docs/sage_protocol/protocol_heuristics_v1.json`
+- Versioned methodology heuristics SHA-256: `a686a343477ccb325f8d79fb061b0e1cef808bff5babc912eb2afe17c380a83f`
+- Statistical analysis script: `scripts/write_final_statistical_analysis.py`
+- Statistical analysis report: `docs/sage_protocol/final_statistical_analysis_report.md`
+- Statistical analysis report SHA-256: `cb715c70adbf856e2b6bdea5a9ac485ce6661f1984d6d04bd31926ee8330a645`
+- Statistical analysis JSON: `artifacts/summaries/final_statistical_analysis/analysis.json`
+- Statistical analysis JSON SHA-256: `02649b0193f03e8fc795524ec0c3b39c8b75ccee302080d666cc65b65a1f3429`
+- Chapter 3 methodology prep: `docs/sage_protocol/chapter3_methodology_prep.md`
+- Trace-audited feedback exports:
+  - `artifacts/summaries/v2_6_feedback_packets_trace_audit/v2_formal250_best3_trace_audit/feedback_summary.json`
+  - `artifacts/summaries/v2_6_feedback_packets_trace_audit/v2_6_current_code_original250_best3_trace_audit/feedback_summary.json`
+  - `artifacts/summaries/v2_6_feedback_packets_trace_audit/v2_6_current_code_original250_expanded_trace_audit/feedback_summary.json`
+  - `artifacts/summaries/v2_6_feedback_packets_trace_audit/v2_6_current_code_500_best3_trace_audit/feedback_summary.json`
+  - `artifacts/summaries/v2_6_feedback_packets_trace_audit/v2_6_current_code_500_expanded_trace_audit/feedback_summary.json`
+
 ## Final Package
 
 - Package directory: `artifacts/final_sage_praxis_package/`
@@ -69,3 +91,9 @@
 - Evidence index: `artifacts/final_sage_praxis_package/final_evidence_index.md`
 - Limitations: `artifacts/final_sage_praxis_package/final_limitations_and_future_work.md`
 - V2.6 current-code reports copied into final package for reference.
+- Pre-final supplements copied into final package:
+  - `artifacts/final_sage_praxis_package/final_run_readiness_report.md`
+  - `artifacts/final_sage_praxis_package/final_statistical_analysis_report.md`
+  - `artifacts/final_sage_praxis_package/chapter3_methodology_prep.md`
+  - `artifacts/final_sage_praxis_package/protocol_heuristics_v1.json`
+  - `artifacts/final_sage_praxis_package/final_run_preflight_config.json`
