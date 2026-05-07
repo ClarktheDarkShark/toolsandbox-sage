@@ -162,6 +162,12 @@ data/
 outputs/
 artifacts/*
 !artifacts/.gitkeep
+!artifacts/experiment_manifests/
+!artifacts/experiment_manifests/gap_closure_lab/
+!artifacts/experiment_manifests/gap_closure_lab/**
+!artifacts/registry_experiments/
+!artifacts/registry_experiments/gap_closure_lab/
+!artifacts/registry_experiments/gap_closure_lab/**
 .sage_cache/
 persistent_prompt_cache/
 generated_tools/
