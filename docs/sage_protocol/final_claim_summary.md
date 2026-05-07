@@ -49,45 +49,29 @@ On a quality-gated, gap-enriched frozen250 manifest:
 
 This supports a matched gap-enriched V2.6 gap-closure claim. It does not directly replace the original formal250 best3 claim or prove the original absolute `44.4% -> <=40.0%` target because the matched manifest was intentionally gap-enriched.
 
-## V2.6 Original Formal250 Expanded Evidence
+## Current-Code Matched Evidence
 
-On the original formal250 manifest:
+The current-code matched campaign reran best3 and expanded V2.6 from the same commit on the same manifests, generation OFF.
 
-- Preserved best3 run: `outputs/v2_formal250_clean_20260504_034104_frozen_best3_relative_20260504_052217/validate_250_20260504_052222`
-- Expanded clean rerun: `outputs/v2_6_original_formal250_expanded_rerun/validate_250_20260507_082209`
-- Expanded outcome vs control: `0.5986`, delta `+0.1982`
-- Expanded vs preserved best3 outcome: `+0.1249`
-- Expanded vs preserved best3 canonical/reference: `+0.0137`
-- Exact successes best3 -> expanded: `40 -> 41`
-- Feedback no-current-helper-fit: `52.0% -> 46.0%`, relative reduction `11.54%`
-- Runtime exceptions: `0`
-- Helper side-effect incidents: `0`
-- Protocol gate: PASS
+| Manifest | Best3 Outcome | Expanded Outcome | Delta | Best3 Canonical | Expanded Canonical | Delta | Exact Delta | Dynamic No-Fit | Relative No-Fit Reduction | Decision |
+|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---|
+| Original250 | 0.6078 | 0.6179 | +0.0100 | 0.7679 | 0.7395 | -0.0283 | -8 | 52.0% -> 46.0% | 11.54% | positive, variance-limited |
+| Non-external500 | 0.6590 | 0.6692 | +0.0101 | 0.7137 | 0.7362 | +0.0225 | +1 | 67.6% -> 62.8% | 7.10% | positive, below 10% gap target |
 
-A later same-manifest best3 rerun scored `0.5626`, so the large preserved-best3 comparison should be interpreted with stochastic-run variance in mind. The direction remains positive versus both preserved best3 and later same-manifest best3 context.
+Safety in current-code matched runs:
 
-## V2.6 Expanded 500 Evidence
+- Runtime exceptions: `0` in all four arms.
+- Helper side-effect incidents: `0` in all four arms.
+- Protocol gate: PASS in all four arms.
 
-On the non-external 500 manifest:
-
-- Expanded run: `outputs/v2_6_expanded_500/full_benchmark_20260507_090922`
-- Expanded outcome vs control: `0.6822`, delta `+0.1596`
-- Expanded canonical/reference delta vs control: `+0.0762`
-- Exact successes: `42 -> 96`
-- Expanded vs preserved best3 500 outcome: `+0.1299`
-- Expanded vs preserved best3 500 canonical/reference: `+0.0326`
-- Expanded vs preserved best3 exact successes: `+20`
-- Feedback no-current-helper-fit: `67.6% -> 62.8%`, relative reduction `7.10%`
-- Runtime exceptions: `0`
-- Helper side-effect incidents: `0`
-- Protocol gate: PASS
-
-The expanded portfolio is scale-positive at 500. The broad 500 helper-fit reduction is positive but below 10% because the 500 manifest includes many no-fit lanes outside the contact-scalar scope.
+The current-code evidence shows the expanded V2.6 portfolio is non-harmful and modestly outcome-positive on original250 and non-external500. It does not show broad 500 helper-fit closure at the 10% threshold.
 
 ## Final Interpretation
 
-The frozen best3 portfolio remains the broad, locked claim portfolio. V2.6 adds strong secondary evidence that contact-scalar helpers can close a targeted helper-fit gap and generalize positively to original250 and 500-scale validation without runtime or side-effect harm. The expanded portfolio should be treated as a validated V2.6 candidate portfolio, not as a replacement for the protected best3 broad claim unless a future current-code best3 matched rerun and optional 1032 expanded validation are explicitly performed.
+The frozen best3 portfolio remains the broad, locked claim portfolio.
+
+V2.6 adds secondary evidence that contact-scalar helpers can close a targeted helper-fit gap and can generalize non-harmfully to current-code original250 and non-external500 validation. The expanded portfolio should be described as safe, current-code-positive, and gap-improving, but not as a replacement for the protected best3 broad claim because the broader 500 helper-fit reduction is `7.10%`, below the 10% target.
 
 ## Decision Label
 
-`expanded portfolio scale-positive; best3 broad claim preserved`
+`expanded portfolio non-harmful but variance-limited; best3 broad claim preserved`

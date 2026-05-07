@@ -432,3 +432,20 @@
 - 1032 expanded run deferred: 500 provides broad non-external scale evidence, while 1032 would add substantial live-candidate cost over sparse/external lanes not targeted by contact-scalar helpers.
 - Decision: `expanded portfolio scale-positive; best3 broad claim preserved`.
 - Next action: optional current-code best3 500 rerun or expanded 1032 only if publication scope requires stronger matched-code comparison; otherwise preserve current final package.
+
+## V2.6 Current-Code Matched Evidence Campaign - 2026-05-07
+- Commit: `f7aaffa5c02cff26a355dfcb4a540e33b91fde7d`; branch `sage/init-toolsandbox`.
+- Protected best3 registry unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+- Expanded V2.6 registry unchanged: `artifacts/registry_candidates/v2_6_expanded_contact_scalar_pack/registry_manifest.json`, SHA-256 `ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582`.
+- Preflight: registry check PASS; targeted tests `125 passed, 2 warnings`; `git diff --check` PASS; generation OFF for all current-code matched arms.
+- Original250 current-code best3 run: `outputs/v2_6_current_code_original250_best3/validate_250_20260507_131235`; dashboards opened/checked on port `5684`; control cache mixed `209 cached / 41 fresh`; outcome `0.6078`; canonical `0.7679`; exact `48`; protocol PASS.
+- Original250 current-code expanded run: `outputs/v2_6_current_code_original250_expanded/validate_250_20260507_141441`; dashboards opened/checked on port `5685`; control cache `250 cached / 0 fresh`; outcome `0.6179`; canonical `0.7395`; exact `40`; protocol PASS.
+- Original250 direct expanded-vs-best3: outcome `+0.0100`; canonical `-0.0283`; exact `48 -> 40`; no-current-helper-fit `52.0% -> 46.0%`, relative reduction `11.54%`; runtime/side-effect `0 / 0`.
+- Non-external500 current-code best3 run: `outputs/v2_6_current_code_500_best3/full_benchmark_20260507_145553`; dashboards opened/checked on port `5686`; control cache mixed `435 cached / 65 fresh`; outcome `0.6590`; canonical `0.7137`; exact `92`; protocol PASS.
+- Non-external500 current-code expanded run: `outputs/v2_6_current_code_500_expanded/full_benchmark_20260507_165427`; dashboards opened/checked on port `5687`; control cache mixed `467 cached / 33 fresh`; outcome `0.6692`; canonical `0.7362`; exact `93`; protocol PASS.
+- Non-external500 direct expanded-vs-best3: outcome `+0.0101`; canonical `+0.0225`; exact `92 -> 93`; no-current-helper-fit `67.6% -> 62.8%`, relative reduction `7.10%`; runtime/side-effect `0 / 0`.
+- 500 interpretation: expanded V2.6 is current-code positive and safe, but helper-fit reduction does not meet the 10% broad 500 target. The gap not closed at 500 is mainly sample/coverage: the 500 manifest includes 54 base families, 190 reminder-token tasks, 119 insufficient-information-token tasks, and many no-fit lanes outside contact-scalar scope.
+- Reports added: `docs/sage_protocol/v2_6_current_code_original250_matched_report.md`, `docs/sage_protocol/v2_6_current_code_500_matched_report.md`, `docs/sage_protocol/v2_6_current_code_evidence_synthesis.md`.
+- Final docs updated to preserve best3 as broad claim and present V2.6 as safe, current-code-positive, gap-improving but variance-limited.
+- Decision label: `expanded portfolio non-harmful but variance-limited; best3 broad claim preserved`.
+- Next action: if continuing research, target non-contact no-fit lanes instead of over-tuning the contact-scalar pack.
