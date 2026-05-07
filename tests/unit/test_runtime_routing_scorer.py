@@ -3,11 +3,21 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput
+from sage_ts.generation.tool_spec import (
+    GeneratedTool,
+    StructuredInadequacyEvidence,
+    ToolFamily,
+    ToolInput,
+    ToolSpec,
+)
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.runtime import routing_scorer, toolsandbox_integration
 from sage_ts.runtime.routing_scorer import score_registry_entry_for_scenario
-from sage_ts.runtime.toolsandbox_integration import route_registry_entries
+from sage_ts.runtime.toolsandbox_integration import (
+    compile_toolsandbox_tool,
+    route_registry_entries,
+)
+from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 from tests.unit.test_promotion_gate import _entry
 
 
@@ -542,6 +552,90 @@ def test_derived_calculator_with_original_call_hides_on_insufficient_information
         decisions["format_calculated_distance_km"].reason
         == "derived_calculator_suppressed_for_insufficient_information"
     )
+
+
+def test_insufficient_information_guard_shows_despite_missing_original_tool() -> None:
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="detect_missing_information_before_minefield",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            description=(
+                "Detect missing information before a forbidden minefield call and "
+                "return a clarification plan."
+            ),
+            inputs=(
+                ToolInput("user_request", "str", "The current user request."),
+                ToolInput("failed_tool_name", "str", "Failed producer tool."),
+                ToolInput("error_text", "str", "Visible error text."),
+                ToolInput("intended_downstream_tool", "str", "Forbidden tool."),
+            ),
+            positive_triggers=(
+                "insufficient_information",
+                "failed current-location lookup before minefield call",
+            ),
+            negative_triggers=("no_error_visible", "all_required_information_present"),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "clarification_prompt": {"type": "string"},
+                    "forbidden_downstream_tools": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            applicable_task_families=(
+                "find_distance_with_location_name_insufficient_information",
+                "find_current_city_insufficient_information",
+            ),
+            required_original_tool_calls=("get_current_location",),
+            preserves_side_effect_tools=(),
+            abstain_behavior=(
+                "Return should_abstain=True with a clarification prompt when "
+                "required information is missing."
+            ),
+            shortfall_cluster_evidence=("insufficient_information_or_clarification",),
+            known_failure_mechanisms_addressed=("missing_current_location_minefield",),
+        ),
+        code=(
+            "def detect_missing_information_before_minefield("
+            "user_request: str, failed_tool_name: str, error_text: str, "
+            "intended_downstream_tool: str) -> dict:\n"
+            "    return {'should_abstain': True, "
+            "'missing_information': ['current_location'], "
+            "'clarification_prompt': 'I need your current location to continue.', "
+            "'forbidden_downstream_tools': [intended_downstream_tool], "
+            "'abstain_reason': 'missing_current_location'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="find_distance_with_location_name_insufficient_information",
+    )
+
+    decision = score_registry_entry_for_scenario(
+        entry, "find_distance_with_location_name_insufficient_information"
+    )
+
+    assert decision.visible
+    assert decision.reason == "generic_relevance_score_passed"
+
+    selected, decisions = route_registry_entries(
+        {"detect_missing_information_before_minefield": entry},
+        "find_distance_with_location_name_insufficient_information",
+        available_base_tools={"calculate_lat_lon_distance"},
+    )
+    assert selected == [entry]
+    assert decisions["detect_missing_information_before_minefield"].visible
 
 
 def test_derived_calculator_with_original_call_requires_trigger_match() -> None:
@@ -1139,3 +1233,165 @@ def test_search_filter_selector_requires_any_record_producer_not_all_domains() -
         "select_visible_record_by_constraints"
     ]
     assert decisions["select_visible_record_by_constraints"].visible
+
+
+def test_explicit_contact_lookup_contract_blocks_non_matching_all_tools() -> None:
+    base = _entry()
+    entry = RegistryEntry.accepted(
+        replace(
+            base.tool,
+            spec=replace(
+                base.tool.spec,
+                tool_name="plan_contact_lookup_query",
+                family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+                positive_triggers=("search_name_with_relationship",),
+                negative_triggers=("insufficient_information", "add_contact"),
+                applicable_task_families=(
+                    "search_name_with_relationship",
+                    "search_phone_number_with_name",
+                ),
+                required_original_tool_calls=("search_contacts",),
+                preserves_side_effect_tools=("search_contacts",),
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "search_contacts_kwargs": {"type": "object"},
+                        "answer_field": {"type": "string"},
+                        "abstain_reason": {"type": "string"},
+                    },
+                },
+            ),
+        ),
+        base.validation,
+        birth_scenario="search_name_with_relationship",
+    )
+
+    selected, decisions = route_registry_entries(
+        {"plan_contact_lookup_query": entry},
+        "add_reminder_content_and_week_delta_and_time_all_tools",
+        available_base_tools={"search_contacts", "add_reminder"},
+    )
+
+    assert selected == []
+    assert not decisions["plan_contact_lookup_query"].visible
+    assert (
+        decisions["plan_contact_lookup_query"].reason
+        == "explicit_contract_requires_trigger_or_family_match"
+    )
+
+    selected, decisions = route_registry_entries(
+        {"plan_contact_lookup_query": entry},
+        "search_name_with_relationship_3_distraction_tools",
+        available_base_tools={"search_contacts"},
+    )
+
+    assert [item.tool.spec.tool_name for item in selected] == [
+        "plan_contact_lookup_query"
+    ]
+    assert decisions["plan_contact_lookup_query"].visible
+
+
+def test_scalar_phone_normalizer_compiles_with_optional_defaults() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="normalize_contact_phone_number",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            description="Normalize a visible phone number before original contact tools.",
+            inputs=(
+                ToolInput("phone_number", "str", "Phone number."),
+                ToolInput(
+                    "default_country_code",
+                    "str",
+                    "Optional default country code, usually 1.",
+                ),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "normalized_phone_number": {"type": "string"},
+                    "country_code": {"type": "string"},
+                    "is_valid": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("add_contact_with_name_and_phone_number",),
+            negative_triggers=("insufficient_information",),
+            required_original_tool_calls=("add_contact",),
+            preserves_side_effect_tools=("add_contact",),
+            abstain_behavior="Return is_valid=False and abstain_reason on invalid input.",
+            generalization_rationale=(
+                "Phone-number normalization recurs across contact creation, contact "
+                "lookup, contact update, and phone-number message tasks."
+            ),
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "add_contact_with_name_and_phone_number",
+                "send_message_with_phone_number_and_content",
+            ),
+            reason_tool_is_decisive="Normalizes phone scalars before preserved original tools.",
+            shortfall_cluster_evidence=("direct_side_effect_no_helper",),
+            known_failure_mechanisms_addressed=(
+                "visible_raw_data_lacking_deterministic_transform",
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary=(
+                    "The actor repeatedly has to manually strip phone-number "
+                    "formatting before preserved contact/message ToolSandbox calls."
+                ),
+                signals=("visible_raw_data_lacking_deterministic_transform",),
+                visible_data_gaps=("formatted phone number needs normalized scalar",),
+                planner_failures=(
+                    "manual phone normalization before direct tool call",
+                ),
+            ),
+        ),
+        code=(
+            "def normalize_contact_phone_number(phone_number: str, default_country_code: str) -> dict:\n"
+            "    digits = ''.join(filter(str.isdigit, phone_number))\n"
+            "    country_code = ''.join(filter(str.isdigit, default_country_code)) or '1'\n"
+            "    if phone_number.strip().startswith('+') and 8 <= len(digits) <= 15:\n"
+            "        return {'normalized_phone_number': '+' + digits, 'country_code': country_code, 'is_valid': True, 'abstain_reason': ''}\n"
+            "    if len(digits) == 10:\n"
+            "        return {'normalized_phone_number': '+' + country_code + digits, 'country_code': country_code, 'is_valid': True, 'abstain_reason': ''}\n"
+            "    return {'normalized_phone_number': '', 'country_code': country_code, 'is_valid': False, 'abstain_reason': 'invalid_phone_number'}\n"
+        ),
+    )
+    validation = validate_generated_tool(
+        tool,
+        (
+            ToolExample(
+                {"phone_number": "+1 (987) 654-3210", "default_country_code": "1"},
+                {
+                    "normalized_phone_number": "+19876543210",
+                    "country_code": "1",
+                    "is_valid": True,
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {"phone_number": "245-334-4098", "default_country_code": "1"},
+                {
+                    "normalized_phone_number": "+12453344098",
+                    "country_code": "1",
+                    "is_valid": True,
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+        ),
+    )
+    assert validation.accepted, validation.errors
+    entry = RegistryEntry.accepted(
+        tool,
+        validation,
+        birth_scenario="add_contact_with_name_and_phone_number",
+    )
+
+    fn = compile_toolsandbox_tool(entry)
+
+    assert (
+        fn(phone_number="+1 (987) 654-3210")["normalized_phone_number"]
+        == "+19876543210"
+    )

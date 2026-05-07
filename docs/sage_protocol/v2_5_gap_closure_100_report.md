@@ -1,43 +1,51 @@
 # V2.5 Gap Closure 100 Report
 
-## Design
-- Manifest: `artifacts/summaries/v2_5_gap_closure_100_pack1_distance/cohort_manifest.json`
-- Cohort quality: `pass`
-- External-service contamination: `42` scenarios; `--allow-contaminated-preflight` was required because the candidate lane is distance/location-service based. No low-quality override was used.
-- Registry: `artifacts/registry_candidates/v2_5_candidate_pack1_distance_frozen/registry_manifest.json`
-- Registry SHA-256: `d599a8e56f024f978bcb572ca0df12abb4a4d2196639becf64ef826cbf5f73f4`
-- Best3 run: `outputs/v2_5_gap_closure_100_best3_20260506_161059/validate_100_20260506_161104`
-- Pack run: `outputs/v2_5_gap_closure_100_distance_20260506_164021/validate_100_20260506_164026`
-- Best3 dashboards: `http://127.0.0.1:5646/outputs/v2_5_gap_closure_100_best3_20260506_161059/validate_100_20260506_161104/dashboard/index.html`, `http://127.0.0.1:5646/outputs/v2_5_gap_closure_100_best3_20260506_161059/validate_100_20260506_161104/dashboard/task_focus.html`
-- Pack dashboards: `http://127.0.0.1:5647/outputs/v2_5_gap_closure_100_distance_20260506_164021/validate_100_20260506_164026/dashboard/index.html`, `http://127.0.0.1:5647/outputs/v2_5_gap_closure_100_distance_20260506_164021/validate_100_20260506_164026/dashboard/task_focus.html`
-- Control cache best3: mixed (55 cached / 45 fresh), hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
-- Control cache pack: mixed (58 cached / 42 fresh), hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
+## Candidate Pack 1 Outcome
+Candidate Pack 1 (`format_calculated_distance_km`) reached the gap-reduction proxy on its 100 but failed the outcome guardrail: pack outcome `0.5120` vs best3 `0.5181`, exact successes `18` vs `20`. It remains useful-but-not-promoted.
+
+## Candidate Pack 2 Design
+- Candidate pack: best3 plus `plan_contact_lookup_query`, `extract_contact_field_from_search_result`.
+- Registry: `artifacts/registry_candidates/v2_5_additive_toolset/registry_manifest.json`
+- Registry SHA-256: `835b1ab6524b27ad33591a57b9154dc1d89edbc6b1655f3431b1173fd74a0c48`
+- Protected best3 registry unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`
+- Manifest: `artifacts/summaries/v2_5_gap_closure_100_pack2_contact/cohort_manifest.json`
+- Manifest SHA-256: `da6ca97eeeac0ba2e59521d031aaf6411c1dfe6387a575701a8eb8a669885517`
+- Cohort quality: `pass`; scenarios `100`; largest family share `0.08`; no low-quality override.
+- Static gap files: `artifacts/summaries/v2_5_gap_closure_100_pack2_contact/static_gap_fit_best3.json`, `artifacts/summaries/v2_5_gap_closure_100_pack2_contact/static_gap_fit_pack.json`.
+
+## Commands
+```bash
+OPENAI_API_KEY="$KEY" SAGE_V2_EXPERIMENT_FEATURES=grading_accounting,live_validation,candidate_repair,contract_synthesis,evidence_routing PYTHONPATH=src:. python scripts/run_sage_protocol.py --manifest artifacts/summaries/v2_5_gap_closure_100_pack2_contact/cohort_manifest.json --mode validate_100 --registry-dir artifacts/registry_frozen_best3_claim --generation off --parallel-arms --control-cache use-if-eligible --output-root outputs/v2_5_gap_closure100_pack2_contact_best3_20260506_200940 --dashboard-port 5665
+OPENAI_API_KEY="$KEY" SAGE_V2_EXPERIMENT_FEATURES=grading_accounting,live_validation,candidate_repair,contract_synthesis,evidence_routing PYTHONPATH=src:. python scripts/run_sage_protocol.py --manifest artifacts/summaries/v2_5_gap_closure_100_pack2_contact/cohort_manifest.json --mode validate_100 --registry-dir artifacts/registry_candidates/v2_5_additive_toolset --generation off --parallel-arms --control-cache use-if-eligible --output-root outputs/v2_5_gap_closure100_pack2_contact_pack_20260506_202903 --dashboard-port 5666
+```
+
+## Runs And Dashboards
+- Best3 run: `outputs/v2_5_gap_closure100_pack2_contact_best3_20260506_200940/validate_100_20260506_200945`
+- Best3 dashboards: `http://127.0.0.1:5665/outputs/v2_5_gap_closure100_pack2_contact_best3_20260506_200940/validate_100_20260506_200945/dashboard/index.html`, `http://127.0.0.1:5665/outputs/v2_5_gap_closure100_pack2_contact_best3_20260506_200940/validate_100_20260506_200945/dashboard/task_focus.html`
+- Pack run: `outputs/v2_5_gap_closure100_pack2_contact_pack_20260506_202903/validate_100_20260506_202908`
+- Pack dashboards: `http://127.0.0.1:5666/outputs/v2_5_gap_closure100_pack2_contact_pack_20260506_202903/validate_100_20260506_202908/dashboard/index.html`, `http://127.0.0.1:5666/outputs/v2_5_gap_closure100_pack2_contact_pack_20260506_202903/validate_100_20260506_202908/dashboard/task_focus.html`
+- Control cache best3: mixed `84 cached / 16 fresh`.
+- Control cache pack: mixed `86 cached / 14 fresh`.
 
 ## Metrics
-- Best3 outcome: `0.5181`
-- Pack outcome: `0.5120`
-- Pack vs best3 outcome delta: `-0.0061`
-- Best3 canonical: `0.7902`
-- Pack canonical: `0.7844`
-- Pack vs best3 canonical delta: `-0.0059`
-- Exact successes best3 / pack: `20 / 18`
-- Runtime exceptions best3 / pack: `0 / 0`
+- Best3 outcome vs control: `0.6235` vs `0.3979`; delta `+0.2256`; canonical delta `+0.1138`; exact delta `+24`; runtime `0`; protocol `PASS`.
+- Pack outcome vs control: `0.6490` vs `0.4195`; delta `+0.2295`; canonical delta `+0.1308`; exact delta `+26`; runtime `0`; protocol `PASS`.
+- Direct pack vs best3 on same scored scenarios: outcome `0.6490` vs `0.6235`; delta `+0.0255`; canonical delta `+0.0025`; exact successes `43 -> 48`; gains/regressions/preserved `24 / 19 / 45`.
+- Contact-lookup subset: best3 `0.6836`, pack `0.8363`, delta `+0.1527`; exact `16 -> 20`.
+- Best3/no-helper lane interference: best3 lanes delta `-0.0243`; negative/no-helper delta `-0.0127`.
 
-## Gap Closure
-- Best3 no-current-helper-fit proxy: `0.640`
-- Expanded no-current-helper-fit proxy: `0.570`
-- Relative gap reduction proxy: `10.94%`
-- The 10% proxy target was met at 100, but the performance guardrail was not met because overall outcome and exact successes decreased versus best3.
+## Gap Metric
+- Best3 no-current-helper-fit share: `0.48`.
+- Pack no-current-helper-fit share: `0.24`.
+- Relative reduction: `50.0%`.
 
-## New Helper Contribution
-- `format_calculated_distance_km` visible/called/VNC: `16 / 7 / 9`
-- Called-subset outcome delta vs control: `+0.1429`
-- Called-subset outcome delta vs best3: `+0.1429`
-- Pack-vs-best3 called gains/regressions/preserved: `3 / 0 / 4`
-- Helper side-effect/runtime incidents: `0 / 0`
+## Helper Contribution
+- `plan_contact_lookup_query` visible/called/VNC: `28 / 18 / 10`; called-subset outcome vs control `+0.6848`; gains/regressions/preserved `16 / 1 / 1`.
+- `extract_contact_field_from_search_result` visible/called/VNC: `24 / 8 / 16`; called-subset outcome vs control `+0.6155`; gains/regressions/preserved `6 / 1 / 1`.
+- Helper runtime/side-effect incidents: `0 / 0`.
 
 ## Decision
-Do not run frozen250 for Candidate Pack 1. The distance helper is real and useful on called distance cases, but the distance-only pack is not additive enough at frozen100: overall outcome decreased by `-0.0061`, exact successes decreased by `2`, and visible-not-called was `9`.
+Candidate Pack 2 passed frozen100-style validation strongly enough to run a broad frozen250-style validation. The 100 also exposed a risk: unrelated best3/no-helper lanes showed mild negative variance/interference, so 250 must separate intended gap-lane contribution from cross-lane routing pollution.
 
 ## Decision Label
-`continue gap-closure loop`
+`expanded portfolio ready for 250`

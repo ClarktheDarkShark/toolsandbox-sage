@@ -191,6 +191,54 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
     )
 
 
+def test_task_focus_balanced_summary_uses_only_complete_pairs() -> None:
+    pairs = [
+        {
+            "control": {
+                "status": "complete",
+                "similarity": 0.2,
+                "outcome_similarity": 0.4,
+            },
+            "candidate": {
+                "status": "complete",
+                "similarity": 1.0,
+                "outcome_similarity": 0.9,
+            },
+        },
+        {
+            "control": {
+                "status": "complete",
+                "similarity": 1.0,
+                "outcome_similarity": 0.6,
+            },
+            "candidate": {
+                "status": "complete",
+                "similarity": 0.5,
+                "outcome_similarity": 0.3,
+            },
+        },
+        {
+            "control": {
+                "status": "complete",
+                "similarity": 0.0,
+                "outcome_similarity": 0.0,
+            },
+            "candidate": {"status": "running"},
+        },
+    ]
+
+    summary = exporters._balanced_pair_summary(pairs)
+
+    assert summary["balanced_completed"] == 2
+    assert summary["balanced_control_mean_similarity"] == pytest.approx(0.6)
+    assert summary["balanced_candidate_mean_similarity"] == pytest.approx(0.75)
+    assert summary["balanced_delta"] == pytest.approx(0.15)
+    assert summary["balanced_lift_percent"] == pytest.approx(25.0)
+    assert summary["balanced_control_mean_outcome_similarity"] == pytest.approx(0.5)
+    assert summary["balanced_candidate_mean_outcome_similarity"] == pytest.approx(0.6)
+    assert summary["balanced_outcome_delta"] == pytest.approx(0.1)
+
+
 def test_task_focus_exports_guardrail_evidence_and_left_aligned_tool_messages(
     tmp_path: Path,
 ) -> None:

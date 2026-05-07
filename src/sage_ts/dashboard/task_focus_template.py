@@ -189,6 +189,7 @@ TASK_FOCUS_HTML = r"""<!doctype html>
     const present = n => n !== null && n !== undefined && n !== "" && Number.isFinite(Number(n));
     const fmt = (n, d=3) => present(n) ? Number(n).toFixed(d) : "—";
     const fmtD = n => { if (!present(n)) return "—"; const v=Number(n); return (v>0?"+":"")+v.toFixed(3); };
+    const fmtPct = n => { if (!present(n)) return "—"; const v=Number(n); return (v>0?"+":"")+v.toFixed(1)+"%"; };
 
     /* Return the list of visible entries for the current arm */
     function entries() {
@@ -270,20 +271,22 @@ TASK_FOCUS_HTML = r"""<!doctype html>
 
       let cards;
       if (arm === "paired") {
-        const c = Number(s.control_mean_similarity), sg = Number(s.candidate_mean_similarity);
+        const c = Number(s.balanced_control_mean_similarity), sg = Number(s.balanced_candidate_mean_similarity);
         const d = Number.isFinite(c) && Number.isFinite(sg) ? sg - c : null;
-        const oc = s.control_mean_outcome_similarity;
-        const os = s.candidate_mean_outcome_similarity;
+        const oc = s.balanced_control_mean_outcome_similarity;
+        const os = s.balanced_candidate_mean_outcome_similarity;
         const od = present(oc) && present(os) ? Number(os) - Number(oc) : null;
+        const lift = s.balanced_lift_percent;
+        const balancedDone = s.balanced_completed || 0;
         const cp = armProgressFor("control", s.control_completed);
         const sp = armProgressFor("candidate", s.candidate_completed);
         cards = [
-          {l:"Baseline Score", v:fmt(s.control_mean_similarity), n:`${s.control_completed||0} done`},
-          {l:"SAGE Score", v:fmt(s.candidate_mean_similarity), n:`${s.candidate_completed||0} done`},
+          {l:"Baseline Score", v:fmt(c), n:`${balancedDone} paired done`},
+          {l:"SAGE Score", v:fmt(sg), n:`${balancedDone} paired done`},
           {l:"Delta", v:fmtD(d), n:d===null?"":d>0?"improvement":d<0?"regression":"no change", cls:d===null?"":d>0?"good":d<0?"bad":""},
+          {l:"Lift", v:fmtPct(lift), n:"vs baseline", cls:present(lift) && Number(lift)>0?"good":present(lift) && Number(lift)<0?"bad":""},
           ...(od===null?[]:[{l:"Outcome Delta", v:fmtD(od), n:`${fmt(oc)} → ${fmt(os)}`, cls:od>0?"good":od<0?"bad":""}]),
-          {l:"Tools Born", v:`${s.accepted_tools||0}`, n:`${s.reuse_count||0} reuse calls`},
-          {l:"Tool Attempts", v:`${s.generated_tool_attempted_scenarios||0}`, n:`${s.generated_tool_called_scenarios||0} called · ${s.generated_tool_failed_scenarios||0} failed`},
+          {l:"Tools", v:`${s.accepted_tools||0} born`, n:`${s.reuse_count||0} reuse · ${s.generated_tool_attempted_scenarios||0} attempts · ${s.generated_tool_called_scenarios||0} called · ${s.generated_tool_failed_scenarios||0} failed`},
           {l:"Baseline Progress", v:progressText(cp), n:cp.status},
           {l:"SAGE Progress", v:progressText(sp), n:sp.status},
         ];

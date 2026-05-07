@@ -22,6 +22,7 @@ from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.routing_scorer import (
     DEFAULT_MAX_RUNTIME_BUNDLE_SIZE,
     RuntimeRoutingDecision,
+    _is_insufficient_information_guard,
     score_registry_entry_for_scenario,
 )
 from sage_ts.validation.output_normalization import normalize_generated_tool_output
@@ -56,6 +57,7 @@ OPTIONAL_HELPER_DEFAULTS: dict[str, Any] = {
     "tie_break_fields": [],
     "contact_name": "",
     "phone_number": "",
+    "default_country_code": "1",
     "email": "",
     "relationship": "",
     "target_field": "",
@@ -100,6 +102,43 @@ def _call_path_note(spec: ToolSpec) -> list[str]:
         ]
     )
     return lines
+
+
+def _lookup_query_planner_usage_note(spec: ToolSpec) -> list[str]:
+    """Affordance guidance for helpers that prepare lookup/search kwargs."""
+    input_names = {item.name for item in spec.inputs}
+    output_schema = spec.output_schema or {}
+    output_properties = output_schema.get("properties", {})
+    if not isinstance(output_properties, dict):
+        return []
+    search_kwargs_keys = [
+        str(key)
+        for key in output_properties
+        if str(key).startswith(("search_", "find_", "get_"))
+        and str(key).endswith("_kwargs")
+    ]
+    if not search_kwargs_keys:
+        return []
+    if {"records", "candidates", "selected_record", "contact_record"} & input_names:
+        return []
+    scalar_inputs = sorted(input_names)
+    return [
+        "",
+        "Lookup-query planner usage:",
+        "    Use this helper before the original lookup/search tool when the",
+        " user supplied scalar constraints and the task is to retrieve a",
+        " specific field from a contact, message, reminder, or record.",
+        f"    Pass visible scalar inputs such as {', '.join(scalar_inputs)};",
+        " omit unknown optional fields rather than inventing them.",
+        "    If the helper returns should_call_search_contacts or",
+        " should_call_tool true, call the returned original ToolSandbox search",
+        " kwargs next, then answer from the returned record or use a visible",
+        " post-search extractor.",
+        "    This helper does not execute the lookup and does not complete a",
+        " final side-effect action.",
+        "    If abstain_reason is non-empty, do not guess; ask for",
+        " clarification or use the ordinary ToolSandbox route.",
+    ]
 
 
 def _post_selection_composite_usage_note(spec: ToolSpec) -> list[str]:
@@ -583,6 +622,7 @@ def _with_optional_helper_defaults(
             "tie_break_fields",
             "contact_name",
             "phone_number",
+            "default_country_code",
             "email",
             "relationship",
             "target_field",
@@ -774,6 +814,7 @@ def _google_docstring(entry: RegistryEntry) -> str:
         if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
             lines.extend(_search_filter_action_usage_note(spec))
         if spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
+            lines.extend(_lookup_query_planner_usage_note(spec))
             lines.extend(_medium_grain_composite_usage_note(spec))
             lines.extend(_post_selection_composite_usage_note(spec))
             lines.extend(_direct_scalar_action_usage_note(spec))
@@ -869,6 +910,32 @@ def _compile_toolsandbox_tool(
                 default=copy.deepcopy(OPTIONAL_HELPER_DEFAULTS[p.name])
             )
         signature_parameters.append(replacement)
+    # Adding safe defaults to optional scalar helper inputs can create an
+    # invalid signature when a required selector input follows them in generated
+    # code, e.g. contact_name="", requested_field. ToolSandbox/OpenAI call these
+    # helpers by keyword, so expose a valid keyword signature by listing required
+    # positional-or-keyword parameters before defaulted optional parameters.
+    positional = [
+        p
+        for p in signature_parameters
+        if p.kind
+        in {
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        }
+    ]
+    non_positional = [p for p in signature_parameters if p not in positional]
+    required_positional = [
+        p for p in positional if p.default is inspect.Parameter.empty
+    ]
+    defaulted_positional = [
+        p for p in positional if p.default is not inspect.Parameter.empty
+    ]
+    signature_parameters = [
+        *required_positional,
+        *defaulted_positional,
+        *non_positional,
+    ]
     fn.__signature__ = sig.replace(  # type: ignore[attr-defined]
         parameters=signature_parameters,
         return_annotation=annotations.get("return", inspect.Parameter.empty),
@@ -1132,6 +1199,9 @@ def registry_entry_visibility_reason(
     if trigger_result is not None:
         return trigger_result
 
+    if entry.tool.spec.positive_triggers or entry.tool.spec.applicable_task_families:
+        return False, "explicit_contract_requires_trigger_or_family_match"
+
     if entry.tool.spec.family != ToolFamily.STATE_PRECONDITION_HELPER:
         return _provisional_birth_family_visibility(entry, name)
 
@@ -1239,7 +1309,14 @@ def route_registry_entries(
                 downstream_tools = producer_tools
                 requires_any_downstream = True
         if is_visible and available_base_tools is not None and downstream_tools:
-            if requires_any_downstream:
+            if "insufficient_information" in (
+                scenario_name or ""
+            ).lower() and _is_insufficient_information_guard(entry.tool.spec):
+                # Abstention guards prevent unsafe downstream calls on missing-info
+                # tasks. They must not be hidden just because the original producer
+                # or forbidden downstream tool is absent from this scenario allow-list.
+                missing = set()
+            elif requires_any_downstream:
                 missing = (
                     downstream_tools
                     if not downstream_tools & available_base_tools

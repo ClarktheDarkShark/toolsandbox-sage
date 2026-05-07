@@ -110,21 +110,46 @@ PARKED_MECHANISMS: dict[str, dict[str, str]] = {
         "blocker": "non-additive over best3",
         "evidence": "V2.2 Best4 frozen100 underperformed best3.",
     },
+    "distance_answer_resolution": {
+        "blocker": "useful called subset but non-additive portfolio at frozen100",
+        "evidence": "V2.5 Candidate Pack 1 reduced no-fit proxy by 10.94% and had positive called-subset outcome, but frozen100 best3+distance underperformed best3 by -0.0061 outcome and exact successes fell 20 -> 18.",
+    },
+    "insufficient_information_or_clarification": {
+        "blocker": "canonical-only/value failure after routing repair",
+        "evidence": "V2.5 exact-location guard was visible 6/called 5 with zero runtime or side-effect incidents, but called-subset outcome was unavailable and canonical delta was -0.396.",
+    },
 }
 
-DEFERRED_MICRO_POSITIVE_MECHANISMS: dict[str, dict[str, str]] = {
-    "distance_answer_resolution": {
-        "status": "micro-positive narrow candidate",
-        "evidence": "V2.5 format_calculated_distance_km was called 4/4 on relevant positives, VNC 0, called-subset outcome +0.5556, and best3+distance beat best3 by +0.0447 on the same micro manifest. Coverage is too narrow to close the gap alone.",
-    }
-}
+DEFERRED_MICRO_POSITIVE_MECHANISMS: dict[str, dict[str, str]] = {}
 
 FAILED_CANDIDATE_DESIGNS: dict[str, dict[str, str]] = {
     "direct_contact_action_kwargs_preparer": {
         "blocker": "callability/value/safety failure for dict-payload interface",
         "evidence": "V2.5 force-call diagnostic called prepare_direct_contact_action_kwargs 8/8, but the actor supplied {}, producing missing_required_helper_inputs; called-subset outcome was -0.1155 and one side-effect preservation incident was reported.",
         "next_material_repair": "Try a materially different flat-scalar interface rather than action_payload: dict.",
-    }
+    },
+    "direct_contact_action_flat_scalar_preparer": {
+        "blocker": "callable but value-negative for flat-scalar direct action interface",
+        "evidence": "V2.5 prepare_direct_contact_action_args was valid and force-called 8/8 with usable downstream kwargs, but natural calls stayed 0/8 and force called-subset outcome was -0.0816.",
+        "next_material_repair": "Do not retry direct-contact action prep without a materially different mechanism, such as a non-side-effect answer-only validator.",
+    },
+    "contact_phone_scalar_normalizer": {
+        "blocker": "callable but low-value for current benchmark phone inputs",
+        "evidence": "V2.5 normalize_contact_phone_number required E.164 and injection repairs, then was visible 8/called 1 with called-subset outcome -0.328; benchmark phone inputs were already normalized so the helper rarely changed the task route.",
+        "next_material_repair": "Do not retry raw phone normalization unless the cohort contains visibly formatted/noncanonical phone strings; use a post-search answer extractor instead.",
+    },
+}
+
+REOPENED_MECHANISM_DESIGNS = {
+    # The prior visible-record selector failure was an adoption failure for a
+    # selector/action shape. This materially different design runs after the
+    # original search_contacts result and extracts one scalar answer field.
+    "contact_search_result_field_extractor",
+    # The post-search extractor showed correct raw outputs but missed value
+    # when the actor never issued the needed search first. This materially
+    # different design runs before search_contacts and returns original lookup
+    # kwargs plus the requested answer field.
+    "contact_lookup_query_planner",
 }
 
 _SCENARIOS: list[ScenarioRecord] | None = None
@@ -417,6 +442,59 @@ def _designs() -> list[CandidateDesign]:
             negative_applicability=True,
         ),
     )
+    insufficient_guard_examples = (
+        ToolExample(
+            {
+                "user_request": "How far is Trader Joe's from me?",
+                "failed_tool_name": "get_current_location",
+                "error_text": "Current location is unavailable.",
+                "intended_downstream_tool": "calculate_lat_lon_distance",
+            },
+            {
+                "should_abstain": True,
+                "missing_information": ["exact_current_lat_lon"],
+                "clarification_prompt": (
+                    "I need your exact current latitude and longitude to continue."
+                ),
+                "forbidden_downstream_tools": ["calculate_lat_lon_distance"],
+                "abstain_reason": "missing_current_location",
+            },
+        ),
+        ToolExample(
+            {
+                "user_request": "What city am I in?",
+                "failed_tool_name": "get_current_location",
+                "error_text": "Current location unavailable",
+                "intended_downstream_tool": "search_lat_lon",
+            },
+            {
+                "should_abstain": True,
+                "missing_information": ["exact_current_lat_lon"],
+                "clarification_prompt": (
+                    "I need your exact current latitude and longitude to continue."
+                ),
+                "forbidden_downstream_tools": ["search_lat_lon"],
+                "abstain_reason": "missing_current_location",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "user_request": "How far is Central Park from Times Square?",
+                "failed_tool_name": "",
+                "error_text": "",
+                "intended_downstream_tool": "calculate_lat_lon_distance",
+            },
+            {
+                "should_abstain": False,
+                "missing_information": [],
+                "clarification_prompt": "",
+                "forbidden_downstream_tools": [],
+                "abstain_reason": "",
+            },
+            negative_applicability=True,
+        ),
+    )
     location_field_examples = (
         ToolExample(
             {
@@ -639,7 +717,291 @@ def _designs() -> list[CandidateDesign]:
             negative_applicability=True,
         ),
     )
+    phone_normalization_examples = (
+        ToolExample(
+            {"phone_number": "+1 (987) 654-3210", "default_country_code": "1"},
+            {
+                "normalized_phone_number": "+19876543210",
+                "country_code": "1",
+                "is_valid": True,
+                "abstain_reason": "",
+            },
+        ),
+        ToolExample(
+            {"phone_number": "245-334-4098", "default_country_code": "1"},
+            {
+                "normalized_phone_number": "+12453344098",
+                "country_code": "1",
+                "is_valid": True,
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {"phone_number": "555", "default_country_code": "1"},
+            {
+                "normalized_phone_number": "",
+                "country_code": "1",
+                "is_valid": False,
+                "abstain_reason": "invalid_phone_number",
+            },
+            negative_applicability=True,
+        ),
+    )
+    contact_field_examples = (
+        ToolExample(
+            {
+                "contact_record": {
+                    "person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+                    "name": "Homer S",
+                    "phone_number": "+10000000000",
+                    "relationship": "boss",
+                    "is_self": False,
+                },
+                "requested_field": "phone_number",
+            },
+            {
+                "answer_value": "+10000000000",
+                "answer_field": "phone_number",
+                "source_person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+                "abstain_reason": "",
+            },
+        ),
+        ToolExample(
+            {
+                "contact_record": {
+                    "person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+                    "name": "Homer S",
+                    "phone_number": "+10000000000",
+                    "relationship": "boss",
+                    "is_self": False,
+                },
+                "requested_field": "relationship",
+            },
+            {
+                "answer_value": "boss",
+                "answer_field": "relationship",
+                "source_person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "contact_record": {
+                    "person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+                    "name": "Homer S",
+                    "phone_number": "+10000000000",
+                },
+                "requested_field": "relationship",
+            },
+            {
+                "answer_value": "",
+                "answer_field": "relationship",
+                "source_person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+                "abstain_reason": "missing_requested_field",
+            },
+            negative_applicability=True,
+        ),
+    )
     return [
+        CandidateDesign(
+            design_id="contact_lookup_query_planner",
+            cluster_id="visible_record_selector",
+            tool_name="plan_contact_lookup_query",
+            design_type="pre-search scalar lookup planner",
+            allowed_family=str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),
+            deterministic_value=5,
+            input_simplicity=5,
+            natural_adoption_likelihood=4,
+            side_effect_safety=5,
+            negative_case_safety=4,
+            expected_additive_value=4,
+            canonical_only_risk=1,
+            best3_duplication_risk=0,
+            visible_not_called_pollution_risk=2,
+            expected_direct_route_advantage=(
+                "Before search_contacts is called, deterministically converts "
+                "visible scalar contact constraints into safe original search "
+                "kwargs and the exact answer field needed after lookup."
+            ),
+            likely_direct_base_tool_route=(
+                "Parse user request -> choose search_contacts argument field -> "
+                "call search_contacts -> manually copy requested answer field."
+            ),
+            observation=(
+                "Design a deterministic pre-search lookup planner named "
+                "plan_contact_lookup_query. It accepts only scalar inputs: "
+                "contact_name: str optional, phone_number: str optional, "
+                "relationship: str optional, and requested_field: str required. "
+                "It returns exactly should_call_search_contacts: bool, "
+                "search_contacts_kwargs: dict, answer_field: str, and "
+                "abstain_reason: str. When exactly one safe lookup constraint is "
+                "available, return should_call_search_contacts=True and the "
+                "original search_contacts kwargs using only visible supplied "
+                "fields: name from contact_name, phone_number from phone_number, "
+                "or relationship from relationship. Preserve answer_field as the "
+                "requested_field so a later post-search extractor or final answer "
+                "can use the right field. If multiple constraints are supplied "
+                "and they are all visible, include all nonblank constraints in "
+                "search_contacts_kwargs. Abstain when requested_field is blank, "
+                "when no lookup constraint is supplied, when the requested field "
+                "is unsupported, or when the task asks to add/modify/remove/send "
+                "instead of answer a lookup. The helper must not call "
+                "search_contacts and must not replace it; it only prepares the "
+                "next original ToolSandbox search call. Include positive "
+                "triggers for search_name_with_relationship, "
+                "search_phone_number_with_name, and "
+                "search_relationship_with_phone_number. Include negative "
+                "triggers for add_contact, remove_contact, modify_contact, "
+                "send_message, insufficient_information, ambiguous multiple "
+                "contacts, and non-contact tasks. List search_contacts in both "
+                "required_original_tool_calls and preserves_side_effect_tools "
+                "because the original lookup must still be called next. Set "
+                "canonical_route_substitution_risk='none' and "
+                "expected_milestone_calls_replaced=[] because this helper "
+                "preserves the original lookup route while making argument "
+                "selection deterministic."
+            ),
+            validation_examples=(
+                ToolExample(
+                    {
+                        "contact_name": "Homer S",
+                        "phone_number": "",
+                        "relationship": "",
+                        "requested_field": "phone_number",
+                    },
+                    {
+                        "should_call_search_contacts": True,
+                        "search_contacts_kwargs": {"name": "Homer S"},
+                        "answer_field": "phone_number",
+                        "abstain_reason": "",
+                    },
+                ),
+                ToolExample(
+                    {
+                        "contact_name": "",
+                        "phone_number": "",
+                        "relationship": "boss",
+                        "requested_field": "name",
+                    },
+                    {
+                        "should_call_search_contacts": True,
+                        "search_contacts_kwargs": {"relationship": "boss"},
+                        "answer_field": "name",
+                        "abstain_reason": "",
+                    },
+                    held_out=True,
+                ),
+                ToolExample(
+                    {
+                        "contact_name": "",
+                        "phone_number": "+10000000000",
+                        "relationship": "",
+                        "requested_field": "relationship",
+                    },
+                    {
+                        "should_call_search_contacts": True,
+                        "search_contacts_kwargs": {"phone_number": "+10000000000"},
+                        "answer_field": "relationship",
+                        "abstain_reason": "",
+                    },
+                ),
+                ToolExample(
+                    {
+                        "contact_name": "",
+                        "phone_number": "",
+                        "relationship": "",
+                        "requested_field": "phone_number",
+                    },
+                    {
+                        "should_call_search_contacts": False,
+                        "search_contacts_kwargs": {},
+                        "answer_field": "phone_number",
+                        "abstain_reason": "missing_lookup_constraint",
+                    },
+                    negative_applicability=True,
+                ),
+            ),
+            scenario_prefixes=(
+                "search_name_with_relationship",
+                "search_phone_number_with_name",
+                "search_relationship_with_phone_number",
+            ),
+            negative_prefixes=(
+                "add_contact_with_name_and_phone_number",
+                "remove_contact_by_phone_ambiguous",
+                "find_current_city_insufficient_information",
+                "add_reminder_content_and_date_and_time",
+            ),
+        ),
+        CandidateDesign(
+            design_id="contact_search_result_field_extractor",
+            cluster_id="visible_record_selector",
+            tool_name="extract_contact_field_from_search_result",
+            design_type="post-search scalar field extractor",
+            allowed_family=str(ToolFamily.DERIVED_VALUE_CALCULATOR),
+            deterministic_value=4,
+            input_simplicity=4,
+            natural_adoption_likelihood=4,
+            side_effect_safety=5,
+            negative_case_safety=4,
+            expected_additive_value=3,
+            canonical_only_risk=1,
+            best3_duplication_risk=0,
+            visible_not_called_pollution_risk=2,
+            expected_direct_route_advantage=(
+                "After search_contacts returns a visible contact, extracts the exact "
+                "requested scalar field without the actor manually copying, "
+                "reformatting, or over-answering."
+            ),
+            likely_direct_base_tool_route=(
+                "search_contacts -> manually inspect first/unique contact -> copy "
+                "phone_number or relationship into final answer"
+            ),
+            observation=(
+                "Design a deterministic post-search answer extractor named "
+                "extract_contact_field_from_search_result. It accepts contact_record: "
+                "dict and requested_field: str. The runtime may autofill contact_record "
+                "from the latest search_contacts result when exactly one visible "
+                "contact is available; the actor should provide requested_field based "
+                "on the user request, such as phone_number, relationship, name, email, "
+                "or person_id. It returns exactly answer_value: str, answer_field: str, "
+                "source_person_id: str, and abstain_reason: str. It must only extract "
+                "fields already present in the visible contact record. It must not "
+                "call or replace search_contacts, add_contact, remove_contact, "
+                "modify_contact, or send_message_with_phone_number. It must abstain "
+                "with answer_value='' and abstain_reason='missing_requested_field' "
+                "when requested_field is absent, blank, or contact_record lacks that "
+                "key; when requested_field is nonblank but missing, return "
+                "answer_field=requested_field so the abstention is auditable. Do not "
+                "return answer_value='' with abstain_reason='' for missing "
+                "fields. Abstain with abstain_reason='missing_contact_record' when no "
+                "contact_record is available. It must not guess ties or fabricate missing fields. Include "
+                "positive triggers for search_phone_number_with_name, "
+                "search_relationship_with_phone_number, and search_name_with_relationship. "
+                "Include negative triggers for ambiguous multiple contacts, "
+                "insufficient_information, add_contact direct side effects, reminder "
+                "tasks, and non-contact tasks. List search_contacts in "
+                "required_original_tool_calls because the source contact must still "
+                "come from the original ToolSandbox search. Set "
+                "canonical_route_substitution_risk='none' and expected_milestone_calls_replaced=[] "
+                "because this helper preserves search_contacts and only extracts the "
+                "final scalar answer."
+            ),
+            validation_examples=contact_field_examples,
+            scenario_prefixes=(
+                "search_phone_number_with_name",
+                "search_relationship_with_phone_number",
+                "search_name_with_relationship",
+            ),
+            negative_prefixes=(
+                "add_contact_with_name_and_phone_number",
+                "remove_contact_by_phone_ambiguous",
+                "find_current_city_insufficient_information",
+                "add_reminder_content_and_date_and_time",
+            ),
+        ),
         CandidateDesign(
             design_id="temperature_unit_answer_resolver",
             cluster_id="temperature_unit_answer_resolution",
@@ -751,6 +1113,83 @@ def _designs() -> list[CandidateDesign]:
                 "get_wifi",
                 "add_contact_with_name_and_phone_number",
                 "find_current_city_insufficient_information",
+            ),
+        ),
+        CandidateDesign(
+            design_id="insufficient_information_minefield_guard",
+            cluster_id="insufficient_information_or_clarification",
+            tool_name="detect_missing_information_before_minefield",
+            design_type="insufficient-information abstention guard",
+            allowed_family=str(ToolFamily.DERIVED_VALUE_CALCULATOR),
+            deterministic_value=4,
+            input_simplicity=4,
+            natural_adoption_likelihood=3,
+            side_effect_safety=5,
+            negative_case_safety=5,
+            expected_additive_value=3,
+            canonical_only_risk=1,
+            best3_duplication_risk=0,
+            visible_not_called_pollution_risk=2,
+            expected_direct_route_advantage=(
+                "Turns a visible missing-information tool failure into an explicit "
+                "abstain/clarification plan before the actor calls forbidden downstream "
+                "minefield tools such as distance calculation without current location."
+            ),
+            likely_direct_base_tool_route=(
+                "attempt required state lookup -> observe unavailable state/error -> "
+                "avoid downstream calculation/search -> ask clarification"
+            ),
+            observation=(
+                "Design a deterministic derived precondition guard named "
+                "detect_missing_information_before_minefield. It accepts user_request: "
+                "str, failed_tool_name: str, error_text: str, and intended_downstream_tool: "
+                "str. It returns exactly should_abstain: bool, missing_information: list[str], "
+                "clarification_prompt: str, forbidden_downstream_tools: list[str], and "
+                "abstain_reason: str. It should trigger only after a visible original "
+                "ToolSandbox state/lookup tool fails or reports unavailable information. "
+                "It must detect missing current location from failed tool names or error "
+                "text such as get_current_location/current location unavailable and block "
+                "unsafe downstream tools including calculate_lat_lon_distance and location "
+                "lookup tools that require the missing current location. It must abstain "
+                "with a concise clarification prompt instead of computing or fabricating "
+                "an answer. For user-relative distance/current-city/current-weather tasks, "
+                "a city, landmark, or approximate place name is not sufficient current "
+                "location evidence; require exact current latitude and longitude before "
+                "any forbidden downstream calculation/search may proceed. The "
+                "missing_information list must use exact_current_lat_lon for this case so "
+                "the actor does not treat a city name as enough. It must return "
+                "should_abstain false when there is no failed "
+                "tool/error or when the request supplies both required endpoints. It must "
+                "not call any ToolSandbox tool, must not execute side effects, and must "
+                "not suppress ordinary distance/location tasks where the required inputs "
+                "are available. When should_abstain is true and intended_downstream_tool "
+                "is non-empty, forbidden_downstream_tools must be exactly a one-item list "
+                "containing intended_downstream_tool; do not hardcode "
+                "calculate_lat_lon_distance for every missing-current-location case. Use "
+                "the exact clarification_prompt 'I need your exact current latitude and "
+                "longitude to continue.' for missing_current_location so validation and "
+                "runtime affordance are deterministic. "
+                "Include positive triggers for insufficient_information "
+                "tasks after a failed current-location or required-state call. Include "
+                "negative triggers for no_error_visible, all_required_information_present, "
+                "ordinary best3 record-selection tasks, and non-minefield tasks. Set "
+                "family to derived_value_calculator and list get_current_location in "
+                "required_original_tool_calls because the guard must be used only after "
+                "the original state lookup failed or reported unavailable information."
+            ),
+            validation_examples=insufficient_guard_examples,
+            scenario_prefixes=(
+                "find_distance_with_location_name_insufficient_information",
+                "find_current_city_insufficient_information",
+                "find_temperature_f_with_location_insufficient_information",
+            ),
+            negative_prefixes=(
+                "find_distance_with_location_name",
+                "search_message_with_recency_latest",
+                "add_contact_with_name_and_phone_number",
+                "remove_contact_with_id",
+                "convert_currency",
+                "find_days_till_holiday",
             ),
         ),
         CandidateDesign(
@@ -967,6 +1406,83 @@ def _designs() -> list[CandidateDesign]:
                 "find_current_city_insufficient_information",
             ),
         ),
+        CandidateDesign(
+            design_id="contact_phone_scalar_normalizer",
+            cluster_id="direct_side_effect_no_helper",
+            tool_name="normalize_contact_phone_number",
+            design_type="answer-only scalar normalizer",
+            allowed_family=str(ToolFamily.DERIVED_VALUE_CALCULATOR),
+            deterministic_value=4,
+            input_simplicity=5,
+            natural_adoption_likelihood=4,
+            side_effect_safety=5,
+            negative_case_safety=4,
+            expected_additive_value=3,
+            canonical_only_risk=1,
+            best3_duplication_risk=0,
+            visible_not_called_pollution_risk=2,
+            expected_direct_route_advantage=(
+                "Normalizes visible phone-number strings into the leading-plus "
+                "digits format expected by contact/search/send ToolSandbox calls "
+                "without preparing or executing the side effect."
+            ),
+            likely_direct_base_tool_route=(
+                "manual phone parsing/formatting -> original contact/search/send tool"
+            ),
+            observation=(
+                "Design a deterministic scalar helper named normalize_contact_phone_number. "
+                "It accepts phone_number: str and default_country_code: str. It returns "
+                "exactly normalized_phone_number: str, country_code: str, is_valid: bool, "
+                "and abstain_reason: str. It must strip spaces, dashes, parentheses, dots, "
+                "and other visual separators. If phone_number begins with '+', output "
+                "a leading '+' followed by digits only; do not preserve spaces, dashes, "
+                "parentheses, or the original formatted string. A plus-prefixed input "
+                "is valid when the cleaned digit string has 8 to 15 digits; do not apply "
+                "the 10-local-digit rule to plus-prefixed numbers. For example, '+1 (987) "
+                "654-3210' has 11 cleaned digits and must return "
+                "normalized_phone_number='+19876543210', is_valid=true, and "
+                "abstain_reason=''. If no '+' is present and the cleaned number has exactly "
+                "10 US digits, prepend '+' plus default_country_code normalized to "
+                "digits (default to '1' when blank); for example '245-334-4098' must "
+                "return '+12453344098'. Spaces, dashes, dots, and parentheses are valid "
+                "visual separators, not ambiguity. Do not set abstain_reason to "
+                "'ambiguous_multiple_phone_numbers' merely because a single phone "
+                "number contains spaces, dashes, dots, or parentheses. Treat input as "
+                "ambiguous only when it contains two or more independent phone numbers "
+                "such as two separate plus-prefixed numbers or two separate 10-digit "
+                "digit groups. It must abstain on extensions, alphabetic "
+                "characters, fewer than 10 local digits, too many digits without an "
+                "explicit country code, multiple phone numbers in one string, or "
+                "insufficient-information tasks. On abstention return normalized_phone_number='', "
+                "is_valid=false, and a nonempty abstain_reason. It must not call or "
+                "replace add_contact, remove_contact, modify_contact, search_contacts, "
+                "or send_message_with_phone_number; it only returns a normalized scalar "
+                "for the actor to pass to the original ToolSandbox call. Include positive "
+                "triggers for add_contact_with_name_and_phone_number, remove_contact_by_phone, "
+                "search_relationship_with_phone_number, search_phone_number_with_name, "
+                "send_message_with_phone_number_and_content, and update_contact_with_id_and_phone_number. "
+                "Include negative triggers for insufficient_information, no phone number, "
+                "ambiguous multiple phone numbers, and non-contact/non-message phone tasks. "
+                "List add_contact, remove_contact, modify_contact, search_contacts, and "
+                "send_message_with_phone_number in required_original_tool_calls because "
+                "those original ToolSandbox tools must still perform the search or side effect."
+            ),
+            validation_examples=phone_normalization_examples,
+            scenario_prefixes=(
+                "add_contact_with_name_and_phone_number",
+                "remove_contact_by_phone",
+                "search_relationship_with_phone_number",
+                "search_phone_number_with_name",
+                "send_message_with_phone_number_and_content",
+                "update_contact_with_id_and_phone_number",
+            ),
+            negative_prefixes=(
+                "remove_contact_by_phone_ambiguous",
+                "find_current_city_insufficient_information",
+                "add_reminder_content_and_date_and_time",
+                "find_days_till_holiday",
+            ),
+        ),
     ]
 
 
@@ -996,9 +1512,15 @@ def build_gap_atlas() -> dict[str, Any]:
             key=lambda d: d.feasibility_score,
             reverse=True,
         )
+        has_reopened_design = any(
+            design.design_id in REOPENED_MECHANISM_DESIGNS
+            for design in candidate_designs
+        )
         status = (
             "candidate_ranked"
-            if candidate_designs and prior is None and deferred is None
+            if candidate_designs
+            and (prior is None or has_reopened_design)
+            and deferred is None
             else "deferred_micro_positive"
             if deferred is not None
             else "excluded_or_parked"
@@ -1102,6 +1624,8 @@ def _intermediate_step(cluster: str) -> str:
         "currency_answer_normalization": "format visible converted amount with target currency code",
         "location_field_answer_resolution": "extract an address or phone-number field from a visible location lookup payload",
         "direct_side_effect_no_helper": "compile explicit user-provided scalar action fields into original side-effect tool kwargs",
+        "insufficient_information_or_clarification": "convert a visible missing-information tool failure into a safe abstain/clarification plan before minefield tools are called",
+        "visible_record_selector": "extract a requested scalar field from a unique visible contact search result",
     }.get(cluster, "no simple deterministic intermediate isolated")
 
 
@@ -1112,6 +1636,8 @@ def _negative_case_note(cluster: str) -> str:
         "currency_answer_normalization": "missing converted amount/currency code, non-currency tasks",
         "location_field_answer_resolution": "insufficient location payload, unsupported field, missing address/phone, non-location tasks",
         "direct_side_effect_no_helper": "missing action type, missing required scalar fields, selected-record-only workflows, insufficient-information side-effect tasks",
+        "insufficient_information_or_clarification": "no visible failed lookup/state tool, all required information present, non-minefield tasks, ordinary best3 lanes",
+        "visible_record_selector": "ambiguous contacts, missing requested field, no prior search_contacts result, unrelated reminder/location tasks",
     }.get(cluster, "insufficient-information and unrelated no-helper cases")
 
 
@@ -1122,6 +1648,7 @@ def feasibility_payload(atlas: dict[str, Any]) -> dict[str, Any]:
         status = (
             "reject_exhausted_or_parked_cluster"
             if design.cluster_id in PARKED_MECHANISMS
+            and design.design_id not in REOPENED_MECHANISM_DESIGNS
             or design.cluster_id in DEFERRED_MICRO_POSITIVE_MECHANISMS
             or design.design_id in FAILED_CANDIDATE_DESIGNS
             else "advance_to_generation"
@@ -1358,7 +1885,9 @@ def _strict_registry_errors(tool: GeneratedTool) -> list[str]:
             *(item.strip() for item in spec.required_original_tool_calls),
         }
         if not any(
-            call.startswith(("search_", "calculate_", "convert_", "unit_conversion"))
+            call.startswith(
+                ("search_", "calculate_", "convert_", "unit_conversion", "get_")
+            )
             for call in calls
         ):
             errors.append("missing_downstream_original_tool_call")
@@ -1408,10 +1937,19 @@ def build_micro_manifest(design: CandidateDesign, summary_dir: Path) -> dict[str
         4
         if design.cluster_id
         in {"distance_answer_resolution", "location_field_answer_resolution"}
+        else 6
+        if design.cluster_id == "insufficient_information_or_clarification"
+        else 6
+        if design.cluster_id == "visible_record_selector"
         else 8
     )
     for record in _select_records(
-        design.scenario_prefixes, positive_count, already, family_counts
+        design.scenario_prefixes,
+        positive_count,
+        already,
+        family_counts,
+        include_insufficient=design.cluster_id
+        == "insufficient_information_or_clarification",
     ):
         selected.append(record)
         role_by_name[record.name] = "candidate_positive"

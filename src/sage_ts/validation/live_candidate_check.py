@@ -63,7 +63,30 @@ def _abstained(value: Any) -> bool:
             and not value.get("downstream_tool_name")
         ):
             return True
+        if (
+            value.get("should_abstain") is False
+            and not value.get("clarification_prompt")
+            and not value.get("missing_information")
+            and not value.get("selected_record")
+            and not value.get("selected_id")
+            and not value.get("value")
+            and not value.get("answer_value")
+            and not value.get("downstream_tool_name")
+        ):
+            return True
     return False
+
+
+def _positive_abstention_plan(value: Any) -> bool:
+    """A guard can be useful by returning a concrete safe clarification plan."""
+    if not isinstance(value, dict):
+        return False
+    if value.get("should_abstain") is not True:
+        return False
+    if not value.get("clarification_prompt"):
+        return False
+    missing = value.get("missing_information")
+    return isinstance(missing, list) and bool(missing)
 
 
 def run_lightweight_live_candidate_check(
@@ -102,7 +125,9 @@ def run_lightweight_live_candidate_check(
                 negative_abstain += 1
             else:
                 errors.append(f"live_example_{index}_negative_not_abstained")
-        elif _usable_output(result) and not _abstained(result):
+        elif _positive_abstention_plan(result) or (
+            _usable_output(result) and not _abstained(result)
+        ):
             positive_usable += 1
         else:
             errors.append(f"live_example_{index}_positive_unusable_output")

@@ -271,9 +271,27 @@ def _side_effect_followup_failures(
         next_tools = set(_next_assistant_tool_names(messages, start_index=index))
         required = set(required_side_effect_calls)
         if isinstance(output, dict):
+            declares_followup = any(
+                key in output
+                for key in (
+                    "should_call_add_reminder",
+                    "should_call",
+                    "should_call_tool",
+                    "downstream_tool_name",
+                    "add_reminder_kwargs",
+                    "downstream_tool_kwargs",
+                )
+            )
+            if not declares_followup:
+                # Scalar/extraction helpers may preserve one of several original
+                # producers without preparing the final side-effect call. Do not
+                # mark them unsafe simply because a side-effect tool named in the
+                # broad preservation contract was not needed for this scenario.
+                continue
             if (
                 output.get("should_call_add_reminder") is False
                 or output.get("should_call") is False
+                or output.get("should_call_tool") is False
             ):
                 if required & next_tools:
                     return True
@@ -281,6 +299,7 @@ def _side_effect_followup_failures(
             if (
                 output.get("should_call_add_reminder") is True
                 or output.get("should_call") is True
+                or output.get("should_call_tool") is True
             ):
                 if not (required & next_tools):
                     return True

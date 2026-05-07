@@ -1,3 +1,5 @@
+import inspect
+
 from sage_ts.adequacy.inadequacy_classifier import _next_service_tool_call_observation
 from sage_ts.generation.tool_spec import (
     GeneratedTool,
@@ -615,6 +617,102 @@ def test_derived_value_helper_chains_visible_payload_from_required_tool_trace() 
         fn = compile_toolsandbox_tool(entry)
 
         assert fn() == "AAPL"
+
+
+def test_lookup_query_planner_docstring_explains_pre_search_call_path() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="plan_contact_lookup_query",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare search_contacts_kwargs for contact lookup queries.",
+            inputs=(
+                ToolInput(
+                    "relationship",
+                    "str",
+                    "Optional visible relationship constraint.",
+                ),
+                ToolInput(
+                    "requested_field",
+                    "str",
+                    "Field the user wants answered after lookup.",
+                ),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_call_search_contacts": {"type": "boolean"},
+                    "search_contacts_kwargs": {"type": "object"},
+                    "answer_field": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("search_name_with_relationship",),
+            negative_triggers=("insufficient_information",),
+            required_original_tool_calls=("search_contacts",),
+            preserves_side_effect_tools=("search_contacts",),
+            abstain_behavior="Abstain when lookup constraints are missing.",
+            generalization_rationale=(
+                "Contact lookup tasks repeatedly require choosing search kwargs "
+                "and a requested answer field from visible scalar constraints."
+            ),
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "search_name_with_relationship",
+                "search_phone_number_with_name",
+            ),
+            reason_tool_is_decisive=(
+                "It compresses query-field selection, search-argument "
+                "construction, and downstream answer-field preservation."
+            ),
+            shortfall_cluster_evidence=("visible_record_selector:pre_search",),
+            known_failure_mechanisms_addressed=(
+                "planner_failed_to_issue_available_search",
+            ),
+            final_state_preservation_plan=(
+                "The original lookup and final state are unchanged."
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary=(
+                    "Agents sometimes ask for clarification instead of issuing "
+                    "the deterministic contact lookup implied by the user."
+                ),
+                signals=("planner_failure_before_lookup",),
+            ),
+        ),
+        code=(
+            "def plan_contact_lookup_query(relationship: str, requested_field: str) -> dict:\n"
+            "    return {'should_call_search_contacts': True, 'search_contacts_kwargs': {'relationship': relationship}, 'answer_field': requested_field, 'abstain_reason': ''}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="search_name_with_relationship",
+    )
+
+    docstring = _google_docstring(entry)
+
+    assert "Lookup-query planner usage:" in docstring
+    assert "call the returned original ToolSandbox search" in docstring
+    assert (
+        "Call path: plan_contact_lookup_query(...) -> "
+        "search_contacts(**result['search_contacts_kwargs'])."
+    ) in docstring
+
+    fn = compile_toolsandbox_tool(entry)
+    assert "relationship: str = ''" in str(inspect.signature(fn))
+    assert fn(relationship="boss", requested_field="name")[
+        "search_contacts_kwargs"
+    ] == {"relationship": "boss"}
 
 
 def test_derived_value_helper_chains_first_visible_record_from_list_trace() -> None:

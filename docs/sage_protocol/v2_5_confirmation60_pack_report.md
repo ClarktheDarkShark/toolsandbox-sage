@@ -42,3 +42,36 @@ The pack confirmation is positive enough to scale to frozen100: the expanded pac
 
 ## Decision Label
 `expanded portfolio ready for 100`
+
+# Candidate Pack 2 Confirmation60: Contact Lookup Planner + Extractor
+
+## Design
+- Manifest: `artifacts/summaries/v2_5_candidate_pack2_contact_lookup_additive60/cohort_manifest.json`
+- Registry: `artifacts/registry_candidates/v2_5_additive_toolset/registry_manifest.json`
+- Registry SHA-256: `835b1ab6524b27ad33591a57b9154dc1d89edbc6b1655f3431b1173fd74a0c48`
+- Best3 run after answer-retention repair: `outputs/v2_5_confirmation60_pack2_contact_best3_retentionfix_20260506_193957/validate_60_20260506_194002`
+- Pack run after answer-retention repair: `outputs/v2_5_confirmation60_pack2_contact_pack_retentionfix_20260506_195414/mechanism_60_20260506_195420`
+- Dashboards opened: best3 `http://127.0.0.1:5663/.../dashboard/index.html` and task focus; pack `http://127.0.0.1:5664/.../dashboard/index.html` and task focus.
+- Control cache: best3 mixed `41 cached / 19 fresh`; pack mixed `52 cached / 8 fresh`.
+
+## Metrics
+- Best3 outcome: `0.7173`
+- Pack outcome: `0.7811`
+- Direct pack vs best3 outcome delta: `+0.0638`
+- Direct pack vs best3 canonical delta: `+0.0694`
+- Direct exact successes: `29 -> 33`
+- Direct gains/regressions/preserved: `15 / 6 / 29`
+- Runtime exceptions: `0`
+- Helper side-effect incidents: `0`
+
+## Contact Helper Contribution
+- `plan_contact_lookup_query` visible/called/VNC: `24 / 19 / 5`
+- Planner called-subset outcome vs control: `+0.5975`; outcome gains/regressions/preserved `15 / 2 / 2`.
+- `extract_contact_field_from_search_result` visible/called/VNC: `24 / 11 / 13`
+- Extractor called-subset outcome vs control: `+0.6401`; outcome gains/regressions/preserved `9 / 1 / 1`.
+
+## Interpretation
+The first additive60 pass understated tool value because the acting model sometimes answered correctly, then a brief acknowledgement response replaced the final scored answer. The deterministic answer-retention repair changed this from a scoring artifact into a fair task-completion measurement. After that repair, the contact lookup pack had natural calls, positive called-subset outcome, zero runtime incidents, and zero side-effect incidents.
+
+## Decision Label
+`expanded portfolio ready for 100`

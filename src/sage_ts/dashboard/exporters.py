@@ -1215,6 +1215,60 @@ def _arm_progress_status(
     }
 
 
+def _balanced_pair_summary(pairs: list[dict[str, Any]]) -> dict[str, Any]:
+    complete_pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for pair in pairs:
+        control = pair.get("control")
+        candidate = pair.get("candidate")
+        if not isinstance(control, dict) or not isinstance(candidate, dict):
+            continue
+        if control.get("status") != "complete" or candidate.get("status") != "complete":
+            continue
+        complete_pairs.append((control, candidate))
+
+    def mean_value(
+        side: int,
+        key: str,
+    ) -> float | None:
+        values: list[float] = []
+        for pair in complete_pairs:
+            value = pair[side].get(key)
+            if value is not None:
+                try:
+                    values.append(float(value))
+                except (TypeError, ValueError):
+                    continue
+        return sum(values) / len(values) if values else None
+
+    control_mean = mean_value(0, "similarity")
+    candidate_mean = mean_value(1, "similarity")
+    control_outcome_mean = mean_value(0, "outcome_similarity")
+    candidate_outcome_mean = mean_value(1, "outcome_similarity")
+    delta = (
+        candidate_mean - control_mean
+        if control_mean is not None and candidate_mean is not None
+        else None
+    )
+    outcome_delta = (
+        candidate_outcome_mean - control_outcome_mean
+        if control_outcome_mean is not None and candidate_outcome_mean is not None
+        else None
+    )
+    lift_percent = None
+    if delta is not None and control_mean is not None and control_mean != 0:
+        lift_percent = (delta / control_mean) * 100
+    return {
+        "balanced_completed": len(complete_pairs),
+        "balanced_control_mean_similarity": control_mean,
+        "balanced_candidate_mean_similarity": candidate_mean,
+        "balanced_delta": delta,
+        "balanced_lift_percent": lift_percent,
+        "balanced_control_mean_outcome_similarity": control_outcome_mean,
+        "balanced_candidate_mean_outcome_similarity": candidate_outcome_mean,
+        "balanced_outcome_delta": outcome_delta,
+    }
+
+
 def _write_task_focus_dashboard(
     dashboard_dir: Path,
     run_root: Path,
@@ -1263,6 +1317,7 @@ def _write_task_focus_dashboard(
     current = data.get("candidate") or data.get("control") or {}
     control_summary = data.get("control", {})
     candidate_summary = data.get("candidate", {})
+    balanced_summary = _balanced_pair_summary(pairs)
     control_arm_status = _arm_progress_status(
         run_root,
         "control",
@@ -1312,6 +1367,7 @@ def _write_task_focus_dashboard(
             "current_mean_similarity": current.get("mean_similarity"),
             "current_turns": current.get("total_turns"),
             "current_exceptions": current.get("exception_count"),
+            **balanced_summary,
         },
         "arm_progress": {
             "control": control_arm_status,

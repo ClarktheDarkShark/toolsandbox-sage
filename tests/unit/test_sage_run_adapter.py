@@ -121,6 +121,66 @@ def test_side_effect_preservation_ignores_prerequisite_route_calls() -> None:
     )
 
 
+def test_side_effect_preservation_ignores_scalar_helper_without_followup_contract() -> (
+    None
+):
+    messages = [
+        {
+            "role": "tool",
+            "name": "normalize_contact_phone_number",
+            "content": {
+                "normalized_phone_number": "+10000000000",
+                "is_valid": True,
+                "abstain_reason": "",
+            },
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "search_contacts"}}],
+        },
+    ]
+
+    assert not _side_effect_followup_failures(
+        messages,
+        helper_name="normalize_contact_phone_number",
+        required_original_tool_calls=(
+            "add_contact",
+            "remove_contact",
+            "modify_contact",
+            "search_contacts",
+            "send_message_with_phone_number",
+        ),
+    )
+
+
+def test_side_effect_preservation_honors_should_call_tool_contract() -> None:
+    messages = [
+        {
+            "role": "tool",
+            "name": "prepare_contact",
+            "content": {
+                "downstream_tool_name": "add_contact",
+                "downstream_tool_kwargs": {
+                    "name": "Ada",
+                    "phone_number": "+10000000000",
+                },
+                "should_call_tool": True,
+                "abstain_reason": "",
+            },
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "search_contacts"}}],
+        },
+    ]
+
+    assert _side_effect_followup_failures(
+        messages,
+        helper_name="prepare_contact",
+        required_original_tool_calls=("add_contact",),
+    )
+
+
 def _registry_with_canonicalizer(path: Path) -> RegistryStore:
     tool = canonicalizer_tool()
     validation = validate_generated_tool(

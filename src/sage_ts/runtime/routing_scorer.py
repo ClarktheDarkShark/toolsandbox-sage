@@ -224,6 +224,45 @@ def _is_recency_action_selector(spec_text: str, input_names: set[str]) -> bool:
     )
 
 
+def _is_insufficient_information_guard(spec: Any) -> bool:
+    """Identify abstention helpers whose purpose is to stop unsafe minefield calls."""
+    output_props = {}
+    if isinstance(spec.output_schema, dict):
+        raw_props = spec.output_schema.get("properties", {})
+        if isinstance(raw_props, dict):
+            output_props = raw_props
+    evidence_text = " ".join(
+        (
+            spec.description,
+            spec.abstain_behavior,
+            spec.generalization_rationale,
+            " ".join(spec.positive_triggers),
+            " ".join(spec.applicable_task_families),
+            " ".join(spec.shortfall_cluster_evidence),
+            " ".join(spec.known_failure_mechanisms_addressed),
+            " ".join(output_props),
+        )
+    ).lower()
+    has_abstention_contract = (
+        "should_abstain" in output_props
+        and "clarification_prompt" in output_props
+        and (
+            "missing_information" in output_props
+            or "forbidden_downstream_tools" in output_props
+        )
+    )
+    return has_abstention_contract and any(
+        token in evidence_text
+        for token in (
+            "insufficient_information",
+            "missing information",
+            "missing_information",
+            "clarification",
+            "minefield",
+        )
+    )
+
+
 def _scenario_has_recency_action_signal(scenario_name: str) -> bool:
     return any(
         token in scenario_name
@@ -321,6 +360,7 @@ def score_registry_entry_for_scenario(
         spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR
         and "insufficient_information" in scenario_lower
         and spec.required_original_tool_calls
+        and not _is_insufficient_information_guard(spec)
     ):
         return RuntimeRoutingDecision(
             tool_name,

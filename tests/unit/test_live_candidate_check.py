@@ -180,3 +180,95 @@ def test_live_candidate_check_rejects_positive_composite_abstention() -> None:
 
     assert not result.accepted
     assert "live_example_0_positive_unusable_output" in result.errors
+
+
+def test_live_candidate_check_accepts_positive_abstention_guard() -> None:
+    spec = ToolSpec(
+        tool_name="detect_missing_information_before_minefield",
+        family=ToolFamily.STATE_PRECONDITION_HELPER,
+        description="Detect missing information before unsafe downstream calls.",
+        inputs=(
+            ToolInput("user_request", "str", "User request."),
+            ToolInput("failed_tool_name", "str", "Failed state tool."),
+            ToolInput("error_text", "str", "Error text."),
+            ToolInput("intended_downstream_tool", "str", "Downstream tool."),
+        ),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "should_abstain": {"type": "boolean"},
+                "missing_information": {"type": "array", "items": {"type": "string"}},
+                "clarification_prompt": {"type": "string"},
+                "forbidden_downstream_tools": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "abstain_reason": {"type": "string"},
+            },
+        },
+        positive_triggers=("failed current-location lookup before minefield call",),
+        negative_triggers=("no error visible", "all required information present"),
+        required_original_tool_calls=("get_current_location",),
+        abstain_behavior="Return a clarification plan when required information is missing.",
+        generalization_rationale="Missing-state guard applies across insufficient-information tasks.",
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=(
+            "find_distance_with_location_name_insufficient_information",
+            "find_current_city_insufficient_information",
+        ),
+        reason_tool_is_decisive="It prevents unsafe downstream minefield calls.",
+        shortfall_cluster_evidence=("insufficient_information_or_clarification",),
+        known_failure_mechanisms_addressed=("missing_current_location",),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents compute despite missing required information.",
+            signals=("minefield_after_missing_information",),
+        ),
+    )
+    tool = GeneratedTool(
+        spec=spec,
+        code=(
+            "def detect_missing_information_before_minefield("
+            "user_request: str, failed_tool_name: str, error_text: str, "
+            "intended_downstream_tool: str) -> dict:\n"
+            "    if failed_tool_name == 'get_current_location':\n"
+            "        return {'should_abstain': True, "
+            "'missing_information': ['current_location'], "
+            "'clarification_prompt': 'I need your current location first.', "
+            "'forbidden_downstream_tools': [intended_downstream_tool], "
+            "'abstain_reason': 'missing_current_location'}\n"
+            "    return {'should_abstain': False, 'missing_information': [], "
+            "'clarification_prompt': '', 'forbidden_downstream_tools': [], "
+            "'abstain_reason': ''}\n"
+        ),
+    )
+
+    result = run_lightweight_live_candidate_check(
+        tool,
+        (
+            ToolExample(
+                {
+                    "user_request": "How far is the store from me?",
+                    "failed_tool_name": "get_current_location",
+                    "error_text": "Current location unavailable",
+                    "intended_downstream_tool": "calculate_lat_lon_distance",
+                },
+                {},
+            ),
+            ToolExample(
+                {
+                    "user_request": "How far is Central Park from Times Square?",
+                    "failed_tool_name": "",
+                    "error_text": "",
+                    "intended_downstream_tool": "calculate_lat_lon_distance",
+                },
+                {},
+                negative_applicability=True,
+            ),
+        ),
+    )
+
+    assert result.accepted
+    assert result.positive_usable_count == 1
+    assert result.negative_abstain_count == 1

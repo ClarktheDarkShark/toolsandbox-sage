@@ -374,6 +374,54 @@ def test_decisive_gate_rejects_timestamp_only_derived_helper() -> None:
     assert decision.reason == "missing_downstream_original_tool_call"
 
 
+def test_decisive_gate_allows_getter_preserving_derived_guard() -> None:
+    spec = ToolSpec(
+        tool_name="detect_missing_information_before_minefield",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description="Return an abstain and clarification plan after a failed state getter.",
+        inputs=(
+            ToolInput("failed_tool_name", "str", "Failed getter."),
+            ToolInput("error_text", "str", "Error text."),
+        ),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "should_abstain": {"type": "boolean"},
+                "missing_information": {"type": "array", "items": {"type": "string"}},
+                "clarification_prompt": {"type": "string"},
+                "abstain_reason": {"type": "string"},
+            },
+        },
+        positive_triggers=("failed get_current_location before distance calculation",),
+        negative_triggers=("no failed getter",),
+        required_original_tool_calls=("get_current_location",),
+        abstain_behavior="Return should_abstain false when no getter failure is visible.",
+        generalization_rationale=(
+            "Missing current-location guard recurs across insufficient-information tasks."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=(
+            "find_distance_with_location_name_insufficient_information",
+            "find_current_city_insufficient_information",
+        ),
+        reason_tool_is_decisive=(
+            "It prevents forbidden downstream calls after a preserved original getter fails."
+        ),
+        shortfall_cluster_evidence=("insufficient_information_or_clarification",),
+        known_failure_mechanisms_addressed=("missing_current_location_minefield",),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents compute despite visible missing current location.",
+            signals=("failed_base_tool_with_deterministic_fallback",),
+        ),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert decision.allowed
+
+
 def test_decisive_gate_rejects_bounds_only_search_helper_even_with_search_call() -> (
     None
 ):

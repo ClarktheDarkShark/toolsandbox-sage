@@ -68,6 +68,13 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "generic_multi_tool_composition",
     ),
     "extract_service_answer_field": ("weather_location_current_city_distance",),
+    "plan_contact_lookup_query": (
+        "contact_message_search_disambiguation",
+        "generic_multi_tool_composition",
+    ),
+    "extract_contact_field_from_search_result": (
+        "contact_message_search_disambiguation",
+    ),
 }
 
 OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
@@ -83,6 +90,10 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
     ),
     "search_filter:select_contact_field_by_constraint": (
         "select_contact_field_by_constraint",
+    ),
+    "composite:plan_contact_lookup_query": ("plan_contact_lookup_query",),
+    "derived_value:extract_contact_field_from_search_result": (
+        "extract_contact_field_from_search_result",
     ),
     "search_filter:select_visible_record_by_constraints": (
         "select_visible_record_by_constraints",
@@ -356,6 +367,15 @@ def expected_helper_fit(
         helpers.append("resolve_search_window_or_bounds")
     if any(token in name for token in ("holiday", "business_day")):
         helpers.append("days_between_timestamps")
+    if "insufficient_information" not in name and name.startswith(
+        (
+            "search_name_with_relationship",
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number",
+        )
+    ):
+        helpers.append("plan_contact_lookup_query")
+        helpers.append("extract_contact_field_from_search_result")
     return helpers
 
 
@@ -428,6 +448,8 @@ def expected_birth_opportunities(
             )
         )
     ):
+        opportunities.append("composite:plan_contact_lookup_query")
+        opportunities.append("derived_value:extract_contact_field_from_search_result")
         opportunities.append("composite:constraint_to_action_planner")
     if name.startswith("find_days_till_holiday"):
         opportunities.append("derived_value:days_between_timestamps")

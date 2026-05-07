@@ -74,6 +74,19 @@ def test_contact_update_tasks_have_birth_opportunity_and_retained_fit() -> None:
     assert "constraint_to_action_planner" not in expected_helper_fit(scenario)
 
 
+def test_contact_lookup_tasks_match_lookup_query_helpers() -> None:
+    scenario = "search_relationship_with_phone_number_3_distraction_tools"
+
+    assert "plan_contact_lookup_query" in expected_helper_fit(scenario)
+    assert "extract_contact_field_from_search_result" in expected_helper_fit(scenario)
+    assert "composite:plan_contact_lookup_query" in expected_birth_opportunities(
+        scenario
+    )
+    assert "derived_value:extract_contact_field_from_search_result" in (
+        expected_birth_opportunities(scenario)
+    )
+
+
 def test_raw_latest_message_matches_retrieval_window_and_selector() -> None:
     scenario = "search_message_with_recency_latest_multiple_user_turn_alt"
 

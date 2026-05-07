@@ -638,3 +638,32 @@
 - Gap reduction proxy `10.94%` met, but outcome/exact guardrail failed; no frozen250 for this pack.
 - Decision label: `continue gap-closure loop`.
 - Next action: rebuild gap atlas and test a materially different candidate pack; distance remains useful-but-not-promoted.
+
+## 2026-05-06 - V2.5 Candidate Pack 2 Contact Lookup 100/250
+- Protected best3 registry unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+- Candidate pack registry: `artifacts/registry_candidates/v2_5_additive_toolset/registry_manifest.json`, SHA-256 `835b1ab6524b27ad33591a57b9154dc1d89edbc6b1655f3431b1173fd74a0c48`; tools are best3 plus `plan_contact_lookup_query` and `extract_contact_field_from_search_result`.
+- Tests: `PYTHONPATH=src:. pytest tests/unit/test_task_strata.py tests/unit/test_role_factory.py tests/unit/test_state_helper_guidance.py tests/unit/test_sage_run_adapter.py tests/unit/test_runtime_routing_scorer.py tests/unit/test_live_candidate_check.py tests/unit/test_candidate_gate.py tests/unit/test_tool_generator.py tests/unit/test_online_birth.py -q` -> `153 passed`.
+- Registry check: `PYTHONPATH=src:. python scripts/migrate_registry.py --check-only artifacts/registry_candidates/v2_5_additive_toolset/registry_manifest.json` -> PASS, 5 active entries.
+- Frozen100-style manifest: `artifacts/summaries/v2_5_gap_closure_100_pack2_contact/cohort_manifest.json`; quality pass.
+- Frozen100 best3 run: `outputs/v2_5_gap_closure100_pack2_contact_best3_20260506_200940/validate_100_20260506_200945`; dashboards opened on port `5665`.
+- Frozen100 pack run: `outputs/v2_5_gap_closure100_pack2_contact_pack_20260506_202903/validate_100_20260506_202908`; dashboards opened on port `5666`.
+- Direct frozen100 pack-vs-best3: outcome `+0.0255`; canonical `+0.0025`; exact `43 -> 48`; contact subset `+0.1527`; static no-current-helper-fit `48% -> 24%`; runtime/side-effect `0 / 0`.
+- Broad250 manifest: `artifacts/summaries/v2_formal250_clean_20260504_034104/cohort_manifest.json`; quality pass; manifest SHA `c7ec4010f8fc3ea3ca1f914b8d5a980f70e51494c75cc3d9f9148b0b3604a47e`.
+- Broad250 best3 run: `outputs/v2_5_gap_closure250_pack2_contact_best3_20260506_205033/validate_250_20260506_205037`; dashboards opened on port `5667`; cache mixed `211 cached / 39 fresh`; outcome `0.5626`; delta vs control `+0.1556`; exact delta `+19`; protocol PASS.
+- Broad250 pack run: `outputs/v2_5_gap_closure250_pack2_contact_pack_20260506_210835/validate_250_20260506_210840`; dashboards opened on port `5668`; cache `250 cached / 0 fresh`; outcome `0.5637`; delta vs control `+0.1636`; exact delta `+27`; protocol PASS.
+- Direct broad250 pack-vs-best3: outcome `+0.0011`; canonical `+0.0156`; exact `68 -> 72`; contact subset `+0.2167`; static no-current-helper-fit `52.0% -> 46.0%`; relative reduction `11.54%`; runtime/side-effect `0 / 0`.
+- Degradation analysis: smaller-run advantage persisted on called contact tasks, but broad250 aggregate was diluted by only 15 contact opportunities and by unrelated best3/no-helper lane regressions. Report: `docs/sage_protocol/v2_5_pack2_contact_lookup_degradation_report.md`.
+- Decision label: `continue gap-closure loop`.
+- Next action: tighten contact-helper routing/context exposure and continue foundry with another non-overlapping gap lane; Candidate Pack 2 is validated lane progress but not full final gap closure against the original `44.4% -> <=40.0%` reference.
+
+## 2026-05-06 - V2.5 Contact Routing Repair
+- Root cause: explicit contact-helper contracts could still fall through to broad provisional birth-family visibility after generic routing deferred, causing non-contact `all_tools` VNC/context pollution in broad250.
+- Code repair: `src/sage_ts/runtime/toolsandbox_integration.py` now hides helpers with explicit positive triggers/applicable families when no trigger/family match exists.
+- Test added: `tests/unit/test_runtime_routing_scorer.py::test_explicit_contact_lookup_contract_blocks_non_matching_all_tools`.
+- Static route probe: `artifacts/summaries/v2_5_contact_routing_contract_repair/route_probe.json`.
+- Diagnostic20 manifest: `artifacts/summaries/v2_5_contact_routing_repair20/cohort_manifest.json`; quality pass; 6 contact positives, 14 non-contact/negative cases.
+- Diagnostic20 run: `outputs/v2_5_contact_routing_repair20_pack_20260506_220717/mechanism_40_20260506_220721`; dashboards opened on port `5669`; controls `20 cached / 0 fresh`; protocol PASS.
+- Diagnostic20 metrics: outcome delta `+0.2699`; canonical delta `+0.0837`; exact delta `+3`; runtime/side-effect `0 / 0`.
+- Contact helper visibility after repair: `plan_contact_lookup_query` `6 / 5 / 1 / 14`; `extract_contact_field_from_search_result` `6 / 3 / 3 / 14`.
+- Tests: focused routing suite `73 passed`; full targeted suite `154 passed, 2 warnings`; registry check-only PASS for `artifacts/registry_candidates/v2_5_additive_toolset/registry_manifest.json`.
+- Decision label: `continue gap-closure loop`.

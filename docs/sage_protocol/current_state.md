@@ -356,3 +356,35 @@
 - Gap reduction proxy `10.94%` met, but outcome/exact guardrail failed; no frozen250 for this pack.
 - Decision label: `continue gap-closure loop`.
 - Next action: rebuild gap atlas and test a materially different candidate pack; distance remains useful-but-not-promoted.
+
+## V2.5 Candidate Pack 2 Contact Lookup - 2026-05-06
+- Protected frozen best3 registry remains unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+- Candidate pack registry: `artifacts/registry_candidates/v2_5_additive_toolset/registry_manifest.json`, SHA-256 `835b1ab6524b27ad33591a57b9154dc1d89edbc6b1655f3431b1173fd74a0c48`.
+- Candidate tools: `plan_contact_lookup_query`, `extract_contact_field_from_search_result` plus best3.
+- Framework repairs enabling fair testing: generated-helper signature ordering, pre-search contact lookup actor policy, answer-retention final-response repair, contact-helper task-strata accounting.
+- Tests: targeted suite `153 passed`; candidate registry check-only PASS with 5 active entries.
+- Frozen100-style manifest: `artifacts/summaries/v2_5_gap_closure_100_pack2_contact/cohort_manifest.json`; quality pass; best3 no-current-helper-fit `48%`, pack `24%`.
+- Frozen100-style best3 run: `outputs/v2_5_gap_closure100_pack2_contact_best3_20260506_200940/validate_100_20260506_200945`; outcome `0.6235`; canonical `0.8449`; exact successes `43`.
+- Frozen100-style pack run: `outputs/v2_5_gap_closure100_pack2_contact_pack_20260506_202903/validate_100_20260506_202908`; outcome `0.6490`; canonical `0.8474`; exact successes `48`.
+- Direct 100 pack-vs-best3: outcome `+0.0255`; canonical `+0.0025`; exact `43 -> 48`; contact subset `+0.1527`; runtime/side-effect `0 / 0`.
+- Broad250 manifest: `artifacts/summaries/v2_formal250_clean_20260504_034104/cohort_manifest.json`; quality pass; largest family share `0.032`.
+- Broad250 best3 run: `outputs/v2_5_gap_closure250_pack2_contact_best3_20260506_205033/validate_250_20260506_205037`; outcome `0.5626`; control `0.4070`; exact delta `+19`; protocol PASS; cache mixed `211 / 39`.
+- Broad250 pack run: `outputs/v2_5_gap_closure250_pack2_contact_pack_20260506_210835/validate_250_20260506_210840`; outcome `0.5637`; control `0.4001`; exact delta `+27`; protocol PASS; cache `250 / 0`.
+- Direct 250 pack-vs-best3: outcome `+0.0011`; canonical `+0.0156`; exact `68 -> 72`; gains/regressions/preserved `51 / 56 / 95`; runtime/side-effect `0 / 0`.
+- Contact lookup 250 subset: best3 `0.5629`, pack `0.7796`, delta `+0.2167`; exact `8 -> 11`.
+- Registry-aware 250 no-current-helper-fit: best3 `52.0%`, pack `46.0%`, relative reduction `11.54%`. This does not reach the original formal reference target of `<=40.0%`, so the campaign remains open.
+- Degradation analysis: `docs/sage_protocol/v2_5_pack2_contact_lookup_degradation_report.md`; machine artifact `artifacts/summaries/v2_5_pack2_contact_degradation_analysis_250/analysis.json`.
+- Decision label: `continue gap-closure loop`.
+- Next action: keep Candidate Pack 2 as a validated contact-lookup lane, tighten routing to reduce cross-lane VNC/context interference, and mine another non-overlapping high-gap candidate lane before any final expanded-portfolio claim.
+
+## V2.5 Contact Routing Repair - 2026-05-06
+- Repair: explicit generated-tool contracts now block provisional birth-family exposure when positive triggers/applicable families do not match.
+- Test added: `test_explicit_contact_lookup_contract_blocks_non_matching_all_tools`.
+- Static route probe: `artifacts/summaries/v2_5_contact_routing_contract_repair/route_probe.json`.
+- Diagnostic manifest: `artifacts/summaries/v2_5_contact_routing_repair20/cohort_manifest.json`; quality `pass`.
+- Diagnostic run: `outputs/v2_5_contact_routing_repair20_pack_20260506_220717/mechanism_40_20260506_220721`; dashboards opened at port `5669`.
+- Metrics: outcome delta `+0.2699`; canonical delta `+0.0837`; exact delta `+3`; runtime `0`; protocol PASS; controls `20 cached / 0 fresh`.
+- Planner visible/called/VNC/hidden: `6 / 5 / 1 / 14`; extractor `6 / 3 / 3 / 14`; new-helper side-effect/runtime `0 / 0`.
+- Tests after repair: full targeted suite `154 passed`; registry check-only PASS.
+- Decision label: `continue gap-closure loop`.
+- Next action: rerun a broader candidate-pack validation with the routing repair, or combine this contact lane with another non-overlapping gap-lane candidate before another 250-scale proof attempt.

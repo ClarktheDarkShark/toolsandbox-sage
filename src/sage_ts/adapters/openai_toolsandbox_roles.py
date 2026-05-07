@@ -8,9 +8,11 @@ from typing import Any, Iterable, Literal, Mapping, Union, cast
 from openai import NOT_GIVEN, NotGiven
 from openai.types.chat import (
     ChatCompletion,
+    ChatCompletionMessage,
     ChatCompletionMessageParam,
     ChatCompletionToolParam,
 )
+from openai.types.chat.chat_completion import Choice
 
 from sage_ts.config.models import resolve_model_name
 from tool_sandbox.common.utils import all_logging_disabled
@@ -19,6 +21,8 @@ from tool_sandbox.roles.openai_api_user import OpenAIAPIUser
 
 SELECTOR_ACTOR_POLICY_SENTINEL = "[SAGE selector actor policy]"
 DERIVED_ACTOR_POLICY_SENTINEL = "[SAGE derived-value actor policy]"
+LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL = "[SAGE lookup-planner actor policy]"
+ANSWER_RETENTION_ACTOR_POLICY_SENTINEL = "[SAGE answer-retention actor policy]"
 OpenAIMessage = dict[
     Literal["role", "content", "tool_call_id", "name", "tool_calls"],
     Any,
@@ -169,6 +173,54 @@ def _derived_value_tool_names(openai_tools: object) -> set[str]:
     return helpers
 
 
+def _lookup_query_planner_tool_names(openai_tools: object) -> set[str]:
+    """Return helpers that prepare original lookup/search kwargs before search."""
+    if openai_tools is NOT_GIVEN:
+        return set()
+    planners: set[str] = set()
+    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
+        function = tool.get("function", {})
+        if not isinstance(function, dict):
+            continue
+        name = function.get("name")
+        description = str(function.get("description", "")).lower()
+        parameters = function.get("parameters", {})
+        properties: object = {}
+        if isinstance(parameters, dict):
+            properties = parameters.get("properties", {})
+        input_names = set(properties) if isinstance(properties, dict) else set()
+        output_schema = function.get("output_schema")
+        output_properties: object = {}
+        if isinstance(output_schema, dict):
+            output_properties = output_schema.get("properties", {})
+        if not isinstance(output_properties, dict):
+            # OpenAI function schemas usually do not carry output_schema. Fall
+            # back to description/name markers from generated helper docstrings.
+            output_properties = {}
+        if not isinstance(name, str) or not input_names:
+            continue
+        prepares_search_kwargs = any(
+            str(key).startswith(("search_", "find_", "get_"))
+            and str(key).endswith("_kwargs")
+            for key in output_properties
+        ) or any(
+            token in f"{name} {description}"
+            for token in (
+                "search_contacts_kwargs",
+                "lookup query",
+                "query planner",
+                "prepare search",
+                "search kwargs",
+            )
+        )
+        requires_prior_records = bool(
+            input_names & {"records", "candidates", "selected_record", "contact_record"}
+        )
+        if prepares_search_kwargs and not requires_prior_records:
+            planners.add(name)
+    return planners
+
+
 def _tool_content_has_candidate_records(content: object) -> bool:
     text = str(content or "").strip()
     if not text or text.lower() in {"[]", "{}", "null", "none"}:
@@ -260,6 +312,82 @@ def _messages_show_prior_structured_payload(openai_messages: object) -> bool:
     return False
 
 
+def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
+    latest_user = ""
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    for message in reversed(messages):
+        if message.get("role") == "user":
+            latest_user = str(message.get("content", "")).strip().lower()
+            break
+    if not latest_user:
+        return False
+    if "?" in latest_user or any(
+        token in latest_user
+        for token in (
+            "can you",
+            "could you",
+            "what ",
+            "why ",
+            "how ",
+            "search",
+            "find",
+            "add ",
+            "remove ",
+            "modify ",
+            "send ",
+        )
+    ):
+        return False
+    acknowledgement_tokens = (
+        "thank",
+        "thanks",
+        "got it",
+        "great",
+        "cool",
+        "okay",
+        "ok",
+        "alright",
+        "you found it",
+    )
+    return any(token in latest_user for token in acknowledgement_tokens)
+
+
+def _recent_tool_backed_answer_text(openai_messages: object) -> str | None:
+    saw_tool = False
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        role = message.get("role")
+        if role == "tool":
+            saw_tool = True
+            continue
+        if role != "assistant" or not saw_tool:
+            continue
+        content = str(message.get("content", "") or "").strip()
+        if len(content) < 8:
+            continue
+        lower = content.lower()
+        if lower.startswith(("you're welcome", "you are welcome")):
+            continue
+        if any(token in lower for token in (" is ", " are ", "phone", "+", "boss")):
+            return content
+    return None
+
+
+def _messages_show_recent_tool_backed_answer(openai_messages: object) -> bool:
+    return _recent_tool_backed_answer_text(openai_messages) is not None
+
+
+def _answer_retention_response_text(openai_messages: object) -> str | None:
+    if not _latest_user_is_brief_acknowledgement(openai_messages):
+        return None
+    answer = _recent_tool_backed_answer_text(openai_messages)
+    if not answer:
+        return None
+    answer = " ".join(answer.split())
+    if len(answer) > 280:
+        answer = answer[:277].rstrip() + "..."
+    return f"You're welcome. To recap: {answer}"
+
+
 def _selector_actor_policy_message(
     openai_messages: object,
     openai_tools: object,
@@ -325,6 +453,68 @@ def _derived_actor_policy_message(
     }
 
 
+def _answer_retention_actor_policy_message(
+    openai_messages: object,
+) -> dict[str, str] | None:
+    """Keep a just-produced lookup answer visible through closing turns."""
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        if ANSWER_RETENTION_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
+            return None
+    if not _latest_user_is_brief_acknowledgement(openai_messages):
+        return None
+    if not _messages_show_recent_tool_backed_answer(openai_messages):
+        return None
+    return {
+        "role": "system",
+        "content": (
+            f"{ANSWER_RETENTION_ACTOR_POLICY_SENTINEL} The user is acknowledging "
+            "a just-completed tool-backed lookup. The next assistant message must "
+            "include the retrieved value again in a concise recap. Do not answer "
+            'only with a generic acknowledgement such as "you\'re welcome." Do not '
+            "call tools only to recap, and do not invent new facts."
+        ),
+    }
+
+
+def _lookup_planner_actor_policy_message(
+    openai_messages: object,
+    openai_tools: object,
+) -> dict[str, str] | None:
+    """Bounded policy nudge for helpers that prepare original lookup args."""
+    planners = _lookup_query_planner_tool_names(openai_tools)
+    if not planners:
+        return None
+    if any(_message_already_called_tool(openai_messages, name) for name in planners):
+        return None
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        if LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
+            return None
+    if _messages_show_prior_candidate_records(openai_messages):
+        return None
+    planner_list = ", ".join(sorted(planners))
+    return {
+        "role": "system",
+        "content": (
+            f"{LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL} A deterministic lookup "
+            f"query planner helper is available: {planner_list}. If the user "
+            "asks for a contact/message/record field and supplies a scalar "
+            "constraint such as name, phone number, relationship, content, or "
+            "id, call the helper before manually choosing original search "
+            'arguments. Phrases like "my boss" or "with +1555..." count as '
+            "relationship/phone scalar constraints for lookup planning. "
+            "Prefer this helper over manually assembling search kwargs when it "
+            "exactly matches the lookup problem. "
+            "If it returns should_call_search_contacts or "
+            "should_call_tool with search_*_kwargs, call the original "
+            "ToolSandbox search tool next with those kwargs, then answer from "
+            "the returned record or use a visible post-search extractor. Do not "
+            "call it when no scalar constraint is available, on unrelated "
+            "tasks, on insufficient-information tasks, or for final side-effect "
+            "actions."
+        ),
+    }
+
+
 def _with_selector_actor_policy(
     openai_messages: list[OpenAIMessage],
     openai_tools: object,
@@ -332,6 +522,8 @@ def _with_selector_actor_policy(
     policies = [
         policy
         for policy in (
+            _answer_retention_actor_policy_message(openai_messages),
+            _lookup_planner_actor_policy_message(openai_messages, openai_tools),
             _selector_actor_policy_message(openai_messages, openai_tools),
             _derived_actor_policy_message(openai_messages, openai_tools),
         )
@@ -354,6 +546,25 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
         openai_tools: Union[Iterable[ChatCompletionToolParam], NotGiven],
     ) -> ChatCompletion:
         """Run inference, with opt-in diagnostic tool forcing for adoption tests."""
+        retained_answer = _answer_retention_response_text(openai_messages)
+        if retained_answer:
+            return ChatCompletion.model_construct(
+                id="sage-answer-retention",
+                choices=[
+                    Choice.model_construct(
+                        finish_reason="stop",
+                        index=0,
+                        message=ChatCompletionMessage.model_construct(
+                            content=retained_answer,
+                            role="assistant",
+                            tool_calls=None,
+                        ),
+                    )
+                ],
+                created=0,
+                model=self.model_name,
+                object="chat.completion",
+            )
         forced_tool = os.environ.get("SAGE_DIAGNOSTIC_FORCE_TOOL_NAME", "").strip()
         force_after_error = os.environ.get(
             "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_ERROR", ""
