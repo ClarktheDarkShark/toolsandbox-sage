@@ -133,6 +133,20 @@ def test_generation_request_includes_family_contract_guidance(
     assert "tool_generation_v5" not in prompt
 
 
+def test_generation_request_includes_exact_contact_phone_normalization() -> None:
+    request = ToolGenerationRequest(
+        scenario_name="remove_contact_by_phone",
+        observation="Normalize a scalar contact phone constraint.",
+        allowed_families=("composite_workflow_helper",),
+    )
+    prompt = request.prompt()
+
+    assert "if there are 11 digits and the first digit is '1'" in prompt
+    assert "Never prepend '+1' to an 11-digit US number" in prompt
+    assert "preserve the original case and spacing" in prompt
+    assert "should_call_search is false" in prompt
+
+
 def test_generation_request_requires_v2_contract_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -216,3 +230,5 @@ def test_repair_prompt_includes_selector_and_action_alias_contract(
 
     assert any("selected_index=-1" in prompt for prompt in seen)
     assert any("remove/delete" in prompt for prompt in seen)
+    assert any("Exact E.164 repair rule" in prompt for prompt in seen)
+    assert any("search_kwargs must be {}" in prompt for prompt in seen)

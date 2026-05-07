@@ -667,3 +667,38 @@
 - Contact helper visibility after repair: `plan_contact_lookup_query` `6 / 5 / 1 / 14`; `extract_contact_field_from_search_result` `6 / 3 / 3 / 14`.
 - Tests: focused routing suite `73 passed`; full targeted suite `154 passed, 2 warnings`; registry check-only PASS for `artifacts/registry_candidates/v2_5_additive_toolset/registry_manifest.json`.
 - Decision label: `continue gap-closure loop`.
+
+## 2026-05-07 - V2.6 Feedback Packets and Contact Pack Rerun
+- Protected best3 registry unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+- Added structured feedback packet exporter: `src/sage_ts/evaluation/feedback_packets.py`, `scripts/export_v2_6_feedback_packets.py`, `tests/unit/test_v2_6_feedback_packets.py`.
+- Exported task feedback packets for formal100/250/500/1032, V2.5 broad250 best3/contact-pack, V2.5 contact-routing diagnostic20, and V2.6 contact rerun100 best3/pack under `artifacts/summaries/v2_6_feedback_packets/`.
+- Feedback audit decision: `feedback sufficient for tool birth`; feedback mode decision: `feedback mode B wins`.
+- Contact pack rerun best3: `outputs/v2_6_contact_pack_rerun_best3/validate_100_20260507_000133`; dashboards opened on port `5672`; control cache `100 cached / 0 fresh`; protocol PASS.
+- Contact pack rerun candidate: `outputs/v2_6_contact_pack_rerun_pack/validate_100_20260507_002045`; dashboards opened on port `5673`; control cache `44 cached / 56 fresh` due initial-state-compatible task-level misses, then collected fresh controls; protocol PASS.
+- Direct matched candidate-arm comparison over `88` scored scenarios: pack-vs-best3 outcome `-0.0178`, canonical `+0.0408`, exact `30 -> 29`.
+- Contact subset comparison over `24` scenarios: outcome `+0.0563`, canonical `+0.1461`.
+- Helper contribution: `plan_contact_lookup_query` visible/called/VNC `24 / 15 / 9`, called outcome `+0.5755`; `extract_contact_field_from_search_result` `24 / 9 / 15`, called outcome `+0.6851`; runtime/side-effect `0 / 0`.
+- Feedback packet gap metric on rerun100: best3 no-fit `48.0%`, pack no-fit `24.0%`.
+- Cross-task packet artifact: `artifacts/summaries/v2_6_cross_task_packets/latest_packets.json`, SHA `c4437da1dadfb9f96f625fdbfb1415fc9991545cc0bda2fed1142e3440415794`.
+- User-flagged insufficient-info distance case recorded as a valid minefield zero; current helper-call guard designs are not promotion-ready because a helper call can still be a forbidden trajectory in those tasks.
+- Decision label: `continue foundry loop`.
+- Next action: score and validate one non-overlapping cross-task candidate design, then run micro20 before additive60.
+
+## 2026-05-07 - V2.6 Unified Final Gap-Closure Matched 250
+- Protected best3 registry unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+- Expanded candidate registry: `artifacts/registry_candidates/v2_6_expanded_contact_scalar_pack/registry_manifest.json`, SHA-256 `ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582`; registry check-only PASS with 6 active entries.
+- Candidate-design reports written: `docs/sage_protocol/v2_6_candidate_design_batch_report.md`, `docs/sage_protocol/v2_6_candidate_validation_report.md`, `docs/sage_protocol/v2_6_micro20_feedback_report.md`, `docs/sage_protocol/v2_6_candidate_pack_additive60_report.md`, `docs/sage_protocol/v2_6_gap_closure_100_report.md`, `docs/sage_protocol/v2_6_gap_closure_250_report.md`.
+- Generator repair: contact scalar phone normalization and abstain-output contract added to `src/sage_ts/generation/tool_generator.py`; tests updated in `tests/unit/test_tool_generator.py`.
+- Accepted scalar candidate: `plan_contact_search_from_scalar_constraint`; micro20 visible/called/VNC `8 / 3 / 5`, called outcome `+0.4222`, runtime/side-effect `0 / 0`.
+- Additive60 pack vs best3: outcome `+0.0740`, canonical `+0.0330`, exact `14 -> 13`; pack protocol PASS; no runtime/side-effect incidents.
+- Frozen100 expanded vs best3: outcome `+0.0574`, canonical `+0.0538`, exact `29 -> 34`; no-current-helper-fit `64.0% -> 40.0%`; protocol PASS.
+- Frozen250 manifest: `artifacts/summaries/v2_6_gap_closure_250/cohort_manifest.json`, SHA `5019602d637362a03317ac4349b9b89a2a790ff69bd5a72203d8dad9516f60e6`; quality PASS; 250 scenarios, 33 base families, largest family share `3.2%`.
+- Best3 frozen250 run: `outputs/v2_6_gap_closure_250_best3/validate_250_20260507_023114`; dashboards opened/checked on port `5679`; control cache mixed `190 / 60`; outcome `0.6040`; canonical `0.7838`; exact `59`; protocol PASS.
+- Expanded frozen250 run: `outputs/v2_6_gap_closure_250_expanded_rerun/validate_250_20260507_033336`; dashboards opened/checked on port `5680`; control cache mixed `222 / 28`; outcome `0.6235`; canonical `0.8060`; exact `59`; protocol PASS.
+- Cache note: partial expanded run `outputs/v2_6_gap_closure_250_expanded/validate_250_20260507_032818` was interrupted and not used because it planned only `87 cached / 163 fresh`; rerun used the settled task-level cache plan `222 cached / 28 fresh`.
+- Matched frozen250 expanded-vs-best3: outcome `+0.0195`; canonical `+0.0222`; exact `59 -> 59`; runtime exceptions `0`; helper side-effect incidents `0`.
+- Feedback packet gap metric: best3 no-current-helper-fit `55.2%`, expanded `45.6%`, relative reduction `17.39%`; feedback insufficient count `0` in both arms.
+- New helper contribution: `plan_contact_lookup_query` visible/called/VNC `24 / 15 / 9`, called outcome `+0.6527`; `extract_contact_field_from_search_result` `24 / 7 / 17`, called outcome `+0.6904`; `plan_contact_search_from_scalar_constraint` `74 / 12 / 62`, called outcome `+0.4279`; all side-effect/runtime `0 / 0`.
+- Caveat: this is a matched gap-enriched frozen250 success, not a direct claim that the original formal250 absolute no-fit reference `44.4% -> <=40.0%` was met on the original formal cohort.
+- Decision label: `gap closure target met`.
+- Exact next action: lock final V2.6 matched-gap evidence; optionally run original-formal-manifest 250 or 500/1032 expanded validation if a broader final claim is required.

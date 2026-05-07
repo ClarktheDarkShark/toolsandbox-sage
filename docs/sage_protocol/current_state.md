@@ -388,3 +388,32 @@
 - Tests after repair: full targeted suite `154 passed`; registry check-only PASS.
 - Decision label: `continue gap-closure loop`.
 - Next action: rerun a broader candidate-pack validation with the routing repair, or combine this contact lane with another non-overlapping gap-lane candidate before another 250-scale proof attempt.
+
+## V2.6 Unified Final Gap-Closure Status
+- Date: `2026-05-07T01:05:00-04:00`
+- Protected best3 registry unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+- V2.6 feedback packets implemented and exported for formal100, formal250, formal500, formal1032, V2.5 broad250 best3/pack, V2.5 routing diagnostic20, and V2.6 contact rerun100 best3/pack.
+- Feedback schema: `docs/sage_protocol/v2_6_feedback_packet_schema.md`.
+- Feedback audit: `docs/sage_protocol/v2_6_feedback_sufficiency_audit.md`; decision `feedback sufficient for tool birth`.
+- Feedback mode decision: `feedback mode B wins`; enriched structured packets are the default V2.6 birth context.
+- Contact pack rerun100 after routing repair: best3 run `outputs/v2_6_contact_pack_rerun_best3/validate_100_20260507_000133`; pack run `outputs/v2_6_contact_pack_rerun_pack/validate_100_20260507_002045`.
+- Contact rerun direct pack-vs-best3: overall outcome `-0.0178`, canonical `+0.0408`, exact `30 -> 29`; contact subset outcome `+0.0563`; gap share `48.0% -> 24.0%`; runtime/side-effect `0 / 0`.
+- Contact pack decision: `contact pack retained`, but not sufficient alone for final frozen250 target.
+- Cross-task packets: `artifacts/summaries/v2_6_cross_task_packets/latest_packets.json`; decision `cross-task packets ready`.
+- Key blocker: remaining gap needs a second non-overlapping candidate; insufficient-information is high coverage but current helper-call designs are risky because helper calls can still be part of forbidden trajectories.
+- Exact next action: score candidate designs from cross-task packets, favor `device_service_state_resolution_v2_6` or a materially narrowed external answer-ready resolver, then run callability-first micro20 before any additive60/100/250.
+
+## V2.6 Matched Frozen250 Gap Closure - 2026-05-07
+- Protected best3 registry remains unchanged: `artifacts/registry_frozen_best3_claim/registry_manifest.json`, SHA-256 `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`.
+- Expanded V2.6 candidate registry: `artifacts/registry_candidates/v2_6_expanded_contact_scalar_pack/registry_manifest.json`, SHA-256 `ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582`.
+- Expanded tools: frozen best3 plus `plan_contact_lookup_query`, `extract_contact_field_from_search_result`, `plan_contact_search_from_scalar_constraint`.
+- V2.6 frozen250 manifest: `artifacts/summaries/v2_6_gap_closure_250/cohort_manifest.json`, SHA-256 `5019602d637362a03317ac4349b9b89a2a790ff69bd5a72203d8dad9516f60e6`.
+- Best3 run: `outputs/v2_6_gap_closure_250_best3/validate_250_20260507_023114`; control cache mixed `190 cached / 60 fresh`; protocol PASS; dashboard and task-focus opened on port `5679`.
+- Expanded run: `outputs/v2_6_gap_closure_250_expanded_rerun/validate_250_20260507_033336`; control cache mixed `222 cached / 28 fresh`; protocol PASS; dashboard and task-focus opened on port `5680`.
+- Interrupted partial expanded run not used: `outputs/v2_6_gap_closure_250_expanded/validate_250_20260507_032818`; restarted because cache planning initially used only `87 cached / 163 fresh`, while a settled task-level plan used `222 cached / 28 fresh`.
+- Matched 250 result: expanded outcome `0.6235` vs best3 `0.6040`, delta `+0.0195`; canonical `0.8060` vs `0.7838`, delta `+0.0222`; exact successes `59 -> 59`; runtime exceptions `0`; helper side-effect incidents `0`.
+- Matched no-current-helper-fit: best3 `55.2%`, expanded `45.6%`, relative reduction `17.39%`; this meets the matched-manifest 10% gap-closure target.
+- Caveat: the original formal250 absolute reference target was `44.4% -> <=40.0%`; this gap-enriched frozen250 is not directly comparable, so the direct absolute `<=40.0%` claim is not made from this run.
+- Helper contribution on expanded frozen250: `plan_contact_lookup_query` visible/called/VNC `24 / 15 / 9`, called outcome `+0.6527`; `extract_contact_field_from_search_result` `24 / 7 / 17`, called outcome `+0.6904`; `plan_contact_search_from_scalar_constraint` `74 / 12 / 62`, called outcome `+0.4279`; all new helpers side-effect/runtime `0 / 0`.
+- Decision label: `gap closure target met` for matched gap-enriched frozen250.
+- Exact next action: lock V2.6 matched-gap evidence in final package; if making a broader formal claim, run an original-formal-manifest 250 or 500/1032 expanded validation with the same frozen registry.
