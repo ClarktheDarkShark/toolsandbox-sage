@@ -1,50 +1,85 @@
 # SAGE Gap-Closure Lab Report
 
+Experimental branch report only. This is not protected final claim evidence and does not modify best3, locked formal evidence, V2.6 evidence, or final-package claim artifacts.
+
 ## Status
-Blocked preflight report for `exp/sage-gap-closure-lab`. No SAGE gap-closure benchmark runs have been executed yet because the environment lacks live OpenAI credentials.
 
-This report is experimental branch documentation only and is not part of the protected final claim package.
+Stop condition 2 is met for this campaign. All required experiment families received fair-chance diagnostic or expanded-pilot treatment, including repair and force diagnostics where appropriate. No approach produced scalable primary outcome value with zero safety findings and sufficient natural adoption.
 
-## Setup Completed
-- Created an isolated experimental branch from clean commit `28fa525`.
-- Added a deterministic split-manifest builder for seed/dev, pilot-unseen, confirm-unseen, and scale-unseen cohorts.
-- Added split metadata for label access, allowed uses, disallowed uses, final-evaluation eligibility, expected helper fit, birth opportunities, and diversity summaries.
-- Added placeholder ledger and candidate triage reports.
-- Added runner-compatible aliases for `pilot_20`, `expanded_60`, `confirm_100`, and `validate_250`.
-- Added campaign preflight script and artifact.
+## Best Experimental Approach
 
-## Protected Asset Statement
-No protected final evidence, locked registry, locked best3 evidence, locked formal evidence, or final-package claim artifact was modified by this setup.
+The strongest broad signal came from robust live generation with `gpt-5-mini` for generation/repair and `gpt-4o-mini` for execution:
 
-## Data Leakage Statement
-The setup manifest marks truth-label access as allowed only for `seed_dev_labeled`. All unseen splits are marked as truth-label-uninspected. Seed/dev base task families are excluded from unseen splits. Scenario IDs are recorded for auditability and are forbidden in tool, router, prompt, repair, or expected-answer logic.
+- Live generation pilot20: outcome +0.2090, canonical +0.0127, gate pass, zero runtime/side-effect incidents.
+- Frozen generated pilot20: outcome +0.1377, canonical +0.0772, gate pass, zero runtime/side-effect incidents.
+- Expanded60 of the frozen pack: outcome +0.0707, canonical +0.0628, but two side-effect incidents, so it was not safe for promotion.
+
+The strongest low-frequency tool signal was `select_recency_target_and_prepare_action`:
+
+- Force-after-search diagnostic on 2 recency side-effect tasks: outcome +0.2931, canonical +0.1648, zero incidents.
+- Repaired natural safety diagnostic on the same 2-task mechanism split: outcome +0.1460, canonical +0.2102, zero incidents.
+- Expanded60 rerun: canonical +0.0441 and exact successes +6, but primary outcome -0.0189 and the chain was visible-not-called on both target recency tasks.
+
+That means the recency bridge has real potential but is not a standalone scale candidate.
+
+## Failed Or Parked Families
+
+- Many small deterministic tools: full/refined/minus-unsafe packs did not produce stable outcome lift at 60.
+- Tool chaining: repaired chain showed latent value, but natural adoption remained too sparse in expanded60.
+- Regular refinement/adaptive repair: fixed a real wrapper/output-shape blocker and a safety-accounting false positive, but did not change broad outcome.
+- Robust generation: best pilot family, but expanded safety incidents blocked promotion.
+- Pain-point synthesis: useful for designs, but shared tools did not generalize into broad unseen lift.
+- Actor-policy/affordance: richer descriptions and guard metadata did not improve adoption or outcome.
+- Router/composer/bandit-style exposure: routing suppressed unsafe overexposure, but could not overcome no-call and low helper-call share.
+- Insufficient-information detector: safe but outcome-negative; broad abstention overlay is parked.
+- Final-answer-ready transformation: recency bridge improved, service-answer extraction remains unresolved.
+- Contrastive generation: useful for avoiding known failures; no scalable outcome lift.
+- Leave-family-out: no held-out-family evidence justified confirmation or scale.
+- Portfolio ablation: best broad outcome signals either failed safety or regressed primary outcome.
+- Synthetic validation lab: useful as harness coverage, not claim evidence.
+- Metadata compression/richness: rich metadata did not beat focused trigger metadata.
+- Oracle-free pain-point classifier: useful diagnostic layer, not a standalone lift.
+
+## Leakage Statement
+
+Seed/dev labels were allowed only for the 8-task `seed_dev_labeled` split. Unseen pilot, expanded, confirm, and scale splits were not inspected for truth labels before sealed runs. No tools or routers encode scenario IDs, expected answers, hidden truth labels, benchmark facts, or final labels. Force diagnostics were used only for diagnosis and repair, not promotion.
+
+Split manifest:
+
+- File: `artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json`
+- File SHA-256: `7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9`
+- Payload SHA-256: `41a9565960005007bdcc8a0e901b81a300e2e5c1c52c0b38e15e17fe83f983d4`
 
 ## Cache Statement
-No benchmark cache was used during setup. Future baseline/control arms may use eligible control baseline cache with hash reporting. Future SAGE/candidate arms must be fresh experimental runs unless an arm/tool/registry-specific response-cache key is proved and recorded.
 
-Campaign preflight artifact:
+Baseline/control arms used the eligible control baseline cache where available and recorded cached/fresh counts per run. Candidate/SAGE arms were fresh experimental runs with OpenAI response cache disabled. No scenario selection was based on cache availability.
 
-- `artifacts/experiment_manifests/gap_closure_lab/campaign_preflight.json`
-- Status: `blocked`
-- Blocker: `missing_openai_api_key`
-- Manifest file SHA-256: `7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9`
-- Payload SHA-256: `41a9565960005007bdcc8a0e901b81a300e2e5c1c52c0b38e15e17fe83f983d4`
-- Runner split counts: `pilot_20=20`, `expanded_60=60`, `confirm_100=100`, `validate_250=250`
+Latest expanded60 cache accounting:
 
-## Experiment Families
-The plan covers the six required families plus the additional actor-policy, router/composer, insufficient-information, final-answer-ready, contrastive generation, leave-family-out, ablation, adaptive repair, synthetic validation, bandit routing, metadata compression, and oracle-free classifier families.
+- Run: `outputs/gap_closure_lab/focused_chain_repaired_bridge_expanded60/expanded_60_20260508_005703`
+- Baseline cache: 42 cached / 18 fresh
+- Cache manifest hash: `df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d`
+- Candidate OpenAI response cache: disabled
 
-## Current Blockers
-Hard blocker: `OPENAI_API_KEY` is not set in this execution environment. ToolSandbox agent/user runs, SAGE tool generation, live validation, natural adoption tests, force-call diagnostics, and fresh candidate arms all require live model calls. Running synthetic or hardwired substitutes would not satisfy the requested fair-chance standard and would risk mislabeling non-SAGE work as SAGE evidence.
+## Safety Statement
 
-## Recommended Next Campaign
-1. Provide live model credentials to the environment, preferably by sourcing a local untracked file such as `.secrets/env.sh` or `.env.local` with `OPENAI_API_KEY`.
-2. Rerun `PYTHONPATH=src:. python scripts/preflight_gap_closure_campaign.py`.
-3. Run seed/dev pain-point analysis on `seed_dev_labeled`.
-4. Generate first candidates under `artifacts/registry_experiments/gap_closure_lab/`.
-5. Run static/schema/runtime validation before any ToolSandbox run.
-6. Run `pilot_20`, then `expanded_60` before parking any non-safety-failed family.
-7. Scale only confirmation-positive approaches to `confirm_100` and then `validate_250`.
+Final repaired-chain expanded60 had zero runtime exceptions and zero helper side-effect incidents. Unsafe helper forms were parked:
+
+- `next_dependency_precondition_call`: one side-effect incident in force diagnostic.
+- Initial frozen generated expanded60 pack: two side-effect incidents.
+
+The runtime now allows composite helpers that explicitly preserve `selected_record` on missing updates to execute their own output logic instead of being preempted by a generic missing-update abstain. The side-effect preservation checker now treats a selection-only bridge as requiring the original side-effect later, rather than falsely flagging the later preserved side-effect as unsafe.
+
+## Recommendation
+
+Do not promote any result from this branch to protected evidence. The best candidate for a later campaign is a recombined focused pack centered on:
+
+- `select_recency_target_and_prepare_action`
+- `resolve_search_window_or_bounds`
+- selected contact scalar/search planners
+
+The next campaign should target adoption rather than more broad generation: test a tiny recency/action bundle where `select_record_by_timestamp_extreme` is removed or deprioritized, add clearer actor affordances for when to call the composite bridge, and run another 20-task mechanism/pilot before any 60-task rerun. Formal validation is not warranted until that bundle shows positive primary outcome on unseen confirmation with natural calls and zero incidents.
 
 ## Decision
-`BLOCKED: missing_openai_api_key_prevents_fair_live_campaign_execution`
+
+`STOP: required experiment families received fair-chance treatment; no scalable safe outcome-positive approach found`

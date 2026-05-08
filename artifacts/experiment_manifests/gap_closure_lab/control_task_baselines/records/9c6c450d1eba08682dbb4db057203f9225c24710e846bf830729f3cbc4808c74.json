@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "record_id": "9c6c450d1eba08682dbb4db057203f9225c24710e846bf830729f3cbc4808c74",
+  "timestamp": "2026-05-08T04:23:19.473227+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "83681033ace41d8cd846fd6eb3cc8386980a0a136abe86bafbbcf4546bfafe9a",
+  "scenario_key": "modify_reminder_with_recency_latest_alt_3_distraction_tools_arg_description_scrambled",
+  "scenario_checksum": "cb55f9325042054f86abd037b1f5faa8aaacda998fb4073138019a81ef0fdaff",
+  "initial_state_checksum": "9aaae3081fc1bdd9c7aec929fead990035d278ef5d5709f137ec378517496d82",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "390cb18d2da4a5dc5bc7f4283b02b67f84e4bba777d5e3bd64eb061f29394f6a",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/force_diagnostics/force_select_recency_target_and_prepare_action_manifest.json",
+  "run_dir": "outputs/gap_closure_lab/force_select_recency_target_and_prepare_action/mechanism_12_20260508_002259/control/mechanism_12_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_08_2026_00_23_03",
+  "milestone_scores": {
+    "0": [
+      19,
+      1.0
+    ],
+    "1": [
+      21,
+      1.0
+    ],
+    "2": [
+      21,
+      0.0
+    ]
+  },
+  "canonical_score": 0.6666666666666666,
+  "outcome_score": 0.0,
+  "exact_success": false,
+  "final_state_hash": "bee0e83b0b39d88892e13a34d2cf2ecde91b1809d441c2bbce52260a54ff66e8",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 13,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 13,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/force_select_recency_target_and_prepare_action/mechanism_12_20260508_002259/control/mechanism_12_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_08_2026_00_23_03/trajectories/modify_reminder_with_recency_latest_alt_3_distraction_tools_arg_description_scrambled/conversation.json",
+  "transcript_hash": "08eae62b615afcf2d6934bd33bbb567f4d892b640351f67157f668165642a5f5",
+  "result_row": {
+    "name": "modify_reminder_with_recency_latest_alt_3_distraction_tools_arg_description_scrambled",
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_DESCRIPTION_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.6666666666666666,
+    "minefield_similarity": 0,
+    "similarity": 0.6666666666666666,
+    "turn_count": 13,
+    "milestone_mapping": {
+      "0": [
+        19,
+        1.0
+      ],
+      "1": [
+        21,
+        1.0
+      ],
+      "2": [
+        21,
+        0.0
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.0,
+    "outcome_milestone_similarity": 0.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "state",
+        "included": true,
+        "score": 0.0
+      }
+    ]
+  }
+}

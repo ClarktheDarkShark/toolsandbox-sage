@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "record_id": "6ed7ac7dbec283e54b6ec20b5fa073ad24039a8f85bf3c05c97e1d6e6d03212d",
+  "timestamp": "2026-05-08T02:28:47.397184+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "cfaff25c4d706d15d90d5cec74e586fb9adc3d7bcf466f1e300e0201ad478d0e",
+  "scenario_key": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+  "scenario_checksum": "5138db73707b0b145d4fc9c632163068e74c6bc13969cadf4f9b6c0100d57a4c",
+  "initial_state_checksum": "8e765665a7df7d0c9304d6dd6ff468184dc30f4022bddb86c602ba1e99b47fa3",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/refined_candidate_expanded60/expanded_60_20260507_221615/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_22_16_20",
+  "milestone_scores": {
+    "0": [
+      27,
+      1.0
+    ],
+    "1": [
+      29,
+      1.0
+    ],
+    "2": [
+      32,
+      0.7937005097107789
+    ]
+  },
+  "canonical_score": 0.9312335032369262,
+  "outcome_score": 0.5,
+  "exact_success": false,
+  "final_state_hash": "2df9957558c6692effbc561c9044e43710a34e62fdbc1a772550e54147d14307",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 11,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 11,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/refined_candidate_expanded60/expanded_60_20260507_221615/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_22_16_20/trajectories/search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled/conversation.json",
+  "transcript_hash": "f646cfe40d8153334e318ae5c22b06ef5ceec46046547f8000f77c335f9f459f",
+  "result_row": {
+    "name": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+    "categories": [
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_TYPE_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9312335032369262,
+    "minefield_similarity": 0,
+    "similarity": 0.9312335032369262,
+    "turn_count": 11,
+    "milestone_mapping": {
+      "0": [
+        27,
+        1.0
+      ],
+      "1": [
+        29,
+        1.0
+      ],
+      "2": [
+        32,
+        0.7937005097107789
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.5,
+    "outcome_milestone_similarity": 0.5,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "answer",
+        "included": true,
+        "score": 0.5,
+        "targets": [
+          "Your first ever text says 'Hey kid, you want some GPU?'.",
+          "Hey kid, you want some GPU?"
+        ]
+      }
+    ]
+  }
+}

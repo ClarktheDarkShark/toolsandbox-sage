@@ -1,0 +1,389 @@
+{
+  "tools": {
+    "resolve_search_window_or_bounds": {
+      "schema_version": 2,
+      "tool": {
+        "spec": {
+          "schema_version": 2,
+          "tool_name": "resolve_search_window_or_bounds",
+          "family": "derived_value_calculator",
+          "description": "When a search task needs bounded time criteria such as yesterday, today, later today, upcoming, recent, latest, or oldest, you MUST call this helper after obtaining get_current_timestamp and BEFORE calling the original search tool. Call path: (1) get_current_timestamp. (2) In the NEXT turn call resolve_search_window_or_bounds with current_timestamp, target_domain, timestamp_intent, and direction. (3) If should_call_search=True, call the original tool named in target_tool_name with **search_kwargs. This helper never calls search itself and never creates, modifies, or sends anything. Use target_domain='reminder' with timestamp_intent='creation' for reminder creation-time recency, timestamp_intent='reminder' for reminder due-time recency, and target_domain='message' with timestamp_intent='message_creation' for message search. Do NOT call search_messages({}) or search_reminder({}) with no criteria. Do NOT manually construct timestamp bounds across turns when this helper is visible. For latest or oldest message search, use the helper output to produce trace-compatible search_messages kwargs before any later record-selection helper. If this helper is visible at the same time as a record-selection helper, call this helper FIRST, then call the original search tool, and only then call the selector with the returned records in a later turn. If the phrase is ambiguous or current_timestamp is missing, the helper abstains and you should ask for clarification rather than guessing.",
+          "inputs": [
+            {
+              "name": "current_timestamp",
+              "annotation": "float",
+              "description": "Current Unix timestamp from get_current_timestamp."
+            },
+            {
+              "name": "phrase",
+              "annotation": "str",
+              "description": "Original user-facing time phrase, such as 'yesterday' or 'later today'."
+            },
+            {
+              "name": "target_domain",
+              "annotation": "str",
+              "description": "Either 'reminder' or 'message'."
+            },
+            {
+              "name": "timestamp_intent",
+              "annotation": "str",
+              "description": "For reminders use 'creation' or 'reminder'. For messages use 'message_creation'."
+            },
+            {
+              "name": "direction",
+              "annotation": "str",
+              "description": "Normalized time-window intent: yesterday, today, later_today, upcoming, recent, latest, oldest, or custom."
+            },
+            {
+              "name": "content_keyword",
+              "annotation": "str",
+              "description": "Optional content filter to pass through to the original search tool."
+            },
+            {
+              "name": "lookback_days",
+              "annotation": "int",
+              "description": "Optional explicit lookback window in days for recent/custom searches."
+            },
+            {
+              "name": "timezone_offset",
+              "annotation": "float",
+              "description": "Optional local UTC offset in hours when local-day boundaries matter."
+            }
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "target_tool_name": {
+                "type": "string"
+              },
+              "search_kwargs": {
+                "type": "object"
+              },
+              "should_call_search": {
+                "type": "boolean"
+              },
+              "abstain_reason": {
+                "type": "string"
+              },
+              "interpretation": {
+                "type": "string"
+              },
+              "bounds_source": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "target_tool_name",
+              "search_kwargs",
+              "should_call_search",
+              "abstain_reason",
+              "interpretation",
+              "bounds_source"
+            ]
+          },
+          "positive_triggers": [
+            "search_reminder_with_creation_recency_yesterday",
+            "search_reminder_with_recency_yesterday",
+            "search_reminder_with_recency_upcoming",
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest",
+            "bounded_recency_search_requires_time_window"
+          ],
+          "negative_triggers": [
+            "add_reminder",
+            "modify_contact",
+            "pure_service_enablement",
+            "insufficient_information",
+            "search_without_time_phrase"
+          ],
+          "preserves_side_effect_tools": [],
+          "required_original_tool_calls": [],
+          "abstain_behavior": "Return should_call_search=False with abstain_reason when current_timestamp is missing, the target domain or timestamp intent is unsupported, or the phrase/direction is ambiguous. When should_call_search=True, call only the original search tool in target_tool_name with **search_kwargs.",
+          "generalization_rationale": "Reminder and message search tasks repeatedly require converting a natural time phrase into benchmark-compatible lower/upper bounds before a search tool can be called safely. This helper compresses multi-step time-window construction without replacing the original search tool.",
+          "estimated_step_compression": null,
+          "cross_task_applicability_count": null,
+          "applicable_task_families": [],
+          "reason_tool_is_decisive": "",
+          "inadequacy_evidence": {
+            "summary": "Reminder and message search tasks fail when the agent needs bounded timestamp criteria but only has natural recency language such as yesterday, today, upcoming, latest, or oldest.",
+            "signals": [
+              "repeated_failed_tool_call",
+              "visible_raw_data_lacking_deterministic_transform",
+              "unnecessary_clarification"
+            ],
+            "failed_tool_calls": [
+              "search_reminder",
+              "search_messages"
+            ],
+            "repeated_failed_tool_calls": [
+              "search_reminder",
+              "search_messages"
+            ],
+            "visible_data_gaps": [
+              "missing benchmark-compatible search window kwargs"
+            ],
+            "planner_failures": [
+              "no_criteria_search_call"
+            ],
+            "final_answer_route_mismatch": false
+          }
+        },
+        "code": "def resolve_search_window_or_bounds(\n    current_timestamp: float,\n    phrase: str,\n    target_domain: str,\n    timestamp_intent: str,\n    direction: str,\n    content_keyword: str = \"\",\n    lookback_days: int = 0,\n    timezone_offset: float = 0.0,\n) -> dict:\n    min_timestamp = 315529200.0\n    now = float(current_timestamp)\n    if now <= 0:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"missing_current_timestamp\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    domain = str(target_domain or \"\").strip().lower()\n    if domain == \"message\":\n        tool_name = \"search_messages\"\n    elif domain == \"reminder\":\n        tool_name = \"search_reminder\"\n    else:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"unsupported_target_domain\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    intent = str(timestamp_intent or \"\").strip().lower()\n    if domain == \"message\":\n        lower_key = \"creation_timestamp_lowerbound\"\n        upper_key = \"creation_timestamp_upperbound\"\n    elif intent == \"creation\":\n        lower_key = \"creation_timestamp_lowerbound\"\n        upper_key = \"creation_timestamp_upperbound\"\n    elif intent == \"reminder\":\n        lower_key = \"reminder_timestamp_lowerbound\"\n        upper_key = \"reminder_timestamp_upperbound\"\n    else:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"unsupported_timestamp_intent\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    normalized_direction = str(direction or \"\").strip().lower()\n    normalized_phrase = str(phrase or \"\").strip().lower()\n    if not normalized_direction:\n        if normalized_phrase in (\"yesterday\", \"today\", \"later today\", \"later_today\", \"upcoming\", \"recent\", \"latest\", \"oldest\"):\n            normalized_direction = normalized_phrase.replace(\" \", \"_\")\n        else:\n            return {\n                \"target_tool_name\": \"\",\n                \"search_kwargs\": {},\n                \"should_call_search\": False,\n                \"abstain_reason\": \"ambiguous_phrase\",\n                \"interpretation\": \"\",\n                \"bounds_source\": \"abstain\",\n            }\n    offset_seconds = float(timezone_offset) * 3600.0\n    local_now = now + offset_seconds\n    local_day_start = float(int(local_now // 86400.0) * 86400.0)\n    day_start = local_day_start - offset_seconds\n    next_day_start = day_start + 86400.0\n    kwargs = {}\n    interpretation = normalized_direction\n    bounds_source = \"resolved_direction\"\n    if normalized_direction == \"yesterday\":\n        kwargs[lower_key] = max(min_timestamp, day_start - 86400.0)\n        kwargs[upper_key] = max(min_timestamp, day_start - 1.0)\n    elif normalized_direction == \"today\":\n        kwargs[lower_key] = max(min_timestamp, day_start)\n        kwargs[upper_key] = max(min_timestamp, next_day_start - 1.0)\n    elif normalized_direction == \"later_today\":\n        kwargs[lower_key] = max(min_timestamp, now)\n        kwargs[upper_key] = max(min_timestamp, next_day_start - 1.0)\n    elif normalized_direction == \"upcoming\":\n        kwargs[lower_key] = max(min_timestamp, now)\n    elif normalized_direction == \"recent\":\n        days = int(lookback_days)\n        if days <= 0:\n            days = 7\n        kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)\n        kwargs[upper_key] = max(min_timestamp, now)\n    elif normalized_direction in (\"latest\", \"oldest\"):\n        if domain == \"message\":\n            kwargs[upper_key] = max(min_timestamp, now)\n        else:\n            days = int(lookback_days)\n            if days <= 0:\n                days = 3650\n            kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)\n            kwargs[upper_key] = max(min_timestamp, now)\n    elif normalized_direction == \"custom\":\n        days = int(lookback_days)\n        if days <= 0:\n            return {\n                \"target_tool_name\": \"\",\n                \"search_kwargs\": {},\n                \"should_call_search\": False,\n                \"abstain_reason\": \"custom_window_requires_positive_lookback_days\",\n                \"interpretation\": \"\",\n                \"bounds_source\": \"abstain\",\n            }\n        kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)\n        kwargs[upper_key] = max(min_timestamp, now)\n        interpretation = \"custom_lookback\"\n    else:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"unsupported_direction\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    if str(content_keyword or \"\").strip():\n        kwargs[\"content\"] = str(content_keyword)\n    if not kwargs:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"no_search_criteria_prepared\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    return {\n        \"target_tool_name\": tool_name,\n        \"search_kwargs\": kwargs,\n        \"should_call_search\": True,\n        \"abstain_reason\": \"\",\n        \"interpretation\": interpretation,\n        \"bounds_source\": bounds_source,\n    }\n"
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "source_example_count": 2,
+        "held_out_check_count": 1,
+        "negative_applicability_count": 2,
+        "runtime_smoke_passed": true
+      },
+      "birth_scenario": "search_reminder_with_creation_recency_yesterday",
+      "accepted_at": "2026-05-03T02:37:52.249369+00:00",
+      "version": 1,
+      "reuse_count": 6,
+      "success_flips": 0,
+      "retired": false,
+      "code_hash": "2f4fdae225cc1af4e9c385eeb601448cc44e6e361555a3741193d3618cb38e8a",
+      "legacy_diagnostic": false
+    },
+    "select_record_by_timestamp_extreme": {
+      "schema_version": 2,
+      "tool": {
+        "spec": {
+          "schema_version": 2,
+          "tool_name": "select_record_by_timestamp_extreme",
+          "family": "search_filter_ranking_helper",
+          "description": "When the user asks for the latest, newest, most recent, oldest, earliest, or first record from a search, you MUST call this helper after retrieving the records \u2014 do NOT manually compare timestamps across turns. Set mode='latest' for most recent/newest/last. Set mode='oldest' for oldest/earliest/first. Complete call path for messages: (1) Call get_current_timestamp to get the current Unix timestamp. (2) Call search_messages with creation_timestamp_upperbound=<current_timestamp> to retrieve all messages. (3) In the NEXT turn (NOT the same parallel turn), call this helper with records=<messages list>, timestamp_field='creation_timestamp', and mode='latest' or mode='oldest'. (4) If should_use_selected_record=True, use selected_record directly for the next action (modify, send, remove, update). Do NOT call search_messages({}) or search_messages with an empty content filter \u2014 this returns no results. Always use creation_timestamp_upperbound. Do NOT attempt manual timestamp comparison. Do NOT skip this helper when records are returned and recency selection is needed. NEVER call a search tool and this helper in the same parallel turn. This helper does NOT call any side-effect tools and does NOT search for records itself \u2014 it only selects from records already returned. Use timestamp_field='creation_timestamp' for messages, 'reminder_timestamp' for reminders, or the appropriate field name visible in the returned records. Ties in timestamp are broken deterministically by original list order (the first occurrence in the input list wins). Do NOT use this helper when no records have been retrieved yet, when the task is pure reminder creation with no record selection, when the task is pure service enabling, or when the task is marked insufficient information.",
+          "inputs": [
+            {
+              "name": "records",
+              "annotation": "list",
+              "description": "The list of record dicts returned by a prior search tool call (e.g., the 'messages' list from search_messages, or the 'reminders' list from search_reminder). Pass the list directly."
+            },
+            {
+              "name": "timestamp_field",
+              "annotation": "str",
+              "description": "The field name in each record that contains the Unix timestamp to compare. Common values: 'creation_timestamp' for messages, 'reminder_timestamp' for reminders."
+            },
+            {
+              "name": "mode",
+              "annotation": "str",
+              "description": "Selection mode: 'latest' to select the record with the highest timestamp, 'oldest' to select the record with the lowest timestamp."
+            },
+            {
+              "name": "tie_break_fields",
+              "annotation": "list",
+              "description": "Optional list of field names to use as secondary sort key when timestamps are equal. Pass None to use original list order for ties."
+            },
+            {
+              "name": "required_filters",
+              "annotation": "dict",
+              "description": "Optional dict of field:value pairs. Only records matching ALL filters are considered. Pass None or empty dict to skip filtering."
+            },
+            {
+              "name": "allow_missing_timestamp",
+              "annotation": "bool",
+              "description": "If False (default), records without the timestamp_field are skipped. If True, records with missing timestamps are included but sorted last."
+            }
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "selected_record": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "description": "The full record dict for the selected record, or null if no valid record could be selected."
+              },
+              "selected_index": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Zero-based index of the selected record in the original records list, or null if abstaining."
+              },
+              "selected_timestamp": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": "The timestamp value of the selected record, or null if abstaining."
+              },
+              "should_use_selected_record": {
+                "type": "boolean",
+                "description": "True when the agent should use selected_record for the next step. False when the helper is abstaining."
+              },
+              "abstain_reason": {
+                "type": "string",
+                "description": "Reason for abstaining. Empty when should_use_selected_record=True."
+              },
+              "selection_reason": {
+                "type": "string",
+                "description": "Brief description of how the record was selected."
+              }
+            },
+            "required": [
+              "selected_record",
+              "selected_index",
+              "selected_timestamp",
+              "should_use_selected_record",
+              "abstain_reason",
+              "selection_reason"
+            ]
+          },
+          "positive_triggers": [
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest",
+            "modify_contact_with_message_recency",
+            "remove_reminder_with_recency_latest",
+            "modify_reminder_with_recency_latest",
+            "select_latest_or_oldest_record_from_search_results",
+            "record_returned_needs_latest_oldest_selection"
+          ],
+          "negative_triggers": [
+            "add_reminder",
+            "insufficient_information",
+            "pure_service_enablement",
+            "pure_date_arithmetic",
+            "no_records_retrieved_yet",
+            "search_without_recency_selection"
+          ],
+          "preserves_side_effect_tools": [],
+          "required_original_tool_calls": [],
+          "abstain_behavior": "Return should_use_selected_record=False with abstain_reason when: the records list is empty or None, no record in the list has the specified timestamp_field, mode is not 'latest' or 'oldest', or required_filters eliminate all candidates. When should_use_selected_record=True, use selected_record directly for the next action \u2014 do not call the search tool again. This helper does not call side-effect tools. Do not use this helper before records have been retrieved.",
+          "generalization_rationale": "Record selection tasks repeatedly require choosing the single latest or oldest record from a list returned by search tools. The base toolset provides search tools but no deterministic latest/oldest selector. Agents frequently pick the wrong record or spend extra turns on manual comparison. This helper is reusable across message, reminder, and contact recency tasks.",
+          "estimated_step_compression": null,
+          "cross_task_applicability_count": null,
+          "applicable_task_families": [],
+          "reason_tool_is_decisive": "",
+          "inadequacy_evidence": {
+            "summary": "Search results require selecting the latest or oldest record by timestamp, but agents make wrong selections or waste extra turns on manual comparison across message, reminder, and contact tasks.",
+            "signals": [
+              "wrong_record_selected_after_search",
+              "repeated_failed_base_tool_calls",
+              "unnecessary_clarification"
+            ],
+            "failed_tool_calls": [
+              "search_messages",
+              "search_reminder"
+            ],
+            "repeated_failed_tool_calls": [
+              "search_messages"
+            ],
+            "visible_data_gaps": [
+              "records list with timestamps already returned by search tool; requires deterministic latest/oldest selection before side-effect call"
+            ],
+            "planner_failures": [],
+            "final_answer_route_mismatch": true
+          }
+        },
+        "code": "def select_record_by_timestamp_extreme(\n    records,\n    timestamp_field,\n    mode,\n    tie_break_fields=None,\n    required_filters=None,\n    allow_missing_timestamp=False,\n):\n    if mode not in (\"latest\", \"oldest\"):\n        return {\n            \"selected_record\": None,\n            \"selected_index\": None,\n            \"selected_timestamp\": None,\n            \"should_use_selected_record\": False,\n            \"abstain_reason\": \"invalid_mode\",\n            \"selection_reason\": \"\",\n        }\n    best_idx = None\n    best_record = None\n    best_ts = None\n    for i, record in enumerate(records or []):\n        if not isinstance(record, dict):\n            continue\n        if required_filters:\n            filter_match = True\n            for _fk, _fv in required_filters.items():\n                if record.get(_fk) != _fv:\n                    filter_match = False\n                    break\n            if not filter_match:\n                continue\n        ts_raw = record.get(timestamp_field)\n        if ts_raw is None:\n            continue\n        if not isinstance(ts_raw, (int, float)):\n            continue\n        ts_val = float(ts_raw)\n        if best_ts is None:\n            best_idx = i\n            best_record = record\n            best_ts = ts_val\n        elif mode == \"latest\" and ts_val > best_ts:\n            best_idx = i\n            best_record = record\n            best_ts = ts_val\n        elif mode == \"oldest\" and ts_val < best_ts:\n            best_idx = i\n            best_record = record\n            best_ts = ts_val\n    if best_record is None:\n        return {\n            \"selected_record\": None,\n            \"selected_index\": None,\n            \"selected_timestamp\": None,\n            \"should_use_selected_record\": False,\n            \"abstain_reason\": \"no_valid_timestamped_records\",\n            \"selection_reason\": \"\",\n        }\n    return {\n        \"selected_record\": best_record,\n        \"selected_index\": best_idx,\n        \"selected_timestamp\": best_ts,\n        \"should_use_selected_record\": True,\n        \"abstain_reason\": \"\",\n        \"selection_reason\": \"selected_\" + mode + \"_by_\" + str(timestamp_field),\n    }\n"
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "source_example_count": 5,
+        "held_out_check_count": 1,
+        "negative_applicability_count": 2,
+        "runtime_smoke_passed": true
+      },
+      "birth_scenario": "search_message_with_recency_latest",
+      "accepted_at": "2026-05-03T01:57:14.590013+00:00",
+      "version": 1,
+      "reuse_count": 2,
+      "success_flips": 0,
+      "retired": false,
+      "code_hash": "e015e1bb737c7e2aaa47c9ed0678d8db92bc7902500b606fe2385227da4bd303",
+      "legacy_diagnostic": false
+    },
+    "relative_day_time_to_timestamp": {
+      "schema_version": 2,
+      "tool": {
+        "spec": {
+          "schema_version": 2,
+          "tool_name": "relative_day_time_to_timestamp",
+          "family": "canonicalizer",
+          "description": "Deterministically convert a user-facing relative local day/time (e.g., 'tomorrow 5:00 PM') into an exact Unix timestamp (seconds since epoch, UTC). Uses the provided current_timestamp and local UTC offset to compute the target UTC timestamp for the specified day_offset, hour, and minute.",
+          "inputs": [
+            {
+              "name": "current_timestamp",
+              "annotation": "float",
+              "description": "Current moment as a Unix timestamp (seconds since epoch, UTC)."
+            },
+            {
+              "name": "day_offset",
+              "annotation": "int",
+              "description": "Number of days forward from the current local date (0 = today, 1 = tomorrow, etc.)."
+            },
+            {
+              "name": "hour",
+              "annotation": "int",
+              "description": "Hour in 24-hour local time for the target reminder (0-23)."
+            },
+            {
+              "name": "minute",
+              "annotation": "int",
+              "description": "Minute (0-59) in local time for the target reminder."
+            },
+            {
+              "name": "local_utc_offset_hours",
+              "annotation": "float",
+              "description": "Local offset from UTC in hours (e.g., -4 for UTC-4). Use -4 for the ToolSandbox local environment unless another offset is known."
+            }
+          ],
+          "output_annotation": "float",
+          "output_schema": null,
+          "positive_triggers": [],
+          "negative_triggers": [],
+          "preserves_side_effect_tools": [],
+          "required_original_tool_calls": [],
+          "abstain_behavior": "",
+          "generalization_rationale": "Many reminder modifications supply a relative local day and time. This small canonicalizer isolates the deterministic conversion from current UTC timestamp + local offset into the precise UTC epoch seconds required by modify_reminder, avoiding repeated ad-hoc date arithmetic across agents.",
+          "estimated_step_compression": null,
+          "cross_task_applicability_count": null,
+          "applicable_task_families": [],
+          "reason_tool_is_decisive": "",
+          "diagnostic_only": false,
+          "shortfall_cluster_evidence": [],
+          "known_failure_mechanisms_addressed": [],
+          "canonical_route_substitution_risk": "none",
+          "expected_milestone_calls_replaced": [],
+          "final_state_preservation_plan": "",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "summary": "Without a dedicated canonicalizer, agents often miscompute dates because they lack consistent local-midnight anchoring and offset handling (e.g., mixing UTC vs local-day boundaries), producing timestamps off by whole days or hours.",
+            "signals": [
+              "legacy_unstructured_evidence"
+            ],
+            "failed_tool_calls": [],
+            "repeated_failed_tool_calls": [],
+            "visible_data_gaps": [],
+            "planner_failures": [],
+            "final_answer_route_mismatch": false
+          }
+        },
+        "code": "def relative_day_time_to_timestamp(current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float) -> float:\n    \"\"\"\n    Convert a relative local day/time into a UTC Unix timestamp (seconds since epoch).\n\n    Algorithm (deterministic, no imports):\n    - shift current UTC timestamp into local-seconds by adding local offset (hours -> seconds)\n    - find the local-day's midnight by floor-dividing by 86400 and multiplying back\n    - advance by day_offset days to get the target local midnight\n    - convert that local-midnight back to UTC epoch by subtracting the offset\n    - add the requested local hour and minute (in seconds)\n\n    Returns float seconds since epoch (UTC).\n    \"\"\"\n    # seconds per day and per minute/hour\n    SECONDS_PER_DAY = 86400.0\n    SECONDS_PER_HOUR = 3600.0\n    SECONDS_PER_MINUTE = 60.0\n\n    # local offset in seconds (can be fractional hours)\n    offset_seconds = local_utc_offset_hours * SECONDS_PER_HOUR\n\n    # represent current time in local-seconds (an epoch shifted by offset)\n    local_seconds = current_timestamp + offset_seconds\n\n    # compute the local midnight (floor to the start of the local day)\n    local_midnight_local_epoch = (local_seconds // SECONDS_PER_DAY) * SECONDS_PER_DAY\n\n    # advance by the required number of days (in local time)\n    target_local_midnight_local_epoch = local_midnight_local_epoch + (day_offset * SECONDS_PER_DAY)\n\n    # convert the target local midnight back to UTC epoch by removing the offset\n    target_local_midnight_utc = target_local_midnight_local_epoch - offset_seconds\n\n    # add the requested local hour and minute (converted to UTC epoch)\n    target_timestamp = target_local_midnight_utc + (hour * SECONDS_PER_HOUR) + (minute * SECONDS_PER_MINUTE)\n\n    return float(target_timestamp)"
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "source_example_count": 1,
+        "held_out_check_count": 1,
+        "negative_applicability_count": 0,
+        "runtime_smoke_passed": true
+      },
+      "birth_scenario": "modify_reminder_with_recency_latest_3_distraction_tools",
+      "accepted_at": "2026-05-04T08:59:41.090975+00:00",
+      "version": 1,
+      "reuse_count": 0,
+      "success_flips": 0,
+      "retired": false,
+      "code_hash": "d2c346dfb9d0288e173ffcf6509ec559881bf02acf86eed588f2f31984972f0e",
+      "legacy_diagnostic": false
+    }
+  }
+}

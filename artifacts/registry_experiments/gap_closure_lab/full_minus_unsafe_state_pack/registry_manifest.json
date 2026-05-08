@@ -1,0 +1,1394 @@
+{
+  "tools": {
+    "constraint_to_action_planner": {
+      "accepted_at": "2026-05-08T01:27:24.077814+00:00",
+      "birth_scenario": "search_sender_phone_number_with_content",
+      "code_hash": "447cb616af819ecde9d4c5c81370eb8ba577f55acd19153729e006ef6c1d64f0",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def constraint_to_action_planner(records: list, match_field: str, match_value: str, action_type: str, update_fields: dict, return_field: str) -> dict:\n    # Prepare default empty response\n    empty_response = {\n        \"selected_record\": {},\n        \"selected_id\": \"\",\n        \"selected_index\": -1,\n        \"value\": \"\",\n        \"downstream_tool_name\": \"\",\n        \"downstream_tool_kwargs\": {},\n        \"should_call_tool\": False,\n        \"tie_candidates\": [],\n        \"abstain_reason\": \"\",\n        \"safety_notes\": \"\"\n    }\n\n    # Basic input checks\n    if not isinstance(records, list) or len(records) == 0:\n        empty_response[\"abstain_reason\"] = \"no_records\"\n        empty_response[\"safety_notes\"] = \"no visible records to select from\"\n        return empty_response\n    if not match_field or not isinstance(match_field, str):\n        empty_response[\"abstain_reason\"] = \"missing_match_field\"\n        empty_response[\"safety_notes\"] = \"cannot match without match_field\"\n        return empty_response\n    if match_value is None or (isinstance(match_value, str) and match_value == \"\"):\n        empty_response[\"abstain_reason\"] = \"missing_match_value\"\n        empty_response[\"safety_notes\"] = \"cannot match without match_value\"\n        return empty_response\n\n    # Determine whether this is a phone/number-type field for digit-only normalization\n    lf = match_field.lower()\n    is_phone_like = (\"phone\" in lf) or (\"number\" in lf)\n\n    # Normalize match_value for comparison\n    mv_raw = match_value if not isinstance(match_value, dict) else \"\"\n    if is_phone_like:\n        mv_norm = \"\".join([c for c in str(mv_raw) if c.isdigit()])\n    else:\n        mv_norm = str(mv_raw).strip().lower()\n\n    # Collect matches\n    matches = []  # list of tuples (index, record)\n    for i, rec in enumerate(records):\n        # If record is not a dict, skip\n        if not isinstance(rec, dict):\n            continue\n        rec_val_raw = rec.get(match_field, \"\")\n        if is_phone_like:\n            rec_norm = \"\".join([c for c in str(rec_val_raw) if c.isdigit()])\n        else:\n            rec_norm = str(rec_val_raw).strip().lower()\n        if rec_norm == mv_norm and mv_norm != \"\":\n            matches.append((i, rec))\n\n    # No matches\n    if len(matches) == 0:\n        empty_response[\"abstain_reason\"] = \"no_match\"\n        empty_response[\"safety_notes\"] = \"no visible record matched the constraint\"\n        return empty_response\n\n    # More than one match -> ambiguous tie\n    if len(matches) > 1:\n        tie_recs = [r for (_, r) in matches]\n        empty_response[\"tie_candidates\"] = tie_recs\n        empty_response[\"abstain_reason\"] = \"ambiguous_multiple_matches\"\n        empty_response[\"safety_notes\"] = \"do not guess before side-effect action\"\n        return empty_response\n\n    # Exactly one match\n    selected_index, selected_record = matches[0]\n\n    # Find stable id in preferred order\n    id_keys = [\"person_id\", \"message_id\", \"reminder_id\", \"sender_person_id\", \"recipient_person_id\", \"id\"]\n    sel_id = \"\"\n    for k in id_keys:\n        if k in selected_record and isinstance(selected_record.get(k), str) and selected_record.get(k) != \"\":\n            sel_id = selected_record.get(k)\n            break\n    if sel_id == \"\":\n        empty_response[\"abstain_reason\"] = \"missing_stable_id\"\n        empty_response[\"safety_notes\"] = \"selected record lacks a stable id required for side-effect actions\"\n        return empty_response\n\n    # Determine returned value (prefer return_field if present)\n    if return_field and return_field in selected_record:\n        value = selected_record.get(return_field)\n    else:\n        value = sel_id\n    if value is None:\n        value = \"\"\n\n    # Prepare downstream kwargs depending on action_type\n    act = action_type if isinstance(action_type, str) else \"\"\n    downstream_name = \"\"\n    downstream_kwargs = {}\n    should_call = False\n    safety_notes = \"\"\n\n    # Helper: normalize phone to E.164-friendly form per rules\n    raw_phone_source = None\n    if act == \"answer_field\":\n        downstream_name = \"\"\n        downstream_kwargs = {}\n        should_call = False\n        safety_notes = \"answer from value; no side effect needed\"\n    elif act == \"remove_contact\":\n        # requires person_id\n        downstream_name = \"remove_contact\"\n        downstream_kwargs = {\"person_id\": sel_id}\n        should_call = True\n        safety_notes = \"call downstream ToolSandbox side-effect next\"\n    elif act == \"modify_contact\":\n        # requires person_id and non-empty update_fields\n        if not isinstance(update_fields, dict) or len(update_fields) == 0:\n            empty_response[\"abstain_reason\"] = \"insufficient_update_fields_for_modify_contact\"\n            empty_response[\"safety_notes\"] = \"modify_contact requires at least one field to change\"\n            return empty_response\n        downstream_name = \"modify_contact\"\n        # Prepare kwargs by copying update_fields (preserve display casing/spacing) and adding person_id\n        kw = {}\n        for k, v in update_fields.items():\n            kw[k] = v\n        kw[\"person_id\"] = sel_id\n        downstream_kwargs = kw\n        should_call = True\n        safety_notes = \"call downstream ToolSandbox side-effect next\"\n    elif act == \"send_message\":\n        # Need phone_number and content either in selected_record or update_fields\n        content = None\n        phone_raw = None\n        if isinstance(update_fields, dict) and \"content\" in update_fields:\n            content = update_fields.get(\"content\")\n        # phone may be on record or in update_fields\n        if isinstance(update_fields, dict) and \"phone_number\" in update_fields:\n            phone_raw = update_fields.get(\"phone_number\")\n        elif \"phone_number\" in selected_record:\n            phone_raw = selected_record.get(\"phone_number\")\n        # Validate\n        if not content or (phone_raw is None or str(phone_raw) == \"\"):\n            empty_response[\"abstain_reason\"] = \"missing_phone_or_content_for_send_message\"\n            empty_response[\"safety_notes\"] = \"send_message requires a phone number and message content\"\n            return empty_response\n        # Normalize phone per E.164-like rule\n        rp = str(phone_raw)\n        stripped_digits = \"\".join([c for c in rp if c.isdigit()])\n        had_plus = str(phone_raw).strip().startswith('+')\n        normalized_phone = \"\"\n        if had_plus:\n            normalized_phone = \"+\" + stripped_digits\n        else:\n            if len(stripped_digits) == 11 and stripped_digits.startswith('1'):\n                normalized_phone = \"+\" + stripped_digits\n            elif len(stripped_digits) == 10:\n                normalized_phone = \"+1\" + stripped_digits\n            else:\n                # preserve stripped digits when not matching 10/11 pattern\n                normalized_phone = stripped_digits\n        downstream_name = \"send_message\"\n        downstream_kwargs = {\"phone_number\": normalized_phone, \"content\": content}\n        # If we have a stable person id, include it as well for the sandbox call\n        if sel_id:\n            downstream_kwargs[\"recipient_person_id\"] = sel_id\n        should_call = True\n        safety_notes = \"call downstream ToolSandbox side-effect next\"\n    else:\n        empty_response[\"abstain_reason\"] = \"unsupported_action_type\"\n        empty_response[\"safety_notes\"] = \"action_type not supported by helper\"\n        return empty_response\n\n    # Successful preparation\n    return {\n        \"selected_record\": selected_record,\n        \"selected_id\": sel_id,\n        \"selected_index\": selected_index,\n        \"value\": value,\n        \"downstream_tool_name\": downstream_name if should_call else \"\",\n        \"downstream_tool_kwargs\": downstream_kwargs if should_call else {},\n        \"should_call_tool\": should_call,\n        \"tie_candidates\": [],\n        \"abstain_reason\": \"\",\n        \"safety_notes\": safety_notes\n    }",
+        "spec": {
+          "abstain_behavior": "Abstain (return should_call_tool=false and empty downstream kwargs) when input records is empty, match_field or match_value is missing, there is no match, there are multiple equal matches (ambiguous tie), the selected record lacks a required stable id, required update_fields are missing or empty for modify_contact, required phone/content are missing for send_message, or the action_type is unsupported. On tie the helper returns selected_index=-1, selected_id='', value='', selected_record={}, and tie_candidates containing all tied records. The description and this field together define explicit no-match, multiple-match, and unsupported-action abstain semantics.",
+          "applicable_task_families": [
+            "contact_management",
+            "message_sending"
+          ],
+          "canonical_route_substitution_risk": "medium",
+          "cross_task_applicability_count": 2,
+          "description": "A deterministic composite helper that (1) normalizes a single scalar constraint and visible record values, (2) selects exactly one matching visible record from a provided records list (abstaining on ties or missing/ambiguous data), and (3) prepares downstream ToolSandbox side-effect kwargs without executing them. Normalization: for fields whose name contains 'phone' or 'number' the helper strips all non-digit characters for matching; for other fields it strips leading/trailing whitespace and lowercases both sides for matching. For send_message phone kwargs the helper prepares an E.164-friendly phone_number following the explicit rules: preserve an existing leading '+', otherwise if the stripped digits are 11 and start with '1' return '+' + digits, if 10 digits return '+1' + digits, otherwise return the stripped digits. The helper supports action_type values: answer_field (no side-effect; returns the requested return_field value), remove_contact (requires person_id), modify_contact (requires person_id and non-empty update_fields), and send_message (requires phone_number and content either from the selected record or update_fields). The helper never calls side-effect tools; instead it returns downstream_tool_name and downstream_tool_kwargs along with should_call_tool and safety_notes. On ambiguous multiple matches it abstains with tie_candidates containing all tied records and selected_index -1 per the runtime contract. For selection it uses only the visible records list input. Intended to be called immediately after a visible search/get result or when the agent has visible records to inspect.",
+          "diagnostic_only": true,
+          "estimated_step_compression": 5,
+          "expected_milestone_calls_replaced": [
+            "search_contacts",
+            "select_contact",
+            "prepare_modify_contact_kwargs"
+          ],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "The helper is outcome-preserving: it prepares downstream_tool_name and downstream_tool_kwargs identical in purpose to the original ToolSandbox side-effect call but does not execute it. The runtime may then call the preserved tool using the returned kwargs to reach the same final state. The helper always preserves the original search results by returning selected_record and selected_index.",
+          "generalization_rationale": "Combines constraint normalization, unique visible-record selection, ambiguity-safe abstention, and downstream-side-effect kwargs preparation. This compresses repeated agent patterns across contact management and messaging flows: matching by phone/number or name, detecting ties, and assembling the exact kwargs the original ToolSandbox side-effect tools expect without executing them.",
+          "grading_accounting_note": "This helper substitutes intermediate canonical milestones (selection+kwargs-prep). Grade it as outcome-preserving (it produces the same final side-effect arguments) while noting it is canonical-substituting: tests should verify correctness of selection, normalization, and prepared kwargs rather than enforcing intermediate canonical API call counts.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "chain search result inspection, constraint matching, ambiguity handling, and action prep"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "visible_info_unused",
+              "wrong_selected_record",
+              "side_effect_argument_preparation_failure"
+            ],
+            "summary": "A medium-grain shortfall cluster spans contact/message constraint selection, visible-record resolution, and safe downstream action planning. Small selectors were valid but naturally uncalled, and side-effect-only preparers were too brittle because they required a separately selected record. Generate a deterministic medium-grain composite helper named constraint_to_action_planner that accepts simple callable inputs: records list copied directly from a visible search/get result, match_field string, match_value string, action_type string, update_fields dict, and return_field string. It must normalize record values and constraints internally, select exactly one visible record when unambiguous, detect ties, and prepare the downstream ToolSandbox kwargs when safe. It must not execute final side-effect tools. Return selected_record, selected_id, selected_index, value, downstream_tool_name, downstream_tool_kwargs, should_call_tool, tie_candidates, abstain_reason, and safety_notes. Supported action types include answer_field, remove_contact, modify_contact, and send_message. remove_contact requires person_id; modify_contact requires person_id plus non-empty update_fields; send_message requires phone_number and content in update_fields. answer_field should return the requested return_field value with should_call_tool false. Abstain on no records, missing match_field/match_value, no match, multiple equal matches, missing ids, missing update fields, unsupported action, or insufficient information. This skill compresses search-result inspection, constraint normalization, target selection, ambiguity handling, and downstream-kwargs preparation while preserving original ToolSandbox search and side-effect calls.",
+            "visible_data_gaps": [
+              "visible records plus scalar constraints must become a safe target and downstream kwargs"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "list",
+              "description": "List of visible record objects from a prior search/get result. Each record is a dict with any stable id keys (person_id, message_id, reminder_id, sender_person_id, recipient_person_id, id) and visible fields such as phone_number, name, relationship, etc.",
+              "name": "records"
+            },
+            {
+              "annotation": "str",
+              "description": "The field name in each visible record to match against (e.g., 'phone_number', 'name', 'relationship').",
+              "name": "match_field"
+            },
+            {
+              "annotation": "str",
+              "description": "The scalar constraint value to match. For phone/number fields this can be digits-only or formatted; the helper normalizes both sides for comparison.",
+              "name": "match_value"
+            },
+            {
+              "annotation": "str",
+              "description": "The intended downstream action: one of 'answer_field', 'remove_contact', 'modify_contact', or 'send_message'.",
+              "name": "action_type"
+            },
+            {
+              "annotation": "dict",
+              "description": "A dict of fields to apply for modify/send actions (e.g., {'relationship':'friend'} or {'content':'Hi','phone_number':'+15550100'}). May be empty for actions that do not require updates.",
+              "name": "update_fields"
+            },
+            {
+              "annotation": "str",
+              "description": "If present and available on the selected record, the helper will return that field's value (unchanged formatting). Otherwise the helper returns the selected stable id.",
+              "name": "return_field"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "constraint matching failure between formatted phone strings and digit-only constraints",
+            "ambiguous selection leading to unsafe side-effects",
+            "side-effect argument preparation failures (missing ids or missing update fields)"
+          ],
+          "negative_triggers": [
+            "no_records",
+            "missing_match_field",
+            "missing_match_value",
+            "no_match",
+            "ambiguous_multiple_matches",
+            "missing_stable_id_on_selected_record",
+            "insufficient_update_fields_for_modify_contact",
+            "missing_phone_or_content_for_send_message",
+            "unsupported_action_type"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "description": "Empty string when action is prepared; otherwise a short abstain code (e.g., 'no_records','missing_match_field','missing_match_value','no_match','ambiguous_multiple_matches','missing_stable_id','insufficient_update_fields','unsupported_action').",
+                "type": "string"
+              },
+              "downstream_tool_kwargs": {
+                "description": "Prepared kwargs for the downstream original ToolSandbox call (suitable to pass to the preserved tool). Empty when should_call_tool is false.",
+                "type": "object"
+              },
+              "downstream_tool_name": {
+                "description": "Name of the original ToolSandbox side-effect tool to call (preserved) or empty when should_call_tool is false.",
+                "type": "string"
+              },
+              "safety_notes": {
+                "description": "Human-readable safety guidance: e.g., 'call downstream ToolSandbox side-effect next' or 'do not guess before side-effect action'.",
+                "type": "string"
+              },
+              "selected_id": {
+                "description": "The selected stable id (first available of person_id, message_id, reminder_id, sender_person_id, recipient_person_id, id). Empty on abstain.",
+                "type": "string"
+              },
+              "selected_index": {
+                "description": "Index of selected record in the input records list; -1 when abstaining for ambiguity or no selection.",
+                "type": "integer"
+              },
+              "selected_record": {
+                "description": "The exact selected visible record when unique; empty object on abstain/ambiguity.",
+                "type": "object"
+              },
+              "should_call_tool": {
+                "description": "Whether the runtime should proceed to call the downstream side-effect tool using returned kwargs.",
+                "type": "boolean"
+              },
+              "tie_candidates": {
+                "description": "When abstaining due to ambiguity, includes all tied visible records; otherwise empty list.",
+                "type": "array"
+              },
+              "value": {
+                "description": "If return_field exists in selected_record, that value (preserving original formatting); otherwise the selected_id. Empty when abstaining.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "selected_record",
+              "selected_id",
+              "selected_index",
+              "value",
+              "downstream_tool_name",
+              "downstream_tool_kwargs",
+              "should_call_tool",
+              "tie_candidates",
+              "abstain_reason",
+              "safety_notes"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "visible_records_present_and_nonempty",
+            "match_field_provided",
+            "match_value_provided",
+            "action_type_in_{answer_field,remove_contact,modify_contact,send_message}"
+          ],
+          "preserves_side_effect_tools": [
+            "modify_contact",
+            "remove_contact",
+            "send_message"
+          ],
+          "reason_tool_is_decisive": "This helper prevents common failures by (1) normalizing phone/number comparisons so formatted vs digits-only constraints match reliably; (2) enforcing a single unambiguous visible-record selection and abstaining on ties to avoid unsafe side-effects; and (3) preparing correct, validated kwargs for preserve-side-effect tools (modify_contact/remove_contact/send_message) so downstream calls are outcome-preserving and safe.",
+          "required_original_tool_calls": [
+            "modify_contact",
+            "remove_contact",
+            "send_message"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "composite:constraint_to_action_planner"
+          ],
+          "tool_name": "constraint_to_action_planner"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 2
+      },
+      "version": 1
+    },
+    "extract_contact_field_from_search_result": {
+      "accepted_at": "2026-05-06T22:38:04.442713+00:00",
+      "birth_scenario": "search_phone_number_with_name",
+      "code_hash": "ab8aac055e434730885653b5626c40ae13be29c5e096a66e2e93c60b3fa1b4af",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def extract_contact_field_from_search_result(contact_record: dict, requested_field: str) -> dict:\n    if not contact_record:\n        return {'answer_value': '', 'answer_field': '', 'source_person_id': '', 'abstain_reason': 'missing_contact_record'}\n    if not requested_field or requested_field not in contact_record:\n        return {'answer_value': '', 'answer_field': requested_field, 'source_person_id': contact_record.get('person_id', ''), 'abstain_reason': 'missing_requested_field'}\n    answer_value = contact_record[requested_field]\n    return {'answer_value': answer_value, 'answer_field': requested_field, 'source_person_id': contact_record.get('person_id', ''), 'abstain_reason': ''}",
+        "spec": {
+          "abstain_behavior": "If the requested_field is missing, blank, or not present in contact_record, return answer_value='' and abstain_reason='missing_requested_field'. If contact_record is not provided, return answer_value='' and abstain_reason='missing_contact_record'.",
+          "applicable_task_families": [
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number",
+            "search_name_with_relationship"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 3,
+          "description": "This tool extracts a specific field from a contact record after a search operation. It requires a contact_record containing the details of a contact and a requested_field indicating which detail to extract. The tool will return the value of the requested field if it exists, along with the source person's ID. If the requested field is missing or the contact record is not provided, it will abstain with an appropriate reason. This tool is designed to streamline the process of retrieving specific contact information without requiring manual extraction by the user.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "derived_value_calculator",
+          "final_state_preservation_plan": "The tool does not alter the state of the contact records and only extracts information, ensuring that the original search results remain intact.",
+          "generalization_rationale": "This tool can be applied across multiple search scenarios where specific contact information is needed, making it versatile for various user requests.",
+          "grading_accounting_note": "The tool's effectiveness is measured by its ability to accurately extract requested fields without manual intervention.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": true,
+            "planner_failures": [
+              "direct route requires brittle manual intermediate reasoning"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "visible_raw_data_lacking_deterministic_transform",
+              "v2_5_foundry_candidate_design"
+            ],
+            "summary": "Design a deterministic post-search answer extractor named extract_contact_field_from_search_result. It accepts contact_record: dict and requested_field: str. The runtime may autofill contact_record from the latest search_contacts result when exactly one visible contact is available; the actor should provide requested_field based on the user request, such as phone_number, relationship, name, email, or person_id. It returns exactly answer_value: str, answer_field: str, source_person_id: str, and abstain_reason: str. It must only extract fields already present in the visible contact record. It must not call or replace search_contacts, add_contact, remove_contact, modify_contact, or send_message_with_phone_number. It must abstain with answer_value='' and abstain_reason='missing_requested_field' when requested_field is absent, blank, or contact_record lacks that key; when requested_field is nonblank but missing, return answer_field=requested_field so the abstention is auditable. Do not return answer_value='' with abstain_reason='' for missing fields. Abstain with abstain_reason='missing_contact_record' when no contact_record is available. It must not guess ties or fabricate missing fields. Include positive triggers for search_phone_number_with_name, search_relationship_with_phone_number, and search_name_with_relationship. Include negative triggers for ambiguous multiple contacts, insufficient_information, add_contact direct side effects, reminder tasks, and non-contact tasks. List search_contacts in required_original_tool_calls because the source contact must still come from the original ToolSandbox search. Set canonical_route_substitution_risk='none' and expected_milestone_calls_replaced=[] because this helper preserves search_contacts and only extracts the final scalar answer.",
+            "visible_data_gaps": [
+              "After search_contacts returns a visible contact, extracts the exact requested scalar field without the actor manually copying, reformatting, or over-answering."
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "dict",
+              "description": "A dictionary containing the details of a contact, such as person_id, name, phone_number, relationship, etc.",
+              "name": "contact_record"
+            },
+            {
+              "annotation": "str",
+              "description": "The field to extract from the contact_record, such as phone_number, relationship, name, email, or person_id.",
+              "name": "requested_field"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "failure to extract specific fields from contact records after search"
+          ],
+          "negative_triggers": [
+            "ambiguous multiple contacts",
+            "insufficient_information",
+            "add_contact direct side effects",
+            "reminder tasks",
+            "non-contact tasks"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "answer_field": {
+                "type": "string"
+              },
+              "answer_value": {
+                "type": "string"
+              },
+              "source_person_id": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "positive_triggers": [
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number",
+            "search_name_with_relationship"
+          ],
+          "preserves_side_effect_tools": [],
+          "reason_tool_is_decisive": "It automates the extraction of specific fields from contact records, reducing manual effort and potential errors in retrieving contact information.",
+          "required_original_tool_calls": [
+            "search_contacts"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "visible_record_selector"
+          ],
+          "tool_name": "extract_contact_field_from_search_result"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    },
+    "extract_service_answer_field": {
+      "accepted_at": "2026-05-08T01:29:00.017086+00:00",
+      "birth_scenario": "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+      "code_hash": "c24730ed1a2759c382aef1a6905f73a8e18e08a923186cdc3e30018ce556a4af",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def extract_service_answer_field(service_payload: dict) -> dict:\n    \"\"\"\n    Extract a single scalar answer from a visible service_payload dict.\n    Returns a dict with keys: answer_value (str), answer_kind (str), answer_unit (str), abstain_reason (str).\n    Abstains with abstain_reason 'no_supported_answer_field' when no supported scalar field is present.\n    \"\"\"\n    # Safe input guard\n    if not isinstance(service_payload, dict):\n        return {\"answer_value\": \"\", \"answer_kind\": \"\", \"answer_unit\": \"\", \"abstain_reason\": \"no_supported_answer_field\"}\n\n    # Priority-ordered candidate keys (first match wins)\n    candidates = [\n        (\"phone_number\", \"phone_number\"),\n        (\"address\", \"address\"),\n        (\"current_temperature\", \"current_temperature\"),\n        (\"temperature\", \"temperature\"),\n        (\"distance\", \"distance\"),\n        (\"converted_amount\", \"converted_amount\"),\n        (\"convertedAmount\", \"convertedAmount\"),\n        (\"amount\", \"amount\"),\n        (\"value\", \"value\"),\n    ]\n\n    # Unit-like keys to check (prefer more specific keys first)\n    unit_keys = [\n        \"temperature_unit\", \"temperatureUnit\", \"distance_unit\", \"distanceUnit\",\n        \"converted_amount_unit\", \"convertedAmount_unit\", \"amount_unit\",\n        \"unit\", \"currency\", \"currency_unit\"\n    ]\n\n    for payload_key, kind in candidates:\n        if payload_key in service_payload:\n            val = service_payload[payload_key]\n            # Accept scalar types only\n            if isinstance(val, (str, int, float, bool)):\n                # Convert numeric/bool to string for consistent answer_value\n                answer_value = str(val)\n                # Find any unit-like sibling\n                answer_unit = \"\"\n                for uk in unit_keys:\n                    if uk in service_payload:\n                        uk_val = service_payload[uk]\n                        if isinstance(uk_val, str):\n                            answer_unit = uk_val\n                            break\n                return {\n                    \"answer_value\": answer_value,\n                    \"answer_kind\": kind,\n                    \"answer_unit\": answer_unit,\n                    \"abstain_reason\": \"\"\n                }\n            else:\n                # Found a supported key but the value isn't a scalar -> abstain\n                return {\"answer_value\": \"\", \"answer_kind\": \"\", \"answer_unit\": \"\", \"abstain_reason\": \"no_supported_answer_field\"}\n\n    # No supported keys found -> abstain\n    return {\"answer_value\": \"\", \"answer_kind\": \"\", \"answer_unit\": \"\", \"abstain_reason\": \"no_supported_answer_field\"}\n",
+        "spec": {
+          "abstain_behavior": "When no supported scalar answer field is deterministically present, the helper abstains by returning answer_value=='', answer_kind=='', answer_unit=='', and abstain_reason=='no_supported_answer_field'. It never fabricates values, never normalizes phone numbers, and never calls original ToolSandbox producers itself.",
+          "applicable_task_families": [
+            "find_phone_number_with_location_name",
+            "get_weather_for_location",
+            "convert_currency_for_amount"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 3,
+          "description": "Deterministic extractor that pulls a single, final scalar answer out of a visible service_payload produced by an upstream ToolSandbox lookup/conversion (e.g. location, weather, distance, currency/unit conversion). It recognizes common visible fields (phone_number, address, current_temperature, temperature, distance, converted_amount / convertedAmount, amount, value). On success it returns the answer_value (string), answer_kind (the field name matched), and answer_unit (if any unit-like field is present). The helper never calls external services or performs side effects and does not replace the original producer tool; it only extracts the final answer from the visible payload. It abstains (returns empty answer_value and a non-empty abstain_reason) if no supported scalar field is present or the matched field value is not a scalar. Priority order: phone_number, address, current_temperature, temperature, distance, converted_amount, convertedAmount, amount, value. Unit detection prefers keys such as temperature_unit, unit, distance_unit, convertedAmount_unit, converted_amount_unit, amount_unit, currency.",
+          "diagnostic_only": true,
+          "estimated_step_compression": 4,
+          "expected_milestone_calls_replaced": [],
+          "family": "derived_value_calculator",
+          "final_state_preservation_plan": "This helper performs no side effects and does not call or replace the original ToolSandbox producer. It only reads the given visible payload dict and returns a small extraction dict, preserving the original call and final state.",
+          "generalization_rationale": "Many final-step tasks (phone lookup, address lookups, weather readings, distance calculations, currency/unit conversions) expose a visible payload row; extracting the correct scalar answer and capturing accompanying unit is a repeated small decision that otherwise requires multiple manual checks. This helper deterministically encodes that selection and unit-capture logic so agents avoid copying the wrong field or losing units across different lookup types.",
+          "grading_accounting_note": "Outcome-preserving extractor: grading should count the original producer tool as the source of truth; this helper only deterministically extracts an answer field and should not be credited as replacing the upstream lookup/conversion call.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [
+              "search_location_around_lat_lon",
+              "search_weather_around_lat_lon",
+              "search_lat_lon",
+              "calculate_lat_lon_distance",
+              "convert_currency",
+              "unit_conversion"
+            ],
+            "final_answer_route_mismatch": true,
+            "planner_failures": [],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "visible_raw_data_lacking_deterministic_transform"
+            ],
+            "summary": "External lookup and conversion tasks repeatedly expose a visible ToolSandbox result payload, but the agent can still lose task completion by manually copying, normalizing, or selecting the wrong answer field from that payload. Generate a deterministic answer-only helper named extract_service_answer_field. Input: service_payload dict copied from a visible result row or dictionary returned by an original ToolSandbox lookup/conversion tool. Return a dict with answer_value, answer_kind, answer_unit, and abstain_reason. Recognize common visible fields such as phone_number, address, current_temperature, temperature, distance, converted_amount, convertedAmount, amount, and value. Return answer_value as a string and preserve any visible unit field as answer_unit when present. Abstain with an empty answer_value when no supported scalar answer field is present. This helper must not call external services itself, must not perform side effects, and must not replace the original ToolSandbox lookup or conversion call; it only extracts the final answer from visible output after that original call returns. Its required_original_tool_calls and preserves_side_effect_tools must use concrete ToolSandbox producer names from this list only: search_location_around_lat_lon, search_weather_around_lat_lon, search_lat_lon, calculate_lat_lon_distance, convert_currency, and unit_conversion. Do not invent placeholder producer names such as search_service_payload.",
+            "visible_data_gaps": [
+              "visible service result payload contains answer fields requiring deterministic extraction"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "dict",
+              "description": "A single visible result row/dictionary produced by an upstream ToolSandbox lookup or conversion tool (e.g. search_location_around_lat_lon result row, convert_currency result).",
+              "name": "service_payload"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "manual_field_selection_error (agent copies the wrong key from visible payload)",
+            "unit_loss (agent overlooks sibling unit fields)",
+            "scalar/non-scalar mismatch (agent attempts to return complex objects)"
+          ],
+          "negative_triggers": [
+            "no_supported_answer_field",
+            "ambiguous_multiple_answer_fields (multiple distinct supported fields present - tool uses predefined priority)",
+            "matched_field present but value not scalar (object/array/null)",
+            "missing service_payload or service_payload not a dict"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "description": "Empty on successful extraction; otherwise a short reason such as 'no_supported_answer_field'.",
+                "type": "string"
+              },
+              "answer_kind": {
+                "description": "The canonical name of the matched field (e.g. 'phone_number', 'address', 'current_temperature'). Empty when abstaining.",
+                "type": "string"
+              },
+              "answer_unit": {
+                "description": "Preserved unit string if a unit-like sibling field is present (e.g. 'Celsius', 'km'). Empty if none found or abstain.",
+                "type": "string"
+              },
+              "answer_value": {
+                "description": "The extracted scalar answer as a string. Empty when abstaining.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "positive_triggers": [
+            "service_payload contains key 'phone_number'",
+            "service_payload contains key 'address'",
+            "service_payload contains key 'current_temperature' or 'temperature'",
+            "service_payload contains 'converted_amount' or 'convertedAmount' or 'amount' or 'value'",
+            "service_payload contains 'distance'"
+          ],
+          "preserves_side_effect_tools": [
+            "search_location_around_lat_lon",
+            "search_weather_around_lat_lon",
+            "search_lat_lon",
+            "calculate_lat_lon_distance",
+            "convert_currency",
+            "unit_conversion"
+          ],
+          "reason_tool_is_decisive": "It centralizes the last-mile extraction decision (which field to pick and whether a unit exists) so that the agent no longer needs to inspect the payload and choose manually across multiple conversion/lookup families. This reduces human-like copying errors and unit-loss errors that cause incorrect final answers.",
+          "required_original_tool_calls": [
+            "search_location_around_lat_lon",
+            "search_weather_around_lat_lon",
+            "search_lat_lon",
+            "calculate_lat_lon_distance",
+            "convert_currency",
+            "unit_conversion"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "derived_value:extract_service_answer_field"
+          ],
+          "tool_name": "extract_service_answer_field"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 2
+      },
+      "version": 1
+    },
+    "plan_contact_lookup_query": {
+      "accepted_at": "2026-05-06T22:37:42.030799+00:00",
+      "birth_scenario": "search_name_with_relationship",
+      "code_hash": "462b205de95a71602269cc6c92533dc7ffad34595d63f70c7884e60e50d9256f",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 2,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def plan_contact_lookup_query(contact_name: str, phone_number: str, relationship: str, requested_field: str) -> dict:\n    search_contacts_kwargs = {}\n    should_call_search_contacts = False\n    abstain_reason = ''\n\n    if not requested_field:\n        abstain_reason = 'requested_field is blank'\n    else:\n        if contact_name:\n            search_contacts_kwargs['name'] = contact_name.strip()\n            should_call_search_contacts = True\n        if phone_number:\n            search_contacts_kwargs['phone_number'] = phone_number.strip()\n            should_call_search_contacts = True\n        if relationship:\n            search_contacts_kwargs['relationship'] = relationship.strip()\n            should_call_search_contacts = True\n\n        if not search_contacts_kwargs:\n            abstain_reason = 'missing_lookup_constraint'\n\n    return {\n        'should_call_search_contacts': should_call_search_contacts,\n        'search_contacts_kwargs': search_contacts_kwargs,\n        'answer_field': requested_field,\n        'abstain_reason': abstain_reason\n    }",
+        "spec": {
+          "abstain_behavior": "Returns an empty dict when no unique safe selection exists or when conditions for a lookup are not met.",
+          "applicable_task_families": [
+            "search_name_with_relationship",
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 3,
+          "description": "This helper prepares a deterministic pre-search lookup for contacts based on provided constraints. It accepts optional inputs for contact name, phone number, and relationship, and requires a requested field. It returns whether to call the search, the search parameters, the answer field, and an abstain reason. It triggers for specific search tasks and abstains when conditions are not met.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "The original search_contacts call will still be made, preserving the intended lookup route.",
+          "generalization_rationale": "This helper can be applied across multiple contact lookup scenarios, ensuring that the correct parameters are prepared for the next search call.",
+          "grading_accounting_note": "This tool prepares the necessary arguments for the search without altering the original lookup process.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": true,
+            "planner_failures": [
+              "direct route requires brittle manual intermediate reasoning"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "visible_raw_data_lacking_deterministic_transform",
+              "v2_5_foundry_candidate_design"
+            ],
+            "summary": "Design a deterministic pre-search lookup planner named plan_contact_lookup_query. It accepts only scalar inputs: contact_name: str optional, phone_number: str optional, relationship: str optional, and requested_field: str required. It returns exactly should_call_search_contacts: bool, search_contacts_kwargs: dict, answer_field: str, and abstain_reason: str. When exactly one safe lookup constraint is available, return should_call_search_contacts=True and the original search_contacts kwargs using only visible supplied fields: name from contact_name, phone_number from phone_number, or relationship from relationship. Preserve answer_field as the requested_field so a later post-search extractor or final answer can use the right field. If multiple constraints are supplied and they are all visible, include all nonblank constraints in search_contacts_kwargs. Abstain when requested_field is blank, when no lookup constraint is supplied, when the requested field is unsupported, or when the task asks to add/modify/remove/send instead of answer a lookup. The helper must not call search_contacts and must not replace it; it only prepares the next original ToolSandbox search call. Include positive triggers for search_name_with_relationship, search_phone_number_with_name, and search_relationship_with_phone_number. Include negative triggers for add_contact, remove_contact, modify_contact, send_message, insufficient_information, ambiguous multiple contacts, and non-contact tasks. List search_contacts in both required_original_tool_calls and preserves_side_effect_tools because the original lookup must still be called next. Set canonical_route_substitution_risk='none' and expected_milestone_calls_replaced=[] because this helper preserves the original lookup route while making argument selection deterministic.",
+            "visible_data_gaps": [
+              "Before search_contacts is called, deterministically converts visible scalar contact constraints into safe original search kwargs and the exact answer field needed after lookup."
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "str",
+              "description": "The name of the contact to look up.",
+              "name": "contact_name"
+            },
+            {
+              "annotation": "str",
+              "description": "The phone number of the contact to look up.",
+              "name": "phone_number"
+            },
+            {
+              "annotation": "str",
+              "description": "The relationship to the contact to look up.",
+              "name": "relationship"
+            },
+            {
+              "annotation": "str",
+              "description": "The specific field to return from the contact lookup.",
+              "name": "requested_field"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "direct route requires brittle manual intermediate reasoning"
+          ],
+          "negative_triggers": [
+            "add_contact",
+            "remove_contact",
+            "modify_contact",
+            "send_message",
+            "insufficient_information",
+            "ambiguous multiple contacts",
+            "non-contact tasks"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "answer_field": {
+                "type": "string"
+              },
+              "search_contacts_kwargs": {
+                "type": "object"
+              },
+              "should_call_search_contacts": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "positive_triggers": [
+            "search_name_with_relationship",
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number"
+          ],
+          "preserves_side_effect_tools": [
+            "search_contacts"
+          ],
+          "reason_tool_is_decisive": "It ensures that the search parameters are correctly determined based on the available input constraints, leading to a more efficient lookup process.",
+          "required_original_tool_calls": [
+            "search_contacts"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "visible_record_selector"
+          ],
+          "tool_name": "plan_contact_lookup_query"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 2
+      },
+      "version": 1
+    },
+    "plan_contact_search_from_scalar_constraint": {
+      "accepted_at": "2026-05-07T05:16:32.319001+00:00",
+      "birth_scenario": "remove_contact_by_phone",
+      "code_hash": "ba87e6c8d0be36f6fa36face218d8ef94c4b880eb7b1b8c922f65624d7f14a56",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 1,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def plan_contact_search_from_scalar_constraint(constraint_field: str, constraint_value: str) -> dict:\n    normalized_constraint_value = constraint_value.strip()\n    if constraint_field == 'phone_number':\n        normalized_constraint_value = normalized_constraint_value.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')\n        if normalized_constraint_value.startswith('+'):\n            return_value = normalized_constraint_value\n        else:\n            if len(normalized_constraint_value) == 11 and normalized_constraint_value[0] == '1':\n                return_value = '+' + normalized_constraint_value\n            elif len(normalized_constraint_value) == 10:\n                return_value = '+1' + normalized_constraint_value\n            else:\n                return_value = '+' + normalized_constraint_value\n        return {\n            'should_call_search': True,\n            'search_tool_name': 'search_contacts',\n            'search_kwargs': {'phone_number': return_value},\n            'normalized_constraint_field': 'phone_number',\n            'normalized_constraint_value': return_value,\n            'abstain_reason': ''\n        }\n    elif constraint_field == 'name' or constraint_field == 'relationship':\n        return {\n            'should_call_search': True,\n            'search_tool_name': 'search_contacts',\n            'search_kwargs': {constraint_field: normalized_constraint_value},\n            'normalized_constraint_field': constraint_field,\n            'normalized_constraint_value': normalized_constraint_value,\n            'abstain_reason': ''\n        }\n    else:\n        return {\n            'should_call_search': False,\n            'search_tool_name': '',\n            'search_kwargs': {},\n            'normalized_constraint_field': '',\n            'normalized_constraint_value': '',\n            'abstain_reason': 'missing_contact_constraint'\n        }",
+        "spec": {
+          "abstain_behavior": "If no valid constraint is provided, return an empty tool name and kwargs.",
+          "applicable_task_families": [
+            "remove_contact_by_phone",
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number",
+            "send_message_with_contact_content_cellular_off"
+          ],
+          "canonical_route_substitution_risk": "low",
+          "cross_task_applicability_count": 4,
+          "description": "This tool generates a search_contacts query plan based on a scalar constraint, such as a phone number, name, or relationship. It normalizes phone numbers to E.164 format, preserves the case and spacing for names and relationships, and abstains when no valid constraint is provided. It is designed to streamline contact search workflows by providing deterministic search parameters from scalar inputs.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "The tool does not perform side effects, so no final state preservation is necessary.",
+          "generalization_rationale": "This tool can be applied across various contact-related tasks, providing a unified way to generate search parameters from scalar inputs.",
+          "grading_accounting_note": "The tool provides a clear mapping from scalar constraints to search parameters, improving the reliability of contact searches.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [
+              "prepare_direct_contact_action_kwargs",
+              "prepare_direct_contact_action_args",
+              "plan_contact_action_lookup_query"
+            ],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "prior designs were too broad or unstable; split to scalar search query only"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "contact_action_no_current_helper_fit",
+              "scalar_search_query_planning"
+            ],
+            "summary": "scalar contact search query planner after V2.6 prompt repair",
+            "visible_data_gaps": [
+              "search_contacts kwargs from scalar constraints"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "str",
+              "description": "The field to constrain the search by, such as 'phone_number', 'name', or 'relationship'.",
+              "name": "constraint_field"
+            },
+            {
+              "annotation": "str",
+              "description": "The value to match against the specified constraint field.",
+              "name": "constraint_value"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "contact workflows need deterministic search_contacts kwargs from scalar constraints"
+          ],
+          "negative_triggers": [
+            "missing contact constraint",
+            "unknown constraint field"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "normalized_constraint_field": {
+                "type": "string"
+              },
+              "normalized_constraint_value": {
+                "type": "string"
+              },
+              "search_kwargs": {
+                "type": "object"
+              },
+              "search_tool_name": {
+                "type": "string"
+              },
+              "should_call_search": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "positive_triggers": [
+            "valid phone number provided",
+            "valid name provided",
+            "valid relationship provided"
+          ],
+          "preserves_side_effect_tools": [
+            "search_contacts"
+          ],
+          "reason_tool_is_decisive": "This tool addresses the need for deterministic search parameters from scalar constraints, which is critical for effective contact management workflows.",
+          "required_original_tool_calls": [
+            "search_contacts"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "contact_scalar_search_planning"
+          ],
+          "tool_name": "plan_contact_search_from_scalar_constraint"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 2,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    },
+    "prepare_side_effect_args_from_selected_record": {
+      "accepted_at": "2026-05-08T01:25:56.306330+00:00",
+      "birth_scenario": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+      "code_hash": "10ab547bcca65f980f729176ad43d96279f89b2e56da7dfb02388d5523d01d88",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def prepare_side_effect_args_from_selected_record(selected_record: dict = None, action_type: str = \"\", updates: dict = None, user_intent: str = \"\") -> dict:\n    \"\"\"\n    Prepare downstream tool name and kwargs for an already-selected visible record.\n\n    Returns a dict with keys: downstream_tool_name (str), downstream_tool_kwargs (dict), should_call_tool (bool), abstain_reason (str).\n    \"\"\"\n    sel = selected_record or {}\n    upd = updates or {}\n    act = (action_type or \"\").strip().lower()\n\n    # Safe empty return template\n    empty_result = {\n        \"downstream_tool_name\": \"\",\n        \"downstream_tool_kwargs\": {},\n        \"should_call_tool\": False,\n        \"abstain_reason\": \"\"\n    }\n\n    if not sel:\n        return {**empty_result, \"abstain_reason\": \"missing_selected_record\"}\n\n    # Helper: check for at least one non-empty update field\n    def has_concrete_updates(u: dict) -> bool:\n        if not isinstance(u, dict):\n            return False\n        for k, v in u.items():\n            if v is None:\n                continue\n            if isinstance(v, str) and v.strip() == \"\":\n                continue\n            return True\n        return False\n\n    # Phone normalization per E.164 guidance in the spec\n    def normalize_phone(raw: str) -> str:\n        if raw is None:\n            return \"\"\n        s = str(raw).strip()\n        if s == \"\":\n            return \"\"\n        leading_plus = s.startswith(\"+\")\n        # Remove everything except digits\n        digits = \"\".join(ch for ch in s if ch.isdigit())\n        if leading_plus:\n            # preserve leading + and stripped digits\n            if digits == \"\":\n                return \"\"\n            return \"+\" + digits\n        # No leading plus: use rules\n        if len(digits) == 11 and digits[0] == \"1\":\n            return \"+\" + digits\n        if len(digits) == 10:\n            return \"+1\" + digits\n        # fallback: return the stripped digits (no +)\n        return digits\n\n    # Normalize action aliases to canonical actions\n    canonical = \"\"\n    if act in {\"remove\", \"delete\"}:\n        # choose contact vs reminder by available ids\n        if \"person_id\" in sel:\n            canonical = \"remove_contact\"\n        elif \"reminder_id\" in sel:\n            canonical = \"remove_reminder\"\n    elif act in {\"modify\", \"update\", \"change\"}:\n        if \"person_id\" in sel:\n            canonical = \"modify_contact\"\n        elif \"reminder_id\" in sel:\n            canonical = \"modify_reminder\"\n    elif act in {\"send\", \"send_message\", \"message\", \"send_sms\"}:\n        canonical = \"send_message\"\n    elif act in {\"add_reminder\", \"create_reminder\", \"set_reminder\"}:\n        canonical = \"add_reminder\"\n    else:\n        # accept direct canonical names as well\n        if act in {\"modify_contact\", \"remove_contact\", \"modify_reminder\", \"remove_reminder\", \"send_message\", \"add_reminder\"}:\n            canonical = act\n\n    if canonical == \"\":\n        return {**empty_result, \"abstain_reason\": \"unsupported_action\"}\n\n    # Prepare per-action kwargs\n    if canonical == \"modify_contact\":\n        if \"person_id\" not in sel:\n            return {**empty_result, \"abstain_reason\": \"missing_required_id\"}\n        if not has_concrete_updates(upd):\n            return {**empty_result, \"abstain_reason\": \"empty_updates_for_modify\"}\n        kwargs = {\"person_id\": sel.get(\"person_id\")}\n        # Merge updates (preserve provided casing and spacing for names)\n        for k, v in upd.items():\n            kwargs[k] = v\n        return {\"downstream_tool_name\": \"modify_contact\", \"downstream_tool_kwargs\": kwargs, \"should_call_tool\": True, \"abstain_reason\": \"\"}\n\n    if canonical == \"remove_contact\":\n        if \"person_id\" not in sel:\n            return {**empty_result, \"abstain_reason\": \"missing_required_id\"}\n        return {\"downstream_tool_name\": \"remove_contact\", \"downstream_tool_kwargs\": {\"person_id\": sel.get(\"person_id\")}, \"should_call_tool\": True, \"abstain_reason\": \"\"}\n\n    if canonical == \"modify_reminder\":\n        if \"reminder_id\" not in sel:\n            return {**empty_result, \"abstain_reason\": \"missing_required_id\"}\n        if not has_concrete_updates(upd):\n            return {**empty_result, \"abstain_reason\": \"empty_updates_for_modify\"}\n        kwargs = {\"reminder_id\": sel.get(\"reminder_id\")}\n        for k, v in upd.items():\n            kwargs[k] = v\n        return {\"downstream_tool_name\": \"modify_reminder\", \"downstream_tool_kwargs\": kwargs, \"should_call_tool\": True, \"abstain_reason\": \"\"}\n\n    if canonical == \"remove_reminder\":\n        if \"reminder_id\" not in sel:\n            return {**empty_result, \"abstain_reason\": \"missing_required_id\"}\n        return {\"downstream_tool_name\": \"remove_reminder\", \"downstream_tool_kwargs\": {\"reminder_id\": sel.get(\"reminder_id\")}, \"should_call_tool\": True, \"abstain_reason\": \"\"}\n\n    if canonical == \"add_reminder\":\n        # For adding a reminder, require at least one concrete field (time or content)\n        if not has_concrete_updates(upd):\n            return {**empty_result, \"abstain_reason\": \"insufficient_information\"}\n        kwargs = {}\n        # copy any explicit fields\n        for k, v in upd.items():\n            kwargs[k] = v\n        return {\"downstream_tool_name\": \"add_reminder\", \"downstream_tool_kwargs\": kwargs, \"should_call_tool\": True, \"abstain_reason\": \"\"}\n\n    if canonical == \"send_message\":\n        # Determine recipient: prefer recipient_person_id, then person_id, then recipient_id, then phone fields\n        recipient_person = None\n        for key in (\"recipient_person_id\", \"person_id\", \"recipient_id\", \"sender_person_id\", \"recipient_person\"):\n            if key in sel and sel.get(key):\n                recipient_person = sel.get(key)\n                break\n        phone_source = None\n        for pkey in (\"phone_number\", \"phone\", \"mobile\", \"phone_number_e164\"):\n            if pkey in sel and sel.get(pkey):\n                phone_source = sel.get(pkey)\n                break\n        # Message content can come from updates keys 'content','message','text'\n        content = None\n        for ck in (\"content\", \"message\", \"text\", \"body\"):\n            if ck in upd and upd.get(ck):\n                content = upd.get(ck)\n                break\n        # If no explicit content in updates, attempt to extract from user_intent heuristics (only when clear 'send' intent)\n        if not content:\n            if isinstance(user_intent, str) and user_intent.strip().lower().startswith(\"send\"):\n                # weak heuristic: not sufficient to auto-fill content\n                content = None\n        # Construct kwargs\n        kwargs = {}\n        if recipient_person:\n            kwargs[\"recipient_person_id\"] = recipient_person\n        elif phone_source:\n            norm = normalize_phone(phone_source)\n            if norm:\n                kwargs[\"phone_number\"] = norm\n        # Allow explicit phone in updates to override\n        if \"phone_number\" in upd and upd.get(\"phone_number\"):\n            kwargs[\"phone_number\"] = normalize_phone(upd.get(\"phone_number\"))\n        if \"recipient_person_id\" in upd and upd.get(\"recipient_person_id\"):\n            kwargs[\"recipient_person_id\"] = upd.get(\"recipient_person_id\")\n        if content:\n            kwargs[\"content\"] = content\n        elif \"content\" in upd and upd.get(\"content\"):\n            kwargs[\"content\"] = upd.get(\"content\")\n\n        # Validate we have recipient and content\n        has_recipient = (\"recipient_person_id\" in kwargs) or (\"phone_number\" in kwargs)\n        has_content = (\"content\" in kwargs)\n        if not has_recipient or not has_content:\n            return {**empty_result, \"abstain_reason\": \"insufficient_information\"}\n        return {\"downstream_tool_name\": \"send_message\", \"downstream_tool_kwargs\": kwargs, \"should_call_tool\": True, \"abstain_reason\": \"\"}\n\n    # Fallback (should not be reached)\n    return {**empty_result, \"abstain_reason\": \"unsupported_action\"}\n",
+        "spec": {
+          "abstain_behavior": "Abstains with should_call_tool=false and downstream fields empty when: selected_record is empty ('missing_selected_record'); the action_type is not a supported action ('unsupported_action'); the selected_record lacks the required stable id for the requested action ('missing_required_id'); modify actions have no concrete update fields ('empty_updates_for_modify'); send_message missing both recipient and message content ('insufficient_information'). Returns explicit abstain_reason strings to allow deterministic planner branching.",
+          "applicable_task_families": [
+            "modify_contact_with_message_recency",
+            "manage_reminders_and_contacts"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 2,
+          "description": "Prepare side-effect arguments (kwargs) for original ToolSandbox calls from an already-selected visible record. Accepts a single selected_record (the unique visible record), an action_type (with common aliases), an updates dict (for modify/add actions), and the user_intent string. Returns the downstream_tool_name, downstream_tool_kwargs, should_call_tool, and an explicit abstain_reason. Abstains when selected_record is missing, the action is unsupported, required stable ids are missing, modify actions have no concrete update fields, or when there is insufficient information to safely prepare the original tool call. Does not perform side effects; it only prepares arguments for modify_contact, remove_contact, modify_reminder, remove_reminder, send_message, or add_reminder. Normalizes common action aliases and phone numbers when preparing phone_number kwargs. Use this helper only when exactly one visible selected_record exists (the calling planner/selector must ensure uniqueness); it will abstain if selected_record is empty.",
+          "diagnostic_only": true,
+          "estimated_step_compression": 4,
+          "expected_milestone_calls_replaced": [],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "This helper only prepares arguments and does not execute any side effects. The planner must still call the preserved original ToolSandbox call (one of the listed tools). Since it does not perform the call, final state is preserved only when the planner subsequently invokes the prepared original tool.",
+          "generalization_rationale": "Many multi-turn workflows deterministically identify a single visible record but then repeatedly fail to synthesize exact original-tool kwargs (ids, normalized phone numbers, required field names). This helper encapsulates those deterministic mapping rules and normalization (including phone/E.164 handling) so multiple task families can reuse a single, auditable argument-preparation step.",
+          "grading_accounting_note": "This helper should be graded only for correct argument preparation and abstention behavior. It must not be credited for completing the side effect; downstream original tool invocations are separate milestones.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "prepare kwargs before original side-effect tool call"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "side_effect_argument_preparation_failure"
+            ],
+            "summary": "Several workflows reach or can deterministically identify the correct visible target record, but then fail to prepare the exact kwargs for the original ToolSandbox side-effect call. Generate a compact composite helper named prepare_side_effect_args_from_selected_record. Inputs: selected_record, action_type, updates, and user_intent. Return downstream_tool_name, downstream_tool_kwargs, should_call_tool, and abstain_reason. For supported actions, copy stable ids from the selected record into kwargs and merge explicit updates only when the required fields are present. Preserve the original side-effect tools modify_contact, remove_contact, modify_reminder, remove_reminder, send_message, or add_reminder as applicable. Abstain if selected_record is empty, action_type is unsupported, required ids are missing, updates are ambiguous, or the user did not provide enough information. This helper prepares arguments only; it must not perform the side effect. The generated function should be safe when the acting model omits optional chaining inputs: use default empty dicts for selected_record and updates, then abstain unless a previous selector or explicit input provides the selected record. Remove/delete actions may use updates {}. Modify/update actions must abstain unless updates contains at least one actual field to change.",
+            "visible_data_gaps": [
+              "selected record id and explicit updates must become downstream kwargs"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "dict",
+              "description": "The single visible record selected earlier (e.g., a contact or reminder). May be empty; if empty the helper abstains.",
+              "name": "selected_record"
+            },
+            {
+              "annotation": "str",
+              "description": "The requested side-effect action or alias (e.g., 'modify', 'update', 'remove', 'delete', 'send', 'send_message', 'add_reminder').",
+              "name": "action_type"
+            },
+            {
+              "annotation": "dict",
+              "description": "Explicit update fields supplied by the user (e.g., {'relationship':'friend'} or {'content':'hi'}). Optional; defaults to {}. Modify actions require at least one concrete field.",
+              "name": "updates"
+            },
+            {
+              "annotation": "str",
+              "description": "Original user intent or utterance to help disambiguate when updates are sparse. Not used to perform side effects; only to decide whether there is enough information.",
+              "name": "user_intent"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "side_effect_argument_preparation_failure",
+            "missing_stable_id_in_prepared_kwargs",
+            "incorrect_phone_number_format_for_send_message"
+          ],
+          "negative_triggers": [
+            "missing_selected_record",
+            "unsupported action_type or unknown alias",
+            "missing required stable id in selected_record (person_id or reminder_id)",
+            "modify/update action with empty or no updates",
+            "no message content for send_message",
+            "ambiguous or insufficient updates for add_reminder or send_message"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "description": "Empty when should_call_tool is true; otherwise a short machine-readable reason for abstaining (e.g., 'missing_selected_record', 'unsupported_action', 'missing_required_id', 'empty_updates_for_modify', 'insufficient_information').",
+                "type": "string"
+              },
+              "downstream_tool_kwargs": {
+                "description": "The prepared kwargs to be passed to the preserved original side-effect tool (empty when abstaining).",
+                "type": "object"
+              },
+              "downstream_tool_name": {
+                "description": "The canonical original ToolSandbox side-effect tool this helper prepares args for (empty string when abstaining).",
+                "type": "string"
+              },
+              "should_call_tool": {
+                "description": "True when the helper prepared a valid call and the caller may proceed to invoke the original side-effect tool.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "downstream_tool_name",
+              "downstream_tool_kwargs",
+              "should_call_tool",
+              "abstain_reason"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "selected_record is non-empty and contains a stable id (person_id or reminder_id) and action_type is a supported action",
+            "action_type is a modify/update and updates contains at least one non-empty field",
+            "action_type is remove/delete and selected_record contains the required id",
+            "action_type is send_message and there is a recipient id or phone and message content provided"
+          ],
+          "preserves_side_effect_tools": [
+            "modify_contact",
+            "remove_contact",
+            "modify_reminder",
+            "remove_reminder",
+            "send_message",
+            "add_reminder"
+          ],
+          "reason_tool_is_decisive": "This helper is decisive because it bridges selection (a prior step) to a canonical side-effect invocation by copying stable ids, normalizing phone numbers, verifying required fields for each supported action, and assembling the exact kwargs expected by preserved side-effect tools. That eliminates repeated planning failures where the planner selected a record but failed to prepare valid tool arguments.",
+          "required_original_tool_calls": [
+            "modify_contact",
+            "remove_contact",
+            "modify_reminder",
+            "remove_reminder",
+            "send_message",
+            "add_reminder"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "composite:prepare_side_effect_args_from_selected_record"
+          ],
+          "tool_name": "prepare_side_effect_args_from_selected_record"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    },
+    "relative_day_time_to_timestamp": {
+      "accepted_at": "2026-05-04T08:59:41.090975+00:00",
+      "birth_scenario": "modify_reminder_with_recency_latest_3_distraction_tools",
+      "code_hash": "d2c346dfb9d0288e173ffcf6509ec559881bf02acf86eed588f2f31984972f0e",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def relative_day_time_to_timestamp(current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float) -> float:\n    \"\"\"\n    Convert a relative local day/time into a UTC Unix timestamp (seconds since epoch).\n\n    Algorithm (deterministic, no imports):\n    - shift current UTC timestamp into local-seconds by adding local offset (hours -> seconds)\n    - find the local-day's midnight by floor-dividing by 86400 and multiplying back\n    - advance by day_offset days to get the target local midnight\n    - convert that local-midnight back to UTC epoch by subtracting the offset\n    - add the requested local hour and minute (in seconds)\n\n    Returns float seconds since epoch (UTC).\n    \"\"\"\n    # seconds per day and per minute/hour\n    SECONDS_PER_DAY = 86400.0\n    SECONDS_PER_HOUR = 3600.0\n    SECONDS_PER_MINUTE = 60.0\n\n    # local offset in seconds (can be fractional hours)\n    offset_seconds = local_utc_offset_hours * SECONDS_PER_HOUR\n\n    # represent current time in local-seconds (an epoch shifted by offset)\n    local_seconds = current_timestamp + offset_seconds\n\n    # compute the local midnight (floor to the start of the local day)\n    local_midnight_local_epoch = (local_seconds // SECONDS_PER_DAY) * SECONDS_PER_DAY\n\n    # advance by the required number of days (in local time)\n    target_local_midnight_local_epoch = local_midnight_local_epoch + (day_offset * SECONDS_PER_DAY)\n\n    # convert the target local midnight back to UTC epoch by removing the offset\n    target_local_midnight_utc = target_local_midnight_local_epoch - offset_seconds\n\n    # add the requested local hour and minute (converted to UTC epoch)\n    target_timestamp = target_local_midnight_utc + (hour * SECONDS_PER_HOUR) + (minute * SECONDS_PER_MINUTE)\n\n    return float(target_timestamp)",
+        "spec": {
+          "abstain_behavior": "",
+          "applicable_task_families": [],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": null,
+          "description": "Deterministically convert a user-facing relative local day/time (e.g., 'tomorrow 5:00 PM') into an exact Unix timestamp (seconds since epoch, UTC). Uses the provided current_timestamp and local UTC offset to compute the target UTC timestamp for the specified day_offset, hour, and minute.",
+          "diagnostic_only": false,
+          "estimated_step_compression": null,
+          "expected_milestone_calls_replaced": [],
+          "family": "canonicalizer",
+          "final_state_preservation_plan": "",
+          "generalization_rationale": "Many reminder modifications supply a relative local day and time. This small canonicalizer isolates the deterministic conversion from current UTC timestamp + local offset into the precise UTC epoch seconds required by modify_reminder, avoiding repeated ad-hoc date arithmetic across agents.",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "legacy_unstructured_evidence"
+            ],
+            "summary": "Without a dedicated canonicalizer, agents often miscompute dates because they lack consistent local-midnight anchoring and offset handling (e.g., mixing UTC vs local-day boundaries), producing timestamps off by whole days or hours.",
+            "visible_data_gaps": []
+          },
+          "inputs": [
+            {
+              "annotation": "float",
+              "description": "Current moment as a Unix timestamp (seconds since epoch, UTC).",
+              "name": "current_timestamp"
+            },
+            {
+              "annotation": "int",
+              "description": "Number of days forward from the current local date (0 = today, 1 = tomorrow, etc.).",
+              "name": "day_offset"
+            },
+            {
+              "annotation": "int",
+              "description": "Hour in 24-hour local time for the target reminder (0-23).",
+              "name": "hour"
+            },
+            {
+              "annotation": "int",
+              "description": "Minute (0-59) in local time for the target reminder.",
+              "name": "minute"
+            },
+            {
+              "annotation": "float",
+              "description": "Local offset from UTC in hours (e.g., -4 for UTC-4). Use -4 for the ToolSandbox local environment unless another offset is known.",
+              "name": "local_utc_offset_hours"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [],
+          "negative_triggers": [],
+          "output_annotation": "float",
+          "output_schema": null,
+          "positive_triggers": [],
+          "preserves_side_effect_tools": [],
+          "reason_tool_is_decisive": "",
+          "required_original_tool_calls": [],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [],
+          "tool_name": "relative_day_time_to_timestamp"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 0,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    },
+    "resolve_search_window_or_bounds": {
+      "accepted_at": "2026-05-03T02:37:52.249369+00:00",
+      "birth_scenario": "search_reminder_with_creation_recency_yesterday",
+      "code_hash": "2f4fdae225cc1af4e9c385eeb601448cc44e6e361555a3741193d3618cb38e8a",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 6,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def resolve_search_window_or_bounds(\n    current_timestamp: float,\n    phrase: str,\n    target_domain: str,\n    timestamp_intent: str,\n    direction: str,\n    content_keyword: str = \"\",\n    lookback_days: int = 0,\n    timezone_offset: float = 0.0,\n) -> dict:\n    min_timestamp = 315529200.0\n    now = float(current_timestamp)\n    if now <= 0:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"missing_current_timestamp\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    domain = str(target_domain or \"\").strip().lower()\n    if domain == \"message\":\n        tool_name = \"search_messages\"\n    elif domain == \"reminder\":\n        tool_name = \"search_reminder\"\n    else:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"unsupported_target_domain\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    intent = str(timestamp_intent or \"\").strip().lower()\n    if domain == \"message\":\n        lower_key = \"creation_timestamp_lowerbound\"\n        upper_key = \"creation_timestamp_upperbound\"\n    elif intent == \"creation\":\n        lower_key = \"creation_timestamp_lowerbound\"\n        upper_key = \"creation_timestamp_upperbound\"\n    elif intent == \"reminder\":\n        lower_key = \"reminder_timestamp_lowerbound\"\n        upper_key = \"reminder_timestamp_upperbound\"\n    else:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"unsupported_timestamp_intent\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    normalized_direction = str(direction or \"\").strip().lower()\n    normalized_phrase = str(phrase or \"\").strip().lower()\n    if not normalized_direction:\n        if normalized_phrase in (\"yesterday\", \"today\", \"later today\", \"later_today\", \"upcoming\", \"recent\", \"latest\", \"oldest\"):\n            normalized_direction = normalized_phrase.replace(\" \", \"_\")\n        else:\n            return {\n                \"target_tool_name\": \"\",\n                \"search_kwargs\": {},\n                \"should_call_search\": False,\n                \"abstain_reason\": \"ambiguous_phrase\",\n                \"interpretation\": \"\",\n                \"bounds_source\": \"abstain\",\n            }\n    offset_seconds = float(timezone_offset) * 3600.0\n    local_now = now + offset_seconds\n    local_day_start = float(int(local_now // 86400.0) * 86400.0)\n    day_start = local_day_start - offset_seconds\n    next_day_start = day_start + 86400.0\n    kwargs = {}\n    interpretation = normalized_direction\n    bounds_source = \"resolved_direction\"\n    if normalized_direction == \"yesterday\":\n        kwargs[lower_key] = max(min_timestamp, day_start - 86400.0)\n        kwargs[upper_key] = max(min_timestamp, day_start - 1.0)\n    elif normalized_direction == \"today\":\n        kwargs[lower_key] = max(min_timestamp, day_start)\n        kwargs[upper_key] = max(min_timestamp, next_day_start - 1.0)\n    elif normalized_direction == \"later_today\":\n        kwargs[lower_key] = max(min_timestamp, now)\n        kwargs[upper_key] = max(min_timestamp, next_day_start - 1.0)\n    elif normalized_direction == \"upcoming\":\n        kwargs[lower_key] = max(min_timestamp, now)\n    elif normalized_direction == \"recent\":\n        days = int(lookback_days)\n        if days <= 0:\n            days = 7\n        kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)\n        kwargs[upper_key] = max(min_timestamp, now)\n    elif normalized_direction in (\"latest\", \"oldest\"):\n        if domain == \"message\":\n            kwargs[upper_key] = max(min_timestamp, now)\n        else:\n            days = int(lookback_days)\n            if days <= 0:\n                days = 3650\n            kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)\n            kwargs[upper_key] = max(min_timestamp, now)\n    elif normalized_direction == \"custom\":\n        days = int(lookback_days)\n        if days <= 0:\n            return {\n                \"target_tool_name\": \"\",\n                \"search_kwargs\": {},\n                \"should_call_search\": False,\n                \"abstain_reason\": \"custom_window_requires_positive_lookback_days\",\n                \"interpretation\": \"\",\n                \"bounds_source\": \"abstain\",\n            }\n        kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)\n        kwargs[upper_key] = max(min_timestamp, now)\n        interpretation = \"custom_lookback\"\n    else:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"unsupported_direction\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    if str(content_keyword or \"\").strip():\n        kwargs[\"content\"] = str(content_keyword)\n    if not kwargs:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"no_search_criteria_prepared\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    return {\n        \"target_tool_name\": tool_name,\n        \"search_kwargs\": kwargs,\n        \"should_call_search\": True,\n        \"abstain_reason\": \"\",\n        \"interpretation\": interpretation,\n        \"bounds_source\": bounds_source,\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_call_search=False with abstain_reason when current_timestamp is missing, the target domain or timestamp intent is unsupported, or the phrase/direction is ambiguous. When should_call_search=True, call only the original search tool in target_tool_name with **search_kwargs.",
+          "applicable_task_families": [],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": null,
+          "description": "When a search task needs bounded time criteria such as yesterday, today, later today, upcoming, recent, latest, or oldest, you MUST call this helper after obtaining get_current_timestamp and BEFORE calling the original search tool. Call path: (1) get_current_timestamp. (2) In the NEXT turn call resolve_search_window_or_bounds with current_timestamp, target_domain, timestamp_intent, and direction. (3) If should_call_search=True, call the original tool named in target_tool_name with **search_kwargs. This helper never calls search itself and never creates, modifies, or sends anything. Use target_domain='reminder' with timestamp_intent='creation' for reminder creation-time recency, timestamp_intent='reminder' for reminder due-time recency, and target_domain='message' with timestamp_intent='message_creation' for message search. Do NOT call search_messages({}) or search_reminder({}) with no criteria. Do NOT manually construct timestamp bounds across turns when this helper is visible. For latest or oldest message search, use the helper output to produce trace-compatible search_messages kwargs before any later record-selection helper. If this helper is visible at the same time as a record-selection helper, call this helper FIRST, then call the original search tool, and only then call the selector with the returned records in a later turn. If the phrase is ambiguous or current_timestamp is missing, the helper abstains and you should ask for clarification rather than guessing.",
+          "diagnostic_only": false,
+          "estimated_step_compression": null,
+          "expected_milestone_calls_replaced": [],
+          "family": "derived_value_calculator",
+          "final_state_preservation_plan": "",
+          "generalization_rationale": "Reminder and message search tasks repeatedly require converting a natural time phrase into benchmark-compatible lower/upper bounds before a search tool can be called safely. This helper compresses multi-step time-window construction without replacing the original search tool.",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [
+              "search_reminder",
+              "search_messages"
+            ],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "no_criteria_search_call"
+            ],
+            "repeated_failed_tool_calls": [
+              "search_reminder",
+              "search_messages"
+            ],
+            "signals": [
+              "repeated_failed_tool_call",
+              "visible_raw_data_lacking_deterministic_transform",
+              "unnecessary_clarification"
+            ],
+            "summary": "Reminder and message search tasks fail when the agent needs bounded timestamp criteria but only has natural recency language such as yesterday, today, upcoming, latest, or oldest.",
+            "visible_data_gaps": [
+              "missing benchmark-compatible search window kwargs"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "float",
+              "description": "Current Unix timestamp from get_current_timestamp.",
+              "name": "current_timestamp"
+            },
+            {
+              "annotation": "str",
+              "description": "Original user-facing time phrase, such as 'yesterday' or 'later today'.",
+              "name": "phrase"
+            },
+            {
+              "annotation": "str",
+              "description": "Either 'reminder' or 'message'.",
+              "name": "target_domain"
+            },
+            {
+              "annotation": "str",
+              "description": "For reminders use 'creation' or 'reminder'. For messages use 'message_creation'.",
+              "name": "timestamp_intent"
+            },
+            {
+              "annotation": "str",
+              "description": "Normalized time-window intent: yesterday, today, later_today, upcoming, recent, latest, oldest, or custom.",
+              "name": "direction"
+            },
+            {
+              "annotation": "str",
+              "description": "Optional content filter to pass through to the original search tool.",
+              "name": "content_keyword"
+            },
+            {
+              "annotation": "int",
+              "description": "Optional explicit lookback window in days for recent/custom searches.",
+              "name": "lookback_days"
+            },
+            {
+              "annotation": "float",
+              "description": "Optional local UTC offset in hours when local-day boundaries matter.",
+              "name": "timezone_offset"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [],
+          "negative_triggers": [
+            "add_reminder",
+            "modify_contact",
+            "pure_service_enablement",
+            "insufficient_information",
+            "search_without_time_phrase"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "bounds_source": {
+                "type": "string"
+              },
+              "interpretation": {
+                "type": "string"
+              },
+              "search_kwargs": {
+                "type": "object"
+              },
+              "should_call_search": {
+                "type": "boolean"
+              },
+              "target_tool_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "target_tool_name",
+              "search_kwargs",
+              "should_call_search",
+              "abstain_reason",
+              "interpretation",
+              "bounds_source"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "search_reminder_with_creation_recency_yesterday",
+            "search_reminder_with_recency_yesterday",
+            "search_reminder_with_recency_upcoming",
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest",
+            "bounded_recency_search_requires_time_window"
+          ],
+          "preserves_side_effect_tools": [],
+          "reason_tool_is_decisive": "",
+          "required_original_tool_calls": [],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [],
+          "tool_name": "resolve_search_window_or_bounds"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 2,
+        "runtime_smoke_passed": true,
+        "source_example_count": 2
+      },
+      "version": 1
+    },
+    "select_action_target_by_recency": {
+      "accepted_at": "2026-05-08T01:24:37.279044+00:00",
+      "birth_scenario": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+      "code_hash": "ef8032aaa9e0da5d19927a3a506016986129af35233188c544741aa781541212",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def select_action_target_by_recency(records: list, timestamp_key: str, selection_mode: str, action_type: str, constraints: dict = None) -> dict:\n    \"\"\"\n    Deterministically select one visible record by recency after optional constraint filtering.\n    Returns a dict with keys: selected_record, selected_index, selected_id, selected_timestamp,\n    action_type, downstream_tool_name, tie_candidates, abstain_reason.\n    \"\"\"\n    # Safe defaults\n    if not isinstance(records, list) or len(records) == 0:\n        return {\n            \"selected_record\": {},\n            \"selected_index\": -1,\n            \"selected_id\": \"\",\n            \"selected_timestamp\": 0.0,\n            \"action_type\": action_type if isinstance(action_type, str) else \"\",\n            \"downstream_tool_name\": action_type if isinstance(action_type, str) else \"\",\n            \"tie_candidates\": [],\n            \"abstain_reason\": \"no_records\"\n        }\n\n    if constraints is None:\n        constraints = {}\n    if not isinstance(constraints, dict):\n        constraints = {}\n\n    # Helper: normalize values for constraint comparison based on field name\n    def _normalize_field_for_match(field_name: str, val) -> str:\n        if val is None:\n            return \"\"\n        s = str(val)\n        fn = field_name.lower() if isinstance(field_name, str) else \"\"\n        if \"phone\" in fn or \"number\" in fn:\n            # keep only digits for constraint matching\n            return ''.join(ch for ch in s if ch.isdigit())\n        # default: strip and lowercase\n        return s.strip().lower()\n\n    # Build list of candidate tuples preserving original indices\n    indexed = [(i, r) for i, r in enumerate(records) if isinstance(r, dict)]\n\n    # Apply constraints: every (field->expected) must match\n    filtered = []\n    for idx, rec in indexed:\n        match = True\n        for f, expected in constraints.items():\n            # If expected is None, treat as mismatch\n            if f not in rec:\n                match = False\n                break\n            rec_val = rec.get(f)\n            # If expected or rec_val are numeric types, still normalize via string rules above\n            norm_rec = _normalize_field_for_match(f, rec_val)\n            norm_exp = _normalize_field_for_match(f, expected)\n            if norm_rec != norm_exp:\n                match = False\n                break\n        if match:\n            filtered.append((idx, rec))\n\n    if len(filtered) == 0:\n        return {\n            \"selected_record\": {},\n            \"selected_index\": -1,\n            \"selected_id\": \"\",\n            \"selected_timestamp\": 0.0,\n            \"action_type\": action_type,\n            \"downstream_tool_name\": action_type,\n            \"tie_candidates\": [],\n            \"abstain_reason\": \"no_matching_constraints\"\n        }\n\n    mode = selection_mode if isinstance(selection_mode, str) else \"\"\n    if mode not in (\"latest\", \"oldest\"):\n        return {\n            \"selected_record\": {},\n            \"selected_index\": -1,\n            \"selected_id\": \"\",\n            \"selected_timestamp\": 0.0,\n            \"action_type\": action_type,\n            \"downstream_tool_name\": action_type,\n            \"tie_candidates\": [],\n            \"abstain_reason\": \"invalid_selection_mode\"\n        }\n\n    # Extract numeric timestamps and track records with valid timestamps\n    candidates_with_ts = []  # list of (idx, rec, ts)\n    for idx, rec in filtered:\n        ts = rec.get(timestamp_key)\n        if isinstance(ts, (int, float)) and not isinstance(ts, bool):\n            candidates_with_ts.append((idx, rec, float(ts)))\n        else:\n            # non-numeric timestamp -> abstain per spec\n            return {\n                \"selected_record\": {},\n                \"selected_index\": -1,\n                \"selected_id\": \"\",\n                \"selected_timestamp\": 0.0,\n                \"action_type\": action_type,\n                \"downstream_tool_name\": action_type,\n                \"tie_candidates\": [],\n                \"abstain_reason\": \"no_numeric_timestamps\"\n            }\n\n    if len(candidates_with_ts) == 0:\n        return {\n            \"selected_record\": {},\n            \"selected_index\": -1,\n            \"selected_id\": \"\",\n            \"selected_timestamp\": 0.0,\n            \"action_type\": action_type,\n            \"downstream_tool_name\": action_type,\n            \"tie_candidates\": [],\n            \"abstain_reason\": \"no_numeric_timestamps\"\n        }\n\n    # Determine the extreme timestamp\n    timestamps = [t for (_, _, t) in candidates_with_ts]\n    best_ts = max(timestamps) if mode == \"latest\" else min(timestamps)\n\n    # Collect all records that share the best timestamp\n    best_candidates = [(i, r, t) for (i, r, t) in candidates_with_ts if t == best_ts]\n\n    if len(best_candidates) > 1:\n        # Tie: abstain and return all tied record dicts\n        tie_recs = [r for (_, r, _) in best_candidates]\n        return {\n            \"selected_record\": {},\n            \"selected_index\": -1,\n            \"selected_id\": \"\",\n            \"selected_timestamp\": best_ts,\n            \"action_type\": action_type,\n            \"downstream_tool_name\": action_type,\n            \"tie_candidates\": tie_recs,\n            \"abstain_reason\": \"ambiguous_timestamp_tie\"\n        }\n\n    # Exactly one best candidate\n    sel_idx, sel_rec, sel_ts = best_candidates[0]\n\n    # Resolve stable id in order: reminder_id, message_id, person_id, sender_person_id, recipient_person_id, id\n    def _pick_stable_id(rec: dict) -> str:\n        for key in (\"reminder_id\", \"message_id\", \"person_id\", \"sender_person_id\", \"recipient_person_id\", \"id\"):\n            v = rec.get(key)\n            if isinstance(v, str) and v != \"\":\n                return v\n            # allow numeric ids too (coerce to str)\n            if isinstance(v, (int, float)):\n                return str(v)\n        return \"\"\n\n    stable_id = _pick_stable_id(sel_rec)\n    if stable_id == \"\":\n        return {\n            \"selected_record\": {},\n            \"selected_index\": -1,\n            \"selected_id\": \"\",\n            \"selected_timestamp\": sel_ts,\n            \"action_type\": action_type,\n            \"downstream_tool_name\": action_type,\n            \"tie_candidates\": [],\n            \"abstain_reason\": \"missing_target_id\"\n        }\n\n    return {\n        \"selected_record\": sel_rec,\n        \"selected_index\": sel_idx,\n        \"selected_id\": stable_id,\n        \"selected_timestamp\": sel_ts,\n        \"action_type\": action_type,\n        \"downstream_tool_name\": action_type,\n        \"tie_candidates\": [],\n        \"abstain_reason\": \"\"\n    }",
+        "spec": {
+          "abstain_behavior": "Explicit: return an output dict with selected_record as {} and selected_index -1 when abstaining. On timestamp ties return abstain_reason 'ambiguous_timestamp_tie' and include all tied records in tie_candidates. For missing constraints matches return abstain_reason 'no_matching_constraints'. For no records return 'no_records'. For invalid mode return 'invalid_selection_mode'. For missing numeric timestamps return 'no_numeric_timestamps'. For missing target id return 'missing_target_id'. When abstaining, downstream_tool_name is still set to action_type but selected_id and selected_record are empty and tie_candidates are populated only for timestamp ties.",
+          "applicable_task_families": [
+            "modify_contact_with_message_recency",
+            "remove_reminder_by_recency",
+            "reply_to_recent_message"
+          ],
+          "canonical_route_substitution_risk": "low",
+          "cross_task_applicability_count": 3,
+          "description": "Select exactly one visible candidate record by recency (latest or oldest) to label the downstream side-effect action (modify_contact, modify_reminder, remove_reminder, remove_contact). Treat omitted constraints as {} (no extra filter). Filter visible records deterministically by the provided constraints (normalizing both sides: for fields whose name contains 'phone' or 'number' keep only digits on both sides; otherwise strip and lowercase both sides). Use the provided timestamp_key to choose the record with the extreme timestamp per selection_mode. Abstain when there are no records, no records matching constraints, invalid selection_mode, no numeric timestamps, ties on the best timestamp (explicit tie behavior: return abstention with tie_candidates containing all tied records including the first), or when the chosen record lacks any stable id (reminder_id, message_id, person_id, sender_person_id, recipient_person_id, id). The helper does not perform side effects; it only selects a target and returns downstream_tool_name equal to the action_type. On a unique best record, return that record and its original index. On a timestamp tie, return selected_record as {}, selected_index -1, selected_id '', selected_timestamp set to the tied timestamp, tie_candidates list of all tied candidate dicts, and abstain_reason 'ambiguous_timestamp_tie'.",
+          "diagnostic_only": true,
+          "estimated_step_compression": 4,
+          "expected_milestone_calls_replaced": [
+            "select_most_recent_record",
+            "resolve_timestamp_tie"
+          ],
+          "family": "search_filter_ranking_helper",
+          "final_state_preservation_plan": "The helper never performs the downstream side effect. It only returns the chosen record and downstream_tool_name/action_type so the original side-effect ToolSandbox call can be invoked afterwards by the agent with preserved arguments. This maintains final-state semantics because the actual modify/remove call is still performed by the original tool and is not duplicated.",
+          "generalization_rationale": "Recency selection plus deterministic constraint normalization and tie-handling is a repeated sub-problem across multiple user tasks that must pick a single visible target before invoking a side-effect. Centralizing this logic compresses repeated steps (filter, normalize, numeric-validate timestamps, select extreme, tie-abstain) into one deterministic helper usable by different downstream actions.",
+          "grading_accounting_note": "This helper substitutes the intermediate selection milestone so the planner may skip an explicit multi-step selection subroutine; graders should treat this as outcome-preserving but canonical-substituting (low substitution risk) because the helper does not change the eventual side-effect tool call semantics and explicitly abstains on ambiguity.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "select target before modify/remove side-effect call"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "wrong_selected_record",
+              "side_effect_target_selection"
+            ],
+            "summary": "Repeated modify/remove/reply workflows fail after search because the agent must choose the one visible target record that satisfies recency, timestamp, and user constraints before calling an original ToolSandbox side-effect tool. Generate a deterministic search/filter helper named select_action_target_by_recency. Inputs: records as visible candidate dictionaries, timestamp_key, selection_mode latest or oldest, action_type such as modify_contact, modify_reminder, remove_reminder, or remove_contact, and constraints as an optional dict. The generated function must treat omitted constraints as {} and {} as no additional filter. Return selected_record, selected_index, selected_id, selected_timestamp, action_type, downstream_tool_name, tie_candidates, and abstain_reason. Abstain on no records, no numeric timestamp, invalid mode, ties, constraints not met, or missing target id. The helper must preserve the original search tool and downstream side-effect tool; it only selects the target and labels the next action. When exactly one best record exists, tie_candidates must be empty. selected_id must use the first available stable id among reminder_id, message_id, person_id, sender_person_id, recipient_person_id, or id. It must never execute modify/remove/send/add itself. On a timestamp tie, tie_candidates must include every record sharing the selected timestamp, including the first best record; selected_record must remain empty.",
+            "visible_data_gaps": [
+              "visible records need deterministic target selection before side effect"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "list",
+              "description": "List of visible candidate record dictionaries (unchanged, in original order).",
+              "name": "records"
+            },
+            {
+              "annotation": "str",
+              "description": "Key in each record whose numeric value is the timestamp used for recency selection (e.g. 'creation_timestamp' or 'reminder_timestamp').",
+              "name": "timestamp_key"
+            },
+            {
+              "annotation": "str",
+              "description": "Either 'latest' or 'oldest' indicating whether to pick the maximum or minimum timestamp.",
+              "name": "selection_mode"
+            },
+            {
+              "annotation": "str",
+              "description": "The intended side-effect action label (e.g. 'modify_contact', 'modify_reminder', 'remove_reminder', 'remove_contact'). This helper preserves and returns this as downstream_tool_name; it never executes side effects.",
+              "name": "action_type"
+            },
+            {
+              "annotation": "dict",
+              "description": "Optional mapping of a single or multiple field_name -> expected_value to filter visible records before timestamp selection. Treated as {} when omitted.",
+              "name": "constraints"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "ambiguous_recency_selection",
+            "wrong_record_selected_due_to_formatting_mismatch",
+            "missing_target_id_after_selection"
+          ],
+          "negative_triggers": [
+            "no records",
+            "no candidate matches constraints",
+            "invalid selection_mode (not 'latest' or 'oldest')",
+            "no numeric timestamps present under timestamp_key for filtered candidates",
+            "ambiguous timestamp tie among top candidates",
+            "selected candidate missing any stable id (reminder_id, message_id, person_id, sender_person_id, recipient_person_id, id)"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "description": "Empty string when a unique selection was made; otherwise a short code explaining why the helper abstained.",
+                "type": "string"
+              },
+              "action_type": {
+                "description": "Echo of the input action_type.",
+                "type": "string"
+              },
+              "downstream_tool_name": {
+                "description": "Name of the original side-effect ToolSandbox tool to call next (preserved; equals action_type).",
+                "type": "string"
+              },
+              "selected_id": {
+                "description": "Stable id chosen from the record (first of reminder_id, message_id, person_id, sender_person_id, recipient_person_id, id) or empty string if abstaining.",
+                "type": "string"
+              },
+              "selected_index": {
+                "description": "Index of the selected record in the original records list, or -1 if abstaining.",
+                "type": "integer"
+              },
+              "selected_record": {
+                "description": "The single chosen visible record (empty object if abstaining due to tie or other abstention).",
+                "type": "object"
+              },
+              "selected_timestamp": {
+                "description": "The numeric timestamp value used for the selection (even when abstaining due to tie).",
+                "type": "number"
+              },
+              "tie_candidates": {
+                "description": "When abstaining for a timestamp tie, contains every record sharing the best timestamp (including the first best record). Empty list for a unique selection.",
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "selected_record",
+              "selected_index",
+              "selected_id",
+              "selected_timestamp",
+              "action_type",
+              "downstream_tool_name",
+              "tie_candidates",
+              "abstain_reason"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "records length > 0 and timestamp_key present in candidates and selection_mode in ['latest','oldest'] and action_type in supported actions",
+            "constraints empty or constraints all match at least one visible record after normalization"
+          ],
+          "preserves_side_effect_tools": [
+            "modify_contact",
+            "remove_contact",
+            "modify_reminder",
+            "remove_reminder"
+          ],
+          "reason_tool_is_decisive": "This tool deterministically resolves which visible record is the canonical target of the user's recency-based intent by applying the same normalization and tie policy used by downstream side-effect steps; this prevents the agent from calling side-effect tools on the wrong record or on multiple candidates.",
+          "required_original_tool_calls": [
+            "modify_contact",
+            "remove_contact",
+            "modify_reminder",
+            "remove_reminder"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "search_filter:select_action_target_by_recency"
+          ],
+          "tool_name": "select_action_target_by_recency"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    },
+    "select_record_by_timestamp_extreme": {
+      "accepted_at": "2026-05-03T01:57:14.590013+00:00",
+      "birth_scenario": "search_message_with_recency_latest",
+      "code_hash": "e015e1bb737c7e2aaa47c9ed0678d8db92bc7902500b606fe2385227da4bd303",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 3,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def select_record_by_timestamp_extreme(\n    records,\n    timestamp_field,\n    mode,\n    tie_break_fields=None,\n    required_filters=None,\n    allow_missing_timestamp=False,\n):\n    if mode not in (\"latest\", \"oldest\"):\n        return {\n            \"selected_record\": None,\n            \"selected_index\": None,\n            \"selected_timestamp\": None,\n            \"should_use_selected_record\": False,\n            \"abstain_reason\": \"invalid_mode\",\n            \"selection_reason\": \"\",\n        }\n    best_idx = None\n    best_record = None\n    best_ts = None\n    for i, record in enumerate(records or []):\n        if not isinstance(record, dict):\n            continue\n        if required_filters:\n            filter_match = True\n            for _fk, _fv in required_filters.items():\n                if record.get(_fk) != _fv:\n                    filter_match = False\n                    break\n            if not filter_match:\n                continue\n        ts_raw = record.get(timestamp_field)\n        if ts_raw is None:\n            continue\n        if not isinstance(ts_raw, (int, float)):\n            continue\n        ts_val = float(ts_raw)\n        if best_ts is None:\n            best_idx = i\n            best_record = record\n            best_ts = ts_val\n        elif mode == \"latest\" and ts_val > best_ts:\n            best_idx = i\n            best_record = record\n            best_ts = ts_val\n        elif mode == \"oldest\" and ts_val < best_ts:\n            best_idx = i\n            best_record = record\n            best_ts = ts_val\n    if best_record is None:\n        return {\n            \"selected_record\": None,\n            \"selected_index\": None,\n            \"selected_timestamp\": None,\n            \"should_use_selected_record\": False,\n            \"abstain_reason\": \"no_valid_timestamped_records\",\n            \"selection_reason\": \"\",\n        }\n    return {\n        \"selected_record\": best_record,\n        \"selected_index\": best_idx,\n        \"selected_timestamp\": best_ts,\n        \"should_use_selected_record\": True,\n        \"abstain_reason\": \"\",\n        \"selection_reason\": \"selected_\" + mode + \"_by_\" + str(timestamp_field),\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_use_selected_record=False with abstain_reason when: the records list is empty or None, no record in the list has the specified timestamp_field, mode is not 'latest' or 'oldest', or required_filters eliminate all candidates. When should_use_selected_record=True, use selected_record directly for the next action \u2014 do not call the search tool again. This helper does not call side-effect tools. Do not use this helper before records have been retrieved.",
+          "applicable_task_families": [],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": null,
+          "description": "When the user asks for the latest, newest, most recent, oldest, earliest, or first record from a search, you MUST call this helper after retrieving the records \u2014 do NOT manually compare timestamps across turns. Set mode='latest' for most recent/newest/last. Set mode='oldest' for oldest/earliest/first. Complete call path for messages: (1) Call get_current_timestamp to get the current Unix timestamp. (2) Call search_messages with creation_timestamp_upperbound=<current_timestamp> to retrieve all messages. (3) In the NEXT turn (NOT the same parallel turn), call this helper with records=<messages list>, timestamp_field='creation_timestamp', and mode='latest' or mode='oldest'. (4) If should_use_selected_record=True, use selected_record directly for the next action (modify, send, remove, update). Do NOT call search_messages({}) or search_messages with an empty content filter \u2014 this returns no results. Always use creation_timestamp_upperbound. Do NOT attempt manual timestamp comparison. Do NOT skip this helper when records are returned and recency selection is needed. NEVER call a search tool and this helper in the same parallel turn. This helper does NOT call any side-effect tools and does NOT search for records itself \u2014 it only selects from records already returned. Use timestamp_field='creation_timestamp' for messages, 'reminder_timestamp' for reminders, or the appropriate field name visible in the returned records. Ties in timestamp are broken deterministically by original list order (the first occurrence in the input list wins). Do NOT use this helper when no records have been retrieved yet, when the task is pure reminder creation with no record selection, when the task is pure service enabling, or when the task is marked insufficient information.",
+          "diagnostic_only": false,
+          "estimated_step_compression": null,
+          "expected_milestone_calls_replaced": [],
+          "family": "search_filter_ranking_helper",
+          "final_state_preservation_plan": "",
+          "generalization_rationale": "Record selection tasks repeatedly require choosing the single latest or oldest record from a list returned by search tools. The base toolset provides search tools but no deterministic latest/oldest selector. Agents frequently pick the wrong record or spend extra turns on manual comparison. This helper is reusable across message, reminder, and contact recency tasks.",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [
+              "search_messages",
+              "search_reminder"
+            ],
+            "final_answer_route_mismatch": true,
+            "planner_failures": [],
+            "repeated_failed_tool_calls": [
+              "search_messages"
+            ],
+            "signals": [
+              "wrong_record_selected_after_search",
+              "repeated_failed_base_tool_calls",
+              "unnecessary_clarification"
+            ],
+            "summary": "Search results require selecting the latest or oldest record by timestamp, but agents make wrong selections or waste extra turns on manual comparison across message, reminder, and contact tasks.",
+            "visible_data_gaps": [
+              "records list with timestamps already returned by search tool; requires deterministic latest/oldest selection before side-effect call"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "list",
+              "description": "The list of record dicts returned by a prior search tool call (e.g., the 'messages' list from search_messages, or the 'reminders' list from search_reminder). Pass the list directly.",
+              "name": "records"
+            },
+            {
+              "annotation": "str",
+              "description": "The field name in each record that contains the Unix timestamp to compare. Common values: 'creation_timestamp' for messages, 'reminder_timestamp' for reminders.",
+              "name": "timestamp_field"
+            },
+            {
+              "annotation": "str",
+              "description": "Selection mode: 'latest' to select the record with the highest timestamp, 'oldest' to select the record with the lowest timestamp.",
+              "name": "mode"
+            },
+            {
+              "annotation": "list",
+              "description": "Optional list of field names to use as secondary sort key when timestamps are equal. Pass None to use original list order for ties.",
+              "name": "tie_break_fields"
+            },
+            {
+              "annotation": "dict",
+              "description": "Optional dict of field:value pairs. Only records matching ALL filters are considered. Pass None or empty dict to skip filtering.",
+              "name": "required_filters"
+            },
+            {
+              "annotation": "bool",
+              "description": "If False (default), records without the timestamp_field are skipped. If True, records with missing timestamps are included but sorted last.",
+              "name": "allow_missing_timestamp"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [],
+          "negative_triggers": [
+            "add_reminder",
+            "insufficient_information",
+            "pure_service_enablement",
+            "pure_date_arithmetic",
+            "no_records_retrieved_yet",
+            "search_without_recency_selection"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "description": "Reason for abstaining. Empty when should_use_selected_record=True.",
+                "type": "string"
+              },
+              "selected_index": {
+                "description": "Zero-based index of the selected record in the original records list, or null if abstaining.",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "selected_record": {
+                "description": "The full record dict for the selected record, or null if no valid record could be selected.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "selected_timestamp": {
+                "description": "The timestamp value of the selected record, or null if abstaining.",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "selection_reason": {
+                "description": "Brief description of how the record was selected.",
+                "type": "string"
+              },
+              "should_use_selected_record": {
+                "description": "True when the agent should use selected_record for the next step. False when the helper is abstaining.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "selected_record",
+              "selected_index",
+              "selected_timestamp",
+              "should_use_selected_record",
+              "abstain_reason",
+              "selection_reason"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest",
+            "modify_contact_with_message_recency",
+            "remove_reminder_with_recency_latest",
+            "modify_reminder_with_recency_latest",
+            "select_latest_or_oldest_record_from_search_results",
+            "record_returned_needs_latest_oldest_selection"
+          ],
+          "preserves_side_effect_tools": [],
+          "reason_tool_is_decisive": "",
+          "required_original_tool_calls": [],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [],
+          "tool_name": "select_record_by_timestamp_extreme"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 2,
+        "runtime_smoke_passed": true,
+        "source_example_count": 5
+      },
+      "version": 1
+    }
+  }
+}

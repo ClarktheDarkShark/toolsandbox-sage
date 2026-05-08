@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "record_id": "16248d8e8d667d8ce01e3725d314d5fc8bbade353ed48b9e8635c8f8d4ad4d6a",
+  "timestamp": "2026-05-08T01:03:47.586004+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "0e2b54a2eee0f26382b6a334f44e652f312fc2d5d507c691ed65a2d4e2532c5d",
+  "scenario_key": "search_phone_number_with_name_all_tools",
+  "scenario_checksum": "39bd3728f25ae8c5404a320274bcb709e4c2c55dd56487443a6feac4ded98864",
+  "initial_state_checksum": "4bfbfc744549013b9f9194003bd0a918e425177a5ba69aaf96aa4e68da6ed016",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/best3_pilot/pilot_20_20260507_205940/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_20_59_44",
+  "milestone_scores": {
+    "0": [
+      19,
+      1.0
+    ],
+    "1": [
+      20,
+      0.9039125672926325
+    ]
+  },
+  "canonical_score": 0.9519562836463162,
+  "outcome_score": 0.0,
+  "exact_success": false,
+  "final_state_hash": "485e9ddc7fffa40b6cf837f8b5795a0a09f418da88cf9229b169d36618734376",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 9,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 9,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/best3_pilot/pilot_20_20260507_205940/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_20_59_44/trajectories/search_phone_number_with_name_all_tools/conversation.json",
+  "transcript_hash": "3962be28bc739ab77200d2696b9101c516d72cd6ffab78fbf9301d53a3e9a0d3",
+  "result_row": {
+    "name": "search_phone_number_with_name_all_tools",
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9519562836463162,
+    "minefield_similarity": 0,
+    "similarity": 0.9519562836463162,
+    "turn_count": 9,
+    "milestone_mapping": {
+      "0": [
+        19,
+        1.0
+      ],
+      "1": [
+        20,
+        0.9039125672926325
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.0,
+    "outcome_milestone_similarity": 0.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 0.0,
+        "targets": [
+          "I found Homer S's phone number: +10000000000",
+          "+10000000000"
+        ]
+      }
+    ]
+  }
+}

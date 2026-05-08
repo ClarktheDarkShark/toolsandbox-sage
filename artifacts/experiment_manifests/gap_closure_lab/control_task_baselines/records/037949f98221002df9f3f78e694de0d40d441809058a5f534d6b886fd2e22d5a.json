@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "record_id": "037949f98221002df9f3f78e694de0d40d441809058a5f534d6b886fd2e22d5a",
+  "timestamp": "2026-05-08T01:03:47.562490+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "e2996f38ee591611d330a24a9a3d32bdfa8fcd1b30b4a94618517b6454981161",
+  "scenario_key": "search_name_with_relationship_3_distraction_tools",
+  "scenario_checksum": "b2ce1860845652981e42eef9ff52f2906df560a7e43454ad48fb0c7def5c06ed",
+  "initial_state_checksum": "7384227d132317bad74f806b0a651ee198da3aa48c0ffddccdbb3a95b28986cf",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/best3_pilot/pilot_20_20260507_205940/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_20_59_44",
+  "milestone_scores": {
+    "0": [
+      15,
+      0.0
+    ],
+    "1": [
+      22,
+      0.4680925940883409
+    ]
+  },
+  "canonical_score": 0.23404629704417046,
+  "outcome_score": 0.09090909090909091,
+  "exact_success": false,
+  "final_state_hash": "1d0feddd4eef8657e975a22ffce58df73588781eba0bf4ab6b80687c79a49ba5",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 9,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 9,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/best3_pilot/pilot_20_20260507_205940/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_20_59_44/trajectories/search_name_with_relationship_3_distraction_tools/conversation.json",
+  "transcript_hash": "7d2617b54b602604dae8a0434ed376ebd3c5e708e2a5580ab0e33ff8fec077dc",
+  "result_row": {
+    "name": "search_name_with_relationship_3_distraction_tools",
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.23404629704417046,
+    "minefield_similarity": 0,
+    "similarity": 0.23404629704417046,
+    "turn_count": 9,
+    "milestone_mapping": {
+      "0": [
+        15,
+        0.0
+      ],
+      "1": [
+        22,
+        0.4680925940883409
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.09090909090909091,
+    "outcome_milestone_similarity": 0.09090909090909091,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 0.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 0.09090909090909091,
+        "targets": [
+          "Your boss is Homer S"
+        ]
+      }
+    ]
+  }
+}

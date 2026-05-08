@@ -293,6 +293,23 @@ def _side_effect_followup_failures(
                 or output.get("should_call") is False
                 or output.get("should_call_tool") is False
             ):
+                selection_only_bridge = (
+                    isinstance(output.get("selected_record"), dict)
+                    and bool(output.get("selected_record"))
+                    and str(output.get("downstream_tool_name") or "")
+                    in required_side_effect_calls
+                    and str(output.get("final_answer_recommendation") or "").startswith(
+                        "use_selected_record:"
+                    )
+                )
+                if selection_only_bridge:
+                    bridge_followup_tools: set[str] = set()
+                    for later in messages[index + 1 :]:
+                        if isinstance(later, dict) and later.get("role") == "assistant":
+                            bridge_followup_tools.update(_assistant_tool_names(later))
+                    if not (required & bridge_followup_tools):
+                        return True
+                    continue
                 if required & next_tools:
                     return True
                 continue

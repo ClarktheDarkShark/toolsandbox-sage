@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "record_id": "94577cd565018af0cf014816edaaf0700040058f46f5451994a10fa0767ca503",
+  "timestamp": "2026-05-08T01:03:47.350172+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "8a296e57ba3eb62b5ef83b6ba22ee53e7e807845daf2212306e70e9b6e6e4029",
+  "scenario_key": "cellular_off_3_distraction_tools",
+  "scenario_checksum": "ee48e54d8b37daf013f7dec826d408513c45145e3eb034269ab45f34f4a5d53d",
+  "initial_state_checksum": "1fd2a5611cd3183ec9f0a3d3ec35ee1471ee5958c4eff03a66add637d9697132",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/best3_pilot/pilot_20_20260507_205940/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_20_59_44",
+  "milestone_scores": {
+    "0": [
+      17,
+      1.0
+    ],
+    "1": [
+      18,
+      0.5581839775049409
+    ]
+  },
+  "canonical_score": 0.7790919887524704,
+  "outcome_score": 1.0,
+  "exact_success": false,
+  "final_state_hash": "d55d3d6240e90f0a318f42cc2d504ddd4f26e10963f86b3106ba6a353890afb1",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 3,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 3,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/best3_pilot/pilot_20_20260507_205940/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_20_59_44/trajectories/cellular_off_3_distraction_tools/conversation.json",
+  "transcript_hash": "e9979a41e2576a347235b7d1b93d3fa7acdc75aa2440070ae529a5a7e1d211dc",
+  "result_row": {
+    "name": "cellular_off_3_distraction_tools",
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.7790919887524704,
+    "minefield_similarity": 0,
+    "similarity": 0.7790919887524704,
+    "turn_count": 3,
+    "milestone_mapping": {
+      "0": [
+        17,
+        1.0
+      ],
+      "1": [
+        18,
+        0.5581839775049409
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 1.0,
+    "outcome_milestone_similarity": 1.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 2,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 1.0,
+        "targets": [
+          "Cellular service is turned off"
+        ]
+      }
+    ]
+  }
+}

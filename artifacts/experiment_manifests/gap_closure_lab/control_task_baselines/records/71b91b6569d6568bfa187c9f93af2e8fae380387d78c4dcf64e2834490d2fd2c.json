@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "record_id": "71b91b6569d6568bfa187c9f93af2e8fae380387d78c4dcf64e2834490d2fd2c",
+  "timestamp": "2026-05-08T02:28:47.289814+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "55ee26fd3aec72d4b98d45ab9d2831235b148b3481b788b27e6c77104f0ecb9d",
+  "scenario_key": "send_message_with_phone_number_and_content_all_tools",
+  "scenario_checksum": "dbf8e85bb160ea1d3b5c1cc491e621e2a79fb7a5b3931a14f0868bd2efa71c91",
+  "initial_state_checksum": "cdbc1dfe2de255582ae9335f2297a2c58849fd898a64ecf4d14386dadf70e1f2",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/refined_candidate_expanded60/expanded_60_20260507_221615/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_22_16_20",
+  "milestone_scores": {
+    "0": [
+      17,
+      1.0
+    ],
+    "1": [
+      18,
+      0.9017797380823793
+    ]
+  },
+  "canonical_score": 0.9508898690411897,
+  "outcome_score": 1.0,
+  "exact_success": false,
+  "final_state_hash": "722abc4020d0fcfc5a5b61772d6f81dc4b2403de244e62f5639f8bdb3927b788",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 3,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 3,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/refined_candidate_expanded60/expanded_60_20260507_221615/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_22_16_20/trajectories/send_message_with_phone_number_and_content_all_tools/conversation.json",
+  "transcript_hash": "7dd5745b180fa20adbdc4f8a4f5c994f0d32aee34ac5a6ee8c764a598b10e50b",
+  "result_row": {
+    "name": "send_message_with_phone_number_and_content_all_tools",
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9508898690411897,
+    "minefield_similarity": 0,
+    "similarity": 0.9508898690411897,
+    "turn_count": 3,
+    "milestone_mapping": {
+      "0": [
+        17,
+        1.0
+      ],
+      "1": [
+        18,
+        0.9017797380823793
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 1.0,
+    "outcome_milestone_similarity": 1.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 2,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 1.0,
+        "targets": [
+          "Your message to +12453344098 has been sent saying: How's the new album coming along"
+        ]
+      }
+    ]
+  }
+}

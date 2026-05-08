@@ -88,6 +88,62 @@ def test_side_effect_preservation_flags_direct_side_effect_after_abstain() -> No
     )
 
 
+def test_side_effect_preservation_allows_selection_only_bridge() -> None:
+    messages = [
+        {
+            "role": "tool",
+            "name": "select_recency_target_and_prepare_action",
+            "content": {
+                "selected_record": {"person_id": "p2", "creation_timestamp": 20},
+                "selected_id": "p2",
+                "downstream_tool_name": "modify_contact",
+                "downstream_tool_kwargs": {},
+                "should_call_tool": False,
+                "abstain_reason": "missing_update_fields",
+                "final_answer_recommendation": "use_selected_record:missing_update_fields",
+            },
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "modify_contact"}}],
+        },
+    ]
+
+    assert not _side_effect_followup_failures(
+        messages,
+        helper_name="select_recency_target_and_prepare_action",
+        required_original_tool_calls=("modify_contact",),
+    )
+
+
+def test_side_effect_preservation_requires_followup_for_selection_only_bridge() -> None:
+    messages = [
+        {
+            "role": "tool",
+            "name": "select_recency_target_and_prepare_action",
+            "content": {
+                "selected_record": {"person_id": "p2", "creation_timestamp": 20},
+                "selected_id": "p2",
+                "downstream_tool_name": "modify_contact",
+                "downstream_tool_kwargs": {},
+                "should_call_tool": False,
+                "abstain_reason": "missing_update_fields",
+                "final_answer_recommendation": "use_selected_record:missing_update_fields",
+            },
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "search_contacts"}}],
+        },
+    ]
+
+    assert _side_effect_followup_failures(
+        messages,
+        helper_name="select_recency_target_and_prepare_action",
+        required_original_tool_calls=("modify_contact",),
+    )
+
+
 def test_side_effect_preservation_requires_next_call_after_success() -> None:
     messages = [
         {"role": "tool", "name": "prepare", "content": {"should_call": True}},

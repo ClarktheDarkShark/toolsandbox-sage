@@ -651,6 +651,19 @@ def _missing_modify_update_abstain_result(
     updates = kwargs.get("updates")
     if isinstance(updates, dict) and updates:
         return None
+    spec_text = " ".join(
+        [
+            entry.tool.spec.description,
+            entry.tool.spec.abstain_behavior,
+            entry.tool.spec.reason_tool_is_decisive,
+        ]
+    ).lower()
+    if (
+        "still returns selected_record" in spec_text
+        or "returns selected_record and selected_id even when update fields"
+        in spec_text
+    ):
+        return None
     output_schema = entry.tool.spec.output_schema or {}
     output_properties = output_schema.get("properties", {})
     if (

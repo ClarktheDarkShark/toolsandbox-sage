@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "record_id": "df16a40f4e4e9d1212b21f07b768a6a99b4b87a6b89fff0a874c87b88d851ad7",
+  "timestamp": "2026-05-08T01:59:51.698587+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "3fe7356b5c8fa38cb23fc681204b19191db231e82754c4a4ebbd4d465a9d18a9",
+  "scenario_key": "find_days_till_holiday_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+  "scenario_checksum": "abaa1cb9446f1666ddaee5c48aa91aa9887cf303f6e8c707a673fa8e22a87129",
+  "initial_state_checksum": "786a370d4ef3a337b7180a416cb6d53f133a4a27a25e21b0ad5b7f7463ca844d",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/live_generation_frozen_expanded60/expanded_60_20260507_214548/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_45_53",
+  "milestone_scores": {
+    "0": [
+      26,
+      1.0
+    ],
+    "1": [
+      17,
+      1.0
+    ],
+    "2": [
+      29,
+      1.0
+    ],
+    "3": [
+      30,
+      0.8657438053004054
+    ]
+  },
+  "canonical_score": 0.9664359513251013,
+  "outcome_score": 0.0,
+  "exact_success": false,
+  "final_state_hash": "92c5e04efe61a18016d646ea146f7e06f93d315a51c5651163247a5214060de4",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 19,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 19,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/live_generation_frozen_expanded60/expanded_60_20260507_214548/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_45_53/trajectories/find_days_till_holiday_multiple_user_turn_3_distraction_tools_tool_description_scrambled/conversation.json",
+  "transcript_hash": "388c2874a5cb86876779f3af377ddd3f21225c383cafe9b119175cf036e7d2ad",
+  "result_row": {
+    "name": "find_days_till_holiday_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_DESCRIPTION_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9664359513251013,
+    "minefield_similarity": 0,
+    "similarity": 0.9664359513251013,
+    "turn_count": 19,
+    "milestone_mapping": {
+      "0": [
+        26,
+        1.0
+      ],
+      "1": [
+        17,
+        1.0
+      ],
+      "2": [
+        29,
+        1.0
+      ],
+      "3": [
+        30,
+        0.8657438053004054
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.0,
+    "outcome_milestone_similarity": 0.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 3,
+        "kind": "answer",
+        "included": true,
+        "score": 0.0,
+        "targets": [
+          "It is {days} days till Christmas Day",
+          "{days}"
+        ]
+      }
+    ]
+  }
+}

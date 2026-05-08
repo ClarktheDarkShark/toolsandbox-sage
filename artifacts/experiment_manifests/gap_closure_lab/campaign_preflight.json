@@ -1,12 +1,10 @@
 {
   "schema_version": 1,
-  "created_at": "2026-05-08T00:48:28.429508+00:00",
+  "created_at": "2026-05-08T05:22:14.364477+00:00",
   "branch": "exp/sage-gap-closure-lab",
-  "head": "a662f0e",
-  "status": "blocked",
-  "blockers": [
-    "missing_openai_api_key"
-  ],
+  "head": "a5d4094",
+  "status": "ready",
+  "blockers": [],
   "manifest": {
     "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
     "manifest_type": "sage_gap_closure_lab_splits",
@@ -25,8 +23,8 @@
     "runner_split_errors": {}
   },
   "openai": {
-    "OPENAI_API_KEY_present": false,
-    "status": "blocker",
+    "OPENAI_API_KEY_present": true,
+    "status": "pass",
     "required_for": [
       "ToolSandbox agent/user live runs",
       "SAGE tool generation and repair",

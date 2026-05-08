@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "record_id": "b6450d59a4f41ebc165e536e7d2f44a5b83c87f4348427ff7165690df99c8068",
+  "timestamp": "2026-05-08T02:57:35.788775+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "d8a6cbf299e658a27be236b88a06b8c43b4a2883e9c99ee537da6c9742ec1a31",
+  "scenario_key": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+  "scenario_checksum": "e4e374b44c65edb4a2fca23496d7368781006fbd08b39e36a65063f7a889d1b3",
+  "initial_state_checksum": "0ca17ee6b972f42b00a8422c7290fba25b8e24215b9d829b7d8d320ff8d684c4",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/full_minus_unsafe_expanded60/expanded_60_20260507_224500/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_22_45_05",
+  "milestone_scores": {
+    "0": [
+      31,
+      1.0
+    ],
+    "1": [
+      33,
+      1.0
+    ],
+    "2": [
+      33,
+      0.0
+    ],
+    "3": [
+      41,
+      0.0
+    ],
+    "4": [
+      44,
+      0.42666226244351746
+    ]
+  },
+  "canonical_score": 0.4853324524887035,
+  "outcome_score": 0.6666666666666666,
+  "exact_success": false,
+  "final_state_hash": "ec0ff484d50d55df77dde9a8254b49ee81fd57271227909230ff5962f516b918",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 30,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 30,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/full_minus_unsafe_expanded60/expanded_60_20260507_224500/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_22_45_05/trajectories/find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled/conversation.json",
+  "transcript_hash": "c900d916cfc2b3cb6c9ff08e9101fe524bd728f681c2876e608422c6607118cd",
+  "result_row": {
+    "name": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+    "categories": [
+      "CANONICALIZATION",
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.4853324524887035,
+    "minefield_similarity": 0,
+    "similarity": 0.4853324524887035,
+    "turn_count": 30,
+    "milestone_mapping": {
+      "0": [
+        31,
+        1.0
+      ],
+      "1": [
+        33,
+        1.0
+      ],
+      "2": [
+        33,
+        0.0
+      ],
+      "3": [
+        41,
+        0.0
+      ],
+      "4": [
+        44,
+        0.42666226244351746
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.6666666666666666,
+    "outcome_milestone_similarity": 0.6666666666666666,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 3,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "route",
+        "included": false,
+        "score": 0.0
+      },
+      {
+        "index": 3,
+        "kind": "route",
+        "included": false,
+        "score": 0.0
+      },
+      {
+        "index": 4,
+        "kind": "answer",
+        "included": true,
+        "score": 0.0,
+        "targets": [
+          "You are approximately 67.86 kilometers away from Golden Gate Bridge"
+        ]
+      }
+    ]
+  }
+}

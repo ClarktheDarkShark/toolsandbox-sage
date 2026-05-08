@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "record_id": "ecd550ae61e02d0603b0fbc020f6461a6da4a22541c7a6128fd032b283b8b521",
+  "timestamp": "2026-05-08T01:10:18.346411+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "665520a1e9ee07f19d760f4a747c1600b4467063244b37be28635d40118bbc68",
+  "scenario_key": "send_message_with_contact_content_cellular_off",
+  "scenario_checksum": "894b32e58ae70d5073d2a045fae857de440d0ffbd8ec4745e3c7d398450dda19",
+  "initial_state_checksum": "eacdc8a00c6c2929bc2e5129b617a660c10d34d7b966f8e3159eb0a9b46841d5",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/best3_v26_pilot/pilot_20_20260507_210706/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_07_10",
+  "milestone_scores": {
+    "0": [
+      23,
+      1.0
+    ],
+    "1": [
+      17,
+      1.0
+    ],
+    "2": [
+      25,
+      1.0
+    ],
+    "3": [
+      26,
+      0.8298265325617152
+    ]
+  },
+  "canonical_score": 0.9574566331404288,
+  "outcome_score": 0.8571428571428571,
+  "exact_success": false,
+  "final_state_hash": "23aac38c1e8978bd5ed65b0ced63ae58a8b042f134e7f64bca101573fcd80862",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 11,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 11,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/best3_v26_pilot/pilot_20_20260507_210706/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_07_10/trajectories/send_message_with_contact_content_cellular_off/conversation.json",
+  "transcript_hash": "60298a39ac318df6449156ee48b34c08318f02cd84fd99bcef5aa62082f8aa41",
+  "result_row": {
+    "name": "send_message_with_contact_content_cellular_off",
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "NO_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9574566331404288,
+    "minefield_similarity": 0,
+    "similarity": 0.9574566331404288,
+    "turn_count": 11,
+    "milestone_mapping": {
+      "0": [
+        23,
+        1.0
+      ],
+      "1": [
+        17,
+        1.0
+      ],
+      "2": [
+        25,
+        1.0
+      ],
+      "3": [
+        26,
+        0.8298265325617152
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.8571428571428571,
+    "outcome_milestone_similarity": 0.8571428571428571,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 3,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 3,
+        "kind": "answer",
+        "included": true,
+        "score": 0.5714285714285714,
+        "targets": [
+          "Your message to Fredrik Thordendal has been sent saying: How's the new album coming along"
+        ]
+      }
+    ]
+  }
+}

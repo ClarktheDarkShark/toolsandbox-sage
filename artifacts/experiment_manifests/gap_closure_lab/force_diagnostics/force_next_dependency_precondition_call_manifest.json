@@ -1,0 +1,112 @@
+{
+  "manifest_type": "sage_gap_closure_lab_force_diagnostic",
+  "schema_version": 1,
+  "status": "experimental_diagnostic_not_promotion_evidence",
+  "truth_labels_inspected": false,
+  "source_split": "pilot_unseen",
+  "leakage_policy": "scenario ids copied from sealed pilot run after natural comparison; not used for tool design or promotion",
+  "splits": {
+    "mechanism_12": [
+      {
+        "name": "wifi_off_3_distraction_tools_arg_description_scrambled",
+        "categories": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "allowed_tools": [
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation"
+        ]
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "categories": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_cellular_service_status"
+        ]
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_all_tools",
+        "categories": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "allowed_tools": [
+          "set_wifi_status",
+          "convert_currency",
+          "calculate_lat_lon_distance",
+          "search_contacts",
+          "remove_reminder",
+          "send_message_with_phone_number",
+          "get_wifi_status",
+          "add_reminder",
+          "search_stock",
+          "set_low_battery_mode_status",
+          "timestamp_diff",
+          "search_weather_around_lat_lon",
+          "search_location_around_lat_lon",
+          "get_location_service_status",
+          "seconds_to_hours_minutes_seconds",
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "modify_contact",
+          "timestamp_to_datetime_info",
+          "get_low_battery_mode_status",
+          "search_holiday",
+          "search_reminder",
+          "search_lat_lon",
+          "set_cellular_service_status",
+          "get_current_location",
+          "unit_conversion",
+          "add_contact",
+          "end_conversation",
+          "get_current_timestamp",
+          "shift_timestamp",
+          "remove_contact",
+          "search_messages",
+          "modify_reminder",
+          "datetime_info_to_timestamp"
+        ]
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off",
+        "categories": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "send_message_with_phone_number",
+          "set_cellular_service_status",
+          "end_conversation",
+          "search_contacts"
+        ]
+      }
+    ]
+  },
+  "split_sizes": {
+    "mechanism_12": 4
+  }
+}

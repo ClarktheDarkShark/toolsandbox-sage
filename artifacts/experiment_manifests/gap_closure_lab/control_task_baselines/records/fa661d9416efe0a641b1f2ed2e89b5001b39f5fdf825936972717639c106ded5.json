@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "record_id": "fa661d9416efe0a641b1f2ed2e89b5001b39f5fdf825936972717639c106ded5",
+  "timestamp": "2026-05-08T01:19:34.647592+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "de62a58ab4d13b67b2fac9dd19e25f25a0fb89c0a6959dd291fa2a059b15799c",
+  "scenario_key": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+  "scenario_checksum": "bcbdfbacdcc4ccb6a0c50407c0cc0165aec3053d99ed4c976e290589ee3a1c89",
+  "initial_state_checksum": "327a4634cbc7e43f771a1fc810b7bf5900b5579da742b6c22ecbd9b2f8c0ba89",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/live_generation_pilot/pilot_20_20260507_211527/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_15_32",
+  "milestone_scores": {
+    "0": [
+      41,
+      1.0
+    ],
+    "1": [
+      33,
+      1.0
+    ],
+    "2": [
+      43,
+      1.0
+    ],
+    "3": [
+      43,
+      0.0
+    ],
+    "4": [
+      48,
+      0.721124774220366
+    ]
+  },
+  "canonical_score": 0.7442249548440732,
+  "outcome_score": 0.18749999999999997,
+  "exact_success": false,
+  "final_state_hash": "67a5f3a959dae20760fc2ff2e2166324d4e97ac1b8413ea7fd0fdac84d5d354d",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 25,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 25,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/live_generation_pilot/pilot_20_20260507_211527/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_15_32/trajectories/modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools/conversation.json",
+  "transcript_hash": "2197069e3362865cde12de8a160c0f7d2503a65f8bc36e5de60677d9aea62a23",
+  "result_row": {
+    "name": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.7442249548440732,
+    "minefield_similarity": 0,
+    "similarity": 0.7442249548440732,
+    "turn_count": 25,
+    "milestone_mapping": {
+      "0": [
+        41,
+        1.0
+      ],
+      "1": [
+        33,
+        1.0
+      ],
+      "2": [
+        43,
+        1.0
+      ],
+      "3": [
+        43,
+        0.0
+      ],
+      "4": [
+        48,
+        0.721124774220366
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.18749999999999997,
+    "outcome_milestone_similarity": 0.18749999999999997,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 2,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 3,
+        "kind": "state",
+        "included": true,
+        "score": 0.0
+      },
+      {
+        "index": 4,
+        "kind": "answer",
+        "included": true,
+        "score": 0.37499999999999994,
+        "targets": [
+          "Homer S's phone number has been updated to +10293847563."
+        ]
+      }
+    ]
+  }
+}

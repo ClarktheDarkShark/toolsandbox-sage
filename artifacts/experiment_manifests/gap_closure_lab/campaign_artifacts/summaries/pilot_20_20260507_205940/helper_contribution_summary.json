@@ -1,0 +1,405 @@
+{
+  "control_dir": "outputs/gap_closure_lab/best3_pilot/pilot_20_20260507_205940/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_20_59_44",
+  "candidate_dir": "outputs/gap_closure_lab/best3_pilot/pilot_20_20260507_205940/candidate/pilot_20_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_03_47",
+  "registry_dir": "artifacts/registry_experiments/gap_closure_lab/best3_reference_copy",
+  "scenario_count": 20,
+  "helpers": {
+    "relative_day_time_to_timestamp": {
+      "origin": "retained",
+      "visible_scenarios": [],
+      "called_scenarios": [],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number_10_distraction_tools",
+        "cellular_off_3_distraction_tools",
+        "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+        "get_cellular_3_distraction_tools_arg_description_scrambled",
+        "get_wifi_all_tools",
+        "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+        "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "search_name_with_relationship_3_distraction_tools",
+        "search_phone_number_with_name_all_tools",
+        "search_sender_phone_number_with_content",
+        "send_message_with_contact_content_cellular_off",
+        "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+        "turn_on_location_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+        "turn_on_wifi_low_battery_mode_3_distraction_tools",
+        "turn_on_wifi_low_battery_mode_implicit_all_tools",
+        "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+        "wifi_off_3_distraction_tools_arg_description_scrambled"
+      ],
+      "visible_count": 0,
+      "called_count": 0,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 20,
+      "called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 20,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number_10_distraction_tools",
+          "cellular_off_3_distraction_tools",
+          "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+          "get_cellular_3_distraction_tools_arg_description_scrambled",
+          "get_wifi_all_tools",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+          "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "search_name_with_relationship_3_distraction_tools",
+          "search_phone_number_with_name_all_tools",
+          "search_sender_phone_number_with_content",
+          "send_message_with_contact_content_cellular_off",
+          "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+          "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+          "turn_on_location_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+          "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+          "turn_on_wifi_low_battery_mode_3_distraction_tools",
+          "turn_on_wifi_low_battery_mode_implicit_all_tools",
+          "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+          "wifi_off_3_distraction_tools_arg_description_scrambled"
+        ],
+        "mean_canonical_delta": 0.021769076560361127,
+        "mean_outcome_delta": 0.1645242768276146,
+        "canonical_gains": 12,
+        "canonical_regressions": 5,
+        "canonical_preserved": 3,
+        "outcome_gains": 10,
+        "outcome_regressions": 3,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "resolve_search_window_or_bounds": {
+      "origin": "retained",
+      "visible_scenarios": [],
+      "called_scenarios": [],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number_10_distraction_tools",
+        "cellular_off_3_distraction_tools",
+        "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+        "get_cellular_3_distraction_tools_arg_description_scrambled",
+        "get_wifi_all_tools",
+        "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+        "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "search_name_with_relationship_3_distraction_tools",
+        "search_phone_number_with_name_all_tools",
+        "search_sender_phone_number_with_content",
+        "send_message_with_contact_content_cellular_off",
+        "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+        "turn_on_location_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+        "turn_on_wifi_low_battery_mode_3_distraction_tools",
+        "turn_on_wifi_low_battery_mode_implicit_all_tools",
+        "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+        "wifi_off_3_distraction_tools_arg_description_scrambled"
+      ],
+      "visible_count": 0,
+      "called_count": 0,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 20,
+      "called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 20,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number_10_distraction_tools",
+          "cellular_off_3_distraction_tools",
+          "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+          "get_cellular_3_distraction_tools_arg_description_scrambled",
+          "get_wifi_all_tools",
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+          "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "search_name_with_relationship_3_distraction_tools",
+          "search_phone_number_with_name_all_tools",
+          "search_sender_phone_number_with_content",
+          "send_message_with_contact_content_cellular_off",
+          "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+          "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+          "turn_on_location_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+          "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+          "turn_on_wifi_low_battery_mode_3_distraction_tools",
+          "turn_on_wifi_low_battery_mode_implicit_all_tools",
+          "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+          "wifi_off_3_distraction_tools_arg_description_scrambled"
+        ],
+        "mean_canonical_delta": 0.021769076560361127,
+        "mean_outcome_delta": 0.1645242768276146,
+        "canonical_gains": 12,
+        "canonical_regressions": 5,
+        "canonical_preserved": 3,
+        "outcome_gains": 10,
+        "outcome_regressions": 3,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "select_record_by_timestamp_extreme": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools"
+      ],
+      "called_scenarios": [
+        "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools"
+      ],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [
+        "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools"
+      ],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number_10_distraction_tools",
+        "cellular_off_3_distraction_tools",
+        "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+        "get_cellular_3_distraction_tools_arg_description_scrambled",
+        "get_wifi_all_tools",
+        "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "search_name_with_relationship_3_distraction_tools",
+        "search_phone_number_with_name_all_tools",
+        "search_sender_phone_number_with_content",
+        "send_message_with_contact_content_cellular_off",
+        "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+        "turn_on_location_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+        "turn_on_wifi_low_battery_mode_3_distraction_tools",
+        "turn_on_wifi_low_battery_mode_implicit_all_tools",
+        "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+        "wifi_off_3_distraction_tools_arg_description_scrambled"
+      ],
+      "visible_count": 1,
+      "called_count": 1,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 19,
+      "called_subset": {
+        "scenario_count": 1,
+        "scenarios": [
+          "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools"
+        ],
+        "mean_canonical_delta": 0.005623289011158161,
+        "mean_outcome_delta": 0.31081081081081086,
+        "canonical_gains": 1,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 1,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 19,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number_10_distraction_tools",
+          "cellular_off_3_distraction_tools",
+          "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+          "get_cellular_3_distraction_tools_arg_description_scrambled",
+          "get_wifi_all_tools",
+          "remove_contact_by_phone_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "search_name_with_relationship_3_distraction_tools",
+          "search_phone_number_with_name_all_tools",
+          "search_sender_phone_number_with_content",
+          "send_message_with_contact_content_cellular_off",
+          "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+          "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+          "turn_on_location_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+          "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+          "turn_on_wifi_low_battery_mode_3_distraction_tools",
+          "turn_on_wifi_low_battery_mode_implicit_all_tools",
+          "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+          "wifi_off_3_distraction_tools_arg_description_scrambled"
+        ],
+        "mean_canonical_delta": 0.02261885485242444,
+        "mean_outcome_delta": 0.1568249855653411,
+        "canonical_gains": 11,
+        "canonical_regressions": 5,
+        "canonical_preserved": 3,
+        "outcome_gains": 9,
+        "outcome_regressions": 3,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    }
+  },
+  "accepted_tools": [],
+  "accepted_but_uncalled_tools": [],
+  "retained_helper_called_tools": [
+    "select_record_by_timestamp_extreme"
+  ],
+  "newly_generated_helper_called_tools": [],
+  "registry_size": 3,
+  "runtime_bundle_size": {
+    "scenario_count": 20,
+    "mean_generated_tool_bundle_size": 0.05,
+    "max_generated_tool_bundle_size": 1,
+    "mean_available_tool_count": 10.6,
+    "max_available_tool_count": 34
+  },
+  "compute_cache_token_metrics": {
+    "candidate_openai_response_cache": {},
+    "candidate_prompt_cache": {
+      "root": "artifacts/experiment_manifests/gap_closure_lab/prompt_cache",
+      "hits": 0,
+      "misses": 0,
+      "writes": 0
+    }
+  },
+  "selection_event_count": 20,
+  "visibility_event_count": 20
+}

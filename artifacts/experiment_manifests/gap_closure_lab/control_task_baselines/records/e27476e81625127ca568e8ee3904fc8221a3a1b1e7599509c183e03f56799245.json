@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "record_id": "e27476e81625127ca568e8ee3904fc8221a3a1b1e7599509c183e03f56799245",
+  "timestamp": "2026-05-08T01:03:47.633695+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "f696d63a7e4ee1dd7a1b02d00662ee715cedf0487314ada0f9561c973f0aacc9",
+  "scenario_key": "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+  "scenario_checksum": "be97f701a638681fb2da74c60841ddd2569a4250e543e87c8f31d381db219025",
+  "initial_state_checksum": "4c2850e6ff8187393e94573e9632282b9c4364c52ea375726adc9cc8c541b068",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/best3_pilot/pilot_20_20260507_205940/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_20_59_44",
+  "milestone_scores": {
+    "0": [
+      17,
+      1.0
+    ],
+    "1": [
+      18,
+      0.5598113582023632
+    ]
+  },
+  "canonical_score": 0.7799056791011816,
+  "outcome_score": 0.0,
+  "exact_success": false,
+  "final_state_hash": "53d775e54ad744f8024f8bf374464c0b6a9af1057abe359a7b34775b5b4c4f4b",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 5,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 5,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/best3_pilot/pilot_20_20260507_205940/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_20_59_44/trajectories/find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled/conversation.json",
+  "transcript_hash": "9ebbed8e8dbeead499b3c204a7017dad864bf0f234ca6fb8efe5a379442ca17d",
+  "result_row": {
+    "name": "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+    "categories": [
+      "CANONICALIZATION",
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.7799056791011816,
+    "minefield_similarity": 0,
+    "similarity": 0.7799056791011816,
+    "turn_count": 5,
+    "milestone_mapping": {
+      "0": [
+        17,
+        1.0
+      ],
+      "1": [
+        18,
+        0.5598113582023632
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.0,
+    "outcome_milestone_similarity": 0.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 0.0,
+        "targets": [
+          "The phone number for Apple Park is +14089961010"
+        ]
+      }
+    ]
+  }
+}

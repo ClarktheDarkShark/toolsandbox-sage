@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "record_id": "b25d6745b3b029a9e26388f808a311352b92df28a7b759799b827e2c42d3bd8b",
+  "timestamp": "2026-05-08T04:02:52.308903+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "73fbe4d9f9275413e68a896297242b684aa27c44fec39edbb9bfc3c891a540c3",
+  "scenario_key": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+  "scenario_checksum": "454f8cf9328d47e3e8bda517ef0ae819348af72d6ffe9c3fbc4e40368c0e8a73",
+  "initial_state_checksum": "2adb7d76469742a734fd0a3cff2da5b7560b5f182a7142d7d7724257d87fbaf8",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/focused_chain_expanded60/expanded_60_20260507_235944/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_23_59_49",
+  "milestone_scores": {
+    "0": [
+      17,
+      1.0
+    ],
+    "1": [
+      18,
+      0.7539474294458821
+    ]
+  },
+  "canonical_score": 0.8769737147229411,
+  "outcome_score": 1.0,
+  "exact_success": false,
+  "final_state_hash": "1c2d9109960a518b88abb2d75228e4e738b34f71e597d35ce2226f81db43f686",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 3,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 3,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/focused_chain_expanded60/expanded_60_20260507_235944/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_23_59_49/trajectories/update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled/conversation.json",
+  "transcript_hash": "233c1f38c63e46d514a859f6367416ad8f8115d31479a167eca16943d6c25d31",
+  "result_row": {
+    "name": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_TYPE_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.8769737147229411,
+    "minefield_similarity": 0,
+    "similarity": 0.8769737147229411,
+    "turn_count": 3,
+    "milestone_mapping": {
+      "0": [
+        17,
+        1.0
+      ],
+      "1": [
+        18,
+        0.7539474294458821
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 1.0,
+    "outcome_milestone_similarity": 1.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 2,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 1.0,
+        "targets": [
+          "9e137f06-916a-5310-8174-cf0b7e9f7054's  phone number have been updated to +19876543210"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "record_id": "402374000d31e255be3e55b33e9879fb49303d6de1e9ffc32e5dd0cecd1db28a",
+  "timestamp": "2026-05-08T01:59:50.635245+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "959a312826687c4bfe42b988b39bbc5e61dd72ac8645b80915e63e7a47616de4",
+  "scenario_key": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+  "scenario_checksum": "3d1d59b211b17c139899a35b0b9ae1bff07a1f4aa99edb5d6a29a7662d3039fe",
+  "initial_state_checksum": "45aad76260918654f02fe73dbdeb5a016c3491455d3810f1e3ba2d3e8cf63d45",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/live_generation_frozen_expanded60/expanded_60_20260507_214548/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_45_53",
+  "milestone_scores": {
+    "0": [
+      23,
+      1.0
+    ],
+    "1": [
+      25,
+      1.0
+    ],
+    "2": [
+      26,
+      0.7451798135385213
+    ]
+  },
+  "canonical_score": 0.9150599378461738,
+  "outcome_score": 1.0,
+  "exact_success": false,
+  "final_state_hash": "938bc69f85d97bca8e4dd6264dae45d82675fe8603ea2879ce0a05e42422ec2e",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 11,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 11,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/live_generation_frozen_expanded60/expanded_60_20260507_214548/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_45_53/trajectories/turn_on_cellular_low_battery_mode_3_distraction_tools_arg_type_scrambled/conversation.json",
+  "transcript_hash": "f0c31f0a42388e203506758796505ac47756c55950dfbd625c95a217ad7e654a",
+  "result_row": {
+    "name": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_TYPE_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9150599378461738,
+    "minefield_similarity": 0,
+    "similarity": 0.9150599378461738,
+    "turn_count": 11,
+    "milestone_mapping": {
+      "0": [
+        23,
+        1.0
+      ],
+      "1": [
+        25,
+        1.0
+      ],
+      "2": [
+        26,
+        0.7451798135385213
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 1.0,
+    "outcome_milestone_similarity": 1.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 3,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "answer",
+        "included": true,
+        "score": 1.0,
+        "targets": [
+          "Cellular service has been turned on."
+        ]
+      }
+    ]
+  }
+}

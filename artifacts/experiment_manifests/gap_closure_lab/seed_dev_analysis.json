@@ -1,0 +1,241 @@
+{
+  "manifest": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "manifest_file_sha256": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "split": "seed_dev_labeled",
+  "truth_labels_inspected": true,
+  "scenario_count": 8,
+  "distinct_family_count": 8,
+  "family_counts": {
+    "add_reminder_content_and_weekday_delta_and_time": 1,
+    "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 1,
+    "add_reminder_content_and_week_delta_and_time_and_location": 1,
+    "add_reminder_content_and_date_and_time": 1,
+    "add_reminder_content_and_week_delta_and_time": 1,
+    "search_message_with_recency_latest": 1,
+    "search_relationship_with_phone_number": 1,
+    "update_contact_relationship_with_relationship": 1
+  },
+  "strata_counts": {
+    "temporal_reminder_date_canonicalization": 5,
+    "generic_multi_tool_composition": 8,
+    "direct_state_precondition_service_enablement": 1,
+    "contact_message_search_disambiguation": 3,
+    "record_filtering_ranking_latest_selection": 2
+  },
+  "expected_helper_fit_counts": {
+    "relative_day_time_to_timestamp": 5,
+    "select_record_by_timestamp_extreme": 1,
+    "resolve_search_window_or_bounds": 1,
+    "plan_contact_lookup_query": 1,
+    "extract_contact_field_from_search_result": 1,
+    "no_current_helper_fit": 1
+  },
+  "expected_birth_opportunity_counts": {
+    "composite:prepare_reminder_creation_args": 4,
+    "state_precondition:recover_from_tool_error": 1,
+    "no_current_birth_opportunity": 1,
+    "search_filter:select_record_by_timestamp_extreme": 1,
+    "derived_value:resolve_search_window_or_bounds": 1,
+    "search_filter:select_visible_record_by_constraints": 2,
+    "composite:plan_contact_lookup_query": 2,
+    "derived_value:extract_contact_field_from_search_result": 2,
+    "composite:constraint_to_action_planner": 2,
+    "composite:prepare_side_effect_args_from_selected_record": 1
+  },
+  "shared_pain_points": [
+    "side-effect argument preparation after scalar/date/contact reasoning",
+    "contact lookup and field extraction with scalar constraints",
+    "state/precondition recovery for service-disabled tasks",
+    "final-answer-ready transformation rather than intermediate extraction only",
+    "safe abstention for insufficient or ambiguous records before side effects"
+  ],
+  "leakage_guardrail": "Rows in this artifact may inform tool design, but their scenario IDs and hidden labels must not be encoded in tools, routers, prompts, or repairs. Seed/dev families are excluded from unseen splits.",
+  "rows": [
+    {
+      "scenario_id": "add_reminder_content_and_weekday_delta_and_time_all_tools",
+      "family_label": "add_reminder_content_and_weekday_delta_and_time",
+      "categories": [
+        "CANONICALIZATION",
+        "MULTIPLE_TOOL_CALL",
+        "SINGLE_USER_TURN",
+        "ALL_TOOLS_AVAILABLE"
+      ],
+      "task_strata": [
+        "temporal_reminder_date_canonicalization",
+        "generic_multi_tool_composition"
+      ],
+      "expected_helper_fit": [
+        "relative_day_time_to_timestamp"
+      ],
+      "expected_birth_opportunities": [
+        "composite:prepare_reminder_creation_args"
+      ],
+      "label_access": "seed_dev_labeled_only",
+      "pain_point_hypothesis": "final_answer_or_side_effect_argument_preparation"
+    },
+    {
+      "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled",
+      "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+      "categories": [
+        "CANONICALIZATION",
+        "MULTIPLE_TOOL_CALL",
+        "MULTIPLE_USER_TURN",
+        "THREE_DISTRACTION_TOOLS",
+        "TOOL_DESCRIPTION_SCRAMBLED"
+      ],
+      "task_strata": [
+        "temporal_reminder_date_canonicalization",
+        "direct_state_precondition_service_enablement",
+        "generic_multi_tool_composition"
+      ],
+      "expected_helper_fit": [
+        "relative_day_time_to_timestamp"
+      ],
+      "expected_birth_opportunities": [
+        "state_precondition:recover_from_tool_error",
+        "composite:prepare_reminder_creation_args"
+      ],
+      "label_access": "seed_dev_labeled_only",
+      "pain_point_hypothesis": "final_answer_or_side_effect_argument_preparation"
+    },
+    {
+      "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_10_distraction_tools",
+      "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+      "categories": [
+        "CANONICALIZATION",
+        "MULTIPLE_TOOL_CALL",
+        "MULTIPLE_USER_TURN",
+        "TEN_DISTRACTION_TOOLS"
+      ],
+      "task_strata": [
+        "temporal_reminder_date_canonicalization",
+        "generic_multi_tool_composition"
+      ],
+      "expected_helper_fit": [
+        "relative_day_time_to_timestamp"
+      ],
+      "expected_birth_opportunities": [
+        "composite:prepare_reminder_creation_args"
+      ],
+      "label_access": "seed_dev_labeled_only",
+      "pain_point_hypothesis": "final_answer_or_side_effect_argument_preparation"
+    },
+    {
+      "scenario_id": "add_reminder_content_and_date_and_time_alt_3_distraction_tools_tool_description_scrambled",
+      "family_label": "add_reminder_content_and_date_and_time",
+      "categories": [
+        "CANONICALIZATION",
+        "MULTIPLE_TOOL_CALL",
+        "SINGLE_USER_TURN",
+        "THREE_DISTRACTION_TOOLS",
+        "TOOL_DESCRIPTION_SCRAMBLED"
+      ],
+      "task_strata": [
+        "temporal_reminder_date_canonicalization",
+        "generic_multi_tool_composition"
+      ],
+      "expected_helper_fit": [
+        "relative_day_time_to_timestamp"
+      ],
+      "expected_birth_opportunities": [
+        "composite:prepare_reminder_creation_args"
+      ],
+      "label_access": "seed_dev_labeled_only",
+      "pain_point_hypothesis": "final_answer_or_side_effect_argument_preparation"
+    },
+    {
+      "scenario_id": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_tool_description_scrambled",
+      "family_label": "add_reminder_content_and_week_delta_and_time",
+      "categories": [
+        "CANONICALIZATION",
+        "MULTIPLE_TOOL_CALL",
+        "SINGLE_USER_TURN",
+        "THREE_DISTRACTION_TOOLS",
+        "TOOL_DESCRIPTION_SCRAMBLED"
+      ],
+      "task_strata": [
+        "temporal_reminder_date_canonicalization",
+        "generic_multi_tool_composition"
+      ],
+      "expected_helper_fit": [
+        "relative_day_time_to_timestamp"
+      ],
+      "expected_birth_opportunities": [],
+      "label_access": "seed_dev_labeled_only",
+      "pain_point_hypothesis": "final_answer_or_side_effect_argument_preparation"
+    },
+    {
+      "scenario_id": "search_message_with_recency_latest_alt_3_distraction_tools",
+      "family_label": "search_message_with_recency_latest",
+      "categories": [
+        "MULTIPLE_TOOL_CALL",
+        "SINGLE_USER_TURN",
+        "THREE_DISTRACTION_TOOLS"
+      ],
+      "task_strata": [
+        "contact_message_search_disambiguation",
+        "record_filtering_ranking_latest_selection",
+        "generic_multi_tool_composition"
+      ],
+      "expected_helper_fit": [
+        "select_record_by_timestamp_extreme",
+        "resolve_search_window_or_bounds"
+      ],
+      "expected_birth_opportunities": [
+        "search_filter:select_record_by_timestamp_extreme",
+        "derived_value:resolve_search_window_or_bounds"
+      ],
+      "label_access": "seed_dev_labeled_only",
+      "pain_point_hypothesis": "final_answer_or_side_effect_argument_preparation"
+    },
+    {
+      "scenario_id": "search_relationship_with_phone_number_10_distraction_tools",
+      "family_label": "search_relationship_with_phone_number",
+      "categories": [
+        "SINGLE_TOOL_CALL",
+        "SINGLE_USER_TURN",
+        "TEN_DISTRACTION_TOOLS"
+      ],
+      "task_strata": [
+        "contact_message_search_disambiguation",
+        "record_filtering_ranking_latest_selection",
+        "generic_multi_tool_composition"
+      ],
+      "expected_helper_fit": [
+        "plan_contact_lookup_query",
+        "extract_contact_field_from_search_result"
+      ],
+      "expected_birth_opportunities": [
+        "search_filter:select_visible_record_by_constraints",
+        "composite:plan_contact_lookup_query",
+        "derived_value:extract_contact_field_from_search_result",
+        "composite:constraint_to_action_planner"
+      ],
+      "label_access": "seed_dev_labeled_only",
+      "pain_point_hypothesis": "contact_lookup_or_record_selection"
+    },
+    {
+      "scenario_id": "update_contact_relationship_with_relationship_alt",
+      "family_label": "update_contact_relationship_with_relationship",
+      "categories": [
+        "MULTIPLE_TOOL_CALL",
+        "SINGLE_USER_TURN",
+        "NO_DISTRACTION_TOOLS"
+      ],
+      "task_strata": [
+        "contact_message_search_disambiguation",
+        "generic_multi_tool_composition"
+      ],
+      "expected_helper_fit": [],
+      "expected_birth_opportunities": [
+        "search_filter:select_visible_record_by_constraints",
+        "composite:prepare_side_effect_args_from_selected_record",
+        "composite:plan_contact_lookup_query",
+        "derived_value:extract_contact_field_from_search_result",
+        "composite:constraint_to_action_planner"
+      ],
+      "label_access": "seed_dev_labeled_only",
+      "pain_point_hypothesis": "final_answer_or_side_effect_argument_preparation"
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "record_id": "9d59132e586d05de00dda33e6a5ec89f186b18f80bae9e7d4f712997301ea965",
+  "timestamp": "2026-05-08T01:10:18.192212+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "e204ab7212160762b4aef980ae01b0c2105a8d3259d36abd5f59a08d6ad1f7bd",
+  "scenario_key": "turn_on_wifi_low_battery_mode_3_distraction_tools",
+  "scenario_checksum": "3a3825b751e136ba2ada406ee9822a56d4046e1d4601b985970f488376487757",
+  "initial_state_checksum": "557789af077841f52af912adf6dbdc6532f866de7ea136d40fd1bd5d4fc60a15",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/best3_v26_pilot/pilot_20_20260507_210706/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_07_10",
+  "milestone_scores": {
+    "0": [
+      23,
+      1.0
+    ],
+    "1": [
+      25,
+      1.0
+    ],
+    "2": [
+      26,
+      0.6509744980651522
+    ]
+  },
+  "canonical_score": 0.8836581660217174,
+  "outcome_score": 0.7586206896551725,
+  "exact_success": false,
+  "final_state_hash": "ba0648a4d03f5eff8ca485ebb7b18daf4b4128763b53df40f37d16f78d635813",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 11,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 11,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/best3_v26_pilot/pilot_20_20260507_210706/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_07_10/trajectories/turn_on_wifi_low_battery_mode_3_distraction_tools/conversation.json",
+  "transcript_hash": "c0960e078f279ecc22b05626617095fd639a80267f75f1f4ae1115ca5dcb8aa9",
+  "result_row": {
+    "name": "turn_on_wifi_low_battery_mode_3_distraction_tools",
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.8836581660217174,
+    "minefield_similarity": 0,
+    "similarity": 0.8836581660217174,
+    "turn_count": 11,
+    "milestone_mapping": {
+      "0": [
+        23,
+        1.0
+      ],
+      "1": [
+        25,
+        1.0
+      ],
+      "2": [
+        26,
+        0.6509744980651522
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.7586206896551725,
+    "outcome_milestone_similarity": 0.7586206896551725,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 3,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "answer",
+        "included": true,
+        "score": 0.27586206896551724,
+        "targets": [
+          "Wifi has been turned on."
+        ]
+      }
+    ]
+  }
+}

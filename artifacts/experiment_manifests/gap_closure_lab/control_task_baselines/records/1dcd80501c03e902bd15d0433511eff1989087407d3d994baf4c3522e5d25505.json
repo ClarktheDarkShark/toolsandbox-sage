@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "record_id": "1dcd80501c03e902bd15d0433511eff1989087407d3d994baf4c3522e5d25505",
+  "timestamp": "2026-05-08T01:31:56.516580+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "dd5b3d69ac01026809ae9ba1370ac34a13c50d85ec17af7d2b9c38bab653355d",
+  "scenario_key": "search_sender_phone_number_with_content",
+  "scenario_checksum": "c80ce7371fe1c3d7a7f132dedeeb9a3e7f479e83a4bc21777e73cadee5af999c",
+  "initial_state_checksum": "2c69d34739ab6dd369aac430dfa161d006ca77a1acf5bb89b2dbdec669fdf6a1",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/live_generation_frozen_pilot/pilot_20_20260507_213006/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_30_10",
+  "milestone_scores": {
+    "0": [
+      17,
+      1.0
+    ],
+    "1": [
+      18,
+      0.8434326624237617
+    ]
+  },
+  "canonical_score": 0.9217163312118808,
+  "outcome_score": 1.0,
+  "exact_success": false,
+  "final_state_hash": "9462638dc868ec9a30a333070407649583fa29d74f594e342efd2e5af1dc0ce1",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 5,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 5,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/live_generation_frozen_pilot/pilot_20_20260507_213006/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_30_10/trajectories/search_sender_phone_number_with_content/conversation.json",
+  "transcript_hash": "b65cce3978448bb0b31abc4b36d11a4832649872998c8e0161ba8344ebaa001d",
+  "result_row": {
+    "name": "search_sender_phone_number_with_content",
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "NO_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9217163312118808,
+    "minefield_similarity": 0,
+    "similarity": 0.9217163312118808,
+    "turn_count": 5,
+    "milestone_mapping": {
+      "0": [
+        17,
+        1.0
+      ],
+      "1": [
+        18,
+        0.8434326624237617
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 1.0,
+    "outcome_milestone_similarity": 1.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 1.0,
+        "targets": [
+          "+18307976530 asked you if you want some GPUs"
+        ]
+      }
+    ]
+  }
+}

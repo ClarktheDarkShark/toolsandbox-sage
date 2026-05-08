@@ -1,7 +1,9 @@
 # SAGE Gap-Closure Lab Plan
 
 ## Status
-Experimental setup only. This branch is not final claim hardening and this document is not protected final evidence.
+Experimental campaign complete for this branch. This branch is not final claim hardening and this document is not protected final evidence.
+
+The campaign stopped under stop condition 2: all required experiment families received fair-chance diagnostic or expanded-pilot treatment, including repair and force diagnostics where appropriate, and no approach showed scalable primary outcome value.
 
 ## Branch Objective
 Use `exp/sage-gap-closure-lab` for isolated experiments that try to close the remaining SAGE capability gap beyond protected best3 and validated V2.6 evidence. The branch may change code and experimental registries, but those changes are exploratory until separately validated and reviewed.
@@ -132,3 +134,10 @@ git diff --check
 ```
 
 Add routing, candidate validation, force-diagnostic leakage, side-effect preservation, contribution export, and statistical dry-run checks as soon as the corresponding experiment harness exists.
+
+## Current Campaign Artifacts
+
+- Ledger: `docs/sage_protocol/experiments/gap_closure_lab_ledger.md`
+- Candidate triage: `docs/sage_protocol/experiments/gap_closure_lab_candidate_triage.md`
+- Final branch report: `docs/sage_protocol/experiments/gap_closure_lab_report.md`
+- Machine-readable campaign summary: `artifacts/experiment_manifests/gap_closure_lab/campaign_run_summary.json`

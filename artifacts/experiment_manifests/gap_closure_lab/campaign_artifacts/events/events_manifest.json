@@ -1,0 +1,21 @@
+{
+  "description": "Compressed campaign event log for the SAGE gap-closure lab. Raw .jsonl event logs are intentionally ignored because repository hooks reject added files over 500 KB.",
+  "raw_log": {
+    "path": "artifacts/experiment_manifests/gap_closure_lab/campaign_artifacts/events/20260508.jsonl",
+    "line_count": 2151,
+    "sha256": "7847232ab1d695f5431d6ae61c0a4bf916ac5d66d968e5e066066f645a085aff",
+    "committed": false
+  },
+  "compressed_log": {
+    "path": "artifacts/experiment_manifests/gap_closure_lab/campaign_artifacts/events/20260508.jsonl.gz",
+    "size_bytes": 77788,
+    "sha256": "55aaa9ac04cb6b6782a40a5a42b47bc4715975de91e1caba39736ed3acbe1e27",
+    "committed": true
+  },
+  "latest_raw_log": {
+    "path": "artifacts/experiment_manifests/gap_closure_lab/campaign_artifacts/events/latest.jsonl",
+    "same_content_as": "20260508.jsonl",
+    "sha256": "7847232ab1d695f5431d6ae61c0a4bf916ac5d66d968e5e066066f645a085aff",
+    "committed": false
+  }
+}

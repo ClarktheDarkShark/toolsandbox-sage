@@ -1,0 +1,34 @@
+{
+  "manifest_type": "sage_gap_closure_lab_force_diagnostic",
+  "schema_version": 1,
+  "status": "experimental_diagnostic_not_promotion_evidence",
+  "truth_labels_inspected": false,
+  "source_split": "pilot_unseen",
+  "leakage_policy": "scenario ids copied from sealed pilot run after natural comparison; not used for tool design or promotion",
+  "splits": {
+    "mechanism_12": [
+      {
+        "name": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "add_contact",
+          "search_messages",
+          "modify_contact",
+          "timestamp_diff",
+          "get_current_timestamp",
+          "unit_conversion",
+          "end_conversation",
+          "search_contacts"
+        ]
+      }
+    ]
+  },
+  "split_sizes": {
+    "mechanism_12": 1
+  }
+}

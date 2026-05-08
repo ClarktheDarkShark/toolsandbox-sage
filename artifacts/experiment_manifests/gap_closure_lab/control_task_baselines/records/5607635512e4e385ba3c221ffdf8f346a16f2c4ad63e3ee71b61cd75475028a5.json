@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "record_id": "5607635512e4e385ba3c221ffdf8f346a16f2c4ad63e3ee71b61cd75475028a5",
+  "timestamp": "2026-05-08T04:02:52.489856+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "5b7438d56c0a79d81977caac8dfee6ab197f7dca7d15f861bb77fc24cde0da15",
+  "scenario_key": "find_address_with_lat_lon_all_tools",
+  "scenario_checksum": "8d7cd2f2573afdc0ef72f0f6bd02329e923c37f63f2ed5427ddf87a4c4c5c35f",
+  "initial_state_checksum": "bca3e64e7d26a135717f7b17f300ef27186a05fd9001c7dcb09a8c72055c9e5c",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/focused_chain_expanded60/expanded_60_20260507_235944/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_23_59_49",
+  "milestone_scores": {
+    "0": [
+      17,
+      1.0
+    ],
+    "1": [
+      18,
+      0.9011127470474786
+    ]
+  },
+  "canonical_score": 0.9505563735237392,
+  "outcome_score": 0.0,
+  "exact_success": false,
+  "final_state_hash": "0422720ae582d0e2dac1b900a78be2c310f0ff7f8d8f4d2fc199d50dd1c99bf9",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 5,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 5,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/focused_chain_expanded60/expanded_60_20260507_235944/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_23_59_49/trajectories/find_address_with_lat_lon_all_tools/conversation.json",
+  "transcript_hash": "6ec320b33fc919a536bf82fd8565ce37ef8f277dd1d64c5d20e4d60220b6cd20",
+  "result_row": {
+    "name": "find_address_with_lat_lon_all_tools",
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9505563735237392,
+    "minefield_similarity": 0,
+    "similarity": 0.9505563735237392,
+    "turn_count": 5,
+    "milestone_mapping": {
+      "0": [
+        17,
+        1.0
+      ],
+      "1": [
+        18,
+        0.9011127470474786
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.0,
+    "outcome_milestone_similarity": 0.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 0.0,
+        "targets": [
+          "The address for lattitude: 37.334606, longitude: -122.009102 is Apple Park 1 Apple Park Way Cupertino, CA 95014 United States"
+        ]
+      }
+    ]
+  }
+}

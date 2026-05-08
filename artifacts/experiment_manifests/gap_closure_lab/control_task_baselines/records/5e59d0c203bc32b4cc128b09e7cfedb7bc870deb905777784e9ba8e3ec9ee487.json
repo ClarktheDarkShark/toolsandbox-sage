@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "record_id": "5e59d0c203bc32b4cc128b09e7cfedb7bc870deb905777784e9ba8e3ec9ee487",
+  "timestamp": "2026-05-08T01:10:18.236200+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "81809dcf4c31c63d7a8644aa9e95011723e525fff3901304e807e4b2370c62ea",
+  "scenario_key": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+  "scenario_checksum": "64ecb415bf16a43a7ba520d0822b9fb0d932aead0feef4ef60092794e95bda71",
+  "initial_state_checksum": "e5e90194b28cd62efd29e93c0140c2ec347d82aa263c7c9272251593e05e7557",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "GPT_4_o_2024_05_13",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+  "model_parameters_hash": "7b89471f9a2b6dd8d504ebdd42b6563d563c58e03457242538997c8c660432fb",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "0f6f289b90e13f329e40acbd98b1390d23a5b7a29086982a2f0855a6be461a2d",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:a5d40940f70192a8e3be37f03c772bc5eb29d9d1",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/best3_v26_pilot/pilot_20_20260507_210706/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_07_10",
+  "milestone_scores": {
+    "0": [
+      23,
+      1.0
+    ],
+    "1": [
+      25,
+      1.0
+    ],
+    "2": [
+      26,
+      0.5358322837811106
+    ]
+  },
+  "canonical_score": 0.8452774279270369,
+  "outcome_score": 1.0,
+  "exact_success": false,
+  "final_state_hash": "1d7ca626b53809e42476c5025017b541d76d8d43910b2706b7ec92dcca962bf8",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 11,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 11,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/best3_v26_pilot/pilot_20_20260507_210706/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_07_2026_21_07_10/trajectories/turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled/conversation.json",
+  "transcript_hash": "3a14bfa7906b1df8c1d9bb2563fb37289813fdbdde90fef2eb06f632ae8d3f1c",
+  "result_row": {
+    "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_DESCRIPTION_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.8452774279270369,
+    "minefield_similarity": 0,
+    "similarity": 0.8452774279270369,
+    "turn_count": 11,
+    "milestone_mapping": {
+      "0": [
+        23,
+        1.0
+      ],
+      "1": [
+        25,
+        1.0
+      ],
+      "2": [
+        26,
+        0.5358322837811106
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 1.0,
+    "outcome_milestone_similarity": 1.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 3,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "answer",
+        "included": true,
+        "score": 1.0,
+        "targets": [
+          "Location service has been turned on."
+        ]
+      }
+    ]
+  }
+}

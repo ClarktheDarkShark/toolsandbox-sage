@@ -1,0 +1,32 @@
+{
+  "manifest_type": "sage_gap_closure_lab_force_diagnostic",
+  "schema_version": 1,
+  "status": "experimental_diagnostic_not_promotion_evidence",
+  "truth_labels_inspected": false,
+  "source_split": "pilot_unseen",
+  "leakage_policy": "scenario ids copied from sealed pilot run after natural comparison; not used for tool design or promotion",
+  "splits": {
+    "mechanism_12": [
+      {
+        "name": "find_phone_number_with_location_name_3_distraction_tools_tool_name_scrambled",
+        "categories": [
+          "CANONICALIZATION",
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "allowed_tools": [
+          "search_stock",
+          "end_conversation",
+          "search_weather_around_lat_lon",
+          "search_location_around_lat_lon",
+          "search_lat_lon"
+        ]
+      }
+    ]
+  },
+  "split_sizes": {
+    "mechanism_12": 1
+  }
+}

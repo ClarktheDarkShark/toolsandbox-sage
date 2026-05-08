@@ -1,0 +1,110 @@
+{
+  "manifest_type": "sage_gap_closure_lab_force_diagnostic",
+  "schema_version": 1,
+  "status": "experimental_diagnostic_not_promotion_evidence",
+  "truth_labels_inspected": false,
+  "source_split": "pilot_unseen",
+  "leakage_policy": "scenario ids copied from sealed pilot run after natural comparison; not used for tool design or promotion",
+  "splits": {
+    "mechanism_12": [
+      {
+        "name": "wifi_off_3_distraction_tools_arg_description_scrambled",
+        "categories": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "allowed_tools": [
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation"
+        ]
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "categories": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_cellular_service_status"
+        ]
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "categories": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "get_location_service_status"
+        ]
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_3_distraction_tools",
+        "categories": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "allowed_tools": [
+          "get_wifi_status",
+          "set_wifi_status",
+          "end_conversation",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status"
+        ]
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+        "categories": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "allowed_tools": [
+          "set_location_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status",
+          "end_conversation",
+          "get_cellular_service_status"
+        ]
+      }
+    ]
+  },
+  "split_sizes": {
+    "mechanism_12": 5
+  }
+}

@@ -512,6 +512,119 @@ def test_post_selection_composite_chains_selected_record_from_prior_trace() -> N
         assert modify_result["abstain_reason"] == "missing_required_update_fields"
 
 
+def test_selection_only_composite_helper_can_handle_missing_updates() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="select_recency_target_and_prepare_action",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description=(
+                "Selection/action usage helper. It returns selected_record and "
+                "selected_id even when update fields still need to be computed."
+            ),
+            inputs=(
+                ToolInput("records", "list", "Visible records."),
+                ToolInput("timestamp_key", "str", "Timestamp key."),
+                ToolInput("selection_mode", "str", "latest or oldest."),
+                ToolInput("action_type", "str", "modify_contact."),
+                ToolInput("updates", "dict", "Optional fields to update."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                    "selected_id": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+                "required": [
+                    "selected_record",
+                    "selected_id",
+                    "downstream_tool_kwargs",
+                    "should_call_tool",
+                    "abstain_reason",
+                ],
+            },
+            positive_triggers=("modify_contact_with_message_recency",),
+            negative_triggers=("no visible records yet",),
+            abstain_behavior=(
+                "For missing update fields it still returns selected_record, "
+                "selected_id, selected_timestamp, and downstream_tool_name."
+            ),
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "modify_contact_with_message_recency",
+                "modify_reminder_with_recency",
+            ),
+            required_original_tool_calls=("modify_contact",),
+            preserves_side_effect_tools=("modify_contact",),
+            shortfall_cluster_evidence=("force_diagnostic:missing_updates",),
+            known_failure_mechanisms_addressed=("output erased selected target",),
+            reason_tool_is_decisive=(
+                "It preserves the selected target for later update preparation."
+            ),
+            generalization_rationale=(
+                "Selection and action preparation are separable across recency "
+                "side-effect tasks; preserving the target lets the actor compute "
+                "updates later without redoing record ranking."
+            ),
+            final_state_preservation_plan=(
+                "The helper never executes the side effect; the actor must call "
+                "modify_contact after updates exist."
+            ),
+            grading_accounting_note=(
+                "Selection-only output is not a completed side-effect action."
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary=(
+                    "Prior wrapper-level missing-update handling erased the selected "
+                    "target before a composite helper could return useful selection data."
+                ),
+                signals=("output_shape_failure", "visible_not_called_repair"),
+            ),
+        ),
+        code=(
+            "def select_recency_target_and_prepare_action(records: list, "
+            "timestamp_key: str, selection_mode: str, action_type: str, "
+            "updates: dict = None) -> dict:\n"
+            "    record = records[0]\n"
+            "    return {'selected_record': record, 'selected_id': record['person_id'], "
+            "'downstream_tool_kwargs': {}, 'should_call_tool': False, "
+            "'abstain_reason': 'missing_update_fields'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            accepted=True,
+            errors=(),
+            source_example_count=1,
+            held_out_check_count=1,
+            negative_applicability_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="modify_contact_with_message_recency",
+    )
+
+    fn = compile_toolsandbox_tool(entry)
+    result = fn(
+        records=[{"person_id": "p2", "creation_timestamp": 20}],
+        timestamp_key="creation_timestamp",
+        selection_mode="latest",
+        action_type="modify_contact",
+    )
+
+    assert result["selected_record"] == {
+        "person_id": "p2",
+        "creation_timestamp": 20,
+    }
+    assert result["selected_id"] == "p2"
+    assert result["should_call_tool"] is False
+    assert result["abstain_reason"] == "missing_update_fields"
+
+
 def test_derived_value_helper_chains_visible_payload_from_required_tool_trace() -> None:
     tool = GeneratedTool(
         spec=ToolSpec(
