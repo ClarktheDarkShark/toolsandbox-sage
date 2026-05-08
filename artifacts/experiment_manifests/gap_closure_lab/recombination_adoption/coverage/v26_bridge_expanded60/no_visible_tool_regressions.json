@@ -1,0 +1,462 @@
+[
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+    "stratum": "direct_state_precondition_service_enablement",
+    "delta": -0.019394672731232077,
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_TYPE_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -0.019394672731232077,
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_TYPE_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+    "stratum": "direct_state_precondition_service_enablement",
+    "delta": -0.009215535813726139,
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_DESCRIPTION_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -0.009215535813726139,
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_DESCRIPTION_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "turn_on_cellular_low_battery_mode_implicit_all_tools",
+    "stratum": "direct_state_precondition_service_enablement",
+    "delta": -0.021080010481496436,
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "turn_on_cellular_low_battery_mode_implicit_all_tools",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -0.021080010481496436,
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+    "stratum": "direct_state_precondition_service_enablement",
+    "delta": -0.05944643356811352,
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_TYPE_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -0.05944643356811352,
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_TYPE_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "wifi_off",
+    "stratum": "direct_state_precondition_service_enablement",
+    "delta": -0.0572304018903137,
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "NO_DISTRACTION_TOOLS"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_phone_number_with_location_name_all_tools",
+    "stratum": "contact_message_search_disambiguation",
+    "delta": -0.05937254895834543,
+    "categories": [
+      "CANONICALIZATION",
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_phone_number_with_location_name_all_tools",
+    "stratum": "record_filtering_ranking_latest_selection",
+    "delta": -0.05937254895834543,
+    "categories": [
+      "CANONICALIZATION",
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_phone_number_with_location_name_all_tools",
+    "stratum": "weather_location_current_city_distance",
+    "delta": -0.05937254895834543,
+    "categories": [
+      "CANONICALIZATION",
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_phone_number_with_location_name_all_tools",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -0.05937254895834543,
+    "categories": [
+      "CANONICALIZATION",
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_distance_with_location_name_insufficient_information_alt",
+    "stratum": "record_filtering_ranking_latest_selection",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "NO_DISTRACTION_TOOLS"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_distance_with_location_name_insufficient_information_alt",
+    "stratum": "weather_location_current_city_distance",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "NO_DISTRACTION_TOOLS"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_distance_with_location_name_insufficient_information_alt",
+    "stratum": "insufficient_information_clarification",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "NO_DISTRACTION_TOOLS"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_tool_description_scrambled",
+    "stratum": "temporal_reminder_date_canonicalization",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_DESCRIPTION_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_tool_description_scrambled",
+    "stratum": "record_filtering_ranking_latest_selection",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_DESCRIPTION_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_tool_description_scrambled",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_DESCRIPTION_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_tool_description_scrambled",
+    "stratum": "insufficient_information_clarification",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_DESCRIPTION_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+    "stratum": "contact_message_search_disambiguation",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+    "stratum": "direct_state_precondition_service_enablement",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+    "stratum": "insufficient_information_clarification",
+    "delta": -1.0,
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_address_with_lat_lon_all_tools",
+    "stratum": "record_filtering_ranking_latest_selection",
+    "delta": -0.003604606936310706,
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_address_with_lat_lon_all_tools",
+    "stratum": "weather_location_current_city_distance",
+    "delta": -0.003604606936310706,
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_address_with_lat_lon_all_tools",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -0.003604606936310706,
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_temperature_f_with_location_wifi_off_3_distraction_tools_arg_description_scrambled",
+    "stratum": "record_filtering_ranking_latest_selection",
+    "delta": -0.4870770743126732,
+    "categories": [
+      "CANONICALIZATION",
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_DESCRIPTION_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_temperature_f_with_location_wifi_off_3_distraction_tools_arg_description_scrambled",
+    "stratum": "direct_state_precondition_service_enablement",
+    "delta": -0.4870770743126732,
+    "categories": [
+      "CANONICALIZATION",
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_DESCRIPTION_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_temperature_f_with_location_wifi_off_3_distraction_tools_arg_description_scrambled",
+    "stratum": "weather_location_current_city_distance",
+    "delta": -0.4870770743126732,
+    "categories": [
+      "CANONICALIZATION",
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_DESCRIPTION_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_temperature_f_with_location_wifi_off_3_distraction_tools_arg_description_scrambled",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -0.4870770743126732,
+    "categories": [
+      "CANONICALIZATION",
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_DESCRIPTION_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+    "stratum": "record_filtering_ranking_latest_selection",
+    "delta": -0.8460434247715564,
+    "categories": [
+      "CANONICALIZATION",
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+    "stratum": "direct_state_precondition_service_enablement",
+    "delta": -0.8460434247715564,
+    "categories": [
+      "CANONICALIZATION",
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+    "stratum": "weather_location_current_city_distance",
+    "delta": -0.8460434247715564,
+    "categories": [
+      "CANONICALIZATION",
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -0.8460434247715564,
+    "categories": [
+      "CANONICALIZATION",
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+    "stratum": "record_filtering_ranking_latest_selection",
+    "delta": -0.0048004975937062655,
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+    "stratum": "weather_location_current_city_distance",
+    "delta": -0.0048004975937062655,
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  },
+  {
+    "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+    "scenario": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+    "stratum": "generic_multi_tool_composition",
+    "delta": -0.0048004975937062655,
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ]
+  }
+]

@@ -10,7 +10,7 @@ Experimental evidence only. Nothing in this ledger modifies protected best3, for
 - Split payload SHA-256: `41a9565960005007bdcc8a0e901b81a300e2e5c1c52c0b38e15e17fe83f983d4`
 - Baseline cache manifest hash: `df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d`
 - Candidate/SAGE arms: fresh runs with OpenAI response cache disabled for experimental comparisons.
-- Dashboard discipline: each completed run with a dashboard was opened to the Task Focus dashboard; latest opened dashboard is `outputs/gap_closure_lab/focused_chain_repaired_bridge_expanded60/expanded_60_20260508_005703/dashboard/task_focus.html`.
+- Dashboard discipline: each completed run with a dashboard was opened to the Task Focus dashboard; latest opened dashboard is `outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/dashboard/task_focus.html`.
 
 ## Experiment Runs
 
@@ -36,6 +36,14 @@ Experimental evidence only. Nothing in this ledger modifies protected best3, for
 | GCL-017 | Natural two-task repaired-chain diagnostic | 2 mechanism | `focused_chain_repaired_pack` | 2 cached / 0 fresh | Outcome +0.1492, canonical +0.1110; selected record preserved; old safety accounting logged a false incident | Repair safety accounting |
 | GCL-018 | Natural two-task repaired-chain safety diagnostic | 2 mechanism | `focused_chain_repaired_pack` | 2 cached / 0 fresh | Outcome +0.1460, canonical +0.2102, 0 side-effect/runtime incidents | Low-frequency positive; expand once |
 | GCL-019 | Repaired chain expanded rerun | 60 unseen | `focused_chain_repaired_pack` | 42 cached / 18 fresh | Outcome -0.0189, canonical +0.0441, exact success +6, 0 incidents; helper call share below 25%, chain VNC 2/2 | Do not confirm/scale; retain pockets |
+| GCL-020 | Recombination setup: focused recency/action registries | 20 targeted focus manifest | Five experimental registries under `registry_experiments/gap_closure_lab/recombination_adoption` | None | Created minimal, adoption-minimal, contact-bridge, best3-bridge, and V2.6-bridge packs; focus manifest SHA `930d11e8...` | Run focused adoption pilots |
+| GCL-021 | Recombination minimal strict focus20 | 20 targeted unseen | `recency_action_minimal_strict_pack` | 0 cached / 20 fresh | Outcome +0.1518, canonical +0.1198, zero runtime exceptions; `resolve_search_window_or_bounds` called 8/14 visible with called-subset outcome +0.2971 | Retain recency window helper; test adoption variants |
+| GCL-022 | Recombination adoption-minimal focus20 | 20 targeted unseen | `recency_action_adoption_minimal_pack` | 0 cached / 20 fresh | Outcome +0.1482, canonical +0.1597, zero runtime exceptions; composite bridge received one natural call | Retain; combine with prior successes |
+| GCL-023 | Recombination contact bridge focus20 | 20 targeted unseen | `recency_action_contact_bridge_pack` | 0 cached / 20 fresh | Outcome +0.2695, canonical +0.2857; contact helpers not routed/called in the focus cohort | Keep contact helpers as separate low-frequency pockets, not source of this lift |
+| GCL-024 | Recombination best3 bridge focus20 | 20 targeted unseen | `recency_action_best3_bridge_pack` | 20 cached / 0 fresh | Outcome +0.3530, canonical +0.2672; natural calls across best3 time selector, recency window, timestamp selector, and composite bridge | Promising targeted run; expand before confirmation |
+| GCL-025 | Recombination V2.6 bridge focus20 | 20 targeted unseen | `recency_action_v26_bridge_pack` | 20 cached / 0 fresh | Outcome +0.5452, canonical +0.2976; strongest focus result; composite bridge called 5/14 visible with called-subset outcome +0.6116 | Most promising targeted run; expand before confirmation |
+| GCL-026 | Recombination V2.6 bridge expanded60 | 60 unseen | `recency_action_v26_bridge_pack` | 0 cached / 60 fresh | Outcome +0.0050, canonical -0.0429, exact success delta 0, zero runtime exceptions, protocol gate failed; helper call share below 25%; composite bridge VNC 2/2 | Do not confirm; retain pocket only |
+| GCL-027 | Recombination best3 bridge expanded60 | 60 unseen | `recency_action_best3_bridge_pack` | 0 cached / 60 fresh | Outcome -0.0734, canonical -0.0031, exact success delta 0, zero runtime exceptions, protocol gate failed; latest Task Focus dashboard rendered paired data with 0 console errors | Do not confirm; stop broad recombination campaign |
 
 ## Required Family Status
 

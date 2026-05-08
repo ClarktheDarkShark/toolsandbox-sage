@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "record_id": "fd57d2aff3625ade2e4f7d4ea96c4f1ec773d3dccbe7bcb60224de32ec0cdc8a",
+  "timestamp": "2026-05-08T09:40:50.087324+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "ca3fff147be860c833ca2bb074bd45dff953ae3fc9d2112c9245ba1b0dffe28c",
+  "scenario_key": "modify_contact_with_message_recency",
+  "scenario_checksum": "ea46b914da3077b338b2b00e4e5cb541eda85384c473b2826f63314a482053b3",
+  "initial_state_checksum": "17336ecea3db8dc7ba7ee4610461f1f83dca7264d3e44d5e7f601bdb15301ea2",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "930d11e8e399def1cba17d8683a52d5047b03d4f153ceff8ea2fe26cf0eca065",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/recombination_focus20_manifest.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/contact_bridge_focus20/pilot_20_20260508_053514/control/pilot_20_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_35_18",
+  "milestone_scores": {
+    "0": [
+      21,
+      1.0
+    ],
+    "1": [
+      27,
+      1.0
+    ],
+    "2": [
+      23,
+      1.0
+    ],
+    "3": [
+      27,
+      0.0
+    ],
+    "4": [
+      30,
+      0.6465459468849516
+    ]
+  },
+  "canonical_score": 0.7293091893769903,
+  "outcome_score": 0.13513513513513511,
+  "exact_success": false,
+  "final_state_hash": "1d21528678937ceb6f45b163fd4bc91132362db81cb72a83b2384832fe8d9dda",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 15,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 15,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/contact_bridge_focus20/pilot_20_20260508_053514/control/pilot_20_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_35_18/trajectories/modify_contact_with_message_recency/conversation.json",
+  "transcript_hash": "1b31558c04e9ffa315da6bb15765b62bc5be20cd929600baf41e6579c295f06b",
+  "result_row": {
+    "name": "modify_contact_with_message_recency",
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "NO_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.7293091893769903,
+    "minefield_similarity": 0,
+    "similarity": 0.7293091893769903,
+    "turn_count": 15,
+    "milestone_mapping": {
+      "0": [
+        21,
+        1.0
+      ],
+      "1": [
+        27,
+        1.0
+      ],
+      "2": [
+        23,
+        1.0
+      ],
+      "3": [
+        27,
+        0.0
+      ],
+      "4": [
+        30,
+        0.6465459468849516
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.13513513513513511,
+    "outcome_milestone_similarity": 0.13513513513513511,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 2,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 3,
+        "kind": "state",
+        "included": true,
+        "score": 0.0
+      },
+      {
+        "index": 4,
+        "kind": "answer",
+        "included": true,
+        "score": 0.27027027027027023,
+        "targets": [
+          "The phone number of the person you last talked to has been updated to +10293847563."
+        ]
+      }
+    ]
+  }
+}

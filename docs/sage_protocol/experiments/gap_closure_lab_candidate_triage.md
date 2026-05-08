@@ -6,6 +6,8 @@ Experimental evidence only. Generated tools listed here are not part of protecte
 
 No candidate is promotion-ready. The strongest retained signal is not a broad portfolio lift; it is a low-frequency recency/selection/action bridge that showed safe latent value in force and natural mechanism diagnostics but was not adopted reliably in expanded60. Per the campaign clarification, low-frequency positives are retained as recombination candidates instead of being fully discounted.
 
+Follow-on recombination reinforced that interpretation. Small recency/action portfolios produced strong targeted focus20 gains, especially when combined with best3 or V2.6, but the same portfolios did not survive expanded60 routing/adoption. The tools are retained as critical-gap pockets, not promoted as broad evidence.
+
 ## Triage Table
 
 | Candidate / method | Source | Registry path | Validation | Natural calls | Force diagnosis | Called-subset outcome | VNC | Safety | Decision |
@@ -24,6 +26,16 @@ No candidate is promotion-ready. The strongest retained signal is not a broad po
 | `detect_insufficient_visible_records` | Abstention/guard helper | `full_plus_abstention_pack` / `affordance_rich_guard_pack` | Registry/routing checks pass | Rich guard expanded60: visible 20, called 2 | Not force-promoted | Broad run outcome -0.071 | High VNC | 0 incidents | Park broad guard; insufficient-info lane still needs narrower design |
 | `constraint_to_action_planner` | Live-generated planner | `live_generation_working` | Accepted in live generation | Accepted but uncalled in pilot | Not force-promoted | None | unresolved | 0 incidents | Refine only if paired with clearer input bridge |
 | `prepare_side_effect_args_from_selected_record` | Side-effect kwargs preparer | `live_generation_working` | Accepted in live generation | Accepted but uncalled in pilot | Chain concept later tested via composite repair | None | unresolved | 0 incidents | Superseded by repaired composite bridge |
+
+## Recombination Follow-Up Triage
+
+| Candidate / method | Best targeted signal | Expanded60 signal | Natural adoption diagnosis | Safety | Decision |
+| --- | --- | --- | --- | --- | --- |
+| `select_recency_target_and_prepare_action` | V2.6 bridge focus20: called 5/14 visible, called-subset outcome +0.6116; best3 bridge focus20: called 4/14 visible, called-subset outcome +0.3525 | V2.6 expanded60: visible 2, called 0; best3 expanded60: visible 2, called 0 | Critical low-frequency helper with real targeted value, but still VNC in broad mixed cohorts | 0 runtime exceptions and 0 helper side-effect incidents in recombination runs | Keep/refine; prioritize routing/adoption, not broad exposure |
+| `resolve_search_window_or_bounds` | Adoption-minimal focus20: called 9/20 visible, called-subset outcome +0.5213; best3 bridge focus20: called 5/20 visible, called-subset outcome +0.5637 | V2.6 expanded60 called-subset outcome -0.2350; best3 expanded60 called-subset outcome -0.0583 | Good targeted utility; broad route needs tighter task-fit gating | 0 runtime exceptions | Keep as narrow recency/search-window helper |
+| `relative_day_time_to_timestamp` | Best3/V2.6 bridge focus20: called 4/4 visible, called-subset outcome +0.7500 | V2.6 expanded60 called-subset outcome 0.0; best3 expanded60 called-subset outcome 0.0 | Useful when the exact relative-time gap appears; low-frequency is acceptable | 0 runtime exceptions | Keep with narrow route or chain-only exposure |
+| `select_record_by_timestamp_extreme` | V2.6 bridge focus20: called 7/18 visible, called-subset outcome +0.3882; best3 bridge focus20: called 8/18 visible, called-subset outcome +0.2328 | V2.6 expanded60 called-subset outcome -0.0934; best3 expanded60 called-subset outcome -0.5977 | Positive in targeted adoption, harmful in broad mixed use | 0 runtime exceptions | Park broad route; only reconsider behind stronger chain validation |
+| Contact bridge helpers | Contact bridge focus20 had outcome +0.2695, but contact helpers were not exercised there | V2.6 expanded60 `plan_contact_lookup_query` called 2 and outcome -0.5; best3 bridge did not include contact helpers | No evidence that contact bridge helped this recency/action campaign | 0 runtime exceptions | Keep separate from recency/action portfolio unless a contact-specific focus split is used |
 
 ## Diagnosis Labels Used
 

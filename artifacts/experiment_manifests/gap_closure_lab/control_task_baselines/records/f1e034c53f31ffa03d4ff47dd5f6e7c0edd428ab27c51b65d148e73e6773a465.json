@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "record_id": "f1e034c53f31ffa03d4ff47dd5f6e7c0edd428ab27c51b65d148e73e6773a465",
+  "timestamp": "2026-05-08T10:16:16.303239+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "fbb506526b0812b0a9aa76aca22c8b919e680ee519ab57041548887885847d97",
+  "scenario_key": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+  "scenario_checksum": "d991bbb8d0cbe385235417297d2941c9860d3ddf633f6a604229f6f91e9f1d68",
+  "initial_state_checksum": "2f606d03ed062d8338d1c186b09ee5034a7a24e5a92610a50179dedbd5ac0a34",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51",
+  "milestone_scores": {
+    "0": [
+      19,
+      1.0
+    ],
+    "1": [
+      20,
+      0.7937005097107789
+    ]
+  },
+  "canonical_score": 0.8968502548553894,
+  "outcome_score": 0.75,
+  "exact_success": false,
+  "final_state_hash": "c58be747eb12f90423304541ed7677c245fc3ea091a84f45a5502011816532ab",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 5,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 5,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51/trajectories/add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled/conversation.json",
+  "transcript_hash": "ebbe87b6b087fb73db87af4ac8cfaa5b0ceea3d888f6d7541c7dedd68215fb08",
+  "result_row": {
+    "name": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_NAME_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.8968502548553894,
+    "minefield_similarity": 0,
+    "similarity": 0.8968502548553894,
+    "turn_count": 5,
+    "milestone_mapping": {
+      "0": [
+        19,
+        1.0
+      ],
+      "1": [
+        20,
+        0.7937005097107789
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.75,
+    "outcome_milestone_similarity": 0.75,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 2,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 0.5,
+        "targets": [
+          "Stephen Sondheim has been added to your contact"
+        ]
+      }
+    ]
+  }
+}

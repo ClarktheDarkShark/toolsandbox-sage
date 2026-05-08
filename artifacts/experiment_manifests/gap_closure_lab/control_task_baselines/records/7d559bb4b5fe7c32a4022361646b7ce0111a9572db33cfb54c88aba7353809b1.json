@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "record_id": "7d559bb4b5fe7c32a4022361646b7ce0111a9572db33cfb54c88aba7353809b1",
+  "timestamp": "2026-05-08T09:29:52.077477+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "636207be46d441f749c612b3fe71903109cb338fd50b1b463ad1a8068bfa064c",
+  "scenario_key": "search_message_with_recency_oldest",
+  "scenario_checksum": "e472bec4ffb6533ec763d9b3b5e6c8351357fedda5f40063ba5d784f313dfa8a",
+  "initial_state_checksum": "e63778af7ea57ff11000af9ae198e85d32fcc898a5160ff7e3d39e392b85092b",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "930d11e8e399def1cba17d8683a52d5047b03d4f153ceff8ea2fe26cf0eca065",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/recombination_focus20_manifest.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/adoption_minimal_focus20/pilot_20_20260508_052513/control/pilot_20_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_25_17",
+  "milestone_scores": {
+    "0": [
+      19,
+      1.0
+    ],
+    "1": [
+      21,
+      1.0
+    ],
+    "2": [
+      22,
+      0.9295613255826292
+    ]
+  },
+  "canonical_score": 0.9765204418608763,
+  "outcome_score": 0.07715167498104596,
+  "exact_success": false,
+  "final_state_hash": "3d4c86e37d95dafb80975242179dd232e058a05c241be20cb83fcd5392c54d96",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 9,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 9,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/adoption_minimal_focus20/pilot_20_20260508_052513/control/pilot_20_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_25_17/trajectories/search_message_with_recency_oldest/conversation.json",
+  "transcript_hash": "194083996dc42152e13b09bc59218d419d122b59785caec6778e3374218d20e5",
+  "result_row": {
+    "name": "search_message_with_recency_oldest",
+    "categories": [
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "NO_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9765204418608763,
+    "minefield_similarity": 0,
+    "similarity": 0.9765204418608763,
+    "turn_count": 9,
+    "milestone_mapping": {
+      "0": [
+        19,
+        1.0
+      ],
+      "1": [
+        21,
+        1.0
+      ],
+      "2": [
+        22,
+        0.9295613255826292
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.07715167498104596,
+    "outcome_milestone_similarity": 0.07715167498104596,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "answer",
+        "included": true,
+        "score": 0.07715167498104596,
+        "targets": [
+          "Your oldest message says 'Hey kid, you want some GPU?'.",
+          "Hey kid, you want some GPU?"
+        ]
+      }
+    ]
+  }
+}

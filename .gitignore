@@ -168,6 +168,8 @@ artifacts/*
 !artifacts/registry_experiments/
 !artifacts/registry_experiments/gap_closure_lab/
 !artifacts/registry_experiments/gap_closure_lab/**
+# Large local campaign event streams are preserved in the workspace but not committed.
+artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/campaign_artifacts/events/*.jsonl
 .sage_cache/
 persistent_prompt_cache/
 generated_tools/

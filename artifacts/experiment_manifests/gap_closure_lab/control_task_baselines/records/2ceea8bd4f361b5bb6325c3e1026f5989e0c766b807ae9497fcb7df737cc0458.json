@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "record_id": "2ceea8bd4f361b5bb6325c3e1026f5989e0c766b807ae9497fcb7df737cc0458",
+  "timestamp": "2026-05-08T09:29:52.097230+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "ec861bf25272bf2966ac309cb9f2d94e19cde608d43a310ae1b3d4a32a596f6f",
+  "scenario_key": "search_message_with_recency_latest_alt",
+  "scenario_checksum": "8e0d7508b01a26daa15836a78db3e27288bb9b7cf592834b469ec1369e79da71",
+  "initial_state_checksum": "8a0623c8d3f10d632c2cd901716933ae2e598e96a4be0bf52d649ef2f3a77cf7",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "930d11e8e399def1cba17d8683a52d5047b03d4f153ceff8ea2fe26cf0eca065",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/recombination_focus20_manifest.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/adoption_minimal_focus20/pilot_20_20260508_052513/control/pilot_20_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_25_17",
+  "milestone_scores": {
+    "0": [
+      21,
+      1.0
+    ],
+    "1": [
+      36,
+      0.790440808845853
+    ]
+  },
+  "canonical_score": 0.8952204044229265,
+  "outcome_score": 0.4938647983247948,
+  "exact_success": false,
+  "final_state_hash": "9fa601c8a3c7daeefeeae69b40f944d77df0345510c4b411d905d98b21b1b2a1",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 21,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 21,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/adoption_minimal_focus20/pilot_20_20260508_052513/control/pilot_20_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_25_17/trajectories/search_message_with_recency_latest_alt/conversation.json",
+  "transcript_hash": "0e93253f26af80315b7bc0745188c0b302c052d58b8e5ca53913f532b3702b31",
+  "result_row": {
+    "name": "search_message_with_recency_latest_alt",
+    "categories": [
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "NO_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.8952204044229265,
+    "minefield_similarity": 0,
+    "similarity": 0.8952204044229265,
+    "turn_count": 21,
+    "milestone_mapping": {
+      "0": [
+        21,
+        1.0
+      ],
+      "1": [
+        36,
+        0.790440808845853
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.4938647983247948,
+    "outcome_milestone_similarity": 0.4938647983247948,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 0.4938647983247948,
+        "targets": [
+          "Your most recent message says 'Good, keep me posted'.",
+          "Good, keep me posted"
+        ]
+      }
+    ]
+  }
+}

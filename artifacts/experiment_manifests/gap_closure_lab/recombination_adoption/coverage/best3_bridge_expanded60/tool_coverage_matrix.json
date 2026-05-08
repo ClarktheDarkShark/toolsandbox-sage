@@ -1,0 +1,239 @@
+{
+  "days_between_timestamps": {
+    "trigger_strata": [
+      "holiday_calendar_business_day_logic"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "relative_day_time_to_timestamp": {
+    "trigger_strata": [
+      "temporal_reminder_date_canonicalization"
+    ],
+    "visible_by_stratum": {
+      "temporal_reminder_date_canonicalization": 2,
+      "record_filtering_ranking_latest_selection": 2,
+      "insufficient_information_clarification": 1,
+      "generic_multi_tool_composition": 1
+    },
+    "called_by_stratum": {
+      "temporal_reminder_date_canonicalization": 2,
+      "record_filtering_ranking_latest_selection": 2,
+      "insufficient_information_clarification": 1,
+      "generic_multi_tool_composition": 1
+    },
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {
+      "temporal_reminder_date_canonicalization": 0.0,
+      "record_filtering_ranking_latest_selection": 0.0,
+      "insufficient_information_clarification": 0.0,
+      "generic_multi_tool_composition": 0.0
+    }
+  },
+  "recency_to_timestamp_bounds": {
+    "trigger_strata": [
+      "temporal_reminder_date_canonicalization",
+      "record_filtering_ranking_latest_selection"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "resolve_search_window_or_bounds": {
+    "trigger_strata": [
+      "temporal_reminder_date_canonicalization",
+      "record_filtering_ranking_latest_selection",
+      "contact_message_search_disambiguation"
+    ],
+    "visible_by_stratum": {
+      "record_filtering_ranking_latest_selection": 5,
+      "generic_multi_tool_composition": 5,
+      "temporal_reminder_date_canonicalization": 3,
+      "contact_message_search_disambiguation": 2
+    },
+    "called_by_stratum": {
+      "temporal_reminder_date_canonicalization": 2,
+      "record_filtering_ranking_latest_selection": 2,
+      "generic_multi_tool_composition": 2
+    },
+    "called_gain_by_stratum": {
+      "temporal_reminder_date_canonicalization": 1,
+      "record_filtering_ranking_latest_selection": 1,
+      "generic_multi_tool_composition": 1
+    },
+    "called_regression_by_stratum": {
+      "temporal_reminder_date_canonicalization": 1,
+      "record_filtering_ranking_latest_selection": 1,
+      "generic_multi_tool_composition": 1
+    },
+    "mean_delta_when_called_by_stratum": {
+      "temporal_reminder_date_canonicalization": 0.1088325264637498,
+      "record_filtering_ranking_latest_selection": 0.1088325264637498,
+      "generic_multi_tool_composition": 0.1088325264637498
+    }
+  },
+  "select_latest_record_by_timestamp": {
+    "trigger_strata": [
+      "record_filtering_ranking_latest_selection",
+      "contact_message_search_disambiguation"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "select_record_by_timestamp_extreme": {
+    "trigger_strata": [
+      "record_filtering_ranking_latest_selection",
+      "contact_message_search_disambiguation"
+    ],
+    "visible_by_stratum": {
+      "record_filtering_ranking_latest_selection": 3,
+      "generic_multi_tool_composition": 3,
+      "contact_message_search_disambiguation": 2,
+      "temporal_reminder_date_canonicalization": 1
+    },
+    "called_by_stratum": {
+      "contact_message_search_disambiguation": 2,
+      "record_filtering_ranking_latest_selection": 2,
+      "generic_multi_tool_composition": 2
+    },
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {
+      "contact_message_search_disambiguation": 2,
+      "record_filtering_ranking_latest_selection": 2,
+      "generic_multi_tool_composition": 2
+    },
+    "mean_delta_when_called_by_stratum": {
+      "contact_message_search_disambiguation": -0.20089695816106096,
+      "record_filtering_ranking_latest_selection": -0.20089695816106096,
+      "generic_multi_tool_composition": -0.20089695816106096
+    }
+  },
+  "select_visible_record_by_constraints": {
+    "trigger_strata": [
+      "contact_message_search_disambiguation",
+      "record_filtering_ranking_latest_selection"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "select_action_target_by_recency": {
+    "trigger_strata": [
+      "record_filtering_ranking_latest_selection",
+      "contact_message_search_disambiguation",
+      "temporal_reminder_date_canonicalization"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "prepare_side_effect_args_from_selected_record": {
+    "trigger_strata": [
+      "generic_multi_tool_composition",
+      "contact_message_search_disambiguation",
+      "record_filtering_ranking_latest_selection"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "constraint_to_action_planner": {
+    "trigger_strata": [
+      "generic_multi_tool_composition",
+      "contact_message_search_disambiguation",
+      "record_filtering_ranking_latest_selection"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "next_service_tool_call": {
+    "trigger_strata": [
+      "direct_state_precondition_service_enablement"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "recover_from_tool_error": {
+    "trigger_strata": [
+      "direct_state_precondition_service_enablement"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "next_service_enablement_action": {
+    "trigger_strata": [
+      "direct_state_precondition_service_enablement"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "prepare_reminder_creation_args": {
+    "trigger_strata": [
+      "temporal_reminder_date_canonicalization",
+      "generic_multi_tool_composition"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "extract_service_answer_field": {
+    "trigger_strata": [
+      "weather_location_current_city_distance"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "plan_contact_lookup_query": {
+    "trigger_strata": [
+      "contact_message_search_disambiguation",
+      "generic_multi_tool_composition"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  },
+  "extract_contact_field_from_search_result": {
+    "trigger_strata": [
+      "contact_message_search_disambiguation"
+    ],
+    "visible_by_stratum": {},
+    "called_by_stratum": {},
+    "called_gain_by_stratum": {},
+    "called_regression_by_stratum": {},
+    "mean_delta_when_called_by_stratum": {}
+  }
+}

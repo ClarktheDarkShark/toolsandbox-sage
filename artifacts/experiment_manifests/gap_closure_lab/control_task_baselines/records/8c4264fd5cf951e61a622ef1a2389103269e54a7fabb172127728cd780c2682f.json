@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "record_id": "8c4264fd5cf951e61a622ef1a2389103269e54a7fabb172127728cd780c2682f",
+  "timestamp": "2026-05-08T09:29:52.037026+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "ad8a3708ab1d17ff0c48cd020a4e788ab609bd95a70fd94c813389d5d518db5f",
+  "scenario_key": "remove_reminder_with_recency_latest_alt_3_distraction_tools",
+  "scenario_checksum": "7802b462f15f025a671aa24205a1a5c112558652dc37c4cc2efc1fcfdb32a286",
+  "initial_state_checksum": "c6e20021c7e86d4aad4c48431f23f9f79f53ecc14bf69987d6028ccee1fd8607",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "930d11e8e399def1cba17d8683a52d5047b03d4f153ceff8ea2fe26cf0eca065",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/recombination_focus20_manifest.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/adoption_minimal_focus20/pilot_20_20260508_052513/control/pilot_20_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_25_17",
+  "milestone_scores": {
+    "0": [
+      19,
+      1.0
+    ],
+    "1": [
+      19,
+      0.0
+    ],
+    "2": [
+      19,
+      0.0
+    ]
+  },
+  "canonical_score": 0.3333333333333333,
+  "outcome_score": 0.0,
+  "exact_success": false,
+  "final_state_hash": "0a9778de74e001dae65839151e3c797d3c58b162a5c587550c67417d2d842dd5",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 7,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 7,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/adoption_minimal_focus20/pilot_20_20260508_052513/control/pilot_20_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_25_17/trajectories/remove_reminder_with_recency_latest_alt_3_distraction_tools/conversation.json",
+  "transcript_hash": "201e83d69379dc4eadd620b613b6804aea046d6dfc984df720729ddf2faa54a0",
+  "result_row": {
+    "name": "remove_reminder_with_recency_latest_alt_3_distraction_tools",
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.3333333333333333,
+    "minefield_similarity": 0,
+    "similarity": 0.3333333333333333,
+    "turn_count": 7,
+    "milestone_mapping": {
+      "0": [
+        19,
+        1.0
+      ],
+      "1": [
+        19,
+        0.0
+      ],
+      "2": [
+        19,
+        0.0
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.0,
+    "outcome_milestone_similarity": 0.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 0.0
+      },
+      {
+        "index": 2,
+        "kind": "state",
+        "included": true,
+        "score": 0.0
+      }
+    ]
+  }
+}

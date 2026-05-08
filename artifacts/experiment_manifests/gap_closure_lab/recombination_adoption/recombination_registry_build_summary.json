@@ -1,0 +1,41 @@
+{
+  "created_at": "2026-05-08T09:14:07.940323+00:00",
+  "experimental_only": true,
+  "focus20_manifest": {
+    "path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/recombination_focus20_manifest.json",
+    "sha256": "930d11e8e399def1cba17d8683a52d5047b03d4f153ceff8ea2fe26cf0eca065"
+  },
+  "objective": "Recombine retained positive recency/action helpers into small portfolios and test natural adoption/routing.",
+  "registries": [
+    {
+      "name": "recency_action_minimal_strict_pack",
+      "path": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_minimal_strict_pack/registry_manifest.json",
+      "sha256": "3f2eb0b5a0b34ad1bed66a24dfa9f10980f97529570c42f29c0e7a36ee5afbd9",
+      "tool_count": 2
+    },
+    {
+      "name": "recency_action_adoption_minimal_pack",
+      "path": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_adoption_minimal_pack/registry_manifest.json",
+      "sha256": "612569f68ba7b96feaf4eea78c0fac4552681104663c0e7250654d91541ad2d1",
+      "tool_count": 2
+    },
+    {
+      "name": "recency_action_best3_bridge_pack",
+      "path": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_best3_bridge_pack/registry_manifest.json",
+      "sha256": "d56834e2860b46b88f488b046b7886e2a29b8ed0e2358329c92ba8f902722c74",
+      "tool_count": 4
+    },
+    {
+      "name": "recency_action_v26_bridge_pack",
+      "path": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_v26_bridge_pack/registry_manifest.json",
+      "sha256": "18422494d980d94962411a5cd239a872cfa7e08305deec2f827fd1a0eec213df",
+      "tool_count": 7
+    },
+    {
+      "name": "recency_action_contact_bridge_pack",
+      "path": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_contact_bridge_pack/registry_manifest.json",
+      "sha256": "76f89e7b70cbe4c6262e880f82d525e32d97532c572c600ae7bd033f7d2deaa7",
+      "tool_count": 5
+    }
+  ]
+}

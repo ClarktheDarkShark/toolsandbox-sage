@@ -1,0 +1,1026 @@
+{
+  "branch": "exp/sage-gap-closure-lab",
+  "cache_policy": "Control arms used eligible task-level cache where available; candidate arms were fresh; OpenAI response cache disabled.",
+  "campaign_decision": "Retain low-frequency recency/action positives for future recombination, but do not run confirmation100 because both expanded60 variants failed promotion gates.",
+  "created_at": "2026-05-08T11:10:08-04:00",
+  "experimental_only": true,
+  "focus_manifest": {
+    "path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/recombination_focus20_manifest.json",
+    "quality_note": "targeted recency/action focus set; intentionally not broad-diverse and not claim evidence",
+    "scenario_count": 20,
+    "sha256": "930d11e8e399def1cba17d8683a52d5047b03d4f153ceff8ea2fe26cf0eca065"
+  },
+  "kind": "sage_gap_closure_lab_recombination_adoption_summary",
+  "leakage_policy": "Unseen labels were not inspected before sealed runs. No tool encodes scenario IDs, labels, expected answers, task-specific hidden facts, or benchmark strings.",
+  "not_protected_final_evidence": true,
+  "protected_asset_policy": "No protected best3, locked formal, V2.6 evidence, or final claim artifacts were modified.",
+  "runs": [
+    {
+      "cohort_quality": {
+        "failures": [
+          "family_share_above_limit",
+          "near_duplicate_family_variants_above_limit",
+          "weak_negative_no_helper_coverage",
+          "known_helper_lane_overrepresented"
+        ],
+        "status": "fail",
+        "warnings": [
+          "family_share_above_limit",
+          "near_duplicate_family_variants_above_limit",
+          "weak_negative_no_helper_coverage",
+          "known_helper_lane_overrepresented"
+        ]
+      },
+      "control_cache": {
+        "cached_control_tasks": 0,
+        "fresh_control_tasks": 20,
+        "manifest_hash": "df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d",
+        "mode": "use-if-eligible",
+        "source": "fresh"
+      },
+      "dashboard_task_focus_url": "http://127.0.0.1:61999/outputs/gap_closure_lab/recombination_adoption/minimal_strict_focus20/pilot_20_20260508_051427/dashboard/task_focus.html",
+      "dashboard_verification": {
+        "browser_console_error_count": 0,
+        "opened_task_focus": true,
+        "rendered_paired_data": true
+      },
+      "decision": "targeted focus20 positive; retain recency window helper and refine composite adoption",
+      "helpers": {
+        "resolve_search_window_or_bounds": {
+          "called_count": 8,
+          "called_subset_mean_outcome_delta": 0.2970828829786609,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 14,
+          "visible_not_called_count": 6
+        },
+        "select_recency_target_and_prepare_action": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 14,
+          "visible_not_called_count": 14
+        }
+      },
+      "id": "GCL-R001",
+      "metrics": {
+        "exact_success_delta": 3,
+        "helper_side_effect_incidents": null,
+        "mean_outcome_similarity_delta": 0.15181998617829734,
+        "mean_similarity_delta": 0.11977135913011043,
+        "protocol_gate_passed": true,
+        "protocol_gate_reasons": [],
+        "route_mismatch_qualified": false,
+        "runtime_exception_count": 0
+      },
+      "mode": "pilot_20",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "mixed_model_warning": null,
+        "user": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        }
+      },
+      "name": "minimal_strict_focus20",
+      "openai_response_cache": {
+        "enabled": false,
+        "mode": "off"
+      },
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_minimal_strict_pack",
+      "registry_gate_restore": null,
+      "registry_manifest_digest_after_run": "3f2eb0b5a0b34ad1bed66a24dfa9f10980f97529570c42f29c0e7a36ee5afbd9",
+      "registry_manifest_sha256": "3f2eb0b5a0b34ad1bed66a24dfa9f10980f97529570c42f29c0e7a36ee5afbd9",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/minimal_strict_focus20/pilot_20_20260508_051427",
+      "scenario_count": 20
+    },
+    {
+      "cohort_quality": {
+        "failures": [
+          "family_share_above_limit",
+          "near_duplicate_family_variants_above_limit",
+          "weak_negative_no_helper_coverage",
+          "known_helper_lane_overrepresented"
+        ],
+        "status": "fail",
+        "warnings": [
+          "family_share_above_limit",
+          "near_duplicate_family_variants_above_limit",
+          "weak_negative_no_helper_coverage",
+          "known_helper_lane_overrepresented"
+        ]
+      },
+      "control_cache": {
+        "cached_control_tasks": 0,
+        "fresh_control_tasks": 20,
+        "manifest_hash": "df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d",
+        "mode": "use-if-eligible",
+        "source": "fresh"
+      },
+      "dashboard_task_focus_url": "http://127.0.0.1:61999/outputs/gap_closure_lab/recombination_adoption/adoption_minimal_focus20/pilot_20_20260508_052513/dashboard/task_focus.html",
+      "dashboard_verification": {
+        "browser_console_error_count": 0,
+        "opened_task_focus": true,
+        "rendered_paired_data": true
+      },
+      "decision": "targeted focus20 positive with one natural composite call; retain and test combinations",
+      "helpers": {
+        "resolve_search_window_or_bounds": {
+          "called_count": 9,
+          "called_subset_mean_outcome_delta": 0.5212940485305436,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 20,
+          "visible_not_called_count": 11
+        },
+        "select_recency_target_and_prepare_action": {
+          "called_count": 1,
+          "called_subset_mean_outcome_delta": 0.0,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 14,
+          "visible_not_called_count": 13
+        }
+      },
+      "id": "GCL-R002",
+      "metrics": {
+        "exact_success_delta": 5,
+        "helper_side_effect_incidents": null,
+        "mean_outcome_similarity_delta": 0.14824408250908078,
+        "mean_similarity_delta": 0.1596755451640202,
+        "protocol_gate_passed": true,
+        "protocol_gate_reasons": [],
+        "route_mismatch_qualified": false,
+        "runtime_exception_count": 0
+      },
+      "mode": "pilot_20",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "mixed_model_warning": null,
+        "user": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        }
+      },
+      "name": "adoption_minimal_focus20",
+      "openai_response_cache": {
+        "enabled": false,
+        "mode": "off"
+      },
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_adoption_minimal_pack",
+      "registry_gate_restore": null,
+      "registry_manifest_digest_after_run": "612569f68ba7b96feaf4eea78c0fac4552681104663c0e7250654d91541ad2d1",
+      "registry_manifest_sha256": "612569f68ba7b96feaf4eea78c0fac4552681104663c0e7250654d91541ad2d1",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/adoption_minimal_focus20/pilot_20_20260508_052513",
+      "scenario_count": 20
+    },
+    {
+      "cohort_quality": {
+        "failures": [
+          "family_share_above_limit",
+          "near_duplicate_family_variants_above_limit",
+          "weak_negative_no_helper_coverage",
+          "known_helper_lane_overrepresented"
+        ],
+        "status": "fail",
+        "warnings": [
+          "family_share_above_limit",
+          "near_duplicate_family_variants_above_limit",
+          "weak_negative_no_helper_coverage",
+          "known_helper_lane_overrepresented"
+        ]
+      },
+      "control_cache": {
+        "cached_control_tasks": 0,
+        "fresh_control_tasks": 20,
+        "manifest_hash": "df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d",
+        "mode": "use-if-eligible",
+        "source": "fresh"
+      },
+      "dashboard_task_focus_url": "http://127.0.0.1:61999/outputs/gap_closure_lab/recombination_adoption/contact_bridge_focus20/pilot_20_20260508_053514/dashboard/task_focus.html",
+      "dashboard_verification": {
+        "browser_console_error_count": 0,
+        "opened_task_focus": true,
+        "rendered_paired_data": true
+      },
+      "decision": "targeted focus20 positive; contact helpers not exercised in this cohort",
+      "helpers": {
+        "extract_contact_field_from_search_result": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 0,
+          "visible_not_called_count": 0
+        },
+        "plan_contact_lookup_query": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 0,
+          "visible_not_called_count": 0
+        },
+        "plan_contact_search_from_scalar_constraint": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 0,
+          "visible_not_called_count": 0
+        },
+        "resolve_search_window_or_bounds": {
+          "called_count": 10,
+          "called_subset_mean_outcome_delta": 0.43019852169995315,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 20,
+          "visible_not_called_count": 10
+        },
+        "select_recency_target_and_prepare_action": {
+          "called_count": 2,
+          "called_subset_mean_outcome_delta": 0.2524390243902439,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 14,
+          "visible_not_called_count": 12
+        }
+      },
+      "id": "GCL-R003",
+      "metrics": {
+        "exact_success_delta": 3,
+        "helper_side_effect_incidents": null,
+        "mean_outcome_similarity_delta": 0.26946435862296425,
+        "mean_similarity_delta": 0.2856598959205797,
+        "protocol_gate_passed": true,
+        "protocol_gate_reasons": [],
+        "route_mismatch_qualified": false,
+        "runtime_exception_count": 0
+      },
+      "mode": "pilot_20",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "mixed_model_warning": null,
+        "user": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        }
+      },
+      "name": "contact_bridge_focus20",
+      "openai_response_cache": {
+        "enabled": false,
+        "mode": "off"
+      },
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_contact_bridge_pack",
+      "registry_gate_restore": null,
+      "registry_manifest_digest_after_run": "76f89e7b70cbe4c6262e880f82d525e32d97532c572c600ae7bd033f7d2deaa7",
+      "registry_manifest_sha256": "76f89e7b70cbe4c6262e880f82d525e32d97532c572c600ae7bd033f7d2deaa7",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/contact_bridge_focus20/pilot_20_20260508_053514",
+      "scenario_count": 20
+    },
+    {
+      "cohort_quality": {
+        "failures": [
+          "family_share_above_limit",
+          "near_duplicate_family_variants_above_limit",
+          "weak_negative_no_helper_coverage",
+          "known_helper_lane_overrepresented"
+        ],
+        "status": "fail",
+        "warnings": [
+          "family_share_above_limit",
+          "near_duplicate_family_variants_above_limit",
+          "weak_negative_no_helper_coverage",
+          "known_helper_lane_overrepresented"
+        ]
+      },
+      "control_cache": {
+        "cached_control_tasks": 20,
+        "fresh_control_tasks": 0,
+        "manifest_hash": "df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d",
+        "mode": "use-if-eligible",
+        "source": "cached"
+      },
+      "dashboard_task_focus_url": "http://127.0.0.1:61999/outputs/gap_closure_lab/recombination_adoption/best3_bridge_focus20/pilot_20_20260508_054649/dashboard/task_focus.html",
+      "dashboard_verification": {
+        "browser_console_error_count": 0,
+        "opened_task_focus": true,
+        "rendered_paired_data": true
+      },
+      "decision": "strong targeted focus20 positive; expand before confirmation",
+      "helpers": {
+        "relative_day_time_to_timestamp": {
+          "called_count": 4,
+          "called_subset_mean_outcome_delta": 0.75,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 4,
+          "visible_not_called_count": 0
+        },
+        "resolve_search_window_or_bounds": {
+          "called_count": 5,
+          "called_subset_mean_outcome_delta": 0.5637110554505061,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 20,
+          "visible_not_called_count": 15
+        },
+        "select_recency_target_and_prepare_action": {
+          "called_count": 4,
+          "called_subset_mean_outcome_delta": 0.3524774774774775,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 14,
+          "visible_not_called_count": 10
+        },
+        "select_record_by_timestamp_extreme": {
+          "called_count": 8,
+          "called_subset_mean_outcome_delta": 0.23282455250168124,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 18,
+          "visible_not_called_count": 10
+        }
+      },
+      "id": "GCL-R004",
+      "metrics": {
+        "exact_success_delta": 7,
+        "helper_side_effect_incidents": null,
+        "mean_outcome_similarity_delta": 0.35297650378221795,
+        "mean_similarity_delta": 0.2671992075293721,
+        "protocol_gate_passed": true,
+        "protocol_gate_reasons": [],
+        "route_mismatch_qualified": false,
+        "runtime_exception_count": 0
+      },
+      "mode": "pilot_20",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "mixed_model_warning": null,
+        "user": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        }
+      },
+      "name": "best3_bridge_focus20",
+      "openai_response_cache": {
+        "enabled": false,
+        "mode": "off"
+      },
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_best3_bridge_pack",
+      "registry_gate_restore": null,
+      "registry_manifest_digest_after_run": "d56834e2860b46b88f488b046b7886e2a29b8ed0e2358329c92ba8f902722c74",
+      "registry_manifest_sha256": "d56834e2860b46b88f488b046b7886e2a29b8ed0e2358329c92ba8f902722c74",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/best3_bridge_focus20/pilot_20_20260508_054649",
+      "scenario_count": 20
+    },
+    {
+      "cohort_quality": {
+        "failures": [
+          "family_share_above_limit",
+          "near_duplicate_family_variants_above_limit",
+          "weak_negative_no_helper_coverage",
+          "known_helper_lane_overrepresented"
+        ],
+        "status": "fail",
+        "warnings": [
+          "family_share_above_limit",
+          "near_duplicate_family_variants_above_limit",
+          "weak_negative_no_helper_coverage",
+          "known_helper_lane_overrepresented"
+        ]
+      },
+      "control_cache": {
+        "cached_control_tasks": 20,
+        "fresh_control_tasks": 0,
+        "manifest_hash": "df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d",
+        "mode": "use-if-eligible",
+        "source": "cached"
+      },
+      "dashboard_task_focus_url": "http://127.0.0.1:61999/outputs/gap_closure_lab/recombination_adoption/v26_bridge_focus20/pilot_20_20260508_055415/dashboard/task_focus.html",
+      "dashboard_verification": {
+        "browser_console_error_count": 0,
+        "opened_task_focus": true,
+        "rendered_paired_data": true
+      },
+      "decision": "strongest targeted focus20 positive; expand before confirmation",
+      "helpers": {
+        "extract_contact_field_from_search_result": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 0,
+          "visible_not_called_count": 0
+        },
+        "plan_contact_lookup_query": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 0,
+          "visible_not_called_count": 0
+        },
+        "plan_contact_search_from_scalar_constraint": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 0,
+          "visible_not_called_count": 0
+        },
+        "relative_day_time_to_timestamp": {
+          "called_count": 4,
+          "called_subset_mean_outcome_delta": 0.75,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 4,
+          "visible_not_called_count": 0
+        },
+        "resolve_search_window_or_bounds": {
+          "called_count": 6,
+          "called_subset_mean_outcome_delta": 0.5214149108036458,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 20,
+          "visible_not_called_count": 14
+        },
+        "select_recency_target_and_prepare_action": {
+          "called_count": 5,
+          "called_subset_mean_outcome_delta": 0.6115500115500115,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 14,
+          "visible_not_called_count": 9
+        },
+        "select_record_by_timestamp_extreme": {
+          "called_count": 7,
+          "called_subset_mean_outcome_delta": 0.3882429367679078,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 18,
+          "visible_not_called_count": 11
+        }
+      },
+      "id": "GCL-R005",
+      "metrics": {
+        "exact_success_delta": 7,
+        "helper_side_effect_incidents": null,
+        "mean_outcome_similarity_delta": 0.5451970039973644,
+        "mean_similarity_delta": 0.2976080698439207,
+        "protocol_gate_passed": true,
+        "protocol_gate_reasons": [],
+        "route_mismatch_qualified": false,
+        "runtime_exception_count": 0
+      },
+      "mode": "pilot_20",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "mixed_model_warning": null,
+        "user": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        }
+      },
+      "name": "v26_bridge_focus20",
+      "openai_response_cache": {
+        "enabled": false,
+        "mode": "off"
+      },
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_v26_bridge_pack",
+      "registry_gate_restore": null,
+      "registry_manifest_digest_after_run": "18422494d980d94962411a5cd239a872cfa7e08305deec2f827fd1a0eec213df",
+      "registry_manifest_sha256": "18422494d980d94962411a5cd239a872cfa7e08305deec2f827fd1a0eec213df",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_focus20/pilot_20_20260508_055415",
+      "scenario_count": 20
+    },
+    {
+      "cohort_quality": {
+        "failures": [],
+        "status": "pass",
+        "warnings": [
+          "external_service_cases_present",
+          "low_expected_helper_fit_share"
+        ]
+      },
+      "control_cache": {
+        "cached_control_tasks": 0,
+        "fresh_control_tasks": 60,
+        "manifest_hash": "df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d",
+        "mode": "use-if-eligible",
+        "source": "fresh"
+      },
+      "dashboard_task_focus_url": "http://127.0.0.1:61999/outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/dashboard/task_focus.html",
+      "dashboard_verification": {
+        "browser_console_error_count": 0,
+        "opened_task_focus": true,
+        "rendered_paired_data": true
+      },
+      "decision": "expanded60 essentially flat and gate failed; do not confirm",
+      "helpers": {
+        "extract_contact_field_from_search_result": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 2,
+          "visible_not_called_count": 2
+        },
+        "plan_contact_lookup_query": {
+          "called_count": 2,
+          "called_subset_mean_outcome_delta": -0.5,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 2,
+          "visible_not_called_count": 0
+        },
+        "plan_contact_search_from_scalar_constraint": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 3,
+          "visible_not_called_count": 3
+        },
+        "relative_day_time_to_timestamp": {
+          "called_count": 1,
+          "called_subset_mean_outcome_delta": 0.0,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 2,
+          "visible_not_called_count": 1
+        },
+        "resolve_search_window_or_bounds": {
+          "called_count": 2,
+          "called_subset_mean_outcome_delta": -0.2350369155429561,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 5,
+          "visible_not_called_count": 3
+        },
+        "select_recency_target_and_prepare_action": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 2,
+          "visible_not_called_count": 2
+        },
+        "select_record_by_timestamp_extreme": {
+          "called_count": 2,
+          "called_subset_mean_outcome_delta": -0.09342967564752735,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 3,
+          "visible_not_called_count": 1
+        }
+      },
+      "id": "GCL-R006",
+      "metrics": {
+        "exact_success_delta": 0,
+        "helper_side_effect_incidents": null,
+        "mean_outcome_similarity_delta": 0.005038177664715117,
+        "mean_similarity_delta": -0.042876036033919145,
+        "protocol_gate_passed": false,
+        "protocol_gate_reasons": [
+          "confirmation_outcome_delta_below_0_08",
+          "gain_regression_ratio_below_1_4",
+          "helper_call_share_below_25_percent"
+        ],
+        "route_mismatch_qualified": true,
+        "runtime_exception_count": 0
+      },
+      "mode": "expanded_60",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "mixed_model_warning": null,
+        "user": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        }
+      },
+      "name": "v26_bridge_expanded60",
+      "openai_response_cache": {
+        "enabled": false,
+        "mode": "off"
+      },
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_v26_bridge_pack",
+      "registry_gate_restore": {
+        "failed_snapshot_path": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/registry_gate/registry_manifest_failed_gate.json",
+        "manifest_existed_before_run": true,
+        "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_v26_bridge_pack",
+        "restored": true,
+        "restored_snapshot_path": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/registry_gate/registry_manifest_before_run.json"
+      },
+      "registry_manifest_digest_after_run": "18422494d980d94962411a5cd239a872cfa7e08305deec2f827fd1a0eec213df",
+      "registry_manifest_sha256": "18422494d980d94962411a5cd239a872cfa7e08305deec2f827fd1a0eec213df",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947",
+      "scenario_count": 60
+    },
+    {
+      "cohort_quality": {
+        "failures": [],
+        "status": "pass",
+        "warnings": [
+          "external_service_cases_present",
+          "low_expected_helper_fit_share"
+        ]
+      },
+      "control_cache": {
+        "cached_control_tasks": 0,
+        "fresh_control_tasks": 60,
+        "manifest_hash": "df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d",
+        "mode": "use-if-eligible",
+        "source": "fresh"
+      },
+      "dashboard_task_focus_url": "http://127.0.0.1:61999/outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/dashboard/task_focus.html",
+      "dashboard_verification": {
+        "browser_console_error_count": 0,
+        "browser_observed_baseline_score": 0.702,
+        "browser_observed_outcome_delta": -0.073,
+        "browser_observed_sage_score": 0.699,
+        "opened_task_focus": true,
+        "rendered_paired_data": true
+      },
+      "decision": "expanded60 outcome negative and gate failed; do not confirm",
+      "helpers": {
+        "relative_day_time_to_timestamp": {
+          "called_count": 2,
+          "called_subset_mean_outcome_delta": 0.0,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 2,
+          "visible_not_called_count": 0
+        },
+        "resolve_search_window_or_bounds": {
+          "called_count": 2,
+          "called_subset_mean_outcome_delta": -0.05829364896434257,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 5,
+          "visible_not_called_count": 3
+        },
+        "select_recency_target_and_prepare_action": {
+          "called_count": 0,
+          "called_subset_mean_outcome_delta": null,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 2,
+          "visible_not_called_count": 2
+        },
+        "select_record_by_timestamp_extreme": {
+          "called_count": 2,
+          "called_subset_mean_outcome_delta": -0.5976798057230248,
+          "called_subset_mean_similarity_delta": null,
+          "runtime_incident_count": null,
+          "side_effect_incident_count": null,
+          "visible_count": 3,
+          "visible_not_called_count": 1
+        }
+      },
+      "id": "GCL-R007",
+      "metrics": {
+        "exact_success_delta": 0,
+        "helper_side_effect_incidents": null,
+        "mean_outcome_similarity_delta": -0.07343116558211808,
+        "mean_similarity_delta": -0.0030930347618104205,
+        "protocol_gate_passed": false,
+        "protocol_gate_reasons": [
+          "non_positive_outcome_delta",
+          "outcome_gains_do_not_exceed_regressions",
+          "non_positive_canonical_delta",
+          "gains_do_not_exceed_regressions",
+          "confirmation_outcome_delta_below_0_08",
+          "exact_successes_not_improved",
+          "gain_regression_ratio_below_1_4",
+          "helper_call_share_below_25_percent"
+        ],
+        "route_mismatch_qualified": false,
+        "runtime_exception_count": 0
+      },
+      "mode": "expanded_60",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "mixed_model_warning": null,
+        "user": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        }
+      },
+      "name": "best3_bridge_expanded60",
+      "openai_response_cache": {
+        "enabled": false,
+        "mode": "off"
+      },
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_best3_bridge_pack",
+      "registry_gate_restore": {
+        "failed_snapshot_path": "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/registry_gate/registry_manifest_failed_gate.json",
+        "manifest_existed_before_run": true,
+        "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_best3_bridge_pack",
+        "restored": true,
+        "restored_snapshot_path": "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/registry_gate/registry_manifest_before_run.json"
+      },
+      "registry_manifest_digest_after_run": "d56834e2860b46b88f488b046b7886e2a29b8ed0e2358329c92ba8f902722c74",
+      "registry_manifest_sha256": "d56834e2860b46b88f488b046b7886e2a29b8ed0e2358329c92ba8f902722c74",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356",
+      "scenario_count": 60
+    }
+  ]
+}

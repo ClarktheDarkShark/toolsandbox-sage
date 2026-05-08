@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "record_id": "9ba97d6332547e8ecaedcda0a3916347f1adcc4b653fc93d9334856a9a579c94",
+  "timestamp": "2026-05-08T10:16:16.867079+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "29adbe7c08d5f8d95cd643249e1403413bcead5202e7727b95ff1bc38bd8a6b1",
+  "scenario_key": "search_reminder_with_creation_recency_yesterday_10_distraction_tools",
+  "scenario_checksum": "388942d83fcd2ea85626301ee9e0fb94516ac295f21e3a8e761227f2a90936ec",
+  "initial_state_checksum": "38b6f7d913d006439aa8317df71dd9641ea273378f920c7617aac8e2bccf9853",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51",
+  "milestone_scores": {
+    "0": [
+      17,
+      1.0
+    ],
+    "1": [
+      19,
+      1.0
+    ],
+    "2": [
+      26,
+      0.9346552670335769
+    ]
+  },
+  "canonical_score": 0.9782184223445256,
+  "outcome_score": 0.816496580927726,
+  "exact_success": false,
+  "final_state_hash": "82777cd5498ab5abda05c391581e8b5cf8f6c97b7c29e2460add0b23bb904515",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 11,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 11,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51/trajectories/search_reminder_with_creation_recency_yesterday_10_distraction_tools/conversation.json",
+  "transcript_hash": "45ca226fbb54f806e51d19c419d65f8fc3d37635ad56680950ef50aa50e1a2a0",
+  "result_row": {
+    "name": "search_reminder_with_creation_recency_yesterday_10_distraction_tools",
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "TEN_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9782184223445256,
+    "minefield_similarity": 0,
+    "similarity": 0.9782184223445256,
+    "turn_count": 11,
+    "milestone_mapping": {
+      "0": [
+        17,
+        1.0
+      ],
+      "1": [
+        19,
+        1.0
+      ],
+      "2": [
+        26,
+        0.9346552670335769
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.816496580927726,
+    "outcome_milestone_similarity": 0.816496580927726,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "answer",
+        "included": true,
+        "score": 0.816496580927726,
+        "targets": [
+          "Your reminder created yesterday says 'Buy tickets for Merrily next week'.",
+          "Buy tickets for Merrily next week"
+        ]
+      }
+    ]
+  }
+}

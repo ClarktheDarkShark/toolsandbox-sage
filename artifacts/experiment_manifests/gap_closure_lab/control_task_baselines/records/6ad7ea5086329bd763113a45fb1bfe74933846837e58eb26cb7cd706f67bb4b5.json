@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "record_id": "6ad7ea5086329bd763113a45fb1bfe74933846837e58eb26cb7cd706f67bb4b5",
+  "timestamp": "2026-05-08T10:16:16.641348+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "27ab2f95c03436071009ddd215f00c0962d564067679fb8ff7a316fb229e29cf",
+  "scenario_key": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+  "scenario_checksum": "7f4e0ea6991f3b63aff06da3852a67cb98750f47813c346da06e2956059cf341",
+  "initial_state_checksum": "d0043d2c4367c669c249db42b0c9341d710dfa0b516fb379900a80225f99261d",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51",
+  "milestone_scores": {
+    "0": [
+      34,
+      0.6376437037027375
+    ]
+  },
+  "canonical_score": 0.6376437037027375,
+  "outcome_score": 0.1111111111111111,
+  "exact_success": false,
+  "final_state_hash": "b6516e9bfb6e50bf474fc09fc978a0c37341d13c5156ca392e5d27e0a2be7edc",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 25,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 25,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51/trajectories/remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools/conversation.json",
+  "transcript_hash": "611e0ffa7ad137fdebc38e73ab91c58da1c201be6d4c6d1efa05f715ca5bc413",
+  "result_row": {
+    "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+    "categories": [
+      "INSUFFICIENT_INFORMATION",
+      "TEN_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.6376437037027375,
+    "minefield_similarity": 0,
+    "similarity": 0.6376437037027375,
+    "turn_count": 25,
+    "milestone_mapping": {
+      "0": [
+        34,
+        0.6376437037027375
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.1111111111111111,
+    "outcome_milestone_similarity": 0.1111111111111111,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "answer",
+        "included": true,
+        "score": 0.1111111111111111,
+        "targets": [
+          "I cannot remove the phone number from your contact , because I don't have the tools available."
+        ]
+      }
+    ]
+  }
+}

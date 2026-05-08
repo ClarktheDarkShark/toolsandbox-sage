@@ -1,0 +1,1390 @@
+{
+  "runs": {
+    "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356": {
+      "comparison_path": "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/paired_comparison.json",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "user": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+        "mixed_model_warning": null
+      },
+      "comparison_model_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+      "candidate_dir": "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/candidate/expanded_60_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_06_49_14",
+      "overall": {
+        "scenario_count": 60,
+        "control_mean": 0.702053810022209,
+        "sage_mean": 0.6989607752603987,
+        "mean_delta": -0.0030930347618104205,
+        "control_outcome_mean": 0.6612432411310054,
+        "sage_outcome_mean": 0.5878120755488874,
+        "mean_outcome_delta": -0.07343116558211808,
+        "gains": 10,
+        "regressions": 23,
+        "preserved": 27,
+        "outcome_gains": 11,
+        "outcome_regressions": 12,
+        "outcome_preserved": 14,
+        "control_exact_success": 12,
+        "sage_exact_success": 12,
+        "retained_reuse_count": 6
+      },
+      "strata": {
+        "temporal_reminder_date_canonicalization": {
+          "scenario_count": 11,
+          "total_delta": -0.7823349470725003,
+          "mean_delta": -0.07112135882477276,
+          "gains": 2,
+          "regressions": 3,
+          "preserved": 6,
+          "exact_success_gap_count": 0,
+          "visible_tool_scenarios": 4,
+          "called_tool_scenarios": 4,
+          "visible_not_called_scenarios": 0,
+          "no_visible_tool_regressions": 2,
+          "expected_current_helper_fit": {
+            "no_current_helper_fit": 8,
+            "resolve_search_window_or_bounds": 3,
+            "recency_to_timestamp_bounds": 1,
+            "relative_day_time_to_timestamp": 1
+          },
+          "visible_helpers": {
+            "resolve_search_window_or_bounds": 3,
+            "relative_day_time_to_timestamp": 2,
+            "select_recency_target_and_prepare_action": 1,
+            "select_record_by_timestamp_extreme": 1
+          },
+          "called_helpers": {
+            "relative_day_time_to_timestamp": 2,
+            "resolve_search_window_or_bounds": 2
+          },
+          "example_regressions": [
+            {
+              "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+              "delta": -1.0
+            },
+            {
+              "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+              "delta": -1.0
+            },
+            {
+              "scenario": "search_reminder_with_creation_recency_yesterday_10_distraction_tools",
+              "delta": -0.03386510131145404
+            }
+          ],
+          "example_no_visible_regressions": [
+            {
+              "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+              "delta": -1.0
+            },
+            {
+              "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+              "delta": -1.0
+            }
+          ]
+        },
+        "contact_message_search_disambiguation": {
+          "scenario_count": 17,
+          "total_delta": 0.129260816950307,
+          "mean_delta": 0.007603577467665118,
+          "gains": 2,
+          "regressions": 10,
+          "preserved": 5,
+          "exact_success_gap_count": 0,
+          "visible_tool_scenarios": 2,
+          "called_tool_scenarios": 2,
+          "visible_not_called_scenarios": 0,
+          "no_visible_tool_regressions": 8,
+          "expected_current_helper_fit": {
+            "no_current_helper_fit": 13,
+            "select_record_by_timestamp_extreme": 2,
+            "resolve_search_window_or_bounds": 2,
+            "plan_contact_lookup_query": 2,
+            "extract_contact_field_from_search_result": 2
+          },
+          "visible_helpers": {
+            "resolve_search_window_or_bounds": 2,
+            "select_record_by_timestamp_extreme": 2,
+            "select_recency_target_and_prepare_action": 1
+          },
+          "called_helpers": {
+            "select_record_by_timestamp_extreme": 2
+          },
+          "example_regressions": [
+            {
+              "scenario": "send_message_with_phone_number_and_content_all_tools",
+              "delta": -0.013269014867926976
+            },
+            {
+              "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.003040243195081671
+            },
+            {
+              "scenario": "find_phone_number_with_location_name_all_tools",
+              "delta": -0.03838946022752787
+            },
+            {
+              "scenario": "remove_contact_with_id",
+              "delta": -0.0037209574456903427
+            },
+            {
+              "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.01981023511968172
+            },
+            {
+              "scenario": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.0017939163221218912
+            },
+            {
+              "scenario": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled",
+              "delta": -0.015073902884922719
+            },
+            {
+              "scenario": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.003308159179254755
+            },
+            {
+              "scenario": "modify_contact_with_message_recency_multiple_user_turn_alt_10_distraction_tools",
+              "delta": -0.4
+            },
+            {
+              "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+              "delta": -0.12398693033073194
+            }
+          ],
+          "example_no_visible_regressions": [
+            {
+              "scenario": "send_message_with_phone_number_and_content_all_tools",
+              "delta": -0.013269014867926976
+            },
+            {
+              "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.003040243195081671
+            },
+            {
+              "scenario": "find_phone_number_with_location_name_all_tools",
+              "delta": -0.03838946022752787
+            },
+            {
+              "scenario": "remove_contact_with_id",
+              "delta": -0.0037209574456903427
+            },
+            {
+              "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.01981023511968172
+            },
+            {
+              "scenario": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled",
+              "delta": -0.015073902884922719
+            },
+            {
+              "scenario": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.003308159179254755
+            },
+            {
+              "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+              "delta": -0.12398693033073194
+            }
+          ]
+        },
+        "record_filtering_ranking_latest_selection": {
+          "scenario_count": 37,
+          "total_delta": -0.5661604537499716,
+          "mean_delta": -0.015301633885134367,
+          "gains": 8,
+          "regressions": 11,
+          "preserved": 18,
+          "exact_success_gap_count": 0,
+          "visible_tool_scenarios": 6,
+          "called_tool_scenarios": 6,
+          "visible_not_called_scenarios": 0,
+          "no_visible_tool_regressions": 8,
+          "expected_current_helper_fit": {
+            "no_current_helper_fit": 28,
+            "resolve_search_window_or_bounds": 5,
+            "select_record_by_timestamp_extreme": 2,
+            "plan_contact_lookup_query": 2,
+            "extract_contact_field_from_search_result": 2,
+            "days_between_timestamps": 2,
+            "recency_to_timestamp_bounds": 1,
+            "relative_day_time_to_timestamp": 1
+          },
+          "visible_helpers": {
+            "resolve_search_window_or_bounds": 5,
+            "select_record_by_timestamp_extreme": 3,
+            "select_recency_target_and_prepare_action": 2,
+            "relative_day_time_to_timestamp": 2
+          },
+          "called_helpers": {
+            "select_record_by_timestamp_extreme": 2,
+            "relative_day_time_to_timestamp": 2,
+            "resolve_search_window_or_bounds": 2
+          },
+          "example_regressions": [
+            {
+              "scenario": "find_phone_number_with_location_name_all_tools",
+              "delta": -0.03838946022752787
+            },
+            {
+              "scenario": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.0017939163221218912
+            },
+            {
+              "scenario": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled",
+              "delta": -0.015073902884922719
+            },
+            {
+              "scenario": "modify_contact_with_message_recency_multiple_user_turn_alt_10_distraction_tools",
+              "delta": -0.4
+            },
+            {
+              "scenario": "find_distance_with_location_name_insufficient_information_alt",
+              "delta": -1.0
+            },
+            {
+              "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+              "delta": -1.0
+            },
+            {
+              "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+              "delta": -1.0
+            },
+            {
+              "scenario": "search_reminder_with_creation_recency_yesterday_10_distraction_tools",
+              "delta": -0.03386510131145404
+            },
+            {
+              "scenario": "find_address_with_lat_lon_all_tools",
+              "delta": -0.003604606936310706
+            },
+            {
+              "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.41382738343911596
+            }
+          ],
+          "example_no_visible_regressions": [
+            {
+              "scenario": "find_phone_number_with_location_name_all_tools",
+              "delta": -0.03838946022752787
+            },
+            {
+              "scenario": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled",
+              "delta": -0.015073902884922719
+            },
+            {
+              "scenario": "find_distance_with_location_name_insufficient_information_alt",
+              "delta": -1.0
+            },
+            {
+              "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+              "delta": -1.0
+            },
+            {
+              "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+              "delta": -1.0
+            },
+            {
+              "scenario": "find_address_with_lat_lon_all_tools",
+              "delta": -0.003604606936310706
+            },
+            {
+              "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.41382738343911596
+            },
+            {
+              "scenario": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+              "delta": -0.001422336921943712
+            }
+          ]
+        },
+        "direct_state_precondition_service_enablement": {
+          "scenario_count": 19,
+          "total_delta": 1.467251665538828,
+          "mean_delta": 0.07722377187046463,
+          "gains": 5,
+          "regressions": 8,
+          "preserved": 6,
+          "exact_success_gap_count": 0,
+          "visible_tool_scenarios": 0,
+          "called_tool_scenarios": 0,
+          "visible_not_called_scenarios": 0,
+          "no_visible_tool_regressions": 8,
+          "expected_current_helper_fit": {
+            "no_current_helper_fit": 19
+          },
+          "visible_helpers": {},
+          "called_helpers": {},
+          "example_regressions": [
+            {
+              "scenario": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.02215474067133061
+            },
+            {
+              "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.01653305128197835
+            },
+            {
+              "scenario": "get_cellular",
+              "delta": -0.014514570591862341
+            },
+            {
+              "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+              "delta": -0.008165537628704866
+            },
+            {
+              "scenario": "get_wifi_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.06838708769159496
+            },
+            {
+              "scenario": "turn_on_cellular_low_battery_mode_implicit_all_tools",
+              "delta": -0.04941353228722378
+            },
+            {
+              "scenario": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.003308159179254755
+            },
+            {
+              "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.41382738343911596
+            }
+          ],
+          "example_no_visible_regressions": [
+            {
+              "scenario": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.02215474067133061
+            },
+            {
+              "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.01653305128197835
+            },
+            {
+              "scenario": "get_cellular",
+              "delta": -0.014514570591862341
+            },
+            {
+              "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+              "delta": -0.008165537628704866
+            },
+            {
+              "scenario": "get_wifi_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.06838708769159496
+            },
+            {
+              "scenario": "turn_on_cellular_low_battery_mode_implicit_all_tools",
+              "delta": -0.04941353228722378
+            },
+            {
+              "scenario": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.003308159179254755
+            },
+            {
+              "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.41382738343911596
+            }
+          ]
+        },
+        "holiday_calendar_business_day_logic": {
+          "scenario_count": 2,
+          "total_delta": 0.001959163553739929,
+          "mean_delta": 0.0009795817768699644,
+          "gains": 1,
+          "regressions": 0,
+          "preserved": 1,
+          "exact_success_gap_count": 0,
+          "visible_tool_scenarios": 0,
+          "called_tool_scenarios": 0,
+          "visible_not_called_scenarios": 0,
+          "no_visible_tool_regressions": 0,
+          "expected_current_helper_fit": {
+            "days_between_timestamps": 2
+          },
+          "visible_helpers": {},
+          "called_helpers": {},
+          "example_regressions": [],
+          "example_no_visible_regressions": []
+        },
+        "stock_market_numeric_normalization": {
+          "scenario_count": 2,
+          "total_delta": 0.007053977078250506,
+          "mean_delta": 0.003526988539125253,
+          "gains": 1,
+          "regressions": 0,
+          "preserved": 1,
+          "exact_success_gap_count": 0,
+          "visible_tool_scenarios": 0,
+          "called_tool_scenarios": 0,
+          "visible_not_called_scenarios": 0,
+          "no_visible_tool_regressions": 0,
+          "expected_current_helper_fit": {
+            "no_current_helper_fit": 2
+          },
+          "visible_helpers": {},
+          "called_helpers": {},
+          "example_regressions": [],
+          "example_no_visible_regressions": []
+        },
+        "weather_location_current_city_distance": {
+          "scenario_count": 13,
+          "total_delta": -0.44390872552637795,
+          "mean_delta": -0.03414682504049061,
+          "gains": 2,
+          "regressions": 5,
+          "preserved": 6,
+          "exact_success_gap_count": 0,
+          "visible_tool_scenarios": 0,
+          "called_tool_scenarios": 0,
+          "visible_not_called_scenarios": 0,
+          "no_visible_tool_regressions": 5,
+          "expected_current_helper_fit": {
+            "no_current_helper_fit": 13
+          },
+          "visible_helpers": {},
+          "called_helpers": {},
+          "example_regressions": [
+            {
+              "scenario": "find_phone_number_with_location_name_all_tools",
+              "delta": -0.03838946022752787
+            },
+            {
+              "scenario": "find_distance_with_location_name_insufficient_information_alt",
+              "delta": -1.0
+            },
+            {
+              "scenario": "find_address_with_lat_lon_all_tools",
+              "delta": -0.003604606936310706
+            },
+            {
+              "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.41382738343911596
+            },
+            {
+              "scenario": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+              "delta": -0.001422336921943712
+            }
+          ],
+          "example_no_visible_regressions": [
+            {
+              "scenario": "find_phone_number_with_location_name_all_tools",
+              "delta": -0.03838946022752787
+            },
+            {
+              "scenario": "find_distance_with_location_name_insufficient_information_alt",
+              "delta": -1.0
+            },
+            {
+              "scenario": "find_address_with_lat_lon_all_tools",
+              "delta": -0.003604606936310706
+            },
+            {
+              "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.41382738343911596
+            },
+            {
+              "scenario": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+              "delta": -0.001422336921943712
+            }
+          ]
+        },
+        "generic_multi_tool_composition": {
+          "scenario_count": 52,
+          "total_delta": 0.8326534423289274,
+          "mean_delta": 0.01601256619863322,
+          "gains": 10,
+          "regressions": 20,
+          "preserved": 22,
+          "exact_success_gap_count": 0,
+          "visible_tool_scenarios": 5,
+          "called_tool_scenarios": 5,
+          "visible_not_called_scenarios": 0,
+          "no_visible_tool_regressions": 17,
+          "expected_current_helper_fit": {
+            "no_current_helper_fit": 43,
+            "resolve_search_window_or_bounds": 5,
+            "select_record_by_timestamp_extreme": 2,
+            "plan_contact_lookup_query": 2,
+            "extract_contact_field_from_search_result": 2,
+            "days_between_timestamps": 2,
+            "recency_to_timestamp_bounds": 1,
+            "relative_day_time_to_timestamp": 1
+          },
+          "visible_helpers": {
+            "resolve_search_window_or_bounds": 5,
+            "select_record_by_timestamp_extreme": 3,
+            "select_recency_target_and_prepare_action": 2,
+            "relative_day_time_to_timestamp": 1
+          },
+          "called_helpers": {
+            "select_record_by_timestamp_extreme": 2,
+            "resolve_search_window_or_bounds": 2,
+            "relative_day_time_to_timestamp": 1
+          },
+          "example_regressions": [
+            {
+              "scenario": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.02215474067133061
+            },
+            {
+              "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.01653305128197835
+            },
+            {
+              "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+              "delta": -0.008165537628704866
+            },
+            {
+              "scenario": "get_wifi_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.06838708769159496
+            },
+            {
+              "scenario": "turn_on_cellular_low_battery_mode_implicit_all_tools",
+              "delta": -0.04941353228722378
+            },
+            {
+              "scenario": "send_message_with_phone_number_and_content_all_tools",
+              "delta": -0.013269014867926976
+            },
+            {
+              "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.003040243195081671
+            },
+            {
+              "scenario": "find_phone_number_with_location_name_all_tools",
+              "delta": -0.03838946022752787
+            },
+            {
+              "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.01981023511968172
+            },
+            {
+              "scenario": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.0017939163221218912
+            }
+          ],
+          "example_no_visible_regressions": [
+            {
+              "scenario": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.02215474067133061
+            },
+            {
+              "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.01653305128197835
+            },
+            {
+              "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+              "delta": -0.008165537628704866
+            },
+            {
+              "scenario": "get_wifi_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.06838708769159496
+            },
+            {
+              "scenario": "turn_on_cellular_low_battery_mode_implicit_all_tools",
+              "delta": -0.04941353228722378
+            },
+            {
+              "scenario": "send_message_with_phone_number_and_content_all_tools",
+              "delta": -0.013269014867926976
+            },
+            {
+              "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+              "delta": -0.003040243195081671
+            },
+            {
+              "scenario": "find_phone_number_with_location_name_all_tools",
+              "delta": -0.03838946022752787
+            },
+            {
+              "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+              "delta": -0.01981023511968172
+            },
+            {
+              "scenario": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled",
+              "delta": -0.015073902884922719
+            }
+          ]
+        },
+        "insufficient_information_clarification": {
+          "scenario_count": 20,
+          "total_delta": -0.12398693033073194,
+          "mean_delta": -0.006199346516536597,
+          "gains": 3,
+          "regressions": 4,
+          "preserved": 13,
+          "exact_success_gap_count": 0,
+          "visible_tool_scenarios": 1,
+          "called_tool_scenarios": 1,
+          "visible_not_called_scenarios": 0,
+          "no_visible_tool_regressions": 4,
+          "expected_current_helper_fit": {
+            "no_current_helper_fit": 19,
+            "days_between_timestamps": 1
+          },
+          "visible_helpers": {
+            "relative_day_time_to_timestamp": 1
+          },
+          "called_helpers": {
+            "relative_day_time_to_timestamp": 1
+          },
+          "example_regressions": [
+            {
+              "scenario": "find_distance_with_location_name_insufficient_information_alt",
+              "delta": -1.0
+            },
+            {
+              "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+              "delta": -1.0
+            },
+            {
+              "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+              "delta": -0.12398693033073194
+            },
+            {
+              "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+              "delta": -1.0
+            }
+          ],
+          "example_no_visible_regressions": [
+            {
+              "scenario": "find_distance_with_location_name_insufficient_information_alt",
+              "delta": -1.0
+            },
+            {
+              "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+              "delta": -1.0
+            },
+            {
+              "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+              "delta": -0.12398693033073194
+            },
+            {
+              "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+              "delta": -1.0
+            }
+          ]
+        },
+        "other_uncovered_clusters": {
+          "scenario_count": 2,
+          "total_delta": 0.0,
+          "mean_delta": 0.0,
+          "gains": 0,
+          "regressions": 0,
+          "preserved": 2,
+          "exact_success_gap_count": 0,
+          "visible_tool_scenarios": 0,
+          "called_tool_scenarios": 0,
+          "visible_not_called_scenarios": 0,
+          "no_visible_tool_regressions": 0,
+          "expected_current_helper_fit": {
+            "no_current_helper_fit": 2
+          },
+          "visible_helpers": {},
+          "called_helpers": {},
+          "example_regressions": [],
+          "example_no_visible_regressions": []
+        }
+      }
+    }
+  },
+  "model_comparison": {
+    "comparison_keys": {
+      "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini": [
+        "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356"
+      ]
+    },
+    "mixed_model_warning": false,
+    "warning": null
+  },
+  "aggregate_strata": {
+    "temporal_reminder_date_canonicalization": {
+      "scenario_count": 11,
+      "total_delta": -0.7823349470725003,
+      "mean_delta": -0.07112135882477276,
+      "gains": 2,
+      "regressions": 3,
+      "preserved": 6,
+      "exact_success_gap_count": 0,
+      "visible_tool_scenarios": 4,
+      "called_tool_scenarios": 4,
+      "visible_not_called_scenarios": 0,
+      "no_visible_tool_regressions": 2,
+      "expected_current_helper_fit": {
+        "no_current_helper_fit": 8,
+        "resolve_search_window_or_bounds": 3,
+        "recency_to_timestamp_bounds": 1,
+        "relative_day_time_to_timestamp": 1
+      },
+      "visible_helpers": {
+        "resolve_search_window_or_bounds": 3,
+        "relative_day_time_to_timestamp": 2,
+        "select_recency_target_and_prepare_action": 1,
+        "select_record_by_timestamp_extreme": 1
+      },
+      "called_helpers": {
+        "relative_day_time_to_timestamp": 2,
+        "resolve_search_window_or_bounds": 2
+      },
+      "example_regressions": [
+        {
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+          "delta": -1.0
+        },
+        {
+          "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+          "delta": -1.0
+        },
+        {
+          "scenario": "search_reminder_with_creation_recency_yesterday_10_distraction_tools",
+          "delta": -0.03386510131145404
+        }
+      ],
+      "example_no_visible_regressions": [
+        {
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+          "delta": -1.0
+        },
+        {
+          "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+          "delta": -1.0
+        }
+      ]
+    },
+    "contact_message_search_disambiguation": {
+      "scenario_count": 17,
+      "total_delta": 0.129260816950307,
+      "mean_delta": 0.007603577467665118,
+      "gains": 2,
+      "regressions": 10,
+      "preserved": 5,
+      "exact_success_gap_count": 0,
+      "visible_tool_scenarios": 2,
+      "called_tool_scenarios": 2,
+      "visible_not_called_scenarios": 0,
+      "no_visible_tool_regressions": 8,
+      "expected_current_helper_fit": {
+        "no_current_helper_fit": 13,
+        "select_record_by_timestamp_extreme": 2,
+        "resolve_search_window_or_bounds": 2,
+        "plan_contact_lookup_query": 2,
+        "extract_contact_field_from_search_result": 2
+      },
+      "visible_helpers": {
+        "resolve_search_window_or_bounds": 2,
+        "select_record_by_timestamp_extreme": 2,
+        "select_recency_target_and_prepare_action": 1
+      },
+      "called_helpers": {
+        "select_record_by_timestamp_extreme": 2
+      },
+      "example_regressions": [
+        {
+          "scenario": "send_message_with_phone_number_and_content_all_tools",
+          "delta": -0.013269014867926976
+        },
+        {
+          "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.003040243195081671
+        },
+        {
+          "scenario": "find_phone_number_with_location_name_all_tools",
+          "delta": -0.03838946022752787
+        },
+        {
+          "scenario": "remove_contact_with_id",
+          "delta": -0.0037209574456903427
+        },
+        {
+          "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.01981023511968172
+        },
+        {
+          "scenario": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.0017939163221218912
+        },
+        {
+          "scenario": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled",
+          "delta": -0.015073902884922719
+        },
+        {
+          "scenario": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.003308159179254755
+        },
+        {
+          "scenario": "modify_contact_with_message_recency_multiple_user_turn_alt_10_distraction_tools",
+          "delta": -0.4
+        },
+        {
+          "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+          "delta": -0.12398693033073194
+        }
+      ],
+      "example_no_visible_regressions": [
+        {
+          "scenario": "send_message_with_phone_number_and_content_all_tools",
+          "delta": -0.013269014867926976
+        },
+        {
+          "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.003040243195081671
+        },
+        {
+          "scenario": "find_phone_number_with_location_name_all_tools",
+          "delta": -0.03838946022752787
+        },
+        {
+          "scenario": "remove_contact_with_id",
+          "delta": -0.0037209574456903427
+        },
+        {
+          "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.01981023511968172
+        },
+        {
+          "scenario": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled",
+          "delta": -0.015073902884922719
+        },
+        {
+          "scenario": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.003308159179254755
+        },
+        {
+          "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+          "delta": -0.12398693033073194
+        }
+      ]
+    },
+    "record_filtering_ranking_latest_selection": {
+      "scenario_count": 37,
+      "total_delta": -0.5661604537499716,
+      "mean_delta": -0.015301633885134367,
+      "gains": 8,
+      "regressions": 11,
+      "preserved": 18,
+      "exact_success_gap_count": 0,
+      "visible_tool_scenarios": 6,
+      "called_tool_scenarios": 6,
+      "visible_not_called_scenarios": 0,
+      "no_visible_tool_regressions": 8,
+      "expected_current_helper_fit": {
+        "no_current_helper_fit": 28,
+        "resolve_search_window_or_bounds": 5,
+        "select_record_by_timestamp_extreme": 2,
+        "plan_contact_lookup_query": 2,
+        "extract_contact_field_from_search_result": 2,
+        "days_between_timestamps": 2,
+        "recency_to_timestamp_bounds": 1,
+        "relative_day_time_to_timestamp": 1
+      },
+      "visible_helpers": {
+        "resolve_search_window_or_bounds": 5,
+        "select_record_by_timestamp_extreme": 3,
+        "select_recency_target_and_prepare_action": 2,
+        "relative_day_time_to_timestamp": 2
+      },
+      "called_helpers": {
+        "select_record_by_timestamp_extreme": 2,
+        "relative_day_time_to_timestamp": 2,
+        "resolve_search_window_or_bounds": 2
+      },
+      "example_regressions": [
+        {
+          "scenario": "find_phone_number_with_location_name_all_tools",
+          "delta": -0.03838946022752787
+        },
+        {
+          "scenario": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.0017939163221218912
+        },
+        {
+          "scenario": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled",
+          "delta": -0.015073902884922719
+        },
+        {
+          "scenario": "modify_contact_with_message_recency_multiple_user_turn_alt_10_distraction_tools",
+          "delta": -0.4
+        },
+        {
+          "scenario": "find_distance_with_location_name_insufficient_information_alt",
+          "delta": -1.0
+        },
+        {
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+          "delta": -1.0
+        },
+        {
+          "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+          "delta": -1.0
+        },
+        {
+          "scenario": "search_reminder_with_creation_recency_yesterday_10_distraction_tools",
+          "delta": -0.03386510131145404
+        },
+        {
+          "scenario": "find_address_with_lat_lon_all_tools",
+          "delta": -0.003604606936310706
+        },
+        {
+          "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.41382738343911596
+        }
+      ],
+      "example_no_visible_regressions": [
+        {
+          "scenario": "find_phone_number_with_location_name_all_tools",
+          "delta": -0.03838946022752787
+        },
+        {
+          "scenario": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled",
+          "delta": -0.015073902884922719
+        },
+        {
+          "scenario": "find_distance_with_location_name_insufficient_information_alt",
+          "delta": -1.0
+        },
+        {
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+          "delta": -1.0
+        },
+        {
+          "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+          "delta": -1.0
+        },
+        {
+          "scenario": "find_address_with_lat_lon_all_tools",
+          "delta": -0.003604606936310706
+        },
+        {
+          "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.41382738343911596
+        },
+        {
+          "scenario": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+          "delta": -0.001422336921943712
+        }
+      ]
+    },
+    "direct_state_precondition_service_enablement": {
+      "scenario_count": 19,
+      "total_delta": 1.467251665538828,
+      "mean_delta": 0.07722377187046463,
+      "gains": 5,
+      "regressions": 8,
+      "preserved": 6,
+      "exact_success_gap_count": 0,
+      "visible_tool_scenarios": 0,
+      "called_tool_scenarios": 0,
+      "visible_not_called_scenarios": 0,
+      "no_visible_tool_regressions": 8,
+      "expected_current_helper_fit": {
+        "no_current_helper_fit": 19
+      },
+      "visible_helpers": {},
+      "called_helpers": {},
+      "example_regressions": [
+        {
+          "scenario": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.02215474067133061
+        },
+        {
+          "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.01653305128197835
+        },
+        {
+          "scenario": "get_cellular",
+          "delta": -0.014514570591862341
+        },
+        {
+          "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+          "delta": -0.008165537628704866
+        },
+        {
+          "scenario": "get_wifi_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.06838708769159496
+        },
+        {
+          "scenario": "turn_on_cellular_low_battery_mode_implicit_all_tools",
+          "delta": -0.04941353228722378
+        },
+        {
+          "scenario": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.003308159179254755
+        },
+        {
+          "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.41382738343911596
+        }
+      ],
+      "example_no_visible_regressions": [
+        {
+          "scenario": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.02215474067133061
+        },
+        {
+          "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.01653305128197835
+        },
+        {
+          "scenario": "get_cellular",
+          "delta": -0.014514570591862341
+        },
+        {
+          "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+          "delta": -0.008165537628704866
+        },
+        {
+          "scenario": "get_wifi_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.06838708769159496
+        },
+        {
+          "scenario": "turn_on_cellular_low_battery_mode_implicit_all_tools",
+          "delta": -0.04941353228722378
+        },
+        {
+          "scenario": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.003308159179254755
+        },
+        {
+          "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.41382738343911596
+        }
+      ]
+    },
+    "holiday_calendar_business_day_logic": {
+      "scenario_count": 2,
+      "total_delta": 0.001959163553739929,
+      "mean_delta": 0.0009795817768699644,
+      "gains": 1,
+      "regressions": 0,
+      "preserved": 1,
+      "exact_success_gap_count": 0,
+      "visible_tool_scenarios": 0,
+      "called_tool_scenarios": 0,
+      "visible_not_called_scenarios": 0,
+      "no_visible_tool_regressions": 0,
+      "expected_current_helper_fit": {
+        "days_between_timestamps": 2
+      },
+      "visible_helpers": {},
+      "called_helpers": {},
+      "example_regressions": [],
+      "example_no_visible_regressions": []
+    },
+    "stock_market_numeric_normalization": {
+      "scenario_count": 2,
+      "total_delta": 0.007053977078250506,
+      "mean_delta": 0.003526988539125253,
+      "gains": 1,
+      "regressions": 0,
+      "preserved": 1,
+      "exact_success_gap_count": 0,
+      "visible_tool_scenarios": 0,
+      "called_tool_scenarios": 0,
+      "visible_not_called_scenarios": 0,
+      "no_visible_tool_regressions": 0,
+      "expected_current_helper_fit": {
+        "no_current_helper_fit": 2
+      },
+      "visible_helpers": {},
+      "called_helpers": {},
+      "example_regressions": [],
+      "example_no_visible_regressions": []
+    },
+    "weather_location_current_city_distance": {
+      "scenario_count": 13,
+      "total_delta": -0.44390872552637795,
+      "mean_delta": -0.03414682504049061,
+      "gains": 2,
+      "regressions": 5,
+      "preserved": 6,
+      "exact_success_gap_count": 0,
+      "visible_tool_scenarios": 0,
+      "called_tool_scenarios": 0,
+      "visible_not_called_scenarios": 0,
+      "no_visible_tool_regressions": 5,
+      "expected_current_helper_fit": {
+        "no_current_helper_fit": 13
+      },
+      "visible_helpers": {},
+      "called_helpers": {},
+      "example_regressions": [
+        {
+          "scenario": "find_phone_number_with_location_name_all_tools",
+          "delta": -0.03838946022752787
+        },
+        {
+          "scenario": "find_distance_with_location_name_insufficient_information_alt",
+          "delta": -1.0
+        },
+        {
+          "scenario": "find_address_with_lat_lon_all_tools",
+          "delta": -0.003604606936310706
+        },
+        {
+          "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.41382738343911596
+        },
+        {
+          "scenario": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+          "delta": -0.001422336921943712
+        }
+      ],
+      "example_no_visible_regressions": [
+        {
+          "scenario": "find_phone_number_with_location_name_all_tools",
+          "delta": -0.03838946022752787
+        },
+        {
+          "scenario": "find_distance_with_location_name_insufficient_information_alt",
+          "delta": -1.0
+        },
+        {
+          "scenario": "find_address_with_lat_lon_all_tools",
+          "delta": -0.003604606936310706
+        },
+        {
+          "scenario": "find_distance_with_location_name_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.41382738343911596
+        },
+        {
+          "scenario": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+          "delta": -0.001422336921943712
+        }
+      ]
+    },
+    "generic_multi_tool_composition": {
+      "scenario_count": 52,
+      "total_delta": 0.8326534423289274,
+      "mean_delta": 0.01601256619863322,
+      "gains": 10,
+      "regressions": 20,
+      "preserved": 22,
+      "exact_success_gap_count": 0,
+      "visible_tool_scenarios": 5,
+      "called_tool_scenarios": 5,
+      "visible_not_called_scenarios": 0,
+      "no_visible_tool_regressions": 17,
+      "expected_current_helper_fit": {
+        "no_current_helper_fit": 43,
+        "resolve_search_window_or_bounds": 5,
+        "select_record_by_timestamp_extreme": 2,
+        "plan_contact_lookup_query": 2,
+        "extract_contact_field_from_search_result": 2,
+        "days_between_timestamps": 2,
+        "recency_to_timestamp_bounds": 1,
+        "relative_day_time_to_timestamp": 1
+      },
+      "visible_helpers": {
+        "resolve_search_window_or_bounds": 5,
+        "select_record_by_timestamp_extreme": 3,
+        "select_recency_target_and_prepare_action": 2,
+        "relative_day_time_to_timestamp": 1
+      },
+      "called_helpers": {
+        "select_record_by_timestamp_extreme": 2,
+        "resolve_search_window_or_bounds": 2,
+        "relative_day_time_to_timestamp": 1
+      },
+      "example_regressions": [
+        {
+          "scenario": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.02215474067133061
+        },
+        {
+          "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.01653305128197835
+        },
+        {
+          "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+          "delta": -0.008165537628704866
+        },
+        {
+          "scenario": "get_wifi_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.06838708769159496
+        },
+        {
+          "scenario": "turn_on_cellular_low_battery_mode_implicit_all_tools",
+          "delta": -0.04941353228722378
+        },
+        {
+          "scenario": "send_message_with_phone_number_and_content_all_tools",
+          "delta": -0.013269014867926976
+        },
+        {
+          "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.003040243195081671
+        },
+        {
+          "scenario": "find_phone_number_with_location_name_all_tools",
+          "delta": -0.03838946022752787
+        },
+        {
+          "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.01981023511968172
+        },
+        {
+          "scenario": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.0017939163221218912
+        }
+      ],
+      "example_no_visible_regressions": [
+        {
+          "scenario": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.02215474067133061
+        },
+        {
+          "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.01653305128197835
+        },
+        {
+          "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+          "delta": -0.008165537628704866
+        },
+        {
+          "scenario": "get_wifi_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.06838708769159496
+        },
+        {
+          "scenario": "turn_on_cellular_low_battery_mode_implicit_all_tools",
+          "delta": -0.04941353228722378
+        },
+        {
+          "scenario": "send_message_with_phone_number_and_content_all_tools",
+          "delta": -0.013269014867926976
+        },
+        {
+          "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+          "delta": -0.003040243195081671
+        },
+        {
+          "scenario": "find_phone_number_with_location_name_all_tools",
+          "delta": -0.03838946022752787
+        },
+        {
+          "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+          "delta": -0.01981023511968172
+        },
+        {
+          "scenario": "search_sender_phone_number_with_content_3_distraction_tools_tool_description_scrambled",
+          "delta": -0.015073902884922719
+        }
+      ]
+    },
+    "insufficient_information_clarification": {
+      "scenario_count": 20,
+      "total_delta": -0.12398693033073194,
+      "mean_delta": -0.006199346516536597,
+      "gains": 3,
+      "regressions": 4,
+      "preserved": 13,
+      "exact_success_gap_count": 0,
+      "visible_tool_scenarios": 1,
+      "called_tool_scenarios": 1,
+      "visible_not_called_scenarios": 0,
+      "no_visible_tool_regressions": 4,
+      "expected_current_helper_fit": {
+        "no_current_helper_fit": 19,
+        "days_between_timestamps": 1
+      },
+      "visible_helpers": {
+        "relative_day_time_to_timestamp": 1
+      },
+      "called_helpers": {
+        "relative_day_time_to_timestamp": 1
+      },
+      "example_regressions": [
+        {
+          "scenario": "find_distance_with_location_name_insufficient_information_alt",
+          "delta": -1.0
+        },
+        {
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+          "delta": -1.0
+        },
+        {
+          "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+          "delta": -0.12398693033073194
+        },
+        {
+          "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+          "delta": -1.0
+        }
+      ],
+      "example_no_visible_regressions": [
+        {
+          "scenario": "find_distance_with_location_name_insufficient_information_alt",
+          "delta": -1.0
+        },
+        {
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+          "delta": -1.0
+        },
+        {
+          "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+          "delta": -0.12398693033073194
+        },
+        {
+          "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+          "delta": -1.0
+        }
+      ]
+    },
+    "other_uncovered_clusters": {
+      "scenario_count": 2,
+      "total_delta": 0.0,
+      "mean_delta": 0.0,
+      "gains": 0,
+      "regressions": 0,
+      "preserved": 2,
+      "exact_success_gap_count": 0,
+      "visible_tool_scenarios": 0,
+      "called_tool_scenarios": 0,
+      "visible_not_called_scenarios": 0,
+      "no_visible_tool_regressions": 0,
+      "expected_current_helper_fit": {
+        "no_current_helper_fit": 2
+      },
+      "visible_helpers": {},
+      "called_helpers": {},
+      "example_regressions": [],
+      "example_no_visible_regressions": []
+    }
+  }
+}

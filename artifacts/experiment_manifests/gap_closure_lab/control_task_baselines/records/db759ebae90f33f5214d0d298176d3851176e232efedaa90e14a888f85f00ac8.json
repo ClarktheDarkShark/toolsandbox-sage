@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "record_id": "db759ebae90f33f5214d0d298176d3851176e232efedaa90e14a888f85f00ac8",
+  "timestamp": "2026-05-08T09:40:50.451531+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "e44e22becdb838b821640178e7b83d37fcfb83ac9daf923b9bb14ae1d90de2d8",
+  "scenario_key": "search_reminder_with_recency_yesterday",
+  "scenario_checksum": "c7c363c1811e7362c8ccd20c4daa95c145d4d94dd76fecac59e8213f02567882",
+  "initial_state_checksum": "59e532c288f9e1b859b14ba2a738b75348b24f0da9a1d4c58eb6ee7454c42f43",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "930d11e8e399def1cba17d8683a52d5047b03d4f153ceff8ea2fe26cf0eca065",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/recombination_focus20_manifest.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/contact_bridge_focus20/pilot_20_20260508_053514/control/pilot_20_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_35_18",
+  "milestone_scores": {
+    "0": [
+      17,
+      1.0
+    ],
+    "1": [
+      21,
+      1.0
+    ],
+    "2": [
+      26,
+      0.832683158359091
+    ]
+  },
+  "canonical_score": 0.9442277194530303,
+  "outcome_score": 0.0,
+  "exact_success": false,
+  "final_state_hash": "73d4093e05158827865c1a44295fd8ef500c7b2ffd13a58fac996d234674cabb",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 13,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 13,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/contact_bridge_focus20/pilot_20_20260508_053514/control/pilot_20_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_35_18/trajectories/search_reminder_with_recency_yesterday/conversation.json",
+  "transcript_hash": "2ff7921dacbfdc8296781b0f85558084cfac51745eb824338d59156d333c3996",
+  "result_row": {
+    "name": "search_reminder_with_recency_yesterday",
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "NO_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9442277194530303,
+    "minefield_similarity": 0,
+    "similarity": 0.9442277194530303,
+    "turn_count": 13,
+    "milestone_mapping": {
+      "0": [
+        17,
+        1.0
+      ],
+      "1": [
+        21,
+        1.0
+      ],
+      "2": [
+        26,
+        0.832683158359091
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.0,
+    "outcome_milestone_similarity": 0.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "answer",
+        "included": true,
+        "score": 0.0,
+        "targets": [
+          "Your reminder from yesterday says 'Look for Company SF tickets'.",
+          "Look for Company SF tickets"
+        ]
+      }
+    ]
+  }
+}

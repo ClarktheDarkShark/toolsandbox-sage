@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "record_id": "9653d7308b1f17ef11ac74be253fd4bdf22722908716084b961187b5a258e5ee",
+  "timestamp": "2026-05-08T10:16:16.173234+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "784895b6ca8ef722077ddbdc59f7708887d123349037bbb32f55fd4fa7a6fe44",
+  "scenario_key": "wifi_off",
+  "scenario_checksum": "573ab7f56d8388a8b6dfc2a0929fde434dd3e28b78de130bda1254f594a39628",
+  "initial_state_checksum": "87755367a5bcc4ad24376269565fc0624f9c736033a3adeb56566a6f7ca380f3",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51",
+  "milestone_scores": {
+    "0": [
+      17,
+      1.0
+    ],
+    "1": [
+      18,
+      0.6809771271195484
+    ]
+  },
+  "canonical_score": 0.8404885635597742,
+  "outcome_score": 1.0,
+  "exact_success": false,
+  "final_state_hash": "4f39593790f1ae81c371397edb9007d4a07718270a15168d40806567d7e06e9e",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 3,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 3,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51/trajectories/wifi_off/conversation.json",
+  "transcript_hash": "6171e08cb78d5f2176352a5cf518c339a080230d46cf3537bfb305c1335e6768",
+  "result_row": {
+    "name": "wifi_off",
+    "categories": [
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "NO_DISTRACTION_TOOLS"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.8404885635597742,
+    "minefield_similarity": 0,
+    "similarity": 0.8404885635597742,
+    "turn_count": 3,
+    "milestone_mapping": {
+      "0": [
+        17,
+        1.0
+      ],
+      "1": [
+        18,
+        0.6809771271195484
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 1.0,
+    "outcome_milestone_similarity": 1.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 2,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "answer",
+        "included": true,
+        "score": 1.0,
+        "targets": [
+          "Wifi is turned off"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "record_id": "2dd30e65661a3958a6bc15cfd1dc65a2765ce76fbcdaff268cc6f441ccd4f3ea",
+  "timestamp": "2026-05-08T10:49:14.011570+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "4822482722a6a043a975ba8bc1bafe6b1e578a72b7169c8798ac0f678ced34c3",
+  "scenario_key": "find_distance_with_location_name_3_distraction_tools_tool_description_scrambled",
+  "scenario_checksum": "03e5e1d85ccf237beb930e3268cea817a2906c0aafe30da1f4108dfb3ed940cc",
+  "initial_state_checksum": "7b5b6c8097873f80e816fda53b69c1f73ade7af55c233ee91705175f50304790",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_06_34_01",
+  "milestone_scores": {
+    "0": [
+      17,
+      1.0
+    ],
+    "1": [
+      19,
+      1.0
+    ],
+    "2": [
+      20,
+      0.9215414770969214
+    ]
+  },
+  "canonical_score": 0.9738471590323071,
+  "outcome_score": 1.0,
+  "exact_success": false,
+  "final_state_hash": "94731269928da519252609529d795ef3d3e7dc247464d1826d8fecb7abc06040",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 17,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 17,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_06_34_01/trajectories/find_distance_with_location_name_3_distraction_tools_tool_description_scrambled/conversation.json",
+  "transcript_hash": "4522616b7fdcdc5fba7d82d6a77f83aa053f6b65eaffb3439e18e7916a722138",
+  "result_row": {
+    "name": "find_distance_with_location_name_3_distraction_tools_tool_description_scrambled",
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "TOOL_DESCRIPTION_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9738471590323071,
+    "minefield_similarity": 0,
+    "similarity": 0.9738471590323071,
+    "turn_count": 17,
+    "milestone_mapping": {
+      "0": [
+        17,
+        1.0
+      ],
+      "1": [
+        19,
+        1.0
+      ],
+      "2": [
+        20,
+        0.9215414770969214
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 1.0,
+    "outcome_milestone_similarity": 1.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "answer",
+        "included": true,
+        "score": 1.0,
+        "targets": [
+          "You are approximately 67.86 kilometers away from Golden Gate Bridge"
+        ]
+      }
+    ]
+  }
+}

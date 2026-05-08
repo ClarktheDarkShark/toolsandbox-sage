@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "record_id": "3a9e93a31367349f6b2dff8da4a1762e15a7a065e3a781ec11d02fc81ec27970",
+  "timestamp": "2026-05-08T10:49:12.857782+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "b6a99fa9b62b4bb9a5fbb87647d65b3024447110d9fcd024d5254629dd6653c5",
+  "scenario_key": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+  "scenario_checksum": "052a093778b7bb0a852701c52d314ba3fcf89e8ffe99fe9922e632a3bc75c984",
+  "initial_state_checksum": "944a7ea25b2d82aa530351715f7ffe28437b8941f8fcc5017ab84c36b14a19d3",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_06_34_01",
+  "milestone_scores": {
+    "0": [
+      23,
+      1.0
+    ],
+    "1": [
+      25,
+      1.0
+    ],
+    "2": [
+      26,
+      0.5800098233500788
+    ]
+  },
+  "canonical_score": 0.8600032744500262,
+  "outcome_score": 0.7317073170731708,
+  "exact_success": false,
+  "final_state_hash": "5df74327ed086e8ded9b134a18d2d163b65c8872ef477c6061fd86e7d3475226",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 11,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 11,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_06_34_01/trajectories/turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled/conversation.json",
+  "transcript_hash": "5d4d5f2d02c979b9c8b09b82e8f2fb72475ff6b3f58fcc4daed59227f4c5471d",
+  "result_row": {
+    "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+    "categories": [
+      "STATE_DEPENDENCY",
+      "MULTIPLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_DESCRIPTION_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.8600032744500262,
+    "minefield_similarity": 0,
+    "similarity": 0.8600032744500262,
+    "turn_count": 11,
+    "milestone_mapping": {
+      "0": [
+        23,
+        1.0
+      ],
+      "1": [
+        25,
+        1.0
+      ],
+      "2": [
+        26,
+        0.5800098233500788
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.7317073170731708,
+    "outcome_milestone_similarity": 0.7317073170731708,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 3,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "state",
+        "included": true,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "answer",
+        "included": true,
+        "score": 0.19512195121951217,
+        "targets": [
+          "Location service has been turned on."
+        ]
+      }
+    ]
+  }
+}

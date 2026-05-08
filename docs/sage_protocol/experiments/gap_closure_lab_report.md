@@ -22,6 +22,42 @@ The strongest low-frequency tool signal was `select_recency_target_and_prepare_a
 
 That means the recency bridge has real potential but is not a standalone scale candidate.
 
+## Recombination And Adoption Follow-Up
+
+Per the follow-on instruction, the retained low-frequency positives were recombined into smaller recency/action portfolios and tested specifically for natural adoption and routing. Frequency was not treated as the main value criterion; a tool can remain useful if it solves a rare critical gap safely and is available when that gap appears again.
+
+Focus20 targeted recency/action results were positive:
+
+- Minimal strict pack: outcome +0.1518, canonical +0.1198; `resolve_search_window_or_bounds` was called 8/14 visible with called-subset outcome +0.2971.
+- Adoption-minimal pack: outcome +0.1482, canonical +0.1597; `resolve_search_window_or_bounds` was called 9/20 visible with called-subset outcome +0.5213, and `select_recency_target_and_prepare_action` received one natural call.
+- Contact bridge pack: outcome +0.2695, canonical +0.2857; lift came from the recency/action core, not contact helper calls.
+- Best3 bridge pack: outcome +0.3530, canonical +0.2672; `relative_day_time_to_timestamp`, `resolve_search_window_or_bounds`, `select_record_by_timestamp_extreme`, and `select_recency_target_and_prepare_action` all received natural calls with positive called-subset outcome.
+- V2.6 bridge pack: outcome +0.5452, canonical +0.2976; strongest targeted result, again driven by recency/action calls rather than contact helper calls.
+
+The targeted focus20 manifest is intentionally mechanism-focused, not broad claim evidence:
+
+- File: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/recombination_focus20_manifest.json`
+- SHA-256: `930d11e8e399def1cba17d8683a52d5047b03d4f153ceff8ea2fe26cf0eca065`
+- Quality note: targeted recency/action cohort; useful for adoption diagnostics, but not diverse enough for promotion.
+
+Expanded60 results did not justify confirmation100:
+
+- V2.6 bridge expanded60: outcome +0.0050, canonical -0.0429, exact success delta 0, zero runtime exceptions, protocol gate failed. Helper-call share was below 25%; `select_recency_target_and_prepare_action` was visible 2 times and called 0 times.
+- Best3 bridge expanded60: outcome -0.0734, canonical -0.0031, exact success delta 0, zero runtime exceptions, protocol gate failed. Helper-call share was below 25%; `select_recency_target_and_prepare_action` was visible 2 times and called 0 times.
+
+All recombination dashboards were opened to the Task Focus view. The latest Task Focus browser check rendered paired data with no console errors:
+
+- Dashboard: `http://127.0.0.1:61999/outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/dashboard/task_focus.html`
+- Browser-observed values: baseline score 0.702, SAGE score 0.699, outcome delta -0.073.
+
+Machine-readable summary:
+
+- File: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/recombination_run_summary.json`
+- SHA-256: `627483ab5a576f4d948a053f3e4011b1da189a69fd5022a3d2b4e68c7a1e2c75`
+- Expanded60 coverage dry-run artifacts: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/coverage/`
+
+Decision: keep the recency/action tools as retained experimental pockets, especially `select_recency_target_and_prepare_action`, `resolve_search_window_or_bounds`, and narrowly routed time helpers. Do not run confirmation100 from this state because the lift did not survive expanded60 routing/adoption.
+
 ## Failed Or Parked Families
 
 - Many small deterministic tools: full/refined/minus-unsafe packs did not produce stable outcome lift at 60.
@@ -56,8 +92,8 @@ Baseline/control arms used the eligible control baseline cache where available a
 
 Latest expanded60 cache accounting:
 
-- Run: `outputs/gap_closure_lab/focused_chain_repaired_bridge_expanded60/expanded_60_20260508_005703`
-- Baseline cache: 42 cached / 18 fresh
+- Run: `outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356`
+- Baseline cache: 0 cached / 60 fresh
 - Cache manifest hash: `df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d`
 - Candidate OpenAI response cache: disabled
 

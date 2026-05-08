@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "record_id": "d763ced0131b38c722b4088c5f07e1178660aecff756664caf7573f89411a0bc",
+  "timestamp": "2026-05-08T10:16:16.990029+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "ac1470f506ce08a93b2b619ca9966faadb85ab81ccc3393d101a42bb12514179",
+  "scenario_key": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+  "scenario_checksum": "1ac326c24741608df449abb61d884e82b7a89676cba1e02c05b72efef91cc689",
+  "initial_state_checksum": "521c2fd7e2c2813f89832df38a89cf346a5bb2cd0c27aad88ff186534f59bd56",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51",
+  "milestone_scores": {
+    "0": [
+      35,
+      1.0
+    ],
+    "1": [
+      41,
+      1.0
+    ],
+    "2": [
+      42,
+      0.8406535452506703
+    ]
+  },
+  "canonical_score": 0.9468845150835566,
+  "outcome_score": 0.0,
+  "exact_success": false,
+  "final_state_hash": "4046886d1a4d8b5e28bb8fd985c463be7043046e26819b63a6bc298f1e53f4f4",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 19,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 19,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51/trajectories/find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools/conversation.json",
+  "transcript_hash": "ee02a972de18a45178b6b0c2bc066b1ebfd8937eab2f7c171a7e73067b0fa0d5",
+  "result_row": {
+    "name": "find_temperature_f_with_location_and_time_diff_multiple_user_turn_all_tools",
+    "categories": [
+      "CANONICALIZATION",
+      "MULTIPLE_TOOL_CALL",
+      "MULTIPLE_USER_TURN",
+      "ALL_TOOLS_AVAILABLE"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.9468845150835566,
+    "minefield_similarity": 0,
+    "similarity": 0.9468845150835566,
+    "turn_count": 19,
+    "milestone_mapping": {
+      "0": [
+        35,
+        1.0
+      ],
+      "1": [
+        41,
+        1.0
+      ],
+      "2": [
+        42,
+        0.8406535452506703
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": 0.0,
+    "outcome_milestone_similarity": 0.0,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 1,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 1,
+        "kind": "route",
+        "included": false,
+        "score": 1.0
+      },
+      {
+        "index": 2,
+        "kind": "answer",
+        "included": true,
+        "score": 0.0,
+        "targets": [
+          "The lowest temperature in Grand Canyon tomorrow is {min_temperature} degrees Fahrenheit",
+          "{min_temperature}"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "record_id": "6cb3e345bb3d69d667024fcd373848ee041131031035e03afd33d035a6b7ed75",
+  "timestamp": "2026-05-08T10:16:16.849094+00:00",
+  "complete_run": true,
+  "valid_for_cache": true,
+  "compatibility_key": "ae0a9ae225d09e94b551fe94cc50fdc6cc01a11878ac0e851de3398f1c77ce52",
+  "scenario_key": "convert_currency_3_distraction_tools_arg_description_scrambled",
+  "scenario_checksum": "f5d5acc365a7b21912d85c187eb16654c43b6ecf433d749b0750789edf7d5a7b",
+  "initial_state_checksum": "08a1451cbe9576d94c07ebc582990268e3da0171847a9008ec7b7d9d6de9f26b",
+  "agent_model": "gpt-4o-mini",
+  "user_model": "gpt-4o-mini",
+  "model_version": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+  "model_parameters_hash": "f0d88aaf7dfd5c9d0c25a5658d56c5a503427d9e044de2b5bfee5d595087a0c6",
+  "prompt_hashes": {
+    "agent_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "user_role": "8a43428062692d369599bd00272fd529aa5949ba715361e20f54e63c444ccea1",
+    "role_factory": "82da0061fb284b3123e9d6dcbefbcbf6dbce32287b838359610e199c5938ba39"
+  },
+  "runner_version": "29a70836f6fcc6a8ad5d92ba995d1136cd226a2e899b6739c040354b1292eee8",
+  "scorer_version": "45221f4e8be007455cd3ee04706057515d5e1a28a45c0b965994bee3e92790d9",
+  "toolsandbox_version": "local:82839ba569d3255fa60293bf5c59a774b820878c",
+  "manifest_checksum": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "base_tool_policy": "upstream",
+  "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "run_dir": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51",
+  "milestone_scores": {
+    "0": [
+      15,
+      0.0
+    ]
+  },
+  "canonical_score": 0.0,
+  "outcome_score": null,
+  "exact_success": false,
+  "final_state_hash": "266fad91f8f5a4305400cb2ce65ff0e0b8e6bf391ce1ec2b7a352c32cc0694ce",
+  "final_state_hash_source": "execution_context.json",
+  "runtime_exceptions": [],
+  "side_effect_violations": [],
+  "turn_count": 9,
+  "token_tool_call_model_turn_wall_time": {
+    "turn_count": 9,
+    "token_count": null,
+    "tool_call_count": null,
+    "wall_time_seconds": null
+  },
+  "transcript_path": "outputs/gap_closure_lab/recombination_adoption/v26_bridge_expanded60/expanded_60_20260508_055947/control/expanded_60_control_agent_gpt-4o-mini_user_gpt-4o-mini_05_08_2026_05_59_51/trajectories/convert_currency_3_distraction_tools_arg_description_scrambled/conversation.json",
+  "transcript_hash": "74a35fdaf00cb875f6632e7e030bbe7880ef3173e0549172629d11d3775628e0",
+  "result_row": {
+    "name": "convert_currency_3_distraction_tools_arg_description_scrambled",
+    "categories": [
+      "CANONICALIZATION",
+      "SINGLE_TOOL_CALL",
+      "SINGLE_USER_TURN",
+      "THREE_DISTRACTION_TOOLS",
+      "ARG_DESCRIPTION_SCRAMBLED"
+    ],
+    "traceback": null,
+    "exception_type": null,
+    "milestone_similarity": 0.0,
+    "minefield_similarity": 0,
+    "similarity": 0.0,
+    "turn_count": 9,
+    "milestone_mapping": {
+      "0": [
+        15,
+        0.0
+      ]
+    },
+    "minefield_mapping": {},
+    "outcome_similarity": null,
+    "outcome_milestone_similarity": null,
+    "outcome_minefield_similarity": 0.0,
+    "outcome_check_count": 0,
+    "outcome_checks": [
+      {
+        "index": 0,
+        "kind": "route",
+        "included": false,
+        "score": 0.0
+      }
+    ]
+  }
+}
