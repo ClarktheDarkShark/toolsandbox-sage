@@ -1,0 +1,200 @@
+{
+  "tools": {
+    "select_recency_target_and_prepare_action": {
+      "accepted_at": "2026-05-08T13:24:50.511855+00:00",
+      "birth_scenario": "gap_closure_lab_selector_only_recombination",
+      "code_hash": "a9d2ab25f24fb3a35da0e38561a082ef377967228fbfc1f09560f59cdd1abde8",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def select_recency_target_and_prepare_action(records: list, timestamp_key: str, selection_mode: str, action_type: str, constraints: dict = None, updates: dict = None) -> dict:\n    \"\"\"Select a unique recency target and optionally prepare preserved side-effect kwargs.\"\"\"\n    constraints = constraints if isinstance(constraints, dict) else {}\n    updates = updates if isinstance(updates, dict) else {}\n    raw_action = (action_type or \"\").strip().lower() if isinstance(action_type, str) else \"\"\n\n    def empty(reason, selected_timestamp=0.0, tie_candidates=None, safety_notes=\"abstain; no safe unique action\"):\n        return {\n            \"selected_record\": {},\n            \"selected_index\": -1,\n            \"selected_id\": \"\",\n            \"selected_timestamp\": float(selected_timestamp or 0.0),\n            \"value\": \"\",\n            \"downstream_tool_name\": \"\",\n            \"downstream_tool_kwargs\": {},\n            \"should_call_tool\": False,\n            \"tie_candidates\": tie_candidates if isinstance(tie_candidates, list) else [],\n            \"abstain_reason\": str(reason or \"\"),\n            \"safety_notes\": safety_notes,\n            \"final_answer_recommendation\": \"abstain:\" + str(reason or \"insufficient_information\"),\n        }\n\n    def selected_only(reason, selected_index, selected_record, selected_timestamp, downstream_tool_name=\"\"):\n        selected_id = _select_id(selected_record)\n        return {\n            \"selected_record\": selected_record,\n            \"selected_index\": int(selected_index),\n            \"selected_id\": selected_id,\n            \"selected_timestamp\": float(selected_timestamp),\n            \"value\": selected_id,\n            \"downstream_tool_name\": str(downstream_tool_name or \"\"),\n            \"downstream_tool_kwargs\": {},\n            \"should_call_tool\": False,\n            \"tie_candidates\": [],\n            \"abstain_reason\": str(reason or \"\"),\n            \"safety_notes\": \"selected target only; collect or compute update fields before side-effect\",\n            \"final_answer_recommendation\": \"use_selected_record:\" + str(reason or \"selection_only\"),\n        }\n\n    if not isinstance(records, list) or len(records) == 0:\n        return empty(\"no_records\")\n    mode = (selection_mode or \"\").strip().lower() if isinstance(selection_mode, str) else \"\"\n    if mode not in (\"latest\", \"oldest\"):\n        return empty(\"invalid_selection_mode\")\n\n    def norm(field, value):\n        if value is None:\n            return \"\"\n        text = str(value)\n        fname = str(field).lower()\n        if \"phone\" in fname or \"number\" in fname:\n            return \"\".join(ch for ch in text if ch.isdigit())\n        return text.strip().lower()\n\n    def _select_id(record):\n        if not isinstance(record, dict):\n            return \"\"\n        for key in (\"person_id\", \"sender_person_id\", \"recipient_person_id\", \"reminder_id\", \"message_id\", \"id\"):\n            value = record.get(key)\n            if value not in (None, \"\"):\n                return str(value)\n        return \"\"\n\n    filtered = []\n    for idx, record in enumerate(records):\n        if not isinstance(record, dict):\n            continue\n        ok = True\n        for field, expected in constraints.items():\n            if field not in record or norm(field, record.get(field)) != norm(field, expected):\n                ok = False\n                break\n        if ok:\n            filtered.append((idx, record))\n    if not filtered:\n        return empty(\"no_matching_constraints\")\n\n    candidates = []\n    for idx, record in filtered:\n        raw_ts = record.get(timestamp_key)\n        if isinstance(raw_ts, bool) or not isinstance(raw_ts, (int, float)):\n            continue\n        candidates.append((idx, record, float(raw_ts)))\n    if not candidates:\n        return empty(\"no_numeric_timestamps\")\n\n    best_ts = max(item[2] for item in candidates) if mode == \"latest\" else min(item[2] for item in candidates)\n    best = [(idx, rec, ts) for idx, rec, ts in candidates if ts == best_ts]\n    if len(best) > 1:\n        return empty(\"ambiguous_timestamp_tie\", best_ts, [rec for _, rec, _ in best], \"do not guess before side-effect action\")\n\n    selected_index, selected_record, selected_timestamp = best[0]\n    selected_id = _select_id(selected_record)\n    if not selected_id:\n        return selected_only(\"missing_target_id\", selected_index, selected_record, selected_timestamp)\n\n    def has_updates(values):\n        for _key, value in values.items():\n            if value is None:\n                continue\n            if isinstance(value, str) and value.strip() == \"\":\n                continue\n            return True\n        return False\n\n    action = raw_action\n    if action in {\"modify\", \"update\"}:\n        if \"reminder_id\" in selected_record:\n            action = \"modify_reminder\"\n        else:\n            action = \"modify_contact\"\n    elif action in {\"remove\", \"delete\"}:\n        if \"reminder_id\" in selected_record:\n            action = \"remove_reminder\"\n        else:\n            action = \"remove_contact\"\n\n    downstream_tool_name = \"\"\n    downstream_tool_kwargs = {}\n    if action in {\"modify_contact\", \"update_contact\"}:\n        person_id = selected_record.get(\"person_id\") or selected_record.get(\"sender_person_id\") or selected_record.get(\"recipient_person_id\")\n        if not person_id:\n            return selected_only(\"missing_person_id\", selected_index, selected_record, selected_timestamp, \"modify_contact\")\n        downstream_tool_name = \"modify_contact\"\n        if not has_updates(updates):\n            return selected_only(\"missing_update_fields\", selected_index, selected_record, selected_timestamp, downstream_tool_name)\n        downstream_tool_kwargs = {\"person_id\": person_id, **updates}\n    elif action in {\"remove_contact\", \"delete_contact\"}:\n        person_id = selected_record.get(\"person_id\") or selected_record.get(\"sender_person_id\") or selected_record.get(\"recipient_person_id\")\n        if not person_id:\n            return selected_only(\"missing_person_id\", selected_index, selected_record, selected_timestamp, \"remove_contact\")\n        downstream_tool_name = \"remove_contact\"\n        downstream_tool_kwargs = {\"person_id\": person_id}\n    elif action in {\"modify_reminder\", \"update_reminder\"}:\n        if \"reminder_id\" not in selected_record:\n            return selected_only(\"missing_reminder_id\", selected_index, selected_record, selected_timestamp, \"modify_reminder\")\n        downstream_tool_name = \"modify_reminder\"\n        if not has_updates(updates):\n            return selected_only(\"missing_update_fields\", selected_index, selected_record, selected_timestamp, downstream_tool_name)\n        downstream_tool_kwargs = {\"reminder_id\": selected_record.get(\"reminder_id\"), **updates}\n    elif action in {\"remove_reminder\", \"delete_reminder\"}:\n        if \"reminder_id\" not in selected_record:\n            return selected_only(\"missing_reminder_id\", selected_index, selected_record, selected_timestamp, \"remove_reminder\")\n        downstream_tool_name = \"remove_reminder\"\n        downstream_tool_kwargs = {\"reminder_id\": selected_record.get(\"reminder_id\")}\n    elif action in {\"send_message\", \"send\"}:\n        content = updates.get(\"content\") or updates.get(\"message\") or updates.get(\"text\")\n        recipient = selected_record.get(\"recipient_person_id\") or selected_record.get(\"person_id\") or updates.get(\"recipient_person_id\")\n        phone = selected_record.get(\"phone_number\") or selected_record.get(\"recipient_phone_number\") or updates.get(\"phone_number\")\n        downstream_tool_name = \"send_message\"\n        if not content or (not recipient and not phone):\n            return selected_only(\"missing_message_content_or_recipient\", selected_index, selected_record, selected_timestamp, downstream_tool_name)\n        downstream_tool_kwargs = {\"content\": content}\n        if recipient:\n            downstream_tool_kwargs[\"recipient_person_id\"] = recipient\n        else:\n            digits = \"\".join(ch for ch in str(phone) if ch.isdigit())\n            downstream_tool_kwargs[\"phone_number\"] = \"+1\" + digits if len(digits) == 10 else str(phone)\n    else:\n        return selected_only(\"unsupported_action\", selected_index, selected_record, selected_timestamp)\n\n    return {\n        \"selected_record\": selected_record,\n        \"selected_index\": int(selected_index),\n        \"selected_id\": selected_id,\n        \"selected_timestamp\": float(selected_timestamp),\n        \"value\": selected_id,\n        \"downstream_tool_name\": downstream_tool_name,\n        \"downstream_tool_kwargs\": downstream_tool_kwargs,\n        \"should_call_tool\": True,\n        \"tie_candidates\": [],\n        \"abstain_reason\": \"\",\n        \"safety_notes\": \"call downstream ToolSandbox side-effect next with downstream_tool_kwargs\",\n        \"final_answer_recommendation\": \"call:\" + downstream_tool_name,\n    }\n",
+        "spec": {
+          "abstain_behavior": "Returns should_call_tool false with explicit abstain_reason on no_records, no_matching_constraints, invalid_selection_mode, no_numeric_timestamps, ambiguous_timestamp_tie, missing target ids, missing update fields, missing message content/recipient, or unsupported_action. For post-selection issues such as missing update fields it still returns selected_record, selected_id, selected_timestamp, and downstream_tool_name so the actor can compute missing updates or use the selected target without redoing recency comparison.",
+          "applicable_task_families": [
+            "modify_contact_with_message_recency",
+            "modify_reminder_with_recency_latest",
+            "remove_reminder_with_recency_latest"
+          ],
+          "canonical_route_substitution_risk": "low",
+          "cross_task_applicability_count": 3,
+          "description": "Call after a search tool returns visible records when the next step is to modify or remove the latest/oldest contact or reminder. It selects one record by timestamp, prepares downstream tool kwargs when fields are available, and abstains on missing records, ties, or search-only questions. Do not call for pure search answers.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 5,
+          "expected_milestone_calls_replaced": [
+            "select_latest_or_oldest_visible_target",
+            "prepare_downstream_side_effect_kwargs"
+          ],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "The helper never performs side effects. It returns downstream_tool_name and downstream_tool_kwargs so the original ToolSandbox side-effect tool is still called exactly once by the actor.",
+          "generalization_rationale": "Selector-only recombination after expanded60 diagnosis: the resolver had net-negative called subset, and the contact-specific bridge was negative under force-call. This keeps the retained positive low-frequency selector while bounding exposure to recency/action tasks.",
+          "grading_accounting_note": "Outcome-preserving but canonical-substituting: the helper compresses intermediate target-selection and kwargs-preparation milestones while preserving the final original ToolSandbox side-effect call.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "compose target selection with preserved side-effect argument preparation"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "visible_not_called_chain_steps",
+              "force_call_positive_contact_recency",
+              "output_shape_repair_needed_missing_updates",
+              "side_effect_argument_preparation_failure"
+            ],
+            "summary": "Natural expanded60 left the chain visible-not-called. Force-after-search diagnostic called it on two scenarios with positive aggregate outcome and no safety incidents, but the tool returned an empty selected target when update fields were omitted. The repaired version preserves selected target output and prepares downstream kwargs only when updates are available.",
+            "visible_data_gaps": [
+              "visible records plus recency intent plus action updates must become one safe downstream call"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "list",
+              "description": "Visible candidate record list returned by an already-called search_messages, search_reminder, search_contacts, or similar original lookup tool.",
+              "name": "records"
+            },
+            {
+              "annotation": "str",
+              "description": "Visible numeric timestamp field to rank, such as 'creation_timestamp' for messages or 'reminder_timestamp' for reminders.",
+              "name": "timestamp_key"
+            },
+            {
+              "annotation": "str",
+              "description": "Either 'latest' or 'oldest'.",
+              "name": "selection_mode"
+            },
+            {
+              "annotation": "str",
+              "description": "Preserved action to prepare: modify_contact, remove_contact, modify_reminder, remove_reminder, send_message, or generic modify/remove when the selected record type is visible.",
+              "name": "action_type"
+            },
+            {
+              "annotation": "dict",
+              "description": "Optional visible field/value constraints to filter records before timestamp ranking; pass an empty dict when no constraint is needed.",
+              "name": "constraints"
+            },
+            {
+              "annotation": "dict",
+              "description": "Optional user-supplied or computed update fields such as {'phone_number': '+15551234567'} or {'reminder_timestamp': 1778346000.0}. If omitted, the helper still returns the selected target for later update preparation.",
+              "name": "updates"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "manual latest-or-oldest record selection before action",
+            "resolver search-only displacement",
+            "final answer/action target ambiguity"
+          ],
+          "negative_triggers": [
+            "insufficient_information",
+            "search_message_with_recency_oldest",
+            "search_message_with_recency_latest",
+            "search_reminder_with_creation_recency_yesterday",
+            "search_reminder_with_recency_yesterday",
+            "search-only answer",
+            "send_message",
+            "ambiguous timestamp tie"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "downstream_tool_kwargs": {
+                "type": "object"
+              },
+              "downstream_tool_name": {
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "safety_notes": {
+                "type": "string"
+              },
+              "selected_id": {
+                "type": "string"
+              },
+              "selected_index": {
+                "type": "integer"
+              },
+              "selected_record": {
+                "type": "object"
+              },
+              "selected_timestamp": {
+                "type": "number"
+              },
+              "should_call_tool": {
+                "type": "boolean"
+              },
+              "tie_candidates": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "selected_record",
+              "selected_index",
+              "selected_id",
+              "selected_timestamp",
+              "value",
+              "downstream_tool_name",
+              "downstream_tool_kwargs",
+              "should_call_tool",
+              "tie_candidates",
+              "abstain_reason",
+              "safety_notes",
+              "final_answer_recommendation"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "modify_contact_with_message_recency",
+            "modify_reminder_with_recency_latest",
+            "remove_reminder_with_recency_latest",
+            "latest visible record before modify action",
+            "oldest visible record before remove action"
+          ],
+          "preserves_side_effect_tools": [
+            "modify_contact",
+            "remove_contact",
+            "modify_reminder",
+            "remove_reminder",
+            "send_message"
+          ],
+          "reason_tool_is_decisive": "It performs the deterministic timestamp selection and returns either safe downstream side-effect kwargs or an explicit abstain reason, which is the critical step in recency-conditioned modify/remove tasks.",
+          "required_original_tool_calls": [
+            "modify_contact",
+            "remove_contact",
+            "modify_reminder",
+            "remove_reminder",
+            "send_message"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "minimal_expanded60_selector_called_once_canonical_positive",
+            "force_contact_focus20_selector_called_subset_outcome_positive"
+          ],
+          "tool_name": "select_recency_target_and_prepare_action"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 4,
+        "negative_applicability_count": 5,
+        "runtime_smoke_passed": true,
+        "source_example_count": 3
+      },
+      "version": 3
+    }
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "cache": {
+    "cached_control_tasks": 0,
+    "candidate_openai_response_cache_enabled": false,
+    "candidate_openai_response_cache_mode": "off",
+    "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "control_cache_mode": "use-if-eligible",
+    "control_source": "fresh",
+    "fresh_control_tasks": 100
+  },
+  "created_at": "2026-05-08T10:50:00-04:00",
+  "dashboard_check": {
+    "console_error_count": 0,
+    "opened_in_app_browser": true,
+    "paired_data_visible": true,
+    "task_focus_url": "http://127.0.0.1:62005/outputs/gap_closure_lab/recombination_adoption/selector_only_confirm100/confirm_100_20260508_095751/dashboard/task_focus.html",
+    "task_focus_visible": true
+  },
+  "decision": "expanded60 positive adoption retained as potential; confirm100 failed broad outcome and safety, so park current form from scale and refine before any further confirmation",
+  "experimental_only": true,
+  "helper_metrics": {
+    "called_count": 2,
+    "called_subset": {
+      "canonical_gains": 0,
+      "canonical_preserved": 0,
+      "canonical_regressions": 2,
+      "mean_canonical_delta": -0.33333333333333337,
+      "mean_outcome_delta": 0.0,
+      "outcome_gains": 0,
+      "outcome_preserved": 2,
+      "outcome_regressions": 0,
+      "route_mismatch_accounting": {
+        "helper_substitution_likely": false,
+        "reason": "none"
+      },
+      "scenario_count": 2,
+      "scenarios": [
+        "remove_reminder_with_recency_latest",
+        "remove_reminder_with_recency_latest_alt_3_distraction_tools_tool_name_scrambled"
+      ]
+    },
+    "failed_attempt_count": 0,
+    "hidden_no_call_count": 95,
+    "runtime_incident_count": 0,
+    "side_effect_incident_count": 1,
+    "side_effect_incidents": [
+      {
+        "row": {
+          "generated_tools_called": [
+            "select_recency_target_and_prepare_action"
+          ],
+          "scenario": "remove_reminder_with_recency_latest_alt_3_distraction_tools_tool_name_scrambled",
+          "side_effect_preservation_failures": [
+            "select_recency_target_and_prepare_action"
+          ]
+        },
+        "scenario": "remove_reminder_with_recency_latest_alt_3_distraction_tools_tool_name_scrambled"
+      }
+    ],
+    "tool": "select_recency_target_and_prepare_action",
+    "visible_count": 5,
+    "visible_not_called_count": 3,
+    "visible_not_called_subset": {
+      "canonical_gains": 1,
+      "canonical_preserved": 2,
+      "canonical_regressions": 0,
+      "mean_canonical_delta": 0.010279669824687384,
+      "mean_outcome_delta": 0.09375,
+      "outcome_gains": 1,
+      "outcome_preserved": 2,
+      "outcome_regressions": 0,
+      "route_mismatch_accounting": {
+        "helper_substitution_likely": false,
+        "reason": "none"
+      },
+      "scenario_count": 3,
+      "scenarios": [
+        "modify_contact_with_message_recency_multiple_user_turn",
+        "modify_reminder_with_recency_latest_10_distraction_tools",
+        "modify_reminder_with_recency_latest_alt_3_distraction_tools"
+      ]
+    }
+  },
+  "leakage_statement": "No unseen truth labels or expected answers were used for tool design. Post-run scenario names and metrics were inspected only after sealed runs for diagnosis/reporting.",
+  "mode": "confirm_100",
+  "model": {
+    "generation_enabled": false,
+    "generation_model": "gpt-4o-mini",
+    "requested_agent": "gpt-4o-mini",
+    "resolved_agent": "gpt-4o-mini"
+  },
+  "paired_metrics": {
+    "exact_success_delta": -4,
+    "gain_count": 28,
+    "mean_outcome_similarity_delta": -0.10041287532994693,
+    "mean_similarity_delta": -0.048261125779481925,
+    "outcome_gain_count": 16,
+    "outcome_preserved_count": 34,
+    "outcome_regression_count": 27,
+    "protocol_gate_passed": false,
+    "protocol_gate_reasons": [
+      "non_positive_outcome_delta",
+      "outcome_gains_do_not_exceed_regressions",
+      "non_positive_canonical_delta",
+      "gains_do_not_exceed_regressions",
+      "confirmation_outcome_delta_below_0_08",
+      "exact_successes_not_improved",
+      "gain_regression_ratio_below_1_4",
+      "helper_call_share_below_25_percent"
+    ],
+    "regression_count": 31,
+    "route_mismatch_qualified": false,
+    "runtime_exception_count": 0
+  },
+  "registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_selector_only_pack",
+  "registry_sha256": "761444d635e9f8d558e17e83f95e47f880a2ad339d9de86d9937c20e5f3548c8",
+  "run_id": "confirm_100_20260508_095751",
+  "run_root": "outputs/gap_closure_lab/recombination_adoption/selector_only_confirm100/confirm_100_20260508_095751",
+  "sample_size": 100
+}

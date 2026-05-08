@@ -1,0 +1,13 @@
+{
+  "created_at": "2026-05-08T12:31:46.938668+00:00",
+  "experimental_only": true,
+  "leakage_statement": "No scenario ids, hidden truth labels, expected answers, or task-specific facts are encoded. Routing uses visible family labels and generic recency/action text only.",
+  "objective": "Action-only repair after minimal expanded60: park the negative resolver and test final-answer-ready contact-recency adoption.",
+  "registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_contact_update_action_only_pack/registry_manifest.json",
+  "registry_sha256": "b07d81a9e28d14095449664848ae4c1d0b1da4d2d95f45f942af42c4c306d287",
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_adoption_minimal_pack/registry_manifest.json",
+  "tools": [
+    "prepare_contact_update_from_recent_message",
+    "select_recency_target_and_prepare_action"
+  ]
+}

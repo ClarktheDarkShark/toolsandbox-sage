@@ -1,0 +1,318 @@
+{
+  "control_dir": "outputs/gap_closure_lab/recombination_adoption/action_only_force_contact_focus20/pilot_20_20260508_090747/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_08_2026_09_07_51",
+  "candidate_dir": "outputs/gap_closure_lab/recombination_adoption/action_only_force_contact_focus20/pilot_20_20260508_090747/candidate/pilot_20_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_08_2026_09_15_29",
+  "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_contact_update_action_only_pack",
+  "scenario_count": 20,
+  "helpers": {
+    "prepare_contact_update_from_recent_message": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "modify_contact_with_message_recency",
+        "modify_contact_with_message_recency_10_distraction_tools",
+        "modify_contact_with_message_recency_3_distraction_tools",
+        "modify_contact_with_message_recency_alt",
+        "modify_contact_with_message_recency_alt_10_distraction_tools",
+        "modify_contact_with_message_recency_alt_3_distraction_tools"
+      ],
+      "called_scenarios": [
+        "modify_contact_with_message_recency",
+        "modify_contact_with_message_recency_10_distraction_tools",
+        "modify_contact_with_message_recency_3_distraction_tools",
+        "modify_contact_with_message_recency_alt",
+        "modify_contact_with_message_recency_alt_10_distraction_tools",
+        "modify_contact_with_message_recency_alt_3_distraction_tools"
+      ],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [
+        "modify_contact_with_message_recency",
+        "modify_contact_with_message_recency_10_distraction_tools",
+        "modify_contact_with_message_recency_3_distraction_tools",
+        "modify_contact_with_message_recency_alt",
+        "modify_contact_with_message_recency_alt_10_distraction_tools",
+        "modify_contact_with_message_recency_alt_3_distraction_tools"
+      ],
+      "hidden_no_call_scenarios": [
+        "modify_reminder_with_recency_latest",
+        "modify_reminder_with_recency_latest_3_distraction_tools",
+        "modify_reminder_with_recency_latest_alt",
+        "modify_reminder_with_recency_latest_alt_3_distraction_tools",
+        "remove_reminder_with_recency_latest",
+        "remove_reminder_with_recency_latest_3_distraction_tools",
+        "remove_reminder_with_recency_latest_alt",
+        "remove_reminder_with_recency_latest_alt_3_distraction_tools",
+        "search_message_with_recency_latest",
+        "search_message_with_recency_latest_alt",
+        "search_message_with_recency_oldest",
+        "search_message_with_recency_oldest_alt",
+        "search_reminder_with_creation_recency_yesterday",
+        "search_reminder_with_recency_yesterday"
+      ],
+      "visible_count": 6,
+      "called_count": 6,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 14,
+      "called_subset": {
+        "scenario_count": 6,
+        "scenarios": [
+          "modify_contact_with_message_recency",
+          "modify_contact_with_message_recency_10_distraction_tools",
+          "modify_contact_with_message_recency_3_distraction_tools",
+          "modify_contact_with_message_recency_alt",
+          "modify_contact_with_message_recency_alt_10_distraction_tools",
+          "modify_contact_with_message_recency_alt_3_distraction_tools"
+        ],
+        "mean_canonical_delta": -0.0765210867896893,
+        "mean_outcome_delta": -0.0937118437118437,
+        "canonical_gains": 2,
+        "canonical_regressions": 4,
+        "canonical_preserved": 0,
+        "outcome_gains": 1,
+        "outcome_regressions": 1,
+        "outcome_preserved": 4,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 14,
+        "scenarios": [
+          "modify_reminder_with_recency_latest",
+          "modify_reminder_with_recency_latest_3_distraction_tools",
+          "modify_reminder_with_recency_latest_alt",
+          "modify_reminder_with_recency_latest_alt_3_distraction_tools",
+          "remove_reminder_with_recency_latest",
+          "remove_reminder_with_recency_latest_3_distraction_tools",
+          "remove_reminder_with_recency_latest_alt",
+          "remove_reminder_with_recency_latest_alt_3_distraction_tools",
+          "search_message_with_recency_latest",
+          "search_message_with_recency_latest_alt",
+          "search_message_with_recency_oldest",
+          "search_message_with_recency_oldest_alt",
+          "search_reminder_with_creation_recency_yesterday",
+          "search_reminder_with_recency_yesterday"
+        ],
+        "mean_canonical_delta": -0.01976695309556311,
+        "mean_outcome_delta": -0.01778290330298892,
+        "canonical_gains": 3,
+        "canonical_regressions": 5,
+        "canonical_preserved": 6,
+        "outcome_gains": 2,
+        "outcome_regressions": 5,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "select_recency_target_and_prepare_action": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "modify_contact_with_message_recency",
+        "modify_contact_with_message_recency_10_distraction_tools",
+        "modify_contact_with_message_recency_3_distraction_tools",
+        "modify_contact_with_message_recency_alt",
+        "modify_contact_with_message_recency_alt_10_distraction_tools",
+        "modify_contact_with_message_recency_alt_3_distraction_tools",
+        "modify_reminder_with_recency_latest",
+        "modify_reminder_with_recency_latest_3_distraction_tools",
+        "modify_reminder_with_recency_latest_alt",
+        "modify_reminder_with_recency_latest_alt_3_distraction_tools",
+        "remove_reminder_with_recency_latest",
+        "remove_reminder_with_recency_latest_3_distraction_tools",
+        "remove_reminder_with_recency_latest_alt",
+        "remove_reminder_with_recency_latest_alt_3_distraction_tools"
+      ],
+      "called_scenarios": [
+        "modify_reminder_with_recency_latest_alt",
+        "remove_reminder_with_recency_latest",
+        "remove_reminder_with_recency_latest_alt",
+        "remove_reminder_with_recency_latest_alt_3_distraction_tools"
+      ],
+      "visible_not_called_scenarios": [
+        "modify_contact_with_message_recency",
+        "modify_contact_with_message_recency_10_distraction_tools",
+        "modify_contact_with_message_recency_3_distraction_tools",
+        "modify_contact_with_message_recency_alt",
+        "modify_contact_with_message_recency_alt_10_distraction_tools",
+        "modify_contact_with_message_recency_alt_3_distraction_tools",
+        "modify_reminder_with_recency_latest",
+        "modify_reminder_with_recency_latest_3_distraction_tools",
+        "modify_reminder_with_recency_latest_alt_3_distraction_tools",
+        "remove_reminder_with_recency_latest_3_distraction_tools"
+      ],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [
+        "modify_reminder_with_recency_latest_alt",
+        "remove_reminder_with_recency_latest",
+        "remove_reminder_with_recency_latest_alt",
+        "remove_reminder_with_recency_latest_alt_3_distraction_tools"
+      ],
+      "hidden_no_call_scenarios": [
+        "search_message_with_recency_latest",
+        "search_message_with_recency_latest_alt",
+        "search_message_with_recency_oldest",
+        "search_message_with_recency_oldest_alt",
+        "search_reminder_with_creation_recency_yesterday",
+        "search_reminder_with_recency_yesterday"
+      ],
+      "visible_count": 14,
+      "called_count": 4,
+      "visible_not_called_count": 10,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 6,
+      "called_subset": {
+        "scenario_count": 4,
+        "scenarios": [
+          "modify_reminder_with_recency_latest_alt",
+          "remove_reminder_with_recency_latest",
+          "remove_reminder_with_recency_latest_alt",
+          "remove_reminder_with_recency_latest_alt_3_distraction_tools"
+        ],
+        "mean_canonical_delta": 0.08333333333333333,
+        "mean_outcome_delta": 0.25,
+        "canonical_gains": 1,
+        "canonical_regressions": 0,
+        "canonical_preserved": 3,
+        "outcome_gains": 1,
+        "outcome_regressions": 0,
+        "outcome_preserved": 3,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 10,
+        "scenarios": [
+          "modify_contact_with_message_recency",
+          "modify_contact_with_message_recency_10_distraction_tools",
+          "modify_contact_with_message_recency_3_distraction_tools",
+          "modify_contact_with_message_recency_alt",
+          "modify_contact_with_message_recency_alt_10_distraction_tools",
+          "modify_contact_with_message_recency_alt_3_distraction_tools",
+          "modify_reminder_with_recency_latest",
+          "modify_reminder_with_recency_latest_3_distraction_tools",
+          "modify_reminder_with_recency_latest_alt_3_distraction_tools",
+          "remove_reminder_with_recency_latest_3_distraction_tools"
+        ],
+        "mean_canonical_delta": -0.11257931874048024,
+        "mean_outcome_delta": -0.15622710622710623,
+        "canonical_gains": 2,
+        "canonical_regressions": 6,
+        "canonical_preserved": 2,
+        "outcome_gains": 1,
+        "outcome_regressions": 2,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 6,
+        "scenarios": [
+          "search_message_with_recency_latest",
+          "search_message_with_recency_latest_alt",
+          "search_message_with_recency_oldest",
+          "search_message_with_recency_oldest_alt",
+          "search_reminder_with_creation_recency_yesterday",
+          "search_reminder_with_recency_yesterday"
+        ],
+        "mean_canonical_delta": 0.009432664999241632,
+        "mean_outcome_delta": -0.041493441040307485,
+        "canonical_gains": 2,
+        "canonical_regressions": 3,
+        "canonical_preserved": 1,
+        "outcome_gains": 1,
+        "outcome_regressions": 4,
+        "outcome_preserved": 1,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    }
+  },
+  "accepted_tools": [],
+  "accepted_but_uncalled_tools": [],
+  "retained_helper_called_tools": [
+    "prepare_contact_update_from_recent_message",
+    "select_recency_target_and_prepare_action"
+  ],
+  "newly_generated_helper_called_tools": [],
+  "registry_size": 2,
+  "runtime_bundle_size": {
+    "scenario_count": 20,
+    "mean_generated_tool_bundle_size": 1.0,
+    "max_generated_tool_bundle_size": 2,
+    "mean_available_tool_count": 7.9,
+    "max_available_tool_count": 17
+  },
+  "compute_cache_token_metrics": {
+    "candidate_openai_response_cache": {},
+    "candidate_prompt_cache": {
+      "root": "outputs/prompt_cache",
+      "hits": 0,
+      "misses": 0,
+      "writes": 0
+    }
+  },
+  "selection_event_count": 20,
+  "visibility_event_count": 20
+}

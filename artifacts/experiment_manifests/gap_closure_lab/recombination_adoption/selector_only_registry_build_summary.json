@@ -1,0 +1,12 @@
+{
+  "created_at": "2026-05-08T13:24:50.512470+00:00",
+  "experimental_only": true,
+  "leakage_statement": "No scenario ids, hidden truth labels, expected answers, or task-specific facts are encoded. Routing uses visible family labels and generic recency/action trigger text only.",
+  "objective": "Natural expanded60 adoption test for a small selector-only recency/action portfolio after parking the resolver and contact bridge.",
+  "registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_selector_only_pack/registry_manifest.json",
+  "registry_sha256": "761444d635e9f8d558e17e83f95e47f880a2ad339d9de86d9937c20e5f3548c8",
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_adoption_minimal_pack/registry_manifest.json",
+  "tools": [
+    "select_recency_target_and_prepare_action"
+  ]
+}

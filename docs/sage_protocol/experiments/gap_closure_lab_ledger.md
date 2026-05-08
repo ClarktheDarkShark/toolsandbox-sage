@@ -8,9 +8,9 @@ Experimental evidence only. Nothing in this ledger modifies protected best3, for
 - Split manifest: `artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json`
 - Split file SHA-256: `7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9`
 - Split payload SHA-256: `41a9565960005007bdcc8a0e901b81a300e2e5c1c52c0b38e15e17fe83f983d4`
-- Baseline cache manifest hash: `df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d`
+- Baseline cache manifest hashes observed: earlier campaign `df208500e1d1a2cbfafae05f2b73e1a75b8929d245506836acc17deeb463099d`; recombination continuation `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
 - Candidate/SAGE arms: fresh runs with OpenAI response cache disabled for experimental comparisons.
-- Dashboard discipline: each completed run with a dashboard was opened to the Task Focus dashboard; latest opened dashboard is `outputs/gap_closure_lab/recombination_adoption/best3_bridge_expanded60/expanded_60_20260508_063356/dashboard/task_focus.html`.
+- Dashboard discipline: each completed run with a dashboard was opened to the Task Focus dashboard; latest opened dashboard is `outputs/gap_closure_lab/recombination_adoption/selector_only_confirm100/confirm_100_20260508_095751/dashboard/task_focus.html`.
 
 ## Experiment Runs
 
@@ -44,6 +44,11 @@ Experimental evidence only. Nothing in this ledger modifies protected best3, for
 | GCL-025 | Recombination V2.6 bridge focus20 | 20 targeted unseen | `recency_action_v26_bridge_pack` | 20 cached / 0 fresh | Outcome +0.5452, canonical +0.2976; strongest focus result; composite bridge called 5/14 visible with called-subset outcome +0.6116 | Most promising targeted run; expand before confirmation |
 | GCL-026 | Recombination V2.6 bridge expanded60 | 60 unseen | `recency_action_v26_bridge_pack` | 0 cached / 60 fresh | Outcome +0.0050, canonical -0.0429, exact success delta 0, zero runtime exceptions, protocol gate failed; helper call share below 25%; composite bridge VNC 2/2 | Do not confirm; retain pocket only |
 | GCL-027 | Recombination best3 bridge expanded60 | 60 unseen | `recency_action_best3_bridge_pack` | 0 cached / 60 fresh | Outcome -0.0734, canonical -0.0031, exact success delta 0, zero runtime exceptions, protocol gate failed; latest Task Focus dashboard rendered paired data with 0 console errors | Do not confirm; stop broad recombination campaign |
+| GCL-028 | Recombination adoption-minimal expanded60 | 60 unseen | `recency_action_adoption_minimal_pack` | 0 cached / 60 fresh; OpenAI cache off | Outcome +0.0480, canonical -0.0551, exact success -2, runtime exceptions 0; selector called 1/2 visible with canonical +0.1808 and outcome preserved | Retain selector signal; resolver not enough for scale |
+| GCL-029 | Action-only contact/selector expanded60 | 60 unseen | `recency_action_contact_update_action_only_pack`, SHA `b07d81a9...` | 0 cached / 60 fresh; OpenAI cache off | Outcome -0.0052, canonical -0.0829, exact success -6, runtime exceptions 0; no experimental tools called | Diagnose no-call; force contact helper |
+| GCL-030 | Force-after-search contact diagnostic | 20 targeted diagnostic | `recency_action_contact_update_action_only_pack` with forced `prepare_contact_update_from_recent_message` | 0 cached / 20 fresh; OpenAI cache off | Outcome -0.0406, canonical -0.0368, runtime exceptions 0; contact helper forced 6/6 with called-subset outcome -0.0937; selector naturally called 4 with called-subset outcome +0.2500 | Park contact helper; keep selector pocket |
+| GCL-031 | Selector-only expanded60 adoption run | 60 unseen | `recency_action_selector_only_pack`, SHA `761444d6...` | 0 cached / 60 fresh; OpenAI cache off | Outcome +0.0045, canonical -0.0487, exact success -4, runtime exceptions 0; selector visible 2/called 2/VNC 0, called-subset outcome +0.2478 and canonical +0.1026 | Expanded60 positive adoption achieved; run confirm100 because low-frequency value may matter |
+| GCL-032 | Selector-only confirm100 | 100 unseen | `recency_action_selector_only_pack`, SHA `761444d6...` | 0 cached / 100 fresh; OpenAI cache off | Outcome -0.1004, canonical -0.0483, exact success -4, runtime exceptions 0; selector visible 5/called 2/VNC 3, called-subset outcome 0.0 and canonical -0.3333; one helper side-effect preservation incident | Do not scale/promote; retain expanded60 as potential but park current form pending side-effect and routing repair |
 
 ## Required Family Status
 
@@ -70,4 +75,4 @@ Experimental evidence only. Nothing in this ledger modifies protected best3, for
 
 ## Stop Decision
 
-Stop condition 2 is met for this branch campaign: all required families received fair-chance diagnostic or expanded-pilot treatment, including repair/force diagnostics where appropriate, and no approach shows scalable value on primary outcome. Minor positive tools are not discarded; they remain recombination candidates for a later campaign.
+Stop condition 2 remains met for the full branch campaign. The focused recombination continuation did achieve the requested expanded60 positive natural-adoption signal for `select_recency_target_and_prepare_action`, but confirm100 failed on broad outcome and safety, so no approach is currently promotion-ready. Minor positive tools are not discarded; the selector remains a design/refinement pocket, not scale evidence.
