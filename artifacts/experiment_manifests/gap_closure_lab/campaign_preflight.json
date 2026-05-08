@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-05-08T00:48:28.429508+00:00",
+  "branch": "exp/sage-gap-closure-lab",
+  "head": "a662f0e",
+  "status": "blocked",
+  "blockers": [
+    "missing_openai_api_key"
+  ],
+  "manifest": {
+    "manifest_path": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+    "manifest_type": "sage_gap_closure_lab_splits",
+    "file_sha256": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+    "recorded_file_sha256": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+    "file_hash_matches_sidecar": true,
+    "payload_sha256": "41a9565960005007bdcc8a0e901b81a300e2e5c1c52c0b38e15e17fe83f983d4",
+    "recorded_payload_sha256": "41a9565960005007bdcc8a0e901b81a300e2e5c1c52c0b38e15e17fe83f983d4",
+    "payload_hash_matches": true,
+    "runner_split_counts": {
+      "pilot_20": 20,
+      "expanded_60": 60,
+      "confirm_100": 100,
+      "validate_250": 250
+    },
+    "runner_split_errors": {}
+  },
+  "openai": {
+    "OPENAI_API_KEY_present": false,
+    "status": "blocker",
+    "required_for": [
+      "ToolSandbox agent/user live runs",
+      "SAGE tool generation and repair",
+      "fresh candidate arms without cross-arm cache leakage"
+    ]
+  },
+  "protected_paths": [
+    {
+      "path": "artifacts/registry_frozen_best3_claim/registry_manifest.json",
+      "exists": false,
+      "policy": "do_not_modify"
+    },
+    {
+      "path": "artifacts/final_sage_praxis_package",
+      "exists": true,
+      "policy": "do_not_modify"
+    }
+  ]
+}

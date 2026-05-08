@@ -41,10 +41,18 @@ Split policy:
 | --- | ---: | --- | --- | --- |
 | `seed_dev_labeled` | 8 | allowed | pain-point analysis, tool design, generation prompt repair, validation examples | never final evidence |
 | `pilot_unseen` | 20 | not allowed before sealed run | Micro20 natural and force diagnostics | diagnostic only |
+| `expanded_pilot_unseen` | 60 | not allowed before sealed run | expanded natural adoption, repair rerun, portfolio interaction testing | diagnostic only |
 | `confirm_unseen` | 100 | not allowed before sealed run | matched confirmation, ablations, adoption measurement | confirmation evidence only |
 | `scale_unseen` | 250 | not allowed before sealed run | scale validation after confirm-positive result | experimental scale evidence |
 
 Seed/dev base task families are excluded from all unseen splits. Scenario IDs are recorded for auditability only and may not be hard-coded into generated tools, routers, prompts, repairs, or expected outputs.
+
+Runner aliases in the manifest map:
+
+- `pilot_20` -> `pilot_unseen`
+- `expanded_60` -> `expanded_pilot_unseen`
+- `confirm_100` -> `confirm_unseen`
+- `validate_250` and `promotion_250` -> `scale_unseen`
 
 ## Leakage Controls
 - No hidden truth labels outside `seed_dev_labeled`.
@@ -117,6 +125,7 @@ Run targeted validation after meaningful changes:
 
 ```bash
 PYTHONPATH=src:. python scripts/make_gap_closure_lab_manifest.py
+PYTHONPATH=src:. python scripts/preflight_gap_closure_campaign.py
 PYTHONPATH=src:. pytest tests/unit/test_gap_closure_lab_manifest.py
 python scripts/migrate_registry.py --check-only
 git diff --check

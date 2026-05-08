@@ -47,6 +47,19 @@ SPLIT_SPECS: dict[str, dict[str, Any]] = {
         "disallowed_uses": ["generation_with_truth_labels", "final_evaluation"],
         "final_evaluation": False,
     },
+    "expanded_pilot_unseen": {
+        "size": 60,
+        "max_per_family": 3,
+        "truth_labels_inspected": False,
+        "allowed_uses": [
+            "expanded_pilot",
+            "natural_adoption_rerun_after_repair",
+            "portfolio_interaction_test",
+            "family_merit_assessment",
+        ],
+        "disallowed_uses": ["generation_with_truth_labels", "final_evaluation"],
+        "final_evaluation": False,
+    },
     "confirm_unseen": {
         "size": 100,
         "max_per_family": 4,
@@ -75,6 +88,14 @@ SPLIT_SPECS: dict[str, dict[str, Any]] = {
         ],
         "final_evaluation": True,
     },
+}
+
+RUNNER_SPLIT_ALIASES = {
+    "pilot_20": "pilot_unseen",
+    "expanded_60": "expanded_pilot_unseen",
+    "confirm_100": "confirm_unseen",
+    "validate_250": "scale_unseen",
+    "promotion_250": "scale_unseen",
 }
 
 PRIMARY_STRATA_ORDER = (
@@ -336,6 +357,7 @@ def make_gap_closure_lab_manifest(
             }
             for name, spec in SPLIT_SPECS.items()
         },
+        "split_aliases": RUNNER_SPLIT_ALIASES,
         "leakage_controls": [
             "Seed/dev base families are excluded from all unseen splits.",
             "No scenario is assigned to more than one split.",

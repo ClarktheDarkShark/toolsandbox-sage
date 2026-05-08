@@ -81,9 +81,18 @@ def write_split_manifest(output_path: Path, seed: int = 42) -> Path:
 
 def load_split_names(manifest_path: Path, split_name: str) -> list[str]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    aliases = manifest.get("split_aliases", {})
+    if split_name not in manifest.get("splits", {}) and isinstance(aliases, dict):
+        split_name = str(aliases.get(split_name, split_name))
     try:
         records = manifest["splits"][split_name]
     except KeyError as exc:
         available = sorted(manifest.get("splits", {}).keys())
         raise KeyError(f"Unknown split {split_name!r}; available: {available}") from exc
-    return [str(record["name"]) for record in records]
+    names = []
+    for record in records:
+        if "name" in record:
+            names.append(str(record["name"]))
+        else:
+            names.append(str(record["scenario_id"]))
+    return names

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from sage_ts.config.campaign_splits import make_campaign_manifest
@@ -14,6 +15,27 @@ def test_write_and_load_split_manifest(tmp_path: Path) -> None:
     assert len(online) == 100
     assert len(set(smoke)) == 10
     assert not set(smoke) & set(online)
+
+
+def test_load_split_names_resolves_manifest_alias(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "aliased_splits.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "splits": {
+                    "pilot_unseen": [
+                        {"scenario_id": "task_a"},
+                        {"scenario_id": "task_b"},
+                    ]
+                },
+                "split_aliases": {"pilot_20": "pilot_unseen"},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert load_split_names(manifest_path, "pilot_20") == ["task_a", "task_b"]
 
 
 def test_campaign_manifest_front_loads_recency_birth_scenarios() -> None:

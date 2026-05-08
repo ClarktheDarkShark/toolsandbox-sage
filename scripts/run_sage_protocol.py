@@ -59,6 +59,9 @@ MODES = (
     # Smoke / wiring checks
     "smoke_6",
     "smoke_12",
+    # Experimental gap-closure lab lanes
+    "pilot_20",
+    "expanded_60",
     # Mechanism / tool-birth checks
     "viability_12",
     "mechanism_12",
@@ -93,6 +96,8 @@ def _generation_enabled_by_default(mode: str, manifest_type: str) -> bool:
     generation_modes = {
         "smoke_6",
         "smoke_12",
+        "pilot_20",
+        "expanded_60",
         "viability_12",
         "mechanism_12",
         "mechanism_40",
