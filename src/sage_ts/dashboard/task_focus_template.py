@@ -437,7 +437,8 @@ TASK_FOCUS_HTML = r"""<!doctype html>
           <div class="paired-run-status">${esc(task.status || "pending")} · ${esc(String(task.turn_count ?? "—"))} turns</div>
         </div>
         <div class="paired-run-metrics">
-          <div class="paired-mini"><div class="mlabel">Final</div><div class="mvalue">${esc(fmt(ev.final_score))}</div><div class="mnote">${ev.blocked_by_guardrail ? "guardrail" : "score"}</div></div>
+          <div class="paired-mini"><div class="mlabel">Canonical</div><div class="mvalue">${esc(fmt(ev.final_score))}</div><div class="mnote">${ev.blocked_by_guardrail ? "guardrail" : "score"}</div></div>
+          ${present(task.outcome_similarity)?`<div class="paired-mini"><div class="mlabel">Outcome</div><div class="mvalue">${esc(fmt(task.outcome_similarity))}</div><div class="mnote">task result</div></div>`:""}
           <div class="paired-mini"><div class="mlabel">Required</div><div class="mvalue">${esc(fmt(ev.required_score))}</div><div class="mnote">${esc(requiredState)}</div></div>
           <div class="paired-mini"><div class="mlabel">Forbidden</div><div class="mvalue">${esc(fmt(ev.forbidden_score))}</div><div class="mnote">${esc(forbiddenState)}</div></div>
         </div>
@@ -547,12 +548,13 @@ TASK_FOCUS_HTML = r"""<!doctype html>
 
       const o = task.outcome || {};
       const sim = task.similarity ?? o.similarity;
-      const scoreClass = Number.isFinite(Number(sim)) ? (Number(sim) >= .999 ? "good" : "bad") : "";
+      const scoreClass = Number.isFinite(Number(sim)) ? (Number(sim) >= .999 ? "good" : "") : "";
       const cats = (task.categories||[]).map(c=>`<span class="pill">${esc(c)}</span>`).join("");
-      const outcome = present(task.outcome_similarity) ? `<span class="pill">outcome ${fmt(task.outcome_similarity)}</span>` : "";
+      const outcomeClass = present(task.outcome_similarity) ? (Number(task.outcome_similarity) >= .999 ? "good" : "bad") : "";
+      const outcome = present(task.outcome_similarity) ? `<span class="pill ${outcomeClass}">outcome ${fmt(task.outcome_similarity)}</span>` : "";
       dh.innerHTML = `
         <div class="d-title">${detailTitleHtml(task, task.short_name||task.scenario)}</div>
-        <div class="tags">${cats}<span class="pill ${scoreClass}">score ${fmt(sim)}</span>${outcome}<span class="pill">${task.turn_count||"—"} turns</span></div>`;
+        <div class="tags">${cats}<span class="pill ${scoreClass}">canonical ${fmt(sim)}</span>${outcome}<span class="pill">${task.turn_count||"—"} turns</span></div>`;
 
       renderEvaluation(task);
     }

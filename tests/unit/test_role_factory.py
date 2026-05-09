@@ -151,3 +151,24 @@ def test_answer_retention_response_recaps_without_tool_call() -> None:
         _answer_retention_response_text(messages)
         == "You're welcome. To recap: Your relationship with +10000000000 is boss."
     )
+
+
+def test_answer_retention_response_recaps_message_answer_after_ack() -> None:
+    messages = [
+        {"role": "user", "content": "Find my most recent text."},
+        {
+            "role": "tool",
+            "name": "select_message_content_by_recency",
+            "content": "{'exact_final_answer': \"Your most recent message says 'Good, keep me posted'.\"}",
+        },
+        {
+            "role": "assistant",
+            "content": "Your most recent message says 'Good, keep me posted'.",
+        },
+        {"role": "user", "content": "Thanks!"},
+    ]
+
+    assert (
+        _answer_retention_response_text(messages)
+        == "You're welcome. To recap: Your most recent message says 'Good, keep me posted'."
+    )

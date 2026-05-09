@@ -3,7 +3,11 @@ import json
 
 import pytest
 
-from sage_ts.evaluation.outcome_score import _content_similarity, compute_outcome_score
+from sage_ts.evaluation.outcome_score import (
+    _content_similarity,
+    _outcome_observed_messages,
+    compute_outcome_score,
+)
 from tool_sandbox.cli.utils import resolve_scenarios
 from tool_sandbox.common.execution_context import (
     DatabaseNamespace,
@@ -136,3 +140,59 @@ def test_outcome_score_only_uses_final_agent_to_user_message() -> None:
     )
 
     assert outcome["outcome_similarity"] == 0.0
+
+
+def test_outcome_score_ignores_plain_ack_after_user_thanks() -> None:
+    scenario_name = "find_days_till_holiday_3_distraction_tools"
+    scenario = resolve_scenarios(
+        desired_scenario_names=[scenario_name],
+        preferred_tool_backend=ToolBackend.DEFAULT,
+    )[scenario_name]
+    current_timestamp = 1777597539.872639
+    execution_context = ExecutionContext()
+    execution_context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.EXECUTION_ENVIRONMENT,
+                "recipient": RoleType.AGENT,
+                "content": str(current_timestamp),
+                "tool_trace": [
+                    json.dumps(
+                        {
+                            "tool_name": "get_current_timestamp",
+                            "arguments": {},
+                            "result": current_timestamp,
+                        }
+                    )
+                ],
+            },
+            {
+                "sender": RoleType.AGENT,
+                "recipient": RoleType.USER,
+                "content": "There are 239 days until Christmas Day.",
+            },
+            {
+                "sender": RoleType.USER,
+                "recipient": RoleType.AGENT,
+                "content": "Thanks!",
+            },
+            {
+                "sender": RoleType.AGENT,
+                "recipient": RoleType.USER,
+                "content": "You're welcome! If you need anything else, feel free to ask.",
+            },
+        ],
+    )
+
+    assert _outcome_observed_messages(execution_context) == [
+        "There are 239 days until Christmas Day."
+    ]
+    outcome = compute_outcome_score(
+        scenario,
+        execution_context,
+        canonical_milestone_scores={0: 1.0, 1: 0.0, 2: 0.0, 3: 0.0},
+        minefield_similarity=0.0,
+    )
+
+    assert outcome["outcome_similarity"] == 1.0

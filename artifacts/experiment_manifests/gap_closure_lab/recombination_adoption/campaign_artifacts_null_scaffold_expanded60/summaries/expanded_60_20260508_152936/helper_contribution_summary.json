@@ -1,0 +1,30 @@
+{
+  "control_dir": "outputs/gap_closure_lab/recombination_adoption/null_scaffold_expanded60/expanded_60_20260508_152936/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_08_2026_15_29_42",
+  "candidate_dir": "outputs/gap_closure_lab/recombination_adoption/null_scaffold_expanded60/expanded_60_20260508_152936/candidate/expanded_60_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_08_2026_15_44_18",
+  "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/null_scaffold_pack",
+  "scenario_count": 60,
+  "helpers": {},
+  "accepted_tools": [],
+  "accepted_but_uncalled_tools": [],
+  "retained_helper_called_tools": [],
+  "newly_generated_helper_called_tools": [],
+  "registry_size": 0,
+  "runtime_bundle_size": {
+    "scenario_count": 60,
+    "mean_generated_tool_bundle_size": 0.0,
+    "max_generated_tool_bundle_size": 0,
+    "mean_available_tool_count": 9.583333333333334,
+    "max_available_tool_count": 34
+  },
+  "compute_cache_token_metrics": {
+    "candidate_openai_response_cache": {},
+    "candidate_prompt_cache": {
+      "root": "outputs/prompt_cache",
+      "hits": 0,
+      "misses": 0,
+      "writes": 0
+    }
+  },
+  "selection_event_count": 60,
+  "visibility_event_count": 60
+}

@@ -1,0 +1,96 @@
+{
+  "runs": [
+    {
+      "updated_at": "2026-05-09T07:41:52.646484+00:00",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113",
+      "mode": "expanded_60",
+      "manifest_type": "sage_gap_closure_lab_postexpanded_residual_splits",
+      "status": "complete",
+      "agent": "gpt-4o-mini",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "user": {
+          "requested_model": "GPT_4_o_2024_05_13",
+          "resolved_model": "GPT_4_o_2024_05_13",
+          "known_model": false,
+          "comparison_key": "GPT_4_o_2024_05_13"
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+        "mixed_model_warning": null
+      },
+      "comparison_model_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+      "generation_enabled": false,
+      "base_tool_policy": "upstream",
+      "scenario_count": 40,
+      "control_dir": "outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113/control/expanded_60_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_09_2026_03_21_18",
+      "candidate_dir": "outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113/candidate/expanded_60_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_09_2026_03_30_30",
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/best3_plus_final_selector_days_pack",
+      "registry_gate_snapshot": {
+        "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/best3_plus_final_selector_days_pack",
+        "manifest_existed_before_run": true,
+        "snapshot_path": "outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113/registry_gate/registry_manifest_before_run.json",
+        "manifest_digest_before_run": "a2dfe231a38f79970b5259131e436ed7e36022b99eee5006bfc32ead60343c3e"
+      },
+      "registry_gate_restore": null,
+      "registry_manifest_digest_after_run": "a2dfe231a38f79970b5259131e436ed7e36022b99eee5006bfc32ead60343c3e",
+      "cohort_preflight_report": "outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113/cohort_preflight_report.json",
+      "cohort_preflight_warnings": [
+        "too_few_base_families",
+        "family_share_above_limit",
+        "near_duplicate_family_variants_above_limit"
+      ],
+      "cohort_quality_gate_status": "fail",
+      "cohort_quality_gate_failures": [
+        "too_few_base_families",
+        "family_share_above_limit",
+        "near_duplicate_family_variants_above_limit"
+      ],
+      "comparison_path": "outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113/paired_comparison.json",
+      "control_cache_mode": "use-if-eligible",
+      "control_source": "fresh",
+      "cached_control_tasks": 0,
+      "fresh_control_tasks": 40,
+      "control_cache_report_path": "outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113/control_cache_report.json",
+      "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+      "helper_contribution_summary_path": "outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113/helper_contribution_summary.json",
+      "helper_contribution_artifact_path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/campaign_artifacts_postexpanded_residual_days_all40/summaries/expanded_60_20260509_032113/helper_contribution_summary.json",
+      "accepted_but_uncalled_tools": [],
+      "dashboard_path": "outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113/dashboard/index.html",
+      "dashboard_url": "http://127.0.0.1:62036/outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113/dashboard/index.html",
+      "dashboard_task_focus_url": "http://127.0.0.1:62036/outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113/dashboard/task_focus.html",
+      "parallel_arms": false,
+      "mean_similarity_delta": -0.04051962588930616,
+      "mean_outcome_similarity_delta": 0.11686623535944465,
+      "protocol_gate_passed": true,
+      "protocol_gate_reasons": []
+    }
+  ],
+  "updated_at": "2026-05-09T07:41:52.646494+00:00"
+}

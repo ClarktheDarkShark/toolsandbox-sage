@@ -65,6 +65,12 @@ def _is_agent_to_user(row: dict[str, Any]) -> bool:
     ) == _role(RoleType.USER)
 
 
+def _is_user_to_agent(row: dict[str, Any]) -> bool:
+    return _role(row.get("sender")) == _role(RoleType.USER) and _role(
+        row.get("recipient")
+    ) == _role(RoleType.AGENT)
+
+
 def _sandbox_rows(execution_context: ExecutionContext) -> list[dict[str, Any]]:
     sandbox_namespace = cast(DatabaseNamespace, DatabaseNamespace.SANDBOX)
     rows = execution_context.get_database(
@@ -75,14 +81,97 @@ def _sandbox_rows(execution_context: ExecutionContext) -> list[dict[str, Any]]:
     return rows
 
 
+def _is_brief_user_acknowledgement(content: str) -> bool:
+    lower = content.strip().lower()
+    if not lower:
+        return False
+    if "?" in lower or any(
+        token in lower
+        for token in (
+            "can you",
+            "could you",
+            "what ",
+            "why ",
+            "how ",
+            "search",
+            "find",
+            "add ",
+            "remove ",
+            "modify ",
+            "send ",
+        )
+    ):
+        return False
+    return any(
+        token in lower
+        for token in (
+            "thank",
+            "thanks",
+            "got it",
+            "great",
+            "cool",
+            "okay",
+            "ok",
+            "alright",
+            "you found it",
+        )
+    )
+
+
+def _is_plain_assistant_acknowledgement(content: str) -> bool:
+    lower = " ".join(content.strip().lower().split())
+    if not lower:
+        return False
+    if any(
+        token in lower
+        for token in (
+            "recap",
+            "says",
+            "phone",
+            "+",
+            " is ",
+            " are ",
+        )
+    ):
+        return False
+    return lower.startswith(
+        (
+            "you're welcome",
+            "you are welcome",
+            "no problem",
+            "glad i could help",
+            "happy to help",
+        )
+    )
+
+
 def _agent_messages(execution_context: ExecutionContext) -> list[str]:
-    messages: list[str] = []
-    for row in _sandbox_rows(execution_context):
+    rows = _sandbox_rows(execution_context)
+    messages: list[tuple[int, str]] = []
+    for index, row in enumerate(rows):
         if _is_agent_to_user(row):
             content = _as_text(row.get("content")).strip()
             if content:
-                messages.append(content)
-    return [] if not messages else [messages[-1]]
+                messages.append((index, content))
+    if not messages:
+        return []
+    latest_index, latest_content = messages[-1]
+    if len(messages) > 1 and _is_plain_assistant_acknowledgement(latest_content):
+        latest_user = None
+        for row in reversed(rows[:latest_index]):
+            if _is_user_to_agent(row):
+                latest_user = _as_text(row.get("content"))
+                break
+            if _is_agent_to_user(row):
+                break
+        if latest_user is not None and _is_brief_user_acknowledgement(latest_user):
+            return [messages[-2][1]]
+    return [latest_content]
+
+
+def _outcome_observed_messages(execution_context: ExecutionContext) -> list[str]:
+    """Expose the exact assistant messages used by outcome scoring."""
+    return _agent_messages(execution_context)
 
 
 def _parse_tool_trace_value(tool_trace: Any) -> list[dict[str, Any]]:
@@ -386,6 +475,7 @@ def compute_outcome_score(
                     "included": True,
                     "score": score,
                     "targets": templates,
+                    "observed_messages": messages,
                 }
             )
             continue

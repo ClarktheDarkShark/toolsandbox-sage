@@ -1,0 +1,11 @@
+{
+  "created_at": "2026-05-08T20:45:42.109128+00:00",
+  "leakage_statement": "Tool metadata uses generic user-facing recency phrases and prior experimental diagnostics. It does not encode scenario IDs, hidden truth labels, expected answers, or benchmark-specific task facts.",
+  "objective": "Test whether a tiny two-tool recency/search-plus-selector portfolio improves natural adoption on contact-recency action tasks while preserving narrow routing and zero side-effect incidents.",
+  "output_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_portfolio_pack/registry_manifest.json",
+  "output_registry_sha256": "18f24d91c5723bd6f1bc8b5a28bd40365d4d28230c3264472d8196dcdada1d56",
+  "tool_names": [
+    "resolve_search_window_or_bounds",
+    "select_message_counterparty_for_contact_update"
+  ]
+}

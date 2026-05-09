@@ -1,0 +1,197 @@
+{
+  "cache_policy": {
+    "baseline_control_cache": "eligible",
+    "openai_response_cache_for_candidate": "disabled",
+    "sage_candidate_cache": "fresh_only"
+  },
+  "created_at": "2026-05-09T02:09:35.713530+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "cache_availability_used_for_selection": false,
+    "expected_answers_encoded": false,
+    "labels_inspected_before_run": false,
+    "repair_contaminated": true,
+    "scenario_ids_encoded_into_tools_or_router": false
+  },
+  "manifest_type": "sage_gap_closure_lab_final_selector_repair_smoke6",
+  "schema_version": 1,
+  "selection_policy": {
+    "purpose": "Diagnostic-only repair replay for post-search message recency selection. Includes the sealed Task 77 failure mechanism and near variants; not promotion evidence.",
+    "source": "tool_sandbox.scenarios named_scenarios via scenario_records",
+    "used_cache_availability": false,
+    "used_expected_answers": false,
+    "used_truth_labels": false
+  },
+  "split_aliases": {
+    "smoke_6": "final_selector_repair_smoke6"
+  },
+  "split_diversity": {
+    "final_selector_repair_smoke6": {
+      "distinct_family_count": 2,
+      "diversity_reason": "Intentional diagnostic near-variant set for one repaired failure mode. It is unsuitable for final evidence.",
+      "family_counts": {
+        "search_message_with_recency_latest": 4,
+        "search_message_with_recency_oldest": 2
+      },
+      "near_duplicate_dominated": true,
+      "scenario_count": 6
+    }
+  },
+  "split_sizes": {
+    "final_selector_repair_smoke6": 6
+  },
+  "splits": {
+    "final_selector_repair_smoke6": [
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "end_conversation",
+          "search_messages",
+          "timestamp_diff"
+        ],
+        "family_label": "search_message_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "search_message_with_recency_latest_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled",
+        "split": "final_selector_repair_smoke6",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "end_conversation",
+          "search_messages",
+          "timestamp_diff"
+        ],
+        "family_label": "search_message_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "search_message_with_recency_latest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+        "split": "final_selector_repair_smoke6",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "end_conversation",
+          "search_messages",
+          "timestamp_diff"
+        ],
+        "family_label": "search_message_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "search_message_with_recency_latest_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled",
+        "split": "final_selector_repair_smoke6",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "search_messages"
+        ],
+        "family_label": "search_message_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "search_message_with_recency_latest_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+        "split": "final_selector_repair_smoke6",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "unit_conversion",
+          "timestamp_diff",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "search_messages"
+        ],
+        "family_label": "search_message_with_recency_oldest",
+        "final_evaluation": false,
+        "scenario_id": "search_message_with_recency_oldest_3_distraction_tools",
+        "split": "final_selector_repair_smoke6",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "unit_conversion",
+          "timestamp_diff",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "search_messages"
+        ],
+        "family_label": "search_message_with_recency_oldest",
+        "final_evaluation": false,
+        "scenario_id": "search_message_with_recency_oldest_3_distraction_tools_arg_type_scrambled",
+        "split": "final_selector_repair_smoke6",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ]
+  },
+  "truth_labels_inspected": false
+}

@@ -134,6 +134,45 @@ def _parse_tool_message_content(raw_content: object) -> object:
             return text
 
 
+def _tool_trace_events_from_execution_context(path: Path) -> list[dict[str, object]]:
+    """Return actual ToolSandbox tool events from a serialized execution context."""
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    dbs = payload.get("_dbs")
+    if not isinstance(dbs, dict):
+        return []
+    rows = dbs.get("SANDBOX")
+    if not isinstance(rows, list):
+        return []
+
+    events: list[dict[str, object]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        raw_traces = row.get("tool_trace")
+        if raw_traces is None:
+            continue
+        trace_items = raw_traces if isinstance(raw_traces, list) else [raw_traces]
+        for raw_trace in trace_items:
+            trace = _parse_tool_message_content(raw_trace)
+            if not isinstance(trace, dict):
+                continue
+            tool_name = trace.get("tool_name")
+            if not isinstance(tool_name, str) or not tool_name:
+                continue
+            event = dict(trace)
+            event["_sandbox_message_index"] = row.get("sandbox_message_index")
+            event["_openai_function_name"] = row.get("openai_function_name")
+            events.append(event)
+    return events
+
+
 def _conversation_generated_tool_results(
     output_directory: Path,
     scenario_name: str,
@@ -241,11 +280,103 @@ def _next_assistant_tool_names(
     return []
 
 
+def _next_trace_tool_names(
+    events: list[dict[str, object]],
+    *,
+    start_index: int,
+) -> set[str]:
+    for event in events[start_index + 1 :]:
+        tool_name = event.get("tool_name")
+        if isinstance(tool_name, str):
+            return {tool_name}
+    return set()
+
+
+def _later_trace_tool_names(
+    events: list[dict[str, object]],
+    *,
+    start_index: int,
+) -> set[str]:
+    later_tools: set[str] = set()
+    for event in events[start_index + 1 :]:
+        tool_name = event.get("tool_name")
+        if isinstance(tool_name, str):
+            later_tools.add(tool_name)
+    return later_tools
+
+
+def _side_effect_followup_failures_from_trace_events(
+    events: list[dict[str, object]],
+    *,
+    helper_name: str,
+    required_side_effect_calls: tuple[str, ...],
+) -> bool:
+    saw_helper_result = False
+    for index, event in enumerate(events):
+        if event.get("tool_name") != helper_name:
+            continue
+        saw_helper_result = True
+        output = event.get("result")
+        next_tools = _next_trace_tool_names(events, start_index=index)
+        required = set(required_side_effect_calls)
+        if isinstance(output, dict):
+            declares_followup = any(
+                key in output
+                for key in (
+                    "should_call_add_reminder",
+                    "should_call",
+                    "should_call_tool",
+                    "downstream_tool_name",
+                    "add_reminder_kwargs",
+                    "downstream_tool_kwargs",
+                )
+            )
+            if not declares_followup:
+                continue
+            if (
+                output.get("should_call_add_reminder") is False
+                or output.get("should_call") is False
+                or output.get("should_call_tool") is False
+            ):
+                selection_only_bridge = (
+                    isinstance(output.get("selected_record"), dict)
+                    and bool(output.get("selected_record"))
+                    and str(output.get("downstream_tool_name") or "")
+                    in required_side_effect_calls
+                    and str(output.get("final_answer_recommendation") or "").startswith(
+                        "use_selected_record:"
+                    )
+                )
+                if selection_only_bridge:
+                    later_tools = _later_trace_tool_names(
+                        events,
+                        start_index=index,
+                    )
+                    if not (required & later_tools):
+                        return True
+                    continue
+                if required & next_tools:
+                    return True
+                continue
+            if (
+                output.get("should_call_add_reminder") is True
+                or output.get("should_call") is True
+                or output.get("should_call_tool") is True
+            ):
+                if not (required & next_tools):
+                    return True
+                continue
+        if not (required & _later_trace_tool_names(events, start_index=index)):
+            return True
+    return not saw_helper_result
+
+
 def _side_effect_followup_failures(
     messages: list[object],
     *,
     helper_name: str,
     required_original_tool_calls: tuple[str, ...],
+    actual_tool_trace_events: list[dict[str, object]] | None = None,
 ) -> bool:
     """Return True when a helper's declared follow-up contract is violated.
 
@@ -260,6 +391,12 @@ def _side_effect_followup_failures(
     )
     if not required_side_effect_calls:
         return False
+    if actual_tool_trace_events:
+        return _side_effect_followup_failures_from_trace_events(
+            actual_tool_trace_events,
+            helper_name=helper_name,
+            required_side_effect_calls=required_side_effect_calls,
+        )
     saw_helper_result = False
     for index, message in enumerate(messages):
         if not isinstance(message, dict):
@@ -651,6 +788,9 @@ def run_sage_with_registry(
                         conv_messages = []
                 except Exception:
                     pass
+            actual_tool_trace_events = _tool_trace_events_from_execution_context(
+                output_directory / "trajectories" / name / "execution_context.json"
+            )
             for helper_name in generated_called:
                 entry = loaded_entries_for_check.get(helper_name)
                 if entry is None:
@@ -660,6 +800,7 @@ def run_sage_with_registry(
                     conv_messages,
                     helper_name=helper_name,
                     required_original_tool_calls=required,
+                    actual_tool_trace_events=actual_tool_trace_events,
                 ):
                     side_effect_failures.append(helper_name)
         if side_effect_failures:

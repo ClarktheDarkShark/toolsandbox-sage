@@ -22,11 +22,50 @@ from tool_sandbox.roles.openai_api_user import OpenAIAPIUser
 SELECTOR_ACTOR_POLICY_SENTINEL = "[SAGE selector actor policy]"
 DERIVED_ACTOR_POLICY_SENTINEL = "[SAGE derived-value actor policy]"
 LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL = "[SAGE lookup-planner actor policy]"
+SEARCH_WINDOW_ACTOR_POLICY_SENTINEL = "[SAGE search-window actor policy]"
+SAFE_ARGUMENT_ACTOR_POLICY_SENTINEL = "[SAGE safe-argument actor policy]"
 ANSWER_RETENTION_ACTOR_POLICY_SENTINEL = "[SAGE answer-retention actor policy]"
 OpenAIMessage = dict[
     Literal["role", "content", "tool_call_id", "name", "tool_calls"],
     Any,
 ]
+
+ORIGINAL_TOOLSANDBOX_TOOL_NAMES = {
+    "add_contact",
+    "modify_contact",
+    "remove_contact",
+    "search_contacts",
+    "get_cellular_service_status",
+    "get_current_location",
+    "get_location_service_status",
+    "get_wifi_status",
+    "get_low_battery_mode_status",
+    "set_cellular_service_status",
+    "set_location_service_status",
+    "set_low_battery_mode_status",
+    "set_wifi_status",
+    "search_messages",
+    "send_message_with_phone_number",
+    "convert_currency",
+    "search_lat_lon",
+    "search_location_around_lat_lon",
+    "search_stock",
+    "search_weather_around_lat_lon",
+    "add_reminder",
+    "modify_reminder",
+    "remove_reminder",
+    "search_reminder",
+    "end_conversation",
+    "calculate_lat_lon_distance",
+    "datetime_info_to_timestamp",
+    "get_current_timestamp",
+    "search_holiday",
+    "seconds_to_hours_minutes_seconds",
+    "shift_timestamp",
+    "timestamp_diff",
+    "timestamp_to_datetime_info",
+    "unit_conversion",
+}
 
 
 def _tool_names(
@@ -221,6 +260,47 @@ def _lookup_query_planner_tool_names(openai_tools: object) -> set[str]:
     return planners
 
 
+def _search_window_tool_names(openai_tools: object) -> set[str]:
+    """Return helpers that prepare bounded search kwargs from recency phrases."""
+    if openai_tools is NOT_GIVEN:
+        return set()
+    helpers: set[str] = set()
+    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
+        function = tool.get("function", {})
+        if not isinstance(function, dict):
+            continue
+        name = function.get("name")
+        description = str(function.get("description", "")).lower()
+        parameters = function.get("parameters", {})
+        properties: object = {}
+        if isinstance(parameters, dict):
+            properties = parameters.get("properties", {})
+        input_names = set(properties) if isinstance(properties, dict) else set()
+        if not isinstance(name, str):
+            continue
+        is_window_helper = name == "resolve_search_window_or_bounds" or (
+            {
+                "current_timestamp",
+                "phrase",
+                "target_domain",
+                "timestamp_intent",
+                "direction",
+            }.issubset(input_names)
+            and any(
+                token in description
+                for token in (
+                    "time-window",
+                    "recency phrase",
+                    "search kwargs",
+                    "bounded search",
+                )
+            )
+        )
+        if is_window_helper:
+            helpers.add(name)
+    return helpers
+
+
 def _tool_content_has_candidate_records(content: object) -> bool:
     text = str(content or "").strip()
     if not text or text.lower() in {"[]", "{}", "null", "none"}:
@@ -354,6 +434,7 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
 
 def _recent_tool_backed_answer_text(openai_messages: object) -> str | None:
     saw_tool = False
+    answer: str | None = None
     for message in cast(Iterable[Mapping[str, Any]], openai_messages):
         role = message.get("role")
         if role == "tool":
@@ -367,9 +448,12 @@ def _recent_tool_backed_answer_text(openai_messages: object) -> str | None:
         lower = content.lower()
         if lower.startswith(("you're welcome", "you are welcome")):
             continue
-        if any(token in lower for token in (" is ", " are ", "phone", "+", "boss")):
-            return content
-    return None
+        if any(
+            token in lower
+            for token in (" is ", " are ", "phone", "+", "boss", "message", "says")
+        ):
+            answer = content
+    return answer
 
 
 def _messages_show_recent_tool_backed_answer(openai_messages: object) -> bool:
@@ -415,7 +499,10 @@ def _selector_actor_policy_message(
             "call the helper before manually choosing. Do not call it without "
             "visible candidates, on insufficient-information tasks, or when its "
             "negative triggers match. If the selector abstains or reports a tie, "
-            "do not guess before a side-effect action."
+            "do not guess before a side-effect action. If the selector returns "
+            "exact_final_answer, final_answer_recommendation, or selected_content "
+            "for an answer-only task, your next assistant message must be exactly "
+            "that value without markdown, extra punctuation, or additional fields."
         ),
     }
 
@@ -444,7 +531,9 @@ def _derived_actor_policy_message(
             "ToolSandbox tool returned the raw structured payload needed by this "
             "helper and the user asks for a scalar/normalized answer from that "
             "payload, call the helper before manually copying or normalizing the "
-            "field. If the helper has a dict payload input, the runtime may "
+            "field. Pass the full prior tool payload when the helper expects a "
+            "dict/list payload input. If the helper has a dict payload input, "
+            "the runtime may "
             "autofill that input from the latest original tool result; provide any "
             "remaining scalar selector inputs such as requested_field or target_unit. "
             "Do not call it before the original lookup/result tool has returned, "
@@ -515,6 +604,90 @@ def _lookup_planner_actor_policy_message(
     }
 
 
+def _search_window_actor_policy_message(
+    openai_messages: object,
+    openai_tools: object,
+) -> dict[str, str] | None:
+    """Bounded policy nudge for recency/time-window search helpers."""
+    helpers = _search_window_tool_names(openai_tools)
+    if not helpers:
+        return None
+    if any(_message_already_called_tool(openai_messages, name) for name in helpers):
+        return None
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        if SEARCH_WINDOW_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
+            return None
+    helper_list = ", ".join(sorted(helpers))
+    return {
+        "role": "system",
+        "content": (
+            f"{SEARCH_WINDOW_ACTOR_POLICY_SENTINEL} A deterministic recency "
+            f"search-window helper is available: {helper_list}. If the user asks "
+            "for the latest, oldest, last, most recent, yesterday, today, or "
+            "upcoming message/reminder/search result, prefer this helper before "
+            "manually constructing search criteria. First call get_current_timestamp "
+            "when a current timestamp is needed; then call the helper with the "
+            "visible recency phrase, target_domain ('message' or 'reminder'), "
+            "timestamp_intent, and direction; then call the original ToolSandbox "
+            "search tool in target_tool_name with search_kwargs. Never call "
+            "search_messages or search_reminder with blank strings, null values, "
+            "or no criteria when a recency phrase can be converted into bounds. "
+            "If that search returns multiple records and a visible-record selector "
+            "helper is also available, call the selector before answering; do not "
+            "manually pick the first returned record when the user asked for latest "
+            "or oldest. "
+            "Do not call this helper on insufficient-information tasks or when no "
+            "time/recency search phrase is present."
+        ),
+    }
+
+
+def _has_experimental_helper_tools(openai_tools: object) -> bool:
+    if openai_tools is NOT_GIVEN:
+        return False
+    names = _tool_names(openai_tools)
+    return bool(
+        any(name not in ORIGINAL_TOOLSANDBOX_TOOL_NAMES for name in names)
+        or _selector_tool_names(openai_tools)
+        or _derived_value_tool_names(openai_tools)
+        or _lookup_query_planner_tool_names(openai_tools)
+        or _search_window_tool_names(openai_tools)
+    )
+
+
+def _safe_argument_actor_policy_message(
+    openai_messages: object,
+    openai_tools: object,
+) -> dict[str, str] | None:
+    """Generic guard against placeholder arguments that crash ToolSandbox."""
+    if not _has_experimental_helper_tools(openai_tools):
+        return None
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        if SAFE_ARGUMENT_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
+            return None
+    return {
+        "role": "system",
+        "content": (
+            f"{SAFE_ARGUMENT_ACTOR_POLICY_SENTINEL} Never call original "
+            "ToolSandbox tools with null, None, empty-string, or placeholder "
+            "arguments such as person_id=None, reminder_id=None, message_id=None, "
+            "or a guessed 'last'/'latest' id. First obtain a concrete visible "
+            "record or scalar id from a search result or deterministic helper. "
+            "If the user request lacks enough information and no visible record "
+            "or helper result supplies the required id, ask for clarification or "
+            "state that there is insufficient information. Do not probe "
+            "search_contacts, search_messages, search_reminders, modify_contact, "
+            "modify_reminder, remove_reminder, or other original tools with "
+            "None/null placeholders. For contact updates based on the last, "
+            "latest, or most recent person contacted or messaged, do not use "
+            "search_contacts(is_self=true) or the user's self contact as the "
+            "target person. Modify a contact only after a visible message/contact "
+            "record or a dedicated helper unambiguously identifies the non-self "
+            "counterparty and concrete person_id; otherwise ask or abstain."
+        ),
+    }
+
+
 def _with_selector_actor_policy(
     openai_messages: list[OpenAIMessage],
     openai_tools: object,
@@ -523,7 +696,9 @@ def _with_selector_actor_policy(
         policy
         for policy in (
             _answer_retention_actor_policy_message(openai_messages),
+            _safe_argument_actor_policy_message(openai_messages, openai_tools),
             _lookup_planner_actor_policy_message(openai_messages, openai_tools),
+            _search_window_actor_policy_message(openai_messages, openai_tools),
             _selector_actor_policy_message(openai_messages, openai_tools),
             _derived_actor_policy_message(openai_messages, openai_tools),
         )

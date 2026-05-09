@@ -1,0 +1,51 @@
+{
+  "cache_policy": {
+    "baseline_control_cache": "eligible",
+    "openai_response_cache_for_candidate": "disabled",
+    "sage_candidate_cache": "fresh_only"
+  },
+  "created_at": "2026-05-09T00:00:00+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "diagnostic_only": true,
+    "expected_answers_encoded": false,
+    "scenario_id_encoded_into_tools_or_router": false
+  },
+  "manifest_type": "sage_gap_closure_lab_safe_argument_repair_smoke",
+  "schema_version": 1,
+  "split_aliases": {
+    "smoke_6": "safe_argument_repair_smoke"
+  },
+  "split_diversity": {
+    "safe_argument_repair_smoke": {
+      "diversity_reason": "Single-scenario regression diagnostic for ToolSandbox null-argument assertion; not claim evidence.",
+      "near_duplicate_dominated": true,
+      "scenario_count": 1
+    }
+  },
+  "split_sizes": {
+    "safe_argument_repair_smoke": 1
+  },
+  "splits": {
+    "safe_argument_repair_smoke": [
+      {
+        "allowed_tools": [],
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_argument_repair_smoke",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ]
+  },
+  "truth_labels_inspected": false
+}

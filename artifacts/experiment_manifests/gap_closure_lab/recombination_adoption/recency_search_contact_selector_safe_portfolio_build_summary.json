@@ -1,0 +1,17 @@
+{
+  "cache_policy": {
+    "baseline_control_cache": "eligible",
+    "openai_response_cache_for_candidate": "disabled",
+    "sage_candidate_cache": "fresh_only"
+  },
+  "created_at": "2026-05-08T23:23:15.405111+00:00",
+  "leakage_statement": "Repair uses a generic malformed/inconsistent visible-ID failure mode observed after a sealed diagnostic run. It does not encode truth labels, expected answers, scenario-specific strings, or hidden benchmark facts; the triggering scenario is repair-contaminated and cannot be used as promotion evidence for this repaired registry.",
+  "output_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_safe_portfolio_pack/registry_manifest.json",
+  "output_registry_sha256": "10a9fb88f3d12329d32076e75508bc19837d895399bf0202d588067609b5d5f5",
+  "repair_trigger": "Confirm100 for recency_search_contact_selector_portfolio_pack had one side-effect preservation failure in modify_contact_with_message_recency_multiple_user_turn_alt_3_distraction_tools: the selector exposed a malformed message person_id as modify_contact input.",
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_portfolio_pack/registry_manifest.json",
+  "tool_names": [
+    "resolve_search_window_or_bounds",
+    "select_message_counterparty_for_contact_update"
+  ]
+}

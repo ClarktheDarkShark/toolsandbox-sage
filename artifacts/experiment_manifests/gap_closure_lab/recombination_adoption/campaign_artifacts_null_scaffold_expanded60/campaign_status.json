@@ -1,0 +1,49 @@
+{
+  "campaign": "toolsandbox_sage_tool_evolution",
+  "status": "active",
+  "phase": "expanded_60",
+  "branch": "exp/sage-gap-closure-lab",
+  "git_sha": "15fdb8040142651a07735aa7a36797245012c9fb",
+  "model": "gpt-4o-mini",
+  "benchmark": "ToolSandbox",
+  "base_toolset": "recency_reduced for current proof; category-specific reduced policies for future lanes",
+  "generation_settings": {
+    "enabled_for": [
+      "mechanism_40",
+      "extended_reuse_100"
+    ],
+    "recurrence_threshold": 2,
+    "allowed_tool_classes": [
+      "derived_value_calculator",
+      "state_precondition_helper",
+      "search_filter_ranking_helper",
+      "canonicalizer",
+      "validation_abstention_helper"
+    ]
+  },
+  "registry_path": null,
+  "validation_settings": {
+    "requires_schema_validation": true,
+    "requires_deterministic_tests": true,
+    "requires_toolsandbox_runtime_smoke": true
+  },
+  "dashboard_path": null,
+  "ladder": {
+    "mechanism": "current proof exists; clean reproduction pending",
+    "frozen_transfer": "pending",
+    "category_confirmation": "pending",
+    "broad_validation": "pending"
+  },
+  "milestones": {
+    "accepted_tool_classes": 1,
+    "target_tool_classes": 3,
+    "challenge_categories": [
+      "CANONICALIZATION"
+    ],
+    "target_challenge_category_count": 2,
+    "dashboard_live": true
+  },
+  "current_blocker": "Need reproducible clean-start proof, frozen transfer proof, then second/third retained tool classes.",
+  "next_action": "Run clean mechanism40 reproduction with dashboard and campaign artifacts.",
+  "updated_at": "2026-05-08T19:29:41.973477+00:00"
+}

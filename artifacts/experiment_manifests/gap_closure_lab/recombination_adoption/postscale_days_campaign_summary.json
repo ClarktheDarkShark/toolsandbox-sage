@@ -1,0 +1,84 @@
+{
+  "created_at": "2026-05-09T04:50:00-04:00",
+  "experimental_only": true,
+  "protected_claim_evidence": false,
+  "best_experimental_approach": "best3_plus_final_selector_days_pack",
+  "best_registry_path": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/best3_plus_final_selector_days_pack/registry_manifest.json",
+  "best_registry_sha256": "2d976e06a22726633a4f3b6dfe2b09b86799cf771d35c81227d4bb61c961f7bd",
+  "best_registry_sha256_at_run": "a2dfe231a38f79970b5259131e436ed7e36022b99eee5006bfc32ead60343c3e",
+  "registry_digest_note": "Registry metadata was scrubbed after leakage scan to remove task-specific diagnostic wording; tool code/specs were unchanged. Run rows preserve the run-time digest where relevant.",
+  "best_tool": "days_between_timestamps",
+  "runs": [
+    {
+      "run_id": "postexpanded_residual_days_all40",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/postexpanded_residual_days_all40/expanded_60_20260509_032113",
+      "sample_size": 40,
+      "quality": "low_quality_diagnostic",
+      "mean_outcome_delta": 0.11686623535944465,
+      "mean_canonical_delta": -0.04051962588930616,
+      "exact_success_delta": 4,
+      "runtime_exceptions": 0,
+      "helper_side_effect_incidents": 0,
+      "protocol_gate_passed": true,
+      "decision": "strong diagnostic only"
+    },
+    {
+      "run_id": "postscale_best3_final_days_expanded60_backtest",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/postscale_best3_final_days_expanded60_backtest/expanded_60_20260509_034255",
+      "sample_size": 60,
+      "quality": "quality_passing_repair_backtest",
+      "mean_outcome_delta": 0.07345911379156962,
+      "mean_canonical_delta": -0.007027624928875223,
+      "exact_success_delta": 3,
+      "runtime_exceptions": 0,
+      "helper_side_effect_incidents": 0,
+      "protocol_gate_passed": false,
+      "protocol_gate_reasons": [
+        "confirmation_outcome_delta_below_0_08",
+        "gain_regression_ratio_below_1_4"
+      ],
+      "decision": "best current experimental candidate, not promotion evidence"
+    },
+    {
+      "run_id": "postscale_best3_final_days_answer_expanded60_backtest",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/postscale_best3_final_days_answer_expanded60_backtest/expanded_60_20260509_041841",
+      "sample_size": 60,
+      "quality": "quality_passing_repair_backtest",
+      "mean_outcome_delta": 0.03932285441007328,
+      "mean_canonical_delta": -0.01904955878081741,
+      "exact_success_delta": 1,
+      "runtime_exceptions": 0,
+      "helper_side_effect_incidents": 0,
+      "protocol_gate_passed": false,
+      "decision": "park broad answer-shape helper"
+    },
+    {
+      "run_id": "postscale_recency_time_days_minimal_expanded60_backtest",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/postscale_recency_time_days_minimal_expanded60_backtest/expanded_60_20260509_043804",
+      "sample_size": 60,
+      "quality": "quality_passing_repair_backtest",
+      "mean_outcome_delta": 0.05419762328077537,
+      "mean_canonical_delta": 0.00193646059820153,
+      "exact_success_delta": 7,
+      "runtime_exceptions": 0,
+      "helper_side_effect_incidents": 0,
+      "control_cache": {
+        "cached": 49,
+        "fresh": 11,
+        "manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2"
+      },
+      "protocol_gate_passed": false,
+      "decision": "keep compact exact-success ablation, not top outcome candidate"
+    }
+  ],
+  "task77_resolution": {
+    "scenario": "find_days_till_holiday_3_distraction_tools_tool_name_scrambled",
+    "finding": "Final response was correct; canonical/reference score was partial.",
+    "fix": "Task Focus dashboard now separates outcome correctness from canonical/reference score."
+  },
+  "leakage_statement": "Seed/dev labels were not used for these postscale repairs. The new helpers are generic over visible timestamps, event names, and retained recency/time behavior, and do not encode scenario IDs, hidden labels, expected answers, or benchmark facts.",
+  "cache_statement": "Candidate/SAGE arms were fresh with OpenAI response cache disabled. Baseline/control cache was used where eligible; the final minimal run used 49 cached and 11 fresh controls.",
+  "safety_statement": "All postscale day-distance/time runs recorded zero runtime exceptions and zero helper side-effect incidents.",
+  "formal_validation_blocker": "No clean uninspected confirmation100/scale250 pool remains in this branch; postrepair confirm100 and validate250 are backtest-only after inspection and have 0 cached controls under the three-compatible-controls eligibility rule.",
+  "recommended_next_campaign": "Create a new frozen clean confirmation100 split and evaluate the days_between_timestamps plus retained recency/time portfolio with no code changes between matched arms. Scale to fresh 250 only if confirmation is positive with natural calls and zero incidents."
+}

@@ -576,7 +576,10 @@ def _with_chained_post_selection_arguments(
     """Autofill mechanical chaining args from prior traces when safe."""
     spec = entry.tool.spec
     input_names = {item.name for item in spec.inputs}
-    if spec.family != ToolFamily.COMPOSITE_WORKFLOW_HELPER:
+    if spec.family not in {
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+    }:
         return kwargs
     if not ({"selected_record", "records"} & input_names):
         return kwargs
@@ -824,15 +827,31 @@ def _google_docstring(entry: RegistryEntry) -> str:
                 ]
             )
     elif spec.required_original_tool_calls:
-        if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
-            lines.extend(_search_filter_action_usage_note(spec))
-        if spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
-            lines.extend(_lookup_query_planner_usage_note(spec))
-            lines.extend(_medium_grain_composite_usage_note(spec))
-            lines.extend(_post_selection_composite_usage_note(spec))
-            lines.extend(_direct_scalar_action_usage_note(spec))
-        # General call-path note for any other side-effect-preserving prep helper
-        lines.extend(_call_path_note(spec))
+        if spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR:
+            required = ", ".join(spec.required_original_tool_calls)
+            input_names = ", ".join(item.name for item in spec.inputs)
+            lines.extend(
+                [
+                    "",
+                    "Deterministic derived-value usage:",
+                    f"    First call the original ToolSandbox tool(s): {required}.",
+                    f"    Then call {spec.tool_name} with visible scalar inputs",
+                    f"    such as {input_names}; do not invent missing values.",
+                    "    Use the helper result for the final answer when it is",
+                    " final-answer-ready. The helper is pure and performs no side",
+                    " effects.",
+                ]
+            )
+        else:
+            if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
+                lines.extend(_search_filter_action_usage_note(spec))
+            if spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
+                lines.extend(_lookup_query_planner_usage_note(spec))
+                lines.extend(_medium_grain_composite_usage_note(spec))
+                lines.extend(_post_selection_composite_usage_note(spec))
+                lines.extend(_direct_scalar_action_usage_note(spec))
+            # General call-path note for side-effect-preserving prep helpers.
+            lines.extend(_call_path_note(spec))
     return "\n".join(lines)
 
 
@@ -1102,6 +1121,11 @@ def registry_entry_visibility_reason(
         if name.startswith("find_days_till_holiday"):
             return True, "calendar_day_distance_task"
         return False, "calendar_day_distance_requires_holiday_task"
+
+    if tool_name == "format_days_until_event_answer":
+        if name.startswith("find_days_till_holiday"):
+            return True, "calendar_day_distance_final_answer_task"
+        return False, "calendar_day_answer_requires_holiday_task"
 
     if tool_name == "prepare_reminder_arguments_with_optional_location":
         if is_insufficient:

@@ -884,14 +884,25 @@ def _task_outcome(
         else _compact_content(messages[final_index].get("content"), limit=4000)
     )
     similarity = None if result is None else result.get("similarity")
-    exact = bool(similarity is not None and float(similarity) >= 0.999)
+    outcome_similarity = None if result is None else result.get("outcome_similarity")
+    correctness_score = (
+        outcome_similarity if outcome_similarity is not None else similarity
+    )
+    exact = bool(correctness_score is not None and float(correctness_score) >= 0.999)
     tool_summary = _summarize_tool_messages(messages)
     result_parts = []
     if final_answer:
         result_parts.append(f"Answer: {_one_line(final_answer, limit=130)}")
     if tool_summary:
         result_parts.append(f"Tools: {tool_summary}")
-    if similarity is not None and float(similarity) < 0.999:
+    if outcome_similarity is not None:
+        result_parts.append(f"Outcome: {float(outcome_similarity):.3f}")
+        if (
+            similarity is not None
+            and abs(float(outcome_similarity) - float(similarity)) > 0.001
+        ):
+            result_parts.append(f"Canonical score: {float(similarity):.3f}")
+    elif similarity is not None and float(similarity) < 0.999:
         result_parts.append(f"Score: {float(similarity):.3f}")
     observed_lines: list[str] = []
     expected_lines: list[str] = []
@@ -926,6 +937,8 @@ def _task_outcome(
             "State/tool milestone-scored target; inspect messages and tool evidence."
         ),
         "similarity": similarity,
+        "outcome_similarity": outcome_similarity,
+        "canonical_similarity": similarity,
         "exact_correct": exact,
         "correctness_label": (
             "pending" if result is None else "correct" if exact else "not exact"

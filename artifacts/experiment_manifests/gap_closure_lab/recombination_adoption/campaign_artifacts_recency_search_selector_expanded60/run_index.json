@@ -1,0 +1,103 @@
+{
+  "runs": [
+    {
+      "updated_at": "2026-05-08T21:21:45.755298+00:00",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034",
+      "mode": "expanded_60",
+      "manifest_type": "sage_gap_closure_lab_splits",
+      "status": "complete",
+      "agent": "gpt-4o-mini",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "user": {
+          "requested_model": "GPT_4_o_2024_05_13",
+          "resolved_model": "GPT_4_o_2024_05_13",
+          "known_model": false,
+          "comparison_key": "GPT_4_o_2024_05_13"
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+        "mixed_model_warning": null
+      },
+      "comparison_model_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+      "generation_enabled": false,
+      "base_tool_policy": "upstream",
+      "scenario_count": 60,
+      "control_dir": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/control/expanded_60_control_cached_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_08_2026_17_04_55",
+      "candidate_dir": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/candidate/expanded_60_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_08_2026_17_04_56",
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_portfolio_pack",
+      "registry_gate_snapshot": {
+        "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_portfolio_pack",
+        "manifest_existed_before_run": true,
+        "snapshot_path": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/registry_gate/registry_manifest_before_run.json",
+        "manifest_digest_before_run": "18f24d91c5723bd6f1bc8b5a28bd40365d4d28230c3264472d8196dcdada1d56"
+      },
+      "registry_gate_restore": {
+        "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_portfolio_pack",
+        "restored": true,
+        "manifest_existed_before_run": true,
+        "failed_snapshot_path": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/registry_gate/registry_manifest_failed_gate.json",
+        "restored_snapshot_path": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/registry_gate/registry_manifest_before_run.json"
+      },
+      "registry_manifest_digest_after_run": "18f24d91c5723bd6f1bc8b5a28bd40365d4d28230c3264472d8196dcdada1d56",
+      "cohort_preflight_report": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/cohort_preflight_report.json",
+      "cohort_preflight_warnings": [
+        "external_service_cases_present",
+        "low_expected_helper_fit_share"
+      ],
+      "cohort_quality_gate_status": "pass",
+      "cohort_quality_gate_failures": [],
+      "comparison_path": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/paired_comparison.json",
+      "control_cache_mode": "use-if-eligible",
+      "control_source": "mixed",
+      "cached_control_tasks": 6,
+      "fresh_control_tasks": 54,
+      "control_cache_report_path": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/control_cache_report.json",
+      "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+      "helper_contribution_summary_path": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/helper_contribution_summary.json",
+      "helper_contribution_artifact_path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/campaign_artifacts_recency_search_selector_expanded60/summaries/expanded_60_20260508_165034/helper_contribution_summary.json",
+      "accepted_but_uncalled_tools": [],
+      "dashboard_path": "outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/dashboard/index.html",
+      "dashboard_url": "http://127.0.0.1:62010/outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/dashboard/index.html",
+      "dashboard_task_focus_url": "http://127.0.0.1:62010/outputs/gap_closure_lab/recombination_adoption/recency_search_selector_expanded60/expanded_60_20260508_165034/dashboard/task_focus.html",
+      "parallel_arms": false,
+      "mean_similarity_delta": 0.06934903725198314,
+      "mean_outcome_similarity_delta": -0.026082863218068266,
+      "protocol_gate_passed": false,
+      "protocol_gate_reasons": [
+        "non_positive_outcome_delta",
+        "outcome_gains_do_not_exceed_regressions",
+        "confirmation_outcome_delta_below_0_08",
+        "gain_regression_ratio_below_1_4",
+        "helper_call_share_below_25_percent"
+      ]
+    }
+  ],
+  "updated_at": "2026-05-08T21:21:45.755307+00:00"
+}

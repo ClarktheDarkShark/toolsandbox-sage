@@ -1,0 +1,13 @@
+{
+  "cache_policy": "Control arms may use the eligible baseline cache. Candidate arms are fresh with OpenAI response reuse disabled for outcome evidence.",
+  "created_at": "2026-05-08T20:04:00.455888+00:00",
+  "experimental_only": true,
+  "leakage_statement": "No scenario ids, hidden truth labels, expected answers, or task-specific facts are encoded. The tool uses generic visible message record fields and generic contact-update routing triggers.",
+  "objective": "Focused recency/action natural adoption test for a single contact-update selector with explicit selector affordance and no reminder/remove exposure.",
+  "registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_contact_selector_affordance_pack/registry_manifest.json",
+  "registry_sha256": "97d2581e531c7e9ca4bed67eabacf2ae18ce60145bfa113f62e0b8ed35a4266e",
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_action_contact_update_action_only_pack/registry_manifest.json",
+  "tools": [
+    "select_message_counterparty_for_contact_update"
+  ]
+}

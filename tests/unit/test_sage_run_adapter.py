@@ -116,6 +116,50 @@ def test_side_effect_preservation_allows_selection_only_bridge() -> None:
     )
 
 
+def test_side_effect_preservation_uses_actual_trace_names_for_scrambled_tools() -> None:
+    messages = [
+        {
+            "role": "tool",
+            "name": "generated_tools_1",
+            "content": {
+                "selected_record": {"person_id": "p2", "creation_timestamp": 20},
+                "downstream_tool_name": "modify_contact",
+                "downstream_tool_kwargs": {},
+                "should_call_tool": False,
+                "final_answer_recommendation": "use_selected_record:missing_update_fields",
+            },
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "contact_1"}}],
+        },
+    ]
+    trace_events: list[dict[str, object]] = [
+        {
+            "tool_name": "select_message_counterparty_for_contact_update",
+            "result": {
+                "selected_record": {"person_id": "p2", "creation_timestamp": 20},
+                "downstream_tool_name": "modify_contact",
+                "downstream_tool_kwargs": {},
+                "should_call_tool": False,
+                "final_answer_recommendation": "use_selected_record:missing_update_fields",
+            },
+        },
+        {
+            "tool_name": "modify_contact",
+            "arguments": {"person_id": "p2", "phone_number": "+15555550123"},
+            "result": None,
+        },
+    ]
+
+    assert not _side_effect_followup_failures(
+        messages,
+        helper_name="select_message_counterparty_for_contact_update",
+        required_original_tool_calls=("modify_contact",),
+        actual_tool_trace_events=trace_events,
+    )
+
+
 def test_side_effect_preservation_requires_followup_for_selection_only_bridge() -> None:
     messages = [
         {

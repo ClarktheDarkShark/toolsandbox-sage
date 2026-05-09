@@ -4,7 +4,7 @@ Experimental branch report only. This is not protected final claim evidence and 
 
 ## Status
 
-Stop condition 2 remains met for the full campaign. All required experiment families received fair-chance diagnostic or expanded-pilot treatment, including repair and force diagnostics where appropriate. The focused recombination continuation did produce an expanded60 natural-adoption signal for the retained selector, but confirm100 failed broad outcome and safety, so no approach is promotion-ready.
+Stop condition 3 is now the practical formal-validation blocker. All required experiment families received fair-chance diagnostic or expanded-pilot treatment, including repair and force diagnostics where appropriate. The focused recombination continuation found a better experimental direction, `days_between_timestamps` plus retained recency/time helpers, but clean confirmation/scale data is exhausted. The best evidence is promising experimental backtest evidence, not protected claim evidence.
 
 ## Best Experimental Approach
 
@@ -23,6 +23,13 @@ The strongest low-frequency tool signal was `select_recency_target_and_prepare_a
 - Selector-only confirm100: outcome -0.1004, canonical -0.0483, visible 5/called 2/VNC 3, called-subset outcome 0.0, and one helper side-effect preservation incident.
 
 That means the recency bridge has real potential on rare eligible tasks, but the current registry is not a standalone scale candidate.
+
+The strongest postscale gap-closure approach is now the generic day-distance helper:
+
+- Residual all40 diagnostic: outcome +0.1169, exact success +4, gate pass, zero runtime/side-effect incidents. This was low-quality and near-duplicate dominated, so it is diagnostic only.
+- Quality expanded60 backtest: outcome +0.0735, exact success +3, zero runtime/side-effect incidents. It narrowly missed the +0.08 confirmation threshold and failed gain/regression ratio, but it beat the prior positive-pack expanded60 (+0.0155) and the answer-shape/pruned variants on primary outcome.
+- Natural adoption was real: `days_between_timestamps` was visible 11/called 11/VNC 0 on the quality split. `relative_day_time_to_timestamp` remained the strongest called-subset helper in the same run.
+- Canonical/reference scoring was often negative because the generated helper substituted for the expected `timestamp_diff` trace. Outcome/task completion is the primary metric, so this is a canonical-route accounting issue rather than a model-task failure.
 
 ## Recombination And Adoption Follow-Up
 
@@ -57,8 +64,25 @@ Per the later campaign instruction, the positive but low-frequency selector was 
 
 All recombination dashboards were opened to the Task Focus view. The latest Task Focus browser check rendered paired data with no console errors:
 
-- Dashboard: `http://127.0.0.1:62005/outputs/gap_closure_lab/recombination_adoption/selector_only_confirm100/confirm_100_20260508_095751/dashboard/task_focus.html`
-- Browser-observed values: baseline score 0.761, SAGE score 0.713, canonical delta -0.048, outcome delta -0.100, console errors 0.
+- Dashboard: `http://127.0.0.1:62040/outputs/gap_closure_lab/recombination_adoption/postscale_recency_time_days_minimal_expanded60_backtest/expanded_60_20260509_043804/dashboard/task_focus.html`
+- Browser-observed values: baseline score 0.779, SAGE score 0.781, canonical delta +0.002, outcome delta +0.054, console errors 0.
+
+Task 77 review:
+
+- Run: `outputs/gap_closure_lab/recombination_adoption/postrepair_holdout_final_selector_validate250/validate_250_20260509_010935`
+- Scenario: `find_days_till_holiday_3_distraction_tools_tool_name_scrambled`
+- Both control and SAGE final answers were correct: "There are 229 days until Christmas Day."
+- The outcome scorer gave 1.000 while canonical/reference was 0.978 because the reference text/tool trace was only partially matched.
+- Fix: `src/sage_ts/dashboard/exporters.py` and `src/sage_ts/dashboard/task_focus_template.py` now display outcome correctness separately from canonical/reference score. The Task Focus dashboard was regenerated and opened with zero console errors.
+
+Postscale follow-up results:
+
+- Best3 plus final-selector pilot18: outcome +0.1597, gate pass, zero incidents.
+- Best3 plus final-selector expanded60: outcome +0.0155, gate fail; preflight exposed the missing day-distance helper.
+- Days helper residual all40: outcome +0.1169, exact success +4, gate pass, diagnostic only because the split was low-quality.
+- Days helper quality expanded60 backtest: outcome +0.0735, exact success +3, zero incidents; best current approach.
+- Final-answer-ready days answer diagnostic: outcome +0.1316 on holiday residual19, but quality expanded60 backtest fell to +0.0393 with negative called-subset outcome, so broad route is parked.
+- Pruned recency/time/days minimal pack: outcome +0.0542, canonical +0.0019, exact success +7, zero incidents. It is a useful exact-success ablation but not the top outcome portfolio.
 
 Machine-readable summary:
 
@@ -68,7 +92,7 @@ Machine-readable summary:
 - Selector-only confirm100 summary SHA-256: `8a3eabd84ee54d1e94206126d3aef251a8d80209e00c7e2bbece2a4488f5c0a6`
 - Expanded60 coverage dry-run artifacts: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/coverage/`
 
-Decision: keep the expanded60 selector result as experimental potential, but park the current selector-only registry from scale. Any next attempt must repair side-effect preservation on remove-reminder actions and improve natural adoption on visible action targets before another confirmation run.
+Decision: keep the expanded60 selector result as experimental potential, and retain the generic day-distance helper as the best current gap-closure candidate. Do not scale or promote from this branch because the strongest broad result is a repair backtest and there is no clean remaining confirmation/scale pool.
 
 ## Failed Or Parked Families
 
@@ -102,28 +126,31 @@ Split manifest:
 
 Baseline/control arms used the eligible control baseline cache where available and recorded cached/fresh counts per run. Candidate/SAGE arms were fresh experimental runs with OpenAI response cache disabled. No scenario selection was based on cache availability.
 
-Latest confirmation cache accounting:
+Latest postscale cache accounting:
 
-- Run: `outputs/gap_closure_lab/recombination_adoption/selector_only_confirm100/confirm_100_20260508_095751`
-- Baseline cache: 0 cached / 100 fresh
+- Run: `outputs/gap_closure_lab/recombination_adoption/postscale_recency_time_days_minimal_expanded60_backtest/expanded_60_20260509_043804`
+- Baseline cache: 49 cached / 11 fresh
 - Cache manifest hash: `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
 - Candidate OpenAI response cache: disabled
 
+The OpenAI API key was present for completed live runs by mapping a local untracked `OPENAI_KEY` variable to `OPENAI_API_KEY` for the process. The secret value was not recorded in reports.
+
 ## Safety Statement
 
-Final selector-only confirm100 had zero runtime exceptions but one helper side-effect preservation incident. Unsafe or currently negative helper forms were parked:
+Final selector-only confirm100 had zero runtime exceptions but one helper side-effect preservation incident. The postscale days/time runs had zero runtime exceptions and zero helper side-effect incidents. Unsafe or currently negative helper forms were parked:
 
 - `next_dependency_precondition_call`: one side-effect incident in force diagnostic.
 - Initial frozen generated expanded60 pack: two side-effect incidents.
 - `prepare_contact_update_from_recent_message`: force diagnostic negative called subset.
 - Current selector-only registry: one remove-reminder side-effect preservation incident at confirm100.
+- `format_days_until_event_answer`: safe but broad quality expanded60 called-subset outcome-negative.
 
 The runtime now allows composite helpers that explicitly preserve `selected_record` on missing updates to execute their own output logic instead of being preempted by a generic missing-update abstain. The side-effect preservation checker now treats a selection-only bridge as requiring the original side-effect later, rather than falsely flagging the later preserved side-effect as unsafe.
 
 ## Recommendation
 
-Do not promote any result from this branch to protected evidence. The selector-only expanded60 result deserves later design attention, not formal validation. The next campaign should repair the selector for side-effect preservation, keep it narrowly routed to post-search action tasks, and rerun an expanded60 adoption test before any new confirmation. Formal validation is not warranted until confirmation is positive with natural calls and zero incidents.
+Do not promote any result from this branch to protected evidence. The best next campaign should carry `days_between_timestamps`, `relative_day_time_to_timestamp`, and the compact recency/time/day ablation into a newly frozen clean confirmation100 split. If that clears +0.08 outcome lift with natural calls and zero incidents, scale to a fresh 250. The current branch does not have clean remaining data for that formal step.
 
 ## Decision
 
-`STOP: required experiment families received fair-chance treatment; no scalable safe outcome-positive approach found`
+`STOP: promising day-distance portfolio found, but formal confirmation/scale is blocked by clean-data exhaustion`

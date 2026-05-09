@@ -239,6 +239,29 @@ def test_task_focus_balanced_summary_uses_only_complete_pairs() -> None:
     assert summary["balanced_outcome_delta"] == pytest.approx(0.1)
 
 
+def test_task_outcome_prefers_outcome_similarity_for_correctness_label() -> None:
+    outcome = exporters._task_outcome(
+        [
+            {
+                "role": "assistant",
+                "assistant_details": {},
+                "content": "There are 229 days until Christmas Day.",
+            }
+        ],
+        {"similarity": 0.977737, "outcome_similarity": 1.0},
+        "find_days_till_holiday_3_distraction_tools_tool_name_scrambled",
+        [],
+        [],
+    )
+
+    assert outcome["exact_correct"] is True
+    assert outcome["correctness_label"] == "correct"
+    assert outcome["outcome_similarity"] == 1.0
+    assert outcome["canonical_similarity"] == 0.977737
+    assert "Outcome: 1.000" in outcome["agent_result_summary"]
+    assert "Canonical score: 0.978" in outcome["agent_result_summary"]
+
+
 def test_task_focus_arm_progress_prefers_run_scenario_count_over_subset_plan() -> None:
     progress = exporters._arm_progress_status(
         Path("run"),

@@ -1,0 +1,212 @@
+{
+  "cache_policy": {
+    "baseline_control": "eligible for control baseline cache when the exact manifest, model, base tools, and cache hash are recorded",
+    "cross_arm_response_reuse": "disabled unless the cache key is provably arm/tool/registry specific and recorded in the run report",
+    "sage_candidate_arms": "fresh experimental runs only; no prior SAGE traces as outcome evidence"
+  },
+  "created_at": "2026-05-08T20:38:04.882751+00:00",
+  "leakage_controls": [
+    "Seed/dev base families are excluded from all unseen splits.",
+    "No scenario is assigned to more than one split.",
+    "Unseen split truth labels are marked not inspected.",
+    "Cache availability is not used as a scenario-selection feature.",
+    "Scenario IDs may not be hard-coded into generated tools or routers.",
+    "This repair replay may use previously observed experimental scenarios only for contract repair diagnostics, not final evidence.",
+    "Tool code and routing metadata must not include scenario IDs or truth labels."
+  ],
+  "manifest_integrity": {
+    "hash_algorithm": "sha256",
+    "hash_scope": "canonical_payload_without_manifest_integrity",
+    "payload_sha256": "402e3b2face79d85d2186fee9d691103ec6f5d31ab1a124aa8dbbff9c099b43e"
+  },
+  "manifest_type": "sage_gap_closure_lab_repair_replay_split",
+  "purpose": "contact selector side-effect bridge contract repair replay; not final evidence",
+  "schema_version": 1,
+  "source_manifest": "artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json",
+  "source_manifest_sha256": "7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9",
+  "split_aliases": {
+    "smoke_6": "repair_replay_smoke6"
+  },
+  "split_diversity": {
+    "repair_replay_smoke6": {
+      "near_duplicate_assessment": "Contains related contact/message tasks by design for repair replay plus reminder negatives; not claim evidence.",
+      "reason": "One positive target, one contact insufficiency negative, one message-search non-action negative, one contact-update non-target, and two reminder negatives/checks to verify narrow routing and side-effect accounting."
+    }
+  },
+  "split_sizes": {
+    "repair_replay_smoke6": 6
+  },
+  "splits": {
+    "repair_replay_smoke6": [
+      {
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "expected_birth_opportunities": [
+          "derived_value:recency_timestamp_bounds",
+          "search_filter:select_record_by_timestamp_extreme",
+          "derived_value:resolve_search_window_or_bounds",
+          "search_filter:select_action_target_by_recency",
+          "composite:prepare_side_effect_args_from_selected_record"
+        ],
+        "expected_helper_fit": [
+          "select_record_by_timestamp_extreme",
+          "resolve_search_window_or_bounds"
+        ],
+        "family_label": "modify_contact_with_message_recency",
+        "primary_task_label": "contact_message_search_disambiguation",
+        "scenario_id": "modify_contact_with_message_recency_multiple_user_turn_alt_10_distraction_tools",
+        "task_labels": [
+          "contact_message_search_disambiguation",
+          "record_filtering_ranking_latest_selection",
+          "generic_multi_tool_composition"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_final_evaluation": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "categories": [
+          "ARG_DESCRIPTION_SCRAMBLED",
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "expected_birth_opportunities": [],
+        "expected_helper_fit": [],
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "primary_task_label": "insufficient_information_clarification",
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "task_labels": [
+          "contact_message_search_disambiguation",
+          "record_filtering_ranking_latest_selection",
+          "generic_multi_tool_composition",
+          "insufficient_information_clarification"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_final_evaluation": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "categories": [
+          "ARG_TYPE_SCRAMBLED",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "expected_birth_opportunities": [
+          "search_filter:select_record_by_timestamp_extreme",
+          "derived_value:resolve_search_window_or_bounds"
+        ],
+        "expected_helper_fit": [
+          "select_record_by_timestamp_extreme",
+          "resolve_search_window_or_bounds"
+        ],
+        "family_label": "search_message_with_recency_oldest",
+        "primary_task_label": "contact_message_search_disambiguation",
+        "scenario_id": "search_message_with_recency_oldest_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+        "task_labels": [
+          "contact_message_search_disambiguation",
+          "record_filtering_ranking_latest_selection",
+          "generic_multi_tool_composition"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_final_evaluation": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "categories": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "expected_birth_opportunities": [
+          "search_filter:select_visible_record_by_constraints",
+          "composite:prepare_side_effect_args_from_selected_record",
+          "composite:plan_contact_lookup_query",
+          "derived_value:extract_contact_field_from_search_result",
+          "composite:constraint_to_action_planner"
+        ],
+        "expected_helper_fit": [],
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "primary_task_label": "contact_message_search_disambiguation",
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+        "task_labels": [
+          "contact_message_search_disambiguation",
+          "generic_multi_tool_composition"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_final_evaluation": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "categories": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "expected_birth_opportunities": [],
+        "expected_helper_fit": [],
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "primary_task_label": "insufficient_information_clarification",
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools",
+        "task_labels": [
+          "temporal_reminder_date_canonicalization",
+          "record_filtering_ranking_latest_selection",
+          "generic_multi_tool_composition",
+          "insufficient_information_clarification"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_final_evaluation": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "expected_birth_opportunities": [
+          "derived_value:recency_timestamp_bounds",
+          "derived_value:resolve_search_window_or_bounds"
+        ],
+        "expected_helper_fit": [
+          "recency_to_timestamp_bounds",
+          "resolve_search_window_or_bounds"
+        ],
+        "family_label": "search_reminder_with_creation_recency_yesterday",
+        "primary_task_label": "record_filtering_ranking_latest_selection",
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_10_distraction_tools",
+        "task_labels": [
+          "temporal_reminder_date_canonicalization",
+          "record_filtering_ranking_latest_selection",
+          "generic_multi_tool_composition"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_final_evaluation": false,
+        "used_for_generation": false,
+        "used_for_repair": true,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ]
+  }
+}

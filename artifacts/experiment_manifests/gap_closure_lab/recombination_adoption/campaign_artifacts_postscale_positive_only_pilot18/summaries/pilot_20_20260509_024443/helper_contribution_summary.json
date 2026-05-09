@@ -1,0 +1,400 @@
+{
+  "control_dir": "outputs/gap_closure_lab/recombination_adoption/postscale_positive_only_pilot18/pilot_20_20260509_024443/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_09_2026_02_44_47",
+  "candidate_dir": "outputs/gap_closure_lab/recombination_adoption/postscale_positive_only_pilot18/pilot_20_20260509_024443/candidate/pilot_20_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_09_2026_02_47_02",
+  "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_positive_only_pack",
+  "scenario_count": 18,
+  "helpers": {
+    "resolve_search_window_or_bounds": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "search_message_with_recency_oldest_alt_all_tools"
+      ],
+      "called_scenarios": [
+        "search_message_with_recency_oldest_alt_all_tools"
+      ],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [
+        "search_message_with_recency_oldest_alt_all_tools"
+      ],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled",
+        "add_reminder_content_and_date_and_time_3_distraction_tools_arg_description_scrambled",
+        "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+        "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+        "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools",
+        "cellular_off_3_distraction_tools_tool_name_scrambled",
+        "find_days_till_holiday_3_distraction_tools",
+        "find_days_till_holiday_wifi_off",
+        "find_thanksgiving_timestamp_3_distraction_tools_arg_description_scrambled",
+        "get_cellular_3_distraction_tools_tool_description_scrambled",
+        "get_wifi_3_distraction_tools",
+        "remove_contact_by_phone_3_distraction_tools",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+        "remove_contact_with_id_3_distraction_tools_arg_description_scrambled",
+        "search_name_with_relationship_3_distraction_tools_tool_description_scrambled",
+        "search_phone_number_with_name_3_distraction_tools_arg_description_scrambled"
+      ],
+      "visible_count": 1,
+      "called_count": 1,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 17,
+      "called_subset": {
+        "scenario_count": 1,
+        "scenarios": [
+          "search_message_with_recency_oldest_alt_all_tools"
+        ],
+        "mean_canonical_delta": 0.6518964746462514,
+        "mean_outcome_delta": 0.817885821021148,
+        "canonical_gains": 1,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 1,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 17,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled",
+          "add_reminder_content_and_date_and_time_3_distraction_tools_arg_description_scrambled",
+          "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+          "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+          "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools",
+          "cellular_off_3_distraction_tools_tool_name_scrambled",
+          "find_days_till_holiday_3_distraction_tools",
+          "find_days_till_holiday_wifi_off",
+          "find_thanksgiving_timestamp_3_distraction_tools_arg_description_scrambled",
+          "get_cellular_3_distraction_tools_tool_description_scrambled",
+          "get_wifi_3_distraction_tools",
+          "remove_contact_by_phone_3_distraction_tools",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+          "remove_contact_with_id_3_distraction_tools_arg_description_scrambled",
+          "search_name_with_relationship_3_distraction_tools_tool_description_scrambled",
+          "search_phone_number_with_name_3_distraction_tools_arg_description_scrambled"
+        ],
+        "mean_canonical_delta": 0.023362883922681807,
+        "mean_outcome_delta": -0.01628714687538217,
+        "canonical_gains": 4,
+        "canonical_regressions": 8,
+        "canonical_preserved": 5,
+        "outcome_gains": 1,
+        "outcome_regressions": 3,
+        "outcome_preserved": 11,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "select_message_content_by_recency": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "search_message_with_recency_oldest_alt_all_tools"
+      ],
+      "called_scenarios": [
+        "search_message_with_recency_oldest_alt_all_tools"
+      ],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [
+        "search_message_with_recency_oldest_alt_all_tools"
+      ],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled",
+        "add_reminder_content_and_date_and_time_3_distraction_tools_arg_description_scrambled",
+        "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+        "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+        "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools",
+        "cellular_off_3_distraction_tools_tool_name_scrambled",
+        "find_days_till_holiday_3_distraction_tools",
+        "find_days_till_holiday_wifi_off",
+        "find_thanksgiving_timestamp_3_distraction_tools_arg_description_scrambled",
+        "get_cellular_3_distraction_tools_tool_description_scrambled",
+        "get_wifi_3_distraction_tools",
+        "remove_contact_by_phone_3_distraction_tools",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+        "remove_contact_with_id_3_distraction_tools_arg_description_scrambled",
+        "search_name_with_relationship_3_distraction_tools_tool_description_scrambled",
+        "search_phone_number_with_name_3_distraction_tools_arg_description_scrambled"
+      ],
+      "visible_count": 1,
+      "called_count": 1,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 17,
+      "called_subset": {
+        "scenario_count": 1,
+        "scenarios": [
+          "search_message_with_recency_oldest_alt_all_tools"
+        ],
+        "mean_canonical_delta": 0.6518964746462514,
+        "mean_outcome_delta": 0.817885821021148,
+        "canonical_gains": 1,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 1,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 17,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled",
+          "add_reminder_content_and_date_and_time_3_distraction_tools_arg_description_scrambled",
+          "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+          "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+          "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools",
+          "cellular_off_3_distraction_tools_tool_name_scrambled",
+          "find_days_till_holiday_3_distraction_tools",
+          "find_days_till_holiday_wifi_off",
+          "find_thanksgiving_timestamp_3_distraction_tools_arg_description_scrambled",
+          "get_cellular_3_distraction_tools_tool_description_scrambled",
+          "get_wifi_3_distraction_tools",
+          "remove_contact_by_phone_3_distraction_tools",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+          "remove_contact_with_id_3_distraction_tools_arg_description_scrambled",
+          "search_name_with_relationship_3_distraction_tools_tool_description_scrambled",
+          "search_phone_number_with_name_3_distraction_tools_arg_description_scrambled"
+        ],
+        "mean_canonical_delta": 0.023362883922681807,
+        "mean_outcome_delta": -0.01628714687538217,
+        "canonical_gains": 4,
+        "canonical_regressions": 8,
+        "canonical_preserved": 5,
+        "outcome_gains": 1,
+        "outcome_regressions": 3,
+        "outcome_preserved": 11,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "select_message_counterparty_for_contact_update": {
+      "origin": "retained",
+      "visible_scenarios": [],
+      "called_scenarios": [],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled",
+        "add_reminder_content_and_date_and_time_3_distraction_tools_arg_description_scrambled",
+        "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+        "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+        "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools",
+        "cellular_off_3_distraction_tools_tool_name_scrambled",
+        "find_days_till_holiday_3_distraction_tools",
+        "find_days_till_holiday_wifi_off",
+        "find_thanksgiving_timestamp_3_distraction_tools_arg_description_scrambled",
+        "get_cellular_3_distraction_tools_tool_description_scrambled",
+        "get_wifi_3_distraction_tools",
+        "remove_contact_by_phone_3_distraction_tools",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+        "remove_contact_with_id_3_distraction_tools_arg_description_scrambled",
+        "search_message_with_recency_oldest_alt_all_tools",
+        "search_name_with_relationship_3_distraction_tools_tool_description_scrambled",
+        "search_phone_number_with_name_3_distraction_tools_arg_description_scrambled"
+      ],
+      "visible_count": 0,
+      "called_count": 0,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 18,
+      "called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 18,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled",
+          "add_reminder_content_and_date_and_time_3_distraction_tools_arg_description_scrambled",
+          "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+          "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+          "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools",
+          "cellular_off_3_distraction_tools_tool_name_scrambled",
+          "find_days_till_holiday_3_distraction_tools",
+          "find_days_till_holiday_wifi_off",
+          "find_thanksgiving_timestamp_3_distraction_tools_arg_description_scrambled",
+          "get_cellular_3_distraction_tools_tool_description_scrambled",
+          "get_wifi_3_distraction_tools",
+          "remove_contact_by_phone_3_distraction_tools",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+          "remove_contact_with_id_3_distraction_tools_arg_description_scrambled",
+          "search_message_with_recency_oldest_alt_all_tools",
+          "search_name_with_relationship_3_distraction_tools_tool_description_scrambled",
+          "search_phone_number_with_name_3_distraction_tools_arg_description_scrambled"
+        ],
+        "mean_canonical_delta": 0.0582814167406579,
+        "mean_outcome_delta": 0.03584866361815097,
+        "canonical_gains": 5,
+        "canonical_regressions": 8,
+        "canonical_preserved": 5,
+        "outcome_gains": 2,
+        "outcome_regressions": 3,
+        "outcome_preserved": 11,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "called_subset_outcome_positive_but_canonical_negative_or_regressive"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    }
+  },
+  "accepted_tools": [],
+  "accepted_but_uncalled_tools": [],
+  "retained_helper_called_tools": [
+    "resolve_search_window_or_bounds",
+    "select_message_content_by_recency"
+  ],
+  "newly_generated_helper_called_tools": [],
+  "registry_size": 3,
+  "runtime_bundle_size": {
+    "scenario_count": 18,
+    "mean_generated_tool_bundle_size": 0.1111111111111111,
+    "max_generated_tool_bundle_size": 2,
+    "mean_available_tool_count": 7.611111111111111,
+    "max_available_tool_count": 36
+  },
+  "compute_cache_token_metrics": {
+    "candidate_openai_response_cache": {},
+    "candidate_prompt_cache": {
+      "root": "outputs/prompt_cache",
+      "hits": 0,
+      "misses": 0,
+      "writes": 0
+    }
+  },
+  "selection_event_count": 18,
+  "visibility_event_count": 18
+}

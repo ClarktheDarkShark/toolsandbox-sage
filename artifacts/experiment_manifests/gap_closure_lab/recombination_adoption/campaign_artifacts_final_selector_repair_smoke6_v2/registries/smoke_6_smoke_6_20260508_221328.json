@@ -1,0 +1,697 @@
+{
+  "tools": {
+    "detect_insufficient_visible_records": {
+      "accepted_at": "2026-05-09T00:56:26.304297+00:00",
+      "birth_scenario": "gap_closure_lab_safe_bridge_plus_guard_recombination",
+      "code_hash": "6ee586d758981ebb9e5c2595ae4a1f238e14830c1458c5f4d8907175ce2d5321",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def detect_insufficient_visible_records(records: list, required_fields: list, constraints: dict = None, forbidden_downstream_tools: list = None) -> dict:\n    \"\"\"Determine whether visible records are sufficient, or return a safe abstention contract.\"\"\"\n    if constraints is None or not isinstance(constraints, dict):\n        constraints = {}\n    if forbidden_downstream_tools is None or not isinstance(forbidden_downstream_tools, list):\n        forbidden_downstream_tools = []\n    if not isinstance(required_fields, list):\n        required_fields = []\n\n    def base(should_answer, reason, count, selected, missing):\n        missing_list = list(missing) if isinstance(missing, list) else []\n        should_abstain = not bool(should_answer)\n        if should_abstain:\n            missing_information = missing_list if missing_list else ([reason] if reason else [])\n            clarification_prompt = \"I do not have enough visible information to determine the requested answer.\"\n            final_recommendation = \"abstain:\" + str(reason or \"insufficient_information\")\n        else:\n            missing_information = []\n            clarification_prompt = \"\"\n            final_recommendation = \"answer_from_selected_record\"\n        return {\n            \"should_answer\": bool(should_answer),\n            \"should_abstain\": bool(should_abstain),\n            \"abstain_reason\": str(reason or \"\"),\n            \"matching_record_count\": int(count or 0),\n            \"selected_record\": selected if isinstance(selected, dict) else {},\n            \"missing_fields\": missing_list,\n            \"missing_information\": missing_information,\n            \"forbidden_downstream_tools\": [str(item) for item in forbidden_downstream_tools if str(item)],\n            \"clarification_prompt\": clarification_prompt,\n            \"final_answer_recommendation\": final_recommendation,\n        }\n\n    if not isinstance(records, list) or len(records) == 0:\n        return base(False, \"no_records\", 0, {}, [])\n\n    def norm(field, value):\n        if value is None:\n            return \"\"\n        text = str(value)\n        fname = str(field).lower()\n        if \"phone\" in fname or \"number\" in fname:\n            return \"\".join(ch for ch in text if ch.isdigit())\n        return text.strip().lower()\n\n    matches = []\n    for rec in records:\n        if not isinstance(rec, dict):\n            continue\n        ok = True\n        for field, expected in constraints.items():\n            if field not in rec or norm(field, rec.get(field)) != norm(field, expected):\n                ok = False\n                break\n        if ok:\n            matches.append(rec)\n\n    if len(matches) == 0:\n        return base(False, \"no_matching_records\", 0, {}, [])\n    if len(matches) > 1:\n        return base(False, \"ambiguous_multiple_matches\", len(matches), {}, [])\n\n    selected = matches[0]\n    missing = []\n    for field in required_fields:\n        if not isinstance(field, str) or field == \"\":\n            continue\n        value = selected.get(field)\n        if value is None or (isinstance(value, str) and value.strip() == \"\"):\n            missing.append(field)\n    if missing:\n        return base(False, \"missing_required_fields\", 1, selected, missing)\n    return base(True, \"\", 1, selected, [])\n",
+        "spec": {
+          "abstain_behavior": "Returns should_abstain true, clarification_prompt, and missing_information for no_records, no_matching_records, ambiguous_multiple_matches, or missing_required_fields. Returns should_abstain false only when exactly one visible matching record has all required fields.",
+          "applicable_task_families": [],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": null,
+          "description": "Use only on missing-information or cannot-determine tasks, preferably after an original search/list call has produced visible records or returned no records. It checks whether exactly one usable visible record contains the required fields, returns should_abstain plus a clarification prompt when information is insufficient, and never calls services or performs side effects. Keep using the recency/action helpers for normal latest/oldest tasks; use this guard to avoid over-answering or unsafe actions when required information is absent.",
+          "diagnostic_only": false,
+          "estimated_step_compression": null,
+          "expected_milestone_calls_replaced": [],
+          "family": "validation_abstention_helper",
+          "final_state_preservation_plan": "",
+          "generalization_rationale": "The safe recency/action bridge produced strong natural outcome lift and zero candidate incidents, but confirm100 exact success tied control because hidden-tool insufficient-information tasks moved in both directions. This compact recombination tests whether an existing validated abstention guard can absorb that missing-information lane without diluting recency/action adoption.",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": true,
+            "planner_failures": [],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "insufficient_information_failure",
+              "ambiguous_record_selection",
+              "missing_field_failure"
+            ],
+            "summary": "Seed/dev and feedback traces repeatedly show empty, ambiguous, or incomplete visible records causing unsupported final answers or unsafe target guesses.",
+            "visible_data_gaps": [
+              "empty_search_results",
+              "missing_required_field",
+              "ambiguous_multiple_matches"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "list",
+              "description": "Visible records returned by an already-called ToolSandbox search/list tool.",
+              "name": "records"
+            },
+            {
+              "annotation": "list",
+              "description": "Scalar field names that must be present and non-empty before answering.",
+              "name": "required_fields"
+            },
+            {
+              "annotation": "dict",
+              "description": "Optional visible-field equality constraints used to identify the one relevant record.",
+              "name": "constraints"
+            },
+            {
+              "annotation": "list",
+              "description": "Optional downstream tools that should not be called when the helper recommends abstention.",
+              "name": "forbidden_downstream_tools"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "empty visible records causing fabricated final answers",
+            "ambiguous visible records causing unsafe target guesses",
+            "missing required fields causing over-answering on insufficient-information tasks"
+          ],
+          "negative_triggers": [
+            "direct_scalar_service_answer_available",
+            "side_effect_action_already_has_complete_unique_target",
+            "ordinary_recency_action_with_records_and_required_fields"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "clarification_prompt": {
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "forbidden_downstream_tools": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "matching_record_count": {
+                "type": "integer"
+              },
+              "missing_fields": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "missing_information": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "selected_record": {
+                "type": "object"
+              },
+              "should_abstain": {
+                "type": "boolean"
+              },
+              "should_answer": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "should_answer",
+              "should_abstain",
+              "abstain_reason",
+              "matching_record_count",
+              "selected_record",
+              "missing_fields",
+              "missing_information",
+              "forbidden_downstream_tools",
+              "clarification_prompt",
+              "final_answer_recommendation"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "insufficient_information",
+            "cannot_determine",
+            "missing_information",
+            "not enough visible information",
+            "empty search result on missing-information task"
+          ],
+          "preserves_side_effect_tools": [],
+          "reason_tool_is_decisive": "",
+          "required_original_tool_calls": [],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "safe_bridge_confirm100_exact_losses_hidden_insufficient_information",
+            "candidate_no_runtime_incidents_but_exact_tied_by_missing_info_noise"
+          ],
+          "tool_name": "detect_insufficient_visible_records"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 2,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 3
+    },
+    "resolve_search_window_or_bounds": {
+      "accepted_at": "2026-05-08T20:45:42.108317+00:00",
+      "birth_scenario": "gap_closure_lab_recency_search_selector_portfolio",
+      "code_hash": "2f4fdae225cc1af4e9c385eeb601448cc44e6e361555a3741193d3618cb38e8a",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 6,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def resolve_search_window_or_bounds(\n    current_timestamp: float,\n    phrase: str,\n    target_domain: str,\n    timestamp_intent: str,\n    direction: str,\n    content_keyword: str = \"\",\n    lookback_days: int = 0,\n    timezone_offset: float = 0.0,\n) -> dict:\n    min_timestamp = 315529200.0\n    now = float(current_timestamp)\n    if now <= 0:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"missing_current_timestamp\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    domain = str(target_domain or \"\").strip().lower()\n    if domain == \"message\":\n        tool_name = \"search_messages\"\n    elif domain == \"reminder\":\n        tool_name = \"search_reminder\"\n    else:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"unsupported_target_domain\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    intent = str(timestamp_intent or \"\").strip().lower()\n    if domain == \"message\":\n        lower_key = \"creation_timestamp_lowerbound\"\n        upper_key = \"creation_timestamp_upperbound\"\n    elif intent == \"creation\":\n        lower_key = \"creation_timestamp_lowerbound\"\n        upper_key = \"creation_timestamp_upperbound\"\n    elif intent == \"reminder\":\n        lower_key = \"reminder_timestamp_lowerbound\"\n        upper_key = \"reminder_timestamp_upperbound\"\n    else:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"unsupported_timestamp_intent\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    normalized_direction = str(direction or \"\").strip().lower()\n    normalized_phrase = str(phrase or \"\").strip().lower()\n    if not normalized_direction:\n        if normalized_phrase in (\"yesterday\", \"today\", \"later today\", \"later_today\", \"upcoming\", \"recent\", \"latest\", \"oldest\"):\n            normalized_direction = normalized_phrase.replace(\" \", \"_\")\n        else:\n            return {\n                \"target_tool_name\": \"\",\n                \"search_kwargs\": {},\n                \"should_call_search\": False,\n                \"abstain_reason\": \"ambiguous_phrase\",\n                \"interpretation\": \"\",\n                \"bounds_source\": \"abstain\",\n            }\n    offset_seconds = float(timezone_offset) * 3600.0\n    local_now = now + offset_seconds\n    local_day_start = float(int(local_now // 86400.0) * 86400.0)\n    day_start = local_day_start - offset_seconds\n    next_day_start = day_start + 86400.0\n    kwargs = {}\n    interpretation = normalized_direction\n    bounds_source = \"resolved_direction\"\n    if normalized_direction == \"yesterday\":\n        kwargs[lower_key] = max(min_timestamp, day_start - 86400.0)\n        kwargs[upper_key] = max(min_timestamp, day_start - 1.0)\n    elif normalized_direction == \"today\":\n        kwargs[lower_key] = max(min_timestamp, day_start)\n        kwargs[upper_key] = max(min_timestamp, next_day_start - 1.0)\n    elif normalized_direction == \"later_today\":\n        kwargs[lower_key] = max(min_timestamp, now)\n        kwargs[upper_key] = max(min_timestamp, next_day_start - 1.0)\n    elif normalized_direction == \"upcoming\":\n        kwargs[lower_key] = max(min_timestamp, now)\n    elif normalized_direction == \"recent\":\n        days = int(lookback_days)\n        if days <= 0:\n            days = 7\n        kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)\n        kwargs[upper_key] = max(min_timestamp, now)\n    elif normalized_direction in (\"latest\", \"oldest\"):\n        if domain == \"message\":\n            kwargs[upper_key] = max(min_timestamp, now)\n        else:\n            days = int(lookback_days)\n            if days <= 0:\n                days = 3650\n            kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)\n            kwargs[upper_key] = max(min_timestamp, now)\n    elif normalized_direction == \"custom\":\n        days = int(lookback_days)\n        if days <= 0:\n            return {\n                \"target_tool_name\": \"\",\n                \"search_kwargs\": {},\n                \"should_call_search\": False,\n                \"abstain_reason\": \"custom_window_requires_positive_lookback_days\",\n                \"interpretation\": \"\",\n                \"bounds_source\": \"abstain\",\n            }\n        kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)\n        kwargs[upper_key] = max(min_timestamp, now)\n        interpretation = \"custom_lookback\"\n    else:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"unsupported_direction\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    if str(content_keyword or \"\").strip():\n        kwargs[\"content\"] = str(content_keyword)\n    if not kwargs:\n        return {\n            \"target_tool_name\": \"\",\n            \"search_kwargs\": {},\n            \"should_call_search\": False,\n            \"abstain_reason\": \"no_search_criteria_prepared\",\n            \"interpretation\": \"\",\n            \"bounds_source\": \"abstain\",\n        }\n    return {\n        \"target_tool_name\": tool_name,\n        \"search_kwargs\": kwargs,\n        \"should_call_search\": True,\n        \"abstain_reason\": \"\",\n        \"interpretation\": interpretation,\n        \"bounds_source\": bounds_source,\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_call_search=False with abstain_reason when current_timestamp is missing, the target domain or timestamp intent is unsupported, or the phrase/direction is ambiguous. When should_call_search=True, call only the original search tool in target_tool_name with **search_kwargs.",
+          "applicable_task_families": [
+            "modify_contact_with_message_recency",
+            "modify_reminder_with_recency_latest",
+            "remove_reminder_with_recency_latest",
+            "search_reminder_with_creation_recency_yesterday",
+            "search_reminder_with_recency_yesterday",
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 6,
+          "description": "Recency search-window helper that prepares search kwargs before the original ToolSandbox search. Use for latest, oldest, last, most recent, yesterday, today, recent, or upcoming message/reminder searches. Call get_current_timestamp first when needed, then call this helper, then call target_tool_name with search_kwargs. For contact updates such as the last person I messaged, use target_domain='message', timestamp_intent='message_creation', and direction='latest' so search_messages receives bounded timestamp criteria instead of blank or null arguments. This helper never searches and never performs side effects.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "derived_value_calculator",
+          "final_state_preservation_plan": "",
+          "generalization_rationale": "The repaired contact selector has value only after search_messages returns records. Repair replay showed the actor may call search_messages with blank criteria and never reach records. This tiny portfolio adds the retained recency search-window helper so natural routing has a bounded path from a recency phrase to visible message records before selection.",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [
+              "search_reminder",
+              "search_messages"
+            ],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "no_criteria_search_call"
+            ],
+            "repeated_failed_tool_calls": [
+              "search_reminder",
+              "search_messages"
+            ],
+            "signals": [
+              "repeated_failed_tool_call",
+              "visible_raw_data_lacking_deterministic_transform",
+              "unnecessary_clarification"
+            ],
+            "summary": "Reminder and message search tasks fail when the agent needs bounded timestamp criteria but only has natural recency language such as yesterday, today, upcoming, latest, or oldest.",
+            "visible_data_gaps": [
+              "missing benchmark-compatible search window kwargs"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "float",
+              "description": "Current Unix timestamp from get_current_timestamp.",
+              "name": "current_timestamp"
+            },
+            {
+              "annotation": "str",
+              "description": "Original user-facing time phrase, such as 'yesterday' or 'later today'.",
+              "name": "phrase"
+            },
+            {
+              "annotation": "str",
+              "description": "Either 'reminder' or 'message'.",
+              "name": "target_domain"
+            },
+            {
+              "annotation": "str",
+              "description": "For reminders use 'creation' or 'reminder'. For messages use 'message_creation'.",
+              "name": "timestamp_intent"
+            },
+            {
+              "annotation": "str",
+              "description": "Normalized time-window intent: yesterday, today, later_today, upcoming, recent, latest, oldest, or custom.",
+              "name": "direction"
+            },
+            {
+              "annotation": "str",
+              "description": "Optional content filter to pass through to the original search tool.",
+              "name": "content_keyword"
+            },
+            {
+              "annotation": "int",
+              "description": "Optional explicit lookback window in days for recent/custom searches.",
+              "name": "lookback_days"
+            },
+            {
+              "annotation": "float",
+              "description": "Optional local UTC offset in hours when local-day boundaries matter.",
+              "name": "timezone_offset"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "manual timestamp-window construction drift",
+            "search tool called without trace-compatible recency bounds",
+            "recency/action chain hidden because search-window helper was negatively triggered by modify_contact"
+          ],
+          "negative_triggers": [
+            "add_reminder",
+            "pure_service_enablement",
+            "insufficient_information",
+            "search_without_time_phrase",
+            "lookup by known contact name only"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "bounds_source": {
+                "type": "string"
+              },
+              "interpretation": {
+                "type": "string"
+              },
+              "search_kwargs": {
+                "type": "object"
+              },
+              "should_call_search": {
+                "type": "boolean"
+              },
+              "target_tool_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "target_tool_name",
+              "search_kwargs",
+              "should_call_search",
+              "abstain_reason",
+              "interpretation",
+              "bounds_source"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "last person I messaged",
+            "last person I sent a message to",
+            "latest message before contact update",
+            "modify_contact_with_message_recency",
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest",
+            "search_reminder_with_creation_recency_yesterday",
+            "search_reminder_with_recency_yesterday",
+            "search_reminder_with_recency_upcoming",
+            "bounded_recency_search_requires_time_window"
+          ],
+          "preserves_side_effect_tools": [
+            "search_messages",
+            "search_reminder"
+          ],
+          "reason_tool_is_decisive": "It converts the visible natural time phrase and current timestamp into trace-compatible search kwargs, keeping the original search tool in the route.",
+          "required_original_tool_calls": [
+            "search_messages",
+            "search_reminder"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "contact_selector_affordance_expanded60_called_subset_outcome_plus_0_50",
+            "contact_selector_bridge_repair_smoke6_visible_not_called_after_blank_search",
+            "resolve_search_window_or_bounds_retained_low_frequency_positive"
+          ],
+          "tool_name": "resolve_search_window_or_bounds"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 2,
+        "runtime_smoke_passed": true,
+        "source_example_count": 2
+      },
+      "version": 2
+    },
+    "select_message_content_by_recency": {
+      "accepted_at": "2026-05-09T02:13:13.046529+00:00",
+      "birth_scenario": "gap_closure_lab_task77_recency_message_final_answer_repair",
+      "code_hash": "232c462381b8c0659c7add6126f5f3c31b077e6cf912713535273a8eab24e943",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def select_message_content_by_recency(records: list, selection_mode: str = \"latest\") -> dict:\n    \"\"\"Select the latest/oldest visible message and return answer-ready content.\"\"\"\n    mode = str(selection_mode or \"latest\").strip().lower()\n\n    def empty(reason: str, selected_record=None, selected_timestamp=0.0, tie_candidates=None) -> dict:\n        return {\n            \"selected_record\": selected_record if isinstance(selected_record, dict) else {},\n            \"selected_message\": selected_record if isinstance(selected_record, dict) else {},\n            \"selected_message_id\": \"\",\n            \"selected_content\": \"\",\n            \"selected_timestamp\": float(selected_timestamp or 0.0),\n            \"should_answer\": False,\n            \"abstain_reason\": str(reason or \"insufficient_information\"),\n            \"tie_candidates\": tie_candidates if isinstance(tie_candidates, list) else [],\n            \"selection_reason\": \"\",\n            \"final_answer_recommendation\": \"abstain:\" + str(reason or \"insufficient_information\"),\n        }\n\n    if mode not in (\"latest\", \"oldest\"):\n        return empty(\"invalid_selection_mode\")\n    if not isinstance(records, list) or not records:\n        return empty(\"no_records\")\n\n    candidates = []\n    for index, record in enumerate(records):\n        if not isinstance(record, dict):\n            continue\n        raw_ts = record.get(\"creation_timestamp\")\n        if isinstance(raw_ts, bool) or not isinstance(raw_ts, (int, float)):\n            continue\n        candidates.append((index, record, float(raw_ts)))\n    if not candidates:\n        return empty(\"no_numeric_creation_timestamps\")\n\n    target_ts = max(item[2] for item in candidates) if mode == \"latest\" else min(item[2] for item in candidates)\n    tied = [(index, record, ts) for index, record, ts in candidates if ts == target_ts]\n    if len(tied) != 1:\n        return empty(\"ambiguous_timestamp_tie\", selected_timestamp=target_ts, tie_candidates=[record for _, record, _ in tied])\n\n    selected_index, selected, selected_ts = tied[0]\n    content = str(selected.get(\"content\") or \"\").strip()\n    if not content:\n        return empty(\"selected_message_missing_content\", selected, selected_ts)\n    message_id = selected.get(\"message_id\")\n    return {\n        \"selected_record\": selected,\n        \"selected_message\": selected,\n        \"selected_message_id\": \"\" if message_id in (None, \"\") else str(message_id),\n        \"selected_content\": content,\n        \"selected_timestamp\": float(selected_ts),\n        \"should_answer\": True,\n        \"abstain_reason\": \"\",\n        \"tie_candidates\": [],\n        \"selection_reason\": \"selected_%s_message_by_creation_timestamp_at_index_%s\" % (mode, selected_index),\n        \"final_answer_recommendation\": content,\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_answer=false with abstain_reason on no records, invalid selection mode, missing numeric creation_timestamp, timestamp ties, or selected message missing content. Never guess.",
+          "applicable_task_families": [
+            "search_message_with_recency",
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest"
+          ],
+          "canonical_route_substitution_risk": "low",
+          "cross_task_applicability_count": 2,
+          "description": "Final-answer-ready visible-record selector for message recency search results. Call immediately after search_messages returns multiple visible message records when the user asks for the latest, last, most recent, oldest, or earliest message. It selects by numeric creation_timestamp and returns selected_content plus final_answer_recommendation. For answer-only tasks, copy final_answer_recommendation or selected_content exactly as the final answer, without markdown, added punctuation, timestamps, phone numbers, or extra fields. Do not manually choose the first record. Do not use before records are visible, for reminder/contact actions, or on insufficient-information tasks.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [
+            "manual_latest_message_selection",
+            "manual_final_answer_phrasing"
+          ],
+          "family": "search_filter_ranking_helper",
+          "final_state_preservation_plan": "No side effects. This helper only selects from visible search_messages records and returns answer text.",
+          "generalization_rationale": "Sealed-run diagnostics showed a generic failure mode where timestamp-bounded message search returned multiple records and the actor manually answered from the wrong recency candidate. This repair closes the final-answer-ready gap without encoding scenario IDs or expected answers.",
+          "grading_accounting_note": "Outcome-preserving answer helper; canonical route remains search_messages followed by final answer.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": true,
+            "planner_failures": [
+              "manual post-search latest-message selection chose older record"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "visible_raw_data_lacking_deterministic_transform",
+              "wrong_record_selected_after_search",
+              "output_not_final_answer_ready"
+            ],
+            "summary": "Visible search_messages records include multiple timestamped messages. The actor can use correct search bounds yet answer from the wrong record unless a final-answer-ready selector is called after search.",
+            "visible_data_gaps": [
+              "multiple visible messages with creation_timestamp require max/min selection"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "list",
+              "description": "Full list returned by the prior search_messages call. If omitted after search_messages, SAGE may autofill it from the latest visible original search trace.",
+              "name": "records"
+            },
+            {
+              "annotation": "str",
+              "description": "latest for most recent/last/newest; oldest for earliest/oldest. Defaults to latest when omitted.",
+              "name": "selection_mode"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "wrong latest/oldest message chosen from visible records",
+            "intermediate search-window helper not sufficient for final answer",
+            "manual post-search selection in multi-message results"
+          ],
+          "negative_triggers": [
+            "insufficient_information",
+            "modify_contact",
+            "modify_reminder",
+            "remove_reminder",
+            "send_message",
+            "add_reminder",
+            "search_reminder",
+            "contact_update",
+            "no visible messages"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "selected_content": {
+                "type": "string"
+              },
+              "selected_message": {
+                "type": "object"
+              },
+              "selected_message_id": {
+                "type": "string"
+              },
+              "selected_record": {
+                "type": "object"
+              },
+              "selected_timestamp": {
+                "type": "number"
+              },
+              "selection_reason": {
+                "type": "string"
+              },
+              "should_answer": {
+                "type": "boolean"
+              },
+              "tie_candidates": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "selected_record",
+              "selected_message",
+              "selected_message_id",
+              "selected_content",
+              "selected_timestamp",
+              "should_answer",
+              "abstain_reason",
+              "tie_candidates",
+              "selection_reason",
+              "final_answer_recommendation"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "search_message_with_recency_latest",
+            "search_message_with_recency_oldest",
+            "latest message",
+            "most recent message",
+            "oldest message",
+            "select_latest_or_oldest_record_from_search_results",
+            "record_returned_needs_latest_oldest_selection"
+          ],
+          "preserves_side_effect_tools": [],
+          "reason_tool_is_decisive": "It converts a visible multi-message search result into the exact answer value and phrasing needed for latest/oldest message tasks.",
+          "required_original_tool_calls": [
+            "search_messages"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "task77_confirm100_wrong_post_search_record_selection",
+            "final_answer_ready_transformation_gap"
+          ],
+          "tool_name": "select_message_content_by_recency"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 2,
+        "negative_applicability_count": 4,
+        "runtime_smoke_passed": true,
+        "source_example_count": 2
+      },
+      "version": 1
+    },
+    "select_message_counterparty_for_contact_update": {
+      "accepted_at": "2026-05-08T23:31:37.542105+00:00",
+      "birth_scenario": "gap_closure_lab_safe_contact_selector_bridge_repair",
+      "code_hash": "9f422118f5d294d2bf5aeb9c6e4aff59e228ac9a8975a386881638608424769c",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def select_message_counterparty_for_contact_update(records: list, selection_mode: str, updates: dict = None, self_person_id: str = \"\") -> dict:\n    \"\"\"Select a message counterparty for contact updates without emitting unsafe ids.\"\"\"\n    updates = updates if isinstance(updates, dict) else {}\n    self_person_id = str(self_person_id or \"\").strip()\n\n    def _text(value) -> str:\n        return \"\" if value in (None, \"\") else str(value).strip()\n\n    def _uuid_like(value) -> bool:\n        text = _text(value)\n        if len(text) != 36:\n            return False\n        if [text[8], text[13], text[18], text[23]] != [\"-\", \"-\", \"-\", \"-\"]:\n            return False\n        return all(ch in \"0123456789abcdefABCDEF\" for ch in text.replace(\"-\", \"\"))\n\n    def _phone_like(value) -> bool:\n        text = _text(value)\n        return text.startswith(\"+\") and text[1:].isdigit() and len(text) >= 8\n\n    def empty(reason: str, selected_record=None, selected_timestamp=0.0, tie_candidates=None) -> dict:\n        return {\n            \"selected_record\": selected_record if isinstance(selected_record, dict) else {},\n            \"selected_message\": selected_record if isinstance(selected_record, dict) else {},\n            \"selected_message_id\": \"\",\n            \"selected_person_id\": \"\",\n            \"selected_phone_number\": \"\",\n            \"selected_timestamp\": float(selected_timestamp or 0.0),\n            \"downstream_tool_name\": \"\",\n            \"downstream_tool_kwargs\": {},\n            \"should_call_tool\": False,\n            \"tie_candidates\": tie_candidates if isinstance(tie_candidates, list) else [],\n            \"abstain_reason\": str(reason or \"\"),\n            \"safety_notes\": \"abstain; no unique safe contact update target\",\n            \"final_answer_recommendation\": \"abstain:\" + str(reason or \"insufficient_information\"),\n        }\n\n    if not isinstance(records, list) or not records:\n        return empty(\"no_records\")\n    mode = str(selection_mode or \"\").strip().lower()\n    if mode not in (\"latest\", \"oldest\"):\n        return empty(\"invalid_selection_mode\")\n\n    candidates = []\n    id_counts = {}\n    phone_counts = {}\n    for index, record in enumerate(records):\n        if not isinstance(record, dict):\n            continue\n        for key in (\"sender_person_id\", \"recipient_person_id\"):\n            value = _text(record.get(key))\n            if _uuid_like(value):\n                id_counts[value] = id_counts.get(value, 0) + 1\n        for key in (\"sender_phone_number\", \"recipient_phone_number\"):\n            value = _text(record.get(key))\n            if _phone_like(value):\n                phone_counts[value] = phone_counts.get(value, 0) + 1\n        raw_ts = record.get(\"creation_timestamp\")\n        if isinstance(raw_ts, bool) or not isinstance(raw_ts, (int, float)):\n            continue\n        candidates.append((index, record, float(raw_ts)))\n    if not candidates:\n        return empty(\"no_numeric_creation_timestamps\")\n\n    target_ts = max(item[2] for item in candidates) if mode == \"latest\" else min(item[2] for item in candidates)\n    tied = [(idx, msg, ts) for idx, msg, ts in candidates if ts == target_ts]\n    if len(tied) != 1:\n        return empty(\"ambiguous_timestamp_tie\", selected_timestamp=target_ts, tie_candidates=[msg for _, msg, _ in tied])\n\n    _idx, selected, selected_ts = tied[0]\n    sender_id = _text(selected.get(\"sender_person_id\"))\n    recipient_id = _text(selected.get(\"recipient_person_id\"))\n    sender_phone = _text(selected.get(\"sender_phone_number\"))\n    recipient_phone = _text(selected.get(\"recipient_phone_number\"))\n\n    sides = [\n        {\n            \"role\": \"sender\",\n            \"person_id\": sender_id if _uuid_like(sender_id) else \"\",\n            \"raw_person_id\": sender_id,\n            \"phone_number\": sender_phone if _phone_like(sender_phone) else \"\",\n        },\n        {\n            \"role\": \"recipient\",\n            \"person_id\": recipient_id if _uuid_like(recipient_id) else \"\",\n            \"raw_person_id\": recipient_id,\n            \"phone_number\": recipient_phone if _phone_like(recipient_phone) else \"\",\n        },\n    ]\n\n    if self_person_id and _uuid_like(self_person_id):\n        if sender_id == self_person_id:\n            selected_side = sides[1]\n        elif recipient_id == self_person_id:\n            selected_side = sides[0]\n        else:\n            selected_side = None\n    else:\n        usable = [\n            side for side in sides\n            if side[\"person_id\"] or side[\"phone_number\"]\n        ]\n        if not usable:\n            return empty(\"missing_counterparty_identity\", selected, selected_ts)\n\n        def side_rank(side):\n            phone = side[\"phone_number\"]\n            person_id = side[\"person_id\"]\n            phone_count = phone_counts.get(phone, 9999) if phone else 9999\n            id_count = id_counts.get(person_id, 9999) if person_id else 9999\n            # Prefer the less frequent phone/identity in the visible messages.\n            # The more frequent side is usually the user's own endpoint.\n            return (\n                phone_count,\n                id_count,\n                0 if person_id else 1,\n                0 if phone else 1,\n                side[\"role\"],\n            )\n\n        ranked = sorted(usable, key=side_rank)\n        if len(ranked) > 1 and side_rank(ranked[0])[:4] == side_rank(ranked[1])[:4]:\n            return empty(\"ambiguous_counterparty_without_self_id\", selected, selected_ts)\n        selected_side = ranked[0]\n\n    if selected_side is None:\n        return empty(\"self_id_not_present_in_selected_message\", selected, selected_ts)\n\n    person_id = selected_side[\"person_id\"]\n    phone_number = selected_side[\"phone_number\"]\n    if not person_id and not phone_number:\n        return empty(\"selected_counterparty_has_no_safe_identifier\", selected, selected_ts)\n\n    message_id = selected.get(\"message_id\")\n    has_update = any(\n        value is not None and (not isinstance(value, str) or value.strip())\n        for value in updates.values()\n    )\n    if person_id:\n        downstream_tool_name = \"modify_contact\"\n        downstream_tool_kwargs = {\"person_id\": person_id, **updates} if has_update else {}\n        should_call_tool = bool(has_update)\n        recommendation = \"call:modify_contact\" if has_update else \"use_selected_record:missing_update_fields\"\n        safety = (\n            \"safe contact id selected; call modify_contact with selected_person_id \"\n            \"after collecting requested update fields\"\n        )\n    else:\n        downstream_tool_name = \"search_contacts\"\n        downstream_tool_kwargs = {\"phone_number\": phone_number}\n        should_call_tool = True\n        recommendation = \"call:search_contacts_then_modify_contact\"\n        safety = (\n            \"no reliable person_id in message record; search_contacts by selected_phone_number \"\n            \"before any modify_contact call\"\n        )\n\n    return {\n        \"selected_record\": selected,\n        \"selected_message\": selected,\n        \"selected_message_id\": \"\" if message_id in (None, \"\") else str(message_id),\n        \"selected_person_id\": person_id,\n        \"selected_phone_number\": phone_number,\n        \"selected_timestamp\": float(selected_ts),\n        \"downstream_tool_name\": downstream_tool_name,\n        \"downstream_tool_kwargs\": downstream_tool_kwargs,\n        \"should_call_tool\": should_call_tool,\n        \"tie_candidates\": [],\n        \"abstain_reason\": \"\",\n        \"safety_notes\": safety,\n        \"final_answer_recommendation\": recommendation,\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_call_tool=false with abstain_reason on no records, invalid selection mode, missing timestamps, timestamp ties, missing counterparty id, or ambiguous counterparty when self_person_id/frequency inference cannot choose a unique non-self contact.",
+          "applicable_task_families": [
+            "modify_contact_with_message_recency",
+            "contact_update_after_message_lookup"
+          ],
+          "birth_scenario": "gap_closure_lab_contact_selector_bridge_contract_repair",
+          "canonical_route_substitution_risk": "low",
+          "cross_task_applicability_count": 2,
+          "description": "Safe visible-record selector for contact update tasks. Call after search_messages returns visible message records when the user wants to modify the contact for the latest, oldest, last, or most recent message counterparty. It ranks the less-frequent visible phone/person endpoint as the counterparty, validates person_id shape before exposing it for modify_contact, and falls back to search_contacts by phone when the message record contains no reliable contact id. Do not use before message records are visible, for reminder tasks, search-only answers, send/remove tasks, or insufficient-information tasks.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 4,
+          "expected_milestone_calls_replaced": [
+            "select_latest_or_oldest_visible_target",
+            "prepare_downstream_side_effect_kwargs"
+          ],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "The helper never performs side effects. It emits modify_contact kwargs only when it has a UUID-shaped selected_person_id. If only a phone number is reliable, it emits search_contacts kwargs first so the actor can retrieve a valid person_id before modifying the contact.",
+          "generalization_rationale": "Confirm100 showed the two-tool portfolio has large natural adoption value but one real contact-update failure caused by a malformed message person_id being handed to modify_contact. This repair preserves the positive selector while preventing malformed IDs from becoming action arguments, preserving the modify_contact bridge while update fields are pending, and using phone lookup as the safe fallback.",
+          "grading_accounting_note": "Outcome-preserving but canonical-substituting: the helper compresses intermediate target-selection and kwargs-preparation milestones while preserving the final original ToolSandbox side-effect call.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "compose target selection with preserved side-effect argument preparation"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "visible_not_called_chain_steps",
+              "force_call_positive_contact_recency",
+              "output_shape_repair_needed_missing_updates",
+              "side_effect_argument_preparation_failure",
+              "side_effect_bridge_contract_repair"
+            ],
+            "summary": "Affordance expanded60 naturally called the selector on the intended modify_contact recency scenario and improved outcome by +0.50, but the side-effect preservation checker flagged the output because the selection-only bridge recommendation did not use the expected use_selected_record: prefix. This repaired pack preserves the same routing and deterministic selection behavior while aligning the bridge contract with the checker.",
+            "visible_data_gaps": [
+              "visible records plus recency intent plus action updates must become one safe downstream call"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "list",
+              "description": "Full visible list returned by the prior search_messages call.",
+              "name": "records"
+            },
+            {
+              "annotation": "str",
+              "description": "latest for most recent/last; oldest for earliest/oldest.",
+              "name": "selection_mode"
+            },
+            {
+              "annotation": "dict",
+              "description": "Known modify_contact fields such as {'phone_number': '+15551234567'}; pass {} when the update must still be collected from the user turn.",
+              "name": "updates"
+            },
+            {
+              "annotation": "str",
+              "description": "Optional visible self person_id if already known. Leave empty when not known; the helper uses message-list frequency to infer the counterparty.",
+              "name": "self_person_id"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "manual recency target selection before modify_contact",
+            "contact update helper hidden from selector actor policy",
+            "two-tool bundle adoption ambiguity"
+          ],
+          "negative_triggers": [
+            "insufficient_information",
+            "search_message_with_recency_oldest",
+            "search_message_with_recency_latest",
+            "search_reminder",
+            "modify_reminder",
+            "remove_reminder",
+            "send_message",
+            "remove_contact",
+            "add_contact",
+            "search-only answer",
+            "no visible messages",
+            "ambiguous timestamp tie"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "downstream_tool_kwargs": {
+                "type": "object"
+              },
+              "downstream_tool_name": {
+                "enum": [
+                  "",
+                  "modify_contact"
+                ],
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "safety_notes": {
+                "type": "string"
+              },
+              "selected_message": {
+                "type": "object"
+              },
+              "selected_message_id": {
+                "type": "string"
+              },
+              "selected_person_id": {
+                "type": "string"
+              },
+              "selected_phone_number": {
+                "type": "string"
+              },
+              "selected_record": {
+                "type": "object"
+              },
+              "selected_timestamp": {
+                "type": "number"
+              },
+              "should_call_tool": {
+                "type": "boolean"
+              },
+              "tie_candidates": {
+                "type": "array"
+              }
+            },
+            "required": [
+              "selected_record",
+              "selected_message",
+              "selected_message_id",
+              "selected_person_id",
+              "selected_phone_number",
+              "selected_timestamp",
+              "downstream_tool_name",
+              "downstream_tool_kwargs",
+              "should_call_tool",
+              "tie_candidates",
+              "abstain_reason",
+              "safety_notes",
+              "final_answer_recommendation"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "last person I messaged",
+            "last person I sent a message to",
+            "modify_contact_with_message_recency",
+            "latest message counterparty contact update",
+            "oldest message counterparty contact update",
+            "contact update after search_messages recency"
+          ],
+          "preserves_side_effect_tools": [
+            "modify_contact"
+          ],
+          "reason_tool_is_decisive": "The hard deterministic step is choosing the latest/oldest visible message counterparty and converting it into the person_id required by modify_contact.",
+          "required_original_tool_calls": [
+            "modify_contact"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "selector_only_expanded60_modify_contact_called_subset_outcome_positive",
+            "action_only_expanded60_visible_not_called_due_to_affordance",
+            "null_scaffold_expanded60_modify_contact_same_scenario_negative",
+            "confirm100_safe_repair_single_side_effect_failure_malformed_person_id",
+            "contact_selector_called_subset_outcome_positive_but_needs_id_safety",
+            "safe_repair_smoke6_contract_mismatch_downstream_tool_name_empty"
+          ],
+          "tool_name": "select_message_counterparty_for_contact_update"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 5,
+        "negative_applicability_count": 6,
+        "runtime_smoke_passed": true,
+        "source_example_count": 4
+      },
+      "version": 5
+    }
+  }
+}

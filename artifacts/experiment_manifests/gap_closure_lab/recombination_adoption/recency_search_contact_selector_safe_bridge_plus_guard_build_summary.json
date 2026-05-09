@@ -1,0 +1,22 @@
+{
+  "created_at": "2026-05-09T00:56:26.305119+00:00",
+  "experimental_only": true,
+  "hypothesis": "A three-tool portfolio can preserve the high natural adoption of recency/action helpers while giving missing-information tasks an explicit safe-abstain affordance.",
+  "leakage_controls": [
+    "No scenario IDs, expected answers, or truth labels are encoded in tool code.",
+    "The guard operates only on actor-provided visible records, field names, and constraints.",
+    "The experiment remains targeted and experimental, not protected final evidence."
+  ],
+  "registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_safe_bridge_plus_guard_pack/registry_manifest.json",
+  "registry_sha256": "155fb74e232289d8e4bd10cd75739fea307652141d9a77082ff3bbdd464fdee1",
+  "source_registries": {
+    "abstention_guard": "artifacts/registry_experiments/gap_closure_lab/affordance_rich_guard_pack/registry_manifest.json",
+    "safe_bridge": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_safe_bridge_portfolio_pack/registry_manifest.json"
+  },
+  "tool_count": 3,
+  "tools": [
+    "detect_insufficient_visible_records",
+    "resolve_search_window_or_bounds",
+    "select_message_counterparty_for_contact_update"
+  ]
+}

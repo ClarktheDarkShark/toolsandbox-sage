@@ -1,0 +1,19 @@
+{
+  "cache_policy": {
+    "baseline_control_cache": "eligible",
+    "openai_response_cache_for_candidate": "disabled",
+    "sage_candidate_cache": "fresh_only"
+  },
+  "created_at": "2026-05-09T08:58:08.619381+00:00",
+  "leakage_statement": "The repair uses only the generic visible failure mode observed after the sealed run: multiple timestamped message records require max/min selection before answering. It does not encode expected content, truth labels, hidden facts, or scenario IDs into the tool or route.",
+  "output_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_safe_bridge_plus_guard_final_selector_pack/registry_manifest.json",
+  "output_registry_sha256": "caa45108e8be81b0600372d75664090dfd560ba6b271752eb4a82e81292ff557",
+  "repair_trigger": "Sealed-run diagnostic: search window and search_messages succeeded, but the actor answered from a non-target message record instead of the required recency extreme.",
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_safe_bridge_plus_guard_pack/registry_manifest.json",
+  "tool_names": [
+    "detect_insufficient_visible_records",
+    "resolve_search_window_or_bounds",
+    "select_message_content_by_recency",
+    "select_message_counterparty_for_contact_update"
+  ]
+}
