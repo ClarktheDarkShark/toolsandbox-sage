@@ -84,12 +84,25 @@ Postscale follow-up results:
 - Final-answer-ready days answer diagnostic: outcome +0.1316 on holiday residual19, but quality expanded60 backtest fell to +0.0393 with negative called-subset outcome, so broad route is parked.
 - Pruned recency/time/days minimal pack: outcome +0.0542, canonical +0.0019, exact success +7, zero incidents. It is a useful exact-success ablation but not the top outcome portfolio.
 
+External-holdout confirmation attempt:
+
+- Because no clean non-external confirmation100/scale250 pool remained, I built one final uninspected external-service holdout manifest as an experimental stress test only.
+- Manifest: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/external_holdout_splits.json`
+- Manifest SHA-256: `3abc564321b54a116fb14778129fe99c6154a1c52fd2ecd7d17b2f19b9ddbdb4`
+- Split: `external_holdout_confirm100`, 100 tasks, 23 families, largest family share 0.09. The preflight still failed the family-variant cap by one variant and warned that all 100 tasks were external-service contaminated with no expected helper fit.
+- Run: `outputs/gap_closure_lab/recombination_adoption/external_holdout_days_confirm100/confirm_100_20260509_062014`
+- Result: outcome -0.0447, canonical +0.0085, exact success +5, runtime exceptions 0, helper side-effect incidents 0. Protocol gate failed for non-positive outcome, gain/regression ratio, and helper-call share.
+- Adoption diagnosis: all retained experimental helpers were hidden/no-call because the holdout had no expected helper fit for the recency/day-distance portfolio. This is not a no-call failure for the retained tools; it is a cohort-fit failure.
+- Dashboard: `http://127.0.0.1:62041/outputs/gap_closure_lab/recombination_adoption/external_holdout_days_confirm100/confirm_100_20260509_062014/dashboard/task_focus.html`; Task Focus rendered metrics with 0 console errors.
+
 Machine-readable summary:
 
 - File: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/recombination_run_summary.json`
 - SHA-256: `627483ab5a576f4d948a053f3e4011b1da189a69fd5022a3d2b4e68c7a1e2c75`
 - Selector-only confirm100 summary: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/selector_only_confirm100_summary.json`
 - Selector-only confirm100 summary SHA-256: `8a3eabd84ee54d1e94206126d3aef251a8d80209e00c7e2bbece2a4488f5c0a6`
+- External-holdout confirm100 summary: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/external_holdout_confirm100_summary.json`
+- External-holdout confirm100 summary SHA-256: `7f9a5c0d15b9785e09ebbfa2d1affe01aa315fcd1f65393cbdaa34d0f81a6648`
 - Expanded60 coverage dry-run artifacts: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/coverage/`
 
 Decision: keep the expanded60 selector result as experimental potential, and retain the generic day-distance helper as the best current gap-closure candidate. Do not scale or promote from this branch because the strongest broad result is a repair backtest and there is no clean remaining confirmation/scale pool.
@@ -126,10 +139,10 @@ Split manifest:
 
 Baseline/control arms used the eligible control baseline cache where available and recorded cached/fresh counts per run. Candidate/SAGE arms were fresh experimental runs with OpenAI response cache disabled. No scenario selection was based on cache availability.
 
-Latest postscale cache accounting:
+Latest cache accounting:
 
-- Run: `outputs/gap_closure_lab/recombination_adoption/postscale_recency_time_days_minimal_expanded60_backtest/expanded_60_20260509_043804`
-- Baseline cache: 49 cached / 11 fresh
+- Run: `outputs/gap_closure_lab/recombination_adoption/external_holdout_days_confirm100/confirm_100_20260509_062014`
+- Baseline cache: 0 cached / 100 fresh
 - Cache manifest hash: `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
 - Candidate OpenAI response cache: disabled
 
@@ -149,8 +162,8 @@ The runtime now allows composite helpers that explicitly preserve `selected_reco
 
 ## Recommendation
 
-Do not promote any result from this branch to protected evidence. The best next campaign should carry `days_between_timestamps`, `relative_day_time_to_timestamp`, and the compact recency/time/day ablation into a newly frozen clean confirmation100 split. If that clears +0.08 outcome lift with natural calls and zero incidents, scale to a fresh 250. The current branch does not have clean remaining data for that formal step.
+Do not promote any result from this branch to protected evidence. The best next campaign should carry `days_between_timestamps`, `relative_day_time_to_timestamp`, and the compact recency/time/day ablation into a newly frozen clean confirmation100 split. If that clears +0.08 outcome lift with natural calls and zero incidents, scale to a fresh 250. The current branch does not have clean remaining data for that formal step; the external-holdout confirmation attempt was outcome-negative and is not a substitute for clean non-external confirmation.
 
 ## Decision
 
-`STOP: promising day-distance portfolio found, but formal confirmation/scale is blocked by clean-data exhaustion`
+`STOP: promising day-distance portfolio found, external-holdout stress test was negative, and formal confirmation/scale is blocked by clean-data exhaustion`

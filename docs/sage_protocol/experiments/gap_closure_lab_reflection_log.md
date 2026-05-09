@@ -41,3 +41,13 @@ This log is experimental process evidence only. It is not protected final claim 
 **Next action.** Stop this branch as experimental with a data-exhaustion blocker for formal validation. Recommend a new clean frozen confirmation100/scale250 campaign carrying the retained `days_between_timestamps` and minimal recency/time/day pack.
 
 **Micro/macro adjustment.** Avoid taking too many late microsteps on the same inspected split. The system found the best local direction; the bottleneck is now clean evaluation capacity, not another prompt tweak.
+
+## 2026-05-09 - Reflection 05 - External Holdout Stress Test
+
+**Observation.** A stricter residual scan found 118 fresh uninspected scenarios, but all were external-service families. I built an experimental confirm100 holdout from them to execute the recommended next action anyway. The run was outcome-negative (-0.0447), canonical-slightly-positive (+0.0085), exact-success-positive (+5), and safe, but all retained recency/day helpers were hidden because the cohort had 0/100 expected helper fit.
+
+**Interpretation.** This does not invalidate the day-distance helper; it tests a different gap family. It also does not unblock formal validation because the holdout is external-service contaminated and failed primary outcome.
+
+**Next action.** Record the result as a negative experimental stress test, do not scale, and keep the clean-data blocker. A future campaign needs a new non-external split with day-distance/recency opportunities, not another external-service rerun.
+
+**Micro/macro adjustment.** The right macro move is to stop local confirmation attempts on mismatched residual data. Further progress requires new data or a separate external-service tool family, not more recombination of the retained recency/day portfolio on no-fit tasks.
