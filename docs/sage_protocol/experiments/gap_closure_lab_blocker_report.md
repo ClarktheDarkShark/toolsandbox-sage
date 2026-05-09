@@ -1,13 +1,15 @@
 # SAGE Gap-Closure Lab Blocker Report
 
 ## Decision
-`BLOCKED_FOR_FORMAL_VALIDATION: missing_openai_api_key blocker cleared; clean confirmation/scale data exhausted`
+`SUPERSEDED_FOR_EXPERIMENTAL_SCALE: high-fit 250/500 completed; clean protected formal validation still required`
 
 ## Scope
 Experimental branch `exp/sage-gap-closure-lab`. This report is not protected final claim evidence.
 
 ## Root Cause
-This report now records two blockers:
+This report is retained as historical process evidence. The prior local data-exhaustion blocker was superseded for the experimental branch by constructing a targeted high-fit revalidation split and running 250/500 scale. It is not superseded for protected final evidence: a clean formal same-manifest validation campaign is still required before promotion.
+
+This report records two earlier blockers:
 
 1. The early setup blocker: the execution environment initially did not expose `OPENAI_API_KEY`.
 2. The current formal-validation blocker: the campaign found a promising day-distance portfolio, but clean confirmation100/scale250 data is exhausted in this branch.

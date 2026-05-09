@@ -1,0 +1,20 @@
+{
+  "output_root": "outputs",
+  "cache_root": "artifacts/baselines/control_task_baselines",
+  "dry_run": true,
+  "refresh_existing_run_rows": false,
+  "fresh_control_run_dirs_scanned": 55,
+  "skipped_cached_control_dirs": 0,
+  "skipped_missing_manifest": 0,
+  "skipped_empty_result": 0,
+  "skipped_duplicate_rows": 2765,
+  "collected_or_collectable_records": 0,
+  "collected_run_dir_count": 0,
+  "collected_run_dirs": [],
+  "policy": {
+    "candidate_or_sage_traces_read": false,
+    "truth_labels_read": false,
+    "synthetic_cached_control_dirs_ingested": false,
+    "future_reuse_requires_task_level_compatibility": true
+  }
+}

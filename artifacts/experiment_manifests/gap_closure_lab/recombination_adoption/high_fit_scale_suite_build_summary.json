@@ -1,0 +1,257 @@
+{
+  "created_at": "2026-05-09T12:54:36.124090+00:00",
+  "experimental_only": true,
+  "leakage_statement": "Tools are generic deterministic helpers copied from prior retained positive registries with tightened contact affordances. The split selection uses scenario names/categories/allowed tools only and does not encode hidden labels, expected answers, task-specific strings, or cache availability.",
+  "objective": "Scale the retained positive recency/action tools into 250/500 fresh experimental runs while maximizing eligible control-cache reuse.",
+  "protected_claim_evidence": false,
+  "registries": {
+    "recency_day_contact_registry": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_day_contact_high_power_scale_pack/registry_manifest.json",
+      "sha256": "0800cd2d27a47a7459020120916b36ccd2b909441262e0b0a294daac8f956e75",
+      "tool_count": 8,
+      "tools": [
+        "days_between_timestamps",
+        "extract_contact_field_from_search_result",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update"
+      ]
+    },
+    "recency_day_registry": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_day_high_power_scale_pack/registry_manifest.json",
+      "sha256": "8cb1b2bc10b87ea47394b80e56746c387d08c25b1818f84f126840f3593b08b8",
+      "tool_count": 5,
+      "tools": [
+        "days_between_timestamps",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update"
+      ]
+    },
+    "source_registries": {
+      "days_contact": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/best3_plus_final_selector_days_pack/registry_manifest.json",
+      "high_retained": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_search_contact_selector_safe_bridge_plus_guard_final_selector_pack/registry_manifest.json"
+    }
+  },
+  "split_manifest": {
+    "path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/high_fit_scale_splits.json",
+    "sha256": "a2b197c4eece991b9dc9b07adc5e0ac0b9d73f17f5836eb8f79bfb8b004c296b",
+    "split_diversity": {
+      "high_fit_confirm100": {
+        "distinct_family_count": 13,
+        "diversity_reason": "The split is high-fit by design: it covers the complete visible recency/day/contact-scalar surface before deterministic broad filler. Family ordering is round-robin within each lane and does not use truth labels, expected answers, or cache availability. Because local prior outputs already cover the eligible non-external benchmark surface, this is fresh-run experimental revalidation rather than scenario-unseen final evidence.",
+        "family_counts": {
+          "find_days_till_holiday": 8,
+          "find_days_till_holiday_wifi_off": 8,
+          "modify_contact_with_message_recency": 8,
+          "modify_reminder_with_recency_latest": 8,
+          "remove_reminder_with_recency_latest": 8,
+          "search_message_with_recency_latest": 8,
+          "search_message_with_recency_oldest": 8,
+          "search_reminder_with_creation_recency_yesterday": 8,
+          "search_reminder_with_creation_recency_yesterday_implicit": 8,
+          "search_reminder_with_recency_upcoming": 7,
+          "search_reminder_with_recency_upcoming_implicit": 7,
+          "search_reminder_with_recency_yesterday": 7,
+          "search_reminder_with_recency_yesterday_implicit": 7
+        },
+        "insufficient_information_count": 0,
+        "lane_counts": {
+          "recency_day": 100
+        },
+        "largest_family_count": 8,
+        "largest_family_share": 0.08,
+        "near_duplicate_dominated": false,
+        "prior_local_output_present_count": 100,
+        "scenario_count": 100,
+        "top_task_labels": {
+          "ALL_TOOLS_AVAILABLE": 9,
+          "ARG_DESCRIPTION_SCRAMBLED": 13,
+          "ARG_TYPE_SCRAMBLED": 13,
+          "CANONICALIZATION": 84,
+          "MULTIPLE_TOOL_CALL": 100,
+          "NO_DISTRACTION_TOOLS": 13,
+          "SINGLE_USER_TURN": 100,
+          "STATE_DEPENDENCY": 8,
+          "TEN_DISTRACTION_TOOLS": 13,
+          "THREE_DISTRACTION_TOOLS": 65,
+          "TOOL_DESCRIPTION_SCRAMBLED": 13,
+          "TOOL_NAME_SCRAMBLED": 13
+        }
+      },
+      "high_fit_expanded60": {
+        "distinct_family_count": 13,
+        "diversity_reason": "The split is high-fit by design: it covers the complete visible recency/day/contact-scalar surface before deterministic broad filler. Family ordering is round-robin within each lane and does not use truth labels, expected answers, or cache availability. Because local prior outputs already cover the eligible non-external benchmark surface, this is fresh-run experimental revalidation rather than scenario-unseen final evidence.",
+        "family_counts": {
+          "find_days_till_holiday": 5,
+          "find_days_till_holiday_wifi_off": 5,
+          "modify_contact_with_message_recency": 5,
+          "modify_reminder_with_recency_latest": 5,
+          "remove_reminder_with_recency_latest": 5,
+          "search_message_with_recency_latest": 5,
+          "search_message_with_recency_oldest": 5,
+          "search_reminder_with_creation_recency_yesterday": 5,
+          "search_reminder_with_creation_recency_yesterday_implicit": 4,
+          "search_reminder_with_recency_upcoming": 4,
+          "search_reminder_with_recency_upcoming_implicit": 4,
+          "search_reminder_with_recency_yesterday": 4,
+          "search_reminder_with_recency_yesterday_implicit": 4
+        },
+        "insufficient_information_count": 0,
+        "lane_counts": {
+          "recency_day": 60
+        },
+        "largest_family_count": 5,
+        "largest_family_share": 0.08333333333333333,
+        "near_duplicate_dominated": false,
+        "prior_local_output_present_count": 60,
+        "scenario_count": 60,
+        "top_task_labels": {
+          "ARG_DESCRIPTION_SCRAMBLED": 13,
+          "ARG_TYPE_SCRAMBLED": 8,
+          "CANONICALIZATION": 50,
+          "MULTIPLE_TOOL_CALL": 60,
+          "NO_DISTRACTION_TOOLS": 13,
+          "SINGLE_USER_TURN": 60,
+          "STATE_DEPENDENCY": 5,
+          "TEN_DISTRACTION_TOOLS": 13,
+          "THREE_DISTRACTION_TOOLS": 34
+        }
+      },
+      "high_fit_scale250": {
+        "distinct_family_count": 18,
+        "diversity_reason": "The split is high-fit by design: it covers the complete visible recency/day/contact-scalar surface before deterministic broad filler. Family ordering is round-robin within each lane and does not use truth labels, expected answers, or cache availability. Because local prior outputs already cover the eligible non-external benchmark surface, this is fresh-run experimental revalidation rather than scenario-unseen final evidence.",
+        "family_counts": {
+          "add_reminder_content_and_date_and_time": 6,
+          "add_reminder_content_and_week_delta_and_time": 5,
+          "add_reminder_content_and_week_delta_and_time_and_location": 5,
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 5,
+          "add_reminder_content_and_weekday_delta_and_time": 5,
+          "find_days_till_holiday": 24,
+          "find_days_till_holiday_wifi_off": 24,
+          "modify_contact_with_message_recency": 32,
+          "modify_reminder_with_recency_latest": 16,
+          "remove_reminder_with_recency_latest": 16,
+          "search_message_with_recency_latest": 32,
+          "search_message_with_recency_oldest": 32,
+          "search_reminder_with_creation_recency_yesterday": 8,
+          "search_reminder_with_creation_recency_yesterday_implicit": 8,
+          "search_reminder_with_recency_upcoming": 8,
+          "search_reminder_with_recency_upcoming_implicit": 8,
+          "search_reminder_with_recency_yesterday": 8,
+          "search_reminder_with_recency_yesterday_implicit": 8
+        },
+        "insufficient_information_count": 0,
+        "lane_counts": {
+          "recency_day": 224,
+          "temporal_action": 26
+        },
+        "largest_family_count": 32,
+        "largest_family_share": 0.128,
+        "near_duplicate_dominated": false,
+        "prior_local_output_present_count": 250,
+        "scenario_count": 250,
+        "top_task_labels": {
+          "ALL_TOOLS_AVAILABLE": 28,
+          "ARG_DESCRIPTION_SCRAMBLED": 33,
+          "ARG_TYPE_SCRAMBLED": 33,
+          "CANONICALIZATION": 186,
+          "MULTIPLE_TOOL_CALL": 250,
+          "MULTIPLE_USER_TURN": 69,
+          "NO_DISTRACTION_TOOLS": 33,
+          "SINGLE_USER_TURN": 181,
+          "STATE_DEPENDENCY": 24,
+          "TEN_DISTRACTION_TOOLS": 33,
+          "THREE_DISTRACTION_TOOLS": 156,
+          "TOOL_DESCRIPTION_SCRAMBLED": 29,
+          "TOOL_NAME_SCRAMBLED": 28
+        }
+      },
+      "high_fit_scale500": {
+        "distinct_family_count": 41,
+        "diversity_reason": "The split is high-fit by design: it covers the complete visible recency/day/contact-scalar surface before deterministic broad filler. Family ordering is round-robin within each lane and does not use truth labels, expected answers, or cache availability. Because local prior outputs already cover the eligible non-external benchmark surface, this is fresh-run experimental revalidation rather than scenario-unseen final evidence.",
+        "family_counts": {
+          "add_contact_with_name_and_phone_number": 2,
+          "add_reminder_content_and_date_and_time": 32,
+          "add_reminder_content_and_week_delta_and_time": 32,
+          "add_reminder_content_and_week_delta_and_time_and_location": 32,
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 8,
+          "add_reminder_content_and_weekday_delta_and_time": 32,
+          "cellular_off": 2,
+          "find_days_till_holiday": 24,
+          "find_days_till_holiday_wifi_off": 24,
+          "find_thanksgiving_timestamp": 2,
+          "get_cellular": 2,
+          "get_wifi": 2,
+          "modify_contact_with_message_recency": 32,
+          "modify_reminder_with_recency_latest": 16,
+          "remove_contact_by_phone": 48,
+          "remove_contact_with_id": 2,
+          "remove_reminder_with_recency_latest": 16,
+          "search_message_with_recency_latest": 32,
+          "search_message_with_recency_oldest": 32,
+          "search_name_with_relationship": 8,
+          "search_phone_number_with_name": 8,
+          "search_relationship_with_phone_number": 8,
+          "search_reminder_with_creation_recency_yesterday": 8,
+          "search_reminder_with_creation_recency_yesterday_implicit": 8,
+          "search_reminder_with_recency_upcoming": 8,
+          "search_reminder_with_recency_upcoming_implicit": 8,
+          "search_reminder_with_recency_yesterday": 8,
+          "search_reminder_with_recency_yesterday_implicit": 8,
+          "search_sender_phone_number_with_content": 8,
+          "send_message_with_contact_content_cellular_off": 2,
+          "send_message_with_phone_number_and_content": 2,
+          "turn_on_cellular_low_battery_mode": 2,
+          "turn_on_cellular_low_battery_mode_implicit": 2,
+          "turn_on_location_low_battery_mode": 2,
+          "turn_on_location_low_battery_mode_implicit": 2,
+          "turn_on_wifi_low_battery_mode": 1,
+          "turn_on_wifi_low_battery_mode_implicit": 1,
+          "update_contact_relationship_with_relationship": 24,
+          "update_contact_relationship_with_relationship_twice": 8,
+          "update_contact_with_id_and_phone_number": 1,
+          "wifi_off": 1
+        },
+        "insufficient_information_count": 0,
+        "lane_counts": {
+          "broad_filler": 28,
+          "contact_scalar": 112,
+          "recency_day": 224,
+          "temporal_action": 136
+        },
+        "largest_family_count": 48,
+        "largest_family_share": 0.096,
+        "near_duplicate_dominated": false,
+        "prior_local_output_present_count": 500,
+        "scenario_count": 500,
+        "top_task_labels": {
+          "ALL_TOOLS_AVAILABLE": 59,
+          "ARG_DESCRIPTION_SCRAMBLED": 59,
+          "ARG_TYPE_SCRAMBLED": 59,
+          "CANONICALIZATION": 328,
+          "MULTIPLE_TOOL_CALL": 452,
+          "MULTIPLE_USER_TURN": 168,
+          "NO_DISTRACTION_TOOLS": 75,
+          "SINGLE_TOOL_CALL": 48,
+          "SINGLE_USER_TURN": 332,
+          "STATE_DEPENDENCY": 36,
+          "TEN_DISTRACTION_TOOLS": 71,
+          "THREE_DISTRACTION_TOOLS": 295,
+          "TOOL_DESCRIPTION_SCRAMBLED": 59,
+          "TOOL_NAME_SCRAMBLED": 59
+        }
+      }
+    },
+    "split_sizes": {
+      "high_fit_confirm100": 100,
+      "high_fit_expanded60": 60,
+      "high_fit_scale250": 250,
+      "high_fit_scale500": 500
+    }
+  }
+}

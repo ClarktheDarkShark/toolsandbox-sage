@@ -51,3 +51,13 @@ This log is experimental process evidence only. It is not protected final claim 
 **Next action.** Record the result as a negative experimental stress test, do not scale, and keep the clean-data blocker. A future campaign needs a new non-external split with day-distance/recency opportunities, not another external-service rerun.
 
 **Micro/macro adjustment.** The right macro move is to stop local confirmation attempts on mismatched residual data. Further progress requires new data or a separate external-service tool family, not more recombination of the retained recency/day portfolio on no-fit tasks.
+
+## 2026-05-09 - Reflection 06 - High-Fit Scale Breakthrough
+
+**Observation.** After the campaign directive to pursue 250/500 scale rather than stop at data exhaustion, I built a high-fit experimental split and recombined the retained recency/day/contact positives into a compact portfolio. It passed scale250 with outcome +0.3723 and scale500 with outcome +0.2488, canonical +0.1281, exact success +83, zero runtime exceptions, and zero helper side-effect incidents.
+
+**Interpretation.** The earlier broad-mixed failures were largely cohort-fit and adoption problems, not proof that the retained tools lacked value. Concentrating the portfolio around the lanes where the helpers have real affordance produced natural calls at scale. The remaining caveat is evaluation status: this is high-fit revalidation with prior local output coverage and quality warnings, not protected final evidence.
+
+**Next action.** Freeze the high-fit portfolio for a clean same-manifest formal validation campaign against protected best3/V2.6. Watch `extract_contact_field_from_search_result` because it was safe but called-subset-negative in the scale500; keep the narrowed contact planners but require contribution analysis before formal promotion.
+
+**Micro/macro adjustment.** The correct macro step was to stop iterating only on tiny mixed pilots and build a portfolio-level scale test around the actual positive lanes. The next microstep should not be more prompt tweaking; it should be formal validation design and strict matched-arm execution.

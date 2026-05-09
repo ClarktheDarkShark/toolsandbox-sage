@@ -4,11 +4,50 @@ Experimental branch report only. This is not protected final claim evidence and 
 
 ## Status
 
-Stop condition 3 is now the practical formal-validation blocker. All required experiment families received fair-chance diagnostic or expanded-pilot treatment, including repair and force diagnostics where appropriate. The focused recombination continuation found a better experimental direction, `days_between_timestamps` plus retained recency/time helpers, but clean confirmation/scale data is exhausted. The best evidence is promising experimental backtest evidence, not protected claim evidence.
+The recombination/adoption continuation produced a new high-fit experimental scale result. The retained recency/day/contact portfolio passed both a 250-sample and 500-sample run with generation OFF, fresh SAGE/candidate execution, eligible control-cache reuse only, zero runtime exceptions, and zero helper side-effect incidents.
+
+This is experimental gap-closure evidence, not protected final claim evidence. The high-fit scale splits intentionally target the remaining positive recency/day/action/contact surface, and the manifest records that all selected scenarios already had prior local output coverage. The runs therefore demonstrate a high-power method and natural adoption at 250/500 scale, but they should be followed by a clean frozen formal validation campaign before any protected claim.
 
 ## Best Experimental Approach
 
-The strongest broad signal came from robust live generation with `gpt-5-mini` for generation/repair and `gpt-4o-mini` for execution:
+The best current experimental approach is the compact high-fit recency/day/contact portfolio:
+
+- Registry: `artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_day_contact_high_power_scale_pack/registry_manifest.json`
+- Registry SHA-256: `0800cd2d27a47a7459020120916b36ccd2b909441262e0b0a294daac8f956e75`
+- Tools: `days_between_timestamps`, `relative_day_time_to_timestamp`, `resolve_search_window_or_bounds`, `select_message_content_by_recency`, `select_message_counterparty_for_contact_update`, `plan_contact_lookup_query`, `plan_contact_search_from_scalar_constraint`, `extract_contact_field_from_search_result`
+- Split manifest: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/high_fit_scale_splits.json`
+- Split manifest SHA-256: `a2b197c4eece991b9dc9b07adc5e0ac0b9d73f17f5836eb8f79bfb8b004c296b`
+- Machine-readable result summary: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/high_fit_scale_results_summary.json`
+- Result summary SHA-256: `c646be44c25562f55b73bffc50032c4aece57ca5e9790cfa508d39ab161a2a63`
+
+High-fit scale250 result:
+
+- Run: `outputs/gap_closure_lab/recombination_adoption/high_fit_recency_day_contact_scale250/promotion_250_20260509_090513`
+- Outcome: control `0.3779`, SAGE `0.7502`, delta `+0.3723`
+- Canonical/reference: control `0.6606`, SAGE `0.8329`, delta `+0.1723`
+- Exact successes: `10 -> 66`, delta `+56`
+- Outcome gains/regressions/preserved: `154 / 20 / 76`
+- Control cache: `25` cached / `225` fresh, cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
+- SAGE/candidate cache: OpenAI response cache disabled; candidate task-level cache not used
+- Safety: runtime exceptions `0`; helper side-effect incidents `0`; helper failed attempts `0`
+- Protocol gate: pass
+
+High-fit scale500 result:
+
+- Run: `outputs/gap_closure_lab/recombination_adoption/high_fit_recency_day_contact_scale500/full_benchmark_20260509_105941`
+- Outcome: control `0.4581`, SAGE `0.7069`, delta `+0.2488`
+- Canonical/reference: control `0.6888`, SAGE `0.8169`, delta `+0.1281`
+- Exact successes: `46 -> 129`, delta `+83`
+- Outcome gains/regressions/preserved: `220 / 65 / 213`
+- Control cache: `29` cached / `471` fresh, cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
+- SAGE/candidate cache: OpenAI response cache disabled; candidate task-level cache not used
+- Safety: runtime exceptions `0`; helper side-effect incidents `0`; helper failed attempts `0`
+- Protocol gate: pass
+- Task Focus dashboard: `http://127.0.0.1:62043/outputs/gap_closure_lab/recombination_adoption/high_fit_recency_day_contact_scale500/full_benchmark_20260509_105941/dashboard/task_focus.html`
+
+The final Task Focus dashboard was opened in the in-app browser after the run completed. Browser check: title `Task Focus — SAGE`; Task Focus/Baseline/SAGE content present; console errors `0`.
+
+The strongest prior broad signal came from robust live generation with `gpt-5-mini` for generation/repair and `gpt-4o-mini` for execution:
 
 - Live generation pilot20: outcome +0.2090, canonical +0.0127, gate pass, zero runtime/side-effect incidents.
 - Frozen generated pilot20: outcome +0.1377, canonical +0.0772, gate pass, zero runtime/side-effect incidents.
@@ -104,8 +143,10 @@ Machine-readable summary:
 - External-holdout confirm100 summary: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/external_holdout_confirm100_summary.json`
 - External-holdout confirm100 summary SHA-256: `7f9a5c0d15b9785e09ebbfa2d1affe01aa315fcd1f65393cbdaa34d0f81a6648`
 - Expanded60 coverage dry-run artifacts: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/coverage/`
+- High-fit scale result summary: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/high_fit_scale_results_summary.json`
+- High-fit scale result summary SHA-256: `c646be44c25562f55b73bffc50032c4aece57ca5e9790cfa508d39ab161a2a63`
 
-Decision: keep the expanded60 selector result as experimental potential, and retain the generic day-distance helper as the best current gap-closure candidate. Do not scale or promote from this branch because the strongest broad result is a repair backtest and there is no clean remaining confirmation/scale pool.
+Decision: the earlier data-exhaustion stop was superseded by the high-fit scale continuation requested for this branch. Keep the compact high-fit recency/day/contact portfolio as the best experimental gap-closure method found so far. Do not promote it into protected evidence from this branch because the scale split is targeted and not scenario-unseen, but do carry it forward into clean formal validation.
 
 ## Failed Or Parked Families
 
@@ -134,6 +175,8 @@ Split manifest:
 - File: `artifacts/experiment_manifests/gap_closure_lab/gap_closure_lab_splits.json`
 - File SHA-256: `7843305bfee2e0d021ecd0ab429ea12f88cb381676615079538836c91e9f84c9`
 - Payload SHA-256: `41a9565960005007bdcc8a0e901b81a300e2e5c1c52c0b38e15e17fe83f983d4`
+- High-fit scale file: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/high_fit_scale_splits.json`
+- High-fit scale SHA-256: `a2b197c4eece991b9dc9b07adc5e0ac0b9d73f17f5836eb8f79bfb8b004c296b`
 
 ## Cache Statement
 
@@ -141,8 +184,8 @@ Baseline/control arms used the eligible control baseline cache where available a
 
 Latest cache accounting:
 
-- Run: `outputs/gap_closure_lab/recombination_adoption/external_holdout_days_confirm100/confirm_100_20260509_062014`
-- Baseline cache: 0 cached / 100 fresh
+- Run: `outputs/gap_closure_lab/recombination_adoption/high_fit_recency_day_contact_scale500/full_benchmark_20260509_105941`
+- Baseline cache: 29 cached / 471 fresh
 - Cache manifest hash: `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
 - Candidate OpenAI response cache: disabled
 
@@ -150,7 +193,7 @@ The OpenAI API key was present for completed live runs by mapping a local untrac
 
 ## Safety Statement
 
-Final selector-only confirm100 had zero runtime exceptions but one helper side-effect preservation incident. The postscale days/time runs had zero runtime exceptions and zero helper side-effect incidents. Unsafe or currently negative helper forms were parked:
+Final selector-only confirm100 had zero runtime exceptions but one helper side-effect preservation incident. The postscale days/time runs had zero runtime exceptions and zero helper side-effect incidents. The high-fit scale250 and scale500 runs had zero runtime exceptions, zero helper runtime incidents, zero helper failed attempts, and zero helper side-effect incidents. Unsafe or currently negative helper forms were parked:
 
 - `next_dependency_precondition_call`: one side-effect incident in force diagnostic.
 - Initial frozen generated expanded60 pack: two side-effect incidents.
@@ -162,8 +205,8 @@ The runtime now allows composite helpers that explicitly preserve `selected_reco
 
 ## Recommendation
 
-Do not promote any result from this branch to protected evidence. The best next campaign should carry `days_between_timestamps`, `relative_day_time_to_timestamp`, and the compact recency/time/day ablation into a newly frozen clean confirmation100 split. If that clears +0.08 outcome lift with natural calls and zero incidents, scale to a fresh 250. The current branch does not have clean remaining data for that formal step; the external-holdout confirmation attempt was outcome-negative and is not a substitute for clean non-external confirmation.
+Do not promote any result from this branch to protected evidence. The next formal campaign should freeze the high-fit recency/day/contact portfolio, create a clean non-external confirmation100/scale250/scale500 validation plan with no code or registry changes between matched arms, and run same-manifest comparisons against the protected current best3/V2.6 baselines. The high-fit result is strong enough to justify that campaign: it reached +0.3723 outcome on 250 and +0.2488 outcome on 500 with natural calls and clean safety.
 
 ## Decision
 
-`STOP: promising day-distance portfolio found, external-holdout stress test was negative, and formal confirmation/scale is blocked by clean-data exhaustion`
+`STOP: high-fit experimental 250/500 gap-closure scale target achieved; carry portfolio to clean formal validation before protected claim`

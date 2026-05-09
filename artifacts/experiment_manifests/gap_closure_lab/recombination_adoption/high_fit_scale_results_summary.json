@@ -1,0 +1,256 @@
+{
+  "comparison_note": "Matched no-SAGE control vs fresh SAGE/candidate registry on high-fit experimental split; not protected final claim evidence.",
+  "experimental_only": true,
+  "protected_claim_evidence": false,
+  "registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_day_contact_high_power_scale_pack/registry_manifest.json",
+  "registry_sha256": "0800cd2d27a47a7459020120916b36ccd2b909441262e0b0a294daac8f956e75",
+  "runs": {
+    "high_fit_scale250": {
+      "cached_control_tasks": 25,
+      "candidate_exact_successes": 66,
+      "candidate_mean_outcome_similarity": 0.7502386686410631,
+      "candidate_mean_similarity": 0.8328877262432398,
+      "cohort_quality_gate_failures": [
+        "near_duplicate_family_variants_above_limit",
+        "weak_negative_no_helper_coverage",
+        "known_helper_lane_overrepresented"
+      ],
+      "cohort_quality_gate_status": "fail",
+      "cohort_warnings": [
+        "near_duplicate_family_variants_above_limit",
+        "weak_negative_no_helper_coverage",
+        "known_helper_lane_overrepresented"
+      ],
+      "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+      "control_cache_mode": "use-if-eligible",
+      "control_exact_successes": 10,
+      "control_mean_outcome_similarity": 0.377912988183346,
+      "control_mean_similarity": 0.6606093622380276,
+      "dashboard_task_focus_url": "http://127.0.0.1:62042/outputs/gap_closure_lab/recombination_adoption/high_fit_recency_day_contact_scale250/promotion_250_20260509_090513/dashboard/task_focus.html",
+      "exact_success_delta": 56,
+      "fresh_control_tasks": 225,
+      "generation_enabled": false,
+      "helper_failed_attempts": 0,
+      "helper_runtime_incidents": 0,
+      "helper_side_effect_incidents": 0,
+      "helpers": {
+        "days_between_timestamps": {
+          "called": 46,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.058048668654077734,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 48,
+          "visible_not_called": 2
+        },
+        "extract_contact_field_from_search_result": {
+          "called": 0,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": null,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 0,
+          "visible_not_called": 0
+        },
+        "plan_contact_lookup_query": {
+          "called": 0,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": null,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 0,
+          "visible_not_called": 0
+        },
+        "plan_contact_search_from_scalar_constraint": {
+          "called": 0,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": null,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 0,
+          "visible_not_called": 0
+        },
+        "relative_day_time_to_timestamp": {
+          "called": 27,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.349144079101805,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 31,
+          "visible_not_called": 4
+        },
+        "resolve_search_window_or_bounds": {
+          "called": 168,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.5099991280966909,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 176,
+          "visible_not_called": 8
+        },
+        "select_message_content_by_recency": {
+          "called": 61,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.5976838764850625,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 70,
+          "visible_not_called": 9
+        },
+        "select_message_counterparty_for_contact_update": {
+          "called": 32,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.6285893042570947,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 32,
+          "visible_not_called": 0
+        }
+      },
+      "mean_outcome_similarity_delta": 0.3723256804577172,
+      "mean_similarity_delta": 0.17227836400521224,
+      "openai_response_cache_enabled": false,
+      "openai_response_cache_mode": "off",
+      "outcome_gain_count": 154,
+      "outcome_regression_count": 20,
+      "protocol_gate_passed": true,
+      "registry_manifest_digest_after_run": "0800cd2d27a47a7459020120916b36ccd2b909441262e0b0a294daac8f956e75",
+      "route_mismatch_qualified": false,
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/high_fit_recency_day_contact_scale250/promotion_250_20260509_090513",
+      "runtime_exception_count": 0,
+      "scenario_count": 250
+    },
+    "high_fit_scale500": {
+      "cached_control_tasks": 29,
+      "candidate_exact_successes": 129,
+      "candidate_mean_outcome_similarity": 0.7069408393602516,
+      "candidate_mean_similarity": 0.816928802583775,
+      "cohort_quality_gate_failures": [
+        "family_share_above_limit",
+        "near_duplicate_family_variants_above_limit"
+      ],
+      "cohort_quality_gate_status": "fail",
+      "cohort_warnings": [
+        "family_share_above_limit",
+        "near_duplicate_family_variants_above_limit"
+      ],
+      "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+      "control_cache_mode": "use-if-eligible",
+      "control_exact_successes": 46,
+      "control_mean_outcome_similarity": 0.4581285528531095,
+      "control_mean_similarity": 0.6887840885079565,
+      "dashboard_task_focus_url": "http://127.0.0.1:62043/outputs/gap_closure_lab/recombination_adoption/high_fit_recency_day_contact_scale500/full_benchmark_20260509_105941/dashboard/task_focus.html",
+      "exact_success_delta": 83,
+      "fresh_control_tasks": 471,
+      "generation_enabled": false,
+      "helper_failed_attempts": 0,
+      "helper_runtime_incidents": 0,
+      "helper_side_effect_incidents": 0,
+      "helpers": {
+        "days_between_timestamps": {
+          "called": 45,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": -0.001388888888888889,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 48,
+          "visible_not_called": 3
+        },
+        "extract_contact_field_from_search_result": {
+          "called": 7,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": -0.11607142857142858,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 24,
+          "visible_not_called": 17
+        },
+        "plan_contact_lookup_query": {
+          "called": 8,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.24242424242424243,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 24,
+          "visible_not_called": 16
+        },
+        "plan_contact_search_from_scalar_constraint": {
+          "called": 4,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.07327586206896552,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 66,
+          "visible_not_called": 62
+        },
+        "relative_day_time_to_timestamp": {
+          "called": 85,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.5453647851587788,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 88,
+          "visible_not_called": 3
+        },
+        "resolve_search_window_or_bounds": {
+          "called": 173,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.48081800941340624,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 176,
+          "visible_not_called": 3
+        },
+        "select_message_content_by_recency": {
+          "called": 62,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.546741355231015,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 104,
+          "visible_not_called": 42
+        },
+        "select_message_counterparty_for_contact_update": {
+          "called": 32,
+          "called_subset_canonical_delta": null,
+          "called_subset_outcome_delta": 0.6618359067552737,
+          "failed_attempt_count": 0,
+          "runtime_incidents": 0,
+          "side_effect_incidents": 0,
+          "visible": 32,
+          "visible_not_called": 0
+        }
+      },
+      "mean_outcome_similarity_delta": 0.24881228650714213,
+      "mean_similarity_delta": 0.12814471407581854,
+      "openai_response_cache_enabled": false,
+      "openai_response_cache_mode": "off",
+      "outcome_gain_count": 220,
+      "outcome_regression_count": 65,
+      "protocol_gate_passed": true,
+      "registry_manifest_digest_after_run": "0800cd2d27a47a7459020120916b36ccd2b909441262e0b0a294daac8f956e75",
+      "route_mismatch_qualified": false,
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/high_fit_recency_day_contact_scale500/full_benchmark_20260509_105941",
+      "runtime_exception_count": 0,
+      "scenario_count": 500
+    }
+  },
+  "schema_version": 1,
+  "split_manifest": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/high_fit_scale_splits.json",
+  "split_manifest_sha256": "a2b197c4eece991b9dc9b07adc5e0ac0b9d73f17f5836eb8f79bfb8b004c296b"
+}
