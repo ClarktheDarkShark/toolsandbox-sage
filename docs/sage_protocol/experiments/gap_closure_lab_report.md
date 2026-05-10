@@ -309,3 +309,25 @@ After the broad500 bridge run, I repaired two campaign blockers before treating 
 - Task Focus browser check: title `Task Focus - SAGE`, console errors `0`, data rows `1000`
 
 This clean rerun remains above the documented current-code best3 500 run-vs-control lift of `+0.1617`. It is slightly below the earlier `+0.2264` bridge run, but it is the stronger campaign reference because it validates the repaired bridge-name and side-effect-preservation behavior with zero candidate exceptions. It is still experimental evidence, not protected claim evidence, because it depends on branch-only actor/router bridge code and has not yet been run as a locked formal matched validation against best3 and V2.6.
+
+## 2026-05-10 Locked Matched Formal500 Addendum
+
+The experimental Praxis candidate was frozen and then run in a locked matched formal validation against best3 and V2.6 reference copies. Protected source registries and protected final evidence were not modified.
+
+- Frozen candidate: `artifacts/registry_experiments/gap_closure_lab/praxis_bridgepack_frozen_candidate`
+- Frozen candidate registry SHA-256: `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`
+- Formal manifest: `docs/sage_protocol/manifests/v2_1_formal_500.json`
+- Machine-readable summary: `artifacts/experiment_manifests/gap_closure_lab/praxis_formal_validation/praxis_formal500_locked_summary.json`
+- Summary SHA-256: `41db7fed0e0997cfb691791abca59d47941a2f076951153382b17df3242e2dcc`
+
+Matched results:
+
+| Arm | Candidate outcome | Outcome lift vs cached control | Exact success delta | Canonical delta | Runtime exceptions | Helper side effects |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| best3 reference | `0.7555515211` | `+0.1606795050` | `+104` | `+0.0383606953` | `0` | `0` |
+| V2.6 reference | `0.7817807655` | `+0.1869087493` | `+118` | `+0.0583192599` | `0` | `0` |
+| Praxis frozen BridgePack | `0.8327110684` | `+0.2378390522` | `+166` | `+0.0884140063` | `0` | `0` |
+
+Praxis is now the best experimental option to take forward. It beat best3 by `+0.0771595473` candidate outcome points and V2.6 by `+0.0509303029` candidate outcome points on the same formal500 manifest. The per-task control cache was maximized: all three arms used `500` cached / `0` fresh controls with cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`. Candidate/SAGE arms were fresh and OpenAI response cache was disabled.
+
+This addendum supersedes the prior recommendation to run matched formal validation. The new recommendation is to move Praxis into a separate final-hardening review branch, audit the branch-only actor/router bridge dependency, and only then decide whether protected final claims should be updated.

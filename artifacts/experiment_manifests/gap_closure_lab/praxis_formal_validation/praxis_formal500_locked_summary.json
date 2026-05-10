@@ -1,0 +1,626 @@
+{
+  "candidate_freeze_manifest": "artifacts/registry_experiments/gap_closure_lab/praxis_bridgepack_frozen_candidate/candidate_freeze_manifest.json",
+  "candidate_registry_sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+  "claim_boundary": "This is locked matched experimental evidence on the formal manifest. It does not modify protected final evidence and should be reviewed on a final-hardening branch before any protected final claim.",
+  "created_at_unix": 1778455781,
+  "decision": "praxis_bridgepack_frozen_candidate_is_the_best_experimental_option_to_forward_to_later_protected_hardening",
+  "formal_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "formal_manifest_sha256": "093547e7a89e704e67d4cea85fd96511063becd0b5542ba3abf21c242453bbbf",
+  "head_to_head": {
+    "praxis_minus_best3_candidate_outcome": 0.07715954725209573,
+    "praxis_minus_best3_exact_success_delta": 62,
+    "praxis_minus_best3_run_vs_control_lift": 0.07715954725209567,
+    "praxis_minus_v2_6_candidate_outcome": 0.05093030289577127,
+    "praxis_minus_v2_6_exact_success_delta": 48,
+    "praxis_minus_v2_6_run_vs_control_lift": 0.050930302895771246
+  },
+  "matched_runs": {
+    "best3_reference": {
+      "artifacts": {
+        "dashboard_index": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/dashboard/index.html",
+        "dashboard_task_compare": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/dashboard/task_compare.html",
+        "dashboard_task_compare_data_sha256": "eab71a245d0ad756da30d1e8542c08dfd3873c67b2d497ca58139b91e9866265",
+        "dashboard_task_focus": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/dashboard/task_focus.html",
+        "helper_contribution_summary": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/helper_contribution_summary.json",
+        "helper_contribution_summary_sha256": "b8311f719cb0e09900e64d3efa214f9e2880f6827e9ff6621c6573011516d191",
+        "paired_comparison": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/paired_comparison.json",
+        "paired_comparison_sha256": "500759ec7053256a2249665314a0bf926b82d1d23c8d5aa53889e390cd9f6b86",
+        "protocol_manifest": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/protocol_manifest.json",
+        "protocol_manifest_sha256": "201cbef3b9cb4f70bd8d5cfef5a6d3d5dbb5a824d6314640770502df77fbdd87"
+      },
+      "control_cache": {
+        "cache_eligibility": "cached",
+        "cache_report_sha256": "ad452be0313c42e700ba837978919ef2553f67bda4a6143930c6a07ce1dc644a",
+        "cached_control_tasks": 500,
+        "fresh_control_tasks": 0,
+        "manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+        "mode": "use-if-eligible",
+        "source": "cached"
+      },
+      "label": "best3_reference",
+      "manifest_type": "v2_1_formal_500_nonexternal_best3_scale",
+      "mode": "full_benchmark",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "mixed_model_warning": null,
+        "user": {
+          "comparison_key": "GPT_4_o_2024_05_13",
+          "known_model": false,
+          "requested_model": "GPT_4_o_2024_05_13",
+          "resolved_model": "GPT_4_o_2024_05_13"
+        }
+      },
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/best3_reference_copy",
+      "registry_sha256": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf",
+      "registry_sha_before": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf",
+      "registry_unchanged": true,
+      "run_root": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653",
+      "safety": {
+        "candidate_exception_count": 0,
+        "helper_runtime_incidents": 0,
+        "helper_side_effect_incidents": 0,
+        "protocol_gate_passed": true,
+        "protocol_gate_reasons": [],
+        "route_mismatch_qualified": false,
+        "runtime_exception_count": 0
+      },
+      "sage_cache_status": {
+        "candidate_task_cache": "disabled/fresh candidate arm",
+        "openai_response_cache_enabled": false,
+        "openai_response_cache_mode": "off"
+      },
+      "scenario_count": 500,
+      "scores": {
+        "candidate_exact_successes": 130,
+        "candidate_mean_outcome_similarity": 0.7555515211178414,
+        "candidate_mean_similarity": 0.7083858326464766,
+        "control_exact_successes": 26,
+        "control_mean_outcome_similarity": 0.5948720161327935,
+        "control_mean_similarity": 0.6700251373519808,
+        "exact_success_delta": 104,
+        "gain_count": 278,
+        "mean_outcome_similarity_delta": 0.16067950498504793,
+        "mean_similarity_delta": 0.03836069529449581,
+        "outcome_gain_count": 215,
+        "outcome_preserved_count": 94,
+        "outcome_regression_count": 75,
+        "preserved_count": 72,
+        "regression_count": 150
+      },
+      "tools": {
+        "accepted_but_uncalled_tools": [],
+        "accepted_tools": [],
+        "called_tools": [
+          {
+            "called_count": 63,
+            "called_subset_mean_canonical_delta": 0.24089241527115213,
+            "called_subset_mean_outcome_delta": 0.39171265173666875,
+            "failed_attempt_count": 0,
+            "name": "resolve_search_window_or_bounds",
+            "origin": "retained",
+            "outcome_gains": 57,
+            "outcome_preserved": 1,
+            "outcome_regressions": 5,
+            "visible_count": 94,
+            "visible_not_called_count": 31
+          },
+          {
+            "called_count": 43,
+            "called_subset_mean_canonical_delta": 0.125214579374361,
+            "called_subset_mean_outcome_delta": 0.3851361388602835,
+            "failed_attempt_count": 0,
+            "name": "relative_day_time_to_timestamp",
+            "origin": "retained",
+            "outcome_gains": 21,
+            "outcome_preserved": 10,
+            "outcome_regressions": 10,
+            "visible_count": 51,
+            "visible_not_called_count": 8
+          },
+          {
+            "called_count": 36,
+            "called_subset_mean_canonical_delta": 0.36847794612540596,
+            "called_subset_mean_outcome_delta": 0.5001539209876769,
+            "failed_attempt_count": 0,
+            "name": "select_record_by_timestamp_extreme",
+            "origin": "retained",
+            "outcome_gains": 32,
+            "outcome_preserved": 1,
+            "outcome_regressions": 3,
+            "visible_count": 58,
+            "visible_not_called_count": 22
+          }
+        ],
+        "registry_size": 3,
+        "runtime_bundle_size": {
+          "max_available_tool_count": 37,
+          "max_generated_tool_bundle_size": 3,
+          "mean_available_tool_count": 10.748,
+          "mean_generated_tool_bundle_size": 0.406,
+          "scenario_count": 500
+        }
+      }
+    },
+    "praxis_bridgepack_frozen": {
+      "artifacts": {
+        "dashboard_index": "outputs/gap_closure_lab/praxis_formal_validation/praxis_bridgepack_formal500/full_benchmark_20260510_182832/dashboard/index.html",
+        "dashboard_task_compare": "outputs/gap_closure_lab/praxis_formal_validation/praxis_bridgepack_formal500/full_benchmark_20260510_182832/dashboard/task_compare.html",
+        "dashboard_task_compare_data_sha256": "788338b1fc9b81b68ec96fad8c130f6624f088a2773cabb183c6e1bedc4c91ab",
+        "dashboard_task_focus": "outputs/gap_closure_lab/praxis_formal_validation/praxis_bridgepack_formal500/full_benchmark_20260510_182832/dashboard/task_focus.html",
+        "helper_contribution_summary": "outputs/gap_closure_lab/praxis_formal_validation/praxis_bridgepack_formal500/full_benchmark_20260510_182832/helper_contribution_summary.json",
+        "helper_contribution_summary_sha256": "be329545a1ecf8da2df279bd65cfb6979dbb1de42bc50c18b12709c9f497cc92",
+        "paired_comparison": "outputs/gap_closure_lab/praxis_formal_validation/praxis_bridgepack_formal500/full_benchmark_20260510_182832/paired_comparison.json",
+        "paired_comparison_sha256": "67e9e0e28cf00a248adcbc02c67dd985e15414d59ee5209db64a4a4b2e8aded5",
+        "protocol_manifest": "outputs/gap_closure_lab/praxis_formal_validation/praxis_bridgepack_formal500/full_benchmark_20260510_182832/protocol_manifest.json",
+        "protocol_manifest_sha256": "c2c567a54ae8a68c1c1b9bb88d33f118aa7c022487f6318944d50b2207502078"
+      },
+      "control_cache": {
+        "cache_eligibility": "cached",
+        "cache_report_sha256": "ad452be0313c42e700ba837978919ef2553f67bda4a6143930c6a07ce1dc644a",
+        "cached_control_tasks": 500,
+        "fresh_control_tasks": 0,
+        "manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+        "mode": "use-if-eligible",
+        "source": "cached"
+      },
+      "label": "praxis_bridgepack_frozen",
+      "manifest_type": "v2_1_formal_500_nonexternal_best3_scale",
+      "mode": "full_benchmark",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "mixed_model_warning": null,
+        "user": {
+          "comparison_key": "GPT_4_o_2024_05_13",
+          "known_model": false,
+          "requested_model": "GPT_4_o_2024_05_13",
+          "resolved_model": "GPT_4_o_2024_05_13"
+        }
+      },
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/praxis_bridgepack_frozen_candidate",
+      "registry_sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+      "registry_sha_before": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+      "registry_unchanged": true,
+      "run_root": "outputs/gap_closure_lab/praxis_formal_validation/praxis_bridgepack_formal500/full_benchmark_20260510_182832",
+      "safety": {
+        "candidate_exception_count": 0,
+        "helper_runtime_incidents": 0,
+        "helper_side_effect_incidents": 0,
+        "protocol_gate_passed": true,
+        "protocol_gate_reasons": [],
+        "route_mismatch_qualified": false,
+        "runtime_exception_count": 0
+      },
+      "sage_cache_status": {
+        "candidate_task_cache": "disabled/fresh candidate arm",
+        "openai_response_cache_enabled": false,
+        "openai_response_cache_mode": "off"
+      },
+      "scenario_count": 500,
+      "scores": {
+        "candidate_exact_successes": 192,
+        "candidate_mean_outcome_similarity": 0.8327110683699371,
+        "candidate_mean_similarity": 0.7584391436456258,
+        "control_exact_successes": 26,
+        "control_mean_outcome_similarity": 0.5948720161327935,
+        "control_mean_similarity": 0.6700251373519808,
+        "exact_success_delta": 166,
+        "gain_count": 320,
+        "mean_outcome_similarity_delta": 0.2378390522371436,
+        "mean_similarity_delta": 0.08841400629364493,
+        "outcome_gain_count": 252,
+        "outcome_preserved_count": 95,
+        "outcome_regression_count": 37,
+        "preserved_count": 67,
+        "regression_count": 113
+      },
+      "tools": {
+        "accepted_but_uncalled_tools": [],
+        "accepted_tools": [],
+        "called_tools": [
+          {
+            "called_count": 64,
+            "called_subset_mean_canonical_delta": 0.2324145376065463,
+            "called_subset_mean_outcome_delta": 0.43108846437617904,
+            "failed_attempt_count": 0,
+            "name": "resolve_search_window_or_bounds",
+            "origin": "retained",
+            "outcome_gains": 61,
+            "outcome_preserved": 1,
+            "outcome_regressions": 2,
+            "visible_count": 106,
+            "visible_not_called_count": 42
+          },
+          {
+            "called_count": 45,
+            "called_subset_mean_canonical_delta": 0.15785746139124568,
+            "called_subset_mean_outcome_delta": 0.36747043067112833,
+            "failed_attempt_count": 0,
+            "name": "relative_day_time_to_timestamp",
+            "origin": "retained",
+            "outcome_gains": 21,
+            "outcome_preserved": 12,
+            "outcome_regressions": 9,
+            "visible_count": 51,
+            "visible_not_called_count": 6
+          },
+          {
+            "called_count": 36,
+            "called_subset_mean_canonical_delta": 0.025236318903588708,
+            "called_subset_mean_outcome_delta": 0.07213829144626518,
+            "failed_attempt_count": 0,
+            "name": "plan_device_state_action_sequence_v3",
+            "origin": "retained",
+            "outcome_gains": 21,
+            "outcome_preserved": 14,
+            "outcome_regressions": 1,
+            "visible_count": 110,
+            "visible_not_called_count": 74
+          },
+          {
+            "called_count": 24,
+            "called_subset_mean_canonical_delta": -0.25133907000055195,
+            "called_subset_mean_outcome_delta": -0.050099206349206345,
+            "failed_attempt_count": 0,
+            "name": "days_between_timestamps",
+            "origin": "retained",
+            "outcome_gains": 1,
+            "outcome_preserved": 21,
+            "outcome_regressions": 2,
+            "visible_count": 24,
+            "visible_not_called_count": 0
+          },
+          {
+            "called_count": 19,
+            "called_subset_mean_canonical_delta": 0.2774510845316864,
+            "called_subset_mean_outcome_delta": 0.3853139201182446,
+            "failed_attempt_count": 0,
+            "name": "plan_contact_relationship_batch_update",
+            "origin": "retained",
+            "outcome_gains": 16,
+            "outcome_preserved": 1,
+            "outcome_regressions": 2,
+            "visible_count": 19,
+            "visible_not_called_count": 0
+          },
+          {
+            "called_count": 16,
+            "called_subset_mean_canonical_delta": 0.31181794580554734,
+            "called_subset_mean_outcome_delta": 0.30812772472182137,
+            "failed_attempt_count": 0,
+            "name": "plan_contact_lookup_query",
+            "origin": "retained",
+            "outcome_gains": 14,
+            "outcome_preserved": 2,
+            "outcome_regressions": 0,
+            "visible_count": 24,
+            "visible_not_called_count": 8
+          },
+          {
+            "called_count": 15,
+            "called_subset_mean_canonical_delta": 0.22638574915519633,
+            "called_subset_mean_outcome_delta": 0.2640184579910933,
+            "failed_attempt_count": 0,
+            "name": "select_record_by_timestamp_extreme",
+            "origin": "retained",
+            "outcome_gains": 11,
+            "outcome_preserved": 1,
+            "outcome_regressions": 3,
+            "visible_count": 58,
+            "visible_not_called_count": 43
+          },
+          {
+            "called_count": 13,
+            "called_subset_mean_canonical_delta": 0.6204530967005287,
+            "called_subset_mean_outcome_delta": 0.7575451119820636,
+            "failed_attempt_count": 0,
+            "name": "select_message_content_by_recency",
+            "origin": "retained",
+            "outcome_gains": 12,
+            "outcome_preserved": 1,
+            "outcome_regressions": 0,
+            "visible_count": 52,
+            "visible_not_called_count": 39
+          },
+          {
+            "called_count": 12,
+            "called_subset_mean_canonical_delta": 0.31930438842203546,
+            "called_subset_mean_outcome_delta": 0.5624183006535948,
+            "failed_attempt_count": 0,
+            "name": "next_weekday_time_to_timestamp",
+            "origin": "retained",
+            "outcome_gains": 10,
+            "outcome_preserved": 0,
+            "outcome_regressions": 2,
+            "visible_count": 12,
+            "visible_not_called_count": 0
+          },
+          {
+            "called_count": 12,
+            "called_subset_mean_canonical_delta": 0.04302130114261515,
+            "called_subset_mean_outcome_delta": 0.0628333459866751,
+            "failed_attempt_count": 0,
+            "name": "plan_send_message_contact_lookup",
+            "origin": "retained",
+            "outcome_gains": 11,
+            "outcome_preserved": 0,
+            "outcome_regressions": 1,
+            "visible_count": 12,
+            "visible_not_called_count": 0
+          },
+          {
+            "called_count": 12,
+            "called_subset_mean_canonical_delta": 0.32756415071342654,
+            "called_subset_mean_outcome_delta": 0.8729441399594506,
+            "failed_attempt_count": 0,
+            "name": "select_message_counterparty_for_contact_update",
+            "origin": "retained",
+            "outcome_gains": 12,
+            "outcome_preserved": 0,
+            "outcome_regressions": 0,
+            "visible_count": 12,
+            "visible_not_called_count": 0
+          }
+        ],
+        "registry_size": 13,
+        "runtime_bundle_size": {
+          "max_available_tool_count": 37,
+          "max_generated_tool_bundle_size": 3,
+          "mean_available_tool_count": 11.446,
+          "mean_generated_tool_bundle_size": 1.104,
+          "scenario_count": 500
+        }
+      }
+    },
+    "v2_6_reference": {
+      "artifacts": {
+        "dashboard_index": "outputs/gap_closure_lab/praxis_formal_validation/v26_reference_formal500/full_benchmark_20260510_182832/dashboard/index.html",
+        "dashboard_task_compare": "outputs/gap_closure_lab/praxis_formal_validation/v26_reference_formal500/full_benchmark_20260510_182832/dashboard/task_compare.html",
+        "dashboard_task_compare_data_sha256": "be2bff6821b3fdd3cf9ed2c08bf4dfa1b37824fdfd8ed4d8c0bda1258983ff3a",
+        "dashboard_task_focus": "outputs/gap_closure_lab/praxis_formal_validation/v26_reference_formal500/full_benchmark_20260510_182832/dashboard/task_focus.html",
+        "helper_contribution_summary": "outputs/gap_closure_lab/praxis_formal_validation/v26_reference_formal500/full_benchmark_20260510_182832/helper_contribution_summary.json",
+        "helper_contribution_summary_sha256": "029621474bb9c1d96555ba8ae656bcd701cb50a4c8da8b68722cf4e69c981a3b",
+        "paired_comparison": "outputs/gap_closure_lab/praxis_formal_validation/v26_reference_formal500/full_benchmark_20260510_182832/paired_comparison.json",
+        "paired_comparison_sha256": "fedb78070bfa749a189a63fb317440874460bd1e2d60171598f567d0dd27c7f4",
+        "protocol_manifest": "outputs/gap_closure_lab/praxis_formal_validation/v26_reference_formal500/full_benchmark_20260510_182832/protocol_manifest.json",
+        "protocol_manifest_sha256": "eff9b1f00e258665449ada671e3d9c4177bc6265a9ad0521cc0195c7c50fb460"
+      },
+      "control_cache": {
+        "cache_eligibility": "cached",
+        "cache_report_sha256": "ad452be0313c42e700ba837978919ef2553f67bda4a6143930c6a07ce1dc644a",
+        "cached_control_tasks": 500,
+        "fresh_control_tasks": 0,
+        "manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+        "mode": "use-if-eligible",
+        "source": "cached"
+      },
+      "label": "v2_6_reference",
+      "manifest_type": "v2_1_formal_500_nonexternal_best3_scale",
+      "mode": "full_benchmark",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "chat_completions": true,
+          "comparison_key": "gpt-4o-mini",
+          "context_window": 128000,
+          "family": "gpt-4o",
+          "function_calling": true,
+          "known_model": true,
+          "max_output_tokens": 16384,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "structured_outputs": true,
+          "temperature_supported": true
+        },
+        "mixed_model_warning": null,
+        "user": {
+          "comparison_key": "GPT_4_o_2024_05_13",
+          "known_model": false,
+          "requested_model": "GPT_4_o_2024_05_13",
+          "resolved_model": "GPT_4_o_2024_05_13"
+        }
+      },
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/best3_v26_reference_copy",
+      "registry_sha256": "ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582",
+      "registry_sha_before": "ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582",
+      "registry_unchanged": true,
+      "run_root": "outputs/gap_closure_lab/praxis_formal_validation/v26_reference_formal500/full_benchmark_20260510_182832",
+      "safety": {
+        "candidate_exception_count": 0,
+        "helper_runtime_incidents": 0,
+        "helper_side_effect_incidents": 0,
+        "protocol_gate_passed": true,
+        "protocol_gate_reasons": [],
+        "route_mismatch_qualified": false,
+        "runtime_exception_count": 0
+      },
+      "sage_cache_status": {
+        "candidate_task_cache": "disabled/fresh candidate arm",
+        "openai_response_cache_enabled": false,
+        "openai_response_cache_mode": "off"
+      },
+      "scenario_count": 500,
+      "scores": {
+        "candidate_exact_successes": 144,
+        "candidate_mean_outcome_similarity": 0.7817807654741659,
+        "candidate_mean_similarity": 0.7283443972981825,
+        "control_exact_successes": 26,
+        "control_mean_outcome_similarity": 0.5948720161327935,
+        "control_mean_similarity": 0.6700251373519808,
+        "exact_success_delta": 118,
+        "gain_count": 289,
+        "mean_outcome_similarity_delta": 0.18690874934137236,
+        "mean_similarity_delta": 0.05831925994620164,
+        "outcome_gain_count": 230,
+        "outcome_preserved_count": 90,
+        "outcome_regression_count": 64,
+        "preserved_count": 70,
+        "regression_count": 141
+      },
+      "tools": {
+        "accepted_but_uncalled_tools": [],
+        "accepted_tools": [],
+        "called_tools": [
+          {
+            "called_count": 67,
+            "called_subset_mean_canonical_delta": 0.262649099710509,
+            "called_subset_mean_outcome_delta": 0.45331417623272074,
+            "failed_attempt_count": 0,
+            "name": "resolve_search_window_or_bounds",
+            "origin": "retained",
+            "outcome_gains": 64,
+            "outcome_preserved": 1,
+            "outcome_regressions": 2,
+            "visible_count": 94,
+            "visible_not_called_count": 27
+          },
+          {
+            "called_count": 43,
+            "called_subset_mean_canonical_delta": 0.17401559596513225,
+            "called_subset_mean_outcome_delta": 0.44951341223487723,
+            "failed_attempt_count": 0,
+            "name": "relative_day_time_to_timestamp",
+            "origin": "retained",
+            "outcome_gains": 24,
+            "outcome_preserved": 7,
+            "outcome_regressions": 9,
+            "visible_count": 51,
+            "visible_not_called_count": 8
+          },
+          {
+            "called_count": 34,
+            "called_subset_mean_canonical_delta": 0.4020369399192719,
+            "called_subset_mean_outcome_delta": 0.6206201336442905,
+            "failed_attempt_count": 0,
+            "name": "select_record_by_timestamp_extreme",
+            "origin": "retained",
+            "outcome_gains": 33,
+            "outcome_preserved": 0,
+            "outcome_regressions": 1,
+            "visible_count": 58,
+            "visible_not_called_count": 24
+          },
+          {
+            "called_count": 18,
+            "called_subset_mean_canonical_delta": 0.2773802253602782,
+            "called_subset_mean_outcome_delta": 0.2601330384848792,
+            "failed_attempt_count": 0,
+            "name": "plan_contact_lookup_query",
+            "origin": "retained",
+            "outcome_gains": 15,
+            "outcome_preserved": 2,
+            "outcome_regressions": 1,
+            "visible_count": 24,
+            "visible_not_called_count": 6
+          },
+          {
+            "called_count": 6,
+            "called_subset_mean_canonical_delta": 0.0025710016863543053,
+            "called_subset_mean_outcome_delta": -0.030394167236272484,
+            "failed_attempt_count": 0,
+            "name": "extract_contact_field_from_search_result",
+            "origin": "retained",
+            "outcome_gains": 3,
+            "outcome_preserved": 1,
+            "outcome_regressions": 2,
+            "visible_count": 24,
+            "visible_not_called_count": 18
+          },
+          {
+            "called_count": 2,
+            "called_subset_mean_canonical_delta": -0.008974160379975837,
+            "called_subset_mean_outcome_delta": -0.02604133671206832,
+            "failed_attempt_count": 0,
+            "name": "plan_contact_search_from_scalar_constraint",
+            "origin": "retained",
+            "outcome_gains": 1,
+            "outcome_preserved": 0,
+            "outcome_regressions": 1,
+            "visible_count": 40,
+            "visible_not_called_count": 38
+          }
+        ],
+        "registry_size": 6,
+        "runtime_bundle_size": {
+          "max_available_tool_count": 37,
+          "max_generated_tool_bundle_size": 3,
+          "mean_available_tool_count": 10.924,
+          "mean_generated_tool_bundle_size": 0.582,
+          "scenario_count": 500
+        }
+      }
+    }
+  },
+  "protected_reference_copy_note": "best3 and V2.6 were copied into experimental reference paths with hashes matching protected originals; protected source registries were not modified.",
+  "status": "experimental_locked_matched_formal_validation_complete_not_protected_final_claim"
+}

@@ -144,6 +144,37 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
         json.dumps({"scenario": "a", "tool_name": "helper"}) + "\n",
         encoding="utf-8",
     )
+    (run_root / "helper_contribution_summary.json").write_text(
+        json.dumps(
+            {
+                "registry_size": 1,
+                "runtime_bundle_size": 1,
+                "accepted_tools": ["helper"],
+                "accepted_but_uncalled_tools": [],
+                "helpers": {
+                    "helper": {
+                        "origin": "generated",
+                        "visible_count": 2,
+                        "called_count": 1,
+                        "visible_not_called_count": 1,
+                        "failed_attempt_count": 0,
+                        "called_subset": {
+                            "scenario_count": 1,
+                            "mean_canonical_delta": 0.8,
+                            "mean_outcome_delta": 0.6,
+                            "outcome_gains": 1,
+                            "outcome_regressions": 0,
+                            "outcome_preserved": 0,
+                        },
+                        "side_effect_incidents": [],
+                        "runtime_incidents": [],
+                    }
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     index = write_protocol_dashboard(
         run_root,
@@ -186,9 +217,20 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
         (index.parent / "task_focus_data.json").read_text(encoding="utf-8")
     )
     assert task_focus["tasks"][0]["control_cache_source"] == "cached"
+    task_compare = json.loads(
+        (index.parent / "task_compare_data.json").read_text(encoding="utf-8")
+    )
+    assert (index.parent / "task_compare.html").exists()
+    assert task_compare["tool_summary"]["called_tool_count"] == 1
+    assert task_compare["tool_summary"]["tools"][0]["name"] == "helper"
+    assert (
+        task_compare["tool_summary"]["tools"][0]["called_subset_mean_outcome_delta"]
+        == 0.6
+    )
     assert "control source: cached" in (index.parent / "index.html").read_text(
         encoding="utf-8"
     )
+    assert "Task Compare" in (index.parent / "index.html").read_text(encoding="utf-8")
 
 
 def test_task_focus_balanced_summary_uses_only_complete_pairs() -> None:

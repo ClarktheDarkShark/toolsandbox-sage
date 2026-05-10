@@ -1,0 +1,90 @@
+{
+  "runs": [
+    {
+      "updated_at": "2026-05-10T23:20:04.568052+00:00",
+      "run_root": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653",
+      "mode": "full_benchmark",
+      "manifest_type": "v2_1_formal_500_nonexternal_best3_scale",
+      "status": "complete",
+      "agent": "gpt-4o-mini",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "user": {
+          "requested_model": "GPT_4_o_2024_05_13",
+          "resolved_model": "GPT_4_o_2024_05_13",
+          "known_model": false,
+          "comparison_key": "GPT_4_o_2024_05_13"
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+        "mixed_model_warning": null
+      },
+      "comparison_model_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+      "generation_enabled": false,
+      "base_tool_policy": "upstream",
+      "scenario_count": 500,
+      "control_dir": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/control/full_benchmark_control_cached_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_10_2026_18_27_16",
+      "candidate_dir": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/candidate/full_benchmark_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_10_2026_18_27_17",
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/best3_reference_copy",
+      "registry_gate_snapshot": {
+        "registry_dir": "artifacts/registry_experiments/gap_closure_lab/best3_reference_copy",
+        "manifest_existed_before_run": true,
+        "snapshot_path": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/registry_gate/registry_manifest_before_run.json",
+        "manifest_digest_before_run": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf"
+      },
+      "registry_gate_restore": null,
+      "registry_manifest_digest_after_run": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf",
+      "cohort_preflight_report": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/cohort_preflight_report.json",
+      "cohort_preflight_warnings": [
+        "low_expected_helper_fit_share"
+      ],
+      "cohort_quality_gate_status": "pass",
+      "cohort_quality_gate_failures": [],
+      "comparison_path": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/paired_comparison.json",
+      "control_cache_mode": "use-if-eligible",
+      "control_source": "cached",
+      "cached_control_tasks": 500,
+      "fresh_control_tasks": 0,
+      "control_cache_report_path": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/control_cache_report.json",
+      "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+      "helper_contribution_summary_path": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/helper_contribution_summary.json",
+      "helper_contribution_artifact_path": "artifacts/experiment_manifests/gap_closure_lab/praxis_formal_validation/campaign_artifacts_best3_reference_formal500/summaries/full_benchmark_20260510_182653/helper_contribution_summary.json",
+      "accepted_but_uncalled_tools": [],
+      "dashboard_path": "outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/dashboard/index.html",
+      "dashboard_url": "http://127.0.0.1:62231/outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/dashboard/index.html",
+      "dashboard_task_focus_url": "http://127.0.0.1:62231/outputs/gap_closure_lab/praxis_formal_validation/best3_reference_formal500/full_benchmark_20260510_182653/dashboard/task_focus.html",
+      "parallel_arms": true,
+      "mean_similarity_delta": 0.03836069529449581,
+      "mean_outcome_similarity_delta": 0.16067950498504793,
+      "protocol_gate_passed": true,
+      "protocol_gate_reasons": []
+    }
+  ],
+  "updated_at": "2026-05-10T23:20:04.568062+00:00"
+}

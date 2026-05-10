@@ -54,6 +54,57 @@ Local secrets should be kept out of Git. Use `.secrets/` or environment variable
 
 The current SAGE prototype has demonstrated the full mechanical loop for temporal and calendar-style helpers: birth, validation, registry persistence, runtime injection, later reuse, matched control comparison, and dashboard-backed artifact inspection. Broad validation remains an active research campaign: the next goal is a claim-grade 3-5 tool portfolio that improves real ToolSandbox outcomes across multiple task strata without broad context pollution.
 
+## Praxis Gap-Closure Candidate
+
+The active experimental branch contains a frozen Praxis candidate for later final-hardening review:
+
+- Registry: `artifacts/registry_experiments/gap_closure_lab/praxis_bridgepack_frozen_candidate/registry_manifest.json`
+- Registry SHA-256: `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`
+- Locked validation summary: `artifacts/experiment_manifests/gap_closure_lab/praxis_formal_validation/praxis_formal500_locked_summary.json`
+- Summary SHA-256: `41db7fed0e0997cfb691791abca59d47941a2f076951153382b17df3242e2dcc`
+- Human report: `docs/sage_protocol/experiments/gap_closure_lab_praxis_solution.md`
+
+Matched formal500 experimental result:
+
+| Arm | Outcome lift vs cached control | Candidate outcome | Exact success delta | Safety |
+| --- | ---: | ---: | ---: | --- |
+| best3 reference copy | `+0.1607` | `0.7556` | `+104` | 0 runtime exceptions, 0 helper side effects |
+| V2.6 reference copy | `+0.1869` | `0.7818` | `+118` | 0 runtime exceptions, 0 helper side effects |
+| Praxis frozen BridgePack | `+0.2378` | `0.8327` | `+166` | 0 runtime exceptions, 0 helper side effects |
+
+This is experimental evidence, not protected final-package evidence. The protected best3 registry and final claim artifacts are not modified on this branch. The result depends on branch-only actor/router bridge code and should be reviewed on a separate final-hardening branch before any protected claim update.
+
+### Verify The Praxis Result
+
+Use the per-task control baseline cache to avoid repeated baseline LLM calls. The candidate/SAGE arm must be fresh and OpenAI response reuse should remain disabled unless a future study explicitly records an arm-specific cache key.
+
+```bash
+conda run -n lifelong bash -lc 'export PYTHONPATH=src:.; python scripts/run_sage_protocol.py \
+  --mode full_benchmark \
+  --manifest docs/sage_protocol/manifests/v2_1_formal_500.json \
+  --registry-dir artifacts/registry_experiments/gap_closure_lab/praxis_bridgepack_frozen_candidate \
+  --generation off \
+  --disable-openai-response-cache \
+  --cache-mode off \
+  --parallel-arms \
+  --control-cache use-if-eligible \
+  --output-root outputs/gap_closure_lab/praxis_formal_validation/praxis_bridgepack_formal500_verify \
+  --artifact-root artifacts/experiment_manifests/gap_closure_lab/praxis_formal_validation/campaign_artifacts_praxis_bridgepack_formal500_verify \
+  --dashboard-port 62243'
+```
+
+Expected cache behavior for the current formal500 baseline is `500` cached / `0` fresh controls under cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`.
+
+To compare future models, keep the manifest, registry, cache policy, and generation setting fixed. Record requested/resolved agent, generation, and user models; do not compare a new model against old-model controls unless the comparison key and cache eligibility are explicitly matched.
+
+### Dashboards
+
+Each protocol run exports:
+
+- `dashboard/index.html` for run overview.
+- `dashboard/task_focus.html` for full task and transcript inspection.
+- `dashboard/task_compare.html` for comparison-first task review. This page shows baseline score, SAGE score, score lift, outcome lift, a minimal task list, task-specific lift, and a clickable tool-contribution drawer with natural call counts and called-subset lift.
+
 ---
 
 # Upstream ToolSandbox: A Stateful, Conversational, Interactive Evaluation Benchmark for LLM Tool Use Capabilities

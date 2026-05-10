@@ -1040,11 +1040,15 @@ def main() -> None:
     # Dashboard visibility is part of the experiment surface. Keep it on by
     # default for every run; only the explicit CLI flag should suppress it.
     should_open_dashboard = not args.no_dashboard_open
-    dashboard_url = dashboard_task_focus_url = None
+    dashboard_url = dashboard_task_focus_url = dashboard_task_compare_url = None
     if should_open_dashboard:
         dashboard_url = open_dashboard(dashboard_index, port=args.dashboard_port)
         dashboard_task_focus_url = open_dashboard(
             dashboard_index.with_name("task_focus.html"),
+            port=args.dashboard_port,
+        )
+        dashboard_task_compare_url = open_dashboard(
+            dashboard_index.with_name("task_compare.html"),
             port=args.dashboard_port,
         )
         (run_root / "dashboard_urls.json").write_text(
@@ -1052,6 +1056,7 @@ def main() -> None:
                 {
                     "dashboard_url": dashboard_url,
                     "dashboard_task_focus_url": dashboard_task_focus_url,
+                    "dashboard_task_compare_url": dashboard_task_compare_url,
                 },
                 indent=2,
             )
@@ -1517,6 +1522,7 @@ def main() -> None:
         "dashboard_path": str(dashboard_index),
         "dashboard_url": dashboard_url,
         "dashboard_task_focus_url": dashboard_task_focus_url,
+        "dashboard_task_compare_url": dashboard_task_compare_url,
         "parallel_arms": args.parallel_arms,
         "parallel_cache_policy": "per_arm" if args.parallel_arms else "shared_process",
         "openai_response_cache_enabled": response_cache_enabled,
@@ -1577,6 +1583,7 @@ def main() -> None:
             "dashboard_path": str(dashboard_index),
             "dashboard_url": dashboard_url,
             "dashboard_task_focus_url": dashboard_task_focus_url,
+            "dashboard_task_compare_url": dashboard_task_compare_url,
             "parallel_arms": args.parallel_arms,
             "mean_similarity_delta": comparison.get("mean_similarity_delta"),
             "mean_outcome_similarity_delta": comparison.get(
