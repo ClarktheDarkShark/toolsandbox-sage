@@ -1,0 +1,29 @@
+{
+  "created_at": "2026-05-10T11:29:43.125781+00:00",
+  "experimental_only": true,
+  "field_source_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/top_tools_full_best3_highfit_pack/registry_manifest.json",
+  "leakage_controls": {
+    "protected_claim_evidence": false,
+    "scenario_ids_encoded_into_tools_or_router": false,
+    "truth_labels_inspected": false,
+    "used_cache_availability_for_selection": false
+  },
+  "output_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_plus_field_pack/registry_manifest.json",
+  "protected_claim_evidence": false,
+  "repair_hypothesis": "Schedule-v2 broad500 retained strong recency/scheduling lift but left contact scalar/field lookup under-adopted. Adding the existing field extractor may recover low-frequency contact wins without changing the schedule helpers.",
+  "sha256": "a6486a08a0a4471f9ad5ee9a27bb39bbcf99617099cb476ada2c08e909f71ecb",
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_no_field_plus_schedule_v2_pack/registry_manifest.json",
+  "tools": [
+    "days_between_timestamps",
+    "extract_contact_field_from_search_result",
+    "next_weekday_time_to_timestamp",
+    "plan_contact_lookup_query",
+    "plan_contact_search_from_scalar_constraint",
+    "relative_day_time_to_timestamp",
+    "relative_weeks_time_to_timestamp",
+    "resolve_search_window_or_bounds",
+    "select_message_content_by_recency",
+    "select_message_counterparty_for_contact_update",
+    "select_record_by_timestamp_extreme"
+  ]
+}

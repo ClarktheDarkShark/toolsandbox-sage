@@ -1,0 +1,5346 @@
+{
+  "cache_policy": {
+    "baseline_control_cache": "use-if-eligible",
+    "openai_response_cache_for_candidate": "disabled",
+    "sage_candidate_cache": "fresh_only"
+  },
+  "created_at": "2026-05-10T02:01:03.141141+00:00",
+  "experimental_only": true,
+  "manifest_type": "sage_gap_closure_lab_contact_crud_splits",
+  "protected_claim_evidence": false,
+  "schema_version": 1,
+  "selection_policy": {
+    "selection_note": "Formal1000 scenario names filtered to contact CRUD base families and round-robin by base family. No labels or cache availability used.",
+    "used_cache_availability": false,
+    "used_expected_answers": false,
+    "used_truth_labels": false,
+    "uses_prior_experimental_gap_assessment": true
+  },
+  "split_aliases": {
+    "confirm_100": "contact_crud_100",
+    "expanded_60": "contact_crud_60",
+    "pilot_20": "contact_crud_20",
+    "validate_100": "contact_crud_100"
+  },
+  "split_diversity": {
+    "contact_crud_100": {
+      "bucket_counts": {
+        "contact_crud": 100
+      },
+      "distinct_family_count": 7,
+      "family_counts": {
+        "add_contact_with_name_and_phone_number": 8,
+        "modify_contact_with_message_recency": 23,
+        "remove_contact_by_phone": 23,
+        "remove_contact_with_id": 8,
+        "update_contact_relationship_with_relationship": 22,
+        "update_contact_relationship_with_relationship_twice": 8,
+        "update_contact_with_id_and_phone_number": 8
+      },
+      "largest_family_count": 23,
+      "largest_family_share": 0.23,
+      "near_duplicate_dominated": false,
+      "scenario_count": 100
+    },
+    "contact_crud_20": {
+      "bucket_counts": {
+        "contact_crud": 20
+      },
+      "distinct_family_count": 7,
+      "family_counts": {
+        "add_contact_with_name_and_phone_number": 3,
+        "modify_contact_with_message_recency": 3,
+        "remove_contact_by_phone": 3,
+        "remove_contact_with_id": 3,
+        "update_contact_relationship_with_relationship": 3,
+        "update_contact_relationship_with_relationship_twice": 3,
+        "update_contact_with_id_and_phone_number": 2
+      },
+      "largest_family_count": 3,
+      "largest_family_share": 0.15,
+      "near_duplicate_dominated": false,
+      "scenario_count": 20
+    },
+    "contact_crud_60": {
+      "bucket_counts": {
+        "contact_crud": 60
+      },
+      "distinct_family_count": 7,
+      "family_counts": {
+        "add_contact_with_name_and_phone_number": 8,
+        "modify_contact_with_message_recency": 10,
+        "remove_contact_by_phone": 9,
+        "remove_contact_with_id": 8,
+        "update_contact_relationship_with_relationship": 9,
+        "update_contact_relationship_with_relationship_twice": 8,
+        "update_contact_with_id_and_phone_number": 8
+      },
+      "largest_family_count": 10,
+      "largest_family_share": 0.16666666666666666,
+      "near_duplicate_dominated": false,
+      "scenario_count": 60
+    }
+  },
+  "split_sizes": {
+    "contact_crud_100": 100,
+    "contact_crud_20": 20,
+    "contact_crud_60": 60
+  },
+  "splits": {
+    "contact_crud_100": [
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "add_contact_with_name_and_phone_number",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "modify_contact",
+          "search_messages",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_with_id",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_with_id_and_phone_number",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "remove_contact",
+          "get_location_service_status",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation",
+          "get_current_location",
+          "unit_conversion",
+          "set_location_service_status",
+          "convert_currency"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "add_contact_with_name_and_phone_number_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "add_contact",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "remove_contact",
+          "shift_timestamp",
+          "end_conversation",
+          "search_messages",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "modify_contact",
+          "get_current_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_weather_around_lat_lon",
+          "search_lat_lon",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts",
+          "add_contact",
+          "unit_conversion",
+          "end_conversation",
+          "search_holiday",
+          "search_messages",
+          "search_stock",
+          "convert_currency"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "unit_conversion",
+          "add_contact",
+          "convert_currency",
+          "get_cellular_service_status",
+          "end_conversation",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "get_location_service_status",
+          "remove_contact",
+          "get_low_battery_mode_status",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_with_id_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "convert_currency",
+          "search_holiday",
+          "unit_conversion",
+          "search_contacts",
+          "search_lat_lon",
+          "search_location_around_lat_lon",
+          "modify_contact",
+          "search_stock",
+          "end_conversation",
+          "remove_contact",
+          "search_weather_around_lat_lon",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_weather_around_lat_lon",
+          "search_messages",
+          "unit_conversion",
+          "end_conversation",
+          "modify_contact",
+          "search_stock",
+          "convert_currency",
+          "remove_contact",
+          "add_contact",
+          "search_location_around_lat_lon",
+          "search_lat_lon",
+          "search_holiday",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_reminder",
+          "convert_currency",
+          "set_low_battery_mode_status",
+          "add_contact",
+          "search_contacts",
+          "set_location_service_status",
+          "unit_conversion",
+          "remove_contact",
+          "modify_contact",
+          "get_low_battery_mode_status",
+          "get_location_service_status"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_with_id_and_phone_number_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_with_id_and_phone_number_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_with_id_and_phone_number_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_with_id_and_phone_number_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_lat_lon",
+          "convert_currency",
+          "search_stock",
+          "shift_timestamp",
+          "set_wifi_status",
+          "datetime_info_to_timestamp",
+          "modify_contact",
+          "remove_reminder",
+          "set_low_battery_mode_status",
+          "get_current_timestamp",
+          "search_location_around_lat_lon",
+          "get_cellular_service_status",
+          "set_cellular_service_status",
+          "search_holiday",
+          "set_location_service_status",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "search_weather_around_lat_lon",
+          "get_low_battery_mode_status",
+          "timestamp_to_datetime_info",
+          "get_current_location",
+          "search_messages",
+          "seconds_to_hours_minutes_seconds",
+          "add_contact",
+          "add_reminder",
+          "get_wifi_status",
+          "unit_conversion",
+          "calculate_lat_lon_distance",
+          "timestamp_diff",
+          "get_location_service_status",
+          "search_reminder",
+          "remove_contact",
+          "modify_reminder",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "add_contact_with_name_and_phone_number_all_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "search_location_around_lat_lon",
+          "search_lat_lon",
+          "get_cellular_service_status",
+          "modify_contact",
+          "remove_contact",
+          "get_wifi_status",
+          "search_weather_around_lat_lon",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_low_battery_mode_status",
+          "set_location_service_status",
+          "modify_reminder",
+          "unit_conversion",
+          "search_messages",
+          "send_message_with_phone_number",
+          "search_stock",
+          "set_low_battery_mode_status",
+          "convert_currency",
+          "search_contacts",
+          "search_reminder",
+          "get_current_timestamp",
+          "remove_reminder",
+          "get_location_service_status",
+          "search_holiday",
+          "add_reminder",
+          "timestamp_diff",
+          "set_cellular_service_status",
+          "get_current_location",
+          "set_wifi_status",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_all_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_weather_around_lat_lon",
+          "end_conversation",
+          "search_reminder",
+          "add_reminder",
+          "timestamp_diff",
+          "set_cellular_service_status",
+          "modify_contact",
+          "search_holiday",
+          "modify_reminder",
+          "search_stock",
+          "search_messages",
+          "set_wifi_status",
+          "timestamp_to_datetime_info",
+          "convert_currency",
+          "get_current_location",
+          "search_contacts",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "remove_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "set_low_battery_mode_status",
+          "add_contact",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "remove_contact",
+          "unit_conversion",
+          "search_location_around_lat_lon",
+          "get_location_service_status",
+          "send_message_with_phone_number",
+          "get_wifi_status",
+          "shift_timestamp",
+          "get_cellular_service_status",
+          "calculate_lat_lon_distance"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_all_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "timestamp_diff",
+          "add_contact",
+          "search_holiday",
+          "search_lat_lon",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "search_location_around_lat_lon",
+          "shift_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "timestamp_to_datetime_info",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "remove_contact",
+          "modify_reminder",
+          "search_reminder",
+          "get_current_timestamp",
+          "add_reminder",
+          "get_current_location",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "search_stock",
+          "set_location_service_status",
+          "search_messages",
+          "end_conversation",
+          "convert_currency",
+          "modify_contact",
+          "send_message_with_phone_number",
+          "search_contacts",
+          "calculate_lat_lon_distance",
+          "search_weather_around_lat_lon",
+          "get_wifi_status",
+          "get_cellular_service_status"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_with_id_all_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "search_location_around_lat_lon",
+          "search_holiday",
+          "send_message_with_phone_number",
+          "remove_contact",
+          "shift_timestamp",
+          "modify_reminder",
+          "unit_conversion",
+          "set_location_service_status",
+          "add_reminder",
+          "get_current_timestamp",
+          "get_cellular_service_status",
+          "timestamp_diff",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "search_weather_around_lat_lon",
+          "add_contact",
+          "search_lat_lon",
+          "search_contacts",
+          "datetime_info_to_timestamp",
+          "convert_currency",
+          "set_low_battery_mode_status",
+          "search_messages",
+          "get_current_location",
+          "set_wifi_status",
+          "end_conversation",
+          "seconds_to_hours_minutes_seconds",
+          "search_reminder",
+          "calculate_lat_lon_distance",
+          "timestamp_to_datetime_info",
+          "modify_contact",
+          "get_low_battery_mode_status",
+          "search_stock",
+          "remove_reminder"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_all_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_reminder",
+          "shift_timestamp",
+          "convert_currency",
+          "set_low_battery_mode_status",
+          "search_messages",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "search_weather_around_lat_lon",
+          "add_contact",
+          "add_reminder",
+          "search_reminder",
+          "get_cellular_service_status",
+          "search_lat_lon",
+          "get_location_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_current_timestamp",
+          "unit_conversion",
+          "search_stock",
+          "get_low_battery_mode_status",
+          "search_location_around_lat_lon",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "get_current_location",
+          "remove_reminder",
+          "search_holiday",
+          "timestamp_diff",
+          "modify_contact",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "remove_contact",
+          "set_wifi_status",
+          "calculate_lat_lon_distance",
+          "seconds_to_hours_minutes_seconds"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_all_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "remove_reminder",
+          "search_stock",
+          "set_cellular_service_status",
+          "seconds_to_hours_minutes_seconds",
+          "unit_conversion",
+          "get_location_service_status",
+          "search_holiday",
+          "search_lat_lon",
+          "modify_contact",
+          "timestamp_diff",
+          "end_conversation",
+          "shift_timestamp",
+          "search_contacts",
+          "datetime_info_to_timestamp",
+          "search_location_around_lat_lon",
+          "get_low_battery_mode_status",
+          "search_messages",
+          "search_reminder",
+          "calculate_lat_lon_distance",
+          "timestamp_to_datetime_info",
+          "set_low_battery_mode_status",
+          "add_contact",
+          "convert_currency",
+          "get_cellular_service_status",
+          "send_message_with_phone_number",
+          "search_weather_around_lat_lon",
+          "add_reminder",
+          "get_current_timestamp",
+          "remove_contact",
+          "set_location_service_status",
+          "set_wifi_status",
+          "modify_reminder",
+          "get_current_location"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_with_id_and_phone_number_all_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "end_conversation",
+          "modify_contact",
+          "search_contacts",
+          "get_current_timestamp"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_alt",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_alt",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_alt",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "add_contact",
+          "datetime_info_to_timestamp",
+          "search_messages",
+          "end_conversation",
+          "remove_contact",
+          "modify_contact",
+          "search_contacts",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_holiday",
+          "send_message_with_phone_number",
+          "get_current_timestamp",
+          "timestamp_to_datetime_info",
+          "seconds_to_hours_minutes_seconds"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_alt_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_weather_around_lat_lon",
+          "search_holiday",
+          "search_lat_lon",
+          "search_stock",
+          "end_conversation",
+          "search_messages",
+          "add_contact",
+          "search_contacts",
+          "unit_conversion",
+          "search_location_around_lat_lon",
+          "modify_contact",
+          "remove_contact",
+          "convert_currency"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_alt_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_messages",
+          "convert_currency",
+          "end_conversation",
+          "search_contacts",
+          "search_weather_around_lat_lon",
+          "search_holiday",
+          "remove_contact",
+          "search_lat_lon",
+          "search_stock",
+          "add_contact",
+          "modify_contact",
+          "unit_conversion"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_alt_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "unit_conversion",
+          "get_current_timestamp",
+          "modify_contact",
+          "search_contacts",
+          "add_contact",
+          "end_conversation",
+          "timestamp_diff"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_alt_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_alt_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "remove_contact",
+          "add_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_alt_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "unit_conversion",
+          "get_current_timestamp",
+          "modify_contact",
+          "search_contacts",
+          "add_contact",
+          "end_conversation",
+          "timestamp_diff"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_alt_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_alt_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "remove_contact",
+          "add_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_alt_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "unit_conversion",
+          "get_current_timestamp",
+          "modify_contact",
+          "search_contacts",
+          "add_contact",
+          "end_conversation",
+          "timestamp_diff"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_alt_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_alt_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "remove_contact",
+          "add_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_alt_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "unit_conversion",
+          "get_current_timestamp",
+          "modify_contact",
+          "search_contacts",
+          "add_contact",
+          "end_conversation",
+          "timestamp_diff"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_alt_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_alt_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "remove_contact",
+          "add_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_alt_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "unit_conversion",
+          "get_current_timestamp",
+          "modify_contact",
+          "search_contacts",
+          "add_contact",
+          "end_conversation",
+          "timestamp_diff"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_alt_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_alt_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "remove_contact",
+          "add_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_alt_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "remove_reminder",
+          "set_wifi_status",
+          "calculate_lat_lon_distance",
+          "set_low_battery_mode_status",
+          "search_lat_lon",
+          "search_messages",
+          "shift_timestamp",
+          "convert_currency",
+          "send_message_with_phone_number",
+          "search_weather_around_lat_lon",
+          "get_cellular_service_status",
+          "search_reminder",
+          "search_location_around_lat_lon",
+          "get_wifi_status",
+          "timestamp_diff",
+          "modify_contact",
+          "modify_reminder",
+          "timestamp_to_datetime_info",
+          "seconds_to_hours_minutes_seconds",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_current_location",
+          "search_contacts",
+          "get_low_battery_mode_status",
+          "unit_conversion",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "remove_contact",
+          "search_stock",
+          "get_current_timestamp",
+          "search_holiday",
+          "set_location_service_status",
+          "add_reminder"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_alt_all_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "end_conversation",
+          "get_current_location",
+          "modify_contact",
+          "search_weather_around_lat_lon",
+          "timestamp_to_datetime_info",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "set_cellular_service_status",
+          "remove_reminder",
+          "search_lat_lon",
+          "timestamp_diff",
+          "modify_reminder",
+          "remove_contact",
+          "get_location_service_status",
+          "get_low_battery_mode_status",
+          "search_holiday",
+          "datetime_info_to_timestamp",
+          "get_current_timestamp",
+          "search_location_around_lat_lon",
+          "convert_currency",
+          "shift_timestamp",
+          "calculate_lat_lon_distance",
+          "seconds_to_hours_minutes_seconds",
+          "set_location_service_status",
+          "add_contact",
+          "search_reminder",
+          "add_reminder",
+          "set_wifi_status",
+          "search_messages",
+          "get_wifi_status",
+          "search_stock",
+          "search_contacts",
+          "unit_conversion"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_alt_all_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "calculate_lat_lon_distance",
+          "set_low_battery_mode_status",
+          "search_messages",
+          "set_wifi_status",
+          "add_reminder",
+          "get_wifi_status",
+          "timestamp_diff",
+          "modify_reminder",
+          "search_reminder",
+          "convert_currency",
+          "add_contact",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "get_cellular_service_status",
+          "search_contacts",
+          "search_location_around_lat_lon",
+          "remove_reminder",
+          "get_low_battery_mode_status",
+          "set_location_service_status",
+          "search_weather_around_lat_lon",
+          "set_cellular_service_status",
+          "search_holiday",
+          "remove_contact",
+          "get_current_timestamp",
+          "unit_conversion",
+          "get_current_location",
+          "modify_contact",
+          "send_message_with_phone_number",
+          "get_location_service_status",
+          "end_conversation",
+          "seconds_to_hours_minutes_seconds",
+          "search_stock",
+          "search_lat_lon",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_alt_all_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "search_contacts",
+          "get_current_timestamp",
+          "modify_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_multiple_user_turn",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_ambiguous",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "end_conversation",
+          "modify_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_multiple_user_turn",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "seconds_to_hours_minutes_seconds",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "modify_contact",
+          "add_contact",
+          "search_contacts",
+          "search_messages",
+          "timestamp_diff",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "send_message_with_phone_number",
+          "get_current_timestamp",
+          "search_holiday",
+          "unit_conversion",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_multiple_user_turn_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "modify_contact",
+          "search_stock",
+          "unit_conversion",
+          "search_messages",
+          "end_conversation",
+          "convert_currency",
+          "search_weather_around_lat_lon",
+          "search_holiday",
+          "add_contact",
+          "search_lat_lon",
+          "search_contacts",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_ambiguous_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_lat_lon",
+          "search_weather_around_lat_lon",
+          "search_contacts",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "search_stock",
+          "convert_currency",
+          "unit_conversion",
+          "end_conversation",
+          "search_messages",
+          "remove_contact",
+          "modify_contact",
+          "search_holiday"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_multiple_user_turn_10_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "modify_contact",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_contacts",
+          "add_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "search_contacts",
+          "add_contact",
+          "modify_contact",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_ambiguous_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "modify_contact",
+          "add_contact",
+          "end_conversation",
+          "search_contacts",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_multiple_user_turn_3_distraction_tools",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "modify_contact",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_contacts",
+          "add_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "search_contacts",
+          "add_contact",
+          "modify_contact",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_ambiguous_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "modify_contact",
+          "add_contact",
+          "end_conversation",
+          "search_contacts",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "modify_contact",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_contacts",
+          "add_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "search_contacts",
+          "add_contact",
+          "modify_contact",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_ambiguous_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "modify_contact",
+          "add_contact",
+          "end_conversation",
+          "search_contacts",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_multiple_user_turn_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "modify_contact",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_contacts",
+          "add_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "search_contacts",
+          "add_contact",
+          "modify_contact",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_ambiguous_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "modify_contact",
+          "add_contact",
+          "end_conversation",
+          "search_contacts",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "modify_contact",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_contacts",
+          "add_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "search_contacts",
+          "add_contact",
+          "modify_contact",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_ambiguous_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ],
+    "contact_crud_20": [
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "modify_contact",
+          "search_messages",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "remove_contact",
+          "get_location_service_status",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation",
+          "get_current_location",
+          "unit_conversion",
+          "set_location_service_status",
+          "convert_currency"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number_10_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "add_contact",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "remove_contact",
+          "shift_timestamp",
+          "end_conversation",
+          "search_messages",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "modify_contact",
+          "get_current_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_10_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_weather_around_lat_lon",
+          "search_lat_lon",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts",
+          "add_contact",
+          "unit_conversion",
+          "end_conversation",
+          "search_holiday",
+          "search_messages",
+          "search_stock",
+          "convert_currency"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_10_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "unit_conversion",
+          "add_contact",
+          "convert_currency",
+          "get_cellular_service_status",
+          "end_conversation",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "get_location_service_status",
+          "remove_contact",
+          "get_low_battery_mode_status",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id_10_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "convert_currency",
+          "search_holiday",
+          "unit_conversion",
+          "search_contacts",
+          "search_lat_lon",
+          "search_location_around_lat_lon",
+          "modify_contact",
+          "search_stock",
+          "end_conversation",
+          "remove_contact",
+          "search_weather_around_lat_lon",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_10_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_weather_around_lat_lon",
+          "search_messages",
+          "unit_conversion",
+          "end_conversation",
+          "modify_contact",
+          "search_stock",
+          "convert_currency",
+          "remove_contact",
+          "add_contact",
+          "search_location_around_lat_lon",
+          "search_lat_lon",
+          "search_holiday",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_reminder",
+          "convert_currency",
+          "set_low_battery_mode_status",
+          "add_contact",
+          "search_contacts",
+          "set_location_service_status",
+          "unit_conversion",
+          "remove_contact",
+          "modify_contact",
+          "get_low_battery_mode_status",
+          "get_location_service_status"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number_10_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools",
+        "split": "contact_crud_20",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ],
+    "contact_crud_60": [
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "modify_contact",
+          "search_messages",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "remove_contact",
+          "get_location_service_status",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation",
+          "get_current_location",
+          "unit_conversion",
+          "set_location_service_status",
+          "convert_currency"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number_10_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "add_contact",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "remove_contact",
+          "shift_timestamp",
+          "end_conversation",
+          "search_messages",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "modify_contact",
+          "get_current_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_10_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_weather_around_lat_lon",
+          "search_lat_lon",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts",
+          "add_contact",
+          "unit_conversion",
+          "end_conversation",
+          "search_holiday",
+          "search_messages",
+          "search_stock",
+          "convert_currency"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_10_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "unit_conversion",
+          "add_contact",
+          "convert_currency",
+          "get_cellular_service_status",
+          "end_conversation",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "get_location_service_status",
+          "remove_contact",
+          "get_low_battery_mode_status",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id_10_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "convert_currency",
+          "search_holiday",
+          "unit_conversion",
+          "search_contacts",
+          "search_lat_lon",
+          "search_location_around_lat_lon",
+          "modify_contact",
+          "search_stock",
+          "end_conversation",
+          "remove_contact",
+          "search_weather_around_lat_lon",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_10_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_weather_around_lat_lon",
+          "search_messages",
+          "unit_conversion",
+          "end_conversation",
+          "modify_contact",
+          "search_stock",
+          "convert_currency",
+          "remove_contact",
+          "add_contact",
+          "search_location_around_lat_lon",
+          "search_lat_lon",
+          "search_holiday",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_reminder",
+          "convert_currency",
+          "set_low_battery_mode_status",
+          "add_contact",
+          "search_contacts",
+          "set_location_service_status",
+          "unit_conversion",
+          "remove_contact",
+          "modify_contact",
+          "get_low_battery_mode_status",
+          "get_location_service_status"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number_10_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number_3_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number_3_distraction_tools_tool_description_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "get_current_timestamp",
+          "search_contacts",
+          "end_conversation",
+          "timestamp_diff",
+          "unit_conversion",
+          "modify_contact",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "search_contacts",
+          "add_contact",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "add_contact",
+          "end_conversation"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact",
+          "modify_contact",
+          "remove_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number_3_distraction_tools_tool_name_scrambled",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_lat_lon",
+          "convert_currency",
+          "search_stock",
+          "shift_timestamp",
+          "set_wifi_status",
+          "datetime_info_to_timestamp",
+          "modify_contact",
+          "remove_reminder",
+          "set_low_battery_mode_status",
+          "get_current_timestamp",
+          "search_location_around_lat_lon",
+          "get_cellular_service_status",
+          "set_cellular_service_status",
+          "search_holiday",
+          "set_location_service_status",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "search_weather_around_lat_lon",
+          "get_low_battery_mode_status",
+          "timestamp_to_datetime_info",
+          "get_current_location",
+          "search_messages",
+          "seconds_to_hours_minutes_seconds",
+          "add_contact",
+          "add_reminder",
+          "get_wifi_status",
+          "unit_conversion",
+          "calculate_lat_lon_distance",
+          "timestamp_diff",
+          "get_location_service_status",
+          "search_reminder",
+          "remove_contact",
+          "modify_reminder",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number_all_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "search_location_around_lat_lon",
+          "search_lat_lon",
+          "get_cellular_service_status",
+          "modify_contact",
+          "remove_contact",
+          "get_wifi_status",
+          "search_weather_around_lat_lon",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_low_battery_mode_status",
+          "set_location_service_status",
+          "modify_reminder",
+          "unit_conversion",
+          "search_messages",
+          "send_message_with_phone_number",
+          "search_stock",
+          "set_low_battery_mode_status",
+          "convert_currency",
+          "search_contacts",
+          "search_reminder",
+          "get_current_timestamp",
+          "remove_reminder",
+          "get_location_service_status",
+          "search_holiday",
+          "add_reminder",
+          "timestamp_diff",
+          "set_cellular_service_status",
+          "get_current_location",
+          "set_wifi_status",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_all_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_weather_around_lat_lon",
+          "end_conversation",
+          "search_reminder",
+          "add_reminder",
+          "timestamp_diff",
+          "set_cellular_service_status",
+          "modify_contact",
+          "search_holiday",
+          "modify_reminder",
+          "search_stock",
+          "search_messages",
+          "set_wifi_status",
+          "timestamp_to_datetime_info",
+          "convert_currency",
+          "get_current_location",
+          "search_contacts",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "remove_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "set_low_battery_mode_status",
+          "add_contact",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "remove_contact",
+          "unit_conversion",
+          "search_location_around_lat_lon",
+          "get_location_service_status",
+          "send_message_with_phone_number",
+          "get_wifi_status",
+          "shift_timestamp",
+          "get_cellular_service_status",
+          "calculate_lat_lon_distance"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_all_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "timestamp_diff",
+          "add_contact",
+          "search_holiday",
+          "search_lat_lon",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "search_location_around_lat_lon",
+          "shift_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "timestamp_to_datetime_info",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "remove_contact",
+          "modify_reminder",
+          "search_reminder",
+          "get_current_timestamp",
+          "add_reminder",
+          "get_current_location",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "search_stock",
+          "set_location_service_status",
+          "search_messages",
+          "end_conversation",
+          "convert_currency",
+          "modify_contact",
+          "send_message_with_phone_number",
+          "search_contacts",
+          "calculate_lat_lon_distance",
+          "search_weather_around_lat_lon",
+          "get_wifi_status",
+          "get_cellular_service_status"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id_all_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "search_location_around_lat_lon",
+          "search_holiday",
+          "send_message_with_phone_number",
+          "remove_contact",
+          "shift_timestamp",
+          "modify_reminder",
+          "unit_conversion",
+          "set_location_service_status",
+          "add_reminder",
+          "get_current_timestamp",
+          "get_cellular_service_status",
+          "timestamp_diff",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "search_weather_around_lat_lon",
+          "add_contact",
+          "search_lat_lon",
+          "search_contacts",
+          "datetime_info_to_timestamp",
+          "convert_currency",
+          "set_low_battery_mode_status",
+          "search_messages",
+          "get_current_location",
+          "set_wifi_status",
+          "end_conversation",
+          "seconds_to_hours_minutes_seconds",
+          "search_reminder",
+          "calculate_lat_lon_distance",
+          "timestamp_to_datetime_info",
+          "modify_contact",
+          "get_low_battery_mode_status",
+          "search_stock",
+          "remove_reminder"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_all_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_reminder",
+          "shift_timestamp",
+          "convert_currency",
+          "set_low_battery_mode_status",
+          "search_messages",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "search_weather_around_lat_lon",
+          "add_contact",
+          "add_reminder",
+          "search_reminder",
+          "get_cellular_service_status",
+          "search_lat_lon",
+          "get_location_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_current_timestamp",
+          "unit_conversion",
+          "search_stock",
+          "get_low_battery_mode_status",
+          "search_location_around_lat_lon",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "get_current_location",
+          "remove_reminder",
+          "search_holiday",
+          "timestamp_diff",
+          "modify_contact",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "remove_contact",
+          "set_wifi_status",
+          "calculate_lat_lon_distance",
+          "seconds_to_hours_minutes_seconds"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn_all_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "remove_reminder",
+          "search_stock",
+          "set_cellular_service_status",
+          "seconds_to_hours_minutes_seconds",
+          "unit_conversion",
+          "get_location_service_status",
+          "search_holiday",
+          "search_lat_lon",
+          "modify_contact",
+          "timestamp_diff",
+          "end_conversation",
+          "shift_timestamp",
+          "search_contacts",
+          "datetime_info_to_timestamp",
+          "search_location_around_lat_lon",
+          "get_low_battery_mode_status",
+          "search_messages",
+          "search_reminder",
+          "calculate_lat_lon_distance",
+          "timestamp_to_datetime_info",
+          "set_low_battery_mode_status",
+          "add_contact",
+          "convert_currency",
+          "get_cellular_service_status",
+          "send_message_with_phone_number",
+          "search_weather_around_lat_lon",
+          "add_reminder",
+          "get_current_timestamp",
+          "remove_contact",
+          "set_location_service_status",
+          "set_wifi_status",
+          "modify_reminder",
+          "get_current_location"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number_all_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "end_conversation",
+          "modify_contact",
+          "search_contacts",
+          "get_current_timestamp"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_alt",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_alt",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_alt",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "add_contact",
+          "datetime_info_to_timestamp",
+          "search_messages",
+          "end_conversation",
+          "remove_contact",
+          "modify_contact",
+          "search_contacts",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_holiday",
+          "send_message_with_phone_number",
+          "get_current_timestamp",
+          "timestamp_to_datetime_info",
+          "seconds_to_hours_minutes_seconds"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_alt_10_distraction_tools",
+        "split": "contact_crud_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ]
+  },
+  "truth_labels_inspected": false
+}

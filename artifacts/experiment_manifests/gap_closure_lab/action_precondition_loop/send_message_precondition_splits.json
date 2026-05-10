@@ -1,0 +1,1459 @@
+{
+  "cache_policy": {
+    "baseline_control_cache": "use-if-eligible",
+    "openai_response_cache_for_candidate": "disabled",
+    "sage_candidate_cache": "fresh_only"
+  },
+  "created_at": "2026-05-10T11:43:34.829020+00:00",
+  "experimental_only": true,
+  "manifest_type": "sage_gap_closure_lab_send_message_precondition_splits",
+  "protected_claim_evidence": false,
+  "schema_version": 1,
+  "selection_policy": {
+    "selection_note": "Direct send-message scenarios copied in existing broad500 order. No labels or cache availability were used.",
+    "used_cache_availability": false,
+    "used_expected_answers": false,
+    "used_truth_labels": false
+  },
+  "split_aliases": {
+    "confirm_100": "send_message_precondition_all",
+    "expanded_60": "send_message_precondition_all",
+    "pilot_20": "send_message_precondition_20"
+  },
+  "split_diversity": {
+    "send_message_precondition_20": {
+      "distinct_family_count": 3,
+      "family_counts": {
+        "send_message_with_contact_content_cellular_off": 7,
+        "send_message_with_contact_content_cellular_off_insufficient_information": 7,
+        "send_message_with_phone_number_and_content": 6
+      },
+      "near_duplicate_assessment": "Narrow send-message precondition split; variants include no distraction, distraction, all-tools, alt phrasing, and tool metadata scrambling. It is intentionally bucket-specific."
+    },
+    "send_message_precondition_all": {
+      "distinct_family_count": 3,
+      "family_counts": {
+        "send_message_with_contact_content_cellular_off": 12,
+        "send_message_with_contact_content_cellular_off_insufficient_information": 11,
+        "send_message_with_phone_number_and_content": 8
+      },
+      "near_duplicate_assessment": "Narrow send-message precondition split; variants include no distraction, distraction, all-tools, alt phrasing, and tool metadata scrambling. It is intentionally bucket-specific."
+    }
+  },
+  "split_sizes": {
+    "send_message_precondition_20": 20,
+    "send_message_precondition_all": 31
+  },
+  "splits": {
+    "send_message_precondition_20": [
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_cellular_service_status",
+          "set_cellular_service_status",
+          "search_contacts"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "send_message_with_phone_number",
+          "set_cellular_service_status",
+          "get_cellular_service_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "search_contacts",
+          "get_cellular_service_status",
+          "set_cellular_service_status",
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_location_service_status",
+          "end_conversation",
+          "modify_contact",
+          "add_contact",
+          "remove_contact",
+          "get_low_battery_mode_status",
+          "search_messages",
+          "set_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_10_distraction_tools",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "set_low_battery_mode_status",
+          "unit_conversion",
+          "set_wifi_status",
+          "end_conversation",
+          "get_current_location",
+          "get_wifi_status",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "convert_currency",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "search_messages",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "add_contact",
+          "convert_currency",
+          "set_location_service_status",
+          "search_weather_around_lat_lon",
+          "get_current_location",
+          "search_location_around_lat_lon",
+          "seconds_to_hours_minutes_seconds",
+          "get_location_service_status",
+          "search_messages",
+          "end_conversation",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_10_distraction_tools",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "search_contacts",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "convert_currency",
+          "unit_conversion"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_3_distraction_tools",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "search_contacts",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_description_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "convert_currency",
+          "unit_conversion"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_3_distraction_tools_arg_description_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "search_contacts",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_type_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "convert_currency",
+          "unit_conversion"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_3_distraction_tools_arg_type_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "search_contacts",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_description_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "convert_currency",
+          "unit_conversion"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_3_distraction_tools_tool_description_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "search_contacts",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_name_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "send_message_precondition_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ],
+    "send_message_precondition_all": [
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_cellular_service_status",
+          "set_cellular_service_status",
+          "search_contacts"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "send_message_with_phone_number",
+          "set_cellular_service_status",
+          "get_cellular_service_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "search_contacts",
+          "get_cellular_service_status",
+          "set_cellular_service_status",
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_location_service_status",
+          "end_conversation",
+          "modify_contact",
+          "add_contact",
+          "remove_contact",
+          "get_low_battery_mode_status",
+          "search_messages",
+          "set_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_10_distraction_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "set_low_battery_mode_status",
+          "unit_conversion",
+          "set_wifi_status",
+          "end_conversation",
+          "get_current_location",
+          "get_wifi_status",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "convert_currency",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "search_messages",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "add_contact",
+          "convert_currency",
+          "set_location_service_status",
+          "search_weather_around_lat_lon",
+          "get_current_location",
+          "search_location_around_lat_lon",
+          "seconds_to_hours_minutes_seconds",
+          "get_location_service_status",
+          "search_messages",
+          "end_conversation",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_10_distraction_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "search_contacts",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "convert_currency",
+          "unit_conversion"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_3_distraction_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "search_contacts",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_description_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "convert_currency",
+          "unit_conversion"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_3_distraction_tools_arg_description_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "search_contacts",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_type_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "convert_currency",
+          "unit_conversion"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_3_distraction_tools_arg_type_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "search_contacts",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_description_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "convert_currency",
+          "unit_conversion"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_3_distraction_tools_tool_description_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "search_contacts",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "send_message_with_phone_number"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_name_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "convert_currency",
+          "unit_conversion"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_3_distraction_tools_tool_name_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "calculate_lat_lon_distance",
+          "search_contacts",
+          "search_location_around_lat_lon",
+          "remove_reminder",
+          "get_wifi_status",
+          "search_reminder",
+          "set_cellular_service_status",
+          "modify_contact",
+          "get_cellular_service_status",
+          "get_current_location",
+          "search_lat_lon",
+          "set_location_service_status",
+          "search_stock",
+          "get_low_battery_mode_status",
+          "get_current_timestamp",
+          "remove_contact",
+          "unit_conversion",
+          "search_messages",
+          "modify_reminder",
+          "set_wifi_status",
+          "send_message_with_phone_number",
+          "datetime_info_to_timestamp",
+          "search_holiday",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "add_contact",
+          "search_weather_around_lat_lon",
+          "shift_timestamp",
+          "convert_currency",
+          "set_low_battery_mode_status",
+          "add_reminder",
+          "get_location_service_status",
+          "seconds_to_hours_minutes_seconds"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_all_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "search_messages",
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "get_wifi_status",
+          "remove_contact",
+          "convert_currency",
+          "get_location_service_status",
+          "search_reminder",
+          "shift_timestamp",
+          "end_conversation",
+          "set_cellular_service_status",
+          "send_message_with_phone_number",
+          "add_reminder",
+          "get_current_location",
+          "add_contact",
+          "timestamp_diff",
+          "set_wifi_status",
+          "modify_contact",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "modify_reminder",
+          "search_contacts",
+          "get_current_timestamp",
+          "search_location_around_lat_lon",
+          "search_weather_around_lat_lon",
+          "unit_conversion",
+          "calculate_lat_lon_distance",
+          "remove_reminder",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "get_low_battery_mode_status",
+          "timestamp_to_datetime_info",
+          "search_stock"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_all_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "search_weather_around_lat_lon",
+          "shift_timestamp",
+          "get_wifi_status",
+          "datetime_info_to_timestamp",
+          "send_message_with_phone_number",
+          "search_location_around_lat_lon",
+          "search_holiday",
+          "get_low_battery_mode_status",
+          "get_current_timestamp",
+          "get_current_location",
+          "remove_reminder",
+          "unit_conversion",
+          "timestamp_diff",
+          "search_messages",
+          "search_stock",
+          "add_contact",
+          "add_reminder",
+          "calculate_lat_lon_distance",
+          "modify_contact",
+          "end_conversation",
+          "remove_contact",
+          "search_reminder",
+          "set_cellular_service_status",
+          "timestamp_to_datetime_info",
+          "convert_currency",
+          "set_wifi_status",
+          "seconds_to_hours_minutes_seconds",
+          "set_low_battery_mode_status",
+          "get_cellular_service_status",
+          "search_contacts",
+          "set_location_service_status",
+          "search_lat_lon",
+          "modify_reminder"
+        ],
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content_all_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "get_cellular_service_status",
+          "set_cellular_service_status",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_alt",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "get_cellular_service_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_alt",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "get_wifi_status",
+          "set_cellular_service_status",
+          "search_contacts",
+          "search_messages",
+          "set_low_battery_mode_status",
+          "end_conversation",
+          "modify_contact",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "send_message_with_phone_number",
+          "set_location_service_status",
+          "get_cellular_service_status",
+          "add_contact"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_alt_10_distraction_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_low_battery_mode_status",
+          "convert_currency",
+          "set_cellular_service_status",
+          "get_current_location",
+          "set_wifi_status",
+          "get_cellular_service_status",
+          "unit_conversion",
+          "get_wifi_status",
+          "set_low_battery_mode_status",
+          "set_location_service_status",
+          "get_location_service_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_alt_10_distraction_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "set_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "get_location_service_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "set_wifi_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "get_wifi_status"
+        ],
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_arg_description_scrambled",
+        "split": "send_message_precondition_all",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ]
+  },
+  "truth_labels_inspected": false
+}

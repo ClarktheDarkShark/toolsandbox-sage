@@ -1,0 +1,174 @@
+{
+  "tools": {
+    "plan_device_state_action_sequence_v3": {
+      "accepted_at": "2026-05-10T11:25:11.972858+00:00",
+      "birth_scenario": "settings_state_v2_expanded60_repair",
+      "code_hash": "b98c59683a0f3ecdad724d2fc492f8ee1655d5ac1885034c5e301b60e298c71c",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "\ndef plan_device_state_action_sequence_v3(user_request: str, visible_state_or_error: str = \"\") -> dict:\n    \"\"\"Plan safe original ToolSandbox state setters and exact final phrasing.\"\"\"\n    request = str(user_request or \"\").lower().replace(\"_\", \" \").replace(\"-\", \" \")\n    visible = str(visible_state_or_error or \"\").lower().replace(\"_\", \" \").replace(\"-\", \" \")\n    text = (request + \" \" + visible).strip()\n\n    def empty(reason: str) -> dict:\n        return {\n            \"tool_name\": \"\",\n            \"arguments\": {},\n            \"should_call\": False,\n            \"reason\": reason,\n            \"action_sequence\": [],\n            \"final_response_recommendation\": \"\",\n            \"continue_original_task_after_sequence\": False,\n            \"abstain_reason\": reason,\n        }\n\n    wifi_terms = (\"wifi\", \"wi fi\", \"wi-fi\", \"internet\")\n    cellular_terms = (\"cellular\", \"cell service\", \"mobile service\", \"phone signal\", \"signal\")\n    location_terms = (\"location service\", \"location\", \"current city\", \"where am i\")\n\n    def has_any(haystack: str, terms: tuple) -> bool:\n        return any(term in haystack for term in terms)\n\n    def off_command(terms: tuple) -> bool:\n        for term in terms:\n            if (\n                \"turn off \" + term in request\n                or \"turn \" + term + \" off\" in request\n                or \"disable \" + term in request\n                or \"switch off \" + term in request\n                or \"shut off \" + term in request\n            ):\n                return True\n        return False\n\n    def on_command(terms: tuple) -> bool:\n        for term in terms:\n            if (\n                \"turn on \" + term in request\n                or \"turn \" + term + \" on\" in request\n                or \"enable \" + term in request\n                or \"switch on \" + term in request\n            ):\n                return True\n        return False\n\n    target = \"\"\n    if has_any(text, wifi_terms):\n        target = \"wifi\"\n    elif has_any(text, cellular_terms):\n        target = \"cellular\"\n    elif has_any(text, location_terms):\n        target = \"location\"\n    elif \"low battery\" in text or \"battery mode\" in text:\n        target = \"low_battery\"\n\n    if not target:\n        return empty(\"no_device_state_target\")\n\n    if target == \"low_battery\":\n        desired_on = not off_command((\"low battery mode\", \"low battery\", \"battery mode\"))\n        if on_command((\"low battery mode\", \"low battery\", \"battery mode\")):\n            desired_on = True\n        final = \"Low battery mode has been turned \" + (\"on.\" if desired_on else \"off.\")\n        action = {\n            \"tool_name\": \"set_low_battery_mode_status\",\n            \"arguments\": {\"on\": bool(desired_on)},\n            \"reason\": \"set_low_battery_mode_\" + (\"on\" if desired_on else \"off\"),\n        }\n        return {\n            \"tool_name\": action[\"tool_name\"],\n            \"arguments\": action[\"arguments\"],\n            \"should_call\": True,\n            \"reason\": action[\"reason\"],\n            \"action_sequence\": [action],\n            \"final_response_recommendation\": final,\n            \"continue_original_task_after_sequence\": False,\n            \"abstain_reason\": \"\",\n        }\n\n    target_terms = {\n        \"wifi\": wifi_terms,\n        \"cellular\": cellular_terms,\n        \"location\": location_terms,\n    }[target]\n    setter_by_target = {\n        \"wifi\": \"set_wifi_status\",\n        \"cellular\": \"set_cellular_service_status\",\n        \"location\": \"set_location_service_status\",\n    }\n    label_by_target = {\n        \"wifi\": \"Wifi\",\n        \"cellular\": \"Cellular service\",\n        \"location\": \"Location service\",\n    }\n\n    # Treat \"wifi is off\" in visible state as a reason to turn it on, not as a\n    # command to turn it off. Only explicit off commands in the user request set\n    # the target service to false.\n    desired_on = not off_command(target_terms)\n    if on_command(target_terms):\n        desired_on = True\n\n    low_battery_already_clear = any(\n        marker in text\n        for marker in (\n            \"low battery mode is off\",\n            \"low battery mode already disabled\",\n            \"low battery mode false\",\n            \"low battery=false\",\n            \"already disabled\",\n        )\n    )\n    low_battery_blocks_service = bool(desired_on) and (\n        (\"low battery\" in text and not low_battery_already_clear)\n        or \"cannot be turned on in low battery mode\" in text\n        or \"blocked by low battery\" in text\n    )\n\n    actions = []\n    if low_battery_blocks_service:\n        actions.append(\n            {\n                \"tool_name\": \"set_low_battery_mode_status\",\n                \"arguments\": {\"on\": False},\n                \"reason\": \"clear_low_battery_before_enabling_service\",\n            }\n        )\n    actions.append(\n        {\n            \"tool_name\": setter_by_target[target],\n            \"arguments\": {\"on\": bool(desired_on)},\n            \"reason\": \"set_\" + target + (\"_on\" if desired_on else \"_off\"),\n        }\n    )\n\n    final = label_by_target[target] + \" has been turned \" + (\"on.\" if desired_on else \"off.\")\n    downstream_request = any(\n        token in request\n        for token in (\n            \"send \",\n            \"message\",\n            \"find \",\n            \"search\",\n            \"how many\",\n            \"what is\",\n            \"what's\",\n            \"temperature\",\n            \"weather\",\n            \"reminder\",\n        )\n    ) and not (on_command(target_terms) or off_command(target_terms))\n\n    return {\n        \"tool_name\": actions[0][\"tool_name\"],\n        \"arguments\": actions[0][\"arguments\"],\n        \"should_call\": True,\n        \"reason\": actions[0][\"reason\"],\n        \"action_sequence\": actions,\n        \"final_response_recommendation\": \"continue_original_task\" if downstream_request else final,\n        \"continue_original_task_after_sequence\": bool(downstream_request),\n        \"abstain_reason\": \"\",\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_call false only when no wifi, cellular, location, or low-battery state target is visible.",
+          "applicable_task_families": [
+            "wifi_off",
+            "cellular_off",
+            "turn_on_wifi_low_battery_mode",
+            "turn_on_cellular_low_battery_mode",
+            "turn_on_location_low_battery_mode",
+            "send_message_with_contact_content_cellular_off",
+            "find_days_till_holiday_wifi_off",
+            "find_temperature_f_with_location_wifi_off"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 8,
+          "description": "State action sequence v3 helper. Use for wifi, cellular service, location service, and low-battery mode tasks. It converts the user request plus visible state/error text into original ToolSandbox setter calls in action_sequence, preserving order around low battery mode. For direct settings tasks, answer exactly with final_response_recommendation. For downstream tasks, continue_original_task_after_sequence tells the actor to retry/continue the original request after setters succeed. Pure helper; it performs no side effects.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "state_precondition_helper",
+          "final_state_preservation_plan": "The helper returns only original setter names and arguments; the actor must perform any side effects through original ToolSandbox tools.",
+          "generalization_rationale": "Settings/device-state and downstream precondition tasks repeatedly need the same side-effect-free mapping from state text/errors to legal original setter calls and exact final wording.",
+          "grading_accounting_note": "Direct-setting tasks should preserve exact outcome wording; downstream tasks should continue to the original requested action after state repair.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [
+              "set_wifi_status",
+              "set_cellular_service_status",
+              "set_location_service_status"
+            ],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "state_visible_off_text_confused_with_user_off_command"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "called_subset_negative",
+              "final_answer_not_exact",
+              "state_ordering_error"
+            ],
+            "summary": "Prior state helper had adoption but insufficient value because its parser and final-response contract were too loose.",
+            "visible_data_gaps": []
+          },
+          "inputs": [
+            {
+              "annotation": "str",
+              "description": "The current user request or task wording.",
+              "name": "user_request"
+            },
+            {
+              "annotation": "str",
+              "description": "Visible state, prior setter error, or empty string.",
+              "name": "visible_state_or_error"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "off_state_text_misread_as_turn_off_command",
+            "over_verbose_final_setting_answer",
+            "downstream_precondition_stops_before_original_task"
+          ],
+          "negative_triggers": [
+            "insufficient_information",
+            "contact_recency",
+            "reminder_recency",
+            "search_only"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "action_sequence": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "arguments": {
+                "type": "object"
+              },
+              "continue_original_task_after_sequence": {
+                "type": "boolean"
+              },
+              "final_response_recommendation": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "should_call": {
+                "type": "boolean"
+              },
+              "tool_name": {
+                "enum": [
+                  "",
+                  "set_wifi_status",
+                  "set_cellular_service_status",
+                  "set_location_service_status",
+                  "set_low_battery_mode_status"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "tool_name",
+              "arguments",
+              "should_call",
+              "reason",
+              "action_sequence",
+              "final_response_recommendation",
+              "continue_original_task_after_sequence",
+              "abstain_reason"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "wifi_off",
+            "cellular_off",
+            "location_service_off",
+            "low_battery_mode",
+            "turn_on_wifi",
+            "turn_on_cellular",
+            "turn_on_location",
+            "turn_off_wifi",
+            "turn_off_cellular",
+            "send_message_with_contact_content_cellular_off",
+            "find_days_till_holiday_wifi_off",
+            "find_temperature_f_with_location_wifi_off"
+          ],
+          "preserves_side_effect_tools": [
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+            "set_low_battery_mode_status"
+          ],
+          "reason_tool_is_decisive": "It separates visible off-state text from explicit user commands, returns low-battery/service setter order, and provides exact final phrasing for direct settings tasks.",
+          "required_original_tool_calls": [
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+            "set_low_battery_mode_status"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "Settings v2 expanded60 had natural calls but outcome regressed from misread off-state text and over-verbose final answers.",
+            "Broad500 assessment showed settings/device-state as one of the largest unsupported buckets."
+          ],
+          "tool_name": "plan_device_state_action_sequence_v3"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 2
+      },
+      "version": 1
+    }
+  }
+}

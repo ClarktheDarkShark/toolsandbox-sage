@@ -2,7 +2,7 @@ import copy
 import json
 import ssl
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 import pytest
 
@@ -116,6 +116,49 @@ def test_side_effect_preservation_allows_selection_only_bridge() -> None:
     )
 
 
+def test_side_effect_preservation_allows_search_required_noop() -> None:
+    messages = [
+        {
+            "role": "tool",
+            "name": "plan_contact_relationship_batch_update",
+            "content": {
+                "phase": "search_required",
+                "search_contacts_kwargs": {"relationship": "enemy"},
+                "should_call_search_contacts": True,
+                "downstream_tool_name": "",
+                "downstream_tool_kwargs_list": [],
+                "should_call_tools": False,
+                "abstain_reason": "",
+                "final_answer_recommendation": "call:search_contacts",
+            },
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "search_contacts"}}],
+        },
+        {"role": "tool", "name": "search_contacts", "content": "[]"},
+    ]
+
+    assert not _side_effect_followup_failures(
+        messages,
+        helper_name="plan_contact_relationship_batch_update",
+        required_original_tool_calls=("modify_contact",),
+    )
+    first_message = cast(dict[str, object], messages[0])
+    assert not _side_effect_followup_failures(
+        messages,
+        helper_name="plan_contact_relationship_batch_update",
+        required_original_tool_calls=("modify_contact",),
+        actual_tool_trace_events=[
+            {
+                "tool_name": "plan_contact_relationship_batch_update",
+                "result": cast(str, first_message["content"]),
+            },
+            {"tool_name": "search_contacts", "result": []},
+        ],
+    )
+
+
 def test_side_effect_preservation_uses_actual_trace_names_for_scrambled_tools() -> None:
     messages = [
         {
@@ -201,6 +244,51 @@ def test_side_effect_preservation_requires_next_call_after_success() -> None:
         messages,
         helper_name="prepare",
         required_original_tool_calls=("add_reminder",),
+    )
+
+
+def test_side_effect_preservation_allows_delayed_positive_followup() -> None:
+    messages = [
+        {
+            "role": "tool",
+            "name": "plan_device_state_action_sequence_v3",
+            "content": {"should_call": True},
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "get_low_battery_mode_status"}}],
+        },
+        {"role": "tool", "name": "get_low_battery_mode_status", "content": "True"},
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "set_low_battery_mode_status"}}],
+        },
+        {"role": "tool", "name": "set_low_battery_mode_status", "content": "None"},
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "set_cellular_service_status"}}],
+        },
+    ]
+    trace_events: list[dict[str, object]] = [
+        {
+            "tool_name": "plan_device_state_action_sequence_v3",
+            "result": {"should_call": True},
+        },
+        {"tool_name": "get_low_battery_mode_status", "result": True},
+        {"tool_name": "set_low_battery_mode_status", "result": None},
+        {"tool_name": "set_cellular_service_status", "result": None},
+    ]
+
+    assert not _side_effect_followup_failures(
+        messages,
+        helper_name="plan_device_state_action_sequence_v3",
+        required_original_tool_calls=("set_cellular_service_status",),
+        actual_tool_trace_events=trace_events,
+    )
+    assert not _side_effect_followup_failures(
+        messages,
+        helper_name="plan_device_state_action_sequence_v3",
+        required_original_tool_calls=("set_cellular_service_status",),
     )
 
 

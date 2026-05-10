@@ -1,0 +1,352 @@
+{
+  "tools": {
+    "plan_contact_relationship_batch_update": {
+      "accepted_at": "2026-05-10T14:23:20.895892+00:00",
+      "birth_scenario": "gap_closure_lab_contact_relationship_update_repair",
+      "code_hash": "a3e347b27983ef641a68f99e373e6614b05ec3c22e91876506dabcf052fdf814",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "\ndef plan_contact_relationship_batch_update(user_request: str = \"\", source_relationship: str = \"\", target_relationship: str = \"\", contacts: list = None) -> dict:\n    \"\"\"Plan a safe relationship-group contact update without side effects.\"\"\"\n    contacts = contacts if isinstance(contacts, list) else []\n    text = str(user_request or \"\").strip().lower().replace(\"_\", \" \").replace(\"-\", \" \")\n\n    aliases = {\n        \"friend\": \"friend\",\n        \"friends\": \"friend\",\n        \"enemy\": \"enemy\",\n        \"enemies\": \"enemy\",\n        \"coworker\": \"coworker\",\n        \"coworkers\": \"coworker\",\n        \"colleague\": \"coworker\",\n        \"colleagues\": \"coworker\",\n        \"family\": \"family\",\n        \"families\": \"family\",\n        \"relative\": \"family\",\n        \"relatives\": \"family\",\n        \"self\": \"self\",\n    }\n\n    def norm(value) -> str:\n        raw = str(value or \"\").strip().lower().replace(\"_\", \" \").replace(\"-\", \" \")\n        raw = raw.replace(\"my \", \"\").replace(\"all \", \"\").strip()\n        return aliases.get(raw, raw[:-1] if raw.endswith(\"s\") and len(raw) > 3 else raw)\n\n    def empty(reason: str) -> dict:\n        return {\n            \"phase\": \"abstain\",\n            \"source_relationship\": source,\n            \"target_relationship\": target,\n            \"search_contacts_kwargs\": {},\n            \"should_call_search_contacts\": False,\n            \"selected_contacts\": [],\n            \"downstream_tool_name\": \"\",\n            \"downstream_tool_kwargs_list\": [],\n            \"should_call_tools\": False,\n            \"abstain_reason\": reason,\n            \"final_answer_recommendation\": \"abstain:\" + reason,\n        }\n\n    source = norm(source_relationship)\n    target = norm(target_relationship)\n\n    tokens = text.split()\n    relationship_words = set(aliases)\n    if not source:\n        for index, token in enumerate(tokens):\n            if token in relationship_words and index > 0 and tokens[index - 1] in {\"my\", \"all\", \"the\"}:\n                source = norm(token)\n                break\n        if not source:\n            for token in tokens:\n                if token in relationship_words:\n                    source = norm(token)\n                    break\n\n    if not target:\n        for marker in (\" to be my \", \" to my \", \" into my \", \" as my \", \" be my \", \" my \"):\n            if marker in \" \" + text + \" \":\n                tail = (\" \" + text + \" \").split(marker)[-1].strip()\n                if tail:\n                    target = norm(tail.split()[0])\n        if not target:\n            for token in tokens[::-1]:\n                candidate = norm(token.strip(\".,!?\"))\n                if candidate in set(aliases.values()) and candidate != source:\n                    target = candidate\n                    break\n\n    if not source:\n        return empty(\"missing_source_relationship\")\n    if not target:\n        return empty(\"missing_target_relationship\")\n    if source == target:\n        return empty(\"source_relationship_already_target\")\n    if source == \"self\" or target == \"self\":\n        return empty(\"unsafe_self_relationship_update\")\n\n    if not contacts:\n        return {\n            \"phase\": \"search_required\",\n            \"source_relationship\": source,\n            \"target_relationship\": target,\n            \"search_contacts_kwargs\": {\"relationship\": source},\n            \"should_call_search_contacts\": True,\n            \"selected_contacts\": [],\n            \"downstream_tool_name\": \"\",\n            \"downstream_tool_kwargs_list\": [],\n            \"should_call_tools\": False,\n            \"abstain_reason\": \"\",\n            \"final_answer_recommendation\": \"call:search_contacts\",\n        }\n\n    selected = []\n    for contact in contacts:\n        if not isinstance(contact, dict):\n            continue\n        if bool(contact.get(\"is_self\")):\n            continue\n        if norm(contact.get(\"relationship\")) != source:\n            continue\n        person_id = str(contact.get(\"person_id\") or \"\").strip()\n        if not person_id:\n            continue\n        selected.append(contact)\n\n    if not selected:\n        return empty(\"no_non_self_contacts_with_source_relationship\")\n\n    kwargs_list = [\n        {\"person_id\": str(contact[\"person_id\"]), \"relationship\": target}\n        for contact in selected\n    ]\n    return {\n        \"phase\": \"action_batch_ready\",\n        \"source_relationship\": source,\n        \"target_relationship\": target,\n        \"search_contacts_kwargs\": {\"relationship\": source},\n        \"should_call_search_contacts\": False,\n        \"selected_contacts\": selected,\n        \"downstream_tool_name\": \"modify_contact\",\n        \"downstream_tool_kwargs_list\": kwargs_list,\n        \"should_call_tools\": True,\n        \"abstain_reason\": \"\",\n        \"final_answer_recommendation\": \"call:modify_contact_for_each_selected_contact\",\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return abstain with a reason if source/target relationship is missing, source equals target, self would be modified, or no non-self matching contacts are visible.",
+          "applicable_task_families": [
+            "update_contact_relationship_with_relationship",
+            "update_contact_relationship_with_relationship_twice_multiple_user_turn"
+          ],
+          "canonical_route_substitution_risk": "low",
+          "cross_task_applicability_count": 2,
+          "description": "Pure planner for contact relationship group updates. Use only when the user asks to change all contacts with one visible relationship label to another relationship label, such as friends to enemies. First call it with the user request; if it returns search_required, call search_contacts with search_contacts_kwargs. After the contacts are visible, call it again with those contacts and then call modify_contact once per downstream_tool_kwargs_list item. Do not use for named-contact updates, add/remove contact, message-recency contact updates, or insufficient-information tasks.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 4,
+          "expected_milestone_calls_replaced": [
+            "derive_relationship_search_constraint",
+            "prepare_repeated_modify_contact_kwargs"
+          ],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "The helper performs no side effects. It preserves original search_contacts and modify_contact calls and excludes self contacts from action kwargs.",
+          "generalization_rationale": "Relationship-bulk contact updates recur across plain, distracted, and tool-scrambled Contact CRUD variants. The helper is pure and only bridges visible relationship labels to original search/modify calls.",
+          "grading_accounting_note": "Outcome/task completion is primary; route impact is secondary because the original search and modify tools still perform the state changes.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "asked_for_identifier_despite_visible_relationship_constraint"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "contact_crud_relationship_update_regression"
+            ],
+            "summary": "Contact CRUD diagnostics showed large regressions on relationship group update tasks where the actor asked for identifiers instead of searching contacts by relationship.",
+            "visible_data_gaps": [
+              "source relationship and target relationship to search/modify kwargs"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "str",
+              "description": "Visible user request text.",
+              "name": "user_request"
+            },
+            {
+              "annotation": "str",
+              "description": "Optional visible current relationship label.",
+              "name": "source_relationship"
+            },
+            {
+              "annotation": "str",
+              "description": "Optional visible target relationship label.",
+              "name": "target_relationship"
+            },
+            {
+              "annotation": "list",
+              "description": "Optional visible search_contacts result list.",
+              "name": "contacts"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "asked_for_contact_identifier_instead_of_relationship_search",
+            "failed_to_batch_modify_visible_relationship_matches"
+          ],
+          "negative_triggers": [
+            "insufficient_information",
+            "add_contact",
+            "remove_contact",
+            "modify_contact_with_message_recency",
+            "send_message",
+            "reminder",
+            "search-only answer",
+            "named single contact",
+            "self relationship"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "downstream_tool_kwargs_list": {
+                "type": "array"
+              },
+              "downstream_tool_name": {
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "phase": {
+                "type": "string"
+              },
+              "search_contacts_kwargs": {
+                "type": "object"
+              },
+              "selected_contacts": {
+                "type": "array"
+              },
+              "should_call_search_contacts": {
+                "type": "boolean"
+              },
+              "should_call_tools": {
+                "type": "boolean"
+              },
+              "source_relationship": {
+                "type": "string"
+              },
+              "target_relationship": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "positive_triggers": [
+            "update_contact_relationship_with_relationship",
+            "make all my friends",
+            "change all contacts with relationship",
+            "all friends to enemies",
+            "relationship group update"
+          ],
+          "preserves_side_effect_tools": [
+            "search_contacts",
+            "modify_contact"
+          ],
+          "reason_tool_is_decisive": "It prevents unnecessary identifier clarification by using the visible relationship label as a safe search_contacts constraint, then prepares one original modify_contact call per matched contact.",
+          "required_original_tool_calls": [
+            "search_contacts",
+            "modify_contact"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "contact_crud_relationship_update_clarification"
+          ],
+          "tool_name": "plan_contact_relationship_batch_update"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    },
+    "select_message_counterparty_for_contact_update": {
+      "accepted_at": "2026-05-08T23:31:37.542105+00:00",
+      "birth_scenario": "gap_closure_lab_safe_contact_selector_bridge_repair",
+      "code_hash": "9f422118f5d294d2bf5aeb9c6e4aff59e228ac9a8975a386881638608424769c",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def select_message_counterparty_for_contact_update(records: list, selection_mode: str, updates: dict = None, self_person_id: str = \"\") -> dict:\n    \"\"\"Select a message counterparty for contact updates without emitting unsafe ids.\"\"\"\n    updates = updates if isinstance(updates, dict) else {}\n    self_person_id = str(self_person_id or \"\").strip()\n\n    def _text(value) -> str:\n        return \"\" if value in (None, \"\") else str(value).strip()\n\n    def _uuid_like(value) -> bool:\n        text = _text(value)\n        if len(text) != 36:\n            return False\n        if [text[8], text[13], text[18], text[23]] != [\"-\", \"-\", \"-\", \"-\"]:\n            return False\n        return all(ch in \"0123456789abcdefABCDEF\" for ch in text.replace(\"-\", \"\"))\n\n    def _phone_like(value) -> bool:\n        text = _text(value)\n        return text.startswith(\"+\") and text[1:].isdigit() and len(text) >= 8\n\n    def empty(reason: str, selected_record=None, selected_timestamp=0.0, tie_candidates=None) -> dict:\n        return {\n            \"selected_record\": selected_record if isinstance(selected_record, dict) else {},\n            \"selected_message\": selected_record if isinstance(selected_record, dict) else {},\n            \"selected_message_id\": \"\",\n            \"selected_person_id\": \"\",\n            \"selected_phone_number\": \"\",\n            \"selected_timestamp\": float(selected_timestamp or 0.0),\n            \"downstream_tool_name\": \"\",\n            \"downstream_tool_kwargs\": {},\n            \"should_call_tool\": False,\n            \"tie_candidates\": tie_candidates if isinstance(tie_candidates, list) else [],\n            \"abstain_reason\": str(reason or \"\"),\n            \"safety_notes\": \"abstain; no unique safe contact update target\",\n            \"final_answer_recommendation\": \"abstain:\" + str(reason or \"insufficient_information\"),\n        }\n\n    if not isinstance(records, list) or not records:\n        return empty(\"no_records\")\n    mode = str(selection_mode or \"\").strip().lower()\n    if mode not in (\"latest\", \"oldest\"):\n        return empty(\"invalid_selection_mode\")\n\n    candidates = []\n    id_counts = {}\n    phone_counts = {}\n    for index, record in enumerate(records):\n        if not isinstance(record, dict):\n            continue\n        for key in (\"sender_person_id\", \"recipient_person_id\"):\n            value = _text(record.get(key))\n            if _uuid_like(value):\n                id_counts[value] = id_counts.get(value, 0) + 1\n        for key in (\"sender_phone_number\", \"recipient_phone_number\"):\n            value = _text(record.get(key))\n            if _phone_like(value):\n                phone_counts[value] = phone_counts.get(value, 0) + 1\n        raw_ts = record.get(\"creation_timestamp\")\n        if isinstance(raw_ts, bool) or not isinstance(raw_ts, (int, float)):\n            continue\n        candidates.append((index, record, float(raw_ts)))\n    if not candidates:\n        return empty(\"no_numeric_creation_timestamps\")\n\n    target_ts = max(item[2] for item in candidates) if mode == \"latest\" else min(item[2] for item in candidates)\n    tied = [(idx, msg, ts) for idx, msg, ts in candidates if ts == target_ts]\n    if len(tied) != 1:\n        return empty(\"ambiguous_timestamp_tie\", selected_timestamp=target_ts, tie_candidates=[msg for _, msg, _ in tied])\n\n    _idx, selected, selected_ts = tied[0]\n    sender_id = _text(selected.get(\"sender_person_id\"))\n    recipient_id = _text(selected.get(\"recipient_person_id\"))\n    sender_phone = _text(selected.get(\"sender_phone_number\"))\n    recipient_phone = _text(selected.get(\"recipient_phone_number\"))\n\n    sides = [\n        {\n            \"role\": \"sender\",\n            \"person_id\": sender_id if _uuid_like(sender_id) else \"\",\n            \"raw_person_id\": sender_id,\n            \"phone_number\": sender_phone if _phone_like(sender_phone) else \"\",\n        },\n        {\n            \"role\": \"recipient\",\n            \"person_id\": recipient_id if _uuid_like(recipient_id) else \"\",\n            \"raw_person_id\": recipient_id,\n            \"phone_number\": recipient_phone if _phone_like(recipient_phone) else \"\",\n        },\n    ]\n\n    if self_person_id and _uuid_like(self_person_id):\n        if sender_id == self_person_id:\n            selected_side = sides[1]\n        elif recipient_id == self_person_id:\n            selected_side = sides[0]\n        else:\n            selected_side = None\n    else:\n        usable = [\n            side for side in sides\n            if side[\"person_id\"] or side[\"phone_number\"]\n        ]\n        if not usable:\n            return empty(\"missing_counterparty_identity\", selected, selected_ts)\n\n        def side_rank(side):\n            phone = side[\"phone_number\"]\n            person_id = side[\"person_id\"]\n            phone_count = phone_counts.get(phone, 9999) if phone else 9999\n            id_count = id_counts.get(person_id, 9999) if person_id else 9999\n            # Prefer the less frequent phone/identity in the visible messages.\n            # The more frequent side is usually the user's own endpoint.\n            return (\n                phone_count,\n                id_count,\n                0 if person_id else 1,\n                0 if phone else 1,\n                side[\"role\"],\n            )\n\n        ranked = sorted(usable, key=side_rank)\n        if len(ranked) > 1 and side_rank(ranked[0])[:4] == side_rank(ranked[1])[:4]:\n            return empty(\"ambiguous_counterparty_without_self_id\", selected, selected_ts)\n        selected_side = ranked[0]\n\n    if selected_side is None:\n        return empty(\"self_id_not_present_in_selected_message\", selected, selected_ts)\n\n    person_id = selected_side[\"person_id\"]\n    phone_number = selected_side[\"phone_number\"]\n    if not person_id and not phone_number:\n        return empty(\"selected_counterparty_has_no_safe_identifier\", selected, selected_ts)\n\n    message_id = selected.get(\"message_id\")\n    has_update = any(\n        value is not None and (not isinstance(value, str) or value.strip())\n        for value in updates.values()\n    )\n    if person_id:\n        downstream_tool_name = \"modify_contact\"\n        downstream_tool_kwargs = {\"person_id\": person_id, **updates} if has_update else {}\n        should_call_tool = bool(has_update)\n        recommendation = \"call:modify_contact\" if has_update else \"use_selected_record:missing_update_fields\"\n        safety = (\n            \"safe contact id selected; call modify_contact with selected_person_id \"\n            \"after collecting requested update fields\"\n        )\n    else:\n        downstream_tool_name = \"search_contacts\"\n        downstream_tool_kwargs = {\"phone_number\": phone_number}\n        should_call_tool = True\n        recommendation = \"call:search_contacts_then_modify_contact\"\n        safety = (\n            \"no reliable person_id in message record; search_contacts by selected_phone_number \"\n            \"before any modify_contact call\"\n        )\n\n    return {\n        \"selected_record\": selected,\n        \"selected_message\": selected,\n        \"selected_message_id\": \"\" if message_id in (None, \"\") else str(message_id),\n        \"selected_person_id\": person_id,\n        \"selected_phone_number\": phone_number,\n        \"selected_timestamp\": float(selected_ts),\n        \"downstream_tool_name\": downstream_tool_name,\n        \"downstream_tool_kwargs\": downstream_tool_kwargs,\n        \"should_call_tool\": should_call_tool,\n        \"tie_candidates\": [],\n        \"abstain_reason\": \"\",\n        \"safety_notes\": safety,\n        \"final_answer_recommendation\": recommendation,\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_call_tool=false with abstain_reason on no records, invalid selection mode, missing timestamps, timestamp ties, missing counterparty id, or ambiguous counterparty when self_person_id/frequency inference cannot choose a unique non-self contact.",
+          "adoption_experiment_note": "scheduling_precision_v2_broad_candidate",
+          "applicable_task_families": [
+            "modify_contact_with_message_recency",
+            "contact_update_after_message_lookup"
+          ],
+          "birth_scenario": "gap_closure_lab_contact_selector_bridge_contract_repair",
+          "canonical_route_substitution_risk": "low",
+          "cross_task_applicability_count": 2,
+          "description": "Safe visible-record selector for contact update tasks. Call after search_messages returns visible message records when the user wants to modify the contact for the latest, oldest, last, or most recent message counterparty. It ranks the less-frequent visible phone/person endpoint as the counterparty, validates person_id shape before exposing it for modify_contact, and falls back to search_contacts by phone when the message record contains no reliable contact id. Do not use before message records are visible, for reminder tasks, search-only answers, send/remove tasks, or insufficient-information tasks.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 4,
+          "expected_milestone_calls_replaced": [
+            "select_latest_or_oldest_visible_target",
+            "prepare_downstream_side_effect_kwargs"
+          ],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "The helper never performs side effects. It emits modify_contact kwargs only when it has a UUID-shaped selected_person_id. If only a phone number is reliable, it emits search_contacts kwargs first so the actor can retrieve a valid person_id before modifying the contact.",
+          "generalization_rationale": "Confirm100 showed the two-tool portfolio has large natural adoption value but one real contact-update failure caused by a malformed message person_id being handed to modify_contact. This repair preserves the positive selector while preventing malformed IDs from becoming action arguments, preserving the modify_contact bridge while update fields are pending, and using phone lookup as the safe fallback.",
+          "grading_accounting_note": "Outcome-preserving but canonical-substituting: the helper compresses intermediate target-selection and kwargs-preparation milestones while preserving the final original ToolSandbox side-effect call.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "compose target selection with preserved side-effect argument preparation"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "visible_not_called_chain_steps",
+              "force_call_positive_contact_recency",
+              "output_shape_repair_needed_missing_updates",
+              "side_effect_argument_preparation_failure",
+              "side_effect_bridge_contract_repair"
+            ],
+            "summary": "Affordance expanded60 naturally called the selector on the intended modify_contact recency scenario and improved outcome by +0.50, but the side-effect preservation checker flagged the output because the selection-only bridge recommendation did not use the expected use_selected_record: prefix. This repaired pack preserves the same routing and deterministic selection behavior while aligning the bridge contract with the checker.",
+            "visible_data_gaps": [
+              "visible records plus recency intent plus action updates must become one safe downstream call"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "list",
+              "description": "Full visible list returned by the prior search_messages call.",
+              "name": "records"
+            },
+            {
+              "annotation": "str",
+              "description": "latest for most recent/last; oldest for earliest/oldest.",
+              "name": "selection_mode"
+            },
+            {
+              "annotation": "dict",
+              "description": "Known modify_contact fields such as {'phone_number': '+15551234567'}; pass {} when the update must still be collected from the user turn.",
+              "name": "updates"
+            },
+            {
+              "annotation": "str",
+              "description": "Optional visible self person_id if already known. Leave empty when not known; the helper uses message-list frequency to infer the counterparty.",
+              "name": "self_person_id"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "manual recency target selection before modify_contact",
+            "contact update helper hidden from selector actor policy",
+            "two-tool bundle adoption ambiguity"
+          ],
+          "negative_triggers": [
+            "insufficient_information",
+            "search_message_with_recency_oldest",
+            "search_message_with_recency_latest",
+            "search_reminder",
+            "modify_reminder",
+            "remove_reminder",
+            "send_message",
+            "remove_contact",
+            "add_contact",
+            "search-only answer",
+            "no visible messages",
+            "ambiguous timestamp tie"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "downstream_tool_kwargs": {
+                "type": "object"
+              },
+              "downstream_tool_name": {
+                "enum": [
+                  "",
+                  "modify_contact"
+                ],
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "safety_notes": {
+                "type": "string"
+              },
+              "selected_message": {
+                "type": "object"
+              },
+              "selected_message_id": {
+                "type": "string"
+              },
+              "selected_person_id": {
+                "type": "string"
+              },
+              "selected_phone_number": {
+                "type": "string"
+              },
+              "selected_record": {
+                "type": "object"
+              },
+              "selected_timestamp": {
+                "type": "number"
+              },
+              "should_call_tool": {
+                "type": "boolean"
+              },
+              "tie_candidates": {
+                "type": "array"
+              }
+            },
+            "required": [
+              "selected_record",
+              "selected_message",
+              "selected_message_id",
+              "selected_person_id",
+              "selected_phone_number",
+              "selected_timestamp",
+              "downstream_tool_name",
+              "downstream_tool_kwargs",
+              "should_call_tool",
+              "tie_candidates",
+              "abstain_reason",
+              "safety_notes",
+              "final_answer_recommendation"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "last person I messaged",
+            "last person I sent a message to",
+            "modify_contact_with_message_recency",
+            "latest message counterparty contact update",
+            "oldest message counterparty contact update",
+            "contact update after search_messages recency"
+          ],
+          "preserves_side_effect_tools": [
+            "modify_contact"
+          ],
+          "reason_tool_is_decisive": "The hard deterministic step is choosing the latest/oldest visible message counterparty and converting it into the person_id required by modify_contact.",
+          "required_original_tool_calls": [
+            "modify_contact"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "selector_only_expanded60_modify_contact_called_subset_outcome_positive",
+            "action_only_expanded60_visible_not_called_due_to_affordance",
+            "null_scaffold_expanded60_modify_contact_same_scenario_negative",
+            "confirm100_safe_repair_single_side_effect_failure_malformed_person_id",
+            "contact_selector_called_subset_outcome_positive_but_needs_id_safety",
+            "safe_repair_smoke6_contract_mismatch_downstream_tool_name_empty"
+          ],
+          "tool_name": "select_message_counterparty_for_contact_update"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 5,
+        "negative_applicability_count": 6,
+        "runtime_smoke_passed": true,
+        "source_example_count": 4
+      },
+      "version": 5
+    }
+  }
+}

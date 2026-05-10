@@ -71,3 +71,23 @@ This log is experimental process evidence only. It is not protected final claim 
 **Next action.** Generate and test a small routed `prepare_safe_action_or_abstain` family: a feasibility classifier, an action-spec normalizer, and a chain variant that can use existing timestamp/recency helpers. Start with targeted20 natural adoption, use force diagnostics only on safe seed/dev cases, then move to expanded60 only if natural calls and outcome are positive.
 
 **Micro/macro adjustment.** Stop over-investing in minor recency metadata tweaks. The next macro bet should group several unsupported buckets under one side-effect-free action/precondition tool type, while preserving the current retained positives as a smaller routed portfolio.
+
+## 2026-05-10 - Reflection 08 - Bucket Closure And Broad BridgePack Breakthrough
+
+**Observation.** The action/precondition loop closed reminder CRUD/scheduling at narrow100 with outcome `+0.2100`, contact CRUD at narrow100 with outcome `+0.3303`, and settings/device-state at confirm100 with outcome `+0.0946`. Recombining those retained positives with best3-style timestamp/window/record selectors and the contact/reminder/ack-retention actor bridge produced `BridgePack Broad500: Ack-Retention Contact+Reminder+State Pack`: control `0.5949`, SAGE `0.8213`, delta `+0.2264`, relative lift `+38.1%`, exact success delta `+155`, runtime exceptions `0`, and no observed helper side-effect incidents.
+
+**Interpretation.** The biggest blocker was not a single missing deterministic helper. It was the shallow interaction between routing/adoption and final-response policy: useful low-frequency tools needed a compact portfolio plus actor bridge support so they were actually used when their specific gap appeared. The broad500 result beats the documented best3 500 run-vs-control lift experimentally, but it depends on branch-only bridge code and therefore is not protected claim evidence.
+
+**Next action.** Freeze BridgePack as an experimental candidate, stop making code or registry changes for the matched comparison, and run clean formal-style validation against protected best3 and V2.6 on the same formal manifest with per-task control cache, fresh candidate arms, Task Focus dashboards, contribution export, and explicit bridge-policy reporting.
+
+**Micro/macro adjustment.** The campaign should now move from tool discovery to validation discipline. Further micro-tweaks risk overfitting the inspected broad500 diagnosis; the next useful work is a locked matched formal run and, separately, a small repair lane for the remaining insufficient-information and settings regressions.
+
+## 2026-05-10 - Reflection 09 - Clean Broad500 Rerun After Bridge Repairs
+
+**Observation.** The first broad500 bridge result was strong, but follow-up diagnostics exposed two infrastructure risks: bridge calls could fail under tool-name scrambling because the synthetic calls used execution names, and a search-required contact planner could be misread as a missing side-effect. I repaired both and reran the full broad500 with cached controls and fresh candidate execution. The clean rerun produced control `0.5949`, SAGE `0.8134`, delta `+0.2185`, relative lift `+36.7%`, exact success delta `+163`, runtime exceptions `0`, and helper side-effect incidents `0`.
+
+**Interpretation.** The result is slightly lower than the earlier peak bridge run, but it is the better campaign reference because it validates the repaired bridge machinery under full broad stress. The lift still clears the documented current-code best3 500 run-vs-control lift by roughly `0.0568` outcome points. The positive signal is therefore not only a narrow bucket artifact; it survives a broad same-split rerun once the infrastructure risks are removed.
+
+**Next action.** Stop local code/registry changes for this candidate and prepare a locked matched formal validation against protected best3 and V2.6. The report must separate registry value from bridge-policy value, because this branch has not proven a registry-only replacement.
+
+**Micro/macro adjustment.** The campaign has reached validation discipline. Additional tweaks on this inspected branch are now more likely to overfit than to improve claim quality; the right next step is freezing the candidate and comparing it cleanly.

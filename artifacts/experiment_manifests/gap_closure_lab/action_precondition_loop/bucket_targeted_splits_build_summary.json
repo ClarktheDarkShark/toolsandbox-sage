@@ -1,0 +1,39 @@
+{
+  "created_at": "2026-05-10T02:33:26.333052+00:00",
+  "experimental_only": true,
+  "leakage_statement": "No truth labels, expected answers, scenario outputs, hidden facts, or cache availability are used. Selection is by predeclared scenario-family names and prior aggregate experimental root-cause categories.",
+  "manifests": {
+    "contact_recency_phone_positive": {
+      "available_family_counts": {
+        "add_contact_with_name_and_phone_number": 8,
+        "modify_contact_with_message_recency": 32,
+        "remove_contact_by_phone": 48,
+        "remove_contact_with_id": 8,
+        "update_contact_with_id_and_phone_number": 8
+      },
+      "path": "artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/contact_recency_phone_positive_splits.json",
+      "sha256": "d57e7baf2a7e69a08dfb535fdf85723850cbc869a562bd2ee3cf9630da87af59",
+      "split_sizes": {
+        "contact_recency_phone_positive_100": 100,
+        "contact_recency_phone_positive_20": 20,
+        "contact_recency_phone_positive_60": 60
+      }
+    },
+    "reminder_positive_scheduling": {
+      "available_family_counts": {
+        "add_reminder_content_and_date_and_time": 32,
+        "add_reminder_content_and_week_delta_and_time": 32,
+        "add_reminder_content_and_weekday_delta_and_time": 32,
+        "modify_reminder_with_recency_latest": 16
+      },
+      "path": "artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/reminder_positive_scheduling_splits.json",
+      "sha256": "f313c967163e2438e1a0dccc693cf7cf2d040497aa05bdf1def9f52585bac6ba",
+      "split_sizes": {
+        "reminder_positive_scheduling_100": 100,
+        "reminder_positive_scheduling_20": 20,
+        "reminder_positive_scheduling_60": 60
+      }
+    }
+  },
+  "protected_claim_evidence": false
+}

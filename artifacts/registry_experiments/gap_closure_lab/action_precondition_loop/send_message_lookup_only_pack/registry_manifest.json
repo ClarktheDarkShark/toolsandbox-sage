@@ -1,0 +1,140 @@
+{
+  "tools": {
+    "plan_send_message_contact_lookup": {
+      "accepted_at": "2026-05-10T11:43:34.823400+00:00",
+      "birth_scenario": "send_message_named_recipient_lookup_seed",
+      "code_hash": "dc9ebf6abac554d3ab2602e7aedc66a81352c74a1b6285df048eb519120c8054",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "\ndef plan_send_message_contact_lookup(recipient_name: str, message_content: str) -> dict:\n    \"\"\"Prepare a safe contact lookup before sending a message to a named contact.\"\"\"\n    name = \" \".join(str(recipient_name or \"\").strip().split())\n    content = str(message_content or \"\").strip()\n    if not name:\n        return {\n            \"should_call_search_contacts\": False,\n            \"search_contacts_kwargs\": {},\n            \"downstream_tool_name\": \"\",\n            \"message_content\": content,\n            \"abstain_reason\": \"missing_recipient_name\",\n            \"next_step\": \"ask_for_recipient_or_phone_number\",\n            \"final_answer_recommendation\": \"I need the recipient name or phone number before I can send that message.\",\n        }\n    if not content:\n        return {\n            \"should_call_search_contacts\": False,\n            \"search_contacts_kwargs\": {},\n            \"downstream_tool_name\": \"\",\n            \"message_content\": \"\",\n            \"abstain_reason\": \"missing_message_content\",\n            \"next_step\": \"ask_for_message_content\",\n            \"final_answer_recommendation\": \"I need the message content before I can send that message.\",\n        }\n    return {\n        \"should_call_search_contacts\": True,\n        \"search_contacts_kwargs\": {\"name\": name},\n        \"downstream_tool_name\": \"send_message_with_phone_number\",\n        \"message_content\": content,\n        \"abstain_reason\": \"\",\n        \"next_step\": \"call search_contacts, then send_message_with_phone_number using the returned phone_number and this message_content\",\n        \"final_answer_recommendation\": \"search_contacts first; if cellular is disabled during send, enable cellular and retry once\",\n    }\n",
+        "spec": {
+          "abstain_behavior": "If recipient_name or message_content is missing, return should_call_search_contacts=False and a final-answer-ready clarification.",
+          "applicable_task_families": [
+            "send_message",
+            "send message to named contact"
+          ],
+          "canonical_route_substitution_risk": "low",
+          "cross_task_applicability_count": 2,
+          "description": "Pure send-message recipient lookup planner. Use when the user asks to send, ask, or tell a named contact something and search_contacts is visible but the phone number is not already known. It returns search_contacts_kwargs and the message_content to carry forward to send_message_with_phone_number after the original search returns a phone number. It does not send messages or mutate device state.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "The helper has no side effects. The original search_contacts and send_message_with_phone_number calls must still happen in the trace.",
+          "generalization_rationale": "Named-recipient send requests recur across plain, distracted, and tool-scrambled send-message variants. The helper only prepares a search and carries message text, so it is safe to test narrowly.",
+          "grading_accounting_note": "Outcome/task completion is primary; canonical route is preserved because original search/send calls remain required.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "asked_user_for_phone_before_safe_contact_search"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "no_current_helper_fit",
+              "visible_named_recipient",
+              "send_precondition"
+            ],
+            "summary": "Broad500 send-message diagnostics showed no visible dedicated helper and repeated premature phone-number clarification on named recipient tasks despite search_contacts being available.",
+            "visible_data_gaps": [
+              "search_contacts kwargs and message content carry-forward"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "str",
+              "description": "Visible recipient/contact name from the user request.",
+              "name": "recipient_name"
+            },
+            {
+              "annotation": "str",
+              "description": "Visible message text to send after contact lookup.",
+              "name": "message_content"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "named_recipient_phone_clarification_instead_of_search",
+            "message_content_lost_before_send_retry",
+            "cellular_disabled_retry_needs_same_send_arguments"
+          ],
+          "negative_triggers": [
+            "insufficient_information",
+            "phone_number_and_content",
+            "no recipient name",
+            "missing message content",
+            "search_contacts unavailable",
+            "reminder",
+            "weather",
+            "stock",
+            "currency"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "downstream_tool_name": {
+                "enum": [
+                  "send_message_with_phone_number",
+                  ""
+                ],
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "message_content": {
+                "type": "string"
+              },
+              "next_step": {
+                "type": "string"
+              },
+              "search_contacts_kwargs": {
+                "type": "object"
+              },
+              "should_call_search_contacts": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "positive_triggers": [
+            "send_message",
+            "send message",
+            "ask named contact",
+            "tell named contact",
+            "named recipient lookup before sending"
+          ],
+          "preserves_side_effect_tools": [
+            "search_contacts",
+            "send_message_with_phone_number"
+          ],
+          "reason_tool_is_decisive": "It prevents premature phone-number clarification when a safe contact search can resolve the recipient before the original send tool.",
+          "required_original_tool_calls": [
+            "search_contacts",
+            "send_message_with_phone_number"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "send_message_precondition_no_visible_helper"
+          ],
+          "tool_name": "plan_send_message_contact_lookup"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    }
+  }
+}

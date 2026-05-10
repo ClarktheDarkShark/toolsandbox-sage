@@ -1,0 +1,39 @@
+{
+  "created_at": "2026-05-10T11:25:11.975880+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "protected_claim_evidence": false,
+    "scenario_ids_encoded_into_tools_or_router": false,
+    "truth_labels_inspected": false,
+    "used_cache_availability_for_selection": false
+  },
+  "protected_claim_evidence": false,
+  "registries": {
+    "full_timestamp_schedule_v2_plus_state_v3": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_plus_state_v3_pack/registry_manifest.json",
+      "sha256": "11065d108550d04e26b701b65708b769bad1c3febb070861d88148c3fa9b3cd4",
+      "tools": [
+        "days_between_timestamps",
+        "next_weekday_time_to_timestamp",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "plan_device_state_action_sequence_v3",
+        "relative_day_time_to_timestamp",
+        "relative_weeks_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    "state_action_sequence_v3": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/state_action_sequence_v3_pack/registry_manifest.json",
+      "sha256": "1a2eda483fb36b553f77ecfa7cc6690d19c582ad51be174732ae4eeb66d49459",
+      "tools": [
+        "plan_device_state_action_sequence_v3"
+      ]
+    }
+  },
+  "repair_hypothesis": "State v2 had natural calls but lost outcome through off-state parsing and over-verbose final answers. V3 tightens those contracts and keeps downstream precondition tasks from stopping after setters.",
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_no_field_plus_schedule_v2_pack/registry_manifest.json"
+}

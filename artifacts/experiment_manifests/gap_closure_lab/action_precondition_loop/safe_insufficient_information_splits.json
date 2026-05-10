@@ -1,0 +1,5004 @@
+{
+  "cache_policy": {
+    "baseline_control_cache": "use-if-eligible",
+    "openai_response_cache_for_candidate": "disabled",
+    "sage_candidate_cache": "fresh_only"
+  },
+  "created_at": "2026-05-10T02:01:03.138704+00:00",
+  "experimental_only": true,
+  "manifest_type": "sage_gap_closure_lab_safe_insufficient_information_splits",
+  "protected_claim_evidence": false,
+  "schema_version": 1,
+  "selection_policy": {
+    "selection_note": "Formal500 scenario names filtered by insufficient-information category or token and round-robin by base family. No labels or cache availability used.",
+    "used_cache_availability": false,
+    "used_expected_answers": false,
+    "used_truth_labels": false,
+    "uses_prior_experimental_gap_assessment": true
+  },
+  "split_aliases": {
+    "confirm_100": "safe_insufficient_information_100",
+    "expanded_60": "safe_insufficient_information_60",
+    "pilot_20": "safe_insufficient_information_20",
+    "validate_100": "safe_insufficient_information_100"
+  },
+  "split_diversity": {
+    "safe_insufficient_information_100": {
+      "bucket_counts": {
+        "safe_insufficient_information": 100
+      },
+      "distinct_family_count": 13,
+      "family_counts": {
+        "find_days_till_holiday_insufficient_information": 8,
+        "modify_contact_with_message_recency_insufficient_information": 8,
+        "modify_reminder_with_recency_latest_insufficient_information": 8,
+        "remove_contact_by_phone_no_remove_contact_insufficient_information": 8,
+        "remove_contact_by_phone_no_search_contacts_insufficient_information": 8,
+        "remove_reminder_with_recency_latest_insufficient_information": 8,
+        "search_reminder_with_creation_recency_yesterday_insufficient_information": 8,
+        "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 8,
+        "search_reminder_with_recency_upcoming_insufficient_information": 8,
+        "search_reminder_with_recency_upcoming_insufficient_information_implicit": 7,
+        "search_reminder_with_recency_yesterday_insufficient_information": 7,
+        "search_reminder_with_recency_yesterday_insufficient_information_implicit": 7,
+        "send_message_with_contact_content_cellular_off_insufficient_information": 7
+      },
+      "largest_family_count": 8,
+      "largest_family_share": 0.08,
+      "near_duplicate_dominated": false,
+      "scenario_count": 100
+    },
+    "safe_insufficient_information_20": {
+      "bucket_counts": {
+        "safe_insufficient_information": 20
+      },
+      "distinct_family_count": 13,
+      "family_counts": {
+        "find_days_till_holiday_insufficient_information": 2,
+        "modify_contact_with_message_recency_insufficient_information": 2,
+        "modify_reminder_with_recency_latest_insufficient_information": 2,
+        "remove_contact_by_phone_no_remove_contact_insufficient_information": 2,
+        "remove_contact_by_phone_no_search_contacts_insufficient_information": 2,
+        "remove_reminder_with_recency_latest_insufficient_information": 2,
+        "search_reminder_with_creation_recency_yesterday_insufficient_information": 2,
+        "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 1,
+        "search_reminder_with_recency_upcoming_insufficient_information": 1,
+        "search_reminder_with_recency_upcoming_insufficient_information_implicit": 1,
+        "search_reminder_with_recency_yesterday_insufficient_information": 1,
+        "search_reminder_with_recency_yesterday_insufficient_information_implicit": 1,
+        "send_message_with_contact_content_cellular_off_insufficient_information": 1
+      },
+      "largest_family_count": 2,
+      "largest_family_share": 0.1,
+      "near_duplicate_dominated": false,
+      "scenario_count": 20
+    },
+    "safe_insufficient_information_60": {
+      "bucket_counts": {
+        "safe_insufficient_information": 60
+      },
+      "distinct_family_count": 13,
+      "family_counts": {
+        "find_days_till_holiday_insufficient_information": 5,
+        "modify_contact_with_message_recency_insufficient_information": 5,
+        "modify_reminder_with_recency_latest_insufficient_information": 5,
+        "remove_contact_by_phone_no_remove_contact_insufficient_information": 5,
+        "remove_contact_by_phone_no_search_contacts_insufficient_information": 5,
+        "remove_reminder_with_recency_latest_insufficient_information": 5,
+        "search_reminder_with_creation_recency_yesterday_insufficient_information": 5,
+        "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 5,
+        "search_reminder_with_recency_upcoming_insufficient_information": 4,
+        "search_reminder_with_recency_upcoming_insufficient_information_implicit": 4,
+        "search_reminder_with_recency_yesterday_insufficient_information": 4,
+        "search_reminder_with_recency_yesterday_insufficient_information_implicit": 4,
+        "send_message_with_contact_content_cellular_off_insufficient_information": 4
+      },
+      "largest_family_count": 5,
+      "largest_family_share": 0.08333333333333333,
+      "near_duplicate_dominated": false,
+      "scenario_count": 60
+    }
+  },
+  "split_sizes": {
+    "safe_insufficient_information_100": 100,
+    "safe_insufficient_information_20": 20,
+    "safe_insufficient_information_60": 60
+  },
+  "splits": {
+    "safe_insufficient_information_100": [
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "end_conversation",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_insufficient_information",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_contacts",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "modify_reminder",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "remove_reminder",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_cellular_service_status",
+          "send_message_with_phone_number"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "get_current_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "search_weather_around_lat_lon",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "shift_timestamp",
+          "search_holiday",
+          "datetime_info_to_timestamp",
+          "add_contact",
+          "seconds_to_hours_minutes_seconds",
+          "timestamp_to_datetime_info",
+          "modify_contact",
+          "unit_conversion",
+          "timestamp_diff",
+          "calculate_lat_lon_distance",
+          "search_contacts",
+          "remove_contact",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "modify_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_holiday",
+          "remove_reminder",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_reminder",
+          "get_current_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "search_stock",
+          "search_weather_around_lat_lon",
+          "end_conversation",
+          "search_contacts",
+          "search_holiday",
+          "add_contact",
+          "search_location_around_lat_lon",
+          "modify_contact",
+          "search_lat_lon",
+          "remove_contact",
+          "search_messages"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "end_conversation",
+          "get_cellular_service_status",
+          "get_low_battery_mode_status",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "modify_contact",
+          "unit_conversion",
+          "search_contacts",
+          "remove_contact",
+          "convert_currency",
+          "get_location_service_status"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "modify_reminder",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance",
+          "get_current_timestamp",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "unit_conversion",
+          "remove_reminder",
+          "timestamp_diff"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_holiday",
+          "remove_reminder",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "add_reminder",
+          "end_conversation",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "calculate_lat_lon_distance",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "remove_reminder",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "add_reminder",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "unit_conversion",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "add_reminder",
+          "search_holiday",
+          "get_current_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "unit_conversion",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance",
+          "modify_reminder",
+          "timestamp_diff"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "end_conversation",
+          "add_reminder",
+          "search_holiday",
+          "unit_conversion",
+          "remove_reminder",
+          "timestamp_diff",
+          "modify_reminder",
+          "get_current_timestamp",
+          "search_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "calculate_lat_lon_distance"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "remove_reminder",
+          "search_reminder",
+          "modify_reminder",
+          "timestamp_diff",
+          "calculate_lat_lon_distance",
+          "timestamp_to_datetime_info",
+          "add_reminder",
+          "unit_conversion",
+          "seconds_to_hours_minutes_seconds",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "timestamp_diff",
+          "search_reminder",
+          "calculate_lat_lon_distance",
+          "add_reminder",
+          "unit_conversion",
+          "remove_reminder",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "get_current_timestamp",
+          "datetime_info_to_timestamp",
+          "modify_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "search_messages",
+          "get_wifi_status",
+          "set_low_battery_mode_status",
+          "send_message_with_phone_number",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation",
+          "convert_currency",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "get_current_location"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "get_current_timestamp",
+          "add_contact",
+          "unit_conversion",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "modify_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "add_contact",
+          "modify_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "add_contact",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "unit_conversion",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "unit_conversion",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "get_current_timestamp",
+          "add_contact",
+          "unit_conversion",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "modify_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "add_contact",
+          "modify_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "add_contact",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "unit_conversion",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "unit_conversion",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "get_current_timestamp",
+          "add_contact",
+          "unit_conversion",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "modify_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "add_contact",
+          "modify_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "add_contact",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "unit_conversion",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "unit_conversion",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "get_current_timestamp",
+          "add_contact",
+          "unit_conversion",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "modify_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "add_contact",
+          "modify_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "add_contact",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "unit_conversion",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "unit_conversion",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_description_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "get_current_timestamp",
+          "add_contact",
+          "unit_conversion",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "modify_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "add_contact",
+          "modify_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "add_contact",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "unit_conversion",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "unit_conversion",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_holiday",
+          "send_message_with_phone_number",
+          "modify_contact",
+          "get_low_battery_mode_status",
+          "search_contacts",
+          "search_location_around_lat_lon",
+          "seconds_to_hours_minutes_seconds",
+          "end_conversation",
+          "get_wifi_status",
+          "add_reminder",
+          "add_contact",
+          "set_low_battery_mode_status",
+          "timestamp_diff",
+          "search_lat_lon",
+          "get_current_location",
+          "unit_conversion",
+          "modify_reminder",
+          "calculate_lat_lon_distance",
+          "get_location_service_status",
+          "set_location_service_status",
+          "set_wifi_status",
+          "remove_contact",
+          "remove_reminder",
+          "search_stock",
+          "search_reminder",
+          "search_weather_around_lat_lon",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "convert_currency",
+          "datetime_info_to_timestamp",
+          "search_messages",
+          "get_cellular_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_insufficient_information_all_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "convert_currency",
+          "search_holiday",
+          "search_location_around_lat_lon",
+          "seconds_to_hours_minutes_seconds",
+          "search_contacts",
+          "set_low_battery_mode_status",
+          "modify_contact",
+          "end_conversation",
+          "shift_timestamp",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_messages",
+          "get_cellular_service_status",
+          "search_lat_lon",
+          "search_stock",
+          "set_location_service_status",
+          "datetime_info_to_timestamp",
+          "get_current_location",
+          "search_reminder",
+          "remove_contact",
+          "search_weather_around_lat_lon",
+          "send_message_with_phone_number",
+          "remove_reminder",
+          "modify_reminder",
+          "set_cellular_service_status",
+          "add_contact",
+          "get_location_service_status",
+          "get_wifi_status",
+          "calculate_lat_lon_distance",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "get_current_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_all_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "modify_contact",
+          "search_messages",
+          "add_reminder",
+          "search_weather_around_lat_lon",
+          "get_wifi_status",
+          "send_message_with_phone_number",
+          "convert_currency",
+          "calculate_lat_lon_distance",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "unit_conversion",
+          "search_holiday",
+          "search_location_around_lat_lon",
+          "datetime_info_to_timestamp",
+          "search_lat_lon",
+          "search_stock",
+          "end_conversation",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "remove_contact",
+          "set_wifi_status",
+          "get_location_service_status",
+          "get_current_timestamp",
+          "set_location_service_status",
+          "modify_reminder",
+          "get_cellular_service_status",
+          "search_contacts",
+          "get_current_location",
+          "set_low_battery_mode_status",
+          "add_contact",
+          "remove_reminder",
+          "timestamp_diff"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_all_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "remove_reminder",
+          "search_location_around_lat_lon",
+          "calculate_lat_lon_distance",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "end_conversation",
+          "get_cellular_service_status",
+          "timestamp_to_datetime_info",
+          "get_location_service_status",
+          "search_weather_around_lat_lon",
+          "datetime_info_to_timestamp",
+          "get_wifi_status",
+          "add_reminder",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "seconds_to_hours_minutes_seconds",
+          "unit_conversion",
+          "search_holiday",
+          "timestamp_diff",
+          "modify_contact",
+          "send_message_with_phone_number",
+          "search_stock",
+          "add_contact",
+          "search_reminder",
+          "search_lat_lon",
+          "search_messages",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "remove_contact",
+          "get_current_location",
+          "search_contacts",
+          "modify_reminder",
+          "convert_currency"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_all_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_lat_lon",
+          "search_contacts",
+          "search_reminder",
+          "add_contact",
+          "remove_contact",
+          "timestamp_to_datetime_info",
+          "set_wifi_status",
+          "unit_conversion",
+          "calculate_lat_lon_distance",
+          "get_cellular_service_status",
+          "convert_currency",
+          "get_location_service_status",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "timestamp_diff",
+          "shift_timestamp",
+          "set_location_service_status",
+          "get_current_location",
+          "get_low_battery_mode_status",
+          "send_message_with_phone_number",
+          "get_wifi_status",
+          "modify_reminder",
+          "add_reminder",
+          "set_low_battery_mode_status",
+          "search_weather_around_lat_lon",
+          "seconds_to_hours_minutes_seconds",
+          "search_messages",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "search_stock",
+          "modify_contact",
+          "search_holiday",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_all_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "calculate_lat_lon_distance",
+          "shift_timestamp",
+          "timestamp_diff",
+          "send_message_with_phone_number",
+          "add_reminder",
+          "get_location_service_status",
+          "search_weather_around_lat_lon",
+          "get_current_timestamp",
+          "add_contact",
+          "remove_reminder",
+          "search_reminder",
+          "search_contacts",
+          "seconds_to_hours_minutes_seconds",
+          "search_messages",
+          "convert_currency",
+          "modify_reminder",
+          "timestamp_to_datetime_info",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_current_location",
+          "get_wifi_status",
+          "get_low_battery_mode_status",
+          "remove_contact",
+          "search_stock",
+          "modify_contact",
+          "search_location_around_lat_lon",
+          "unit_conversion",
+          "search_holiday",
+          "end_conversation",
+          "get_cellular_service_status",
+          "set_location_service_status"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_all_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "calculate_lat_lon_distance",
+          "search_contacts",
+          "search_lat_lon",
+          "get_cellular_service_status",
+          "add_contact",
+          "set_location_service_status",
+          "datetime_info_to_timestamp",
+          "get_location_service_status",
+          "send_message_with_phone_number",
+          "get_low_battery_mode_status",
+          "timestamp_diff",
+          "set_wifi_status",
+          "modify_contact",
+          "convert_currency",
+          "search_holiday",
+          "search_stock",
+          "search_weather_around_lat_lon",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "search_location_around_lat_lon",
+          "seconds_to_hours_minutes_seconds",
+          "modify_reminder",
+          "shift_timestamp",
+          "set_cellular_service_status",
+          "end_conversation",
+          "get_current_location",
+          "search_messages",
+          "add_reminder",
+          "remove_reminder",
+          "search_reminder",
+          "get_current_timestamp",
+          "unit_conversion",
+          "remove_contact",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_all_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "remove_contact",
+          "get_low_battery_mode_status",
+          "modify_contact",
+          "modify_reminder",
+          "convert_currency",
+          "search_weather_around_lat_lon",
+          "get_location_service_status",
+          "search_holiday",
+          "get_cellular_service_status",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "get_wifi_status",
+          "add_reminder",
+          "search_lat_lon",
+          "shift_timestamp",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "add_contact",
+          "timestamp_to_datetime_info",
+          "set_low_battery_mode_status",
+          "seconds_to_hours_minutes_seconds",
+          "send_message_with_phone_number",
+          "unit_conversion",
+          "calculate_lat_lon_distance",
+          "set_wifi_status",
+          "search_contacts",
+          "timestamp_diff",
+          "search_messages",
+          "search_stock",
+          "get_current_location",
+          "search_location_around_lat_lon",
+          "set_location_service_status",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_all_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "get_low_battery_mode_status",
+          "search_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "search_stock",
+          "get_location_service_status",
+          "set_low_battery_mode_status",
+          "search_holiday",
+          "add_contact",
+          "search_contacts",
+          "get_wifi_status",
+          "add_reminder",
+          "search_location_around_lat_lon",
+          "calculate_lat_lon_distance",
+          "get_cellular_service_status",
+          "set_cellular_service_status",
+          "set_wifi_status",
+          "remove_reminder",
+          "search_weather_around_lat_lon",
+          "get_current_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "search_messages",
+          "remove_contact",
+          "get_current_location",
+          "modify_reminder",
+          "convert_currency",
+          "search_lat_lon",
+          "modify_contact",
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "set_location_service_status",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_all_tools",
+        "split": "safe_insufficient_information_100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ],
+    "safe_insufficient_information_20": [
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "end_conversation",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_insufficient_information",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_contacts",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "modify_reminder",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "remove_reminder",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_cellular_service_status",
+          "send_message_with_phone_number"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "get_current_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "search_weather_around_lat_lon",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "shift_timestamp",
+          "search_holiday",
+          "datetime_info_to_timestamp",
+          "add_contact",
+          "seconds_to_hours_minutes_seconds",
+          "timestamp_to_datetime_info",
+          "modify_contact",
+          "unit_conversion",
+          "timestamp_diff",
+          "calculate_lat_lon_distance",
+          "search_contacts",
+          "remove_contact",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "modify_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_holiday",
+          "remove_reminder",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_reminder",
+          "get_current_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "search_stock",
+          "search_weather_around_lat_lon",
+          "end_conversation",
+          "search_contacts",
+          "search_holiday",
+          "add_contact",
+          "search_location_around_lat_lon",
+          "modify_contact",
+          "search_lat_lon",
+          "remove_contact",
+          "search_messages"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "end_conversation",
+          "get_cellular_service_status",
+          "get_low_battery_mode_status",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "modify_contact",
+          "unit_conversion",
+          "search_contacts",
+          "remove_contact",
+          "convert_currency",
+          "get_location_service_status"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "modify_reminder",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance",
+          "get_current_timestamp",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "unit_conversion",
+          "remove_reminder",
+          "timestamp_diff"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_holiday",
+          "remove_reminder",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "add_reminder",
+          "end_conversation",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "calculate_lat_lon_distance",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ],
+    "safe_insufficient_information_60": [
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "end_conversation",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_insufficient_information",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_contacts",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "modify_reminder",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "remove_reminder",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_cellular_service_status",
+          "send_message_with_phone_number"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "get_current_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "search_weather_around_lat_lon",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "shift_timestamp",
+          "search_holiday",
+          "datetime_info_to_timestamp",
+          "add_contact",
+          "seconds_to_hours_minutes_seconds",
+          "timestamp_to_datetime_info",
+          "modify_contact",
+          "unit_conversion",
+          "timestamp_diff",
+          "calculate_lat_lon_distance",
+          "search_contacts",
+          "remove_contact",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "modify_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_holiday",
+          "remove_reminder",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_reminder",
+          "get_current_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "search_stock",
+          "search_weather_around_lat_lon",
+          "end_conversation",
+          "search_contacts",
+          "search_holiday",
+          "add_contact",
+          "search_location_around_lat_lon",
+          "modify_contact",
+          "search_lat_lon",
+          "remove_contact",
+          "search_messages"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "end_conversation",
+          "get_cellular_service_status",
+          "get_low_battery_mode_status",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "modify_contact",
+          "unit_conversion",
+          "search_contacts",
+          "remove_contact",
+          "convert_currency",
+          "get_location_service_status"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "modify_reminder",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance",
+          "get_current_timestamp",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "unit_conversion",
+          "remove_reminder",
+          "timestamp_diff"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_holiday",
+          "remove_reminder",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "add_reminder",
+          "end_conversation",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "calculate_lat_lon_distance",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "remove_reminder",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "add_reminder",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "unit_conversion",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "add_reminder",
+          "search_holiday",
+          "get_current_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "unit_conversion",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance",
+          "modify_reminder",
+          "timestamp_diff"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "end_conversation",
+          "add_reminder",
+          "search_holiday",
+          "unit_conversion",
+          "remove_reminder",
+          "timestamp_diff",
+          "modify_reminder",
+          "get_current_timestamp",
+          "search_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "calculate_lat_lon_distance"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "remove_reminder",
+          "search_reminder",
+          "modify_reminder",
+          "timestamp_diff",
+          "calculate_lat_lon_distance",
+          "timestamp_to_datetime_info",
+          "add_reminder",
+          "unit_conversion",
+          "seconds_to_hours_minutes_seconds",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "timestamp_diff",
+          "search_reminder",
+          "calculate_lat_lon_distance",
+          "add_reminder",
+          "unit_conversion",
+          "remove_reminder",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "get_current_timestamp",
+          "datetime_info_to_timestamp",
+          "modify_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "search_messages",
+          "get_wifi_status",
+          "set_low_battery_mode_status",
+          "send_message_with_phone_number",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation",
+          "convert_currency",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "get_current_location"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "get_current_timestamp",
+          "add_contact",
+          "unit_conversion",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "modify_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "add_contact",
+          "modify_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "add_contact",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "unit_conversion",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "unit_conversion",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "get_current_timestamp",
+          "add_contact",
+          "unit_conversion",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "modify_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "add_contact",
+          "modify_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "add_contact",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "unit_conversion",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "unit_conversion",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "get_current_timestamp",
+          "add_contact",
+          "unit_conversion",
+          "modify_contact",
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "modify_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "remove_contact",
+          "add_contact",
+          "modify_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact",
+          "add_contact",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "unit_conversion",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_type_scrambled",
+        "split": "safe_insufficient_information_60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ]
+  },
+  "truth_labels_inspected": false
+}

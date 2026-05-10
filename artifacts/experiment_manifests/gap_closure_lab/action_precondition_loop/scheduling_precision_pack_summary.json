@@ -1,0 +1,39 @@
+{
+  "created_at": "2026-05-10T03:36:24.027050+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "baseline_cache_policy": "use-if-eligible",
+    "candidate_arms_fresh_only": true,
+    "scenario_ids_encoded_into_tools_or_router": false,
+    "truth_labels_inspected": false,
+    "used_cache_availability_for_selection": false
+  },
+  "objective": "Repair broad reminder scheduling regressions with two narrow deterministic timestamp helpers for week and weekday deltas.",
+  "protected_claim_evidence": false,
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/confirmed_bucket_core_pack/registry_manifest.json",
+  "source_registry_sha256": "f343b6051c67a277555c61641e72f6734e37c4e8fce8a1863990271dfd32d806",
+  "variants": {
+    "confirmed_bucket_core_plus_schedule_precision_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/confirmed_bucket_core_plus_schedule_precision_pack/registry_manifest.json",
+      "sha256": "e7ba4138c0bdc0e9c7be7e703ca32cd2612290bd61c93d8d82acf91cb63d235b",
+      "tools": [
+        "days_between_timestamps",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme",
+        "week_delta_time_to_timestamp",
+        "weekday_delta_time_to_timestamp"
+      ]
+    },
+    "scheduling_precision_only_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/scheduling_precision_only_pack/registry_manifest.json",
+      "sha256": "40a33b12259b8199d4a4b8192906fd1e62f32705d613f977e76a38a8299f9ba4",
+      "tools": [
+        "week_delta_time_to_timestamp",
+        "weekday_delta_time_to_timestamp"
+      ]
+    }
+  }
+}

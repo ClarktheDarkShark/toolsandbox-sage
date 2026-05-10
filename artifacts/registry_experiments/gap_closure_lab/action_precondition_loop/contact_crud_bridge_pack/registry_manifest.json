@@ -1,0 +1,192 @@
+{
+  "tools": {
+    "plan_contact_crud_action": {
+      "accepted_at": "2026-05-10T02:29:39.387791+00:00",
+      "birth_scenario": "gap_closure_lab_crud_bridge_repair",
+      "code_hash": "53f7e54e16d29760131ce062315eeee06ed877ff5124fe9a96c5c589831e46d1",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def plan_contact_crud_action(user_request: str = \"\", contacts: list = None, action_type: str = \"\", constraint_field: str = \"\", constraint_value: str = \"\", updates: dict = None) -> dict:\n    \"\"\"Plan search_contacts or prepare final contact CRUD kwargs without side effects.\"\"\"\n    contacts = contacts if isinstance(contacts, list) else []\n    updates = updates if isinstance(updates, dict) else {}\n    text = (str(action_type or \"\") + \" \" + str(user_request or \"\")).strip().lower()\n\n    def empty(reason: str) -> dict:\n        return {\n            \"phase\": \"abstain\",\n            \"search_contacts_kwargs\": {},\n            \"should_call_search_contacts\": False,\n            \"selected_contact\": {},\n            \"downstream_tool_name\": \"\",\n            \"downstream_tool_kwargs\": {},\n            \"should_call_tool\": False,\n            \"abstain_reason\": reason,\n            \"final_answer_recommendation\": \"abstain:\" + reason,\n        }\n\n    def normalize_phone(raw) -> str:\n        value = \"\" if raw is None else str(raw).strip()\n        if not value:\n            return \"\"\n        digits = \"\".join(ch for ch in value if ch.isdigit())\n        if not digits:\n            return \"\"\n        if value.startswith(\"+\"):\n            return \"+\" + digits\n        if len(digits) == 11 and digits.startswith(\"1\"):\n            return \"+\" + digits\n        if len(digits) == 10:\n            return \"+1\" + digits\n        return value\n\n    def clean_updates(raw: dict) -> dict:\n        allowed = {\"name\", \"phone_number\", \"relationship\", \"is_self\"}\n        cleaned = {}\n        for key, value in raw.items():\n            key_s = str(key)\n            if key_s not in allowed or value is None:\n                continue\n            if isinstance(value, str) and not value.strip():\n                continue\n            cleaned[key_s] = normalize_phone(value) if key_s == \"phone_number\" else value\n        return cleaned\n\n    if any(word in text for word in (\"add\", \"create\", \"new contact\")):\n        action = \"add_contact\"\n    elif any(word in text for word in (\"remove\", \"delete\")):\n        action = \"remove_contact\"\n    elif any(word in text for word in (\"modify\", \"update\", \"change\")):\n        action = \"modify_contact\"\n    elif str(action_type or \"\").strip() in {\"add_contact\", \"modify_contact\", \"remove_contact\"}:\n        action = str(action_type).strip()\n    else:\n        return empty(\"unsupported_contact_action\")\n\n    field = str(constraint_field or \"\").strip().lower()\n    value = str(constraint_value or \"\").strip()\n    if field in {\"id\", \"contact_id\"}:\n        field = \"person_id\"\n    if field in {\"phone\", \"phone number\"}:\n        field = \"phone_number\"\n    if not field and value:\n        digits = \"\".join(ch for ch in value if ch.isdigit())\n        if value.count(\"-\") >= 4 and len(value) >= 32:\n            field = \"person_id\"\n        elif len(digits) >= 7:\n            field = \"phone_number\"\n        elif \"relationship\" in text:\n            field = \"relationship\"\n        else:\n            field = \"name\"\n\n    prepared_updates = clean_updates(updates)\n\n    if action == \"add_contact\":\n        name = str(prepared_updates.get(\"name\") or \"\").strip()\n        phone = normalize_phone(prepared_updates.get(\"phone_number\") or \"\")\n        relationship = prepared_updates.get(\"relationship\")\n        if field == \"name\" and value and not name:\n            name = value\n        if field == \"phone_number\" and value and not phone:\n            phone = normalize_phone(value)\n        if not name or not phone:\n            return empty(\"missing_name_or_phone_for_add_contact\")\n        kwargs = {\"name\": name, \"phone_number\": phone}\n        if relationship not in (None, \"\"):\n            kwargs[\"relationship\"] = relationship\n        return {\n            \"phase\": \"action_ready\",\n            \"search_contacts_kwargs\": {},\n            \"should_call_search_contacts\": False,\n            \"selected_contact\": {},\n            \"downstream_tool_name\": \"add_contact\",\n            \"downstream_tool_kwargs\": kwargs,\n            \"should_call_tool\": True,\n            \"abstain_reason\": \"\",\n            \"final_answer_recommendation\": \"call:add_contact\",\n        }\n\n    if field == \"person_id\" and value:\n        selected = {\"person_id\": value}\n        if action == \"remove_contact\":\n            kwargs = {\"person_id\": value}\n        else:\n            if not prepared_updates:\n                return empty(\"empty_updates_for_modify_contact\")\n            kwargs = {\"person_id\": value, **prepared_updates}\n        return {\n            \"phase\": \"action_ready\",\n            \"search_contacts_kwargs\": {},\n            \"should_call_search_contacts\": False,\n            \"selected_contact\": selected,\n            \"downstream_tool_name\": action,\n            \"downstream_tool_kwargs\": kwargs,\n            \"should_call_tool\": True,\n            \"abstain_reason\": \"\",\n            \"final_answer_recommendation\": \"call:\" + action,\n        }\n\n    search_kwargs = {}\n    if field in {\"name\", \"phone_number\", \"relationship\"} and value:\n        search_kwargs[field] = normalize_phone(value) if field == \"phone_number\" else value\n    elif not contacts:\n        return empty(\"missing_contact_lookup_constraint\")\n\n    if not contacts:\n        return {\n            \"phase\": \"search_required\",\n            \"search_contacts_kwargs\": search_kwargs,\n            \"should_call_search_contacts\": True,\n            \"selected_contact\": {},\n            \"downstream_tool_name\": \"\",\n            \"downstream_tool_kwargs\": {},\n            \"should_call_tool\": False,\n            \"abstain_reason\": \"\",\n            \"final_answer_recommendation\": \"call:search_contacts\",\n        }\n\n    candidates = []\n    for contact in contacts:\n        if not isinstance(contact, dict):\n            continue\n        if search_kwargs:\n            ok = True\n            for key, expected in search_kwargs.items():\n                actual = contact.get(key)\n                if key == \"phone_number\":\n                    ok = normalize_phone(actual) == normalize_phone(expected)\n                else:\n                    ok = str(actual or \"\").strip().lower() == str(expected or \"\").strip().lower()\n                if not ok:\n                    break\n            if not ok:\n                continue\n        candidates.append(contact)\n    if len(candidates) != 1:\n        return empty(\"ambiguous_or_missing_contact_match\")\n    selected = candidates[0]\n    person_id = selected.get(\"person_id\")\n    if not person_id:\n        return empty(\"missing_person_id\")\n    if selected.get(\"is_self\") is True:\n        return empty(\"unsafe_self_contact_target\")\n    if action == \"remove_contact\":\n        kwargs = {\"person_id\": person_id}\n    else:\n        if not prepared_updates:\n            return empty(\"empty_updates_for_modify_contact\")\n        kwargs = {\"person_id\": person_id, **prepared_updates}\n    return {\n        \"phase\": \"action_ready\",\n        \"search_contacts_kwargs\": search_kwargs,\n        \"should_call_search_contacts\": False,\n        \"selected_contact\": selected,\n        \"downstream_tool_name\": action,\n        \"downstream_tool_kwargs\": kwargs,\n        \"should_call_tool\": True,\n        \"abstain_reason\": \"\",\n        \"final_answer_recommendation\": \"call:\" + action,\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return an abstain phase when there is no concrete lookup constraint, multiple matching contacts, no stable person_id, a self-contact target, or missing update fields for modify_contact.",
+          "adoption_experiment_note": "high_fit_scale_suite_contact_affordance:plan_contact_search_from_scalar_constraint; experimental only",
+          "applicable_task_families": [
+            "add_contact_with_name_and_phone_number",
+            "remove_contact_by_phone",
+            "remove_contact_with_id",
+            "update_contact_relationship_with_relationship",
+            "update_contact_relationship_with_relationship_twice",
+            "update_contact_with_id_and_phone_number"
+          ],
+          "canonical_route_substitution_risk": "low",
+          "cross_task_applicability_count": 6,
+          "description": "Contact CRUD planner/bridge. Use for add_contact, remove_contact, or modify_contact tasks where the user gives a concrete contact id, phone number, name, or relationship. Before search, it returns search_contacts kwargs. After search_contacts returns visible contacts, call it again with the contacts list to get final original ToolSandbox action kwargs. It never performs side effects.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 4,
+          "expected_milestone_calls_replaced": [],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "The tool does not perform side effects, so no final state preservation is necessary.",
+          "generalization_rationale": "Contact CRUD pilots showed current tools were hidden or only helped message-recency contact update. This bridge covers scalar/id contact CRUD without encoding scenario ids or expected answers.",
+          "grading_accounting_note": "The tool provides a clear mapping from scalar constraints to search parameters, improving the reliability of contact searches.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [
+              "prepare_direct_contact_action_kwargs",
+              "prepare_direct_contact_action_args",
+              "plan_contact_action_lookup_query"
+            ],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "prior designs were too broad or unstable; split to scalar search query only"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "contact_action_no_current_helper_fit",
+              "scalar_search_query_planning"
+            ],
+            "summary": "scalar contact search query planner after V2.6 prompt repair",
+            "visible_data_gaps": [
+              "search_contacts kwargs from scalar constraints"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "str",
+              "description": "Current user request or concise task wording.",
+              "name": "user_request"
+            },
+            {
+              "annotation": "list",
+              "description": "Visible contacts returned by search_contacts, or [] before search.",
+              "name": "contacts"
+            },
+            {
+              "annotation": "str",
+              "description": "add_contact, modify_contact, remove_contact, add, update, change, remove, or delete.",
+              "name": "action_type"
+            },
+            {
+              "annotation": "str",
+              "description": "person_id, phone_number, name, relationship, or blank if inferable from constraint_value.",
+              "name": "constraint_field"
+            },
+            {
+              "annotation": "str",
+              "description": "Concrete contact id, phone number, name, or relationship value from the user request.",
+              "name": "constraint_value"
+            },
+            {
+              "annotation": "dict",
+              "description": "Known fields for add/modify, e.g. {'name':'A','phone_number':'+1555','relationship':'friend'}.",
+              "name": "updates"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "contact CRUD helper hidden by remove/modify negative triggers",
+            "intermediate contact lookup not final-action-ready",
+            "manual contact id propagation into side-effect tools"
+          ],
+          "negative_triggers": [
+            "insufficient_information",
+            "message_recency",
+            "reminder",
+            "send_message",
+            "calendar",
+            "weather",
+            "location",
+            "ambiguous contact"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "downstream_tool_kwargs": {
+                "type": "object"
+              },
+              "downstream_tool_name": {
+                "enum": [
+                  "",
+                  "add_contact",
+                  "modify_contact",
+                  "remove_contact"
+                ],
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "phase": {
+                "type": "string"
+              },
+              "search_contacts_kwargs": {
+                "type": "object"
+              },
+              "selected_contact": {
+                "type": "object"
+              },
+              "should_call_search_contacts": {
+                "type": "boolean"
+              },
+              "should_call_tool": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "phase",
+              "search_contacts_kwargs",
+              "should_call_search_contacts",
+              "selected_contact",
+              "downstream_tool_name",
+              "downstream_tool_kwargs",
+              "should_call_tool",
+              "abstain_reason",
+              "final_answer_recommendation"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "add_contact_with_name_and_phone_number",
+            "remove_contact_by_phone",
+            "remove_contact_with_id",
+            "update_contact_relationship_with_relationship",
+            "update_contact_with_id_and_phone_number",
+            "contact CRUD final kwargs"
+          ],
+          "preserves_side_effect_tools": [
+            "search_contacts",
+            "add_contact",
+            "modify_contact",
+            "remove_contact"
+          ],
+          "reason_tool_is_decisive": "It converts a contact scalar or visible unique contact record into exact preserved add/modify/remove contact kwargs.",
+          "required_original_tool_calls": [
+            "search_contacts",
+            "add_contact",
+            "modify_contact",
+            "remove_contact"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "contact_scalar_search_planning"
+          ],
+          "tool_name": "plan_contact_crud_action"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 3,
+        "negative_applicability_count": 5,
+        "runtime_smoke_passed": true,
+        "source_example_count": 3
+      },
+      "version": 1
+    }
+  }
+}

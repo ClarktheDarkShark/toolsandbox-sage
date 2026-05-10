@@ -1,0 +1,695 @@
+{
+  "created_at": "2026-05-10T02:00:59.770832+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "protected_claim_evidence": false,
+    "scenario_ids_encoded_into_tools_or_router": false,
+    "truth_labels_inspected": false,
+    "used_cache_availability_for_selection": false,
+    "uses_prior_broad500_bucket_assessment_for_category_targeting": true
+  },
+  "manifests": {
+    "broad": {
+      "path": "artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/action_precondition_broad_splits.json",
+      "sha256": "f18370140861de89ef36a0919a0c761b9f1dd3a5f5601ad64a80bb137147930b",
+      "split_diversity": {
+        "action_precondition_broad100": {
+          "bucket_counts": {
+            "contact_crud": 11,
+            "other": 28,
+            "reminder_crud_scheduling": 10,
+            "safe_insufficient_information": 26,
+            "send_message_preconditions": 2,
+            "settings_device_state": 23
+          },
+          "distinct_family_count": 54,
+          "family_counts": {
+            "add_contact_with_name_and_phone_number": 2,
+            "add_reminder_content_and_date_and_time": 2,
+            "add_reminder_content_and_week_delta_and_time": 2,
+            "add_reminder_content_and_week_delta_and_time_and_location": 2,
+            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 2,
+            "add_reminder_content_and_weekday_delta_and_time": 2,
+            "cellular_off": 2,
+            "find_days_till_holiday": 2,
+            "find_days_till_holiday_insufficient_information": 2,
+            "find_days_till_holiday_wifi_off": 2,
+            "find_thanksgiving_timestamp": 2,
+            "get_cellular": 2,
+            "get_wifi": 2,
+            "modify_contact_with_message_recency": 2,
+            "modify_contact_with_message_recency_insufficient_information": 2,
+            "modify_reminder_with_recency_latest": 2,
+            "modify_reminder_with_recency_latest_insufficient_information": 2,
+            "remove_contact_by_phone": 2,
+            "remove_contact_by_phone_no_remove_contact_insufficient_information": 2,
+            "remove_contact_by_phone_no_search_contacts_insufficient_information": 2,
+            "remove_contact_with_id": 2,
+            "remove_reminder_with_recency_latest": 2,
+            "remove_reminder_with_recency_latest_insufficient_information": 2,
+            "search_message_with_recency_latest": 2,
+            "search_message_with_recency_oldest": 2,
+            "search_name_with_relationship": 2,
+            "search_phone_number_with_name": 2,
+            "search_relationship_with_phone_number": 2,
+            "search_reminder_with_creation_recency_yesterday": 2,
+            "search_reminder_with_creation_recency_yesterday_implicit": 2,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information": 2,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 2,
+            "search_reminder_with_recency_upcoming": 2,
+            "search_reminder_with_recency_upcoming_implicit": 2,
+            "search_reminder_with_recency_upcoming_insufficient_information": 2,
+            "search_reminder_with_recency_upcoming_insufficient_information_implicit": 2,
+            "search_reminder_with_recency_yesterday": 2,
+            "search_reminder_with_recency_yesterday_implicit": 2,
+            "search_reminder_with_recency_yesterday_insufficient_information": 2,
+            "search_reminder_with_recency_yesterday_insufficient_information_implicit": 2,
+            "search_sender_phone_number_with_content": 2,
+            "send_message_with_contact_content_cellular_off": 2,
+            "send_message_with_contact_content_cellular_off_insufficient_information": 2,
+            "send_message_with_phone_number_and_content": 2,
+            "turn_on_cellular_low_battery_mode": 2,
+            "turn_on_cellular_low_battery_mode_implicit": 2,
+            "turn_on_location_low_battery_mode": 1,
+            "turn_on_location_low_battery_mode_implicit": 1,
+            "turn_on_wifi_low_battery_mode": 1,
+            "turn_on_wifi_low_battery_mode_implicit": 1,
+            "update_contact_relationship_with_relationship": 1,
+            "update_contact_relationship_with_relationship_twice": 1,
+            "update_contact_with_id_and_phone_number": 1,
+            "wifi_off": 1
+          },
+          "largest_family_count": 2,
+          "largest_family_share": 0.02,
+          "near_duplicate_dominated": false,
+          "scenario_count": 100
+        },
+        "action_precondition_broad20": {
+          "bucket_counts": {
+            "contact_crud": 3,
+            "other": 2,
+            "reminder_crud_scheduling": 4,
+            "safe_insufficient_information": 5,
+            "settings_device_state": 6
+          },
+          "distinct_family_count": 20,
+          "family_counts": {
+            "add_contact_with_name_and_phone_number": 1,
+            "add_reminder_content_and_date_and_time": 1,
+            "add_reminder_content_and_week_delta_and_time": 1,
+            "add_reminder_content_and_week_delta_and_time_and_location": 1,
+            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 1,
+            "add_reminder_content_and_weekday_delta_and_time": 1,
+            "cellular_off": 1,
+            "find_days_till_holiday": 1,
+            "find_days_till_holiday_insufficient_information": 1,
+            "find_days_till_holiday_wifi_off": 1,
+            "find_thanksgiving_timestamp": 1,
+            "get_cellular": 1,
+            "get_wifi": 1,
+            "modify_contact_with_message_recency": 1,
+            "modify_contact_with_message_recency_insufficient_information": 1,
+            "modify_reminder_with_recency_latest": 1,
+            "modify_reminder_with_recency_latest_insufficient_information": 1,
+            "remove_contact_by_phone": 1,
+            "remove_contact_by_phone_no_remove_contact_insufficient_information": 1,
+            "remove_contact_by_phone_no_search_contacts_insufficient_information": 1
+          },
+          "largest_family_count": 1,
+          "largest_family_share": 0.05,
+          "near_duplicate_dominated": false,
+          "scenario_count": 20
+        },
+        "action_precondition_broad60": {
+          "bucket_counts": {
+            "contact_crud": 8,
+            "other": 14,
+            "reminder_crud_scheduling": 8,
+            "safe_insufficient_information": 13,
+            "send_message_preconditions": 1,
+            "settings_device_state": 16
+          },
+          "distinct_family_count": 54,
+          "family_counts": {
+            "add_contact_with_name_and_phone_number": 2,
+            "add_reminder_content_and_date_and_time": 2,
+            "add_reminder_content_and_week_delta_and_time": 2,
+            "add_reminder_content_and_week_delta_and_time_and_location": 2,
+            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 2,
+            "add_reminder_content_and_weekday_delta_and_time": 2,
+            "cellular_off": 1,
+            "find_days_till_holiday": 1,
+            "find_days_till_holiday_insufficient_information": 1,
+            "find_days_till_holiday_wifi_off": 1,
+            "find_thanksgiving_timestamp": 1,
+            "get_cellular": 1,
+            "get_wifi": 1,
+            "modify_contact_with_message_recency": 1,
+            "modify_contact_with_message_recency_insufficient_information": 1,
+            "modify_reminder_with_recency_latest": 1,
+            "modify_reminder_with_recency_latest_insufficient_information": 1,
+            "remove_contact_by_phone": 1,
+            "remove_contact_by_phone_no_remove_contact_insufficient_information": 1,
+            "remove_contact_by_phone_no_search_contacts_insufficient_information": 1,
+            "remove_contact_with_id": 1,
+            "remove_reminder_with_recency_latest": 1,
+            "remove_reminder_with_recency_latest_insufficient_information": 1,
+            "search_message_with_recency_latest": 1,
+            "search_message_with_recency_oldest": 1,
+            "search_name_with_relationship": 1,
+            "search_phone_number_with_name": 1,
+            "search_relationship_with_phone_number": 1,
+            "search_reminder_with_creation_recency_yesterday": 1,
+            "search_reminder_with_creation_recency_yesterday_implicit": 1,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information": 1,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 1,
+            "search_reminder_with_recency_upcoming": 1,
+            "search_reminder_with_recency_upcoming_implicit": 1,
+            "search_reminder_with_recency_upcoming_insufficient_information": 1,
+            "search_reminder_with_recency_upcoming_insufficient_information_implicit": 1,
+            "search_reminder_with_recency_yesterday": 1,
+            "search_reminder_with_recency_yesterday_implicit": 1,
+            "search_reminder_with_recency_yesterday_insufficient_information": 1,
+            "search_reminder_with_recency_yesterday_insufficient_information_implicit": 1,
+            "search_sender_phone_number_with_content": 1,
+            "send_message_with_contact_content_cellular_off": 1,
+            "send_message_with_contact_content_cellular_off_insufficient_information": 1,
+            "send_message_with_phone_number_and_content": 1,
+            "turn_on_cellular_low_battery_mode": 1,
+            "turn_on_cellular_low_battery_mode_implicit": 1,
+            "turn_on_location_low_battery_mode": 1,
+            "turn_on_location_low_battery_mode_implicit": 1,
+            "turn_on_wifi_low_battery_mode": 1,
+            "turn_on_wifi_low_battery_mode_implicit": 1,
+            "update_contact_relationship_with_relationship": 1,
+            "update_contact_relationship_with_relationship_twice": 1,
+            "update_contact_with_id_and_phone_number": 1,
+            "wifi_off": 1
+          },
+          "largest_family_count": 2,
+          "largest_family_share": 0.03333333333333333,
+          "near_duplicate_dominated": false,
+          "scenario_count": 60
+        }
+      },
+      "split_sizes": {
+        "action_precondition_broad100": 100,
+        "action_precondition_broad20": 20,
+        "action_precondition_broad60": 60
+      }
+    },
+    "contact_crud": {
+      "path": "artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/contact_crud_splits.json",
+      "sha256": "508cc3b65bd1963cc897205f42b212c32829c92eee50b08bbbde5d740e26a0be",
+      "split_diversity": {
+        "contact_crud_100": {
+          "bucket_counts": {
+            "contact_crud": 100
+          },
+          "distinct_family_count": 7,
+          "family_counts": {
+            "add_contact_with_name_and_phone_number": 8,
+            "modify_contact_with_message_recency": 23,
+            "remove_contact_by_phone": 23,
+            "remove_contact_with_id": 8,
+            "update_contact_relationship_with_relationship": 22,
+            "update_contact_relationship_with_relationship_twice": 8,
+            "update_contact_with_id_and_phone_number": 8
+          },
+          "largest_family_count": 23,
+          "largest_family_share": 0.23,
+          "near_duplicate_dominated": false,
+          "scenario_count": 100
+        },
+        "contact_crud_20": {
+          "bucket_counts": {
+            "contact_crud": 20
+          },
+          "distinct_family_count": 7,
+          "family_counts": {
+            "add_contact_with_name_and_phone_number": 3,
+            "modify_contact_with_message_recency": 3,
+            "remove_contact_by_phone": 3,
+            "remove_contact_with_id": 3,
+            "update_contact_relationship_with_relationship": 3,
+            "update_contact_relationship_with_relationship_twice": 3,
+            "update_contact_with_id_and_phone_number": 2
+          },
+          "largest_family_count": 3,
+          "largest_family_share": 0.15,
+          "near_duplicate_dominated": false,
+          "scenario_count": 20
+        },
+        "contact_crud_60": {
+          "bucket_counts": {
+            "contact_crud": 60
+          },
+          "distinct_family_count": 7,
+          "family_counts": {
+            "add_contact_with_name_and_phone_number": 8,
+            "modify_contact_with_message_recency": 10,
+            "remove_contact_by_phone": 9,
+            "remove_contact_with_id": 8,
+            "update_contact_relationship_with_relationship": 9,
+            "update_contact_relationship_with_relationship_twice": 8,
+            "update_contact_with_id_and_phone_number": 8
+          },
+          "largest_family_count": 10,
+          "largest_family_share": 0.16666666666666666,
+          "near_duplicate_dominated": false,
+          "scenario_count": 60
+        }
+      },
+      "split_sizes": {
+        "contact_crud_100": 100,
+        "contact_crud_20": 20,
+        "contact_crud_60": 60
+      }
+    },
+    "reminder_crud_scheduling": {
+      "path": "artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/reminder_crud_scheduling_splits.json",
+      "sha256": "b1788b853471e8dc39b79ff9284d2639393e74eb92ba8cdfba7e8fc8f56638b9",
+      "split_diversity": {
+        "reminder_crud_scheduling_100": {
+          "bucket_counts": {
+            "reminder_crud_scheduling": 100
+          },
+          "distinct_family_count": 5,
+          "family_counts": {
+            "add_reminder_content_and_date_and_time": 23,
+            "add_reminder_content_and_week_delta_and_time": 23,
+            "add_reminder_content_and_weekday_delta_and_time": 22,
+            "modify_reminder_with_recency_latest": 16,
+            "remove_reminder_with_recency_latest": 16
+          },
+          "largest_family_count": 23,
+          "largest_family_share": 0.23,
+          "near_duplicate_dominated": false,
+          "scenario_count": 100
+        },
+        "reminder_crud_scheduling_20": {
+          "bucket_counts": {
+            "reminder_crud_scheduling": 20
+          },
+          "distinct_family_count": 5,
+          "family_counts": {
+            "add_reminder_content_and_date_and_time": 4,
+            "add_reminder_content_and_week_delta_and_time": 4,
+            "add_reminder_content_and_weekday_delta_and_time": 4,
+            "modify_reminder_with_recency_latest": 4,
+            "remove_reminder_with_recency_latest": 4
+          },
+          "largest_family_count": 4,
+          "largest_family_share": 0.2,
+          "near_duplicate_dominated": false,
+          "scenario_count": 20
+        },
+        "reminder_crud_scheduling_60": {
+          "bucket_counts": {
+            "reminder_crud_scheduling": 60
+          },
+          "distinct_family_count": 5,
+          "family_counts": {
+            "add_reminder_content_and_date_and_time": 12,
+            "add_reminder_content_and_week_delta_and_time": 12,
+            "add_reminder_content_and_weekday_delta_and_time": 12,
+            "modify_reminder_with_recency_latest": 12,
+            "remove_reminder_with_recency_latest": 12
+          },
+          "largest_family_count": 12,
+          "largest_family_share": 0.2,
+          "near_duplicate_dominated": false,
+          "scenario_count": 60
+        }
+      },
+      "split_sizes": {
+        "reminder_crud_scheduling_100": 100,
+        "reminder_crud_scheduling_20": 20,
+        "reminder_crud_scheduling_60": 60
+      }
+    },
+    "safe_insufficient_information": {
+      "path": "artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/safe_insufficient_information_splits.json",
+      "sha256": "b4a7c9b34ec26f9acd9abbdc848574f19667e0d2a76659d3a56e3461889be30f",
+      "split_diversity": {
+        "safe_insufficient_information_100": {
+          "bucket_counts": {
+            "safe_insufficient_information": 100
+          },
+          "distinct_family_count": 13,
+          "family_counts": {
+            "find_days_till_holiday_insufficient_information": 8,
+            "modify_contact_with_message_recency_insufficient_information": 8,
+            "modify_reminder_with_recency_latest_insufficient_information": 8,
+            "remove_contact_by_phone_no_remove_contact_insufficient_information": 8,
+            "remove_contact_by_phone_no_search_contacts_insufficient_information": 8,
+            "remove_reminder_with_recency_latest_insufficient_information": 8,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information": 8,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 8,
+            "search_reminder_with_recency_upcoming_insufficient_information": 8,
+            "search_reminder_with_recency_upcoming_insufficient_information_implicit": 7,
+            "search_reminder_with_recency_yesterday_insufficient_information": 7,
+            "search_reminder_with_recency_yesterday_insufficient_information_implicit": 7,
+            "send_message_with_contact_content_cellular_off_insufficient_information": 7
+          },
+          "largest_family_count": 8,
+          "largest_family_share": 0.08,
+          "near_duplicate_dominated": false,
+          "scenario_count": 100
+        },
+        "safe_insufficient_information_20": {
+          "bucket_counts": {
+            "safe_insufficient_information": 20
+          },
+          "distinct_family_count": 13,
+          "family_counts": {
+            "find_days_till_holiday_insufficient_information": 2,
+            "modify_contact_with_message_recency_insufficient_information": 2,
+            "modify_reminder_with_recency_latest_insufficient_information": 2,
+            "remove_contact_by_phone_no_remove_contact_insufficient_information": 2,
+            "remove_contact_by_phone_no_search_contacts_insufficient_information": 2,
+            "remove_reminder_with_recency_latest_insufficient_information": 2,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information": 2,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 1,
+            "search_reminder_with_recency_upcoming_insufficient_information": 1,
+            "search_reminder_with_recency_upcoming_insufficient_information_implicit": 1,
+            "search_reminder_with_recency_yesterday_insufficient_information": 1,
+            "search_reminder_with_recency_yesterday_insufficient_information_implicit": 1,
+            "send_message_with_contact_content_cellular_off_insufficient_information": 1
+          },
+          "largest_family_count": 2,
+          "largest_family_share": 0.1,
+          "near_duplicate_dominated": false,
+          "scenario_count": 20
+        },
+        "safe_insufficient_information_60": {
+          "bucket_counts": {
+            "safe_insufficient_information": 60
+          },
+          "distinct_family_count": 13,
+          "family_counts": {
+            "find_days_till_holiday_insufficient_information": 5,
+            "modify_contact_with_message_recency_insufficient_information": 5,
+            "modify_reminder_with_recency_latest_insufficient_information": 5,
+            "remove_contact_by_phone_no_remove_contact_insufficient_information": 5,
+            "remove_contact_by_phone_no_search_contacts_insufficient_information": 5,
+            "remove_reminder_with_recency_latest_insufficient_information": 5,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information": 5,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 5,
+            "search_reminder_with_recency_upcoming_insufficient_information": 4,
+            "search_reminder_with_recency_upcoming_insufficient_information_implicit": 4,
+            "search_reminder_with_recency_yesterday_insufficient_information": 4,
+            "search_reminder_with_recency_yesterday_insufficient_information_implicit": 4,
+            "send_message_with_contact_content_cellular_off_insufficient_information": 4
+          },
+          "largest_family_count": 5,
+          "largest_family_share": 0.08333333333333333,
+          "near_duplicate_dominated": false,
+          "scenario_count": 60
+        }
+      },
+      "split_sizes": {
+        "safe_insufficient_information_100": 100,
+        "safe_insufficient_information_20": 20,
+        "safe_insufficient_information_60": 60
+      }
+    },
+    "settings_device_state": {
+      "path": "artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/settings_device_state_splits.json",
+      "sha256": "b6996f9b9c2cf388dbecad2962be30519930ff30ca2bb3aad768a88a04259124",
+      "split_diversity": {
+        "settings_device_state_100": {
+          "bucket_counts": {
+            "settings_device_state": 100
+          },
+          "distinct_family_count": 14,
+          "family_counts": {
+            "add_reminder_content_and_week_delta_and_time_and_location": 8,
+            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 8,
+            "cellular_off": 7,
+            "find_days_till_holiday_wifi_off": 7,
+            "get_cellular": 7,
+            "get_wifi": 7,
+            "send_message_with_contact_content_cellular_off": 7,
+            "turn_on_cellular_low_battery_mode": 7,
+            "turn_on_cellular_low_battery_mode_implicit": 7,
+            "turn_on_location_low_battery_mode": 7,
+            "turn_on_location_low_battery_mode_implicit": 7,
+            "turn_on_wifi_low_battery_mode": 7,
+            "turn_on_wifi_low_battery_mode_implicit": 7,
+            "wifi_off": 7
+          },
+          "largest_family_count": 8,
+          "largest_family_share": 0.08,
+          "near_duplicate_dominated": false,
+          "scenario_count": 100
+        },
+        "settings_device_state_20": {
+          "bucket_counts": {
+            "settings_device_state": 20
+          },
+          "distinct_family_count": 14,
+          "family_counts": {
+            "add_reminder_content_and_week_delta_and_time_and_location": 2,
+            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 2,
+            "cellular_off": 2,
+            "find_days_till_holiday_wifi_off": 2,
+            "get_cellular": 2,
+            "get_wifi": 2,
+            "send_message_with_contact_content_cellular_off": 1,
+            "turn_on_cellular_low_battery_mode": 1,
+            "turn_on_cellular_low_battery_mode_implicit": 1,
+            "turn_on_location_low_battery_mode": 1,
+            "turn_on_location_low_battery_mode_implicit": 1,
+            "turn_on_wifi_low_battery_mode": 1,
+            "turn_on_wifi_low_battery_mode_implicit": 1,
+            "wifi_off": 1
+          },
+          "largest_family_count": 2,
+          "largest_family_share": 0.1,
+          "near_duplicate_dominated": false,
+          "scenario_count": 20
+        },
+        "settings_device_state_60": {
+          "bucket_counts": {
+            "settings_device_state": 60
+          },
+          "distinct_family_count": 14,
+          "family_counts": {
+            "add_reminder_content_and_week_delta_and_time_and_location": 5,
+            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 5,
+            "cellular_off": 5,
+            "find_days_till_holiday_wifi_off": 5,
+            "get_cellular": 4,
+            "get_wifi": 4,
+            "send_message_with_contact_content_cellular_off": 4,
+            "turn_on_cellular_low_battery_mode": 4,
+            "turn_on_cellular_low_battery_mode_implicit": 4,
+            "turn_on_location_low_battery_mode": 4,
+            "turn_on_location_low_battery_mode_implicit": 4,
+            "turn_on_wifi_low_battery_mode": 4,
+            "turn_on_wifi_low_battery_mode_implicit": 4,
+            "wifi_off": 4
+          },
+          "largest_family_count": 5,
+          "largest_family_share": 0.08333333333333333,
+          "near_duplicate_dominated": false,
+          "scenario_count": 60
+        }
+      },
+      "split_sizes": {
+        "settings_device_state_100": 100,
+        "settings_device_state_20": 20,
+        "settings_device_state_60": 60
+      }
+    },
+    "settings_insufficient_combined": {
+      "path": "artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/settings_insufficient_combined_splits.json",
+      "sha256": "204d839360b06c0a11822888282a51236615e4a4ed54019ecf9eda8a10644592",
+      "split_diversity": {
+        "action_precondition_combined100": {
+          "bucket_counts": {
+            "safe_insufficient_information": 50,
+            "settings_device_state": 50
+          },
+          "distinct_family_count": 27,
+          "family_counts": {
+            "add_reminder_content_and_week_delta_and_time_and_location": 4,
+            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 4,
+            "cellular_off": 4,
+            "find_days_till_holiday_insufficient_information": 4,
+            "find_days_till_holiday_wifi_off": 4,
+            "get_cellular": 4,
+            "get_wifi": 4,
+            "modify_contact_with_message_recency_insufficient_information": 4,
+            "modify_reminder_with_recency_latest_insufficient_information": 4,
+            "remove_contact_by_phone_no_remove_contact_insufficient_information": 4,
+            "remove_contact_by_phone_no_search_contacts_insufficient_information": 4,
+            "remove_reminder_with_recency_latest_insufficient_information": 4,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information": 4,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 4,
+            "search_reminder_with_recency_upcoming_insufficient_information": 4,
+            "search_reminder_with_recency_upcoming_insufficient_information_implicit": 4,
+            "search_reminder_with_recency_yesterday_insufficient_information": 4,
+            "search_reminder_with_recency_yesterday_insufficient_information_implicit": 3,
+            "send_message_with_contact_content_cellular_off": 4,
+            "send_message_with_contact_content_cellular_off_insufficient_information": 3,
+            "turn_on_cellular_low_battery_mode": 4,
+            "turn_on_cellular_low_battery_mode_implicit": 3,
+            "turn_on_location_low_battery_mode": 3,
+            "turn_on_location_low_battery_mode_implicit": 3,
+            "turn_on_wifi_low_battery_mode": 3,
+            "turn_on_wifi_low_battery_mode_implicit": 3,
+            "wifi_off": 3
+          },
+          "largest_family_count": 4,
+          "largest_family_share": 0.04,
+          "near_duplicate_dominated": false,
+          "scenario_count": 100
+        },
+        "action_precondition_combined20": {
+          "bucket_counts": {
+            "safe_insufficient_information": 13,
+            "settings_device_state": 7
+          },
+          "distinct_family_count": 20,
+          "family_counts": {
+            "add_reminder_content_and_week_delta_and_time_and_location": 1,
+            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 1,
+            "cellular_off": 1,
+            "find_days_till_holiday_insufficient_information": 1,
+            "find_days_till_holiday_wifi_off": 1,
+            "get_cellular": 1,
+            "get_wifi": 1,
+            "modify_contact_with_message_recency_insufficient_information": 1,
+            "modify_reminder_with_recency_latest_insufficient_information": 1,
+            "remove_contact_by_phone_no_remove_contact_insufficient_information": 1,
+            "remove_contact_by_phone_no_search_contacts_insufficient_information": 1,
+            "remove_reminder_with_recency_latest_insufficient_information": 1,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information": 1,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 1,
+            "search_reminder_with_recency_upcoming_insufficient_information": 1,
+            "search_reminder_with_recency_upcoming_insufficient_information_implicit": 1,
+            "search_reminder_with_recency_yesterday_insufficient_information": 1,
+            "search_reminder_with_recency_yesterday_insufficient_information_implicit": 1,
+            "send_message_with_contact_content_cellular_off": 1,
+            "send_message_with_contact_content_cellular_off_insufficient_information": 1
+          },
+          "largest_family_count": 1,
+          "largest_family_share": 0.05,
+          "near_duplicate_dominated": false,
+          "scenario_count": 20
+        },
+        "action_precondition_combined60": {
+          "bucket_counts": {
+            "safe_insufficient_information": 27,
+            "settings_device_state": 33
+          },
+          "distinct_family_count": 27,
+          "family_counts": {
+            "add_reminder_content_and_week_delta_and_time_and_location": 3,
+            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 3,
+            "cellular_off": 3,
+            "find_days_till_holiday_insufficient_information": 3,
+            "find_days_till_holiday_wifi_off": 3,
+            "get_cellular": 3,
+            "get_wifi": 2,
+            "modify_contact_with_message_recency_insufficient_information": 2,
+            "modify_reminder_with_recency_latest_insufficient_information": 2,
+            "remove_contact_by_phone_no_remove_contact_insufficient_information": 2,
+            "remove_contact_by_phone_no_search_contacts_insufficient_information": 2,
+            "remove_reminder_with_recency_latest_insufficient_information": 2,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information": 2,
+            "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 2,
+            "search_reminder_with_recency_upcoming_insufficient_information": 2,
+            "search_reminder_with_recency_upcoming_insufficient_information_implicit": 2,
+            "search_reminder_with_recency_yesterday_insufficient_information": 2,
+            "search_reminder_with_recency_yesterday_insufficient_information_implicit": 2,
+            "send_message_with_contact_content_cellular_off": 2,
+            "send_message_with_contact_content_cellular_off_insufficient_information": 2,
+            "turn_on_cellular_low_battery_mode": 2,
+            "turn_on_cellular_low_battery_mode_implicit": 2,
+            "turn_on_location_low_battery_mode": 2,
+            "turn_on_location_low_battery_mode_implicit": 2,
+            "turn_on_wifi_low_battery_mode": 2,
+            "turn_on_wifi_low_battery_mode_implicit": 2,
+            "wifi_off": 2
+          },
+          "largest_family_count": 3,
+          "largest_family_share": 0.05,
+          "near_duplicate_dominated": false,
+          "scenario_count": 60
+        }
+      },
+      "split_sizes": {
+        "action_precondition_combined100": 100,
+        "action_precondition_combined20": 20,
+        "action_precondition_combined60": 60
+      }
+    }
+  },
+  "objective": "Find narrow high-lift solutions for settings/device-state and safe insufficient-information buckets, then combine with the current top-tool set.",
+  "protected_claim_evidence": false,
+  "registries": {
+    "safe_insufficient_abstention": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/safe_insufficient_abstention_pack/registry_manifest.json",
+      "sha256": "a8f9da6d7d40bcfc9648c957eeca3b5e1f28081e02a254a807ae2c00c2a270e3",
+      "tools": [
+        "recommend_safe_missing_information_response"
+      ]
+    },
+    "safe_insufficient_domain_response": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/safe_insufficient_domain_response_pack/registry_manifest.json",
+      "sha256": "d27310a7c385e87c7f053e519d16c31009a92d30e5c99e8057440df887eba7cc",
+      "tools": [
+        "recommend_domain_safe_abstention"
+      ]
+    },
+    "state_action_sequence": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/state_action_sequence_pack/registry_manifest.json",
+      "sha256": "45d71f7285e8a8993d4feca3763faefa83dd7f68960e231895ae5921937ef365",
+      "tools": [
+        "plan_device_state_action_sequence"
+      ]
+    },
+    "state_precondition_next_action": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/state_precondition_next_action_pack/registry_manifest.json",
+      "sha256": "cb4896c91a7e644a633b5c2e8fa15a3071ca5e4d46869e89ffed47678ddbc6ec",
+      "tools": [
+        "plan_device_state_next_action"
+      ]
+    },
+    "top_tools_plus_action_precondition": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/top_tools_plus_action_precondition_pack/registry_manifest.json",
+      "sha256": "8aa76441cb754eb7419e559af8a44bb33a6894a6bc33878df283cb3caf1d6326",
+      "tools": [
+        "days_between_timestamps",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "plan_device_state_next_action",
+        "recommend_safe_missing_information_response",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    "top_tools_plus_action_precondition_v2": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/top_tools_plus_action_precondition_v2_pack/registry_manifest.json",
+      "sha256": "d5763d2233f4bd5b5b8e81e4e2c6a5169c6b4e37fc9d8ceda9bc38aa4e54326f",
+      "tools": [
+        "days_between_timestamps",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "plan_device_state_action_sequence",
+        "recommend_domain_safe_abstention",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    }
+  }
+}

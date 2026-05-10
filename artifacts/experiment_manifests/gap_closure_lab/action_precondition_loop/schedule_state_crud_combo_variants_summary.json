@@ -1,0 +1,72 @@
+{
+  "base_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_no_field_plus_schedule_v2_pack/registry_manifest.json",
+  "base_registry_sha256": "954d5614f774f190aee48d2fdbbe786e3bd73d621563721d800012ff2516ae70",
+  "created_at": "2026-05-10T04:55:11.153113+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "baseline_cache_policy": "use-if-eligible",
+    "candidate_arms_fresh_only": true,
+    "scenario_ids_encoded_into_tools_or_router": false,
+    "truth_labels_inspected": false,
+    "used_cache_availability_for_selection": false
+  },
+  "objective": "Recombine retained positive schedule/recency tools with narrow state and CRUD bridges after broad100 showed remaining losses in settings/device-state and contact/reminder action buckets.",
+  "policy_change": "State, CRUD, and domain-abstention actor nudges are trigger-gated in openai_toolsandbox_roles.py for these experiments to reduce broad context pollution.",
+  "protected_claim_evidence": false,
+  "variants": {
+    "full_timestamp_schedule_v2_plus_crud_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_plus_crud_pack/registry_manifest.json",
+      "sha256": "bc0755f66bf54dca98b63667a7614056f46b67261ad11a286b4f012b02cfc612",
+      "tools": [
+        "days_between_timestamps",
+        "next_weekday_time_to_timestamp",
+        "plan_contact_crud_action",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "prepare_reminder_crud_action",
+        "relative_day_time_to_timestamp",
+        "relative_weeks_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    "full_timestamp_schedule_v2_plus_state_crud_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_plus_state_crud_pack/registry_manifest.json",
+      "sha256": "c545ea88f8f09009c46239e4307c1a16785b1d13d2c5a6e62e500db8c47e65f7",
+      "tools": [
+        "days_between_timestamps",
+        "next_weekday_time_to_timestamp",
+        "plan_contact_crud_action",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "plan_device_state_action_sequence",
+        "prepare_reminder_crud_action",
+        "relative_day_time_to_timestamp",
+        "relative_weeks_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    "full_timestamp_schedule_v2_plus_state_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_plus_state_pack/registry_manifest.json",
+      "sha256": "b1bd99dd36acb8bb4b2fcd2b07afaa01872bc8056724041c346e8a47b1e4c499",
+      "tools": [
+        "days_between_timestamps",
+        "next_weekday_time_to_timestamp",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "plan_device_state_action_sequence",
+        "relative_day_time_to_timestamp",
+        "relative_weeks_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    }
+  }
+}

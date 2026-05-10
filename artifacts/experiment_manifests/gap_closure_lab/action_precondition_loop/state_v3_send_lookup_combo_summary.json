@@ -1,0 +1,27 @@
+{
+  "created_at": "2026-05-10T13:14:59.829161+00:00",
+  "experimental_only": true,
+  "output_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_plus_state_v3_send_lookup_pack/registry_manifest.json",
+  "protected_assets_modified": false,
+  "purpose": "Combine the repaired device-state action lane with the retained send-message lookup/precondition helper for narrow settings/send diagnostics before any broad use.",
+  "registry_sha256": "8ce804e2ae8a173157adf6f841756343d8c9fafecb41183433c25261632cc8a5",
+  "sources": {
+    "send_source": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/send_message_lookup_only_pack/registry_manifest.json",
+    "state_source": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_plus_state_v3_pack/registry_manifest.json"
+  },
+  "tool_count": 12,
+  "tools": [
+    "days_between_timestamps",
+    "next_weekday_time_to_timestamp",
+    "plan_contact_lookup_query",
+    "plan_contact_search_from_scalar_constraint",
+    "plan_device_state_action_sequence_v3",
+    "plan_send_message_contact_lookup",
+    "relative_day_time_to_timestamp",
+    "relative_weeks_time_to_timestamp",
+    "resolve_search_window_or_bounds",
+    "select_message_content_by_recency",
+    "select_message_counterparty_for_contact_update",
+    "select_record_by_timestamp_extreme"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "base_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_no_field_plus_schedule_v2_pack/registry_manifest.json",
+  "base_registry_sha256": "954d5614f774f190aee48d2fdbbe786e3bd73d621563721d800012ff2516ae70",
+  "created_at": "2026-05-10T06:27:46.958248+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "baseline_cache_policy": "use-if-eligible",
+    "candidate_arms_fresh_only": true,
+    "scenario_ids_encoded_into_tools_or_router": false,
+    "truth_labels_inspected": false,
+    "used_cache_availability_for_selection": false
+  },
+  "objective": "Repair the whole-week scheduling visible-not-called lane and test whether shorter selector metadata improves post-search adoption.",
+  "protected_claim_evidence": false,
+  "variants": {
+    "full_timestamp_schedule_v3_week_renamed_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v3_week_renamed_pack/registry_manifest.json",
+      "sha256": "506bfaa7327596ec85ca6eec2f175dffa56d019c9b7325899df8bf42ba51e1b8",
+      "tools": [
+        "days_between_timestamps",
+        "next_weekday_time_to_timestamp",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme",
+        "weeks_from_now_time_to_timestamp"
+      ]
+    },
+    "full_timestamp_schedule_v3_week_renamed_selector_hint_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v3_week_renamed_selector_hint_pack/registry_manifest.json",
+      "sha256": "8bfc4bef6c12f779bce590dad032ca1bb14ed0453bfbfdefc7c96dfc5e9718c7",
+      "tools": [
+        "days_between_timestamps",
+        "next_weekday_time_to_timestamp",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme",
+        "weeks_from_now_time_to_timestamp"
+      ]
+    }
+  }
+}

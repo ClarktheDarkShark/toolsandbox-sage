@@ -326,6 +326,7 @@ def _side_effect_followup_failures_from_trace_events(
                     "should_call_add_reminder",
                     "should_call",
                     "should_call_tool",
+                    "should_call_tools",
                     "downstream_tool_name",
                     "add_reminder_kwargs",
                     "downstream_tool_kwargs",
@@ -337,7 +338,15 @@ def _side_effect_followup_failures_from_trace_events(
                 output.get("should_call_add_reminder") is False
                 or output.get("should_call") is False
                 or output.get("should_call_tool") is False
+                or output.get("should_call_tools") is False
             ):
+                if (
+                    output.get("should_call_search_contacts") is True
+                    and output.get("should_call_tools") is False
+                ):
+                    if required & next_tools:
+                        return True
+                    continue
                 selection_only_bridge = (
                     isinstance(output.get("selected_record"), dict)
                     and bool(output.get("selected_record"))
@@ -362,9 +371,14 @@ def _side_effect_followup_failures_from_trace_events(
                 output.get("should_call_add_reminder") is True
                 or output.get("should_call") is True
                 or output.get("should_call_tool") is True
+                or output.get("should_call_tools") is True
             ):
-                if not (required & next_tools):
-                    return True
+                if required & next_tools:
+                    continue
+                later_tools = _later_trace_tool_names(events, start_index=index)
+                if required & later_tools:
+                    continue
+                return True
                 continue
         if not (required & _later_trace_tool_names(events, start_index=index)):
             return True
@@ -414,6 +428,7 @@ def _side_effect_followup_failures(
                     "should_call_add_reminder",
                     "should_call",
                     "should_call_tool",
+                    "should_call_tools",
                     "downstream_tool_name",
                     "add_reminder_kwargs",
                     "downstream_tool_kwargs",
@@ -429,7 +444,15 @@ def _side_effect_followup_failures(
                 output.get("should_call_add_reminder") is False
                 or output.get("should_call") is False
                 or output.get("should_call_tool") is False
+                or output.get("should_call_tools") is False
             ):
+                if (
+                    output.get("should_call_search_contacts") is True
+                    and output.get("should_call_tools") is False
+                ):
+                    if required & next_tools:
+                        return True
+                    continue
                 selection_only_bridge = (
                     isinstance(output.get("selected_record"), dict)
                     and bool(output.get("selected_record"))
@@ -454,9 +477,17 @@ def _side_effect_followup_failures(
                 output.get("should_call_add_reminder") is True
                 or output.get("should_call") is True
                 or output.get("should_call_tool") is True
+                or output.get("should_call_tools") is True
             ):
-                if not (required & next_tools):
-                    return True
+                if required & next_tools:
+                    continue
+                later_followup_tools: set[str] = set()
+                for later in messages[index + 1 :]:
+                    if isinstance(later, dict) and later.get("role") == "assistant":
+                        later_followup_tools.update(_assistant_tool_names(later))
+                if required & later_followup_tools:
+                    continue
+                return True
                 continue
         later_tools: set[str] = set()
         for later in messages[index + 1 :]:

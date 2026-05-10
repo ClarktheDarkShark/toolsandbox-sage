@@ -1,0 +1,166 @@
+{
+  "tools": {
+    "prepare_reminder_crud_action": {
+      "accepted_at": "2026-05-10T02:29:39.387976+00:00",
+      "birth_scenario": "gap_closure_lab_crud_bridge_repair",
+      "code_hash": "4f6c4f5e386c832796dfd3024fdaf6578b6ca00e62ae1ad26bd3a45e6a0e84a3",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def prepare_reminder_crud_action(reminders: list = None, action_type: str = \"\", selection_mode: str = \"\", updates: dict = None) -> dict:\n    \"\"\"Select a visible reminder and prepare final reminder CRUD kwargs.\"\"\"\n    reminders = reminders if isinstance(reminders, list) else []\n    updates = updates if isinstance(updates, dict) else {}\n    act = str(action_type or \"\").strip().lower()\n    mode = str(selection_mode or \"\").strip().lower()\n\n    def empty(reason: str) -> dict:\n        return {\n            \"selected_reminder\": {},\n            \"selected_reminder_id\": \"\",\n            \"downstream_tool_name\": \"\",\n            \"downstream_tool_kwargs\": {},\n            \"should_call_tool\": False,\n            \"abstain_reason\": reason,\n            \"final_answer_recommendation\": \"abstain:\" + reason,\n        }\n\n    def clean_updates(raw: dict) -> dict:\n        allowed = {\"content\", \"reminder_timestamp\", \"creation_timestamp\", \"latitude\", \"longitude\"}\n        cleaned = {}\n        for key, value in raw.items():\n            key_s = str(key)\n            if key_s not in allowed or value is None:\n                continue\n            if isinstance(value, str) and not value.strip():\n                continue\n            cleaned[key_s] = value\n        return cleaned\n\n    if act in {\"remove\", \"delete\", \"remove_reminder\"}:\n        action = \"remove_reminder\"\n    elif act in {\"modify\", \"update\", \"change\", \"modify_reminder\"}:\n        action = \"modify_reminder\"\n    elif act in {\"add\", \"create\", \"add_reminder\"}:\n        prepared = clean_updates(updates)\n        if \"content\" not in prepared or \"reminder_timestamp\" not in prepared:\n            return empty(\"missing_content_or_timestamp_for_add_reminder\")\n        return {\n            \"selected_reminder\": {},\n            \"selected_reminder_id\": \"\",\n            \"downstream_tool_name\": \"add_reminder\",\n            \"downstream_tool_kwargs\": prepared,\n            \"should_call_tool\": True,\n            \"abstain_reason\": \"\",\n            \"final_answer_recommendation\": \"call:add_reminder\",\n        }\n    else:\n        return empty(\"unsupported_reminder_action\")\n\n    if not reminders:\n        return empty(\"missing_visible_reminders\")\n\n    candidates = [item for item in reminders if isinstance(item, dict)]\n    if not candidates:\n        return empty(\"missing_visible_reminders\")\n\n    def timestamp_of(record: dict) -> float:\n        for key in (\"reminder_timestamp\", \"creation_timestamp\"):\n            value = record.get(key)\n            if isinstance(value, bool):\n                continue\n            if isinstance(value, (int, float)):\n                return float(value)\n        return 0.0\n\n    if len(candidates) == 1:\n        selected = candidates[0]\n    elif mode in {\"latest\", \"last\", \"most_recent\", \"newest\", \"upcoming\"}:\n        best = max(timestamp_of(item) for item in candidates)\n        tied = [item for item in candidates if timestamp_of(item) == best]\n        if len(tied) != 1:\n            return empty(\"ambiguous_reminder_timestamp_tie\")\n        selected = tied[0]\n    elif mode in {\"oldest\", \"first\", \"earliest\"}:\n        best = min(timestamp_of(item) for item in candidates)\n        tied = [item for item in candidates if timestamp_of(item) == best]\n        if len(tied) != 1:\n            return empty(\"ambiguous_reminder_timestamp_tie\")\n        selected = tied[0]\n    else:\n        return empty(\"ambiguous_selection_mode\")\n\n    reminder_id = selected.get(\"reminder_id\")\n    if not reminder_id:\n        return empty(\"missing_reminder_id\")\n    if action == \"remove_reminder\":\n        kwargs = {\"reminder_id\": reminder_id}\n    else:\n        prepared = clean_updates(updates)\n        if not prepared:\n            return empty(\"empty_updates_for_modify_reminder\")\n        kwargs = {\"reminder_id\": reminder_id, **prepared}\n    return {\n        \"selected_reminder\": selected,\n        \"selected_reminder_id\": str(reminder_id),\n        \"downstream_tool_name\": action,\n        \"downstream_tool_kwargs\": kwargs,\n        \"should_call_tool\": True,\n        \"abstain_reason\": \"\",\n        \"final_answer_recommendation\": \"call:\" + action,\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_call_tool false when visible reminders are missing, selection is ambiguous, reminder_id is missing, or required update fields are absent.",
+          "applicable_task_families": [
+            "add_reminder_content_and_date_and_time",
+            "add_reminder_content_and_week_delta_and_time_and_location",
+            "add_reminder_content_and_week_delta_and_time",
+            "add_reminder_content_and_weekday_delta_and_time",
+            "modify_reminder_with_recency_latest",
+            "remove_reminder_with_recency_latest",
+            "modify_reminder",
+            "remove_reminder"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 4,
+          "description": "Reminder CRUD action bridge. Use after search_reminder returns visible reminder records, or when add_reminder kwargs are already known. It selects one latest/oldest/upcoming reminder when requested and returns final original ToolSandbox add/modify/remove reminder kwargs. It never performs side effects.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 4,
+          "expected_milestone_calls_replaced": [],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "",
+          "generalization_rationale": "Reminder CRUD tasks repeatedly need a final-action bridge from visible reminder records or converted timestamps to preserved original reminder side-effect calls.",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "legacy_unstructured_evidence"
+            ],
+            "summary": "Without a dedicated canonicalizer, agents often miscompute dates because they lack consistent local-midnight anchoring and offset handling (e.g., mixing UTC vs local-day boundaries), producing timestamps off by whole days or hours.",
+            "visible_data_gaps": []
+          },
+          "inputs": [
+            {
+              "annotation": "list",
+              "description": "Visible reminders returned by search_reminder, or [] for add_reminder.",
+              "name": "reminders"
+            },
+            {
+              "annotation": "str",
+              "description": "add_reminder, modify_reminder, remove_reminder, add, modify, update, remove, delete.",
+              "name": "action_type"
+            },
+            {
+              "annotation": "str",
+              "description": "latest, oldest, upcoming, first, last, or blank when there is exactly one reminder.",
+              "name": "selection_mode"
+            },
+            {
+              "annotation": "dict",
+              "description": "Known reminder fields such as {'content':'x','reminder_timestamp':123.0}.",
+              "name": "updates"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "intermediate reminder selection not final-action-ready",
+            "missing reminder_id propagation",
+            "manual reminder side-effect argument preparation"
+          ],
+          "negative_triggers": [
+            "insufficient_information",
+            "contact",
+            "send_message",
+            "weather",
+            "location",
+            "ambiguous reminder"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "downstream_tool_kwargs": {
+                "type": "object"
+              },
+              "downstream_tool_name": {
+                "enum": [
+                  "",
+                  "add_reminder",
+                  "modify_reminder",
+                  "remove_reminder"
+                ],
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "selected_reminder": {
+                "type": "object"
+              },
+              "selected_reminder_id": {
+                "type": "string"
+              },
+              "should_call_tool": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "selected_reminder",
+              "selected_reminder_id",
+              "downstream_tool_name",
+              "downstream_tool_kwargs",
+              "should_call_tool",
+              "abstain_reason",
+              "final_answer_recommendation"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "add_reminder_content_and_date_and_time",
+            "modify_reminder_with_recency",
+            "remove_reminder_with_recency",
+            "add_reminder_content_and_week_delta",
+            "add_reminder_content_and_weekday_delta",
+            "reminder CRUD final kwargs"
+          ],
+          "preserves_side_effect_tools": [
+            "add_reminder",
+            "search_reminder",
+            "modify_reminder",
+            "remove_reminder"
+          ],
+          "reason_tool_is_decisive": "It converts a unique visible reminder or known add reminder fields into exact preserved reminder kwargs.",
+          "required_original_tool_calls": [
+            "add_reminder",
+            "search_reminder",
+            "modify_reminder",
+            "remove_reminder"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "reminder CRUD/scheduling bucket had 36 tasks with 24 no-visible-helper cases in the post-scale gap assessment",
+            "reminder pilot20 top-v2 showed visible-not-called select_record_by_timestamp_extreme on 8/20 while relative timestamp helpers provided small positive natural value",
+            "current helpers often stop at timestamp/record selection rather than final add/modify/remove reminder kwargs"
+          ],
+          "tool_name": "prepare_reminder_crud_action"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 3,
+        "negative_applicability_count": 5,
+        "runtime_smoke_passed": true,
+        "source_example_count": 3
+      },
+      "version": 1
+    }
+  }
+}

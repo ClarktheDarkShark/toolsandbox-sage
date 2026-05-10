@@ -1,0 +1,58 @@
+{
+  "base_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_no_field_plus_schedule_v2_pack/registry_manifest.json",
+  "base_registry_sha256": "954d5614f774f190aee48d2fdbbe786e3bd73d621563721d800012ff2516ae70",
+  "created_at": "2026-05-10T05:19:24.577243+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "baseline_cache_policy": "use-if-eligible",
+    "candidate_arms_fresh_only": true,
+    "scenario_ids_encoded_into_tools_or_router": false,
+    "truth_labels_inspected": false,
+    "used_cache_availability_for_selection": false
+  },
+  "objective": "Reduce broad context pollution while keeping low-frequency positive helpers. Candidate arms remain fresh; controls may use eligible cache.",
+  "protected_claim_evidence": false,
+  "variants": {
+    "full_timestamp_schedule_v2_no_days_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_no_days_pack/registry_manifest.json",
+      "sha256": "9930c640bce265e6ca48847002e8e547c1b3efdf1baca9e2b0786236b8f60b79",
+      "tools": [
+        "next_weekday_time_to_timestamp",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "relative_day_time_to_timestamp",
+        "relative_weeks_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    "full_timestamp_schedule_v2_positive_core_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_positive_core_pack/registry_manifest.json",
+      "sha256": "1224941d8b76292934fe5c4184f6596c55b82452184f5dd1e46a23567bb8fcd3",
+      "tools": [
+        "next_weekday_time_to_timestamp",
+        "plan_contact_lookup_query",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    "full_timestamp_schedule_v2_slim_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_slim_pack/registry_manifest.json",
+      "sha256": "9fb52f1d993b52fd636f15e2bf0ea39911d5d4e9a09ff091df0deb40cd05792d",
+      "tools": [
+        "next_weekday_time_to_timestamp",
+        "plan_contact_lookup_query",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    }
+  }
+}

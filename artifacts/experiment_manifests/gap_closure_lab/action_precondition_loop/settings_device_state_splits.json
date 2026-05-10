@@ -1,0 +1,5357 @@
+{
+  "cache_policy": {
+    "baseline_control_cache": "use-if-eligible",
+    "openai_response_cache_for_candidate": "disabled",
+    "sage_candidate_cache": "fresh_only"
+  },
+  "created_at": "2026-05-10T02:01:03.135742+00:00",
+  "experimental_only": true,
+  "manifest_type": "sage_gap_closure_lab_settings_device_state_splits",
+  "protected_claim_evidence": false,
+  "schema_version": 1,
+  "selection_policy": {
+    "selection_note": "Formal500 scenario names filtered by settings/device-state tokens and round-robin by base family. No labels or cache availability used.",
+    "used_cache_availability": false,
+    "used_expected_answers": false,
+    "used_truth_labels": false,
+    "uses_prior_experimental_gap_assessment": true
+  },
+  "split_aliases": {
+    "confirm_100": "settings_device_state_100",
+    "expanded_60": "settings_device_state_60",
+    "pilot_20": "settings_device_state_20",
+    "validate_100": "settings_device_state_100"
+  },
+  "split_diversity": {
+    "settings_device_state_100": {
+      "bucket_counts": {
+        "settings_device_state": 100
+      },
+      "distinct_family_count": 14,
+      "family_counts": {
+        "add_reminder_content_and_week_delta_and_time_and_location": 8,
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 8,
+        "cellular_off": 7,
+        "find_days_till_holiday_wifi_off": 7,
+        "get_cellular": 7,
+        "get_wifi": 7,
+        "send_message_with_contact_content_cellular_off": 7,
+        "turn_on_cellular_low_battery_mode": 7,
+        "turn_on_cellular_low_battery_mode_implicit": 7,
+        "turn_on_location_low_battery_mode": 7,
+        "turn_on_location_low_battery_mode_implicit": 7,
+        "turn_on_wifi_low_battery_mode": 7,
+        "turn_on_wifi_low_battery_mode_implicit": 7,
+        "wifi_off": 7
+      },
+      "largest_family_count": 8,
+      "largest_family_share": 0.08,
+      "near_duplicate_dominated": false,
+      "scenario_count": 100
+    },
+    "settings_device_state_20": {
+      "bucket_counts": {
+        "settings_device_state": 20
+      },
+      "distinct_family_count": 14,
+      "family_counts": {
+        "add_reminder_content_and_week_delta_and_time_and_location": 2,
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 2,
+        "cellular_off": 2,
+        "find_days_till_holiday_wifi_off": 2,
+        "get_cellular": 2,
+        "get_wifi": 2,
+        "send_message_with_contact_content_cellular_off": 1,
+        "turn_on_cellular_low_battery_mode": 1,
+        "turn_on_cellular_low_battery_mode_implicit": 1,
+        "turn_on_location_low_battery_mode": 1,
+        "turn_on_location_low_battery_mode_implicit": 1,
+        "turn_on_wifi_low_battery_mode": 1,
+        "turn_on_wifi_low_battery_mode_implicit": 1,
+        "wifi_off": 1
+      },
+      "largest_family_count": 2,
+      "largest_family_share": 0.1,
+      "near_duplicate_dominated": false,
+      "scenario_count": 20
+    },
+    "settings_device_state_60": {
+      "bucket_counts": {
+        "settings_device_state": 60
+      },
+      "distinct_family_count": 14,
+      "family_counts": {
+        "add_reminder_content_and_week_delta_and_time_and_location": 5,
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 5,
+        "cellular_off": 5,
+        "find_days_till_holiday_wifi_off": 5,
+        "get_cellular": 4,
+        "get_wifi": 4,
+        "send_message_with_contact_content_cellular_off": 4,
+        "turn_on_cellular_low_battery_mode": 4,
+        "turn_on_cellular_low_battery_mode_implicit": 4,
+        "turn_on_location_low_battery_mode": 4,
+        "turn_on_location_low_battery_mode_implicit": 4,
+        "turn_on_wifi_low_battery_mode": 4,
+        "turn_on_wifi_low_battery_mode_implicit": 4,
+        "wifi_off": 4
+      },
+      "largest_family_count": 5,
+      "largest_family_share": 0.08333333333333333,
+      "near_duplicate_dominated": false,
+      "scenario_count": 60
+    }
+  },
+  "split_sizes": {
+    "settings_device_state_100": 100,
+    "settings_device_state_20": 20,
+    "settings_device_state_60": 60
+  },
+  "splits": {
+    "settings_device_state_100": [
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "datetime_info_to_timestamp",
+          "search_location_around_lat_lon",
+          "get_current_timestamp",
+          "modify_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "set_location_service_status",
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "get_location_service_status",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "cellular_off",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "end_conversation",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_wifi_off",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": true,
+        "scenario_id": "get_cellular",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": true,
+        "scenario_id": "get_wifi",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_low_battery_mode_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_location_service_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "wifi_off",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "convert_currency",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "search_holiday",
+          "search_lat_lon",
+          "get_current_timestamp",
+          "search_reminder",
+          "end_conversation",
+          "timestamp_diff",
+          "search_weather_around_lat_lon",
+          "search_stock",
+          "timestamp_to_datetime_info",
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "modify_reminder",
+          "set_location_service_status",
+          "get_current_timestamp",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_holiday",
+          "end_conversation",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "timestamp_diff",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "datetime_info_to_timestamp",
+          "search_weather_around_lat_lon",
+          "search_reminder",
+          "get_wifi_status",
+          "get_current_location",
+          "search_lat_lon",
+          "shift_timestamp",
+          "set_wifi_status",
+          "search_stock"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_location",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "convert_currency",
+          "get_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_location_service_status",
+          "set_low_battery_mode_status",
+          "end_conversation",
+          "set_wifi_status",
+          "get_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "cellular_off_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "get_cellular_service_status",
+          "timestamp_diff",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp",
+          "set_wifi_status",
+          "end_conversation",
+          "search_holiday",
+          "get_location_service_status",
+          "set_location_service_status",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_wifi_off_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "get_current_location",
+          "convert_currency",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": true,
+        "scenario_id": "get_cellular_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_location_service_status",
+          "unit_conversion",
+          "get_cellular_service_status",
+          "end_conversation",
+          "get_current_location",
+          "get_wifi_status",
+          "get_low_battery_mode_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_wifi_status",
+          "convert_currency",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": true,
+        "scenario_id": "get_wifi_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_messages",
+          "get_low_battery_mode_status",
+          "modify_contact",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "get_location_service_status",
+          "remove_contact",
+          "get_wifi_status",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "get_cellular_service_status",
+          "send_message_with_phone_number"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "search_lat_lon",
+          "end_conversation",
+          "unit_conversion",
+          "get_wifi_status",
+          "get_current_timestamp",
+          "get_location_service_status",
+          "search_contacts",
+          "set_location_service_status",
+          "get_current_location",
+          "convert_currency",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_location",
+          "set_location_service_status",
+          "search_contacts",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "end_conversation",
+          "convert_currency",
+          "get_current_timestamp",
+          "search_lat_lon",
+          "set_cellular_service_status",
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "set_wifi_status",
+          "unit_conversion"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "convert_currency",
+          "set_wifi_status",
+          "unit_conversion",
+          "set_cellular_service_status",
+          "search_location_around_lat_lon",
+          "get_wifi_status",
+          "get_location_service_status",
+          "get_current_location",
+          "set_location_service_status",
+          "search_lat_lon",
+          "set_low_battery_mode_status",
+          "search_contacts",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "set_location_service_status",
+          "convert_currency",
+          "search_lat_lon",
+          "set_wifi_status",
+          "search_contacts",
+          "unit_conversion",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "get_low_battery_mode_status",
+          "set_cellular_service_status",
+          "search_location_around_lat_lon",
+          "end_conversation",
+          "get_current_location",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_location_service_status",
+          "end_conversation",
+          "get_current_location",
+          "search_lat_lon",
+          "remove_contact",
+          "convert_currency",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "add_contact",
+          "set_low_battery_mode_status",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_lat_lon",
+          "add_contact",
+          "get_current_location",
+          "remove_contact",
+          "set_cellular_service_status",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "convert_currency",
+          "end_conversation",
+          "get_wifi_status",
+          "unit_conversion",
+          "get_location_service_status",
+          "get_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "end_conversation",
+          "unit_conversion",
+          "get_wifi_status",
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_current_location",
+          "convert_currency",
+          "get_low_battery_mode_status",
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "set_location_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "wifi_off_10_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_stock",
+          "search_reminder",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_current_timestamp",
+          "modify_reminder",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_lat_lon"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_reminder",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "get_location_service_status",
+          "get_current_location",
+          "get_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "cellular_off_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "get_current_timestamp",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_wifi_off_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": true,
+        "scenario_id": "get_cellular_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": true,
+        "scenario_id": "get_wifi_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "search_contacts",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "end_conversation",
+          "set_location_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_location_service_status",
+          "get_wifi_status",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "wifi_off_3_distraction_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_stock",
+          "search_reminder",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_current_timestamp",
+          "modify_reminder",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_lat_lon"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_reminder",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "get_location_service_status",
+          "get_current_location",
+          "get_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "cellular_off_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "get_current_timestamp",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": true,
+        "scenario_id": "get_cellular_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": true,
+        "scenario_id": "get_wifi_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "search_contacts",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "end_conversation",
+          "set_location_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_location_service_status",
+          "get_wifi_status",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "wifi_off_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_stock",
+          "search_reminder",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_current_timestamp",
+          "modify_reminder",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_lat_lon"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_reminder",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "get_location_service_status",
+          "get_current_location",
+          "get_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "cellular_off_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "get_current_timestamp",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": true,
+        "scenario_id": "get_cellular_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": true,
+        "scenario_id": "get_wifi_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "search_contacts",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "end_conversation",
+          "set_location_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_location_service_status",
+          "get_wifi_status",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "wifi_off_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_stock",
+          "search_reminder",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_current_timestamp",
+          "modify_reminder",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_lat_lon"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_reminder",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "get_location_service_status",
+          "get_current_location",
+          "get_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "cellular_off_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "get_current_timestamp",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_wifi_off_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": true,
+        "scenario_id": "get_cellular_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": true,
+        "scenario_id": "get_wifi_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "search_contacts",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "end_conversation",
+          "set_location_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_location_service_status",
+          "get_wifi_status",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "wifi_off_3_distraction_tools_tool_description_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_stock",
+          "search_reminder",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_current_timestamp",
+          "modify_reminder",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_lat_lon"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_reminder",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "get_location_service_status",
+          "get_current_location",
+          "get_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "cellular_off_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "get_current_timestamp",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_wifi_off_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": true,
+        "scenario_id": "get_cellular_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": true,
+        "scenario_id": "get_wifi_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "search_contacts",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "end_conversation",
+          "set_location_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_location_service_status",
+          "get_wifi_status",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "wifi_off_3_distraction_tools_tool_name_scrambled",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "TOOL_NAME_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_stock",
+          "set_location_service_status",
+          "modify_reminder",
+          "set_cellular_service_status",
+          "get_wifi_status",
+          "search_contacts",
+          "seconds_to_hours_minutes_seconds",
+          "datetime_info_to_timestamp",
+          "get_low_battery_mode_status",
+          "get_location_service_status",
+          "modify_contact",
+          "unit_conversion",
+          "convert_currency",
+          "shift_timestamp",
+          "remove_contact",
+          "end_conversation",
+          "get_current_timestamp",
+          "search_messages",
+          "timestamp_to_datetime_info",
+          "add_contact",
+          "timestamp_diff",
+          "set_wifi_status",
+          "add_reminder",
+          "search_location_around_lat_lon",
+          "remove_reminder",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "send_message_with_phone_number",
+          "calculate_lat_lon_distance",
+          "search_lat_lon",
+          "get_current_location",
+          "search_reminder",
+          "search_holiday",
+          "search_weather_around_lat_lon"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_all_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "add_reminder",
+          "search_reminder",
+          "end_conversation",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "get_current_location",
+          "get_low_battery_mode_status",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "timestamp_diff",
+          "calculate_lat_lon_distance",
+          "search_location_around_lat_lon",
+          "search_weather_around_lat_lon",
+          "seconds_to_hours_minutes_seconds",
+          "set_wifi_status",
+          "modify_contact",
+          "modify_reminder",
+          "search_messages",
+          "add_contact",
+          "search_lat_lon",
+          "convert_currency",
+          "set_location_service_status",
+          "search_holiday",
+          "search_contacts",
+          "remove_reminder",
+          "send_message_with_phone_number",
+          "search_stock",
+          "timestamp_to_datetime_info",
+          "get_wifi_status",
+          "remove_contact",
+          "get_current_timestamp",
+          "shift_timestamp",
+          "get_location_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_all_tools",
+        "split": "settings_device_state_100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "ALL_TOOLS_AVAILABLE"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ],
+    "settings_device_state_20": [
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "datetime_info_to_timestamp",
+          "search_location_around_lat_lon",
+          "get_current_timestamp",
+          "modify_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "set_location_service_status",
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "get_location_service_status",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "cellular_off",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "end_conversation",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_wifi_off",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": false,
+        "scenario_id": "get_cellular",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": false,
+        "scenario_id": "get_wifi",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_low_battery_mode_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_location_service_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "wifi_off",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "convert_currency",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "search_holiday",
+          "search_lat_lon",
+          "get_current_timestamp",
+          "search_reminder",
+          "end_conversation",
+          "timestamp_diff",
+          "search_weather_around_lat_lon",
+          "search_stock",
+          "timestamp_to_datetime_info",
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_10_distraction_tools",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "modify_reminder",
+          "set_location_service_status",
+          "get_current_timestamp",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_holiday",
+          "end_conversation",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "timestamp_diff",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "datetime_info_to_timestamp",
+          "search_weather_around_lat_lon",
+          "search_reminder",
+          "get_wifi_status",
+          "get_current_location",
+          "search_lat_lon",
+          "shift_timestamp",
+          "set_wifi_status",
+          "search_stock"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_location",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "convert_currency",
+          "get_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_location_service_status",
+          "set_low_battery_mode_status",
+          "end_conversation",
+          "set_wifi_status",
+          "get_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "cellular_off_10_distraction_tools",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "get_cellular_service_status",
+          "timestamp_diff",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp",
+          "set_wifi_status",
+          "end_conversation",
+          "search_holiday",
+          "get_location_service_status",
+          "set_location_service_status",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_wifi_off_10_distraction_tools",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "get_current_location",
+          "convert_currency",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": false,
+        "scenario_id": "get_cellular_10_distraction_tools",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_location_service_status",
+          "unit_conversion",
+          "get_cellular_service_status",
+          "end_conversation",
+          "get_current_location",
+          "get_wifi_status",
+          "get_low_battery_mode_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_wifi_status",
+          "convert_currency",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": false,
+        "scenario_id": "get_wifi_10_distraction_tools",
+        "split": "settings_device_state_20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ],
+    "settings_device_state_60": [
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "datetime_info_to_timestamp",
+          "search_location_around_lat_lon",
+          "get_current_timestamp",
+          "modify_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "set_location_service_status",
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "get_location_service_status",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "cellular_off",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "end_conversation",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_wifi_off",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": false,
+        "scenario_id": "get_cellular",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": false,
+        "scenario_id": "get_wifi",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_low_battery_mode_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_location_service_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "wifi_off",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "convert_currency",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "search_holiday",
+          "search_lat_lon",
+          "get_current_timestamp",
+          "search_reminder",
+          "end_conversation",
+          "timestamp_diff",
+          "search_weather_around_lat_lon",
+          "search_stock",
+          "timestamp_to_datetime_info",
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "modify_reminder",
+          "set_location_service_status",
+          "get_current_timestamp",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_holiday",
+          "end_conversation",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "timestamp_diff",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "datetime_info_to_timestamp",
+          "search_weather_around_lat_lon",
+          "search_reminder",
+          "get_wifi_status",
+          "get_current_location",
+          "search_lat_lon",
+          "shift_timestamp",
+          "set_wifi_status",
+          "search_stock"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_location",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "convert_currency",
+          "get_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_location_service_status",
+          "set_low_battery_mode_status",
+          "end_conversation",
+          "set_wifi_status",
+          "get_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "cellular_off_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "get_cellular_service_status",
+          "timestamp_diff",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp",
+          "set_wifi_status",
+          "end_conversation",
+          "search_holiday",
+          "get_location_service_status",
+          "set_location_service_status",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_wifi_off_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "get_current_location",
+          "convert_currency",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": false,
+        "scenario_id": "get_cellular_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_location_service_status",
+          "unit_conversion",
+          "get_cellular_service_status",
+          "end_conversation",
+          "get_current_location",
+          "get_wifi_status",
+          "get_low_battery_mode_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_wifi_status",
+          "convert_currency",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": false,
+        "scenario_id": "get_wifi_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_messages",
+          "get_low_battery_mode_status",
+          "modify_contact",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "get_location_service_status",
+          "remove_contact",
+          "get_wifi_status",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "get_cellular_service_status",
+          "send_message_with_phone_number"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "search_lat_lon",
+          "end_conversation",
+          "unit_conversion",
+          "get_wifi_status",
+          "get_current_timestamp",
+          "get_location_service_status",
+          "search_contacts",
+          "set_location_service_status",
+          "get_current_location",
+          "convert_currency",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_location",
+          "set_location_service_status",
+          "search_contacts",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "end_conversation",
+          "convert_currency",
+          "get_current_timestamp",
+          "search_lat_lon",
+          "set_cellular_service_status",
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "set_wifi_status",
+          "unit_conversion"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "convert_currency",
+          "set_wifi_status",
+          "unit_conversion",
+          "set_cellular_service_status",
+          "search_location_around_lat_lon",
+          "get_wifi_status",
+          "get_location_service_status",
+          "get_current_location",
+          "set_location_service_status",
+          "search_lat_lon",
+          "set_low_battery_mode_status",
+          "search_contacts",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "set_location_service_status",
+          "convert_currency",
+          "search_lat_lon",
+          "set_wifi_status",
+          "search_contacts",
+          "unit_conversion",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "get_low_battery_mode_status",
+          "set_cellular_service_status",
+          "search_location_around_lat_lon",
+          "end_conversation",
+          "get_current_location",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_location_service_status",
+          "end_conversation",
+          "get_current_location",
+          "search_lat_lon",
+          "remove_contact",
+          "convert_currency",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "add_contact",
+          "set_low_battery_mode_status",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_lat_lon",
+          "add_contact",
+          "get_current_location",
+          "remove_contact",
+          "set_cellular_service_status",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "convert_currency",
+          "end_conversation",
+          "get_wifi_status",
+          "unit_conversion",
+          "get_location_service_status",
+          "get_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "end_conversation",
+          "unit_conversion",
+          "get_wifi_status",
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_current_location",
+          "convert_currency",
+          "get_low_battery_mode_status",
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "set_location_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "wifi_off_10_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_stock",
+          "search_reminder",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_current_timestamp",
+          "modify_reminder",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_lat_lon"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_reminder",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "get_location_service_status",
+          "get_current_location",
+          "get_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "cellular_off_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "get_current_timestamp",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_wifi_off_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": false,
+        "scenario_id": "get_cellular_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": false,
+        "scenario_id": "get_wifi_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "search_contacts",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "end_conversation",
+          "set_location_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_location_service_status",
+          "get_wifi_status",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "wifi_off_3_distraction_tools",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_stock",
+          "search_reminder",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_current_timestamp",
+          "modify_reminder",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_lat_lon"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_reminder",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "get_location_service_status",
+          "get_current_location",
+          "get_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "cellular_off_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "get_current_timestamp",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": false,
+        "scenario_id": "get_cellular_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": false,
+        "scenario_id": "get_wifi_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "search_contacts",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_cellular_service_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "set_location_service_status",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "end_conversation",
+          "set_location_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_low_battery_mode_status",
+          "get_location_service_status",
+          "get_wifi_status",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "wifi_off_3_distraction_tools_arg_description_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_DESCRIPTION_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_stock",
+          "search_reminder",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "get_current_timestamp",
+          "modify_reminder",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_lat_lon"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_reminder",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "datetime_info_to_timestamp",
+          "get_location_service_status",
+          "get_current_location",
+          "get_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "set_cellular_service_status",
+          "get_wifi_status",
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "cellular_off_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "get_current_timestamp",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_location_service_status",
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_type_scrambled",
+        "split": "settings_device_state_60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS",
+          "ARG_TYPE_SCRAMBLED"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ]
+  },
+  "truth_labels_inspected": false
+}

@@ -1,0 +1,105 @@
+{
+  "registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_state_send_contact_relationship_pack/registry_manifest.json",
+  "helper_contribution_summary": "outputs/gap_closure_lab/action_precondition_loop/ack_retention_bridge_broad500_taskcache/full_benchmark_20260510_133157/helper_contribution_summary.json",
+  "failure_memory": null,
+  "target_lifecycle": "candidate",
+  "allowed": false,
+  "decisions": [
+    {
+      "tool_name": "days_between_timestamps",
+      "allowed": true,
+      "decision": "promote",
+      "reasons": []
+    },
+    {
+      "tool_name": "next_weekday_time_to_timestamp",
+      "allowed": true,
+      "decision": "promote",
+      "reasons": []
+    },
+    {
+      "tool_name": "plan_contact_lookup_query",
+      "allowed": true,
+      "decision": "promote",
+      "reasons": []
+    },
+    {
+      "tool_name": "plan_contact_relationship_batch_update",
+      "allowed": true,
+      "decision": "promote",
+      "reasons": []
+    },
+    {
+      "tool_name": "plan_contact_search_from_scalar_constraint",
+      "allowed": false,
+      "decision": "park",
+      "reasons": [
+        "visible_not_called_rate_too_high"
+      ]
+    },
+    {
+      "tool_name": "plan_device_state_action_sequence_v3",
+      "allowed": false,
+      "decision": "park",
+      "reasons": [
+        "visible_not_called_rate_too_high",
+        "side_effect_incidents_present"
+      ]
+    },
+    {
+      "tool_name": "plan_send_message_contact_lookup",
+      "allowed": true,
+      "decision": "promote",
+      "reasons": []
+    },
+    {
+      "tool_name": "relative_day_time_to_timestamp",
+      "allowed": false,
+      "decision": "park",
+      "reasons": [
+        "missing_shortfall_cluster_evidence",
+        "missing_positive_triggers",
+        "missing_negative_triggers",
+        "missing_safe_abstain_behavior"
+      ]
+    },
+    {
+      "tool_name": "relative_weeks_time_to_timestamp",
+      "allowed": false,
+      "decision": "park",
+      "reasons": [
+        "no_later_task_calls",
+        "visible_not_called_rate_too_high"
+      ]
+    },
+    {
+      "tool_name": "resolve_search_window_or_bounds",
+      "allowed": true,
+      "decision": "promote",
+      "reasons": []
+    },
+    {
+      "tool_name": "select_message_content_by_recency",
+      "allowed": false,
+      "decision": "park",
+      "reasons": [
+        "visible_not_called_rate_too_high"
+      ]
+    },
+    {
+      "tool_name": "select_message_counterparty_for_contact_update",
+      "allowed": true,
+      "decision": "promote",
+      "reasons": []
+    },
+    {
+      "tool_name": "select_record_by_timestamp_extreme",
+      "allowed": false,
+      "decision": "park",
+      "reasons": [
+        "missing_shortfall_cluster_evidence",
+        "visible_not_called_rate_too_high"
+      ]
+    }
+  ]
+}

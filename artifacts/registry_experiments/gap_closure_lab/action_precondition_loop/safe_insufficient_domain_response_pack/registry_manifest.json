@@ -1,0 +1,130 @@
+{
+  "tools": {
+    "recommend_domain_safe_abstention": {
+      "accepted_at": "2026-05-10T02:00:59.802537+00:00",
+      "birth_scenario": "safe_insufficient_pilot20_repair",
+      "code_hash": "c6ea063e3c1583d21d8638f55ce8b5949c186ee06ef2f18768dfae586319ad81",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "\ndef recommend_domain_safe_abstention(user_request: str, available_original_tools: str = \"\", missing_signal: str = \"\") -> dict:\n    \"\"\"Return a domain-specific final answer when the safe action is to abstain.\"\"\"\n    request = str(user_request or \"\")\n    tools_text = str(available_original_tools or \"\")\n    missing = str(missing_signal or \"\")\n    text = \" \".join([request, tools_text, missing]).lower().replace(\"_\", \" \")\n    available = {item.strip() for item in tools_text.replace(\";\", \",\").split(\",\") if item.strip()}\n\n    forbidden = []\n    missing_items = []\n    final = \"\"\n    reason = \"insufficient_information\"\n\n    asks_remove_contact = any(token in text for token in (\"delete\", \"remove\", \"get him out\")) and \"contact\" in text\n    asks_modify_contact = any(token in text for token in (\"update\", \"change\", \"modify\")) and \"contact\" in text\n    mentions_message_recency = any(token in text for token in (\"last person\", \"last message\", \"sent a message\", \"contacted last\", \"messaged\"))\n    asks_reminder_recency = \"reminder\" in text and any(token in text for token in (\"upcoming\", \"yesterday\", \"today\", \"latest\", \"last\", \"later\"))\n    asks_calendar_delta = any(token in text for token in (\"how many days\", \"days till\", \"days until\", \"holiday\"))\n    asks_location = any(token in text for token in (\"where am i\", \"current location\", \"current city\", \"my location\"))\n\n    if asks_remove_contact and \"remove_contact\" not in available:\n        forbidden = [\"remove_contact\"]\n        missing_items = [\"remove_contact tool\"]\n        final = \"I cannot remove that contact because the contact-removal tool is not available.\"\n        reason = \"required_action_tool_unavailable\"\n    elif asks_remove_contact and \"search_contacts\" not in available:\n        forbidden = [\"remove_contact\"]\n        missing_items = [\"contact lookup result\"]\n        final = \"I cannot safely remove that contact because I cannot identify a concrete contact record first.\"\n        reason = \"required_contact_lookup_unavailable\"\n    elif asks_modify_contact and mentions_message_recency:\n        forbidden = [\"modify_contact\"]\n        missing_items = [\"message history identifying the non-self counterparty\"]\n        final = \"I cannot update that contact because I cannot determine which non-self contact the request refers to.\"\n        reason = \"missing_message_counterparty\"\n    elif asks_reminder_recency and \"get_current_timestamp\" not in available:\n        forbidden = [\"search_reminder\", \"modify_reminder\", \"remove_reminder\"]\n        missing_items = [\"current datetime\"]\n        final = \"I cannot determine the requested reminder without the current date and time.\"\n        reason = \"missing_current_datetime\"\n    elif asks_calendar_delta and \"get_current_timestamp\" not in available:\n        forbidden = [\"timestamp_diff\"]\n        missing_items = [\"current date\"]\n        final = \"I cannot determine the number of days without the current date.\"\n        reason = \"missing_current_date\"\n    elif asks_location:\n        forbidden = [\"search_lat_lon\", \"get_current_location\"]\n        missing_items = [\"current location\"]\n        final = \"I cannot determine your current location from the available information.\"\n        reason = \"missing_location\"\n    elif missing:\n        missing_items = [missing]\n        final = \"I do not have enough information to complete that request.\"\n    else:\n        return {\n            \"should_abstain\": False,\n            \"missing_information\": [],\n            \"forbidden_downstream_tools\": [],\n            \"reason\": \"not_applicable\",\n            \"final_answer_recommendation\": \"continue_normally\",\n        }\n\n    return {\n        \"should_abstain\": True,\n        \"missing_information\": missing_items,\n        \"forbidden_downstream_tools\": forbidden,\n        \"reason\": reason,\n        \"final_answer_recommendation\": final,\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_abstain true with a specific final answer and forbidden downstream tools for missing-tool, missing-current-time, missing-location, or ambiguous-message-counterparty cases. Return should_abstain false only when none of those signals applies.",
+          "applicable_task_families": [],
+          "canonical_route_substitution_risk": "medium",
+          "cross_task_applicability_count": null,
+          "description": "Domain-specific insufficient-information responder. Use when the request is unsafe or impossible because a required tool, concrete record id, current time/date, current location, or message-derived counterparty is unavailable. Pass the user request and the visible comma-separated original ToolSandbox tool names. If should_abstain is true, answer with final_answer_recommendation and do not call forbidden_downstream_tools.",
+          "diagnostic_only": false,
+          "estimated_step_compression": null,
+          "expected_milestone_calls_replaced": [],
+          "family": "validation_abstention_helper",
+          "final_state_preservation_plan": "The helper is pure. It explicitly lists forbidden downstream tools so the actor can avoid unsafe contact/reminder/message side effects.",
+          "generalization_rationale": "The same abstention categories recur across contact CRUD, reminder recency, holiday-date, location, and message-counterparty tasks.",
+          "grading_accounting_note": "Outcome and minefield avoidance are primary; canonical reference changes are secondary because correct abstention may replace failed or unsafe action paths.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": true,
+            "planner_failures": [],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "called_subset_negative",
+              "final_answer_not_domain_specific"
+            ],
+            "summary": "The first safe-insufficient pilot naturally called a generic guard 10/20 times but the called subset regressed, indicating output specificity rather than visibility was the blocker.",
+            "visible_data_gaps": [
+              "current datetime",
+              "contact record id",
+              "message counterparty"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "str",
+              "description": "The current user request or concise task wording.",
+              "name": "user_request"
+            },
+            {
+              "annotation": "str",
+              "description": "Comma-separated original ToolSandbox tool names visible for this task.",
+              "name": "available_original_tools"
+            },
+            {
+              "annotation": "str",
+              "description": "Visible missing fact or tool, or empty string.",
+              "name": "missing_signal"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [],
+          "negative_triggers": [
+            "turn_on_wifi_low_battery_mode",
+            "turn_on_cellular_low_battery_mode",
+            "turn_on_location_low_battery_mode",
+            "wifi_off",
+            "cellular_off"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "forbidden_downstream_tools": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "missing_information": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "should_abstain": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "should_abstain",
+              "missing_information",
+              "forbidden_downstream_tools",
+              "reason",
+              "final_answer_recommendation"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "insufficient_information",
+            "cannot_determine",
+            "missing_information",
+            "no_search_contacts_insufficient_information",
+            "no_remove_contact_insufficient_information",
+            "missing_current_datetime",
+            "missing_message_counterparty"
+          ],
+          "preserves_side_effect_tools": [],
+          "reason_tool_is_decisive": "",
+          "required_original_tool_calls": [],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [],
+          "tool_name": "recommend_domain_safe_abstention"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    }
+  }
+}

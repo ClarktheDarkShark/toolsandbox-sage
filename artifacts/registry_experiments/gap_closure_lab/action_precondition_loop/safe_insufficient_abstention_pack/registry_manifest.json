@@ -1,0 +1,128 @@
+{
+  "tools": {
+    "recommend_safe_missing_information_response": {
+      "accepted_at": "2026-05-10T02:00:59.787145+00:00",
+      "birth_scenario": "find_days_till_holiday_insufficient_information",
+      "code_hash": "aa7472287b91c410c5c19a6bd69dbe97551161dc8cfb739f8dd283b609b02247",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "\ndef recommend_safe_missing_information_response(task_family: str = \"\", missing_signal: str = \"\", intended_downstream_tool: str = \"\") -> dict:\n    \"\"\"Return a final-answer-ready abstention contract for missing-information tasks.\"\"\"\n    family = str(task_family or \"\").strip().lower()\n    missing = str(missing_signal or \"\").strip()\n    downstream = str(intended_downstream_tool or \"\").strip()\n    trigger_text = \" \".join([family, missing]).lower()\n    should_abstain = bool(missing) or any(\n        token in trigger_text\n        for token in (\n            \"insufficient_information\",\n            \"insufficient information\",\n            \"missing\",\n            \"cannot determine\",\n            \"cannot_determine\",\n            \"unknown\",\n            \"ambiguous\",\n            \"not enough\",\n        )\n    )\n    if not should_abstain:\n        return {\n            \"should_abstain\": False,\n            \"missing_information\": [],\n            \"clarification_prompt\": \"\",\n            \"forbidden_downstream_tools\": [],\n            \"reason\": \"not_applicable\",\n            \"final_answer_recommendation\": \"continue_normally\",\n        }\n    if missing:\n        missing_information = [missing]\n    elif family:\n        missing_information = [family]\n    else:\n        missing_information = [\"required information is missing\"]\n    forbidden = [downstream] if downstream else []\n    prompt = \"I do not have enough information to complete that request.\"\n    return {\n        \"should_abstain\": True,\n        \"missing_information\": missing_information,\n        \"clarification_prompt\": prompt,\n        \"forbidden_downstream_tools\": forbidden,\n        \"reason\": \"insufficient_information\",\n        \"final_answer_recommendation\": prompt,\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_abstain true with a final-answer-ready sentence when the task is missing required information. Return should_abstain false only when no missing-information signal is supplied.",
+          "applicable_task_families": [],
+          "canonical_route_substitution_risk": "low",
+          "cross_task_applicability_count": null,
+          "description": "Final-answer-ready missing-information guard. Use on tasks where the user request cannot be completed from visible state, visible records, or available tools. It returns should_abstain, a concise missing-information list, a clarification/final-response sentence, and downstream tools that should not be called.",
+          "diagnostic_only": false,
+          "estimated_step_compression": null,
+          "expected_milestone_calls_replaced": [],
+          "family": "validation_abstention_helper",
+          "final_state_preservation_plan": "The helper has no side effects and forbids downstream calls only when information is missing; final state is preserved by abstention.",
+          "generalization_rationale": "Missing-information tasks recur across location, calendar, contact, reminder, message, and external-service families; the safe behavior is to avoid fabricated answers or unsafe side effects.",
+          "grading_accounting_note": "The helper may replace a failed search/action path with a correct abstention response; outcome is primary and canonical substitution is reported separately.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": true,
+            "planner_failures": [],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "no_current_helper_fit",
+              "missing_information_minefield"
+            ],
+            "summary": "Broad500 safe insufficient-information bucket had 119 tasks and 111 no-visible-helper cases, while earlier broad guards were too record-specific and not final-answer-ready.",
+            "visible_data_gaps": [
+              "required user or service information absent"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "str",
+              "description": "Short task family or visible reason, such as insufficient_information.",
+              "name": "task_family"
+            },
+            {
+              "annotation": "str",
+              "description": "Specific missing fact or precondition if known.",
+              "name": "missing_signal"
+            },
+            {
+              "annotation": "str",
+              "description": "Original tool to avoid when information is missing.",
+              "name": "intended_downstream_tool"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [],
+          "negative_triggers": [
+            "turn_on_wifi_low_battery_mode",
+            "turn_on_cellular_low_battery_mode",
+            "turn_on_location_low_battery_mode"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "clarification_prompt": {
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "forbidden_downstream_tools": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "missing_information": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "should_abstain": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "should_abstain",
+              "missing_information",
+              "clarification_prompt",
+              "forbidden_downstream_tools",
+              "reason",
+              "final_answer_recommendation"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "insufficient_information",
+            "cannot_determine",
+            "missing_information",
+            "no_search_contacts_insufficient_information",
+            "no_remove_contact_insufficient_information"
+          ],
+          "preserves_side_effect_tools": [],
+          "reason_tool_is_decisive": "",
+          "required_original_tool_calls": [],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [],
+          "tool_name": "recommend_safe_missing_information_response"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    }
+  }
+}

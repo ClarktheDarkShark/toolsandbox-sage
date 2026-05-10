@@ -1,0 +1,45 @@
+{
+  "created_at": "2026-05-10T04:03:00.519516+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "baseline_cache_policy": "use-if-eligible",
+    "candidate_arms_fresh_only": true,
+    "scenario_ids_encoded_into_tools_or_router": false,
+    "truth_labels_inspected": false,
+    "used_cache_availability_for_selection": false
+  },
+  "objective": "Repair reminder scheduling regressions with an unambiguous next-weekday timestamp helper and a separate exact-week-offset helper.",
+  "protected_claim_evidence": false,
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/top_tools_full_timestamp_no_field_extractor_pack/registry_manifest.json",
+  "source_registry_sha256": "365fa28ecd476c1b3b4cd53b16b5d61b233bd3744e91d5a5d0c060c9a10f5e2b",
+  "v1_failure_repair": {
+    "repair": "remove week_delta from the next-weekday tool interface",
+    "root_cause": "weekday_delta_time_to_timestamp exposed week_delta, which was misused for next Friday"
+  },
+  "variants": {
+    "full_timestamp_no_field_plus_schedule_v2_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_no_field_plus_schedule_v2_pack/registry_manifest.json",
+      "sha256": "954d5614f774f190aee48d2fdbbe786e3bd73d621563721d800012ff2516ae70",
+      "tools": [
+        "days_between_timestamps",
+        "next_weekday_time_to_timestamp",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "relative_day_time_to_timestamp",
+        "relative_weeks_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    "scheduling_precision_v2_only_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/scheduling_precision_v2_only_pack/registry_manifest.json",
+      "sha256": "ecfd23294a38f010abfcf9e7e88baee69286a89f3a127c5b530ba7994c91b996",
+      "tools": [
+        "next_weekday_time_to_timestamp",
+        "relative_weeks_time_to_timestamp"
+      ]
+    }
+  }
+}

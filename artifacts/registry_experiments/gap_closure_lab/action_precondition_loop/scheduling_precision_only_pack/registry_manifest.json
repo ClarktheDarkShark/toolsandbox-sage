@@ -1,0 +1,310 @@
+{
+  "tools": {
+    "week_delta_time_to_timestamp": {
+      "accepted_at": "2026-05-10T03:36:24.018259+00:00",
+      "birth_scenario": "add_reminder_content_and_week_delta_and_time",
+      "code_hash": "14dff717f1ebb1e8661dce102585a4fa19cc687f836888093947195ea7e6ed4e",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "\ndef week_delta_time_to_timestamp(current_timestamp: float, week_delta: int, hour: int, minute: int, local_utc_offset_hours: float) -> dict:\n    \"\"\"Convert an exact week offset plus local time into a UTC Unix timestamp.\"\"\"\n    week_delta = int(week_delta)\n    hour = int(hour)\n    minute = int(minute)\n    if week_delta < 0 or hour < 0 or hour > 23 or minute < 0 or minute > 59:\n        return {\n            \"ok\": False,\n            \"timestamp\": 0.0,\n            \"reminder_timestamp\": 0.0,\n            \"day_offset\": 0,\n            \"add_reminder_kwargs\": {},\n            \"reason\": \"invalid_week_delta_or_time\",\n            \"final_answer_recommendation\": \"abstain:invalid_reminder_time\",\n        }\n    seconds_per_day = 86400.0\n    offset_seconds = float(local_utc_offset_hours) * 3600.0\n    current_local_day = int((float(current_timestamp) + offset_seconds) // seconds_per_day)\n    day_offset = week_delta * 7\n    target_local_day = current_local_day + day_offset\n    timestamp = (target_local_day * seconds_per_day) - offset_seconds + (hour * 3600.0) + (minute * 60.0)\n    return {\n        \"ok\": True,\n        \"timestamp\": float(timestamp),\n        \"reminder_timestamp\": float(timestamp),\n        \"day_offset\": int(day_offset),\n        \"add_reminder_kwargs\": {\"reminder_timestamp\": float(timestamp)},\n        \"reason\": \"week_delta_time_resolved\",\n        \"final_answer_recommendation\": \"use reminder_timestamp for add_reminder or modify_reminder\",\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return ok false and no add_reminder_kwargs for invalid week/time inputs.",
+          "applicable_task_families": [
+            "add_reminder_content_and_week_delta_and_time",
+            "add_reminder_content_and_week_delta_and_time_and_location"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 2,
+          "description": "Reminder scheduling helper for requests like 'in two weeks at 9 AM'. After get_current_timestamp returns the current time, call this instead of manually converting weeks to days. It returns a reminder_timestamp and add_reminder_kwargs. Pure helper; no side effects.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "derived_value_calculator",
+          "final_state_preservation_plan": "The helper is pure and returns kwargs; the actor still must call the original add_reminder or modify_reminder side-effect tool.",
+          "generalization_rationale": "Week-delta reminder creation appears across no-distraction and distraction variants; a deterministic timestamp tool removes a repeated arithmetic/planning burden without performing side effects.",
+          "grading_accounting_note": "Original side-effect route remains visible through add_reminder/modify_reminder.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "manual_week_delta_timestamp_conversion"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "broad_family_regression",
+              "timestamp_arithmetic_gap"
+            ],
+            "summary": "Broad60 retained-core run regressed on week-delta reminder scheduling variants.",
+            "visible_data_gaps": []
+          },
+          "inputs": [
+            {
+              "annotation": "float",
+              "description": "Current Unix timestamp from get_current_timestamp.",
+              "name": "current_timestamp"
+            },
+            {
+              "annotation": "int",
+              "description": "Number of whole weeks from the current local date. Use 1 for next week, 2 for two weeks, etc.",
+              "name": "week_delta"
+            },
+            {
+              "annotation": "int",
+              "description": "Target local hour in 24-hour time.",
+              "name": "hour"
+            },
+            {
+              "annotation": "int",
+              "description": "Target local minute.",
+              "name": "minute"
+            },
+            {
+              "annotation": "float",
+              "description": "Local UTC offset; use -4 for ToolSandbox unless another offset is known.",
+              "name": "local_utc_offset_hours"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "week_delta_to_day_offset_arithmetic",
+            "timestamp_not_final_answer_ready"
+          ],
+          "negative_triggers": [
+            "recency_latest",
+            "search_reminder_with_recency",
+            "insufficient_information",
+            "weekday_delta"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "add_reminder_kwargs": {
+                "type": "object"
+              },
+              "day_offset": {
+                "type": "integer"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "reminder_timestamp": {
+                "type": "number"
+              },
+              "timestamp": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "ok",
+              "timestamp",
+              "reminder_timestamp",
+              "day_offset",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "add_reminder_content_and_week_delta_and_time",
+            "add_reminder_content_and_week_delta_and_time_and_location",
+            "week_delta",
+            "in two weeks",
+            "next week"
+          ],
+          "preserves_side_effect_tools": [
+            "add_reminder",
+            "modify_reminder"
+          ],
+          "reason_tool_is_decisive": "It converts weeks and local time directly into the exact reminder_timestamp required by add_reminder.",
+          "required_original_tool_calls": [
+            "get_current_timestamp",
+            "add_reminder"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "Broad60 confirmed-bucket core showed regressions on add_reminder_content_and_week_delta variants.",
+            "Reminder CRUD confirm100 showed timestamp helpers are naturally adopted and outcome-positive downstream."
+          ],
+          "tool_name": "week_delta_time_to_timestamp"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    },
+    "weekday_delta_time_to_timestamp": {
+      "accepted_at": "2026-05-10T03:36:24.026801+00:00",
+      "birth_scenario": "add_reminder_content_and_weekday_delta_and_time",
+      "code_hash": "c9c9260540634ce3d2da79e3bc2b0629f688f5255eec5ea6b6328524a8217d60",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "\ndef weekday_delta_time_to_timestamp(current_timestamp: float, target_weekday: str, week_delta: int, hour: int, minute: int, local_utc_offset_hours: float, include_today: bool) -> dict:\n    \"\"\"Convert a target weekday plus week offset and local time into a UTC timestamp.\"\"\"\n    names = {\n        \"mon\": 0,\n        \"monday\": 0,\n        \"tue\": 1,\n        \"tues\": 1,\n        \"tuesday\": 1,\n        \"wed\": 2,\n        \"wednesday\": 2,\n        \"thu\": 3,\n        \"thur\": 3,\n        \"thurs\": 3,\n        \"thursday\": 3,\n        \"fri\": 4,\n        \"friday\": 4,\n        \"sat\": 5,\n        \"saturday\": 5,\n        \"sun\": 6,\n        \"sunday\": 6,\n    }\n    key = str(target_weekday or \"\").strip().lower()\n    target = names.get(key)\n    week_delta = int(week_delta)\n    hour = int(hour)\n    minute = int(minute)\n    if target is None or week_delta < 0 or hour < 0 or hour > 23 or minute < 0 or minute > 59:\n        return {\n            \"ok\": False,\n            \"timestamp\": 0.0,\n            \"reminder_timestamp\": 0.0,\n            \"day_offset\": 0,\n            \"add_reminder_kwargs\": {},\n            \"reason\": \"invalid_weekday_or_time\",\n            \"final_answer_recommendation\": \"abstain:invalid_reminder_time\",\n        }\n    seconds_per_day = 86400.0\n    offset_seconds = float(local_utc_offset_hours) * 3600.0\n    current_local_day = int((float(current_timestamp) + offset_seconds) // seconds_per_day)\n    # Unix day 0 was Thursday. With Monday=0, current weekday is day + 3 modulo 7.\n    current_weekday = (current_local_day + 3) % 7\n    days_until = (target - current_weekday) % 7\n    if days_until == 0 and not bool(include_today):\n        days_until = 7\n    day_offset = days_until + (week_delta * 7)\n    target_local_day = current_local_day + day_offset\n    timestamp = (target_local_day * seconds_per_day) - offset_seconds + (hour * 3600.0) + (minute * 60.0)\n    return {\n        \"ok\": True,\n        \"timestamp\": float(timestamp),\n        \"reminder_timestamp\": float(timestamp),\n        \"day_offset\": int(day_offset),\n        \"weekday_index\": int(target),\n        \"add_reminder_kwargs\": {\"reminder_timestamp\": float(timestamp)},\n        \"reason\": \"weekday_delta_time_resolved\",\n        \"final_answer_recommendation\": \"use reminder_timestamp for add_reminder or modify_reminder\",\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return ok false and no add_reminder_kwargs for unknown weekday/time inputs.",
+          "applicable_task_families": [
+            "add_reminder_content_and_weekday_delta_and_time",
+            "add_reminder_content_and_weekday_delta_and_time_10_distraction_tools"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 2,
+          "description": "Reminder scheduling helper for requests like 'next Tuesday at 8 AM' or 'two Fridays from now'. After get_current_timestamp returns the current time, call this to resolve the weekday and local time into a reminder_timestamp. Pure helper; no side effects.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "derived_value_calculator",
+          "final_state_preservation_plan": "The helper is pure and returns kwargs; the actor still must call the original add_reminder or modify_reminder side-effect tool.",
+          "generalization_rationale": "Weekday reminder creation recurs across base and distraction variants; resolving the next matching local weekday is a narrow deterministic arithmetic step.",
+          "grading_accounting_note": "Original side-effect route remains visible through add_reminder/modify_reminder.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "manual_weekday_timestamp_conversion"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "broad_family_regression",
+              "timestamp_arithmetic_gap"
+            ],
+            "summary": "Broad60 retained-core run regressed on weekday-delta reminder scheduling variants.",
+            "visible_data_gaps": []
+          },
+          "inputs": [
+            {
+              "annotation": "float",
+              "description": "Current Unix timestamp from get_current_timestamp.",
+              "name": "current_timestamp"
+            },
+            {
+              "annotation": "str",
+              "description": "Target weekday name, e.g. monday, tue, friday.",
+              "name": "target_weekday"
+            },
+            {
+              "annotation": "int",
+              "description": "Whole weeks after the upcoming occurrence. Use 0 for the next occurrence, 1 for the following week.",
+              "name": "week_delta"
+            },
+            {
+              "annotation": "int",
+              "description": "Target local hour in 24-hour time.",
+              "name": "hour"
+            },
+            {
+              "annotation": "int",
+              "description": "Target local minute.",
+              "name": "minute"
+            },
+            {
+              "annotation": "float",
+              "description": "Local UTC offset; use -4 for ToolSandbox unless another offset is known.",
+              "name": "local_utc_offset_hours"
+            },
+            {
+              "annotation": "bool",
+              "description": "Whether a same-day weekday match is allowed. Use false for 'next <weekday>'.",
+              "name": "include_today"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "weekday_to_day_offset_arithmetic",
+            "timestamp_not_final_answer_ready"
+          ],
+          "negative_triggers": [
+            "recency_latest",
+            "search_reminder_with_recency",
+            "insufficient_information",
+            "week_delta_and_time"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "add_reminder_kwargs": {
+                "type": "object"
+              },
+              "day_offset": {
+                "type": "integer"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "reminder_timestamp": {
+                "type": "number"
+              },
+              "timestamp": {
+                "type": "number"
+              },
+              "weekday_index": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "ok",
+              "timestamp",
+              "reminder_timestamp",
+              "day_offset",
+              "weekday_index",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "add_reminder_content_and_weekday_delta_and_time",
+            "weekday_delta",
+            "next monday",
+            "next tuesday",
+            "next friday"
+          ],
+          "preserves_side_effect_tools": [
+            "add_reminder",
+            "modify_reminder"
+          ],
+          "reason_tool_is_decisive": "It removes ambiguous weekday arithmetic and returns the exact reminder_timestamp required by add_reminder.",
+          "required_original_tool_calls": [
+            "get_current_timestamp",
+            "add_reminder"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "Broad60 confirmed-bucket core showed regressions on add_reminder_content_and_weekday_delta variants.",
+            "Reminder CRUD confirm100 showed timestamp helpers are naturally adopted and outcome-positive downstream."
+          ],
+          "tool_name": "weekday_delta_time_to_timestamp"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "created_at": "2026-05-10T14:23:20.897093+00:00",
+  "experimental_only": true,
+  "leakage_control": "The new helper uses only visible relationship labels and visible contact records. It does not encode scenario ids, expected answers, truth labels, or hidden benchmark facts.",
+  "output_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/contact_selector_relationship_update_pack/registry_manifest.json",
+  "rationale": "Combine only the retained message-recency selector with a narrow relationship-bulk planner; avoid exposing unrelated timestamp, state, send, or broad contact planners on Contact CRUD.",
+  "registry_sha256": "75d1876643179a29e058ea6270eb83511210f4944fb43805c369b82ced3de458",
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/contact_counterparty_selector_only_pack/registry_manifest.json",
+  "tool_names": [
+    "plan_contact_relationship_batch_update",
+    "select_message_counterparty_for_contact_update"
+  ]
+}

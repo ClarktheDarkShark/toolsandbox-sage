@@ -1,0 +1,90 @@
+{
+  "created_at": "2026-05-10T02:29:39.391386+00:00",
+  "experimental_only": true,
+  "leakage_statement": "No scenario IDs, expected answers, hidden truth labels, or benchmark facts are encoded. Tools operate only on visible user scalars and visible search result records.",
+  "protected_claim_evidence": false,
+  "registries": {
+    "contact_crud_bridge": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/contact_crud_bridge_pack/registry_manifest.json",
+      "sha256": "50e0cf522e52165166492ee20c5dac91e6cb923758d03164a8b049279ac8f400",
+      "tools": [
+        "plan_contact_crud_action"
+      ]
+    },
+    "reminder_crud_bridge": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/reminder_crud_bridge_pack/registry_manifest.json",
+      "sha256": "1a481c21b816b77481d326480ac2b1ae1fa2b848d9a1c7b878a4125eb294e93a",
+      "tools": [
+        "prepare_reminder_crud_action"
+      ]
+    },
+    "top_tools_plus_crud_bridge": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/top_tools_plus_crud_bridge_pack/registry_manifest.json",
+      "sha256": "f596396892b1eef22ee2d0128d4314ac008e2284379c91b6708c6d886b8e8b96",
+      "tools": [
+        "days_between_timestamps",
+        "plan_contact_crud_action",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "plan_device_state_action_sequence",
+        "prepare_reminder_crud_action",
+        "recommend_domain_safe_abstention",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    }
+  },
+  "side_effect_statement": "Helpers are pure and return original ToolSandbox kwargs only; actors must still call add/modify/remove/search original tools.",
+  "smoke": {
+    "contact_action": {
+      "abstain_reason": "",
+      "downstream_tool_kwargs": {
+        "person_id": "p1"
+      },
+      "downstream_tool_name": "remove_contact",
+      "final_answer_recommendation": "call:remove_contact",
+      "phase": "action_ready",
+      "search_contacts_kwargs": {
+        "phone_number": "+12453344098"
+      },
+      "selected_contact": {
+        "is_self": false,
+        "person_id": "p1",
+        "phone_number": "+12453344098"
+      },
+      "should_call_search_contacts": false,
+      "should_call_tool": true
+    },
+    "contact_search": {
+      "abstain_reason": "",
+      "downstream_tool_kwargs": {},
+      "downstream_tool_name": "",
+      "final_answer_recommendation": "call:search_contacts",
+      "phase": "search_required",
+      "search_contacts_kwargs": {
+        "phone_number": "+12453344098"
+      },
+      "selected_contact": {},
+      "should_call_search_contacts": true,
+      "should_call_tool": false
+    },
+    "reminder_action": {
+      "abstain_reason": "",
+      "downstream_tool_kwargs": {
+        "reminder_id": "r1"
+      },
+      "downstream_tool_name": "remove_reminder",
+      "final_answer_recommendation": "call:remove_reminder",
+      "selected_reminder": {
+        "reminder_id": "r1",
+        "reminder_timestamp": 10.0
+      },
+      "selected_reminder_id": "r1",
+      "should_call_tool": true
+    }
+  },
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/top_tools_plus_action_precondition_v2_pack/registry_manifest.json"
+}

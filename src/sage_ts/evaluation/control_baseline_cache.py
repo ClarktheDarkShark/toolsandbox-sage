@@ -22,6 +22,7 @@ CACHE_SCHEMA_VERSION = 1
 MIN_COMPATIBLE_RUNS = 3
 CACHE_ROOT = Path("artifacts/baselines/control_task_baselines")
 DEFAULT_TOOL_BACKEND = ToolBackend("DEFAULT")
+CACHE_MATCH_POLICY = "task_name_agent_user_base_tool_policy_min3"
 
 COMPATIBILITY_FIELDS = (
     "scenario_key",
@@ -35,6 +36,12 @@ COMPATIBILITY_FIELDS = (
     "runner_version",
     "scorer_version",
     "toolsandbox_version",
+    "base_tool_policy",
+)
+TASK_LEVEL_CACHE_FIELDS = (
+    "scenario_key",
+    "agent_model",
+    "user_model",
     "base_tool_policy",
 )
 ORDER_INSENSITIVE_LIST_KEYS = frozenset(
@@ -278,11 +285,14 @@ def compatibility_key(context: dict[str, Any]) -> str:
 def _record_matches_context(record: dict[str, Any], context: dict[str, Any]) -> bool:
     """Return whether a stored baseline is task-compatible with this run.
 
-    Historical records include a manifest checksum in their stored compatibility
-    key. V2.5 uses task-level baseline reuse, so compatibility is checked from
-    the record fields directly and intentionally ignores manifest checksum.
+    Baseline control reuse is intentionally task-level: if the same task has
+    been seen enough times under the same baseline model/user/base-tool policy,
+    average those prior controls and reuse the aggregate. Do not include
+    initial-state checksum, local ToolSandbox SHA, runner SHA, scorer SHA, or
+    manifest checksum in this match; those fields fragmented otherwise valid
+    task-level baselines and made reuse stochastic.
     """
-    for field in COMPATIBILITY_FIELDS:
+    for field in TASK_LEVEL_CACHE_FIELDS:
         if stable_json(record.get(field)) != stable_json(context.get(field)):
             return False
     return True
@@ -336,6 +346,19 @@ class ControlBaselineCache:
                     "policy": {
                         "min_compatible_completed_runs": MIN_COMPATIBLE_RUNS,
                         "cache_scope": "control_arm_only",
+                        "cache_match_policy": CACHE_MATCH_POLICY,
+                        "task_level_fields": list(TASK_LEVEL_CACHE_FIELDS),
+                        "ignored_for_task_level_reuse": [
+                            "initial_state_checksum",
+                            "scenario_checksum",
+                            "runner_version",
+                            "scorer_version",
+                            "toolsandbox_version",
+                            "manifest_checksum",
+                            "prompt_hashes",
+                            "model_version",
+                            "model_parameters_hash",
+                        ],
                         "uses_past_scores_before_implementation": False,
                     },
                 },
@@ -445,14 +468,11 @@ class ControlBaselineCache:
         return rows
 
     def compatible_records(self, context: dict[str, Any]) -> list[dict[str, Any]]:
-        key = compatibility_key(context)
         records: list[dict[str, Any]] = []
         for row in self._index_rows():
             if not row.get("valid_for_cache"):
                 continue
-            if row.get("compatibility_key") != key and row.get(
-                "scenario_key"
-            ) != context.get("scenario_key"):
+            if row.get("scenario_key") != context.get("scenario_key"):
                 continue
             record = _read_json(Path(str(row["record_path"])), {})
             if (
@@ -492,6 +512,8 @@ class ControlBaselineCache:
                 "traceback": None,
                 "control_cache": {
                     "source": "cached",
+                    "cache_match_policy": CACHE_MATCH_POLICY,
+                    "task_level_fields": list(TASK_LEVEL_CACHE_FIELDS),
                     "compatible_count": len(records),
                     "canonical_mean": sum(canonical) / len(canonical),
                     "canonical_variance": _variance(canonical),
@@ -704,6 +726,8 @@ def build_control_cache_report(
     )
     return {
         "mode": mode,
+        "cache_match_policy": CACHE_MATCH_POLICY,
+        "task_level_fields": list(TASK_LEVEL_CACHE_FIELDS),
         "control_source": control_source,
         "cached_control_tasks": len(cached_scenarios),
         "fresh_control_tasks": len(fresh_scenarios),

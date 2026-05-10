@@ -1,0 +1,4945 @@
+{
+  "cache_policy": {
+    "baseline_control_cache": "use-if-eligible",
+    "openai_response_cache_for_candidate": "disabled",
+    "sage_candidate_cache": "fresh_only"
+  },
+  "created_at": "2026-05-10T02:01:03.149133+00:00",
+  "experimental_only": true,
+  "manifest_type": "sage_gap_closure_lab_action_precondition_broad_splits",
+  "protected_claim_evidence": false,
+  "schema_version": 1,
+  "selection_policy": {
+    "selection_note": "Formal500 scenario names round-robin by base family for broad add-on smoke after narrow bucket evidence.",
+    "used_cache_availability": false,
+    "used_expected_answers": false,
+    "used_truth_labels": false,
+    "uses_prior_experimental_gap_assessment": true
+  },
+  "split_aliases": {
+    "confirm_100": "action_precondition_broad100",
+    "expanded_60": "action_precondition_broad60",
+    "pilot_20": "action_precondition_broad20",
+    "validate_100": "action_precondition_broad100"
+  },
+  "split_diversity": {
+    "action_precondition_broad100": {
+      "bucket_counts": {
+        "contact_crud": 11,
+        "other": 28,
+        "reminder_crud_scheduling": 10,
+        "safe_insufficient_information": 26,
+        "send_message_preconditions": 2,
+        "settings_device_state": 23
+      },
+      "distinct_family_count": 54,
+      "family_counts": {
+        "add_contact_with_name_and_phone_number": 2,
+        "add_reminder_content_and_date_and_time": 2,
+        "add_reminder_content_and_week_delta_and_time": 2,
+        "add_reminder_content_and_week_delta_and_time_and_location": 2,
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 2,
+        "add_reminder_content_and_weekday_delta_and_time": 2,
+        "cellular_off": 2,
+        "find_days_till_holiday": 2,
+        "find_days_till_holiday_insufficient_information": 2,
+        "find_days_till_holiday_wifi_off": 2,
+        "find_thanksgiving_timestamp": 2,
+        "get_cellular": 2,
+        "get_wifi": 2,
+        "modify_contact_with_message_recency": 2,
+        "modify_contact_with_message_recency_insufficient_information": 2,
+        "modify_reminder_with_recency_latest": 2,
+        "modify_reminder_with_recency_latest_insufficient_information": 2,
+        "remove_contact_by_phone": 2,
+        "remove_contact_by_phone_no_remove_contact_insufficient_information": 2,
+        "remove_contact_by_phone_no_search_contacts_insufficient_information": 2,
+        "remove_contact_with_id": 2,
+        "remove_reminder_with_recency_latest": 2,
+        "remove_reminder_with_recency_latest_insufficient_information": 2,
+        "search_message_with_recency_latest": 2,
+        "search_message_with_recency_oldest": 2,
+        "search_name_with_relationship": 2,
+        "search_phone_number_with_name": 2,
+        "search_relationship_with_phone_number": 2,
+        "search_reminder_with_creation_recency_yesterday": 2,
+        "search_reminder_with_creation_recency_yesterday_implicit": 2,
+        "search_reminder_with_creation_recency_yesterday_insufficient_information": 2,
+        "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 2,
+        "search_reminder_with_recency_upcoming": 2,
+        "search_reminder_with_recency_upcoming_implicit": 2,
+        "search_reminder_with_recency_upcoming_insufficient_information": 2,
+        "search_reminder_with_recency_upcoming_insufficient_information_implicit": 2,
+        "search_reminder_with_recency_yesterday": 2,
+        "search_reminder_with_recency_yesterday_implicit": 2,
+        "search_reminder_with_recency_yesterday_insufficient_information": 2,
+        "search_reminder_with_recency_yesterday_insufficient_information_implicit": 2,
+        "search_sender_phone_number_with_content": 2,
+        "send_message_with_contact_content_cellular_off": 2,
+        "send_message_with_contact_content_cellular_off_insufficient_information": 2,
+        "send_message_with_phone_number_and_content": 2,
+        "turn_on_cellular_low_battery_mode": 2,
+        "turn_on_cellular_low_battery_mode_implicit": 2,
+        "turn_on_location_low_battery_mode": 1,
+        "turn_on_location_low_battery_mode_implicit": 1,
+        "turn_on_wifi_low_battery_mode": 1,
+        "turn_on_wifi_low_battery_mode_implicit": 1,
+        "update_contact_relationship_with_relationship": 1,
+        "update_contact_relationship_with_relationship_twice": 1,
+        "update_contact_with_id_and_phone_number": 1,
+        "wifi_off": 1
+      },
+      "largest_family_count": 2,
+      "largest_family_share": 0.02,
+      "near_duplicate_dominated": false,
+      "scenario_count": 100
+    },
+    "action_precondition_broad20": {
+      "bucket_counts": {
+        "contact_crud": 3,
+        "other": 2,
+        "reminder_crud_scheduling": 4,
+        "safe_insufficient_information": 5,
+        "settings_device_state": 6
+      },
+      "distinct_family_count": 20,
+      "family_counts": {
+        "add_contact_with_name_and_phone_number": 1,
+        "add_reminder_content_and_date_and_time": 1,
+        "add_reminder_content_and_week_delta_and_time": 1,
+        "add_reminder_content_and_week_delta_and_time_and_location": 1,
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 1,
+        "add_reminder_content_and_weekday_delta_and_time": 1,
+        "cellular_off": 1,
+        "find_days_till_holiday": 1,
+        "find_days_till_holiday_insufficient_information": 1,
+        "find_days_till_holiday_wifi_off": 1,
+        "find_thanksgiving_timestamp": 1,
+        "get_cellular": 1,
+        "get_wifi": 1,
+        "modify_contact_with_message_recency": 1,
+        "modify_contact_with_message_recency_insufficient_information": 1,
+        "modify_reminder_with_recency_latest": 1,
+        "modify_reminder_with_recency_latest_insufficient_information": 1,
+        "remove_contact_by_phone": 1,
+        "remove_contact_by_phone_no_remove_contact_insufficient_information": 1,
+        "remove_contact_by_phone_no_search_contacts_insufficient_information": 1
+      },
+      "largest_family_count": 1,
+      "largest_family_share": 0.05,
+      "near_duplicate_dominated": false,
+      "scenario_count": 20
+    },
+    "action_precondition_broad60": {
+      "bucket_counts": {
+        "contact_crud": 8,
+        "other": 14,
+        "reminder_crud_scheduling": 8,
+        "safe_insufficient_information": 13,
+        "send_message_preconditions": 1,
+        "settings_device_state": 16
+      },
+      "distinct_family_count": 54,
+      "family_counts": {
+        "add_contact_with_name_and_phone_number": 2,
+        "add_reminder_content_and_date_and_time": 2,
+        "add_reminder_content_and_week_delta_and_time": 2,
+        "add_reminder_content_and_week_delta_and_time_and_location": 2,
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": 2,
+        "add_reminder_content_and_weekday_delta_and_time": 2,
+        "cellular_off": 1,
+        "find_days_till_holiday": 1,
+        "find_days_till_holiday_insufficient_information": 1,
+        "find_days_till_holiday_wifi_off": 1,
+        "find_thanksgiving_timestamp": 1,
+        "get_cellular": 1,
+        "get_wifi": 1,
+        "modify_contact_with_message_recency": 1,
+        "modify_contact_with_message_recency_insufficient_information": 1,
+        "modify_reminder_with_recency_latest": 1,
+        "modify_reminder_with_recency_latest_insufficient_information": 1,
+        "remove_contact_by_phone": 1,
+        "remove_contact_by_phone_no_remove_contact_insufficient_information": 1,
+        "remove_contact_by_phone_no_search_contacts_insufficient_information": 1,
+        "remove_contact_with_id": 1,
+        "remove_reminder_with_recency_latest": 1,
+        "remove_reminder_with_recency_latest_insufficient_information": 1,
+        "search_message_with_recency_latest": 1,
+        "search_message_with_recency_oldest": 1,
+        "search_name_with_relationship": 1,
+        "search_phone_number_with_name": 1,
+        "search_relationship_with_phone_number": 1,
+        "search_reminder_with_creation_recency_yesterday": 1,
+        "search_reminder_with_creation_recency_yesterday_implicit": 1,
+        "search_reminder_with_creation_recency_yesterday_insufficient_information": 1,
+        "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": 1,
+        "search_reminder_with_recency_upcoming": 1,
+        "search_reminder_with_recency_upcoming_implicit": 1,
+        "search_reminder_with_recency_upcoming_insufficient_information": 1,
+        "search_reminder_with_recency_upcoming_insufficient_information_implicit": 1,
+        "search_reminder_with_recency_yesterday": 1,
+        "search_reminder_with_recency_yesterday_implicit": 1,
+        "search_reminder_with_recency_yesterday_insufficient_information": 1,
+        "search_reminder_with_recency_yesterday_insufficient_information_implicit": 1,
+        "search_sender_phone_number_with_content": 1,
+        "send_message_with_contact_content_cellular_off": 1,
+        "send_message_with_contact_content_cellular_off_insufficient_information": 1,
+        "send_message_with_phone_number_and_content": 1,
+        "turn_on_cellular_low_battery_mode": 1,
+        "turn_on_cellular_low_battery_mode_implicit": 1,
+        "turn_on_location_low_battery_mode": 1,
+        "turn_on_location_low_battery_mode_implicit": 1,
+        "turn_on_wifi_low_battery_mode": 1,
+        "turn_on_wifi_low_battery_mode_implicit": 1,
+        "update_contact_relationship_with_relationship": 1,
+        "update_contact_relationship_with_relationship_twice": 1,
+        "update_contact_with_id_and_phone_number": 1,
+        "wifi_off": 1
+      },
+      "largest_family_count": 2,
+      "largest_family_share": 0.03333333333333333,
+      "near_duplicate_dominated": false,
+      "scenario_count": 60
+    }
+  },
+  "split_sizes": {
+    "action_precondition_broad100": 100,
+    "action_precondition_broad20": 20,
+    "action_precondition_broad60": 60
+  },
+  "splits": {
+    "action_precondition_broad100": [
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "add_contact_with_name_and_phone_number",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "add_reminder",
+          "end_conversation"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_date_and_time",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_date_and_time",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "add_reminder",
+          "get_current_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_week_delta_and_time",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "datetime_info_to_timestamp",
+          "search_location_around_lat_lon",
+          "get_current_timestamp",
+          "modify_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "set_location_service_status",
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "get_location_service_status",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "add_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_weekday_delta_and_time",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_weekday_delta_and_time",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "cellular_off",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_holiday",
+          "end_conversation",
+          "timestamp_diff"
+        ],
+        "bucket": "other",
+        "family_label": "find_days_till_holiday",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "end_conversation",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_insufficient_information",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "end_conversation",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_wifi_off",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_holiday",
+          "end_conversation"
+        ],
+        "bucket": "other",
+        "family_label": "find_thanksgiving_timestamp",
+        "final_evaluation": true,
+        "scenario_id": "find_thanksgiving_timestamp",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": true,
+        "scenario_id": "get_cellular",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": true,
+        "scenario_id": "get_wifi",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "get_current_timestamp",
+          "end_conversation",
+          "search_contacts",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_contacts",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "search_reminder",
+          "modify_reminder",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "modify_reminder_with_recency_latest",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "modify_reminder",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_with_id",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "remove_reminder",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp",
+          "end_conversation",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "remove_reminder_with_recency_latest",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "remove_reminder",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "end_conversation",
+          "get_current_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_message_with_recency_latest",
+        "final_evaluation": true,
+        "scenario_id": "search_message_with_recency_latest",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_messages",
+          "get_current_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_message_with_recency_oldest",
+        "final_evaluation": true,
+        "scenario_id": "search_message_with_recency_oldest",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "other",
+        "family_label": "search_name_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "search_name_with_relationship",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "other",
+        "family_label": "search_phone_number_with_name",
+        "final_evaluation": true,
+        "scenario_id": "search_phone_number_with_name",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "other",
+        "family_label": "search_relationship_with_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "search_relationship_with_phone_number",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_creation_recency_yesterday",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_creation_recency_yesterday_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_implicit",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "shift_timestamp",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "search_reminder"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_upcoming",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "get_current_timestamp",
+          "search_reminder"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_upcoming_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_implicit",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "search_reminder",
+          "get_current_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_yesterday",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp",
+          "shift_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_yesterday_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_implicit",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "end_conversation"
+        ],
+        "bucket": "other",
+        "family_label": "search_sender_phone_number_with_content",
+        "final_evaluation": true,
+        "scenario_id": "search_sender_phone_number_with_content",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_cellular_service_status",
+          "send_message_with_phone_number"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "end_conversation"
+        ],
+        "bucket": "send_message_preconditions",
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_phone_number_and_content",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_low_battery_mode_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_location_service_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "update_contact_with_id_and_phone_number",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "wifi_off",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_location_service_status",
+          "add_contact",
+          "remove_contact",
+          "convert_currency",
+          "end_conversation",
+          "modify_contact",
+          "get_location_service_status",
+          "unit_conversion",
+          "search_contacts",
+          "search_location_around_lat_lon",
+          "get_current_location",
+          "send_message_with_phone_number"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "add_contact_with_name_and_phone_number_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "add_reminder",
+          "modify_reminder",
+          "unit_conversion",
+          "get_current_timestamp",
+          "search_reminder",
+          "timestamp_diff",
+          "remove_reminder"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_date_and_time",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_date_and_time_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_location",
+          "unit_conversion",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "timestamp_diff",
+          "shift_timestamp",
+          "search_holiday",
+          "datetime_info_to_timestamp",
+          "add_reminder",
+          "search_reminder",
+          "calculate_lat_lon_distance",
+          "remove_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "convert_currency",
+          "get_current_timestamp"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_week_delta_and_time",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "convert_currency",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "search_holiday",
+          "search_lat_lon",
+          "get_current_timestamp",
+          "search_reminder",
+          "end_conversation",
+          "timestamp_diff",
+          "search_weather_around_lat_lon",
+          "search_stock",
+          "timestamp_to_datetime_info",
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "modify_reminder",
+          "set_location_service_status",
+          "get_current_timestamp",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_holiday",
+          "end_conversation",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "timestamp_diff",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "datetime_info_to_timestamp",
+          "search_weather_around_lat_lon",
+          "search_reminder",
+          "get_wifi_status",
+          "get_current_location",
+          "search_lat_lon",
+          "shift_timestamp",
+          "set_wifi_status",
+          "search_stock"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "end_conversation",
+          "modify_reminder",
+          "calculate_lat_lon_distance",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "get_current_location",
+          "search_reminder",
+          "shift_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "remove_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "convert_currency",
+          "add_reminder"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_weekday_delta_and_time",
+        "final_evaluation": true,
+        "scenario_id": "add_reminder_content_and_weekday_delta_and_time_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_location",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "convert_currency",
+          "get_low_battery_mode_status",
+          "get_wifi_status",
+          "get_location_service_status",
+          "set_location_service_status",
+          "set_low_battery_mode_status",
+          "end_conversation",
+          "set_wifi_status",
+          "get_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "cellular_off_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "seconds_to_hours_minutes_seconds",
+          "search_location_around_lat_lon",
+          "calculate_lat_lon_distance",
+          "shift_timestamp",
+          "search_weather_around_lat_lon",
+          "datetime_info_to_timestamp",
+          "get_current_timestamp",
+          "end_conversation",
+          "get_current_location",
+          "timestamp_diff",
+          "unit_conversion",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "search_holiday"
+        ],
+        "bucket": "other",
+        "family_label": "find_days_till_holiday",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "get_current_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "search_lat_lon",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "unit_conversion",
+          "search_weather_around_lat_lon",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_insufficient_information_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "get_cellular_service_status",
+          "timestamp_diff",
+          "set_cellular_service_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp",
+          "set_wifi_status",
+          "end_conversation",
+          "search_holiday",
+          "get_location_service_status",
+          "set_location_service_status",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": true,
+        "scenario_id": "find_days_till_holiday_wifi_off_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_weather_around_lat_lon",
+          "unit_conversion",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "seconds_to_hours_minutes_seconds",
+          "get_current_timestamp",
+          "calculate_lat_lon_distance",
+          "search_holiday",
+          "shift_timestamp",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "other",
+        "family_label": "find_thanksgiving_timestamp",
+        "final_evaluation": true,
+        "scenario_id": "find_thanksgiving_timestamp_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "get_location_service_status",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "get_current_location",
+          "convert_currency",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": true,
+        "scenario_id": "get_cellular_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_location_service_status",
+          "unit_conversion",
+          "get_cellular_service_status",
+          "end_conversation",
+          "get_current_location",
+          "get_wifi_status",
+          "get_low_battery_mode_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "set_wifi_status",
+          "convert_currency",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": true,
+        "scenario_id": "get_wifi_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "seconds_to_hours_minutes_seconds",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "search_messages",
+          "end_conversation",
+          "send_message_with_phone_number",
+          "get_current_timestamp",
+          "search_contacts",
+          "shift_timestamp",
+          "timestamp_diff",
+          "add_contact",
+          "search_holiday",
+          "modify_contact",
+          "unit_conversion",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "shift_timestamp",
+          "search_holiday",
+          "datetime_info_to_timestamp",
+          "add_contact",
+          "seconds_to_hours_minutes_seconds",
+          "timestamp_to_datetime_info",
+          "modify_contact",
+          "unit_conversion",
+          "timestamp_diff",
+          "calculate_lat_lon_distance",
+          "search_contacts",
+          "remove_contact",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "unit_conversion",
+          "get_current_timestamp",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "search_holiday",
+          "calculate_lat_lon_distance",
+          "seconds_to_hours_minutes_seconds",
+          "shift_timestamp",
+          "search_weather_around_lat_lon",
+          "modify_reminder",
+          "add_reminder",
+          "remove_reminder",
+          "timestamp_diff",
+          "search_reminder",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "modify_reminder_with_recency_latest",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "modify_reminder",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "search_holiday",
+          "remove_reminder",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "timestamp_diff",
+          "unit_conversion",
+          "search_reminder",
+          "get_current_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "search_location_around_lat_lon"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_stock",
+          "unit_conversion",
+          "remove_contact",
+          "add_contact",
+          "convert_currency",
+          "search_weather_around_lat_lon",
+          "search_location_around_lat_lon",
+          "search_messages",
+          "search_contacts",
+          "modify_contact",
+          "search_holiday",
+          "search_lat_lon"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "unit_conversion",
+          "search_stock",
+          "search_weather_around_lat_lon",
+          "end_conversation",
+          "search_contacts",
+          "search_holiday",
+          "add_contact",
+          "search_location_around_lat_lon",
+          "modify_contact",
+          "search_lat_lon",
+          "remove_contact",
+          "search_messages"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "end_conversation",
+          "get_cellular_service_status",
+          "get_low_battery_mode_status",
+          "remove_reminder",
+          "set_cellular_service_status",
+          "modify_contact",
+          "unit_conversion",
+          "search_contacts",
+          "remove_contact",
+          "convert_currency",
+          "get_location_service_status"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "get_cellular_service_status",
+          "set_cellular_service_status",
+          "get_location_service_status",
+          "modify_contact",
+          "get_low_battery_mode_status",
+          "unit_conversion",
+          "remove_contact",
+          "remove_reminder",
+          "end_conversation",
+          "add_contact",
+          "convert_currency"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": true,
+        "scenario_id": "remove_contact_with_id_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_holiday",
+          "modify_reminder",
+          "shift_timestamp",
+          "search_weather_around_lat_lon",
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "seconds_to_hours_minutes_seconds",
+          "unit_conversion",
+          "add_reminder",
+          "search_reminder",
+          "search_location_around_lat_lon",
+          "calculate_lat_lon_distance",
+          "remove_reminder",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "remove_reminder_with_recency_latest",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "modify_reminder",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "search_reminder",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance",
+          "get_current_timestamp",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_location_around_lat_lon",
+          "unit_conversion",
+          "remove_reminder",
+          "timestamp_diff"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance",
+          "search_holiday",
+          "send_message_with_phone_number",
+          "timestamp_diff",
+          "get_current_timestamp",
+          "search_location_around_lat_lon",
+          "unit_conversion",
+          "shift_timestamp",
+          "search_messages",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "other",
+        "family_label": "search_message_with_recency_latest",
+        "final_evaluation": true,
+        "scenario_id": "search_message_with_recency_latest_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "calculate_lat_lon_distance",
+          "get_current_timestamp",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "send_message_with_phone_number",
+          "shift_timestamp",
+          "search_location_around_lat_lon",
+          "unit_conversion",
+          "search_messages",
+          "datetime_info_to_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds"
+        ],
+        "bucket": "other",
+        "family_label": "search_message_with_recency_oldest",
+        "final_evaluation": true,
+        "scenario_id": "search_message_with_recency_oldest_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_lat_lon",
+          "search_holiday",
+          "end_conversation",
+          "search_weather_around_lat_lon",
+          "search_location_around_lat_lon",
+          "search_stock",
+          "modify_contact",
+          "unit_conversion",
+          "remove_contact",
+          "add_contact",
+          "search_contacts",
+          "search_messages"
+        ],
+        "bucket": "other",
+        "family_label": "search_name_with_relationship",
+        "final_evaluation": true,
+        "scenario_id": "search_name_with_relationship_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_weather_around_lat_lon",
+          "remove_contact",
+          "unit_conversion",
+          "end_conversation",
+          "add_contact",
+          "search_holiday",
+          "search_lat_lon",
+          "search_messages",
+          "search_stock",
+          "search_location_around_lat_lon",
+          "modify_contact",
+          "search_contacts"
+        ],
+        "bucket": "other",
+        "family_label": "search_phone_number_with_name",
+        "final_evaluation": true,
+        "scenario_id": "search_phone_number_with_name_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "search_contacts",
+          "search_messages",
+          "unit_conversion",
+          "remove_contact",
+          "end_conversation",
+          "search_stock",
+          "search_lat_lon",
+          "search_location_around_lat_lon",
+          "search_holiday",
+          "add_contact",
+          "search_weather_around_lat_lon"
+        ],
+        "bucket": "other",
+        "family_label": "search_relationship_with_phone_number",
+        "final_evaluation": true,
+        "scenario_id": "search_relationship_with_phone_number_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "search_location_around_lat_lon",
+          "search_holiday",
+          "modify_reminder",
+          "unit_conversion",
+          "end_conversation",
+          "seconds_to_hours_minutes_seconds",
+          "shift_timestamp",
+          "datetime_info_to_timestamp",
+          "calculate_lat_lon_distance",
+          "remove_reminder",
+          "search_reminder",
+          "add_reminder",
+          "timestamp_diff",
+          "get_current_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_creation_recency_yesterday",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "calculate_lat_lon_distance",
+          "get_current_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "shift_timestamp",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "remove_reminder",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "search_holiday",
+          "end_conversation",
+          "timestamp_diff",
+          "search_reminder",
+          "modify_reminder"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_creation_recency_yesterday_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_implicit_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_holiday",
+          "remove_reminder",
+          "search_reminder",
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "add_reminder",
+          "end_conversation",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "calculate_lat_lon_distance",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "timestamp_to_datetime_info",
+          "remove_reminder",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "add_reminder",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "unit_conversion",
+          "search_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_holiday",
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "timestamp_diff",
+          "shift_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "unit_conversion",
+          "search_location_around_lat_lon",
+          "timestamp_to_datetime_info",
+          "add_reminder",
+          "remove_reminder",
+          "search_reminder",
+          "calculate_lat_lon_distance",
+          "modify_reminder"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_upcoming",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "search_reminder",
+          "remove_reminder",
+          "unit_conversion",
+          "calculate_lat_lon_distance",
+          "search_holiday",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "timestamp_diff",
+          "add_reminder",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "get_current_timestamp",
+          "shift_timestamp",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_upcoming_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_implicit_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_reminder",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp",
+          "add_reminder",
+          "search_holiday",
+          "get_current_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "unit_conversion",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance",
+          "modify_reminder",
+          "timestamp_diff"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "end_conversation",
+          "add_reminder",
+          "search_holiday",
+          "unit_conversion",
+          "remove_reminder",
+          "timestamp_diff",
+          "modify_reminder",
+          "get_current_timestamp",
+          "search_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "calculate_lat_lon_distance"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "shift_timestamp",
+          "add_reminder",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "calculate_lat_lon_distance",
+          "remove_reminder",
+          "get_current_timestamp",
+          "end_conversation",
+          "timestamp_diff",
+          "search_location_around_lat_lon",
+          "search_reminder",
+          "search_holiday"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_yesterday",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "calculate_lat_lon_distance",
+          "add_reminder",
+          "unit_conversion",
+          "get_current_timestamp",
+          "shift_timestamp",
+          "timestamp_diff",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "end_conversation",
+          "search_holiday",
+          "search_location_around_lat_lon",
+          "timestamp_to_datetime_info",
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "search_reminder"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_yesterday_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_implicit_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "remove_reminder",
+          "search_reminder",
+          "modify_reminder",
+          "timestamp_diff",
+          "calculate_lat_lon_distance",
+          "timestamp_to_datetime_info",
+          "add_reminder",
+          "unit_conversion",
+          "seconds_to_hours_minutes_seconds",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "timestamp_diff",
+          "search_reminder",
+          "calculate_lat_lon_distance",
+          "add_reminder",
+          "unit_conversion",
+          "remove_reminder",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "search_holiday",
+          "seconds_to_hours_minutes_seconds",
+          "get_current_timestamp",
+          "datetime_info_to_timestamp",
+          "modify_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": true,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "search_holiday",
+          "search_weather_around_lat_lon",
+          "search_lat_lon",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "search_stock",
+          "unit_conversion",
+          "search_location_around_lat_lon",
+          "search_reminder",
+          "convert_currency",
+          "search_contacts"
+        ],
+        "bucket": "other",
+        "family_label": "search_sender_phone_number_with_content",
+        "final_evaluation": true,
+        "scenario_id": "search_sender_phone_number_with_content_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_contact",
+          "search_contacts",
+          "end_conversation",
+          "search_messages",
+          "get_low_battery_mode_status",
+          "modify_contact",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "get_location_service_status",
+          "remove_contact",
+          "get_wifi_status",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "get_cellular_service_status",
+          "send_message_with_phone_number"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_low_battery_mode_status",
+          "get_cellular_service_status",
+          "search_messages",
+          "get_wifi_status",
+          "set_low_battery_mode_status",
+          "send_message_with_phone_number",
+          "get_location_service_status",
+          "set_wifi_status",
+          "end_conversation",
+          "convert_currency",
+          "set_location_service_status",
+          "set_cellular_service_status",
+          "unit_conversion",
+          "get_current_location"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_location_service_status",
+          "convert_currency",
+          "unit_conversion",
+          "set_location_service_status",
+          "search_location_around_lat_lon",
+          "seconds_to_hours_minutes_seconds",
+          "add_contact",
+          "get_current_location",
+          "search_weather_around_lat_lon",
+          "send_message_with_phone_number",
+          "search_messages"
+        ],
+        "bucket": "send_message_preconditions",
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": true,
+        "scenario_id": "send_message_with_phone_number_and_content_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "set_low_battery_mode_status",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "search_lat_lon",
+          "end_conversation",
+          "unit_conversion",
+          "get_wifi_status",
+          "get_current_timestamp",
+          "get_location_service_status",
+          "search_contacts",
+          "set_location_service_status",
+          "get_current_location",
+          "convert_currency",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_location",
+          "set_location_service_status",
+          "search_contacts",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "end_conversation",
+          "convert_currency",
+          "get_current_timestamp",
+          "search_lat_lon",
+          "set_cellular_service_status",
+          "get_location_service_status",
+          "get_cellular_service_status",
+          "get_wifi_status",
+          "set_wifi_status",
+          "unit_conversion"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": true,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit_10_distraction_tools",
+        "split": "action_precondition_broad100",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ],
+    "action_precondition_broad20": [
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "add_reminder",
+          "end_conversation"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_date_and_time",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_date_and_time",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "add_reminder",
+          "get_current_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_week_delta_and_time",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "datetime_info_to_timestamp",
+          "search_location_around_lat_lon",
+          "get_current_timestamp",
+          "modify_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "set_location_service_status",
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "get_location_service_status",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "add_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_weekday_delta_and_time",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_weekday_delta_and_time",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "cellular_off",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_holiday",
+          "end_conversation",
+          "timestamp_diff"
+        ],
+        "bucket": "other",
+        "family_label": "find_days_till_holiday",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "end_conversation",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_insufficient_information",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "end_conversation",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_wifi_off",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_holiday",
+          "end_conversation"
+        ],
+        "bucket": "other",
+        "family_label": "find_thanksgiving_timestamp",
+        "final_evaluation": false,
+        "scenario_id": "find_thanksgiving_timestamp",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": false,
+        "scenario_id": "get_cellular",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": false,
+        "scenario_id": "get_wifi",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "get_current_timestamp",
+          "end_conversation",
+          "search_contacts",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_contacts",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "search_reminder",
+          "modify_reminder",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "modify_reminder_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "modify_reminder",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "split": "action_precondition_broad20",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ],
+    "action_precondition_broad60": [
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "add_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "add_reminder",
+          "end_conversation"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_date_and_time",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_date_and_time",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "add_reminder",
+          "get_current_timestamp",
+          "end_conversation"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_week_delta_and_time",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "add_reminder",
+          "datetime_info_to_timestamp",
+          "search_location_around_lat_lon",
+          "get_current_timestamp",
+          "modify_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "set_location_service_status",
+          "timestamp_to_datetime_info",
+          "modify_reminder",
+          "get_location_service_status",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "get_wifi_status",
+          "end_conversation",
+          "set_wifi_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "add_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_weekday_delta_and_time",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_weekday_delta_and_time",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "cellular_off",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "search_holiday",
+          "end_conversation",
+          "timestamp_diff"
+        ],
+        "bucket": "other",
+        "family_label": "find_days_till_holiday",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_diff",
+          "end_conversation",
+          "search_holiday"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "find_days_till_holiday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_insufficient_information",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_wifi_status",
+          "end_conversation",
+          "search_holiday",
+          "timestamp_diff",
+          "set_wifi_status",
+          "get_current_timestamp"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_wifi_off",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_holiday",
+          "end_conversation"
+        ],
+        "bucket": "other",
+        "family_label": "find_thanksgiving_timestamp",
+        "final_evaluation": false,
+        "scenario_id": "find_thanksgiving_timestamp",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_cellular",
+        "final_evaluation": false,
+        "scenario_id": "get_cellular",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "get_wifi",
+        "final_evaluation": false,
+        "scenario_id": "get_wifi",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "get_current_timestamp",
+          "end_conversation",
+          "search_contacts",
+          "search_messages"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "modify_contact",
+          "end_conversation",
+          "search_contacts",
+          "get_current_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_contact_with_message_recency_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency_insufficient_information",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "datetime_info_to_timestamp",
+          "search_reminder",
+          "modify_reminder",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "modify_reminder_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "modify_reminder",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "modify_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest_insufficient_information",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "end_conversation"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "remove_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "remove_contact_with_id",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_with_id",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "remove_reminder",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp",
+          "end_conversation",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "remove_reminder_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "remove_reminder_with_recency_latest",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "remove_reminder",
+          "timestamp_to_datetime_info",
+          "datetime_info_to_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "remove_reminder_with_recency_latest_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "remove_reminder_with_recency_latest_insufficient_information",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "end_conversation",
+          "get_current_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_message_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "search_message_with_recency_latest",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_messages",
+          "get_current_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_message_with_recency_oldest",
+        "final_evaluation": false,
+        "scenario_id": "search_message_with_recency_oldest",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "other",
+        "family_label": "search_name_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "search_name_with_relationship",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "other",
+        "family_label": "search_phone_number_with_name",
+        "final_evaluation": false,
+        "scenario_id": "search_phone_number_with_name",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts"
+        ],
+        "bucket": "other",
+        "family_label": "search_relationship_with_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "search_relationship_with_phone_number",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_reminder",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_creation_recency_yesterday",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_creation_recency_yesterday_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_implicit",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "search_reminder"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "shift_timestamp",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "search_reminder"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_upcoming",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "get_current_timestamp",
+          "search_reminder"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_upcoming_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_implicit",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "search_reminder",
+          "get_current_timestamp",
+          "timestamp_to_datetime_info",
+          "end_conversation"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_yesterday",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp",
+          "shift_timestamp"
+        ],
+        "bucket": "other",
+        "family_label": "search_reminder_with_recency_yesterday_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_implicit",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_reminder",
+          "timestamp_to_datetime_info",
+          "shift_timestamp"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_reminder",
+          "shift_timestamp",
+          "end_conversation",
+          "timestamp_to_datetime_info"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "end_conversation"
+        ],
+        "bucket": "other",
+        "family_label": "search_sender_phone_number_with_content",
+        "final_evaluation": false,
+        "scenario_id": "search_sender_phone_number_with_content",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "search_contacts",
+          "send_message_with_phone_number",
+          "end_conversation",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "send_message_with_contact_content_cellular_off",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "end_conversation",
+          "set_cellular_service_status",
+          "send_message_with_phone_number"
+        ],
+        "bucket": "safe_insufficient_information",
+        "family_label": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_contact_content_cellular_off_insufficient_information",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "send_message_with_phone_number",
+          "end_conversation"
+        ],
+        "bucket": "send_message_preconditions",
+        "family_label": "send_message_with_phone_number_and_content",
+        "final_evaluation": false,
+        "scenario_id": "send_message_with_phone_number_and_content",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_low_battery_mode_status",
+          "set_cellular_service_status",
+          "get_cellular_service_status",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_cellular_service_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "set_cellular_service_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_cellular_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_cellular_low_battery_mode_implicit",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_location_service_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "end_conversation",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_location_service_status",
+          "set_location_service_status",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_location_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_location_low_battery_mode_implicit",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "set_wifi_status",
+          "get_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "set_low_battery_mode_status",
+          "get_low_battery_mode_status",
+          "get_wifi_status",
+          "set_wifi_status"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "turn_on_wifi_low_battery_mode_implicit",
+        "final_evaluation": false,
+        "scenario_id": "turn_on_wifi_low_battery_mode_implicit",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact",
+          "search_contacts"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts",
+          "modify_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "update_contact_with_id_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_with_id_and_phone_number",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_wifi_status",
+          "end_conversation"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "wifi_off",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "set_location_service_status",
+          "add_contact",
+          "remove_contact",
+          "convert_currency",
+          "end_conversation",
+          "modify_contact",
+          "get_location_service_status",
+          "unit_conversion",
+          "search_contacts",
+          "search_location_around_lat_lon",
+          "get_current_location",
+          "send_message_with_phone_number"
+        ],
+        "bucket": "contact_crud",
+        "family_label": "add_contact_with_name_and_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "add_contact_with_name_and_phone_number_10_distraction_tools",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "shift_timestamp",
+          "seconds_to_hours_minutes_seconds",
+          "calculate_lat_lon_distance",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "add_reminder",
+          "modify_reminder",
+          "unit_conversion",
+          "get_current_timestamp",
+          "search_reminder",
+          "timestamp_diff",
+          "remove_reminder"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_date_and_time",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_date_and_time_10_distraction_tools",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_location",
+          "unit_conversion",
+          "modify_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "timestamp_diff",
+          "shift_timestamp",
+          "search_holiday",
+          "datetime_info_to_timestamp",
+          "add_reminder",
+          "search_reminder",
+          "calculate_lat_lon_distance",
+          "remove_reminder",
+          "end_conversation",
+          "timestamp_to_datetime_info",
+          "convert_currency",
+          "get_current_timestamp"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_week_delta_and_time",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_10_distraction_tools",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "convert_currency",
+          "search_location_around_lat_lon",
+          "add_reminder",
+          "search_holiday",
+          "search_lat_lon",
+          "get_current_timestamp",
+          "search_reminder",
+          "end_conversation",
+          "timestamp_diff",
+          "search_weather_around_lat_lon",
+          "search_stock",
+          "timestamp_to_datetime_info",
+          "remove_reminder",
+          "datetime_info_to_timestamp",
+          "modify_reminder",
+          "shift_timestamp",
+          "unit_conversion"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_10_distraction_tools",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_location_around_lat_lon",
+          "modify_reminder",
+          "set_location_service_status",
+          "get_current_timestamp",
+          "add_reminder",
+          "timestamp_to_datetime_info",
+          "search_holiday",
+          "end_conversation",
+          "get_low_battery_mode_status",
+          "set_low_battery_mode_status",
+          "timestamp_diff",
+          "get_cellular_service_status",
+          "get_location_service_status",
+          "set_cellular_service_status",
+          "datetime_info_to_timestamp",
+          "search_weather_around_lat_lon",
+          "search_reminder",
+          "get_wifi_status",
+          "get_current_location",
+          "search_lat_lon",
+          "shift_timestamp",
+          "set_wifi_status",
+          "search_stock"
+        ],
+        "bucket": "settings_device_state",
+        "family_label": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "end_conversation",
+          "modify_reminder",
+          "calculate_lat_lon_distance",
+          "unit_conversion",
+          "datetime_info_to_timestamp",
+          "timestamp_to_datetime_info",
+          "get_current_location",
+          "search_reminder",
+          "shift_timestamp",
+          "timestamp_diff",
+          "search_holiday",
+          "remove_reminder",
+          "seconds_to_hours_minutes_seconds",
+          "convert_currency",
+          "add_reminder"
+        ],
+        "bucket": "reminder_crud_scheduling",
+        "family_label": "add_reminder_content_and_weekday_delta_and_time",
+        "final_evaluation": false,
+        "scenario_id": "add_reminder_content_and_weekday_delta_and_time_10_distraction_tools",
+        "split": "action_precondition_broad60",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "TEN_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ]
+  },
+  "truth_labels_inspected": false
+}

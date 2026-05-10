@@ -1,0 +1,86 @@
+{
+  "evidence_status": "experimental_only_not_protected_claim_evidence",
+  "name": "BridgePack Clean Broad500: State Sequence Preservation Pack",
+  "date": "2026-05-10",
+  "branch": "exp/sage-gap-closure-lab",
+  "run_root": "outputs/gap_closure_lab/action_precondition_loop/state_sequence_bridge_broad500_taskcache_clean_rerun/full_benchmark_20260510_164959",
+  "dashboard_task_focus_url": "http://127.0.0.1:62183/outputs/gap_closure_lab/action_precondition_loop/state_sequence_bridge_broad500_taskcache_clean_rerun/full_benchmark_20260510_164959/dashboard/task_focus.html",
+  "manifest": {
+    "path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad_splits.json",
+    "sha256": "14236495e25c65eb04fcbd4ef291278c08439078571d0207fd0e9c3784eb610d",
+    "scenario_count": 500,
+    "selection_influenced_by_cache": false,
+    "truth_labels_inspected_before_run": false
+  },
+  "registry": {
+    "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_state_send_contact_relationship_pack",
+    "sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349"
+  },
+  "models": {
+    "agent_requested": "gpt-4o-mini",
+    "agent_resolved": "gpt-4o-mini",
+    "generation_enabled": false,
+    "generation_requested": "gpt-4o-mini",
+    "generation_resolved": "gpt-4o-mini",
+    "user_requested": "GPT_4_o_2024_05_13",
+    "user_resolved": "GPT_4_o_2024_05_13",
+    "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13"
+  },
+  "cache": {
+    "control_cache_mode": "use-if-eligible",
+    "control_source": "cached",
+    "cached_control_tasks": 500,
+    "fresh_control_tasks": 0,
+    "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "candidate_task_cache": "off",
+    "openai_response_cache_enabled": false,
+    "openai_response_cache_mode": "off"
+  },
+  "metrics": {
+    "control_mean_outcome_similarity": 0.5948720161327935,
+    "candidate_mean_outcome_similarity": 0.813412940410061,
+    "mean_outcome_similarity_delta": 0.21854092427726737,
+    "relative_outcome_lift": 0.36737469295997677,
+    "control_mean_similarity": 0.6700251373519808,
+    "candidate_mean_similarity": 0.7510839827361485,
+    "mean_similarity_delta": 0.08105884538416773,
+    "control_exact_successes": 26,
+    "candidate_exact_successes": 189,
+    "exact_success_delta": 163,
+    "outcome_gain_count": 240,
+    "outcome_regression_count": 46,
+    "outcome_preserved_count": 98,
+    "runtime_exception_count": 0,
+    "candidate_exception_count": 0,
+    "protocol_gate_passed": true,
+    "protocol_gate_reasons": []
+  },
+  "helper_contribution": {
+    "helper_count": 13,
+    "helper_side_effect_incidents": 0,
+    "top_called": [
+      {"tool": "resolve_search_window_or_bounds", "visible": 106, "called": 60, "vnc": 46, "called_subset_outcome_delta": 0.4405216008688042},
+      {"tool": "relative_day_time_to_timestamp", "visible": 51, "called": 44, "vnc": 7, "called_subset_outcome_delta": 0.28302332588046875},
+      {"tool": "plan_device_state_action_sequence_v3", "visible": 110, "called": 33, "vnc": 77, "called_subset_outcome_delta": 0.07686012312507084},
+      {"tool": "days_between_timestamps", "visible": 24, "called": 24, "vnc": 0, "called_subset_outcome_delta": -0.00843253968253968},
+      {"tool": "select_record_by_timestamp_extreme", "visible": 58, "called": 18, "vnc": 40, "called_subset_outcome_delta": 0.3909666138746755},
+      {"tool": "plan_contact_lookup_query", "visible": 24, "called": 17, "vnc": 7, "called_subset_outcome_delta": 0.18452589101607525},
+      {"tool": "plan_contact_relationship_batch_update", "visible": 19, "called": 16, "vnc": 3, "called_subset_outcome_delta": 0.46393777246702517},
+      {"tool": "next_weekday_time_to_timestamp", "visible": 12, "called": 12, "vnc": 0, "called_subset_outcome_delta": 0.5624183006535948},
+      {"tool": "plan_send_message_contact_lookup", "visible": 12, "called": 12, "vnc": 0, "called_subset_outcome_delta": 0.05429946903705112},
+      {"tool": "select_message_content_by_recency", "visible": 52, "called": 11, "vnc": 41, "called_subset_outcome_delta": 0.8148176150702106},
+      {"tool": "select_message_counterparty_for_contact_update", "visible": 12, "called": 11, "vnc": 1, "called_subset_outcome_delta": 0.8398574553469451}
+    ]
+  },
+  "safety": {
+    "runtime_exceptions": 0,
+    "helper_side_effect_incidents": 0,
+    "route_mismatch_qualified": false
+  },
+  "browser_dashboard_check": {
+    "title": "Task Focus - SAGE",
+    "console_error_count": 0,
+    "task_focus_data_rows": 1000
+  },
+  "decision": "current_clean_experimental_broad_reference_move_to_locked_formal_validation"
+}

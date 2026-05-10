@@ -1,0 +1,80 @@
+{
+  "experimental_only": true,
+  "protected_claim_evidence": false,
+  "run_name": "BridgePack Broad500: Ack-Retention Contact+Reminder+State Pack",
+  "run_root": "outputs/gap_closure_lab/action_precondition_loop/ack_retention_bridge_broad500_taskcache/full_benchmark_20260510_133157",
+  "registry_dir": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_state_send_contact_relationship_pack",
+  "registry_manifest_sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+  "split_manifest": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad_splits.json",
+  "split_manifest_sha256": "14236495e25c65eb04fcbd4ef291278c08439078571d0207fd0e9c3784eb610d",
+  "same_scenario_id_set_as": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "same_scenario_id_set_as_sha256": "093547e7a89e704e67d4cea85fd96511063becd0b5542ba3abf21c242453bbbf",
+  "same_order_as_formal500": false,
+  "scenario_set_note": "Same 500 scenario IDs as formal500, reordered for the experimental broad split.",
+  "experimental_code_dependency": [
+    "src/sage_ts/adapters/openai_toolsandbox_roles.py contact lookup bridge",
+    "src/sage_ts/adapters/openai_toolsandbox_roles.py reminder recency bridge",
+    "src/sage_ts/adapters/openai_toolsandbox_roles.py brief-ack final-answer retention"
+  ],
+  "model_metadata": {
+    "agent_requested_model": "gpt-4o-mini",
+    "agent_resolved_model": "gpt-4o-mini",
+    "generation_requested_model": "gpt-4o-mini",
+    "generation_resolved_model": "gpt-4o-mini",
+    "user_requested_model": "GPT_4_o_2024_05_13",
+    "user_resolved_model": "GPT_4_o_2024_05_13",
+    "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13"
+  },
+  "metrics": {
+    "scenario_count": 500,
+    "control_mean_outcome_similarity": 0.5948720161327935,
+    "candidate_mean_outcome_similarity": 0.8213067603551646,
+    "mean_outcome_similarity_delta": 0.22643474422237117,
+    "relative_outcome_lift": 0.3806444715527248,
+    "control_mean_similarity": 0.6700251373519808,
+    "candidate_mean_similarity": 0.7494946623291736,
+    "mean_similarity_delta": 0.07946952497719273,
+    "exact_success_delta": 155,
+    "outcome_gain_count": 243,
+    "outcome_regression_count": 40,
+    "runtime_exception_count": 0,
+    "protocol_gate_passed": true
+  },
+  "bucket_closure_preconditions": {
+    "reminder_crud_scheduling_confirm100_delta": 0.21,
+    "contact_crud_confirm100_delta": 0.33034,
+    "settings_device_state_confirm100_delta": 0.09464
+  },
+  "cache": {
+    "control_cache_mode": "use-if-eligible",
+    "control_source": "cached",
+    "cached_control_tasks": 500,
+    "fresh_control_tasks": 0,
+    "cache_match_policy": "task_name_agent_user_base_tool_policy_min3",
+    "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "cohort_selection_influenced_by_cache": false,
+    "confidence_intervals_account_for_cached_control_variance": true,
+    "openai_response_cache_enabled": false,
+    "candidate_task_cache": "off"
+  },
+  "dashboard_task_focus_file": "outputs/gap_closure_lab/action_precondition_loop/ack_retention_bridge_broad500_taskcache/full_benchmark_20260510_133157/dashboard/task_focus.html",
+  "dashboard_browser_check": {
+    "title": "Task Focus - SAGE",
+    "task_focus_content_present": true,
+    "console_error_count": 0
+  },
+  "artifact_hashes": {
+    "paired_comparison_json_sha256": "785c31e7cc8e1b8b58f6323914d830aee88ad0ee38d1f88e0c2f137d8c2b8d83",
+    "helper_contribution_summary_json_sha256": "7bf865541c333e78ee7fb7e024e4c6cbe9932a60e453cb06d849a55c3aadc614",
+    "control_cache_report_json_sha256": "915d8f6c87967f62f1102dacecc491f59dfa8cf78ef65476e6dafd416b11d9ea",
+    "cohort_diversity_report_json_sha256": "8deb93a7c0115bc1465b32a7a090b314957426e12123a80114fd9d6ba0485b7e"
+  },
+  "comparison_context": {
+    "documented_current_code_best3_500_candidate_outcome": 0.659,
+    "documented_current_code_best3_500_run_vs_control_delta": 0.1617,
+    "documented_v2_6_500_candidate_outcome": 0.6692,
+    "documented_v2_6_500_run_vs_control_delta": 0.1804,
+    "interpretation": "BridgePack broad500 beats documented best3 and V2.6 500 run-vs-control lift experimentally, but is not protected claim evidence until clean matched formal validation is run."
+  },
+  "decision": "PROMISING_EXPERIMENTAL_RESULT_REQUIRES_CLEAN_MATCHED_FORMAL_VALIDATION"
+}

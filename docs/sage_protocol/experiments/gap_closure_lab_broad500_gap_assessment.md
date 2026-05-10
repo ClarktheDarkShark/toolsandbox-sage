@@ -51,6 +51,34 @@ The strongest experimental result in this branch is still the targeted high-fit 
 
 Interpretation: the current broad500 run is a useful stress test and is clearly positive, but it does not beat the documented current-code best3 500 lift. The targeted high-fit scale500 remains the best experimental lift, while best3 remains the stronger broad formal comparator until a same-manifest validation says otherwise.
 
+## 2026-05-10 BridgePack Update
+
+The action/precondition loop that followed this assessment closed the two largest actionable buckets requested for the next campaign and then recombined them into a stronger broad portfolio.
+
+Closed narrow buckets:
+
+- Reminder CRUD/scheduling confirm100: outcome delta `+0.2100`, about `+60%` relative lift, runtime exceptions `0`.
+- Contact CRUD confirm100: control `0.5826`, SAGE `0.9129`, delta `+0.3303`, exact success delta `+56`, runtime exceptions `0`.
+- Settings/device-state confirm100 also moved positively: control `0.7737`, SAGE `0.8683`, delta `+0.0946`.
+
+Updated best broad experimental run:
+
+- Name: `BridgePack Broad500: Ack-Retention Contact+Reminder+State Pack`
+- Run: `outputs/gap_closure_lab/action_precondition_loop/ack_retention_bridge_broad500_taskcache/full_benchmark_20260510_133157`
+- Registry: `artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_state_send_contact_relationship_pack`
+- Registry SHA-256: `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`
+- Scenario set: same 500 scenario IDs as `docs/sage_protocol/manifests/v2_1_formal_500.json`, reordered for the experimental split.
+- Outcome: control `0.5949`, SAGE `0.8213`, delta `+0.2264`, relative lift `+38.1%`.
+- Canonical/reference delta: `+0.0795`.
+- Exact success delta: `+155`.
+- Outcome gains/regressions: `243 / 40`.
+- Control cache: `500` cached / `0` fresh, cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`.
+- Candidate/SAGE cache: task-level cache off; OpenAI response cache disabled.
+- Runtime exceptions: `0`; no observed helper side-effect incidents.
+- Task Focus dashboard: `file:///Users/christopherclark/Library/Mobile%20Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage-gap-closure-lab/outputs/gap_closure_lab/action_precondition_loop/ack_retention_bridge_broad500_taskcache/full_benchmark_20260510_133157/dashboard/task_focus.html`.
+
+Interpretation: this supersedes the older top-tool broad500 stress result as the best broad experimental result in this branch. It beats the documented current-code best3 500 run-vs-control lift of `+0.1617` experimentally, but it is not protected final claim evidence because it includes branch-only actor/router bridge code and has not been rerun in a clean locked formal validation against best3 and V2.6.
+
 ## What Worked
 
 | Lane | Sample | Exposure/calls | Mean outcome delta | Assessment |
@@ -143,4 +171,20 @@ Primary success criterion remains outcome/task completion. Canonical/reference i
 
 ## Decision
 
-Keep the current broad top-tool combo as a positive experimental stress result, but do not treat it as a best3 replacement. The next campaign should target the action/precondition feasibility bucket because it is the largest remaining broad unsupported surface and has enough recurring task types to produce meaningful lift if solved.
+Keep the original broad top-tool combo as a positive historical stress result, not a best3 replacement. The subsequent BridgePack broad500 result is the current best experimental candidate and should move to clean matched formal validation before any protected claim. The remaining improvement surface is no longer whether contact/reminder/state buckets can move narrow runs; it is whether the bridge-policy dependency can be formalized safely and whether the remaining insufficient-information and low-battery/settings regressions can be reduced without weakening the broad lift.
+
+## 2026-05-10 Clean Rerun Update
+
+The latest full rerun after bridge-name and side-effect-accounting repairs is now the current clean broad reference:
+
+- Name: `BridgePack Clean Broad500: State Sequence Preservation Pack`
+- Run: `outputs/gap_closure_lab/action_precondition_loop/state_sequence_bridge_broad500_taskcache_clean_rerun/full_benchmark_20260510_164959`
+- Outcome: control `0.5949`, SAGE `0.8134`, delta `+0.2185`, relative lift `+36.7%`.
+- Exact success delta: `+163` (`26 -> 189`).
+- Canonical/reference delta: `+0.0811`.
+- Outcome gains/regressions/preserved: `240 / 46 / 98`.
+- Runtime exceptions: `0`.
+- Helper side-effect incidents: `0`.
+- Control cache: `500` cached / `0` fresh; candidate fresh, OpenAI response cache off.
+
+This clean rerun still beats the documented current-code best3 500 run-vs-control lift (`+0.1617`) and supersedes the earlier broad500 diagnostic runs as the safety-clean campaign reference. The remaining gap assessment is unchanged: the best next formal step is not more local prompt tweaking, but a locked same-manifest validation against best3 and V2.6 with the bridge-policy dependency declared.

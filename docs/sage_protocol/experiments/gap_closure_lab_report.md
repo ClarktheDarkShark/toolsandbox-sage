@@ -10,9 +10,51 @@ This is experimental gap-closure evidence, not protected final claim evidence. T
 
 A subsequent broad500 stress run recombined all retained top tools with best3-aligned timestamp/window helpers under the run name `Broad500 Top Tool Combo: Full Timestamp No-Field Pack`. It passed the protocol gate with outcome delta `+0.1406`, canonical/reference delta `+0.0596`, exact success delta `+42`, zero runtime exceptions, and zero helper side-effect incidents. This is positive broad experimental evidence, but it does not beat the documented current-code best3 500 run-vs-control lift of `+0.1617`; the next loop should target the newly identified unsupported action/precondition buckets rather than keep tuning only recency tools.
 
+2026-05-10 update: the action/precondition loop produced a stronger broad run named `BridgePack Broad500: Ack-Retention Contact+Reminder+State Pack`. This run keeps the protected best3-style timestamp/window/record selectors, adds retained state/contact/reminder/send-message helpers, and adds experimental actor/router bridge code for contact lookup, reminder recency, and final-answer retention after brief acknowledgements. It passed the 500-task broad formal scenario set with all controls cached, fresh candidate execution, zero runtime exceptions, no observed helper side-effect incidents, and a run-vs-control outcome delta of `+0.2264`. The candidate outcome `0.8213` is above the documented current-code best3 500 candidate outcome `0.6590`, and the run-vs-control lift is above the documented current-code best3 500 lift `+0.1617`. This is still experimental-only evidence because it is from this branch's actor/router bridge code and has not been rerun as a protected matched formal validation.
+
 ## Best Experimental Approach
 
-The best current experimental approach is the compact high-fit recency/day/contact portfolio:
+The best current experimental approach is now `BridgePack Broad500: Ack-Retention Contact+Reminder+State Pack`:
+
+- Run: `outputs/gap_closure_lab/action_precondition_loop/ack_retention_bridge_broad500_taskcache/full_benchmark_20260510_133157`
+- Registry: `artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_state_send_contact_relationship_pack/registry_manifest.json`
+- Registry SHA-256: `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`
+- Split manifest: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad_splits.json`
+- Split manifest SHA-256: `14236495e25c65eb04fcbd4ef291278c08439078571d0207fd0e9c3784eb610d`
+- Scenario set: same 500 scenario IDs as `docs/sage_protocol/manifests/v2_1_formal_500.json`, reordered for progressive experimental broad splits; largest family share `0.024`; not near-duplicate dominated.
+- Outcome: control `0.5949`, SAGE `0.8213`, delta `+0.2264`, relative lift `+38.1%`.
+- Canonical/reference delta: `+0.0795`.
+- Exact successes: `+155`.
+- Outcome gains/regressions: `243 / 40`.
+- Static expected helper fit: `221 / 500`; static no-current-helper-fit `279 / 500`.
+- Control cache: `500` cached / `0` fresh, cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`.
+- SAGE/candidate cache: task-level cache off; OpenAI response cache disabled.
+- Safety: runtime exceptions `0`; helper failed attempts `0`; no helper side-effect incidents observed.
+- Protocol gate: pass.
+- Task Focus dashboard: `file:///Users/christopherclark/Library/Mobile%20Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage-gap-closure-lab/outputs/gap_closure_lab/action_precondition_loop/ack_retention_bridge_broad500_taskcache/full_benchmark_20260510_133157/dashboard/task_focus.html`.
+- Browser check: title `Task Focus — SAGE`; Task Focus content present; console errors `0`.
+
+Natural helper contribution in the 500 run:
+
+- `resolve_search_window_or_bounds`: visible `106`, called `61`, called-subset outcome `+0.3949`, gains/regressions `56 / 4`.
+- `relative_day_time_to_timestamp`: visible `51`, called `44`, called-subset outcome `+0.2899`.
+- `plan_device_state_action_sequence_v3`: visible `110`, called `33`, called-subset outcome `+0.0465`.
+- `select_record_by_timestamp_extreme`: visible `58`, called `19`, called-subset outcome `+0.5229`, gains/regressions `18 / 0`.
+- `plan_contact_relationship_batch_update`: visible `19`, called `18`, called-subset outcome `+0.4104`.
+- `plan_contact_lookup_query`: visible `24`, called `15`, called-subset outcome `+0.2620`.
+- `next_weekday_time_to_timestamp`: visible/called `12`, called-subset outcome `+0.5624`.
+- `plan_send_message_contact_lookup`: visible/called `12`, called-subset outcome `+0.0458`.
+- `select_message_counterparty_for_contact_update`: visible `12`, called `11`, called-subset outcome `+0.7944`.
+- `select_message_content_by_recency`: visible `52`, called `10`, called-subset outcome `+0.8133`.
+
+This result closes two requested unsupported buckets at narrow confirmation scale before broad recombination: reminder CRUD/scheduling confirm100 achieved `+0.2100` absolute outcome lift, and contact CRUD confirm100 achieved `+0.3303` absolute outcome lift. Settings/device-state confirm100 added `+0.0946` absolute lift. The broad500 result shows that combining those retained positives with best3-style timestamp/window helpers and targeted actor/router bridge logic can beat the documented best3 500 lift experimentally.
+
+Machine-readable BridgePack broad500 summary:
+
+- File: `artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/bridgepack_broad500_summary.json`
+- SHA-256: `48a92e39b98d18bd4b1ee2756fa875c477a3d4b9de95454f20bec622ac3067b0`
+
+The prior best targeted experimental approach was the compact high-fit recency/day/contact portfolio:
 
 - Registry: `artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_day_contact_high_power_scale_pack/registry_manifest.json`
 - Registry SHA-256: `0800cd2d27a47a7459020120916b36ccd2b909441262e0b0a294daac8f956e75`
@@ -171,8 +213,10 @@ Machine-readable summary:
 - High-fit scale result summary SHA-256: `c646be44c25562f55b73bffc50032c4aece57ca5e9790cfa508d39ab161a2a63`
 - Broad500 top-tool gap assessment: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad500_gap_assessment.json`
 - Broad500 top-tool gap assessment SHA-256: `d64ebfd3430aa7e88480adc8a78df1e7721edd1d0c3853c77111e1034c7353c2`
+- BridgePack broad500 summary: `artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/bridgepack_broad500_summary.json`
+- BridgePack broad500 summary SHA-256: `48a92e39b98d18bd4b1ee2756fa875c477a3d4b9de95454f20bec622ac3067b0`
 
-Decision: the earlier data-exhaustion stop was superseded by the high-fit scale continuation requested for this branch. Keep the compact high-fit recency/day/contact portfolio as the best experimental gap-closure method found so far. Do not promote it into protected evidence from this branch because the scale split is targeted and not scenario-unseen, but do carry it forward into clean formal validation.
+Decision: the earlier data-exhaustion stop was superseded by the high-fit scale continuation and then by the action/precondition BridgePack broad500 run. Keep BridgePack as the best experimental gap-closure method found so far. Do not promote it into protected evidence from this branch because it includes experimental actor/router bridge code, but do carry it forward into clean matched formal validation.
 
 ## Failed Or Parked Families
 
@@ -210,8 +254,8 @@ Baseline/control arms used the eligible control baseline cache where available a
 
 Latest cache accounting:
 
-- Run: `outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad500/full_benchmark_20260509_182714`
-- Baseline cache: 45 cached / 455 fresh
+- Run: `outputs/gap_closure_lab/action_precondition_loop/ack_retention_bridge_broad500_taskcache/full_benchmark_20260510_133157`
+- Baseline cache: 500 cached / 0 fresh
 - Cache manifest hash: `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
 - Candidate OpenAI response cache: disabled
 
@@ -219,7 +263,7 @@ The OpenAI API key was present for completed live runs by mapping a local untrac
 
 ## Safety Statement
 
-Final selector-only confirm100 had zero runtime exceptions but one helper side-effect preservation incident. The postscale days/time runs had zero runtime exceptions and zero helper side-effect incidents. The high-fit scale250 and scale500 runs had zero runtime exceptions, zero helper runtime incidents, zero helper failed attempts, and zero helper side-effect incidents. Unsafe or currently negative helper forms were parked:
+Final selector-only confirm100 had zero runtime exceptions but one helper side-effect preservation incident. The postscale days/time runs had zero runtime exceptions and zero helper side-effect incidents. The high-fit scale250 and scale500 runs had zero runtime exceptions, zero helper runtime incidents, zero helper failed attempts, and zero helper side-effect incidents. The BridgePack broad500 run had runtime exceptions `0` and no observed helper side-effect incidents. Unsafe or currently negative helper forms were parked:
 
 - `next_dependency_precondition_call`: one side-effect incident in force diagnostic.
 - Initial frozen generated expanded60 pack: two side-effect incidents.
@@ -231,8 +275,37 @@ The runtime now allows composite helpers that explicitly preserve `selected_reco
 
 ## Recommendation
 
-Do not promote any result from this branch to protected evidence. The high-fit recency/day/contact portfolio remains strong enough to justify a future clean same-manifest validation campaign, but the broad500 top-tool-combo run shows that recency/date/contact recombination alone still does not beat the documented current-code best3 500 run-vs-control lift. The next experimental loop should generate and test a side-effect-free action feasibility and action-spec normalizer for the largest unsupported buckets: settings/device-state preconditions, safe insufficient-information, contact CRUD, reminder CRUD/scheduling, and send-message preconditions.
+Do not promote any result from this branch to protected evidence. The `BridgePack Broad500` result is strong enough to justify a clean protected-style formal validation campaign against frozen best3 and V2.6 on the formal500 manifest, with no code or registry changes between matched arms. The most important caveat is that the current result includes experimental actor/router bridge code, so it is not a registry-only protected claim.
+
+Next validation campaign recommendation: freeze the current experimental registry plus the bridge policy code, rerun best3, V2.6, and BridgePack on the same formal manifest with per-task control cache, fresh candidate arms, dashboards opened to Task Focus, and contribution export locked. If that matched campaign preserves the `+0.2264` scale signal or materially beats best3/V2.6 with zero incidents, then prepare a separate final-hardening branch for protected review.
 
 ## Decision
 
-`CONTINUE: broad500 positive stress result complete; next loop targets unsupported action/precondition feasibility gaps before any protected claim`
+`PROMISING_EXPERIMENTAL_RESULT: BridgePack broad500 beats documented best3 500 lift experimentally; requires clean matched formal validation before any protected claim`
+
+## 2026-05-10 Clean Broad500 Rerun Addendum
+
+After the broad500 bridge run, I repaired two campaign blockers before treating the result as the current clean evidence: tool-name-scrambled bridge calls now emit agent-facing tool names, and the side-effect preservation checker now distinguishes search-required/no-op contact phases from missing required side effects. The repaired full broad rerun is the current named result:
+
+- Name: `BridgePack Clean Broad500: State Sequence Preservation Pack`
+- Run: `outputs/gap_closure_lab/action_precondition_loop/state_sequence_bridge_broad500_taskcache_clean_rerun/full_benchmark_20260510_164959`
+- Dashboard Task Focus URL: `http://127.0.0.1:62183/outputs/gap_closure_lab/action_precondition_loop/state_sequence_bridge_broad500_taskcache_clean_rerun/full_benchmark_20260510_164959/dashboard/task_focus.html`
+- Registry: `artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_state_send_contact_relationship_pack`
+- Registry SHA-256: `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`
+- Split manifest: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad_splits.json`
+- Split manifest SHA-256: `14236495e25c65eb04fcbd4ef291278c08439078571d0207fd0e9c3784eb610d`
+- Control outcome: `0.5948720161`
+- Candidate outcome: `0.8134129404`
+- Outcome delta: `+0.2185409243`
+- Relative outcome lift: `+36.7%`
+- Canonical/reference delta: `+0.0810588454`
+- Exact success delta: `+163` (`26 -> 189`)
+- Outcome gains/regressions/preserved: `240 / 46 / 98`
+- Runtime exceptions: `0`
+- Helper side-effect incidents: `0`
+- Protocol gate: passed
+- Control cache: `500` cached / `0` fresh, cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
+- Candidate/SAGE cache: task cache off; OpenAI response cache disabled
+- Task Focus browser check: title `Task Focus - SAGE`, console errors `0`, data rows `1000`
+
+This clean rerun remains above the documented current-code best3 500 run-vs-control lift of `+0.1617`. It is slightly below the earlier `+0.2264` bridge run, but it is the stronger campaign reference because it validates the repaired bridge-name and side-effect-preservation behavior with zero candidate exceptions. It is still experimental evidence, not protected claim evidence, because it depends on branch-only actor/router bridge code and has not yet been run as a locked formal matched validation against best3 and V2.6.

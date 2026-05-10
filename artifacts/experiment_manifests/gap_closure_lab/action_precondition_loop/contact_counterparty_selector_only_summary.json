@@ -1,0 +1,12 @@
+{
+  "created_at": "2026-05-10T14:19:48.230861+00:00",
+  "experimental_only": true,
+  "leakage_control": "No scenario ids, expected answers, truth labels, or hidden facts are encoded in the tool. The pack is a registry recombination of an already validated pure helper.",
+  "output_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/contact_counterparty_selector_only_pack/registry_manifest.json",
+  "rationale": "Retain the proven message-recency contact update selector while removing broad timestamp/contact planners that can pollute plain Contact CRUD tasks.",
+  "registry_sha256": "9c6321d451f8cdc7603e6de66b1eaf15451d90a574f3c7ef0a982e6e0ff1df17",
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_plus_state_v3_send_lookup_pack/registry_manifest.json",
+  "tool_names": [
+    "select_message_counterparty_for_contact_update"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "created_at": "2026-05-10T02:55:14.299786+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "baseline_cache_policy": "use-if-eligible",
+    "candidate_arms_fresh_only": true,
+    "scenario_ids_encoded_into_tools_or_router": false,
+    "truth_labels_inspected": false,
+    "used_cache_availability_for_selection": false
+  },
+  "objective": "Test broad recombination variants after contact/reminder narrow bucket success. These are registry-only ablations; no protected evidence or locked registries are modified.",
+  "protected_claim_evidence": false,
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/top_tools_full_timestamp_no_field_extractor_pack/registry_manifest.json",
+  "source_registry_sha256": "365fa28ecd476c1b3b4cd53b16b5d61b233bd3744e91d5a5d0c060c9a10f5e2b",
+  "variants": {
+    "confirmed_bucket_core_no_days_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/confirmed_bucket_core_no_days_pack/registry_manifest.json",
+      "sha256": "f8a8586d9d2b072be2d6d4da40b45276cee586f0856117aeda3efcd1d677f52b",
+      "tools": [
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    "confirmed_bucket_core_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/confirmed_bucket_core_pack/registry_manifest.json",
+      "sha256": "f343b6051c67a277555c61641e72f6734e37c4e8fce8a1863990271dfd32d806",
+      "tools": [
+        "days_between_timestamps",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    "confirmed_bucket_current_top_minus_state_abstain_pack": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/confirmed_bucket_current_top_minus_state_abstain_pack/registry_manifest.json",
+      "sha256": "3ba5457d931dd51403faec3350fd1217a8fec2b4f790ad7cbbdf8d7c87365a3c",
+      "tools": [
+        "days_between_timestamps",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    }
+  }
+}

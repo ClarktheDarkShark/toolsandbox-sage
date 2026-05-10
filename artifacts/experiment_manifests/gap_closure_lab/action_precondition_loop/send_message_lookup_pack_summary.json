@@ -1,0 +1,46 @@
+{
+  "base_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_no_field_plus_schedule_v2_pack/registry_manifest.json",
+  "base_registry_sha256": "954d5614f774f190aee48d2fdbbe786e3bd73d621563721d800012ff2516ae70",
+  "created_at": "2026-05-10T11:43:34.830108+00:00",
+  "experimental_only": true,
+  "leakage_controls": {
+    "baseline_cache_policy": "use-if-eligible",
+    "candidate_arms_fresh_only": true,
+    "scenario_ids_encoded_into_tool": false,
+    "truth_labels_inspected": false,
+    "used_cache_availability_for_selection": false
+  },
+  "manifest": {
+    "direct_send_scenario_count": 31,
+    "path": "artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/send_message_precondition_splits.json",
+    "sha256": "49b44fecb8e940cc5855946fdabaa162ca20d413f93d62a3cdbb2072b6123413"
+  },
+  "objective": "Add a narrow pure helper for send-message named-recipient lookup and test whether it repairs premature phone-number clarification.",
+  "protected_claim_evidence": false,
+  "registries": {
+    "combined": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_timestamp_schedule_v2_plus_send_lookup_pack/registry_manifest.json",
+      "sha256": "e0fa2c776878bed4a722a14af5f31ab55b077960d59cce03c3462d2e599d1590",
+      "tools": [
+        "days_between_timestamps",
+        "next_weekday_time_to_timestamp",
+        "plan_contact_lookup_query",
+        "plan_contact_search_from_scalar_constraint",
+        "plan_send_message_contact_lookup",
+        "relative_day_time_to_timestamp",
+        "relative_weeks_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    "send_only": {
+      "path": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/send_message_lookup_only_pack/registry_manifest.json",
+      "sha256": "54c40accc3582382a582a69d57671f25b4d04ff8126e5a27a265c5dd52a4e20a",
+      "tools": [
+        "plan_send_message_contact_lookup"
+      ]
+    }
+  }
+}

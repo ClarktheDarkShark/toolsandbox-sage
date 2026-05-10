@@ -1,0 +1,174 @@
+{
+  "tools": {
+    "plan_device_state_next_action": {
+      "accepted_at": "2026-05-10T02:00:59.780402+00:00",
+      "birth_scenario": "turn_on_wifi_low_battery_mode",
+      "code_hash": "b9b554f37bd949206598911aa8b07feb6df26288eaa39469c1d822c646dca36d",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 0,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "\ndef plan_device_state_next_action(target_service: str, wifi_enabled: bool, cellular_enabled: bool, location_service_enabled: bool, low_battery_mode: bool) -> dict:\n    \"\"\"Plan one original ToolSandbox setter needed for a device-state precondition.\"\"\"\n    target = str(target_service or \"\").strip().lower().replace(\"service\", \"\").replace(\"_\", \" \").strip()\n    aliases = {\n        \"wi fi\": \"wifi\",\n        \"wifi\": \"wifi\",\n        \"cell\": \"cellular\",\n        \"cellular\": \"cellular\",\n        \"cellular service\": \"cellular\",\n        \"location\": \"location\",\n        \"location service\": \"location\",\n    }\n    target = aliases.get(target, target)\n    state_by_target = {\n        \"wifi\": bool(wifi_enabled),\n        \"cellular\": bool(cellular_enabled),\n        \"location\": bool(location_service_enabled),\n    }\n    if target not in state_by_target:\n        return {\n            \"ready\": False,\n            \"tool_name\": \"\",\n            \"arguments\": {},\n            \"should_call\": False,\n            \"reason\": \"unknown_target_service\",\n            \"final_response_recommendation\": \"abstain:unknown_target_service\",\n            \"followup_after_success\": \"\",\n        }\n    if state_by_target[target]:\n        return {\n            \"ready\": True,\n            \"tool_name\": \"\",\n            \"arguments\": {},\n            \"should_call\": False,\n            \"reason\": target + \"_already_enabled\",\n            \"final_response_recommendation\": \"state_already_ready\",\n            \"followup_after_success\": \"\",\n        }\n    setter_by_target = {\n        \"wifi\": \"set_wifi_status\",\n        \"cellular\": \"set_cellular_service_status\",\n        \"location\": \"set_location_service_status\",\n    }\n    if bool(low_battery_mode):\n        return {\n            \"ready\": False,\n            \"tool_name\": \"set_low_battery_mode_status\",\n            \"arguments\": {\"on\": False},\n            \"should_call\": True,\n            \"reason\": target + \"_blocked_by_low_battery_mode\",\n            \"final_response_recommendation\": \"turn_off_low_battery_mode_then_enable_\" + target,\n            \"followup_after_success\": setter_by_target[target],\n        }\n    return {\n        \"ready\": False,\n        \"tool_name\": setter_by_target[target],\n        \"arguments\": {\"on\": True},\n        \"should_call\": True,\n        \"reason\": target + \"_disabled\",\n        \"final_response_recommendation\": \"enable_\" + target,\n        \"followup_after_success\": \"\",\n    }\n",
+        "spec": {
+          "abstain_behavior": "Return should_call false with an empty tool_name for unknown target services or when the target service is already enabled.",
+          "applicable_task_families": [
+            "turn_on_wifi_low_battery_mode",
+            "turn_on_cellular_low_battery_mode",
+            "turn_on_location_low_battery_mode",
+            "send_message_with_contact_content_cellular_off",
+            "find_days_till_holiday_wifi_off",
+            "find_temperature_f_with_location_wifi_off"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 6,
+          "description": "Plan exactly one next original ToolSandbox setter for wifi, cellular, or location service precondition tasks. Use after checking visible device state with the original getter tools. If low battery mode is on and the target service is disabled, call the returned set_low_battery_mode_status first, then call the followup setter shown in followup_after_success. The helper is pure and performs no side effects itself.",
+          "diagnostic_only": false,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "state_precondition_helper",
+          "final_state_preservation_plan": "The helper returns only original ToolSandbox setter names and arguments. The actor must execute those setters; the helper itself does not mutate state.",
+          "generalization_rationale": "The same precondition pattern recurs across wifi, cellular, location, message-send, weather, calendar, and reminder workflows where a disabled service or low battery mode blocks the requested task.",
+          "grading_accounting_note": "Canonical route is preserved because the returned original setter must still be called and traced.",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [
+              "set_wifi_status",
+              "set_cellular_service_status",
+              "set_location_service_status"
+            ],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "low_battery_mode_requires_ordered_setter_sequence"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "no_current_helper_fit",
+              "side_effect_precondition_ordering"
+            ],
+            "summary": "Broad500 exposed a large settings/device-state bucket where no effective helper was available for many service precondition tasks.",
+            "visible_data_gaps": []
+          },
+          "inputs": [
+            {
+              "annotation": "str",
+              "description": "Target service: wifi, cellular, or location.",
+              "name": "target_service"
+            },
+            {
+              "annotation": "bool",
+              "description": "Visible result from get_wifi_status.",
+              "name": "wifi_enabled"
+            },
+            {
+              "annotation": "bool",
+              "description": "Visible result from get_cellular_service_status.",
+              "name": "cellular_enabled"
+            },
+            {
+              "annotation": "bool",
+              "description": "Visible result from get_location_service_status.",
+              "name": "location_service_enabled"
+            },
+            {
+              "annotation": "bool",
+              "description": "Visible result from get_low_battery_mode_status.",
+              "name": "low_battery_mode"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "state_helper_opaque_dict_input_contract",
+            "output_not_trace_compatible",
+            "low_battery_precondition_ordering"
+          ],
+          "negative_triggers": [
+            "insufficient_information",
+            "unknown_target_service",
+            "already_ready",
+            "get_wifi",
+            "get_cellular"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "properties": {
+              "arguments": {
+                "type": "object"
+              },
+              "final_response_recommendation": {
+                "type": "string"
+              },
+              "followup_after_success": {
+                "type": "string"
+              },
+              "ready": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "should_call": {
+                "type": "boolean"
+              },
+              "tool_name": {
+                "enum": [
+                  "",
+                  "set_wifi_status",
+                  "set_cellular_service_status",
+                  "set_location_service_status",
+                  "set_low_battery_mode_status"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "tool_name",
+              "arguments",
+              "should_call",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "low_battery_mode",
+            "wifi_off",
+            "cellular_off",
+            "turn_on_wifi",
+            "turn_on_cellular",
+            "turn_on_location",
+            "send_message_with_contact_content_cellular_off",
+            "find_days_till_holiday_wifi_off",
+            "find_temperature_f_with_location_wifi_off"
+          ],
+          "preserves_side_effect_tools": [
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+            "set_low_battery_mode_status"
+          ],
+          "reason_tool_is_decisive": "It chooses the exact benchmark setter and arguments for the next precondition side effect instead of leaving the actor to infer the legal ordering around low battery mode.",
+          "required_original_tool_calls": [
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+            "set_low_battery_mode_status"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "Broad500 settings/device-state bucket had 124 tasks and 80 no-visible-helper cases.",
+            "Prior generic state helper was too weak; this version has scalar inputs and exact setter names."
+          ],
+          "tool_name": "plan_device_state_next_action"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 1,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    }
+  }
+}
