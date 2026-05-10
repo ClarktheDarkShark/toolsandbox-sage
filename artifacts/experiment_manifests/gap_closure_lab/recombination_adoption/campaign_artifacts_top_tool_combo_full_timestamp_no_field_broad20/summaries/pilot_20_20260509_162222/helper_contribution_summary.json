@@ -1,0 +1,1059 @@
+{
+  "control_dir": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad20/pilot_20_20260509_162222/control/pilot_20_control_cached_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_09_2026_16_24_52",
+  "candidate_dir": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad20/pilot_20_20260509_162222/candidate/pilot_20_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_09_2026_16_24_52",
+  "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/top_tools_full_timestamp_no_field_extractor_pack",
+  "scenario_count": 20,
+  "helpers": {
+    "days_between_timestamps": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "find_days_till_holiday",
+        "find_days_till_holiday_wifi_off"
+      ],
+      "called_scenarios": [
+        "find_days_till_holiday",
+        "find_days_till_holiday_wifi_off"
+      ],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [
+        "find_days_till_holiday",
+        "find_days_till_holiday_wifi_off"
+      ],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number",
+        "add_reminder_content_and_date_and_time",
+        "add_reminder_content_and_week_delta_and_time",
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "add_reminder_content_and_weekday_delta_and_time",
+        "cellular_off",
+        "find_days_till_holiday_insufficient_information",
+        "find_thanksgiving_timestamp",
+        "get_cellular",
+        "get_wifi",
+        "modify_contact_with_message_recency",
+        "modify_contact_with_message_recency_insufficient_information",
+        "modify_reminder_with_recency_latest",
+        "modify_reminder_with_recency_latest_insufficient_information",
+        "remove_contact_by_phone",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      ],
+      "visible_count": 2,
+      "called_count": 2,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 18,
+      "called_subset": {
+        "scenario_count": 2,
+        "scenarios": [
+          "find_days_till_holiday",
+          "find_days_till_holiday_wifi_off"
+        ],
+        "mean_canonical_delta": -0.22500000000000003,
+        "mean_outcome_delta": 0.0,
+        "canonical_gains": 0,
+        "canonical_regressions": 2,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 2,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 18,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number",
+          "add_reminder_content_and_date_and_time",
+          "add_reminder_content_and_week_delta_and_time",
+          "add_reminder_content_and_week_delta_and_time_and_location",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+          "add_reminder_content_and_weekday_delta_and_time",
+          "cellular_off",
+          "find_days_till_holiday_insufficient_information",
+          "find_thanksgiving_timestamp",
+          "get_cellular",
+          "get_wifi",
+          "modify_contact_with_message_recency",
+          "modify_contact_with_message_recency_insufficient_information",
+          "modify_reminder_with_recency_latest",
+          "modify_reminder_with_recency_latest_insufficient_information",
+          "remove_contact_by_phone",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information"
+        ],
+        "mean_canonical_delta": 0.16835538425867946,
+        "mean_outcome_delta": 0.17733028303577866,
+        "canonical_gains": 7,
+        "canonical_regressions": 4,
+        "canonical_preserved": 7,
+        "outcome_gains": 5,
+        "outcome_regressions": 3,
+        "outcome_preserved": 5,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "plan_contact_lookup_query": {
+      "origin": "retained",
+      "visible_scenarios": [],
+      "called_scenarios": [],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number",
+        "add_reminder_content_and_date_and_time",
+        "add_reminder_content_and_week_delta_and_time",
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "add_reminder_content_and_weekday_delta_and_time",
+        "cellular_off",
+        "find_days_till_holiday",
+        "find_days_till_holiday_insufficient_information",
+        "find_days_till_holiday_wifi_off",
+        "find_thanksgiving_timestamp",
+        "get_cellular",
+        "get_wifi",
+        "modify_contact_with_message_recency",
+        "modify_contact_with_message_recency_insufficient_information",
+        "modify_reminder_with_recency_latest",
+        "modify_reminder_with_recency_latest_insufficient_information",
+        "remove_contact_by_phone",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      ],
+      "visible_count": 0,
+      "called_count": 0,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 20,
+      "called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 20,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number",
+          "add_reminder_content_and_date_and_time",
+          "add_reminder_content_and_week_delta_and_time",
+          "add_reminder_content_and_week_delta_and_time_and_location",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+          "add_reminder_content_and_weekday_delta_and_time",
+          "cellular_off",
+          "find_days_till_holiday",
+          "find_days_till_holiday_insufficient_information",
+          "find_days_till_holiday_wifi_off",
+          "find_thanksgiving_timestamp",
+          "get_cellular",
+          "get_wifi",
+          "modify_contact_with_message_recency",
+          "modify_contact_with_message_recency_insufficient_information",
+          "modify_reminder_with_recency_latest",
+          "modify_reminder_with_recency_latest_insufficient_information",
+          "remove_contact_by_phone",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information"
+        ],
+        "mean_canonical_delta": 0.1290198458328115,
+        "mean_outcome_delta": 0.15368624529767486,
+        "canonical_gains": 7,
+        "canonical_regressions": 6,
+        "canonical_preserved": 7,
+        "outcome_gains": 5,
+        "outcome_regressions": 3,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "plan_contact_search_from_scalar_constraint": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "remove_contact_by_phone"
+      ],
+      "called_scenarios": [],
+      "visible_not_called_scenarios": [
+        "remove_contact_by_phone"
+      ],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number",
+        "add_reminder_content_and_date_and_time",
+        "add_reminder_content_and_week_delta_and_time",
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "add_reminder_content_and_weekday_delta_and_time",
+        "cellular_off",
+        "find_days_till_holiday",
+        "find_days_till_holiday_insufficient_information",
+        "find_days_till_holiday_wifi_off",
+        "find_thanksgiving_timestamp",
+        "get_cellular",
+        "get_wifi",
+        "modify_contact_with_message_recency",
+        "modify_contact_with_message_recency_insufficient_information",
+        "modify_reminder_with_recency_latest",
+        "modify_reminder_with_recency_latest_insufficient_information",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      ],
+      "visible_count": 1,
+      "called_count": 0,
+      "visible_not_called_count": 1,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 19,
+      "called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 1,
+        "scenarios": [
+          "remove_contact_by_phone"
+        ],
+        "mean_canonical_delta": 0.01950624932227918,
+        "mean_outcome_delta": 0.0,
+        "canonical_gains": 1,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 1,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 19,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number",
+          "add_reminder_content_and_date_and_time",
+          "add_reminder_content_and_week_delta_and_time",
+          "add_reminder_content_and_week_delta_and_time_and_location",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+          "add_reminder_content_and_weekday_delta_and_time",
+          "cellular_off",
+          "find_days_till_holiday",
+          "find_days_till_holiday_insufficient_information",
+          "find_days_till_holiday_wifi_off",
+          "find_thanksgiving_timestamp",
+          "get_cellular",
+          "get_wifi",
+          "modify_contact_with_message_recency",
+          "modify_contact_with_message_recency_insufficient_information",
+          "modify_reminder_with_recency_latest",
+          "modify_reminder_with_recency_latest_insufficient_information",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information"
+        ],
+        "mean_canonical_delta": 0.13478371933336583,
+        "mean_outcome_delta": 0.16466383424750877,
+        "canonical_gains": 6,
+        "canonical_regressions": 6,
+        "canonical_preserved": 7,
+        "outcome_gains": 5,
+        "outcome_regressions": 3,
+        "outcome_preserved": 6,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "relative_day_time_to_timestamp": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "add_reminder_content_and_week_delta_and_time",
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "modify_reminder_with_recency_latest",
+        "modify_reminder_with_recency_latest_insufficient_information"
+      ],
+      "called_scenarios": [
+        "add_reminder_content_and_week_delta_and_time",
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "modify_reminder_with_recency_latest"
+      ],
+      "visible_not_called_scenarios": [
+        "modify_reminder_with_recency_latest_insufficient_information"
+      ],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [
+        "add_reminder_content_and_week_delta_and_time",
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "modify_reminder_with_recency_latest"
+      ],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number",
+        "add_reminder_content_and_date_and_time",
+        "add_reminder_content_and_weekday_delta_and_time",
+        "cellular_off",
+        "find_days_till_holiday",
+        "find_days_till_holiday_insufficient_information",
+        "find_days_till_holiday_wifi_off",
+        "find_thanksgiving_timestamp",
+        "get_cellular",
+        "get_wifi",
+        "modify_contact_with_message_recency",
+        "modify_contact_with_message_recency_insufficient_information",
+        "remove_contact_by_phone",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      ],
+      "visible_count": 5,
+      "called_count": 4,
+      "visible_not_called_count": 1,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 15,
+      "called_subset": {
+        "scenario_count": 4,
+        "scenarios": [
+          "add_reminder_content_and_week_delta_and_time",
+          "add_reminder_content_and_week_delta_and_time_and_location",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+          "modify_reminder_with_recency_latest"
+        ],
+        "mean_canonical_delta": 0.41778708898953065,
+        "mean_outcome_delta": 0.553361266968592,
+        "canonical_gains": 3,
+        "canonical_regressions": 1,
+        "canonical_preserved": 0,
+        "outcome_gains": 3,
+        "outcome_regressions": 1,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 1,
+        "scenarios": [
+          "modify_reminder_with_recency_latest_insufficient_information"
+        ],
+        "mean_canonical_delta": 1.0,
+        "mean_outcome_delta": null,
+        "canonical_gains": 1,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 15,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number",
+          "add_reminder_content_and_date_and_time",
+          "add_reminder_content_and_weekday_delta_and_time",
+          "cellular_off",
+          "find_days_till_holiday",
+          "find_days_till_holiday_insufficient_information",
+          "find_days_till_holiday_wifi_off",
+          "find_thanksgiving_timestamp",
+          "get_cellular",
+          "get_wifi",
+          "modify_contact_with_message_recency",
+          "modify_contact_with_message_recency_insufficient_information",
+          "remove_contact_by_phone",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information"
+        ],
+        "mean_canonical_delta": -0.006050095953459503,
+        "mean_outcome_delta": 0.008349873780977722,
+        "canonical_gains": 3,
+        "canonical_regressions": 5,
+        "canonical_preserved": 7,
+        "outcome_gains": 2,
+        "outcome_regressions": 2,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "called_subset_outcome_positive_but_canonical_negative_or_regressive"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "resolve_search_window_or_bounds": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "modify_contact_with_message_recency",
+        "modify_reminder_with_recency_latest"
+      ],
+      "called_scenarios": [
+        "modify_contact_with_message_recency"
+      ],
+      "visible_not_called_scenarios": [
+        "modify_reminder_with_recency_latest"
+      ],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [
+        "modify_contact_with_message_recency"
+      ],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number",
+        "add_reminder_content_and_date_and_time",
+        "add_reminder_content_and_week_delta_and_time",
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "add_reminder_content_and_weekday_delta_and_time",
+        "cellular_off",
+        "find_days_till_holiday",
+        "find_days_till_holiday_insufficient_information",
+        "find_days_till_holiday_wifi_off",
+        "find_thanksgiving_timestamp",
+        "get_cellular",
+        "get_wifi",
+        "modify_contact_with_message_recency_insufficient_information",
+        "modify_reminder_with_recency_latest_insufficient_information",
+        "remove_contact_by_phone",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      ],
+      "visible_count": 2,
+      "called_count": 1,
+      "visible_not_called_count": 1,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 18,
+      "called_subset": {
+        "scenario_count": 1,
+        "scenarios": [
+          "modify_contact_with_message_recency"
+        ],
+        "mean_canonical_delta": 0.3819109168876229,
+        "mean_outcome_delta": 1.0,
+        "canonical_gains": 1,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 1,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 1,
+        "scenarios": [
+          "modify_reminder_with_recency_latest"
+        ],
+        "mean_canonical_delta": 0.44444444444444453,
+        "mean_outcome_delta": 1.0,
+        "canonical_gains": 1,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 1,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 18,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number",
+          "add_reminder_content_and_date_and_time",
+          "add_reminder_content_and_week_delta_and_time",
+          "add_reminder_content_and_week_delta_and_time_and_location",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+          "add_reminder_content_and_weekday_delta_and_time",
+          "cellular_off",
+          "find_days_till_holiday",
+          "find_days_till_holiday_insufficient_information",
+          "find_days_till_holiday_wifi_off",
+          "find_thanksgiving_timestamp",
+          "get_cellular",
+          "get_wifi",
+          "modify_contact_with_message_recency_insufficient_information",
+          "modify_reminder_with_recency_latest_insufficient_information",
+          "remove_contact_by_phone",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information"
+        ],
+        "mean_canonical_delta": 0.0974467530735646,
+        "mean_outcome_delta": 0.023484129189624836,
+        "canonical_gains": 5,
+        "canonical_regressions": 6,
+        "canonical_preserved": 7,
+        "outcome_gains": 3,
+        "outcome_regressions": 3,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "called_subset_outcome_positive_but_canonical_negative_or_regressive"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "select_message_content_by_recency": {
+      "origin": "retained",
+      "visible_scenarios": [],
+      "called_scenarios": [],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number",
+        "add_reminder_content_and_date_and_time",
+        "add_reminder_content_and_week_delta_and_time",
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "add_reminder_content_and_weekday_delta_and_time",
+        "cellular_off",
+        "find_days_till_holiday",
+        "find_days_till_holiday_insufficient_information",
+        "find_days_till_holiday_wifi_off",
+        "find_thanksgiving_timestamp",
+        "get_cellular",
+        "get_wifi",
+        "modify_contact_with_message_recency",
+        "modify_contact_with_message_recency_insufficient_information",
+        "modify_reminder_with_recency_latest",
+        "modify_reminder_with_recency_latest_insufficient_information",
+        "remove_contact_by_phone",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      ],
+      "visible_count": 0,
+      "called_count": 0,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 20,
+      "called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 20,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number",
+          "add_reminder_content_and_date_and_time",
+          "add_reminder_content_and_week_delta_and_time",
+          "add_reminder_content_and_week_delta_and_time_and_location",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+          "add_reminder_content_and_weekday_delta_and_time",
+          "cellular_off",
+          "find_days_till_holiday",
+          "find_days_till_holiday_insufficient_information",
+          "find_days_till_holiday_wifi_off",
+          "find_thanksgiving_timestamp",
+          "get_cellular",
+          "get_wifi",
+          "modify_contact_with_message_recency",
+          "modify_contact_with_message_recency_insufficient_information",
+          "modify_reminder_with_recency_latest",
+          "modify_reminder_with_recency_latest_insufficient_information",
+          "remove_contact_by_phone",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information"
+        ],
+        "mean_canonical_delta": 0.1290198458328115,
+        "mean_outcome_delta": 0.15368624529767486,
+        "canonical_gains": 7,
+        "canonical_regressions": 6,
+        "canonical_preserved": 7,
+        "outcome_gains": 5,
+        "outcome_regressions": 3,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "select_message_counterparty_for_contact_update": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "modify_contact_with_message_recency"
+      ],
+      "called_scenarios": [
+        "modify_contact_with_message_recency"
+      ],
+      "visible_not_called_scenarios": [],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [
+        "modify_contact_with_message_recency"
+      ],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number",
+        "add_reminder_content_and_date_and_time",
+        "add_reminder_content_and_week_delta_and_time",
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "add_reminder_content_and_weekday_delta_and_time",
+        "cellular_off",
+        "find_days_till_holiday",
+        "find_days_till_holiday_insufficient_information",
+        "find_days_till_holiday_wifi_off",
+        "find_thanksgiving_timestamp",
+        "get_cellular",
+        "get_wifi",
+        "modify_contact_with_message_recency_insufficient_information",
+        "modify_reminder_with_recency_latest",
+        "modify_reminder_with_recency_latest_insufficient_information",
+        "remove_contact_by_phone",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      ],
+      "visible_count": 1,
+      "called_count": 1,
+      "visible_not_called_count": 0,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 19,
+      "called_subset": {
+        "scenario_count": 1,
+        "scenarios": [
+          "modify_contact_with_message_recency"
+        ],
+        "mean_canonical_delta": 0.3819109168876229,
+        "mean_outcome_delta": 1.0,
+        "canonical_gains": 1,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 1,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 19,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number",
+          "add_reminder_content_and_date_and_time",
+          "add_reminder_content_and_week_delta_and_time",
+          "add_reminder_content_and_week_delta_and_time_and_location",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+          "add_reminder_content_and_weekday_delta_and_time",
+          "cellular_off",
+          "find_days_till_holiday",
+          "find_days_till_holiday_insufficient_information",
+          "find_days_till_holiday_wifi_off",
+          "find_thanksgiving_timestamp",
+          "get_cellular",
+          "get_wifi",
+          "modify_contact_with_message_recency_insufficient_information",
+          "modify_reminder_with_recency_latest",
+          "modify_reminder_with_recency_latest_insufficient_information",
+          "remove_contact_by_phone",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information"
+        ],
+        "mean_canonical_delta": 0.11570978946150565,
+        "mean_outcome_delta": 0.09323526281893735,
+        "canonical_gains": 6,
+        "canonical_regressions": 6,
+        "canonical_preserved": 7,
+        "outcome_gains": 4,
+        "outcome_regressions": 3,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    },
+    "select_record_by_timestamp_extreme": {
+      "origin": "retained",
+      "visible_scenarios": [
+        "modify_contact_with_message_recency",
+        "modify_reminder_with_recency_latest"
+      ],
+      "called_scenarios": [],
+      "visible_not_called_scenarios": [
+        "modify_contact_with_message_recency",
+        "modify_reminder_with_recency_latest"
+      ],
+      "failed_attempt_scenarios": [],
+      "attempted_scenarios": [],
+      "hidden_no_call_scenarios": [
+        "add_contact_with_name_and_phone_number",
+        "add_reminder_content_and_date_and_time",
+        "add_reminder_content_and_week_delta_and_time",
+        "add_reminder_content_and_week_delta_and_time_and_location",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+        "add_reminder_content_and_weekday_delta_and_time",
+        "cellular_off",
+        "find_days_till_holiday",
+        "find_days_till_holiday_insufficient_information",
+        "find_days_till_holiday_wifi_off",
+        "find_thanksgiving_timestamp",
+        "get_cellular",
+        "get_wifi",
+        "modify_contact_with_message_recency_insufficient_information",
+        "modify_reminder_with_recency_latest_insufficient_information",
+        "remove_contact_by_phone",
+        "remove_contact_by_phone_no_remove_contact_insufficient_information",
+        "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      ],
+      "visible_count": 2,
+      "called_count": 0,
+      "visible_not_called_count": 2,
+      "failed_attempt_count": 0,
+      "hidden_no_call_count": 18,
+      "called_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "visible_not_called_subset": {
+        "scenario_count": 2,
+        "scenarios": [
+          "modify_contact_with_message_recency",
+          "modify_reminder_with_recency_latest"
+        ],
+        "mean_canonical_delta": 0.4131776806660337,
+        "mean_outcome_delta": 1.0,
+        "canonical_gains": 2,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 2,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "hidden_no_call_subset": {
+        "scenario_count": 18,
+        "scenarios": [
+          "add_contact_with_name_and_phone_number",
+          "add_reminder_content_and_date_and_time",
+          "add_reminder_content_and_week_delta_and_time",
+          "add_reminder_content_and_week_delta_and_time_and_location",
+          "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+          "add_reminder_content_and_weekday_delta_and_time",
+          "cellular_off",
+          "find_days_till_holiday",
+          "find_days_till_holiday_insufficient_information",
+          "find_days_till_holiday_wifi_off",
+          "find_thanksgiving_timestamp",
+          "get_cellular",
+          "get_wifi",
+          "modify_contact_with_message_recency_insufficient_information",
+          "modify_reminder_with_recency_latest_insufficient_information",
+          "remove_contact_by_phone",
+          "remove_contact_by_phone_no_remove_contact_insufficient_information",
+          "remove_contact_by_phone_no_search_contacts_insufficient_information"
+        ],
+        "mean_canonical_delta": 0.0974467530735646,
+        "mean_outcome_delta": 0.023484129189624836,
+        "canonical_gains": 5,
+        "canonical_regressions": 6,
+        "canonical_preserved": 7,
+        "outcome_gains": 3,
+        "outcome_regressions": 3,
+        "outcome_preserved": 7,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "called_subset_outcome_positive_but_canonical_negative_or_regressive"
+        }
+      },
+      "failed_attempt_subset": {
+        "scenario_count": 0,
+        "scenarios": [],
+        "mean_canonical_delta": null,
+        "mean_outcome_delta": null,
+        "canonical_gains": 0,
+        "canonical_regressions": 0,
+        "canonical_preserved": 0,
+        "outcome_gains": 0,
+        "outcome_regressions": 0,
+        "outcome_preserved": 0,
+        "route_mismatch_accounting": {
+          "helper_substitution_likely": false,
+          "reason": "none"
+        }
+      },
+      "side_effect_incidents": [],
+      "runtime_incidents": []
+    }
+  },
+  "accepted_tools": [],
+  "accepted_but_uncalled_tools": [],
+  "retained_helper_called_tools": [
+    "days_between_timestamps",
+    "relative_day_time_to_timestamp",
+    "resolve_search_window_or_bounds",
+    "select_message_counterparty_for_contact_update"
+  ],
+  "newly_generated_helper_called_tools": [],
+  "registry_size": 8,
+  "runtime_bundle_size": {
+    "scenario_count": 20,
+    "mean_generated_tool_bundle_size": 0.65,
+    "max_generated_tool_bundle_size": 3,
+    "mean_available_tool_count": 4.9,
+    "max_available_tool_count": 14
+  },
+  "compute_cache_token_metrics": {
+    "candidate_openai_response_cache": {},
+    "candidate_prompt_cache": {
+      "root": "outputs/prompt_cache",
+      "hits": 0,
+      "misses": 0,
+      "writes": 0
+    }
+  },
+  "selection_event_count": 20,
+  "visibility_event_count": 20
+}

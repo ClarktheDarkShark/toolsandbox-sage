@@ -8,6 +8,8 @@ The recombination/adoption continuation produced a new high-fit experimental sca
 
 This is experimental gap-closure evidence, not protected final claim evidence. The high-fit scale splits intentionally target the remaining positive recency/day/action/contact surface, and the manifest records that all selected scenarios already had prior local output coverage. The runs therefore demonstrate a high-power method and natural adoption at 250/500 scale, but they should be followed by a clean frozen formal validation campaign before any protected claim.
 
+A subsequent broad500 stress run recombined all retained top tools with best3-aligned timestamp/window helpers under the run name `Broad500 Top Tool Combo: Full Timestamp No-Field Pack`. It passed the protocol gate with outcome delta `+0.1406`, canonical/reference delta `+0.0596`, exact success delta `+42`, zero runtime exceptions, and zero helper side-effect incidents. This is positive broad experimental evidence, but it does not beat the documented current-code best3 500 run-vs-control lift of `+0.1617`; the next loop should target the newly identified unsupported action/precondition buckets rather than keep tuning only recency tools.
+
 ## Best Experimental Approach
 
 The best current experimental approach is the compact high-fit recency/day/contact portfolio:
@@ -46,6 +48,28 @@ High-fit scale500 result:
 - Task Focus dashboard: `http://127.0.0.1:62043/outputs/gap_closure_lab/recombination_adoption/high_fit_recency_day_contact_scale500/full_benchmark_20260509_105941/dashboard/task_focus.html`
 
 The final Task Focus dashboard was opened in the in-app browser after the run completed. Browser check: title `Task Focus — SAGE`; Task Focus/Baseline/SAGE content present; console errors `0`.
+
+Broad500 top-tool-combo stress result:
+
+- Run name: `Broad500 Top Tool Combo: Full Timestamp No-Field Pack`
+- Run: `outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad500/full_benchmark_20260509_182714`
+- Registry: `artifacts/registry_experiments/gap_closure_lab/recombination_adoption/top_tools_full_timestamp_no_field_extractor_pack`
+- Registry SHA-256: `365fa28ecd476c1b3b4cd53b16b5d61b233bd3744e91d5a5d0c060c9a10f5e2b`
+- Split manifest: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad_splits.json` locally; compressed archive committed at `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad_splits.json.gz`
+- Outcome: control `0.5947`, SAGE `0.7353`, delta `+0.1406`
+- Canonical/reference: control `0.6628`, SAGE `0.7224`, delta `+0.0596`
+- Exact success delta: `+42`
+- Outcome gains/regressions: `152 / 74`
+- Control cache: `45` cached / `455` fresh, cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
+- SAGE/candidate cache: OpenAI response cache disabled; candidate task-level cache not used
+- Safety: runtime exceptions `0`; helper side-effect incidents `0`
+- Protocol gate: pass
+- Task Focus dashboard: `http://127.0.0.1:62061/outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad500/full_benchmark_20260509_182714/dashboard/task_focus.html`
+- Gap assessment: `docs/sage_protocol/experiments/gap_closure_lab_broad500_gap_assessment.md`
+- Machine-readable assessment: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad500_gap_assessment.json`
+- Assessment SHA-256: `d64ebfd3430aa7e88480adc8a78df1e7721edd1d0c3853c77111e1034c7353c2`
+
+The broad500 gap assessment identified the largest remaining unsupported buckets as safe insufficient-information/abstention, settings/device-state preconditions, contact CRUD, reminder CRUD/scheduling, and send-message preconditions. The next generated-tool loop should target a side-effect-free action feasibility and action-spec normalizer rather than another recency-only helper.
 
 The strongest prior broad signal came from robust live generation with `gpt-5-mini` for generation/repair and `gpt-4o-mini` for execution:
 
@@ -145,6 +169,8 @@ Machine-readable summary:
 - Expanded60 coverage dry-run artifacts: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/coverage/`
 - High-fit scale result summary: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/high_fit_scale_results_summary.json`
 - High-fit scale result summary SHA-256: `c646be44c25562f55b73bffc50032c4aece57ca5e9790cfa508d39ab161a2a63`
+- Broad500 top-tool gap assessment: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad500_gap_assessment.json`
+- Broad500 top-tool gap assessment SHA-256: `d64ebfd3430aa7e88480adc8a78df1e7721edd1d0c3853c77111e1034c7353c2`
 
 Decision: the earlier data-exhaustion stop was superseded by the high-fit scale continuation requested for this branch. Keep the compact high-fit recency/day/contact portfolio as the best experimental gap-closure method found so far. Do not promote it into protected evidence from this branch because the scale split is targeted and not scenario-unseen, but do carry it forward into clean formal validation.
 
@@ -184,8 +210,8 @@ Baseline/control arms used the eligible control baseline cache where available a
 
 Latest cache accounting:
 
-- Run: `outputs/gap_closure_lab/recombination_adoption/high_fit_recency_day_contact_scale500/full_benchmark_20260509_105941`
-- Baseline cache: 29 cached / 471 fresh
+- Run: `outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad500/full_benchmark_20260509_182714`
+- Baseline cache: 45 cached / 455 fresh
 - Cache manifest hash: `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
 - Candidate OpenAI response cache: disabled
 
@@ -205,8 +231,8 @@ The runtime now allows composite helpers that explicitly preserve `selected_reco
 
 ## Recommendation
 
-Do not promote any result from this branch to protected evidence. The next formal campaign should freeze the high-fit recency/day/contact portfolio, create a clean non-external confirmation100/scale250/scale500 validation plan with no code or registry changes between matched arms, and run same-manifest comparisons against the protected current best3/V2.6 baselines. The high-fit result is strong enough to justify that campaign: it reached +0.3723 outcome on 250 and +0.2488 outcome on 500 with natural calls and clean safety.
+Do not promote any result from this branch to protected evidence. The high-fit recency/day/contact portfolio remains strong enough to justify a future clean same-manifest validation campaign, but the broad500 top-tool-combo run shows that recency/date/contact recombination alone still does not beat the documented current-code best3 500 run-vs-control lift. The next experimental loop should generate and test a side-effect-free action feasibility and action-spec normalizer for the largest unsupported buckets: settings/device-state preconditions, safe insufficient-information, contact CRUD, reminder CRUD/scheduling, and send-message preconditions.
 
 ## Decision
 
-`STOP: high-fit experimental 250/500 gap-closure scale target achieved; carry portfolio to clean formal validation before protected claim`
+`CONTINUE: broad500 positive stress result complete; next loop targets unsupported action/precondition feasibility gaps before any protected claim`

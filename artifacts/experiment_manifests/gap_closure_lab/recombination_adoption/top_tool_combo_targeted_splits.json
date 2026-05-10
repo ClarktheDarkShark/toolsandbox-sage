@@ -1,0 +1,522 @@
+{
+  "cache_policy": {
+    "baseline_control_cache": "use-if-eligible",
+    "openai_response_cache_for_candidate": "disabled",
+    "sage_candidate_cache": "fresh_only"
+  },
+  "created_at": "2026-05-09T20:11:04.088088+00:00",
+  "experimental_only": true,
+  "manifest_type": "sage_gap_closure_lab_top_tool_targeted_splits",
+  "protected_claim_evidence": false,
+  "schema_version": 1,
+  "selection_policy": {
+    "selection_note": "Round-robin 20 from prior high-fit recency/contact lanes for fast adoption and routing diagnosis. No labels or cache status used.",
+    "used_cache_availability": false,
+    "used_expected_answers": false,
+    "used_truth_labels": false
+  },
+  "split_aliases": {
+    "pilot_20": "top_tool_targeted20"
+  },
+  "split_diversity": {
+    "top_tool_targeted20": {
+      "distinct_family_count": 20,
+      "family_counts": {
+        "find_days_till_holiday": 1,
+        "find_days_till_holiday_wifi_off": 1,
+        "modify_contact_with_message_recency": 1,
+        "modify_reminder_with_recency_latest": 1,
+        "remove_contact_by_phone": 1,
+        "remove_reminder_with_recency_latest": 1,
+        "search_message_with_recency_latest": 1,
+        "search_message_with_recency_oldest": 1,
+        "search_name_with_relationship": 1,
+        "search_phone_number_with_name": 1,
+        "search_relationship_with_phone_number": 1,
+        "search_reminder_with_creation_recency_yesterday": 1,
+        "search_reminder_with_creation_recency_yesterday_implicit": 1,
+        "search_reminder_with_recency_upcoming": 1,
+        "search_reminder_with_recency_upcoming_implicit": 1,
+        "search_reminder_with_recency_yesterday": 1,
+        "search_reminder_with_recency_yesterday_implicit": 1,
+        "search_sender_phone_number_with_content": 1,
+        "update_contact_relationship_with_relationship": 1,
+        "update_contact_relationship_with_relationship_twice": 1
+      },
+      "largest_family_count": 1,
+      "largest_family_share": 0.05,
+      "near_duplicate_dominated": false,
+      "scenario_count": 20,
+      "top_task_labels": {
+        "CANONICALIZATION": 12,
+        "MULTIPLE_TOOL_CALL": 16,
+        "MULTIPLE_USER_TURN": 1,
+        "NO_DISTRACTION_TOOLS": 20,
+        "SINGLE_TOOL_CALL": 4,
+        "SINGLE_USER_TURN": 19,
+        "STATE_DEPENDENCY": 1
+      }
+    }
+  },
+  "split_sizes": {
+    "top_tool_targeted20": 20
+  },
+  "splits": {
+    "top_tool_targeted20": [
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "timestamp_diff",
+          "end_conversation",
+          "search_holiday"
+        ],
+        "family_label": "find_days_till_holiday",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_holiday",
+          "get_current_timestamp",
+          "set_wifi_status",
+          "end_conversation",
+          "get_wifi_status",
+          "timestamp_diff"
+        ],
+        "family_label": "find_days_till_holiday_wifi_off",
+        "final_evaluation": false,
+        "scenario_id": "find_days_till_holiday_wifi_off",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "STATE_DEPENDENCY",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "modify_contact",
+          "search_messages",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "family_label": "modify_contact_with_message_recency",
+        "final_evaluation": false,
+        "scenario_id": "modify_contact_with_message_recency",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "datetime_info_to_timestamp",
+          "end_conversation",
+          "search_reminder",
+          "get_current_timestamp",
+          "timestamp_to_datetime_info",
+          "modify_reminder"
+        ],
+        "family_label": "modify_reminder_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "modify_reminder_with_recency_latest",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "remove_contact",
+          "end_conversation",
+          "search_contacts"
+        ],
+        "family_label": "remove_contact_by_phone",
+        "final_evaluation": false,
+        "scenario_id": "remove_contact_by_phone",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_current_timestamp",
+          "remove_reminder",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "datetime_info_to_timestamp"
+        ],
+        "family_label": "remove_reminder_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "remove_reminder_with_recency_latest",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "get_current_timestamp",
+          "end_conversation",
+          "search_messages"
+        ],
+        "family_label": "search_message_with_recency_latest",
+        "final_evaluation": false,
+        "scenario_id": "search_message_with_recency_latest",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "end_conversation",
+          "get_current_timestamp"
+        ],
+        "family_label": "search_message_with_recency_oldest",
+        "final_evaluation": false,
+        "scenario_id": "search_message_with_recency_oldest",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "end_conversation"
+        ],
+        "family_label": "search_name_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "search_name_with_relationship",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts"
+        ],
+        "family_label": "search_phone_number_with_name",
+        "final_evaluation": false,
+        "scenario_id": "search_phone_number_with_name",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "search_contacts"
+        ],
+        "family_label": "search_relationship_with_phone_number",
+        "final_evaluation": false,
+        "scenario_id": "search_relationship_with_phone_number",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "get_current_timestamp",
+          "end_conversation",
+          "search_reminder"
+        ],
+        "family_label": "search_reminder_with_creation_recency_yesterday",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "search_reminder",
+          "timestamp_to_datetime_info"
+        ],
+        "family_label": "search_reminder_with_creation_recency_yesterday_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_creation_recency_yesterday_implicit",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "shift_timestamp",
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "end_conversation",
+          "get_current_timestamp"
+        ],
+        "family_label": "search_reminder_with_recency_upcoming",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "end_conversation",
+          "search_reminder",
+          "get_current_timestamp",
+          "shift_timestamp"
+        ],
+        "family_label": "search_reminder_with_recency_upcoming_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_upcoming_implicit",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "timestamp_to_datetime_info",
+          "search_reminder",
+          "shift_timestamp",
+          "get_current_timestamp",
+          "end_conversation"
+        ],
+        "family_label": "search_reminder_with_recency_yesterday",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "get_current_timestamp",
+          "shift_timestamp",
+          "search_reminder",
+          "timestamp_to_datetime_info"
+        ],
+        "family_label": "search_reminder_with_recency_yesterday_implicit",
+        "final_evaluation": false,
+        "scenario_id": "search_reminder_with_recency_yesterday_implicit",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_messages",
+          "end_conversation"
+        ],
+        "family_label": "search_sender_phone_number_with_content",
+        "final_evaluation": false,
+        "scenario_id": "search_sender_phone_number_with_content",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "end_conversation",
+          "modify_contact",
+          "search_contacts"
+        ],
+        "family_label": "update_contact_relationship_with_relationship",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      },
+      {
+        "allowed_tools": [
+          "search_contacts",
+          "modify_contact",
+          "end_conversation"
+        ],
+        "family_label": "update_contact_relationship_with_relationship_twice",
+        "final_evaluation": false,
+        "scenario_id": "update_contact_relationship_with_relationship_twice_multiple_user_turn",
+        "split": "top_tool_targeted20",
+        "task_labels": [
+          "MULTIPLE_TOOL_CALL",
+          "MULTIPLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "truth_labels_inspected": false,
+        "used_for_generation": false,
+        "used_for_repair": false,
+        "used_for_routing": false,
+        "used_for_validation": true
+      }
+    ]
+  },
+  "truth_labels_inspected": false
+}

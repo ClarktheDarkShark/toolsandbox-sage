@@ -1,0 +1,88 @@
+{
+  "runs": [
+    {
+      "updated_at": "2026-05-09T20:10:25.716278+00:00",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330",
+      "mode": "pilot_20",
+      "manifest_type": "sage_gap_closure_lab_top_tool_targeted_splits",
+      "status": "complete",
+      "agent": "gpt-4o-mini",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "user": {
+          "requested_model": "GPT_4_o_2024_05_13",
+          "resolved_model": "GPT_4_o_2024_05_13",
+          "known_model": false,
+          "comparison_key": "GPT_4_o_2024_05_13"
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+        "mixed_model_warning": null
+      },
+      "comparison_model_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+      "generation_enabled": false,
+      "base_tool_policy": "upstream",
+      "scenario_count": 20,
+      "control_dir": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330/control/pilot_20_control_cached_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_09_2026_16_07_04",
+      "candidate_dir": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330/candidate/pilot_20_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_09_2026_16_07_04",
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/top_tools_tight_timestamp_no_field_extractor_pack",
+      "registry_gate_snapshot": {
+        "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/top_tools_tight_timestamp_no_field_extractor_pack",
+        "manifest_existed_before_run": true,
+        "snapshot_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330/registry_gate/registry_manifest_before_run.json",
+        "manifest_digest_before_run": "6137d8659ea39a21dadaac4f96ef238ea46f7549ea97421877abba232d0417e8"
+      },
+      "registry_gate_restore": null,
+      "registry_manifest_digest_after_run": "6137d8659ea39a21dadaac4f96ef238ea46f7549ea97421877abba232d0417e8",
+      "cohort_preflight_report": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330/cohort_preflight_report.json",
+      "cohort_preflight_warnings": [],
+      "cohort_quality_gate_status": "pass",
+      "cohort_quality_gate_failures": [],
+      "comparison_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330/paired_comparison.json",
+      "control_cache_mode": "use-if-eligible",
+      "control_source": "mixed",
+      "cached_control_tasks": 4,
+      "fresh_control_tasks": 16,
+      "control_cache_report_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330/control_cache_report.json",
+      "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+      "helper_contribution_summary_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330/helper_contribution_summary.json",
+      "helper_contribution_artifact_path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/campaign_artifacts_top_tool_combo_no_field_all_best3_targeted20/summaries/pilot_20_20260509_160330/helper_contribution_summary.json",
+      "accepted_but_uncalled_tools": [],
+      "dashboard_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330/dashboard/index.html",
+      "dashboard_url": "http://127.0.0.1:62053/outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330/dashboard/index.html",
+      "dashboard_task_focus_url": "http://127.0.0.1:62053/outputs/gap_closure_lab/recombination_adoption/top_tool_combo/no_field_all_best3_targeted20/pilot_20_20260509_160330/dashboard/task_focus.html",
+      "parallel_arms": true,
+      "mean_similarity_delta": 0.11564114424593555,
+      "mean_outcome_similarity_delta": 0.27623185394930705,
+      "protocol_gate_passed": true,
+      "protocol_gate_reasons": []
+    }
+  ],
+  "updated_at": "2026-05-09T20:10:25.716286+00:00"
+}

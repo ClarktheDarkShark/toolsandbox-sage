@@ -61,3 +61,13 @@ This log is experimental process evidence only. It is not protected final claim 
 **Next action.** Freeze the high-fit portfolio for a clean same-manifest formal validation campaign against protected best3/V2.6. Watch `extract_contact_field_from_search_result` because it was safe but called-subset-negative in the scale500; keep the narrowed contact planners but require contribution analysis before formal promotion.
 
 **Micro/macro adjustment.** The correct macro step was to stop iterating only on tiny mixed pilots and build a portfolio-level scale test around the actual positive lanes. The next microstep should not be more prompt tweaking; it should be formal validation design and strict matched-arm execution.
+
+## 2026-05-09 - Reflection 07 - Broad500 Top-Tool Stress And Next Gap
+
+**Observation.** The run named `Broad500 Top Tool Combo: Full Timestamp No-Field Pack` passed at 500 broad tasks with outcome +0.1406, canonical +0.0596, exact success +42, zero runtime exceptions, and zero helper side-effect incidents. It is positive, but its run-vs-control lift is below the documented current-code best3 500 lift of +0.1617. The strongest called subsets remained recency/date/contact lanes, while the largest no-effective-tool buckets were safe insufficient-information, settings/device-state, contact CRUD, reminder CRUD/scheduling, and send-message preconditions.
+
+**Interpretation.** The retained positive tools are real and should not be discarded for low frequency. They are not enough by themselves to close the broad gap because many broad tasks need side-effect-free feasibility, missing-info, precondition, and final action-spec normalization rather than another recency selector.
+
+**Next action.** Generate and test a small routed `prepare_safe_action_or_abstain` family: a feasibility classifier, an action-spec normalizer, and a chain variant that can use existing timestamp/recency helpers. Start with targeted20 natural adoption, use force diagnostics only on safe seed/dev cases, then move to expanded60 only if natural calls and outcome are positive.
+
+**Micro/macro adjustment.** Stop over-investing in minor recency metadata tweaks. The next macro bet should group several unsupported buckets under one side-effect-free action/precondition tool type, while preserving the current retained positives as a smaller routed portfolio.

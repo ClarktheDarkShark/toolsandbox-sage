@@ -1,0 +1,97 @@
+{
+  "runs": [
+    {
+      "updated_at": "2026-05-09T20:21:58.267833+00:00",
+      "run_root": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900",
+      "mode": "pilot_20",
+      "manifest_type": "sage_gap_closure_lab_top_tool_broad_splits",
+      "status": "complete",
+      "agent": "gpt-4o-mini",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "user": {
+          "requested_model": "GPT_4_o_2024_05_13",
+          "resolved_model": "GPT_4_o_2024_05_13",
+          "known_model": false,
+          "comparison_key": "GPT_4_o_2024_05_13"
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+        "mixed_model_warning": null
+      },
+      "comparison_model_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+      "generation_enabled": false,
+      "base_tool_policy": "upstream",
+      "scenario_count": 20,
+      "control_dir": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/control/pilot_20_control_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_09_2026_16_19_08",
+      "candidate_dir": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/candidate/pilot_20_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_09_2026_16_19_08",
+      "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_day_contact_high_power_scale_pack",
+      "registry_gate_snapshot": {
+        "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_day_contact_high_power_scale_pack",
+        "manifest_existed_before_run": true,
+        "snapshot_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/registry_gate/registry_manifest_before_run.json",
+        "manifest_digest_before_run": "0800cd2d27a47a7459020120916b36ccd2b909441262e0b0a294daac8f956e75"
+      },
+      "registry_gate_restore": {
+        "registry_dir": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/recency_day_contact_high_power_scale_pack",
+        "restored": true,
+        "manifest_existed_before_run": true,
+        "failed_snapshot_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/registry_gate/registry_manifest_failed_gate.json",
+        "restored_snapshot_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/registry_gate/registry_manifest_before_run.json"
+      },
+      "registry_manifest_digest_after_run": "0800cd2d27a47a7459020120916b36ccd2b909441262e0b0a294daac8f956e75",
+      "cohort_preflight_report": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/cohort_preflight_report.json",
+      "cohort_preflight_warnings": [],
+      "cohort_quality_gate_status": "pass",
+      "cohort_quality_gate_failures": [],
+      "comparison_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/paired_comparison.json",
+      "control_cache_mode": "use-if-eligible",
+      "control_source": "fresh",
+      "cached_control_tasks": 0,
+      "fresh_control_tasks": 20,
+      "control_cache_report_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/control_cache_report.json",
+      "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+      "helper_contribution_summary_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/helper_contribution_summary.json",
+      "helper_contribution_artifact_path": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/campaign_artifacts_top_tool_combo_highfit_reference_broad20/summaries/pilot_20_20260509_161900/helper_contribution_summary.json",
+      "accepted_but_uncalled_tools": [],
+      "dashboard_path": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/dashboard/index.html",
+      "dashboard_url": "http://127.0.0.1:62056/outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/dashboard/index.html",
+      "dashboard_task_focus_url": "http://127.0.0.1:62056/outputs/gap_closure_lab/recombination_adoption/top_tool_combo/highfit_reference_broad20/pilot_20_20260509_161900/dashboard/task_focus.html",
+      "parallel_arms": true,
+      "mean_similarity_delta": 0.0714304690966961,
+      "mean_outcome_similarity_delta": 0.04054894331734826,
+      "protocol_gate_passed": false,
+      "protocol_gate_reasons": [
+        "outcome_gains_do_not_exceed_regressions",
+        "gains_do_not_exceed_regressions"
+      ]
+    }
+  ],
+  "updated_at": "2026-05-09T20:21:58.267840+00:00"
+}

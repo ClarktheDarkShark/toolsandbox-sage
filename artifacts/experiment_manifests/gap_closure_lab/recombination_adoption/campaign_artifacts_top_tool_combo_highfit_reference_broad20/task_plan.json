@@ -1,0 +1,41 @@
+{
+  "updated_at": "2026-05-09T20:19:04.800225+00:00",
+  "tasks": [
+    {
+      "task": "freeze_current_proof",
+      "status": "completed"
+    },
+    {
+      "task": "build_command_surface",
+      "status": "in_progress"
+    },
+    {
+      "task": "expand_live_dashboard",
+      "status": "in_progress"
+    },
+    {
+      "task": "reproduce_clean_recency_birth",
+      "status": "pending"
+    },
+    {
+      "task": "frozen_registry_transfer",
+      "status": "pending"
+    },
+    {
+      "task": "second_tool_class_state_precondition",
+      "status": "pending"
+    },
+    {
+      "task": "third_tool_class_search_filter",
+      "status": "pending"
+    },
+    {
+      "task": "registry_consolidation",
+      "status": "pending"
+    },
+    {
+      "task": "broad_validation",
+      "status": "pending"
+    }
+  ]
+}

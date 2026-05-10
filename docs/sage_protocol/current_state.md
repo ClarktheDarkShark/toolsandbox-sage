@@ -1,5 +1,19 @@
 # Current State
 
+## Gap-Closure Lab Experimental Branch Status
+
+- Date: 2026-05-09
+- Branch: `exp/sage-gap-closure-lab`
+- Latest completed step: `Broad500 Top Tool Combo: Full Timestamp No-Field Pack` and unsupported-category assessment.
+- Latest run: `outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad500/full_benchmark_20260509_182714`
+- Latest Task Focus dashboard: `http://127.0.0.1:62061/outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad500/full_benchmark_20260509_182714/dashboard/task_focus.html`
+- Latest result: outcome delta `+0.1406`, canonical/reference delta `+0.0596`, exact success delta `+42`, runtime exceptions `0`, helper side-effect incidents `0`, protocol gate `PASS`.
+- Comparison: positive broad experimental result, but below documented current-code best3 500 run-vs-control lift `+0.1617`.
+- Latest assessment: `docs/sage_protocol/experiments/gap_closure_lab_broad500_gap_assessment.md`
+- Machine-readable assessment: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad500_gap_assessment.json`
+- Next experimental target: side-effect-free action/precondition feasibility and action-spec normalizer for safe insufficient-information, settings/device-state, contact CRUD, reminder CRUD/scheduling, and send-message preconditions.
+- Protected assets modified: `no`.
+
 - Date: 2026-05-07
 - Last completed step: `v2_6_evidence_lock_original250_and_expanded500_validation`
 - Last decision: `expanded portfolio scale-positive; best3 broad claim preserved`

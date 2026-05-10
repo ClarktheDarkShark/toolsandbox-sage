@@ -1,0 +1,1325 @@
+{
+  "bucket_summary": {
+    "calendar/date arithmetic and windows": {
+      "called": 12,
+      "mean_canonical_delta": -0.06944116614116169,
+      "mean_outcome_delta": 0.0,
+      "n": 20,
+      "no_visible": 7,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "top_families_by_n": [
+        {
+          "called": 12,
+          "family": "find_days_till_holiday",
+          "mean_canonical_delta": -0.22684638801304727,
+          "mean_outcome_delta": 0.0,
+          "n": 12,
+          "no_visible": 0,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "find_thanksgiving_timestamp",
+          "mean_canonical_delta": 0.16666666666666669,
+          "mean_outcome_delta": 0.0,
+          "n": 8,
+          "no_visible": 7,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 1
+        }
+      ],
+      "visible_not_called": 1
+    },
+    "contact lookup / scalar selection": {
+      "called": 16,
+      "mean_canonical_delta": 0.06841796413953544,
+      "mean_outcome_delta": 0.1748706256381695,
+      "n": 36,
+      "no_visible": 0,
+      "outcome_gains": 14,
+      "outcome_regressions": 5,
+      "top_families_by_n": [
+        {
+          "called": 12,
+          "family": "modify_contact_with_message_recency",
+          "mean_canonical_delta": 0.26065857465381653,
+          "mean_outcome_delta": 0.7477600250626567,
+          "n": 12,
+          "no_visible": 0,
+          "outcome_gains": 11,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 3,
+          "family": "search_phone_number_with_name",
+          "mean_canonical_delta": -0.0022817197145254403,
+          "mean_outcome_delta": -0.125,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 1,
+          "outcome_regressions": 2,
+          "visible_not_called": 5
+        },
+        {
+          "called": 1,
+          "family": "search_relationship_with_phone_number",
+          "mean_canonical_delta": -0.08176742256859752,
+          "mean_outcome_delta": -0.32222222222222224,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 1,
+          "outcome_regressions": 3,
+          "visible_not_called": 7
+        },
+        {
+          "called": 0,
+          "family": "search_sender_phone_number_with_content",
+          "mean_canonical_delta": 0.0009421189303076699,
+          "mean_outcome_delta": 0.1125,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 1,
+          "outcome_regressions": 0,
+          "visible_not_called": 8
+        }
+      ],
+      "visible_not_called": 20
+    },
+    "contact update / deletion / creation": {
+      "called": 0,
+      "mean_canonical_delta": 0.026501277061399403,
+      "mean_outcome_delta": 0.030265868414367292,
+      "n": 55,
+      "no_visible": 35,
+      "outcome_gains": 14,
+      "outcome_regressions": 17,
+      "top_families_by_n": [
+        {
+          "called": 0,
+          "family": "remove_contact_by_phone",
+          "mean_canonical_delta": 0.022968604506422647,
+          "mean_outcome_delta": 0.125,
+          "n": 12,
+          "no_visible": 0,
+          "outcome_gains": 4,
+          "outcome_regressions": 1,
+          "visible_not_called": 12
+        },
+        {
+          "called": 0,
+          "family": "update_contact_relationship_with_relationship",
+          "mean_canonical_delta": 0.14984443772841058,
+          "mean_outcome_delta": 0.058669584866255106,
+          "n": 11,
+          "no_visible": 8,
+          "outcome_gains": 5,
+          "outcome_regressions": 4,
+          "visible_not_called": 3
+        },
+        {
+          "called": 0,
+          "family": "add_contact_with_name_and_phone_number",
+          "mean_canonical_delta": -0.01909987187332464,
+          "mean_outcome_delta": -0.016556768395003682,
+          "n": 8,
+          "no_visible": 7,
+          "outcome_gains": 2,
+          "outcome_regressions": 5,
+          "visible_not_called": 1
+        },
+        {
+          "called": 0,
+          "family": "remove_contact_with_id",
+          "mean_canonical_delta": 0.01422549564136548,
+          "mean_outcome_delta": 0.0625,
+          "n": 8,
+          "no_visible": 7,
+          "outcome_gains": 1,
+          "outcome_regressions": 0,
+          "visible_not_called": 1
+        },
+        {
+          "called": 0,
+          "family": "update_contact_relationship_with_relationship_twice",
+          "mean_canonical_delta": -0.04721849140118828,
+          "mean_outcome_delta": -0.043536065447321956,
+          "n": 8,
+          "no_visible": 6,
+          "outcome_gains": 2,
+          "outcome_regressions": 6,
+          "visible_not_called": 2
+        },
+        {
+          "called": 0,
+          "family": "update_contact_with_id_and_phone_number",
+          "mean_canonical_delta": -0.006199861205930204,
+          "mean_outcome_delta": -0.0625,
+          "n": 8,
+          "no_visible": 7,
+          "outcome_gains": 0,
+          "outcome_regressions": 1,
+          "visible_not_called": 1
+        }
+      ],
+      "visible_not_called": 20
+    },
+    "generic search/selection": {
+      "called": 1,
+      "mean_canonical_delta": -0.01575294958706201,
+      "mean_outcome_delta": 0.15566232265712843,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 3,
+      "outcome_regressions": 5,
+      "top_families_by_n": [
+        {
+          "called": 1,
+          "family": "search_name_with_relationship",
+          "mean_canonical_delta": -0.01575294958706201,
+          "mean_outcome_delta": 0.15566232265712843,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 3,
+          "outcome_regressions": 5,
+          "visible_not_called": 7
+        }
+      ],
+      "visible_not_called": 7
+    },
+    "message/email search/content by recency": {
+      "called": 24,
+      "mean_canonical_delta": 0.3705308370263041,
+      "mean_outcome_delta": 0.5645726654000321,
+      "n": 24,
+      "no_visible": 0,
+      "outcome_gains": 21,
+      "outcome_regressions": 0,
+      "top_families_by_n": [
+        {
+          "called": 12,
+          "family": "search_message_with_recency_latest",
+          "mean_canonical_delta": 0.5860116482013901,
+          "mean_outcome_delta": 0.7041979619943977,
+          "n": 12,
+          "no_visible": 0,
+          "outcome_gains": 10,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 12,
+          "family": "search_message_with_recency_oldest",
+          "mean_canonical_delta": 0.15505002585121833,
+          "mean_outcome_delta": 0.4249473688056666,
+          "n": 12,
+          "no_visible": 0,
+          "outcome_gains": 11,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        }
+      ],
+      "visible_not_called": 0
+    },
+    "reminder creation / modification / deletion / scheduling": {
+      "called": 12,
+      "mean_canonical_delta": 0.1111111111111111,
+      "mean_outcome_delta": 0.1851851851851852,
+      "n": 36,
+      "no_visible": 24,
+      "outcome_gains": 10,
+      "outcome_regressions": 3,
+      "top_families_by_n": [
+        {
+          "called": 0,
+          "family": "add_reminder_content_and_date_and_time",
+          "mean_canonical_delta": 0.0,
+          "mean_outcome_delta": 0.0,
+          "n": 12,
+          "no_visible": 12,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 12,
+          "family": "add_reminder_content_and_week_delta_and_time",
+          "mean_canonical_delta": 0.23611111111111113,
+          "mean_outcome_delta": 0.4444444444444444,
+          "n": 12,
+          "no_visible": 0,
+          "outcome_gains": 7,
+          "outcome_regressions": 1,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "add_reminder_content_and_weekday_delta_and_time",
+          "mean_canonical_delta": 0.09722222222222221,
+          "mean_outcome_delta": 0.11111111111111112,
+          "n": 12,
+          "no_visible": 12,
+          "outcome_gains": 3,
+          "outcome_regressions": 2,
+          "visible_not_called": 0
+        }
+      ],
+      "visible_not_called": 0
+    },
+    "reminder search/action by recency": {
+      "called": 63,
+      "mean_canonical_delta": 0.2054048099347719,
+      "mean_outcome_delta": 0.29221290105462144,
+      "n": 70,
+      "no_visible": 0,
+      "outcome_gains": 49,
+      "outcome_regressions": 8,
+      "top_families_by_n": [
+        {
+          "called": 10,
+          "family": "modify_reminder_with_recency_latest",
+          "mean_canonical_delta": 0.2828282828282828,
+          "mean_outcome_delta": 0.5454545454545454,
+          "n": 11,
+          "no_visible": 0,
+          "outcome_gains": 6,
+          "outcome_regressions": 0,
+          "visible_not_called": 1
+        },
+        {
+          "called": 5,
+          "family": "remove_reminder_with_recency_latest",
+          "mean_canonical_delta": 0.24242424242424246,
+          "mean_outcome_delta": 0.2727272727272727,
+          "n": 11,
+          "no_visible": 0,
+          "outcome_gains": 3,
+          "outcome_regressions": 0,
+          "visible_not_called": 6
+        },
+        {
+          "called": 8,
+          "family": "search_reminder_with_creation_recency_yesterday",
+          "mean_canonical_delta": 0.0673786850311923,
+          "mean_outcome_delta": 0.17155906828593215,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 8,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 8,
+          "family": "search_reminder_with_creation_recency_yesterday_implicit",
+          "mean_canonical_delta": 0.23418382396946624,
+          "mean_outcome_delta": 0.3444988961994629,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 7,
+          "outcome_regressions": 1,
+          "visible_not_called": 0
+        },
+        {
+          "called": 8,
+          "family": "search_reminder_with_recency_upcoming",
+          "mean_canonical_delta": 0.15591213826235298,
+          "mean_outcome_delta": 0.08257791755545768,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 5,
+          "outcome_regressions": 3,
+          "visible_not_called": 0
+        },
+        {
+          "called": 8,
+          "family": "search_reminder_with_recency_upcoming_implicit",
+          "mean_canonical_delta": 0.19372305849455662,
+          "mean_outcome_delta": 0.1466079622932394,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 6,
+          "outcome_regressions": 2,
+          "visible_not_called": 0
+        },
+        {
+          "called": 8,
+          "family": "search_reminder_with_recency_yesterday",
+          "mean_canonical_delta": 0.11106453530448374,
+          "mean_outcome_delta": 0.17414550317214544,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 6,
+          "outcome_regressions": 2,
+          "visible_not_called": 0
+        },
+        {
+          "called": 8,
+          "family": "search_reminder_with_recency_yesterday_implicit",
+          "mean_canonical_delta": 0.31280762364498,
+          "mean_outcome_delta": 0.5124735367217003,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 8,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        }
+      ],
+      "visible_not_called": 7
+    },
+    "safe insufficient-information / abstention": {
+      "called": 4,
+      "mean_canonical_delta": -0.017035767502486723,
+      "mean_outcome_delta": -0.003488079309383136,
+      "n": 119,
+      "no_visible": 111,
+      "outcome_gains": 5,
+      "outcome_regressions": 6,
+      "top_families_by_n": [
+        {
+          "called": 0,
+          "family": "find_days_till_holiday_insufficient_information",
+          "mean_canonical_delta": 0.0,
+          "mean_outcome_delta": 0.0,
+          "n": 11,
+          "no_visible": 11,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "modify_contact_with_message_recency_insufficient_information",
+          "mean_canonical_delta": 0.09090909090909091,
+          "mean_outcome_delta": 0.0,
+          "n": 11,
+          "no_visible": 11,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+          "mean_canonical_delta": -0.06308390904205335,
+          "mean_outcome_delta": -0.03773467616514484,
+          "n": 11,
+          "no_visible": 11,
+          "outcome_gains": 5,
+          "outcome_regressions": 6,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+          "mean_canonical_delta": -0.09090909090909091,
+          "mean_outcome_delta": 0.0,
+          "n": 11,
+          "no_visible": 11,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "send_message_with_contact_content_cellular_off_insufficient_information",
+          "mean_canonical_delta": 0.0,
+          "mean_outcome_delta": 0.0,
+          "n": 11,
+          "no_visible": 11,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 4,
+          "family": "modify_reminder_with_recency_latest_insufficient_information",
+          "mean_canonical_delta": -0.04166666666666666,
+          "mean_outcome_delta": 0.0,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 4
+        },
+        {
+          "called": 0,
+          "family": "remove_reminder_with_recency_latest_insufficient_information",
+          "mean_canonical_delta": -0.125,
+          "mean_outcome_delta": 0.0,
+          "n": 8,
+          "no_visible": 8,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+          "mean_canonical_delta": 0.0,
+          "mean_outcome_delta": 0.0,
+          "n": 8,
+          "no_visible": 8,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        }
+      ],
+      "visible_not_called": 4
+    },
+    "send-message composition / precondition": {
+      "called": 0,
+      "mean_canonical_delta": -0.0037602758880034975,
+      "mean_outcome_delta": -0.04076086956521739,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 1,
+      "top_families_by_n": [
+        {
+          "called": 0,
+          "family": "send_message_with_phone_number_and_content",
+          "mean_canonical_delta": -0.0037602758880034975,
+          "mean_outcome_delta": -0.04076086956521739,
+          "n": 8,
+          "no_visible": 8,
+          "outcome_gains": 0,
+          "outcome_regressions": 1,
+          "visible_not_called": 0
+        }
+      ],
+      "visible_not_called": 0
+    },
+    "settings / device-state precondition and toggles": {
+      "called": 31,
+      "mean_canonical_delta": 0.01754582422049982,
+      "mean_outcome_delta": 0.0392356784615661,
+      "n": 124,
+      "no_visible": 80,
+      "outcome_gains": 36,
+      "outcome_regressions": 29,
+      "top_families_by_n": [
+        {
+          "called": 12,
+          "family": "add_reminder_content_and_week_delta_and_time_and_location",
+          "mean_canonical_delta": 0.4159352371376788,
+          "mean_outcome_delta": 0.6366946003019253,
+          "n": 12,
+          "no_visible": 0,
+          "outcome_gains": 8,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 11,
+          "family": "find_days_till_holiday_wifi_off",
+          "mean_canonical_delta": -0.17874678308598071,
+          "mean_outcome_delta": 0.0,
+          "n": 12,
+          "no_visible": 0,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 1
+        },
+        {
+          "called": 0,
+          "family": "send_message_with_contact_content_cellular_off",
+          "mean_canonical_delta": -0.019655558148728658,
+          "mean_outcome_delta": -0.025428226980970386,
+          "n": 12,
+          "no_visible": 0,
+          "outcome_gains": 4,
+          "outcome_regressions": 4,
+          "visible_not_called": 12
+        },
+        {
+          "called": 8,
+          "family": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+          "mean_canonical_delta": -0.027997206636474183,
+          "mean_outcome_delta": 0.036671322272543105,
+          "n": 8,
+          "no_visible": 0,
+          "outcome_gains": 2,
+          "outcome_regressions": 2,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "cellular_off",
+          "mean_canonical_delta": -0.0022765640303103046,
+          "mean_outcome_delta": 0.0,
+          "n": 8,
+          "no_visible": 8,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "get_cellular",
+          "mean_canonical_delta": -0.0006912905578597556,
+          "mean_outcome_delta": 0.0,
+          "n": 8,
+          "no_visible": 8,
+          "outcome_gains": 0,
+          "outcome_regressions": 0,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "get_wifi",
+          "mean_canonical_delta": -0.01830867310513616,
+          "mean_outcome_delta": -0.2146825396825397,
+          "n": 8,
+          "no_visible": 8,
+          "outcome_gains": 1,
+          "outcome_regressions": 4,
+          "visible_not_called": 0
+        },
+        {
+          "called": 0,
+          "family": "turn_on_cellular_low_battery_mode",
+          "mean_canonical_delta": -0.020908783906393696,
+          "mean_outcome_delta": 0.042772142928419105,
+          "n": 8,
+          "no_visible": 8,
+          "outcome_gains": 3,
+          "outcome_regressions": 2,
+          "visible_not_called": 0
+        }
+      ],
+      "visible_not_called": 13
+    }
+  },
+  "cohort": {
+    "decision_use": "suitable_for_broad_value_decision",
+    "distinct_base_task_families": 54,
+    "largest_family_share": 0.024,
+    "scenario_count": 500,
+    "warnings": [
+      "low_expected_helper_fit_share"
+    ]
+  },
+  "comparison_notes": {
+    "best3_500_candidate_outcome": 0.659,
+    "best3_500_exact_successes": 92,
+    "best3_500_run_vs_control_outcome_delta": 0.1617,
+    "direct_same_manifest_comparison_available": false,
+    "documented_current_code_best3_500_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+    "interpretation": "Current broad500 combo has higher absolute candidate outcome on its own broad experimental split but lower run-vs-control lift than the documented current-code best3 500; same-manifest validation is required before any protected comparison claim."
+  },
+  "control_cache": {
+    "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "cached_control_tasks": 45,
+    "control_source": "mixed",
+    "fresh_control_tasks": 455,
+    "mode": "use-if-eligible"
+  },
+  "experimental_only": true,
+  "family_summary": {
+    "add_contact_with_name_and_phone_number": {
+      "bucket": "contact update / deletion / creation",
+      "called": 0,
+      "mean_canonical_delta": -0.01909987187332464,
+      "mean_outcome_delta": -0.016556768395003682,
+      "n": 8,
+      "no_visible": 7,
+      "outcome_gains": 2,
+      "outcome_regressions": 5,
+      "visible_not_called": 1
+    },
+    "add_reminder_content_and_date_and_time": {
+      "bucket": "reminder creation / modification / deletion / scheduling",
+      "called": 0,
+      "mean_canonical_delta": 0.0,
+      "mean_outcome_delta": 0.0,
+      "n": 12,
+      "no_visible": 12,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "add_reminder_content_and_week_delta_and_time": {
+      "bucket": "reminder creation / modification / deletion / scheduling",
+      "called": 12,
+      "mean_canonical_delta": 0.23611111111111113,
+      "mean_outcome_delta": 0.4444444444444444,
+      "n": 12,
+      "no_visible": 0,
+      "outcome_gains": 7,
+      "outcome_regressions": 1,
+      "visible_not_called": 0
+    },
+    "add_reminder_content_and_week_delta_and_time_and_location": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 12,
+      "mean_canonical_delta": 0.4159352371376788,
+      "mean_outcome_delta": 0.6366946003019253,
+      "n": 12,
+      "no_visible": 0,
+      "outcome_gains": 8,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 8,
+      "mean_canonical_delta": -0.027997206636474183,
+      "mean_outcome_delta": 0.036671322272543105,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 2,
+      "outcome_regressions": 2,
+      "visible_not_called": 0
+    },
+    "add_reminder_content_and_weekday_delta_and_time": {
+      "bucket": "reminder creation / modification / deletion / scheduling",
+      "called": 0,
+      "mean_canonical_delta": 0.09722222222222221,
+      "mean_outcome_delta": 0.11111111111111112,
+      "n": 12,
+      "no_visible": 12,
+      "outcome_gains": 3,
+      "outcome_regressions": 2,
+      "visible_not_called": 0
+    },
+    "cellular_off": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": -0.0022765640303103046,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "find_days_till_holiday": {
+      "bucket": "calendar/date arithmetic and windows",
+      "called": 12,
+      "mean_canonical_delta": -0.22684638801304727,
+      "mean_outcome_delta": 0.0,
+      "n": 12,
+      "no_visible": 0,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "find_days_till_holiday_insufficient_information": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": 0.0,
+      "mean_outcome_delta": 0.0,
+      "n": 11,
+      "no_visible": 11,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "find_days_till_holiday_wifi_off": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 11,
+      "mean_canonical_delta": -0.17874678308598071,
+      "mean_outcome_delta": 0.0,
+      "n": 12,
+      "no_visible": 0,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 1
+    },
+    "find_thanksgiving_timestamp": {
+      "bucket": "calendar/date arithmetic and windows",
+      "called": 0,
+      "mean_canonical_delta": 0.16666666666666669,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 7,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 1
+    },
+    "get_cellular": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": -0.0006912905578597556,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "get_wifi": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": -0.01830867310513616,
+      "mean_outcome_delta": -0.2146825396825397,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 1,
+      "outcome_regressions": 4,
+      "visible_not_called": 0
+    },
+    "modify_contact_with_message_recency": {
+      "bucket": "contact lookup / scalar selection",
+      "called": 12,
+      "mean_canonical_delta": 0.26065857465381653,
+      "mean_outcome_delta": 0.7477600250626567,
+      "n": 12,
+      "no_visible": 0,
+      "outcome_gains": 11,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "modify_contact_with_message_recency_insufficient_information": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": 0.09090909090909091,
+      "mean_outcome_delta": 0.0,
+      "n": 11,
+      "no_visible": 11,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "modify_reminder_with_recency_latest": {
+      "bucket": "reminder search/action by recency",
+      "called": 10,
+      "mean_canonical_delta": 0.2828282828282828,
+      "mean_outcome_delta": 0.5454545454545454,
+      "n": 11,
+      "no_visible": 0,
+      "outcome_gains": 6,
+      "outcome_regressions": 0,
+      "visible_not_called": 1
+    },
+    "modify_reminder_with_recency_latest_insufficient_information": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 4,
+      "mean_canonical_delta": -0.04166666666666666,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 4
+    },
+    "remove_contact_by_phone": {
+      "bucket": "contact update / deletion / creation",
+      "called": 0,
+      "mean_canonical_delta": 0.022968604506422647,
+      "mean_outcome_delta": 0.125,
+      "n": 12,
+      "no_visible": 0,
+      "outcome_gains": 4,
+      "outcome_regressions": 1,
+      "visible_not_called": 12
+    },
+    "remove_contact_by_phone_no_remove_contact_insufficient_information": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": -0.06308390904205335,
+      "mean_outcome_delta": -0.03773467616514484,
+      "n": 11,
+      "no_visible": 11,
+      "outcome_gains": 5,
+      "outcome_regressions": 6,
+      "visible_not_called": 0
+    },
+    "remove_contact_by_phone_no_search_contacts_insufficient_information": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": -0.09090909090909091,
+      "mean_outcome_delta": 0.0,
+      "n": 11,
+      "no_visible": 11,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "remove_contact_with_id": {
+      "bucket": "contact update / deletion / creation",
+      "called": 0,
+      "mean_canonical_delta": 0.01422549564136548,
+      "mean_outcome_delta": 0.0625,
+      "n": 8,
+      "no_visible": 7,
+      "outcome_gains": 1,
+      "outcome_regressions": 0,
+      "visible_not_called": 1
+    },
+    "remove_reminder_with_recency_latest": {
+      "bucket": "reminder search/action by recency",
+      "called": 5,
+      "mean_canonical_delta": 0.24242424242424246,
+      "mean_outcome_delta": 0.2727272727272727,
+      "n": 11,
+      "no_visible": 0,
+      "outcome_gains": 3,
+      "outcome_regressions": 0,
+      "visible_not_called": 6
+    },
+    "remove_reminder_with_recency_latest_insufficient_information": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": -0.125,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_message_with_recency_latest": {
+      "bucket": "message/email search/content by recency",
+      "called": 12,
+      "mean_canonical_delta": 0.5860116482013901,
+      "mean_outcome_delta": 0.7041979619943977,
+      "n": 12,
+      "no_visible": 0,
+      "outcome_gains": 10,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_message_with_recency_oldest": {
+      "bucket": "message/email search/content by recency",
+      "called": 12,
+      "mean_canonical_delta": 0.15505002585121833,
+      "mean_outcome_delta": 0.4249473688056666,
+      "n": 12,
+      "no_visible": 0,
+      "outcome_gains": 11,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_name_with_relationship": {
+      "bucket": "generic search/selection",
+      "called": 1,
+      "mean_canonical_delta": -0.01575294958706201,
+      "mean_outcome_delta": 0.15566232265712843,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 3,
+      "outcome_regressions": 5,
+      "visible_not_called": 7
+    },
+    "search_phone_number_with_name": {
+      "bucket": "contact lookup / scalar selection",
+      "called": 3,
+      "mean_canonical_delta": -0.0022817197145254403,
+      "mean_outcome_delta": -0.125,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 1,
+      "outcome_regressions": 2,
+      "visible_not_called": 5
+    },
+    "search_relationship_with_phone_number": {
+      "bucket": "contact lookup / scalar selection",
+      "called": 1,
+      "mean_canonical_delta": -0.08176742256859752,
+      "mean_outcome_delta": -0.32222222222222224,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 1,
+      "outcome_regressions": 3,
+      "visible_not_called": 7
+    },
+    "search_reminder_with_creation_recency_yesterday": {
+      "bucket": "reminder search/action by recency",
+      "called": 8,
+      "mean_canonical_delta": 0.0673786850311923,
+      "mean_outcome_delta": 0.17155906828593215,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 8,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_creation_recency_yesterday_implicit": {
+      "bucket": "reminder search/action by recency",
+      "called": 8,
+      "mean_canonical_delta": 0.23418382396946624,
+      "mean_outcome_delta": 0.3444988961994629,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 7,
+      "outcome_regressions": 1,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_creation_recency_yesterday_insufficient_information": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": 0.0,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": 0.0,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_recency_upcoming": {
+      "bucket": "reminder search/action by recency",
+      "called": 8,
+      "mean_canonical_delta": 0.15591213826235298,
+      "mean_outcome_delta": 0.08257791755545768,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 5,
+      "outcome_regressions": 3,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_recency_upcoming_implicit": {
+      "bucket": "reminder search/action by recency",
+      "called": 8,
+      "mean_canonical_delta": 0.19372305849455662,
+      "mean_outcome_delta": 0.1466079622932394,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 6,
+      "outcome_regressions": 2,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_recency_upcoming_insufficient_information": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": 0.0,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_recency_upcoming_insufficient_information_implicit": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": 0.0,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_recency_yesterday": {
+      "bucket": "reminder search/action by recency",
+      "called": 8,
+      "mean_canonical_delta": 0.11106453530448374,
+      "mean_outcome_delta": 0.17414550317214544,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 6,
+      "outcome_regressions": 2,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_recency_yesterday_implicit": {
+      "bucket": "reminder search/action by recency",
+      "called": 8,
+      "mean_canonical_delta": 0.31280762364498,
+      "mean_outcome_delta": 0.5124735367217003,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 8,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_recency_yesterday_insufficient_information": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": -0.375,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_reminder_with_recency_yesterday_insufficient_information_implicit": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": 0.375,
+      "mean_outcome_delta": 0.0,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "search_sender_phone_number_with_content": {
+      "bucket": "contact lookup / scalar selection",
+      "called": 0,
+      "mean_canonical_delta": 0.0009421189303076699,
+      "mean_outcome_delta": 0.1125,
+      "n": 8,
+      "no_visible": 0,
+      "outcome_gains": 1,
+      "outcome_regressions": 0,
+      "visible_not_called": 8
+    },
+    "send_message_with_contact_content_cellular_off": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": -0.019655558148728658,
+      "mean_outcome_delta": -0.025428226980970386,
+      "n": 12,
+      "no_visible": 0,
+      "outcome_gains": 4,
+      "outcome_regressions": 4,
+      "visible_not_called": 12
+    },
+    "send_message_with_contact_content_cellular_off_insufficient_information": {
+      "bucket": "safe insufficient-information / abstention",
+      "called": 0,
+      "mean_canonical_delta": 0.0,
+      "mean_outcome_delta": 0.0,
+      "n": 11,
+      "no_visible": 11,
+      "outcome_gains": 0,
+      "outcome_regressions": 0,
+      "visible_not_called": 0
+    },
+    "send_message_with_phone_number_and_content": {
+      "bucket": "send-message composition / precondition",
+      "called": 0,
+      "mean_canonical_delta": -0.0037602758880034975,
+      "mean_outcome_delta": -0.04076086956521739,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 0,
+      "outcome_regressions": 1,
+      "visible_not_called": 0
+    },
+    "turn_on_cellular_low_battery_mode": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": -0.020908783906393696,
+      "mean_outcome_delta": 0.042772142928419105,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 3,
+      "outcome_regressions": 2,
+      "visible_not_called": 0
+    },
+    "turn_on_cellular_low_battery_mode_implicit": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": 0.0012926220851161713,
+      "mean_outcome_delta": -0.020441341519772893,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 2,
+      "outcome_regressions": 2,
+      "visible_not_called": 0
+    },
+    "turn_on_location_low_battery_mode": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": 0.006388997655181888,
+      "mean_outcome_delta": -0.06109415276081942,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 2,
+      "outcome_regressions": 3,
+      "visible_not_called": 0
+    },
+    "turn_on_location_low_battery_mode_implicit": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": 0.008256404370973275,
+      "mean_outcome_delta": -0.09374185305467397,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 5,
+      "outcome_regressions": 3,
+      "visible_not_called": 0
+    },
+    "turn_on_wifi_low_battery_mode": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": 0.007276530767611172,
+      "mean_outcome_delta": -0.05493838855907818,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 3,
+      "outcome_regressions": 5,
+      "visible_not_called": 0
+    },
+    "turn_on_wifi_low_battery_mode_implicit": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": 0.012805498553195571,
+      "mean_outcome_delta": 0.005571902912400478,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 4,
+      "outcome_regressions": 3,
+      "visible_not_called": 0
+    },
+    "update_contact_relationship_with_relationship": {
+      "bucket": "contact update / deletion / creation",
+      "called": 0,
+      "mean_canonical_delta": 0.14984443772841058,
+      "mean_outcome_delta": 0.058669584866255106,
+      "n": 11,
+      "no_visible": 8,
+      "outcome_gains": 5,
+      "outcome_regressions": 4,
+      "visible_not_called": 3
+    },
+    "update_contact_relationship_with_relationship_twice": {
+      "bucket": "contact update / deletion / creation",
+      "called": 0,
+      "mean_canonical_delta": -0.04721849140118828,
+      "mean_outcome_delta": -0.043536065447321956,
+      "n": 8,
+      "no_visible": 6,
+      "outcome_gains": 2,
+      "outcome_regressions": 6,
+      "visible_not_called": 2
+    },
+    "update_contact_with_id_and_phone_number": {
+      "bucket": "contact update / deletion / creation",
+      "called": 0,
+      "mean_canonical_delta": -0.006199861205930204,
+      "mean_outcome_delta": -0.0625,
+      "n": 8,
+      "no_visible": 7,
+      "outcome_gains": 0,
+      "outcome_regressions": 1,
+      "visible_not_called": 1
+    },
+    "wifi_off": {
+      "bucket": "settings / device-state precondition and toggles",
+      "called": 0,
+      "mean_canonical_delta": -0.02017660363261088,
+      "mean_outcome_delta": 0.05113636363636363,
+      "n": 8,
+      "no_visible": 8,
+      "outcome_gains": 2,
+      "outcome_regressions": 1,
+      "visible_not_called": 0
+    }
+  },
+  "helper_summary": {
+    "days_between_timestamps": {
+      "called": null,
+      "called_mean_canonical_delta": null,
+      "called_mean_outcome_delta": null,
+      "failed": null,
+      "runtime_incidents": [],
+      "side_effect_incidents": [],
+      "visible": null,
+      "vnc": null
+    },
+    "plan_contact_lookup_query": {
+      "called": null,
+      "called_mean_canonical_delta": null,
+      "called_mean_outcome_delta": null,
+      "failed": null,
+      "runtime_incidents": [],
+      "side_effect_incidents": [],
+      "visible": null,
+      "vnc": null
+    },
+    "plan_contact_search_from_scalar_constraint": {
+      "called": null,
+      "called_mean_canonical_delta": null,
+      "called_mean_outcome_delta": null,
+      "failed": null,
+      "runtime_incidents": [],
+      "side_effect_incidents": [],
+      "visible": null,
+      "vnc": null
+    },
+    "relative_day_time_to_timestamp": {
+      "called": null,
+      "called_mean_canonical_delta": null,
+      "called_mean_outcome_delta": null,
+      "failed": null,
+      "runtime_incidents": [],
+      "side_effect_incidents": [],
+      "visible": null,
+      "vnc": null
+    },
+    "resolve_search_window_or_bounds": {
+      "called": null,
+      "called_mean_canonical_delta": null,
+      "called_mean_outcome_delta": null,
+      "failed": null,
+      "runtime_incidents": [],
+      "side_effect_incidents": [],
+      "visible": null,
+      "vnc": null
+    },
+    "select_message_content_by_recency": {
+      "called": null,
+      "called_mean_canonical_delta": null,
+      "called_mean_outcome_delta": null,
+      "failed": null,
+      "runtime_incidents": [],
+      "side_effect_incidents": [],
+      "visible": null,
+      "vnc": null
+    },
+    "select_message_counterparty_for_contact_update": {
+      "called": null,
+      "called_mean_canonical_delta": null,
+      "called_mean_outcome_delta": null,
+      "failed": null,
+      "runtime_incidents": [],
+      "side_effect_incidents": [],
+      "visible": null,
+      "vnc": null
+    },
+    "select_record_by_timestamp_extreme": {
+      "called": null,
+      "called_mean_canonical_delta": null,
+      "called_mean_outcome_delta": null,
+      "failed": null,
+      "runtime_incidents": [],
+      "side_effect_incidents": [],
+      "visible": null,
+      "vnc": null
+    }
+  },
+  "metrics": {
+    "candidate_mean_outcome_similarity": 0.73533939087328,
+    "candidate_mean_similarity": 0.722387761986709,
+    "control_mean_outcome_similarity": 0.5947127416232588,
+    "control_mean_similarity": 0.6627973810359332,
+    "exact_success_delta": 42,
+    "gain_count": 208,
+    "mean_outcome_similarity_delta": 0.1406266492500212,
+    "mean_similarity_delta": 0.059590380950775755,
+    "outcome_gain_count": 152,
+    "outcome_regression_count": 74,
+    "protocol_gate_passed": true,
+    "protocol_gate_reasons": [],
+    "regression_count": 125,
+    "route_mismatch_qualified": false,
+    "runtime_exception_count": 0,
+    "scenario_count": 500
+  },
+  "next_big_tool_target": "side-effect-free task feasibility and action-spec normalizer for settings/device-state, safe insufficient-information, contact CRUD, reminder CRUD, and send-message preconditions",
+  "registry_path": "artifacts/registry_experiments/gap_closure_lab/recombination_adoption/top_tools_full_timestamp_no_field_extractor_pack",
+  "registry_sha256": "365fa28ecd476c1b3b4cd53b16b5d61b233bd3744e91d5a5d0c060c9a10f5e2b",
+  "run_name": "Broad500 Top Tool Combo: Full Timestamp No-Field Pack",
+  "run_root": "outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad500/full_benchmark_20260509_182714",
+  "split_manifest": "artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad_splits.json",
+  "task_focus_dashboard": "http://127.0.0.1:62061/outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad500/full_benchmark_20260509_182714/dashboard/task_focus.html"
+}

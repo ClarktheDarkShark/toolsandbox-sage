@@ -1,5 +1,27 @@
 # Run Ledger
 
+## 2026-05-09
+
+- `SAGE Gap-Closure Lab Broad500 Top Tool Combo` completed.
+  - Run name: `Broad500 Top Tool Combo: Full Timestamp No-Field Pack`
+  - Run: `outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad500/full_benchmark_20260509_182714`
+  - Task Focus dashboard: `http://127.0.0.1:62061/outputs/gap_closure_lab/recombination_adoption/top_tool_combo/full_timestamp_no_field_broad500/full_benchmark_20260509_182714/dashboard/task_focus.html`
+  - Registry: `artifacts/registry_experiments/gap_closure_lab/recombination_adoption/top_tools_full_timestamp_no_field_extractor_pack`
+  - Registry SHA-256: `365fa28ecd476c1b3b4cd53b16b5d61b233bd3744e91d5a5d0c060c9a10f5e2b`
+  - Manifest: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad_splits.json`
+  - Outcome delta: `+0.1406`
+  - Canonical/reference delta: `+0.0596`
+  - Exact success delta: `+42`
+  - Control cache: `45` cached / `455` fresh, cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
+  - Candidate/SAGE cache: OpenAI response cache disabled; task-level cache off
+  - Runtime exceptions: `0`
+  - Helper side-effect incidents: `0`
+  - Protocol gate: `PASS`
+  - Comparison: positive broad stress result, but below documented current-code best3 500 run-vs-control lift `+0.1617`.
+  - Gap assessment: `docs/sage_protocol/experiments/gap_closure_lab_broad500_gap_assessment.md`
+  - Machine-readable assessment: `artifacts/experiment_manifests/gap_closure_lab/recombination_adoption/top_tool_combo_broad500_gap_assessment.json`
+  - Decision: continue with a side-effect-free action/precondition feasibility and action-spec normalizer loop.
+
 ## 2026-05-02
 
 - `Phase B` passed after calling-convention repair for `prepare_reminder_creation_args`.
