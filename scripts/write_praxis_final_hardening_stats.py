@@ -287,10 +287,21 @@ def pairwise(
 
 
 def markdown(summary: dict[str, Any]) -> str:
+    conclusion = summary["conclusion"]
+    if conclusion["praxis_protected_claim_ready"]:
+        status = (
+            "Status: repaired Praxis registry-only candidate passed matched formal500 "
+            "safety and reproduced outcome lift over best3 and V2.6 under review conditions."
+        )
+    else:
+        status = (
+            "Status: not protected-claim ready under this review. "
+            f"Blocker: {conclusion['blocker']}"
+        )
     lines = [
-        "# Praxis Matched Formal500 Statistical Report",
+        f"# {summary['report_title']}",
         "",
-        "Status: blocked for protected-claim promotion because the Praxis registry-only run produced helper side-effect preservation failures under the protected-base checker.",
+        status,
         "",
         "Outcome/task completion is primary. Canonical/reference and exact success are secondary.",
         "",
@@ -369,7 +380,7 @@ def markdown(summary: dict[str, Any]) -> str:
             "",
             f"- Runtime exceptions: best3={summary['arms']['best3']['candidate_runtime_exceptions']}, V2.6={summary['arms']['v2_6']['candidate_runtime_exceptions']}, Praxis={summary['arms']['praxis']['candidate_runtime_exceptions']}.",
             f"- Helper side-effect preservation failures: best3={summary['arms']['best3']['candidate_side_effect_failure_count']}, V2.6={summary['arms']['v2_6']['candidate_side_effect_failure_count']}, Praxis={summary['arms']['praxis']['candidate_side_effect_failure_count']}.",
-            "- Because Praxis has nonzero helper side-effect preservation failures, this review classifies Praxis as not protected-claim ready in registry-only form.",
+            f"- Safety conclusion: {conclusion['safety_conclusion']}",
             "",
             "## Cache And Leakage",
             "",
@@ -380,7 +391,7 @@ def markdown(summary: dict[str, Any]) -> str:
             "",
             "## Treatment Classification",
             "",
-            "Praxis shows registry-only outcome lift under the protected-base final-hardening runtime, but the same run has side-effect preservation failures. The result is therefore promising but blocked for protected review until the failing helpers are redesigned or an explicitly audited bridge-policy/checker treatment is validated with zero side-effect incidents.",
+            conclusion["treatment_classification"],
         ]
     )
     return "\n".join(lines) + "\n"
@@ -393,8 +404,21 @@ def main() -> None:
     parser.add_argument("--praxis", type=Path, required=True)
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-md", type=Path, required=True)
+    parser.add_argument(
+        "--report-title",
+        default="Praxis Matched Formal500 Statistical Report",
+    )
+    parser.add_argument(
+        "--praxis-label",
+        default="Praxis frozen BridgePack",
+    )
+    parser.add_argument(
+        "--schema-version",
+        default="praxis_final_hardening_stats_v1",
+    )
     args = parser.parse_args()
 
+    ARM_LABELS["praxis"] = args.praxis_label
     arms = {
         "best3": summarize_arm(ArmPaths("best3", args.best3)),
         "v2_6": summarize_arm(ArmPaths("v2_6", args.v2_6)),
@@ -406,18 +430,94 @@ def main() -> None:
         }
         for key, arm in arms.items()
     }
+    pairwise_items = [
+        pairwise("best3", arms["best3"], "v2_6", arms["v2_6"]),
+        pairwise("best3", arms["best3"], "praxis", arms["praxis"]),
+        pairwise("v2_6", arms["v2_6"], "praxis", arms["praxis"]),
+    ]
+    pairwise_by_lr = {(item["left"], item["right"]): item for item in pairwise_items}
+    praxis_vs_best3 = pairwise_by_lr[("best3", "praxis")][
+        "outcome_difference_right_minus_left"
+    ]
+    praxis_vs_v2_6 = pairwise_by_lr[("v2_6", "praxis")][
+        "outcome_difference_right_minus_left"
+    ]
+    praxis_side_effects = arms["praxis"]["candidate_side_effect_failure_count"]
+    praxis_exceptions = arms["praxis"]["candidate_runtime_exceptions"]
+    praxis_outcome = arms["praxis"]["candidate_mean_outcome_similarity"]
+    best3_outcome = arms["best3"]["candidate_mean_outcome_similarity"]
+    v2_6_outcome = arms["v2_6"]["candidate_mean_outcome_similarity"]
+    praxis_beats_best3 = bool(
+        praxis_outcome > best3_outcome and praxis_vs_best3["mean"] > 0
+    )
+    praxis_beats_v2_6 = bool(
+        praxis_outcome > v2_6_outcome and praxis_vs_v2_6["mean"] > 0
+    )
+    claim_ready = bool(
+        praxis_side_effects == 0
+        and praxis_exceptions == 0
+        and praxis_beats_best3
+        and praxis_beats_v2_6
+    )
+    if claim_ready:
+        blocker = None
+        safety_conclusion = (
+            "zero runtime exceptions and zero helper side-effect preservation failures "
+            "for repaired Praxis, best3, and V2.6."
+        )
+        treatment_classification = (
+            "Repaired Praxis is classified as a registry-only helper-contract repair "
+            "under the protected-base final-hardening runtime. No actor/router bridge "
+            "policy was imported for this matched formal500 run; routing evidence was disabled."
+        )
+    elif praxis_side_effects:
+        blocker = (
+            f"Praxis registry-only run had {praxis_side_effects} helper side-effect "
+            "preservation failures under the protected-base checker."
+        )
+        safety_conclusion = (
+            "nonzero Praxis helper side-effect preservation failures block promotion."
+        )
+        treatment_classification = (
+            "Praxis remains a promising but blocked registry-only treatment until helper "
+            "contracts or an explicitly audited bridge-policy treatment reach zero side-effect incidents."
+        )
+    elif not praxis_beats_best3:
+        blocker = "Praxis did not beat best3 on paired formal500 outcome."
+        safety_conclusion = "safety passed, but promotion is blocked by insufficient outcome lift over best3."
+        treatment_classification = (
+            "Praxis is a registry-only safety-passing treatment that did not clear the "
+            "primary outcome comparison against best3."
+        )
+    elif not praxis_beats_v2_6:
+        blocker = (
+            "Praxis did not beat or remain competitive with V2.6 on formal500 outcome."
+        )
+        safety_conclusion = "safety passed, but promotion is blocked by insufficient outcome lift over V2.6."
+        treatment_classification = (
+            "Praxis is a registry-only safety-passing treatment that did not clear the "
+            "comparison against V2.6."
+        )
+    else:
+        blocker = "unclassified review blocker."
+        safety_conclusion = (
+            "review did not satisfy all protected-claim readiness checks."
+        )
+        treatment_classification = "Treatment classification is unresolved; inspect machine-readable statistics."
+
     summary = {
-        "schema_version": "praxis_final_hardening_stats_v1",
+        "schema_version": args.schema_version,
+        "report_title": args.report_title,
         "arms": public_arms,
-        "pairwise": [
-            pairwise("best3", arms["best3"], "v2_6", arms["v2_6"]),
-            pairwise("best3", arms["best3"], "praxis", arms["praxis"]),
-            pairwise("v2_6", arms["v2_6"], "praxis", arms["praxis"]),
-        ],
+        "pairwise": pairwise_items,
         "conclusion": {
-            "praxis_reproduced_outcome_lift": True,
-            "praxis_protected_claim_ready": False,
-            "blocker": "Praxis registry-only run had 13 helper side-effect preservation failures under the protected-base checker.",
+            "praxis_reproduced_outcome_lift": praxis_beats_best3,
+            "praxis_beats_best3": praxis_beats_best3,
+            "praxis_beats_v2_6": praxis_beats_v2_6,
+            "praxis_protected_claim_ready": claim_ready,
+            "blocker": blocker,
+            "safety_conclusion": safety_conclusion,
+            "treatment_classification": treatment_classification,
         },
     }
     args.output_json.parent.mkdir(parents=True, exist_ok=True)

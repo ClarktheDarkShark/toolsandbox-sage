@@ -791,3 +791,33 @@
 - Treatment classification: registry-only outcome lift reproduced, but not protected-claim ready because helper side-effect preservation failed. A combined registry plus bridge-policy/checker treatment remains plausible but unvalidated.
 - Decision label: `BLOCKED: praxis_registry_only_side_effect_preservation_failures`.
 - Next action: do not update protected final claim. Redesign failing bridge helpers or audit an explicit combined bridge-policy treatment, then rerun matched formal validation from scratch with zero side-effect failures.
+
+## 2026-05-11 - Praxis Registry-Only Side-Effect Repair And Matched Formal500
+
+- Objective: resolve the Praxis promotion blocker by attempting registry-only helper-contract repair before any combined actor/router bridge-policy treatment.
+- Repair branch: `repair/praxis-side-effect-zero`.
+- Base commit: `672af8ae6ea13770166e5f0e4e4dc01ece698497`.
+- Source review branch: `review/praxis-final-hardening`.
+- Experimental source commit reference only: `7793c8ca29ab4e121d302c777c4e4ad273226470`.
+- Protected assets preserved: protected best3 registry, locked best3 evidence, locked formal evidence, protected final reports, and final-package claim artifacts were not modified.
+- Safety autopsy root cause: mixed `helper_contract_or_bridge_policy_dependency`; contact-update, reminder, and send-message failures were repairable with checker-visible contracts and scrambled-name suppression; relationship batch helper required bridge/checker behavior because natural calls batched planner plus `modify_contact` in the same assistant tool-call message.
+- Repair v1 registry: `artifacts/praxis_safety_repair/registries/praxis_bridgepack_registry_only_repair_v1/registry_manifest.json`, SHA `83ec3734dfda2b3ab756e6ba3ed947a3e6a9864b18508a9fa9d75e6dc14aa733`; failed targeted safety because `plan_contact_relationship_batch_update` still triggered same-batch side-effect preservation failure.
+- Repair v2 registry: `artifacts/praxis_safety_repair/registries/praxis_bridgepack_registry_only_repair_v2/registry_manifest.json`, SHA `24e5ca815c6f3c11a8b226f10abbfba3216f854a5dcb284df860c4131a01cc35`; 12 active helpers; retired diagnostic helper `plan_contact_relationship_batch_update`.
+- Minefield checks: `artifacts/praxis_safety_repair/repair_v2_minefield_checks.json`; 20/20 passed.
+- Targeted77 diagnostic: `outputs/praxis_safety_repair/registry_only_repair_v2_targeted77/mechanism_40_20260511_012403`; runtime exceptions `0`; helper side-effect preservation failures `0`; control cache `77 cached / 0 fresh`; outcome delta `+0.244654`.
+- Exact13 final-style diagnostic: `outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626`; runtime exceptions `0`; helper side-effect preservation failures `0`; control cache `13 cached / 0 fresh`; routing evidence disabled; outcome delta `+0.264650`.
+- Clean formal preflight: `artifacts/praxis_safety_repair/preflight/preflight_registry_only_repair_v2_formal500.json`, SHA `0a1aa49d166009fac89dde025d0c2b44784cb9f6c6bdd70254d0093225c016fb`.
+- Formal manifest: `docs/sage_protocol/manifests/v2_1_formal_500.json`, SHA `093547e7a89e704e67d4cea85fd96511063becd0b5542ba3abf21c242453bbbf`.
+- Run controls for matched formal500: generation off; OpenAI response cache disabled; candidate/SAGE task cache off; control cache `use-if-eligible`; routing evidence disabled; diagnostic force-call env vars absent; no low-quality override; no code or registry changes between arms.
+- Control cache: `500 cached / 0 fresh` in every arm; cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`.
+- best3 formal500 run: `outputs/praxis_safety_repair/formal500_registry_only_v2/best3_reference_formal500/full_benchmark_20260511_015634`; outcome `0.659956`; run-vs-control outcome lift `0.065084`; canonical `0.704683`; exact successes `90`; runtime/side-effect `0 / 0`.
+- V2.6 formal500 run: `outputs/praxis_safety_repair/formal500_registry_only_v2/v2_6_reference_formal500/full_benchmark_20260511_034215`; outcome `0.668039`; run-vs-control outcome lift `0.073167`; canonical `0.728769`; exact successes `97`; runtime/side-effect `0 / 0`.
+- Repaired Praxis v2 formal500 run: `outputs/praxis_safety_repair/formal500_registry_only_v2/praxis_repair_v2_formal500/full_benchmark_20260511_064006`; outcome `0.706948`; run-vs-control outcome lift `0.112076`; canonical `0.724125`; exact successes `109`; runtime/side-effect `0 / 0`.
+- Pairwise statistics: repaired Praxis-vs-best3 outcome diff `+0.046991`, 95% CI `[0.008387, 0.086278]`, p `0.0187`; repaired Praxis-vs-V2.6 outcome diff `+0.038909`, 95% CI `[0.001856, 0.075806]`, p `0.0463`.
+- Helper exposure/calls: best3 visible/called/VNC `203 / 132 / 71`; V2.6 `291 / 161 / 130`; repaired Praxis `530 / 193 / 337`.
+- Dashboard checks: repaired Praxis standard and Task Focus dashboards opened in the in-app browser with zero console errors; Task Compare was not generated.
+- Reports written: `docs/sage_protocol/praxis_side_effect_repair_report.md`, `docs/sage_protocol/praxis_treatment_classification_final.md`, `docs/sage_protocol/praxis_repaired_matched_formal500_statistical_report.md`.
+- Machine-readable artifacts: `artifacts/praxis_safety_repair/praxis_safety_repair_summary.json` SHA `12a6ad783ff62937ba55d70422891a49affca5b1b8ee558fcfab432996b3bfa3`; stats JSON SHA `c5e56fdf6a335c78410a5c8d1bb839484a21ea09421272a74041ef0e03b6c4fb`.
+- Treatment classification: registry-only helper-contract repair; no experimental bridge policy, checker behavior, scoring change, or mtime-selected routing evidence was imported.
+- Decision label: `READY_FOR_PROTECTED_REVIEW: registry_only_praxis_repair_v2`.
+- Next action: prepare a protected final-claim update review for repaired Praxis v2; do not claim the retired relationship batch helper or experimental bridge policy.
