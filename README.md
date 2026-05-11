@@ -73,6 +73,47 @@ Pre-final hardening artifacts:
 
 Before any future frozen final run, use generation OFF, control cache `use-if-eligible`, and explicit routing evidence mode (`disabled` or `pinned`). Diagnostic force-call environment variables are blocked for frozen final runs unless explicit diagnostic mode is selected.
 
+## Praxis Combined Treatment Review
+
+The Praxis high-lift candidate is being reviewed as an explicit combined SAGE
+treatment: a frozen helper registry plus a feature-flagged actor/checker bridge
+policy. This should not be described as registry-only unless a separate
+bridge-disabled ablation reproduces it.
+
+- Combined registry:
+  `artifacts/praxis_safety_repair/registries/praxis_bridgepack_combined_bridge_policy_v1/registry_manifest.json`
+- Registry SHA-256:
+  `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`
+- Bridge flag:
+  `SAGE_PRAXIS_BRIDGE_POLICY=combined`
+- Methodology note:
+  `docs/sage_protocol/praxis_bridge_policy_methodology.md`
+
+Example clean review run:
+
+```bash
+export PYTHONPATH=src:.
+export SAGE_PRAXIS_BRIDGE_POLICY=combined
+
+python scripts/run_sage_protocol.py \
+  --mode validate_100 \
+  --manifest artifacts/praxis_combined_bridge_policy/manifests/formal500_order_first100_clean.json \
+  --registry-dir artifacts/praxis_safety_repair/registries/praxis_bridgepack_combined_bridge_policy_v1 \
+  --generation off \
+  --disable-openai-response-cache \
+  --cache-mode off \
+  --parallel-arms \
+  --control-cache use-if-eligible \
+  --routing-evidence-mode disabled \
+  --output-root outputs/praxis_combined_bridge_policy/formal500_order_first100_clean \
+  --artifact-root artifacts/praxis_combined_bridge_policy/run_artifacts/formal500_order_first100_clean
+```
+
+Controls may use eligible task-level baseline cache; candidate/SAGE arms must
+remain fresh. Task Compare is the default dashboard for new runs and includes
+canonical lift, outcome lift, per-task comparisons, and generated-tool
+contribution details.
+
 ---
 
 # Upstream ToolSandbox: A Stateful, Conversational, Interactive Evaluation Benchmark for LLM Tool Use Capabilities

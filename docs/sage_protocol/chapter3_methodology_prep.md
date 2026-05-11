@@ -18,6 +18,7 @@ Outcome/task-completion is the primary endpoint. Canonical/reference similarity 
 | Generated-tool lifecycle | `src/sage_ts/generation/`, `src/sage_ts/validation/`, `src/sage_ts/registry/manifest.py` | Tools pass schema/static/live validation before registry acceptance. | Generated-but-uncalled is a diagnosis, not no-value evidence. |
 | Candidate validation gates | `src/sage_ts/validation/sandbox_validator.py`, `src/sage_ts/validation/live_candidate_check.py`, `src/sage_ts/validation/output_normalization.py` | Candidate specs must include triggers, abstention, ambiguity behavior, side-effect preservation, and route-accounting when relevant. | Earlier campaigns had evolving gates; final claims use frozen registries. |
 | Routing and bounded exposure | `src/sage_ts/runtime/routing_scorer.py` | Helpers are exposed by trigger/family fit, negative triggers, evidence, fair-chance logic, and context budget. | Final frozen runs must pin or disable contribution evidence to avoid mtime dependence. |
+| Actor/checker bridge policy | `src/sage_ts/adapters/openai_toolsandbox_roles.py`, `src/sage_ts/adapters/sage_run_adapter.py` | When enabled, SAGE includes a general bridge policy that helps the actor naturally adopt retained helpers, preserve final answers after helper calls, and preserve required original ToolSandbox side effects. | This is a treatment component, not registry-only value. It must be feature-flagged, documented, and validated with zero side-effect incidents. |
 | Feedback packets | `src/sage_ts/evaluation/feedback_packets.py`, `scripts/export_v2_6_feedback_packets.py` | Per-task feedback records trace summaries, helper calls, routing decisions, scores, safety, and missing deterministic steps. | Cached-control trace completeness must be read from `control_trace_completeness`. |
 | Contribution analysis | `src/sage_ts/evaluation/helper_contribution.py`, `helper_contribution_summary.json` | Helper visible/called/VNC and called-subset deltas are exported for tool-driven interpretation. | Called-subset estimates are descriptive and may be sparse. |
 | Safety checks | side-effect preservation reports, minefield/outcome checks, runtime exception counts | Final claims require zero runtime exceptions and zero helper side-effect incidents. | Negative/insufficient-information tasks require abstention/clarification behavior. |
@@ -40,11 +41,78 @@ Outcome/task-completion is the primary endpoint. Canonical/reference similarity 
 | Route mismatch | Canonical route divergence that may occur when deterministic helper substitution preserves outcome. |
 | Side-effect incident | Helper behavior that risks or violates downstream side-effect preservation. |
 | Runtime exception | Execution failure during control or SAGE run. Final claim runs require zero. |
+| Bridge policy | General runtime policy that tells the actor how to use side-effect-free helpers without replacing required original ToolSandbox side-effect calls, and tells the checker how to verify that preservation from execution traces. |
+
+## Praxis Bridge Policy Treatment
+
+Praxis should be described as a candidate SAGE treatment with two separable parts:
+
+1. A frozen helper registry, containing deterministic side-effect-free helper tools.
+2. A feature-flagged actor/checker bridge policy, enabled by `SAGE_PRAXIS_BRIDGE_POLICY=combined`.
+
+The bridge policy is not a force-call mechanism and is not allowed to inspect truth labels, expected answers, scenario IDs beyond normal manifest execution, or prior SAGE traces. It supplies general operating rules that were already part of the intended SAGE process but were not included in the earlier registry-only final-hardening isolation.
+
+The policy includes:
+
+- Natural helper adoption guidance for search-window, selector, derived-value, and action-preparation helpers.
+- Scalar/list argument guidance so helpers are called with benchmark-visible data rather than opaque payloads.
+- Final-answer retention so a useful helper result is not lost after later ToolSandbox calls.
+- Temporal-anchor discipline: do not invent current timestamps, years, or timezones; use visible anchors or environment defaults, otherwise ask or abstain.
+- Explicit preservation of original side-effect tools: helpers may prepare arguments, but the original ToolSandbox setter, contact, reminder, or send-message tool must still be called when the task requires a state change.
+- Setter-success clarification: a `None` return from original ToolSandbox state setters is interpreted as success, not failure.
+- Insufficient-information discipline: do not substitute self records, unrelated domains, broad guesses, or ambiguous search results for a missing target.
+- Trace plus conversation-visible side-effect checking to avoid both missed preservation failures and checker false positives.
+
+Methodology language should therefore say "Praxis combined treatment" or "Praxis registry plus bridge policy" unless an ablation has separately validated registry-only value.
+
+### Bridge Policy Pseudocode
+
+```text
+for each sealed scenario in manifest order:
+    run control arm
+        if eligible baseline cache has >=3 compatible completed controls:
+            reuse task-level control score and record cache provenance
+        else:
+            execute fresh control
+
+    run SAGE/Praxis arm fresh
+        assert generation == off
+        assert candidate task cache == off
+        assert OpenAI response cache == disabled
+        load frozen registry by hash
+        route a bounded helper bundle without mtime-selected evidence
+
+        if SAGE_PRAXIS_BRIDGE_POLICY == "combined":
+            add general actor rules:
+                use helpers for deterministic selection, timestamp,
+                recency, precondition, or final-action preparation
+                do not call helpers for irrelevant task families
+                do not replace required original side-effect calls
+                preserve the best final answer after helper calls
+                treat original setter None return as success
+
+        actor completes task naturally
+        checker validates:
+            runtime exceptions == 0
+            helper runtime failures == 0
+            for every helper that prepares a side effect:
+                original ToolSandbox side-effect call appears later
+                required arguments match the helper-prepared action
+                no helper itself mutates state
+
+    score paired outcome and canonical/reference metrics
+    export dashboard, contribution, cache, and safety artifacts
+```
+
+### Claim Boundary
+
+A clean result with this policy enabled supports a combined-treatment claim only. A registry-only claim requires the same candidate registry to reproduce without `SAGE_PRAXIS_BRIDGE_POLICY=combined` and without importing bridge/checker behavior.
 
 ## Diagrams Needed
 
 - Full SAGE pipeline diagram: manifest -> control cache planning -> control arm -> SAGE arm -> scoring -> dashboard/report.
 - Generated-tool lifecycle diagram: shortfall cluster -> spec -> validation -> candidate registry -> routing -> contribution -> frozen evaluation.
+- Praxis combined-treatment diagram: frozen registry + bounded routing + actor bridge policy + original side-effect preservation checker -> paired scoring.
 - Evidence separation table: best3 broad claim, V2.6 matched gap closure, current-code original250, current-code 500, deferred 1032.
 - Cache-policy table: OpenAI response cache vs task-level control baseline cache vs fresh runs.
 - Metric definitions table: outcome, canonical, exact success, no-current-helper-fit, VNC, called-subset contribution.
@@ -57,7 +125,7 @@ Outcome/task-completion is the primary endpoint. Canonical/reference similarity 
 2. Task environment: ToolSandbox scenarios, manifests, task-family stratification.
 3. Experimental arms: control/baseline, frozen SAGE, generation-enabled discovery.
 4. Tool lifecycle: shortfall clustering, generation, validation, repair, promotion/freeze.
-5. Runtime routing: bounded helper exposure and final-run evidence pinning/disablement.
+5. Runtime routing and bridge policy: bounded helper exposure, final-run evidence pinning/disablement, actor affordances, final-answer retention, and side-effect preservation.
 6. Metrics: outcome primary, canonical secondary, exact success, helper-fit, contribution.
 7. Safety: side-effect preservation, insufficient-information abstention, runtime exception tracking.
 8. Caching and reproducibility: OpenAI response cache, task-level control cache, trace completeness labels.

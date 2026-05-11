@@ -25,6 +25,7 @@ LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL = "[SAGE lookup-planner actor policy]"
 SEARCH_WINDOW_ACTOR_POLICY_SENTINEL = "[SAGE search-window actor policy]"
 SAFE_ARGUMENT_ACTOR_POLICY_SENTINEL = "[SAGE safe-argument actor policy]"
 ANSWER_RETENTION_ACTOR_POLICY_SENTINEL = "[SAGE answer-retention actor policy]"
+TEMPORAL_ANCHOR_ACTOR_POLICY_SENTINEL = "[SAGE temporal-anchor actor policy]"
 PRAXIS_BRIDGE_POLICY_ENV = "SAGE_PRAXIS_BRIDGE_POLICY"
 OpenAIMessage = dict[
     Literal["role", "content", "tool_call_id", "name", "tool_calls"],
@@ -688,12 +689,53 @@ def _safe_argument_actor_policy_message(
             "target person. Modify a contact only after a visible message/contact "
             "record or a dedicated helper unambiguously identifies the non-self "
             "counterparty and concrete person_id; otherwise ask or abstain. "
+            "If a task requires information from an unavailable domain, such as "
+            "message history when search_messages is not visible, do not "
+            "substitute unrelated contacts, self records, broad reminder "
+            "searches, or guessed ids. Ask for the missing information or state "
+            "that the request cannot be completed with the available tools. "
+            "If a search returns zero records or multiple ambiguous records for "
+            "a side-effect request, do not perform the side effect until a "
+            "concrete target is identified. "
             "For original state setter tools such as set_wifi_status, "
             "set_cellular_service_status, set_location_service_status, and "
             "set_low_battery_mode_status, a tool result of None means the setter "
             "completed successfully. Do not treat None as failure, do not retry "
             "the setter, and do not call a planning helper after a successful "
             "setter. Answer with the completed state change instead."
+        ),
+    }
+
+
+def _temporal_anchor_actor_policy_message(
+    openai_messages: object,
+    openai_tools: object,
+) -> dict[str, str] | None:
+    """Prevent invented years/timestamps in relative-date and holiday tasks."""
+    names = _tool_names(openai_tools)
+    if not (
+        names & {"search_holiday", "shift_timestamp", "timestamp_to_datetime_info"}
+    ):
+        return None
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        if TEMPORAL_ANCHOR_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
+            return None
+    return {
+        "role": "system",
+        "content": (
+            f"{TEMPORAL_ANCHOR_ACTOR_POLICY_SENTINEL} Do not invent a current "
+            "year, current timestamp, timezone, or date anchor for temporal "
+            "tasks. If the user gives an explicit numeric year or timestamp, use "
+            "that value. For search_holiday, when the user asks for this year's "
+            "holiday but has not supplied a numeric year, call search_holiday "
+            "with only the holiday name so the environment resolves its own "
+            "default. For relative-date phrases such as yesterday, today, or "
+            "tomorrow, first use get_current_timestamp if that original tool is "
+            "visible; otherwise use an explicit timestamp already visible in "
+            "the conversation or tool output. If no anchor is visible, ask for "
+            "clarification or state that there is insufficient information "
+            "instead of calling shift_timestamp or timestamp_to_datetime_info "
+            "with a guessed timestamp."
         ),
     }
 
@@ -706,6 +748,7 @@ def _with_selector_actor_policy(
     if _praxis_bridge_policy_enabled():
         bridge_policies = (
             _safe_argument_actor_policy_message(openai_messages, openai_tools),
+            _temporal_anchor_actor_policy_message(openai_messages, openai_tools),
             _search_window_actor_policy_message(openai_messages, openai_tools),
         )
     policies = [

@@ -1144,13 +1144,18 @@ def main() -> None:
     # Dashboard visibility is part of the experiment surface. Keep it on by
     # default for every run; only the explicit CLI flag should suppress it.
     should_open_dashboard = not args.no_dashboard_open
-    dashboard_url = dashboard_task_focus_url = dashboard_task_compare_url = None
+    dashboard_url = dashboard_standard_url = dashboard_task_focus_url = (
+        dashboard_task_compare_url
+    ) = None
     if should_open_dashboard:
         dashboard_task_compare_url = open_dashboard(
             dashboard_index.with_name("task_compare.html"),
             port=args.dashboard_port,
         )
-        dashboard_url = make_dashboard_url(dashboard_index, port=args.dashboard_port)
+        dashboard_standard_url = make_dashboard_url(
+            dashboard_index, port=args.dashboard_port
+        )
+        dashboard_url = dashboard_task_compare_url
         dashboard_task_focus_url = make_dashboard_url(
             dashboard_index.with_name("task_focus.html"),
             port=args.dashboard_port,
@@ -1159,7 +1164,7 @@ def main() -> None:
             json.dumps(
                 {
                     "dashboard_url": dashboard_task_compare_url,
-                    "dashboard_standard_url": dashboard_url,
+                    "dashboard_standard_url": dashboard_standard_url,
                     "dashboard_task_focus_url": dashboard_task_focus_url,
                     "dashboard_task_compare_url": dashboard_task_compare_url,
                     "default_dashboard": "task_compare",
@@ -1637,6 +1642,7 @@ def main() -> None:
         ),
         "dashboard_path": str(dashboard_index),
         "dashboard_url": dashboard_url,
+        "dashboard_standard_url": dashboard_standard_url,
         "dashboard_task_focus_url": dashboard_task_focus_url,
         "dashboard_task_compare_url": dashboard_task_compare_url,
         "parallel_arms": args.parallel_arms,
@@ -1702,6 +1708,7 @@ def main() -> None:
             ),
             "dashboard_path": str(dashboard_index),
             "dashboard_url": dashboard_url,
+            "dashboard_standard_url": dashboard_standard_url,
             "dashboard_task_focus_url": dashboard_task_focus_url,
             "dashboard_task_compare_url": dashboard_task_compare_url,
             "parallel_arms": args.parallel_arms,

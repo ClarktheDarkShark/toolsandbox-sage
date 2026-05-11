@@ -28,6 +28,12 @@
   "generated_tool_adoption": {
     "interpretation": "Accepted-but-uncalled, visible-not-called, or force-call-only tools are blocker diagnoses. They must not be collapsed into no-value conclusions without routing, schema, affordance, callability, safety, and value evidence."
   },
+  "bridge_policy": {
+    "implementation": "src/sage_ts/adapters/openai_toolsandbox_roles.py and src/sage_ts/adapters/sage_run_adapter.py",
+    "activation": "Feature-flagged Praxis combined treatment uses SAGE_PRAXIS_BRIDGE_POLICY=combined.",
+    "scope": "General actor/checker policy that improves natural adoption of retained helpers, preserves final answers after helper calls, clarifies safe scalar arguments, treats original state-setter None returns as success, and audits helper side-effect preservation using trace and conversation-visible tool calls.",
+    "integrity_boundary": "Bridge policy is part of the tested SAGE treatment when enabled. It must be documented as a registry plus actor/checker bridge-policy treatment, not as registry-only value. It does not force tool calls, inspect labels, use expected answers, or select scenarios."
+  },
   "cache_policy": {
     "openai_response_cache": "Provider response cache controlled separately by scripts/run_sage_protocol.py --cache-mode.",
     "task_level_control_cache": "Control arm may reuse eligible task-level baseline records with >=3 compatible completed controls; cached controls are score-complete, but synthetic rows may be trace-incomplete unless historical trajectories are available."

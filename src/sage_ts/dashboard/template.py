@@ -141,7 +141,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   <main class="wrap">
     <h1>ToolSandbox SAGE</h1>
     <div class="sub" id="subtitle">Loading dashboard data...</div>
-    <div class="links"><a class="btn" href="task_focus.html">Task Focus</a></div>
+    <div class="links"><a class="btn" href="task_compare.html">Task Compare</a><a class="btn" href="task_focus.html">Task Focus</a></div>
     <section class="grid" id="metricGrid"></section>
     <section class="panel">
       <h2>Run Progress</h2>

@@ -10,17 +10,19 @@ TASK_COMPARE_HTML = r"""<!doctype html>
   <title>Task Compare - SAGE</title>
   <style>
     :root {
-      --bg: #f4f6f8;
-      --panel: #ffffff;
-      --panel2: #eef2f6;
-      --line: #cbd5df;
-      --text: #17202a;
-      --muted: #667386;
-      --green: #16794c;
-      --red: #b42318;
-      --amber: #9a6700;
-      --blue: #1d5f99;
-      --ink: #0c1420;
+      --bg: #0b1118;
+      --panel: #111a24;
+      --panel2: #172332;
+      --panel3: #0f1722;
+      --line: #2b3a4d;
+      --text: #e7edf5;
+      --muted: #93a4b8;
+      --green: #41d996;
+      --red: #ff6b73;
+      --amber: #ffc857;
+      --blue: #77bdff;
+      --ink: #dce7f3;
+      --shadow: rgba(0, 0, 0, .35);
     }
     * { box-sizing: border-box; }
     body {
@@ -63,11 +65,12 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       border-radius: 8px;
       padding: 10px 12px;
       min-height: 78px;
+      box-shadow: 0 8px 22px var(--shadow);
     }
     .metric.clickable {
       cursor: pointer;
-      border-color: #8fb6db;
-      background: #edf6ff;
+      border-color: #3f80bd;
+      background: #162a3d;
     }
     .label {
       color: var(--muted);
@@ -98,7 +101,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
     aside {
       border-right: 1px solid var(--line);
-      background: #fbfcfd;
+      background: #0d151f;
       padding: 14px;
       position: sticky;
       top: 139px;
@@ -130,8 +133,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
     .task-btn:hover,
     .task-btn.active {
-      background: #e9f2fb;
-      border-color: #bbd5ee;
+      background: #162a3d;
+      border-color: #3f80bd;
     }
     .task-name {
       font-size: 13px;
@@ -159,6 +162,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       border-radius: 8px;
       padding: 16px;
       margin-bottom: 14px;
+      box-shadow: 0 8px 22px var(--shadow);
     }
     .task-title {
       display: flex;
@@ -195,7 +199,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
     .mini {
       border: 1px solid var(--line);
-      background: #fbfcfd;
+      background: var(--panel3);
       border-radius: 8px;
       padding: 11px;
       min-height: 74px;
@@ -209,7 +213,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     .box {
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: #fbfcfd;
+      background: var(--panel3);
       padding: 12px;
       min-height: 110px;
     }
@@ -250,7 +254,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     .drawer {
       position: fixed;
       inset: 0;
-      background: rgba(12, 20, 32, .38);
+      background: rgba(0, 0, 0, .62);
       z-index: 20;
       display: none;
     }
@@ -334,12 +338,16 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const finite = (v) => v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v));
     const pct = (v) => finite(v) ? (Number(v) * 100).toFixed(1) + "%" : "-";
+    const signedPct = (v) => finite(v) ? (Number(v) >= 0 ? "+" : "") + (Number(v) * 100).toFixed(1) + "%" : "-";
     const num = (v, d = 3) => finite(v) ? Number(v).toFixed(d) : "-";
+    const signedNum = (v, d = 3) => finite(v) ? (Number(v) >= 0 ? "+" : "") + Number(v).toFixed(d) : "-";
+    const relLift = (delta, baseline) => finite(delta) && finite(baseline) && Number(baseline) !== 0 ? Number(delta) / Number(baseline) : null;
     const cls = (v) => Number(v || 0) > 0 ? "good" : Number(v || 0) < 0 ? "bad" : "";
     const outcome = (row) => row?.outcome_similarity ?? row?.outcome_milestone_similarity ?? null;
     let payload = null;
     let pairs = [];
     let selected = 0;
+    let handlersBound = false;
 
     function metric(label, value, hint, className = "", clickable = false) {
       return `<div class="metric ${clickable ? "clickable" : ""}" ${clickable ? 'id="toolsMetric" role="button" tabindex="0"' : ""}>
@@ -352,17 +360,28 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     function renderMetrics() {
       const s = payload.summary || {};
       const tools = payload.tool_summary || {};
-      const scoreDelta = s.balanced_delta ?? null;
-      const outcomeDelta = s.balanced_outcome_delta ?? null;
+      const totalTasks = s.scenario_count ?? pairs.length ?? 0;
+      const baselineDone = s.control_completed ?? 0;
+      const sageDone = s.candidate_completed ?? s.current_completed ?? 0;
+      const matched = Math.min(baselineDone, sageDone);
+      const baselineScore = s.balanced_control_mean_similarity ?? s.control_mean_similarity ?? null;
+      const sageScore = s.balanced_candidate_mean_similarity ?? s.candidate_mean_similarity ?? s.current_mean_similarity ?? null;
+      const scoreDelta = s.balanced_delta ?? (finite(baselineScore) && finite(sageScore) ? Number(sageScore) - Number(baselineScore) : null);
+      const scoreLift = finite(s.balanced_lift_percent) ? Number(s.balanced_lift_percent) / 100 : relLift(scoreDelta, baselineScore);
+      const baselineOutcome = s.balanced_control_mean_outcome_similarity ?? s.control_mean_outcome_similarity ?? null;
+      const sageOutcome = s.balanced_candidate_mean_outcome_similarity ?? s.candidate_mean_outcome_similarity ?? null;
+      const outcomeDelta = s.balanced_outcome_delta ?? (finite(baselineOutcome) && finite(sageOutcome) ? Number(sageOutcome) - Number(baselineOutcome) : null);
+      const outcomeLift = relLift(outcomeDelta, baselineOutcome);
       const used = tools.called_tool_count ?? 0;
       const total = tools.registry_tool_count ?? tools.tool_count ?? 0;
       document.getElementById("metrics").innerHTML = [
-        metric("Baseline Score", pct(s.balanced_control_mean_similarity), `${s.balanced_completed || 0} matched tasks`),
-        metric("SAGE Score", pct(s.balanced_candidate_mean_similarity), "candidate arm"),
-        metric("Score Lift", pct(scoreDelta), "canonical/reference", cls(scoreDelta)),
-        metric("Baseline Outcome", pct(s.balanced_control_mean_outcome_similarity), "task completion"),
-        metric("SAGE Outcome", pct(s.balanced_candidate_mean_outcome_similarity), "task completion"),
-        metric("Outcome Lift", pct(outcomeDelta), `${tools.outcome_gains || 0} gains / ${tools.outcome_regressions || 0} regressions`, cls(outcomeDelta)),
+        metric("Run Progress", `${matched || 0}/${totalTasks || 0}`, `paired complete; baseline ${baselineDone}/${totalTasks || 0} · SAGE ${sageDone}/${totalTasks || 0}`),
+        metric("Baseline Score", num(baselineScore), `${matched || 0} matched tasks`),
+        metric("SAGE Score", num(sageScore), `${s.candidate_completed || 0}/${s.scenario_count || 0} candidate done`),
+        metric("Score Delta", signedNum(scoreDelta), `${signedPct(scoreLift)} lift vs baseline`, cls(scoreDelta)),
+        metric("Baseline Outcome", num(baselineOutcome), "task completion"),
+        metric("SAGE Outcome", num(sageOutcome), "task completion"),
+        metric("Outcome Lift", signedPct(outcomeLift), `${signedNum(outcomeDelta)} outcome delta`, cls(outcomeDelta)),
         metric("Tools Born / Used", `${tools.generated_tool_birth_count || 0} / ${used}`, `${total} registry tools; click for contribution`, "warn", true),
       ].join("");
       const cell = document.getElementById("toolsMetric");
@@ -389,7 +408,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         const d = pairDelta(pair);
         return `<button class="task-btn ${index === selected ? "active" : ""}" data-index="${index}">
           <div class="task-name">${esc(pair.display_index || index + 1)}. ${esc(pair.short_name || pair.scenario)}</div>
-          <div class="task-meta"><span class="${cls(d.scoreDelta)}">${pct(d.scoreDelta)}</span><span class="${cls(d.outcomeDelta)}">${pct(d.outcomeDelta)}</span></div>
+          <div class="task-meta"><span class="${cls(d.scoreDelta)}">${signedNum(d.scoreDelta)}</span><span class="${cls(d.outcomeDelta)}">${signedNum(d.outcomeDelta)}</span></div>
         </button>`;
       }).join("");
       document.querySelectorAll(".task-btn").forEach((btn) => btn.addEventListener("click", () => {
@@ -444,8 +463,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           <div class="compare-grid">
             <div class="mini"><div class="label">Baseline Score</div><div class="value">${pct(control.similarity)}</div></div>
             <div class="mini"><div class="label">SAGE Score</div><div class="value">${pct(candidate.similarity)}</div></div>
-            <div class="mini"><div class="label">Score Lift</div><div class="value ${cls(d.scoreDelta)}">${pct(d.scoreDelta)}</div></div>
-            <div class="mini"><div class="label">Outcome Lift</div><div class="value ${cls(d.outcomeDelta)}">${pct(d.outcomeDelta)}</div><div class="hint">${pct(outcome(control))} -> ${pct(outcome(candidate))}</div></div>
+            <div class="mini"><div class="label">Score Delta</div><div class="value ${cls(d.scoreDelta)}">${signedNum(d.scoreDelta)}</div><div class="hint">${signedPct(relLift(d.scoreDelta, control.similarity))} lift</div></div>
+            <div class="mini"><div class="label">Outcome Lift</div><div class="value ${cls(d.outcomeDelta)}">${signedPct(relLift(d.outcomeDelta, outcome(control)))}</div><div class="hint">${num(outcome(control))} -> ${num(outcome(candidate))}; delta ${signedNum(d.outcomeDelta)}</div></div>
             <div class="mini"><div class="label">Baseline Turns</div><div class="value">${esc(control.turn_count ?? "-")}</div></div>
             <div class="mini"><div class="label">SAGE Turns</div><div class="value">${esc(candidate.turn_count ?? "-")}</div></div>
             <div class="mini"><div class="label">Control Cache</div><div class="value">${esc(control.control_cache_source || "-")}</div></div>
@@ -491,8 +510,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           <td>${esc(tool.visible_count ?? 0)}</td>
           <td>${esc(tool.called_count ?? 0)}</td>
           <td>${esc(tool.visible_not_called_count ?? 0)}</td>
-          <td class="${cls(tool.called_subset_mean_outcome_delta)}">${pct(tool.called_subset_mean_outcome_delta)}<div class="small">${esc(tool.outcome_gains ?? 0)} gains / ${esc(tool.outcome_regressions ?? 0)} regressions</div></td>
-          <td class="${cls(tool.called_subset_mean_canonical_delta)}">${pct(tool.called_subset_mean_canonical_delta)}</td>
+          <td class="${cls(tool.called_subset_mean_outcome_delta)}">${signedNum(tool.called_subset_mean_outcome_delta)}<div class="small">${esc(tool.outcome_gains ?? 0)} gains / ${esc(tool.outcome_regressions ?? 0)} regressions</div></td>
+          <td class="${cls(tool.called_subset_mean_canonical_delta)}">${signedNum(tool.called_subset_mean_canonical_delta)}</td>
           <td>${esc(tool.side_effect_incident_count ?? 0)} side effects<br><span class="small">${esc(tool.runtime_incident_count ?? 0)} runtime incidents</span></td>
         </tr>`).join("")}</tbody>
       </table>`;
@@ -505,23 +524,38 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       document.getElementById("toolDrawer").setAttribute("aria-hidden", "true");
     }
 
-    async function load() {
+    async function refresh() {
       const response = await fetch(`task_compare_data.json?ts=${Date.now()}`, {cache: "no-store"});
       payload = await response.json();
       pairs = payload.pairs || [];
       const s = payload.summary || {};
-      document.getElementById("subtitle").textContent = `${payload.mode || "run"} · ${payload.status || "unknown"} · ${payload.agent || ""} · ${s.balanced_completed || 0} matched tasks`;
+      const baselineDone = s.control_completed ?? 0;
+      const sageDone = s.candidate_completed ?? s.current_completed ?? 0;
+      const matched = Math.min(baselineDone, sageDone);
+      const totalTasks = s.scenario_count ?? pairs.length ?? 0;
+      document.getElementById("subtitle").textContent = `${payload.mode || "run"} · ${payload.status || "unknown"} · ${payload.agent || ""} · ${matched || 0}/${totalTasks || 0} matched tasks · refreshed ${new Date().toLocaleTimeString()}`;
+      if (selected >= pairs.length) selected = Math.max(0, pairs.length - 1);
       renderMetrics();
       renderList();
       renderDetail();
-      document.getElementById("search").addEventListener("input", renderList);
-      document.getElementById("closeTools").addEventListener("click", closeTools);
-      document.getElementById("toolDrawer").addEventListener("click", (event) => {
-        if (event.target.id === "toolDrawer") closeTools();
-      });
-      window.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") closeTools();
-      });
+    }
+
+    async function load() {
+      await refresh();
+      if (!handlersBound) {
+        handlersBound = true;
+        document.getElementById("search").addEventListener("input", renderList);
+        document.getElementById("closeTools").addEventListener("click", closeTools);
+        document.getElementById("toolDrawer").addEventListener("click", (event) => {
+          if (event.target.id === "toolDrawer") closeTools();
+        });
+        window.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closeTools();
+        });
+        window.setInterval(() => {
+          refresh().catch((error) => console.error(error));
+        }, 5000);
+      }
     }
 
     load().catch((error) => {

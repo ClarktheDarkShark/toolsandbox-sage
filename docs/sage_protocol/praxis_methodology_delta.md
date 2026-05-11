@@ -1,8 +1,41 @@
 # Praxis Methodology Delta
 
-Status: non-claim methodology supplement. Praxis did not validate cleanly
-because the registry-only formal500 run produced helper side-effect
-preservation failures.
+Status: non-claim methodology supplement. This file preserves the original
+registry-only final-hardening interpretation and adds the later combined-policy
+methodology boundary.
+
+## Current Combined-Policy Boundary
+
+After the registry-only safety repair, the project restored the general Praxis
+actor/checker bridge policy as a first-class SAGE component. The high-lift
+Praxis candidate should now be described as a combined treatment when
+`SAGE_PRAXIS_BRIDGE_POLICY=combined` is enabled:
+
+- frozen Praxis helper registry;
+- bounded helper routing;
+- general actor bridge policy for natural helper adoption, scalar arguments,
+  final-answer retention, and original ToolSandbox side-effect preservation;
+- side-effect checker support using execution trace events plus
+  conversation-visible assistant tool calls.
+
+This is not cheating if it is stated transparently. It is not force calling,
+does not inspect labels or expected answers, does not select scenarios, and
+does not change the scorer. It is a runtime treatment component that must be
+included in matched validation and documented in Chapter 3.
+
+Protected-claim language must therefore distinguish:
+
+- registry-only Praxis repair v2: clean safety, positive formal500 outcome,
+  lower canonical lift than the prior high-lift run;
+- Praxis combined treatment: under validation, intended to recover high
+  natural-adoption lift by restoring the bridge policy as part of SAGE.
+
+See `docs/sage_protocol/praxis_bridge_policy_methodology.md`.
+
+## Original Registry-Only Review Context
+
+Praxis did not validate cleanly in the first registry-only review because the
+frozen experimental registry produced helper side-effect preservation failures.
 
 ## What Praxis Tested
 

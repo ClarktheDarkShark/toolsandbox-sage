@@ -1,14 +1,17 @@
 # Current State
 
 - Date: 2026-05-11
-- Last completed step: `praxis_registry_only_side_effect_repair_v2_matched_formal500`
-- Last decision: `READY_FOR_PROTECTED_REVIEW: registry_only_praxis_repair_v2`
+- Last completed step: `praxis_combined_bridge_policy_first100_v2_same_code`
+- Last decision: `PROMISING_BUT_NOT_CLAIM_READY: combined_treatment_requires_clean_formal500`
 - Primary metric: outcome/task-completion
-- Active frozen helpers: protected best3 remains `relative_day_time_to_timestamp, resolve_search_window_or_bounds, select_record_by_timestamp_extreme`; repaired Praxis v2 is a review candidate only.
+- Active frozen helpers: protected best3 remains `relative_day_time_to_timestamp, resolve_search_window_or_bounds, select_record_by_timestamp_extreme`; repaired Praxis v2 remains a registry-only review candidate; combined Praxis BridgePack is an experimental combined-treatment candidate only.
 - Active protected registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`
 - Protected registry SHA-256: `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`
 - Praxis repair candidate registry: `artifacts/praxis_safety_repair/registries/praxis_bridgepack_registry_only_repair_v2/registry_manifest.json`
 - Praxis repair candidate SHA-256: `24e5ca815c6f3c11a8b226f10abbfba3216f854a5dcb284df860c4131a01cc35`
+- Praxis combined-treatment registry: `artifacts/praxis_safety_repair/registries/praxis_bridgepack_combined_bridge_policy_v1/registry_manifest.json`
+- Praxis combined-treatment registry SHA-256: `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`
+- Praxis combined-treatment runtime flag: `SAGE_PRAXIS_BRIDGE_POLICY=combined`
 - Final-run preflight: `scripts/preflight_final_run.py`
 - Final-run preflight config: `docs/sage_protocol/final_run_preflight_config.json`
 - Final statistical analysis report: `docs/sage_protocol/final_statistical_analysis_report.md`
@@ -16,6 +19,10 @@
 - Chapter 3 methodology prep: `docs/sage_protocol/chapter3_methodology_prep.md`
 - Versioned methodology heuristics: `docs/sage_protocol/protocol_heuristics_v1.json`
 - Final frozen run requirements: generation OFF, control cache `use-if-eligible`, routing evidence `disabled` or explicitly `pinned`, no diagnostic force-call env vars, no low-quality override.
+- Current Task Compare dashboard default: `task_compare.html`; it is dark mode and reports paired completion as `min(baseline completed, SAGE completed)`.
+- Praxis combined first100 v2 same-code aggregate: canonical `0.654 -> 0.723`, delta `+0.069`, relative lift `+10.6%`; outcome `0.604 -> 0.737`, delta `+0.133`, relative lift `+22.0%`; exact successes `5 -> 20`; runtime exceptions `0`; side-effect preservation reports `0`.
+- Praxis combined first100 v2 summary: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_first100_v2_same_code_summary.json`
+- Praxis combined next step: clean matched formal500 under the declared combined treatment only after commit/preflight; do not update protected final claim artifacts from this branch.
 - Cache/feedback trace caveat: cached controls are score-complete for metrics, but cached-only synthetic rows are labeled trace-incomplete in feedback packets when historical trajectories are unavailable.
 - Formal 100 run: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428`
 - Formal 100 dashboard: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428/dashboard/index.html`
