@@ -134,6 +134,20 @@ def test_answer_retention_policy_does_not_interrupt_followup_request() -> None:
     assert _answer_retention_actor_policy_message(messages) is None
 
 
+def test_answer_retention_does_not_treat_look_as_ok() -> None:
+    messages = [
+        {"role": "user", "content": "What reminders did I have yesterday?"},
+        {"role": "tool", "name": "search_reminder", "content": "[]"},
+        {"role": "assistant", "content": "No matching reminders were found."},
+        {
+            "role": "user",
+            "content": "I see. You can look for anything in the past week then.",
+        },
+    ]
+
+    assert _answer_retention_actor_policy_message(messages) is None
+
+
 def test_answer_retention_response_recaps_without_tool_call() -> None:
     messages = [
         {"role": "user", "content": "What's my relationship with +10000000000?"},

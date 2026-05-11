@@ -476,30 +476,38 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
         for token in (
             "can you",
             "could you",
+            "you can",
             "what ",
             "why ",
             "how ",
             "search",
             "find",
+            "look for",
+            "look up",
+            "list",
+            "show",
+            "check",
             "add ",
             "remove ",
             "modify ",
             "send ",
+            "turn on",
+            "turn off",
         )
     ):
         return False
-    acknowledgement_tokens = (
-        "thank",
-        "thanks",
+    words = set(
+        "".join(char if char.isalnum() else " " for char in latest_user).split()
+    )
+    acknowledgement_phrases = (
         "got it",
-        "great",
-        "cool",
-        "okay",
-        "ok",
-        "alright",
         "you found it",
     )
-    return any(token in latest_user for token in acknowledgement_tokens)
+    return (
+        any(phrase in latest_user for phrase in acknowledgement_phrases)
+        or any(word.startswith("thank") for word in words)
+        or bool(words & {"thanks", "great", "cool", "okay", "ok", "alright"})
+    )
 
 
 def _recent_tool_backed_answer_text(openai_messages: object) -> str | None:
@@ -658,6 +666,9 @@ def _lookup_planner_actor_policy_message(
             "id, call the helper before manually choosing original search "
             'arguments. Phrases like "my boss" or "with +1555..." count as '
             "relationship/phone scalar constraints for lookup planning. "
+            "Relationship words such as boss, friend, coworker, family, or enemy "
+            "are valid relationship constraints; do not ask for the person's name "
+            "before searching by the supplied relationship. "
             "Prefer this helper over manually assembling search kwargs when it "
             "exactly matches the lookup problem. "
             "If it returns should_call_search_contacts or "
@@ -738,8 +749,12 @@ def _relative_time_actor_policy_message(
             "the original add_reminder or modify_reminder call. Do not call the "
             "helper when the user omitted the target day or time, when the current "
             "timestamp is unavailable, or when the local offset cannot be inferred "
-            "from visible runtime context. This helper does not replace the "
-            "original reminder side-effect tool."
+            "from visible runtime context. For modify_reminder or remove_reminder, "
+            "this helper only prepares the new timestamp; it does not identify the "
+            "target reminder. Do not call the original side-effect tool until a "
+            "single reminder_id is visible and unambiguous, or the user explicitly "
+            "asked to update all matching reminders. This helper does not replace "
+            "the original reminder side-effect tool."
         ),
     }
 

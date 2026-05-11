@@ -1,0 +1,22 @@
+{
+  "manifest_type": "praxis_insufficient_info_repair_probe3_diagnostic",
+  "source_manifest": "artifacts/praxis_combined_bridge_policy/manifests/formal500_order_broad60.json",
+  "selection_rule": "Diagnostic-only recheck for broad60 canonical regressions after acknowledgement boundary and recency-action safety repairs.",
+  "labels_inspected": false,
+  "cache_selection_used": false,
+  "splits": {
+    "mechanism_12": [
+      {"name": "search_reminder_with_recency_yesterday_insufficient_information"},
+      {"name": "modify_reminder_with_recency_latest_insufficient_information"},
+      {"name": "search_name_with_relationship"}
+    ]
+  },
+  "integrity_controls": {
+    "final_claim_evidence": false,
+    "candidate_cache_allowed": false,
+    "control_cache_policy": "use-if-eligible",
+    "openai_response_cache": "disabled",
+    "routing_evidence_mode": "disabled",
+    "generation": "off"
+  }
+}
