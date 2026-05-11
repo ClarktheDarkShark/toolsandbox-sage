@@ -1,0 +1,25 @@
+{
+  "schema_version": "praxis_dashboard_checks_v1",
+  "checked_at": "2026-05-11T03:30:00Z",
+  "checks": [
+    {
+      "name": "praxis_standard_dashboard",
+      "url": "http://127.0.0.1:62333/outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731/dashboard/index.html",
+      "title": "ToolSandbox SAGE \u00b7 full_benchmark",
+      "console_error_count": 0,
+      "status": "opened_in_app_browser"
+    },
+    {
+      "name": "praxis_task_focus_dashboard",
+      "url": "http://127.0.0.1:62333/outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731/dashboard/task_focus.html",
+      "title": "Task Focus \u2014 SAGE",
+      "console_error_count": 0,
+      "status": "opened_in_app_browser"
+    },
+    {
+      "name": "praxis_task_compare_dashboard",
+      "path": "outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731/dashboard/task_compare.html",
+      "status": "not_generated_by_review_run"
+    }
+  ]
+}

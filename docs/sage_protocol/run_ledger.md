@@ -761,3 +761,33 @@
   - Development preflight with `--allow-dirty` -> PASS; clean-tree preflight should be rerun after commit with report output outside the repo.
 - Decision: `final preflight ready; chapter 3 methodology package ready`.
 - Next action: run full targeted validation, registry checks, `git diff --check`, commit, clean-tree preflight, and push.
+
+## 2026-05-11 - Praxis Final-Hardening Registry-Only Formal500 Review
+
+- Objective: audit and reproduce the frozen Praxis BridgePack result against protected best3 and V2.6 under matched final-hardening review conditions.
+- Review branch: `review/praxis-final-hardening`.
+- Protected-base commit: `2898c7e502ec75ad5e1fc65c5ffe7a80f5605f4a`.
+- Experimental source commit: `7793c8ca29ab4e121d302c777c4e4ad273226470`.
+- Setup commit used for matched formal runs: `cfe35647dbbb703b4508a709f75dfee0f1f85036`.
+- Protected assets preserved: protected best3 registry, locked best3 evidence, locked formal evidence, and final-package claim artifacts were not modified.
+- Imported review inputs: best3 reference copy, V2.6 reference copy, Praxis frozen candidate copy, locked Praxis experimental summary, and control-arm task-level baseline cache policy.
+- Intentionally not imported: Praxis actor/router bridge policy, final-answer retention changes, scrambled tool-name compatibility changes, side-effect checker changes, scoring changes, and dashboard/export changes.
+- Formal manifest: `docs/sage_protocol/manifests/v2_1_formal_500.json`, SHA `093547e7a89e704e67d4cea85fd96511063becd0b5542ba3abf21c242453bbbf`.
+- Registry hashes:
+  - best3 reference: `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`
+  - V2.6 reference: `ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582`
+  - Praxis frozen BridgePack: `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`
+- Preflight: `artifacts/praxis_final_hardening/preflight/preflight_registry_only_formal500.json`, SHA `f4913869aa740e2c80fbaf0f50523bff2c1f8b10e8a784574278df2d05e86786`; clean git, registry hashes matched, routing evidence disabled, diagnostic force env vars absent.
+- Run controls: generation off; OpenAI response cache disabled; SAGE/candidate task cache off; control cache `use-if-eligible`; routing evidence disabled; no low-quality override; no code or registry changes between matched arms.
+- Control cache: `500 cached / 0 fresh` in every arm; cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`.
+- best3 formal500 run: `outputs/praxis_final_hardening/registry_only/best3_reference_formal500/full_benchmark_20260510_223731`; outcome `0.655285`; run-vs-control outcome lift `0.060413`; canonical `0.722734`; exact successes `94`; runtime exceptions `0`; helper side-effect failures `0`.
+- V2.6 formal500 run: `outputs/praxis_final_hardening/registry_only/v2_6_reference_formal500/full_benchmark_20260510_223731`; outcome `0.664286`; run-vs-control outcome lift `0.069414`; canonical `0.713519`; exact successes `89`; runtime exceptions `0`; helper side-effect failures `0`.
+- Praxis formal500 run: `outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731`; outcome `0.696169`; run-vs-control outcome lift `0.101297`; canonical `0.722681`; exact successes `105`; runtime exceptions `0`; helper side-effect failures `13`.
+- Pairwise result: Praxis-vs-best3 outcome diff `+0.040884`, 95% CI `[0.004697, 0.078220]`, p `0.0283`; Praxis-vs-V2.6 outcome diff `+0.031883`, 95% CI `[-0.009376, 0.072576]`, p `0.1199`.
+- Safety blocker: Praxis side-effect report `outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731/candidate/full_benchmark_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_10_2026_22_38_10/side_effect_preservation_report.jsonl`, SHA `81bf6ee740368bc83f8444f5c608e108d352f5029533d52695d4b430d5fd1aaa`.
+- Reports: `docs/sage_protocol/praxis_final_hardening_review.md`, `docs/sage_protocol/praxis_treatment_dependency_audit.md`, `docs/sage_protocol/praxis_matched_formal500_statistical_report.md`, `docs/sage_protocol/praxis_methodology_delta.md`, `docs/sage_protocol/praxis_final_hardening_blocker_report.md`.
+- Machine-readable summary: `artifacts/praxis_final_hardening/praxis_final_hardening_summary.json`.
+- Dashboard checks: Praxis standard dashboard and Task Focus dashboard opened in the in-app browser with zero console errors; Task Compare was not generated.
+- Treatment classification: registry-only outcome lift reproduced, but not protected-claim ready because helper side-effect preservation failed. A combined registry plus bridge-policy/checker treatment remains plausible but unvalidated.
+- Decision label: `BLOCKED: praxis_registry_only_side_effect_preservation_failures`.
+- Next action: do not update protected final claim. Redesign failing bridge helpers or audit an explicit combined bridge-policy treatment, then rerun matched formal validation from scratch with zero side-effect failures.

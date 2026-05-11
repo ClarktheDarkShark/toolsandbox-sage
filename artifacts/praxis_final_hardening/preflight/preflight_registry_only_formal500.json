@@ -1,0 +1,168 @@
+{
+  "checks": [
+    {
+      "detail": "branch=review/praxis-final-hardening commit=cfe35647dbbb703b4508a709f75dfee0f1f85036",
+      "name": "git_state_known",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "clean",
+      "name": "git_worktree_clean",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "artifacts/praxis_final_hardening/registries/best3_reference/registry_manifest.json",
+      "name": "registry_manifest_exists:artifacts/praxis_final_hardening/registries/best3_reference",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "actual=76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf expected=76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf",
+      "name": "registry_sha_matches:praxis_review_best3_reference_copy",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "artifacts/praxis_final_hardening/registries/v2_6_reference/registry_manifest.json",
+      "name": "registry_manifest_exists:artifacts/praxis_final_hardening/registries/v2_6_reference",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "actual=ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582 expected=ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582",
+      "name": "registry_sha_matches:praxis_review_v2_6_reference_copy",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "artifacts/praxis_final_hardening/registries/praxis_bridgepack_frozen_candidate/registry_manifest.json",
+      "name": "registry_manifest_exists:artifacts/praxis_final_hardening/registries/praxis_bridgepack_frozen_candidate",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "actual=7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349 expected=7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+      "name": "registry_sha_matches:praxis_bridgepack_frozen_candidate",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "registry dirs are unique",
+      "name": "registry_selection_unambiguous",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+      "name": "manifest_exists",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "missing=[]",
+      "name": "manifest_required_fields",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "mode=full_benchmark count=500",
+      "name": "manifest_split_available",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "mode=full_benchmark",
+      "name": "final_mode_known",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "generation=off",
+      "name": "generation_disabled_for_final_run",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "control_cache=use-if-eligible",
+      "name": "control_cache_use_if_eligible",
+      "severity": "high",
+      "status": "pass"
+    },
+    {
+      "detail": "--allow-low-quality-cohort must not be used for final runs",
+      "name": "low_quality_override_disabled",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "active=[] diagnostic_mode=False",
+      "name": "diagnostic_force_env_absent",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "routing_evidence_mode=disabled",
+      "name": "routing_evidence_explicit_for_final",
+      "severity": "critical",
+      "status": "pass"
+    },
+    {
+      "detail": "outputs",
+      "name": "output_root_parent_exists",
+      "severity": "high",
+      "status": "pass"
+    },
+    {
+      "detail": "docs/sage_protocol/protocol_heuristics_v1.json",
+      "name": "heuristics_config_exists",
+      "severity": "high",
+      "status": "pass"
+    }
+  ],
+  "control_cache": "use-if-eligible",
+  "created_at_utc": "2026-05-11T02:36:54.973960+00:00",
+  "diagnostic_mode": false,
+  "generation": "off",
+  "git": {
+    "branch": "review/praxis-final-hardening",
+    "commit": "cfe35647dbbb703b4508a709f75dfee0f1f85036",
+    "dirty_entries": []
+  },
+  "manifest": {
+    "manifest_sha256": "093547e7a89e704e67d4cea85fd96511063becd0b5542ba3abf21c242453bbbf",
+    "manifest_type": "v2_1_formal_500_nonexternal_best3_scale",
+    "path": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+    "scenario_count": 500
+  },
+  "mode": "full_benchmark",
+  "passed": true,
+  "registries": [
+    {
+      "expected_sha256": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf",
+      "label": "praxis_review_best3_reference_copy",
+      "manifest": "artifacts/praxis_final_hardening/registries/best3_reference/registry_manifest.json",
+      "registry_dir": "artifacts/praxis_final_hardening/registries/best3_reference",
+      "sha256": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf"
+    },
+    {
+      "expected_sha256": "ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582",
+      "label": "praxis_review_v2_6_reference_copy",
+      "manifest": "artifacts/praxis_final_hardening/registries/v2_6_reference/registry_manifest.json",
+      "registry_dir": "artifacts/praxis_final_hardening/registries/v2_6_reference",
+      "sha256": "ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582"
+    },
+    {
+      "expected_sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+      "label": "praxis_bridgepack_frozen_candidate",
+      "manifest": "artifacts/praxis_final_hardening/registries/praxis_bridgepack_frozen_candidate/registry_manifest.json",
+      "registry_dir": "artifacts/praxis_final_hardening/registries/praxis_bridgepack_frozen_candidate",
+      "sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349"
+    }
+  ],
+  "routing_evidence_mode": "disabled",
+  "routing_evidence_path": null,
+  "run_affecting_sage_env": {},
+  "schema_version": "sage_final_run_preflight_v1"
+}

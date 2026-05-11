@@ -1,0 +1,195 @@
+{
+  "schema_version": "praxis_final_hardening_summary_v1",
+  "status": "blocked",
+  "decision_label": "BLOCKED: praxis_registry_only_side_effect_preservation_failures",
+  "review_branch": "review/praxis-final-hardening",
+  "protected_base_commit": "2898c7e502ec75ad5e1fc65c5ffe7a80f5605f4a",
+  "experimental_source_commit": "7793c8ca29ab4e121d302c777c4e4ad273226470",
+  "setup_commit_for_matched_runs": "cfe35647dbbb703b4508a709f75dfee0f1f85036",
+  "manifest": {
+    "path": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+    "sha256": "093547e7a89e704e67d4cea85fd96511063becd0b5542ba3abf21c242453bbbf",
+    "scenario_count": 500
+  },
+  "registries": {
+    "best3": {
+      "path": "artifacts/praxis_final_hardening/registries/best3_reference/registry_manifest.json",
+      "sha256": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf"
+    },
+    "v2_6": {
+      "path": "artifacts/praxis_final_hardening/registries/v2_6_reference/registry_manifest.json",
+      "sha256": "ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582"
+    },
+    "praxis": {
+      "path": "artifacts/praxis_final_hardening/registries/praxis_bridgepack_frozen_candidate/registry_manifest.json",
+      "sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349"
+    }
+  },
+  "run_controls": {
+    "generation": "off",
+    "openai_response_cache": "disabled",
+    "candidate_task_cache": "off",
+    "control_cache": "use-if-eligible",
+    "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "control_cache_counts_each_arm": {
+      "cached": 500,
+      "fresh": 0
+    },
+    "routing_evidence_mode": "disabled",
+    "diagnostic_force_call_env": "absent",
+    "low_quality_cohort_override": "absent"
+  },
+  "formal500": {
+    "best3": {
+      "run_root": "outputs/praxis_final_hardening/registry_only/best3_reference_formal500/full_benchmark_20260510_223731",
+      "outcome": 0.6552845567868469,
+      "run_vs_control_outcome_lift": 0.06041254065405349,
+      "canonical": 0.7227341549152954,
+      "exact_successes": 94,
+      "runtime_exceptions": 0,
+      "helper_side_effect_failures": 0,
+      "helper_visible": 203,
+      "helper_called": 123,
+      "helper_visible_not_called": 80
+    },
+    "v2_6": {
+      "run_root": "outputs/praxis_final_hardening/registry_only/v2_6_reference_formal500/full_benchmark_20260510_223731",
+      "outcome": 0.6642860969737152,
+      "run_vs_control_outcome_lift": 0.06941408084092172,
+      "canonical": 0.7135189746893282,
+      "exact_successes": 89,
+      "runtime_exceptions": 0,
+      "helper_side_effect_failures": 0,
+      "helper_visible": 291,
+      "helper_called": 163,
+      "helper_visible_not_called": 128
+    },
+    "praxis": {
+      "run_root": "outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731",
+      "outcome": 0.6961690038995895,
+      "run_vs_control_outcome_lift": 0.10129698776679598,
+      "canonical": 0.7226806032223035,
+      "exact_successes": 105,
+      "runtime_exceptions": 0,
+      "helper_side_effect_failures": 13,
+      "helper_visible": 552,
+      "helper_called": 205,
+      "helper_visible_not_called": 347
+    }
+  },
+  "pairwise_candidate_comparisons": {
+    "v2_6_minus_best3": {
+      "outcome_diff": 0.00900154018686824,
+      "ci95": [
+        -0.026156997651302357,
+        0.043690037448173714
+      ],
+      "p_value": 0.6029397060293971,
+      "canonical_diff": -0.009215180225967026,
+      "exact_diff": -0.01
+    },
+    "praxis_minus_best3": {
+      "outcome_diff": 0.04088444711274267,
+      "ci95": [
+        0.004696750184868375,
+        0.07821956319472771
+      ],
+      "p_value": 0.0282971702829717,
+      "canonical_diff": -5.355169299190438e-05,
+      "exact_diff": 0.022
+    },
+    "praxis_minus_v2_6": {
+      "outcome_diff": 0.03188290692587432,
+      "ci95": [
+        -0.00937620332626255,
+        0.0725757970414336
+      ],
+      "p_value": 0.11988801119888011,
+      "canonical_diff": 0.009161628532975122,
+      "exact_diff": 0.032
+    }
+  },
+  "side_effect_blocker": {
+    "report_path": "outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731/candidate/full_benchmark_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_10_2026_22_38_10/side_effect_preservation_report.jsonl",
+    "report_sha256": "81bf6ee740368bc83f8444f5c608e108d352f5029533d52695d4b430d5fd1aaa",
+    "failures": [
+      {
+        "scenario": "modify_contact_with_message_recency",
+        "helper": "select_message_counterparty_for_contact_update"
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_3_distraction_tools",
+        "helper": "plan_contact_relationship_batch_update"
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled",
+        "helper": "plan_contact_relationship_batch_update"
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+        "helper": "plan_contact_relationship_batch_update"
+      },
+      {
+        "scenario": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_tool_name_scrambled",
+        "helper": "next_weekday_time_to_timestamp"
+      },
+      {
+        "scenario": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_name_scrambled",
+        "helper": "plan_send_message_contact_lookup"
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_3_distraction_tools_tool_name_scrambled",
+        "helper": "plan_contact_relationship_batch_update"
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "helper": "plan_contact_relationship_batch_update"
+      },
+      {
+        "scenario": "modify_contact_with_message_recency_all_tools",
+        "helper": "select_message_counterparty_for_contact_update"
+      },
+      {
+        "scenario": "modify_contact_with_message_recency_alt",
+        "helper": "select_message_counterparty_for_contact_update"
+      },
+      {
+        "scenario": "modify_contact_with_message_recency_alt_10_distraction_tools",
+        "helper": "select_message_counterparty_for_contact_update"
+      },
+      {
+        "scenario": "modify_contact_with_message_recency_alt_3_distraction_tools",
+        "helper": "select_message_counterparty_for_contact_update"
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_alt_3_distraction_tools",
+        "helper": "plan_contact_relationship_batch_update"
+      }
+    ]
+  },
+  "treatment_classification": {
+    "registry_only_outcome_lift_reproduced": true,
+    "protected_claim_ready": false,
+    "actor_router_bridge_policy_imported": false,
+    "combined_registry_bridge_treatment_validated": false,
+    "classification": "registry-only outcome lift reproduced, safety-blocked by helper side-effect preservation failures"
+  },
+  "dashboard_checks_path": "artifacts/praxis_final_hardening/dashboard_checks.json",
+  "reports": {
+    "review": "docs/sage_protocol/praxis_final_hardening_review.md",
+    "audit": "docs/sage_protocol/praxis_treatment_dependency_audit.md",
+    "statistics": "docs/sage_protocol/praxis_matched_formal500_statistical_report.md",
+    "methodology_delta": "docs/sage_protocol/praxis_methodology_delta.md",
+    "blocker": "docs/sage_protocol/praxis_final_hardening_blocker_report.md"
+  },
+  "artifact_hashes": {
+    "docs/sage_protocol/praxis_final_hardening_review.md": "4c4199479772a7d885003a2ff184f0019ddd762b160790014a41098b26820f04",
+    "docs/sage_protocol/praxis_treatment_dependency_audit.md": "1068b5c8e1fa54529b8edb19dfb2a1d4f1c3d0ccf07e47cb50ea53346b0ce272",
+    "docs/sage_protocol/praxis_matched_formal500_statistical_report.md": "d604e710dc312aad3f8fbf57573ba719fa9fb48c4bf56be20c6076cd054fe257",
+    "docs/sage_protocol/praxis_methodology_delta.md": "2dd6aae00409a9a0c6448a7e18827acfcf954909b001e3aa2151c4ec14bdd636",
+    "docs/sage_protocol/praxis_final_hardening_blocker_report.md": "6e3abf6c451f0859588001c6591c45729ada21f952d703a3ae68e4c655c601fc",
+    "artifacts/praxis_final_hardening/praxis_matched_formal500_statistics.json": "1bd1d8068d54a7a4ed513538a457a174943261add61c2ea279eb72ffcbd5b0b0",
+    "artifacts/praxis_final_hardening/dashboard_checks.json": "76242d67abc41c3b4608c4aeacce70aa9da5560c218be92888359281977328d8",
+    "artifacts/praxis_final_hardening/preflight/preflight_registry_only_formal500.json": "f4913869aa740e2c80fbaf0f50523bff2c1f8b10e8a784574278df2d05e86786"
+  }
+}

@@ -1,0 +1,597 @@
+{
+  "arms": {
+    "best3": {
+      "candidate_exact_successes": 94,
+      "candidate_mean_outcome_similarity": 0.6552845567868469,
+      "candidate_mean_similarity": 0.7227341549152954,
+      "candidate_runtime_exceptions": 0,
+      "candidate_side_effect_failure_count": 0,
+      "candidate_side_effect_failures": [],
+      "control_cache": {
+        "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+        "cache_match_policy": "task_name_agent_user_base_tool_policy_min3",
+        "cached_control_tasks": 500,
+        "fresh_control_tasks": 0,
+        "source": "cached"
+      },
+      "dashboard": {
+        "index": "http://127.0.0.1:62331/outputs/praxis_final_hardening/registry_only/best3_reference_formal500/full_benchmark_20260510_223731/dashboard/index.html",
+        "task_compare": null,
+        "task_focus": "http://127.0.0.1:62331/outputs/praxis_final_hardening/registry_only/best3_reference_formal500/full_benchmark_20260510_223731/dashboard/task_focus.html"
+      },
+      "exact_success_delta_vs_control": 68,
+      "gain_count": 276,
+      "helper_called_total": 123,
+      "helper_counts": {
+        "relative_day_time_to_timestamp": {
+          "called_count": 45,
+          "called_subset_outcome_delta_mean": 0.2274677703249132,
+          "called_subset_outcome_delta_n": 42,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 51,
+          "visible_not_called_count": 6
+        },
+        "resolve_search_window_or_bounds": {
+          "called_count": 41,
+          "called_subset_outcome_delta_mean": 0.11535017610762724,
+          "called_subset_outcome_delta_n": 41,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 94,
+          "visible_not_called_count": 53
+        },
+        "select_record_by_timestamp_extreme": {
+          "called_count": 37,
+          "called_subset_outcome_delta_mean": 0.3353845070736297,
+          "called_subset_outcome_delta_n": 37,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 58,
+          "visible_not_called_count": 21
+        }
+      },
+      "helper_summary_sha256": "80756d0b79b899d7ae3211b02a73a0685dc9181693d45433a3f2d7c7fb460820",
+      "helper_visible_not_called_total": 80,
+      "helper_visible_total": 203,
+      "label": "best3 reference",
+      "mean_outcome_similarity_delta_vs_control": 0.06041254065405349,
+      "mean_similarity_delta_vs_control": 0.0527090175633145,
+      "outcome_gain_count": 172,
+      "outcome_preserved_count": 100,
+      "outcome_regression_count": 112,
+      "preserved_count": 78,
+      "registry_dir": "artifacts/praxis_final_hardening/registries/best3_reference",
+      "registry_sha256": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf",
+      "regression_count": 146,
+      "route_mismatch_qualified": false,
+      "run_controls": {
+        "active_diagnostic_force_env": [],
+        "generation_enabled": false,
+        "openai_response_cache_enabled": false,
+        "protocol_gate_passed": false,
+        "protocol_gate_reasons": [
+          "confirmation_outcome_delta_below_0_08",
+          "helper_call_share_below_25_percent"
+        ],
+        "routing_evidence_mode": "disabled"
+      },
+      "run_root": "outputs/praxis_final_hardening/registry_only/best3_reference_formal500/full_benchmark_20260510_223731",
+      "runtime_exception_count": 0
+    },
+    "praxis": {
+      "candidate_exact_successes": 105,
+      "candidate_mean_outcome_similarity": 0.6961690038995895,
+      "candidate_mean_similarity": 0.7226806032223035,
+      "candidate_runtime_exceptions": 0,
+      "candidate_side_effect_failure_count": 13,
+      "candidate_side_effect_failures": [
+        {
+          "canonical_similarity": 0.7561793303031576,
+          "outcome_similarity": 1.0,
+          "scenario": "modify_contact_with_message_recency",
+          "tools": [
+            "select_message_counterparty_for_contact_update"
+          ]
+        },
+        {
+          "canonical_similarity": 0.8956858720735327,
+          "outcome_similarity": 0.6621621621621622,
+          "scenario": "update_contact_relationship_with_relationship_3_distraction_tools",
+          "tools": [
+            "plan_contact_relationship_batch_update"
+          ]
+        },
+        {
+          "canonical_similarity": 0.8862112472885872,
+          "outcome_similarity": 0.6428571428571428,
+          "scenario": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled",
+          "tools": [
+            "plan_contact_relationship_batch_update"
+          ]
+        },
+        {
+          "canonical_similarity": 0.18797324564562806,
+          "outcome_similarity": 0.015038444142921756,
+          "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+          "tools": [
+            "plan_contact_relationship_batch_update"
+          ]
+        },
+        {
+          "canonical_similarity": 1.0,
+          "outcome_similarity": 1.0,
+          "scenario": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_tool_name_scrambled",
+          "tools": [
+            "next_weekday_time_to_timestamp"
+          ]
+        },
+        {
+          "canonical_similarity": 0.9748221566586271,
+          "outcome_similarity": 0.6904761904761906,
+          "scenario": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_name_scrambled",
+          "tools": [
+            "plan_send_message_contact_lookup"
+          ]
+        },
+        {
+          "canonical_similarity": 0.8883428806453656,
+          "outcome_similarity": 0.5,
+          "scenario": "update_contact_relationship_with_relationship_3_distraction_tools_tool_name_scrambled",
+          "tools": [
+            "plan_contact_relationship_batch_update"
+          ]
+        },
+        {
+          "canonical_similarity": 0.8023152703845918,
+          "outcome_similarity": 0.5523399014778325,
+          "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+          "tools": [
+            "plan_contact_relationship_batch_update"
+          ]
+        },
+        {
+          "canonical_similarity": 0.770116148096492,
+          "outcome_similarity": 1.0,
+          "scenario": "modify_contact_with_message_recency_all_tools",
+          "tools": [
+            "select_message_counterparty_for_contact_update"
+          ]
+        },
+        {
+          "canonical_similarity": 0.7486101413488081,
+          "outcome_similarity": 0.7051282051282051,
+          "scenario": "modify_contact_with_message_recency_alt",
+          "tools": [
+            "select_message_counterparty_for_contact_update"
+          ]
+        },
+        {
+          "canonical_similarity": 0.7486101413488081,
+          "outcome_similarity": 1.0,
+          "scenario": "modify_contact_with_message_recency_alt_10_distraction_tools",
+          "tools": [
+            "select_message_counterparty_for_contact_update"
+          ]
+        },
+        {
+          "canonical_similarity": 0.7397906218022025,
+          "outcome_similarity": 0.6707317073170731,
+          "scenario": "modify_contact_with_message_recency_alt_3_distraction_tools",
+          "tools": [
+            "select_message_counterparty_for_contact_update"
+          ]
+        },
+        {
+          "canonical_similarity": 1.0,
+          "outcome_similarity": 1.0,
+          "scenario": "update_contact_relationship_with_relationship_alt_3_distraction_tools",
+          "tools": [
+            "plan_contact_relationship_batch_update"
+          ]
+        }
+      ],
+      "control_cache": {
+        "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+        "cache_match_policy": "task_name_agent_user_base_tool_policy_min3",
+        "cached_control_tasks": 500,
+        "fresh_control_tasks": 0,
+        "source": "cached"
+      },
+      "dashboard": {
+        "index": "http://127.0.0.1:62333/outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731/dashboard/index.html",
+        "task_compare": null,
+        "task_focus": "http://127.0.0.1:62333/outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731/dashboard/task_focus.html"
+      },
+      "exact_success_delta_vs_control": 79,
+      "gain_count": 261,
+      "helper_called_total": 205,
+      "helper_counts": {
+        "days_between_timestamps": {
+          "called_count": 24,
+          "called_subset_outcome_delta_mean": 0.012400793650793654,
+          "called_subset_outcome_delta_n": 24,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 24,
+          "visible_not_called_count": 0
+        },
+        "next_weekday_time_to_timestamp": {
+          "called_count": 12,
+          "called_subset_outcome_delta_mean": 0.47908496732026146,
+          "called_subset_outcome_delta_n": 12,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 1,
+          "visible_count": 12,
+          "visible_not_called_count": 0
+        },
+        "plan_contact_lookup_query": {
+          "called_count": 14,
+          "called_subset_outcome_delta_mean": 0.045539666953602245,
+          "called_subset_outcome_delta_n": 14,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 24,
+          "visible_not_called_count": 10
+        },
+        "plan_contact_relationship_batch_update": {
+          "called_count": 16,
+          "called_subset_outcome_delta_mean": 0.25519768124891123,
+          "called_subset_outcome_delta_n": 16,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 6,
+          "visible_count": 19,
+          "visible_not_called_count": 3
+        },
+        "plan_contact_search_from_scalar_constraint": {
+          "called_count": 8,
+          "called_subset_outcome_delta_mean": 0.09558861451017542,
+          "called_subset_outcome_delta_n": 8,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 40,
+          "visible_not_called_count": 32
+        },
+        "plan_device_state_action_sequence_v3": {
+          "called_count": 0,
+          "called_subset_outcome_delta_mean": null,
+          "called_subset_outcome_delta_n": 0,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 110,
+          "visible_not_called_count": 110
+        },
+        "plan_send_message_contact_lookup": {
+          "called_count": 11,
+          "called_subset_outcome_delta_mean": 0.025710775457492594,
+          "called_subset_outcome_delta_n": 11,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 1,
+          "visible_count": 12,
+          "visible_not_called_count": 1
+        },
+        "relative_day_time_to_timestamp": {
+          "called_count": 46,
+          "called_subset_outcome_delta_mean": 0.23540427826142113,
+          "called_subset_outcome_delta_n": 42,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 51,
+          "visible_not_called_count": 5
+        },
+        "relative_weeks_time_to_timestamp": {
+          "called_count": 0,
+          "called_subset_outcome_delta_mean": null,
+          "called_subset_outcome_delta_n": 0,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 32,
+          "visible_not_called_count": 32
+        },
+        "resolve_search_window_or_bounds": {
+          "called_count": 36,
+          "called_subset_outcome_delta_mean": 0.08544166095283202,
+          "called_subset_outcome_delta_n": 36,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 106,
+          "visible_not_called_count": 70
+        },
+        "select_message_content_by_recency": {
+          "called_count": 11,
+          "called_subset_outcome_delta_mean": 0.5470761538222618,
+          "called_subset_outcome_delta_n": 11,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 52,
+          "visible_not_called_count": 41
+        },
+        "select_message_counterparty_for_contact_update": {
+          "called_count": 7,
+          "called_subset_outcome_delta_mean": 0.6740534301666249,
+          "called_subset_outcome_delta_n": 7,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 5,
+          "visible_count": 12,
+          "visible_not_called_count": 5
+        },
+        "select_record_by_timestamp_extreme": {
+          "called_count": 20,
+          "called_subset_outcome_delta_mean": 0.0752333111272994,
+          "called_subset_outcome_delta_n": 20,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 58,
+          "visible_not_called_count": 38
+        }
+      },
+      "helper_summary_sha256": "964a50d9180b973952079ae75da16d4adbb5933c6e544ee8bad4a223cbba1c4e",
+      "helper_visible_not_called_total": 347,
+      "helper_visible_total": 552,
+      "label": "Praxis frozen BridgePack",
+      "mean_outcome_similarity_delta_vs_control": 0.10129698776679598,
+      "mean_similarity_delta_vs_control": 0.0526554658703227,
+      "outcome_gain_count": 185,
+      "outcome_preserved_count": 97,
+      "outcome_regression_count": 102,
+      "preserved_count": 74,
+      "registry_dir": "artifacts/praxis_final_hardening/registries/praxis_bridgepack_frozen_candidate",
+      "registry_sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+      "regression_count": 165,
+      "route_mismatch_qualified": false,
+      "run_controls": {
+        "active_diagnostic_force_env": [],
+        "generation_enabled": false,
+        "openai_response_cache_enabled": false,
+        "protocol_gate_passed": true,
+        "protocol_gate_reasons": [],
+        "routing_evidence_mode": "disabled"
+      },
+      "run_root": "outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731",
+      "runtime_exception_count": 0
+    },
+    "v2_6": {
+      "candidate_exact_successes": 89,
+      "candidate_mean_outcome_similarity": 0.6642860969737152,
+      "candidate_mean_similarity": 0.7135189746893282,
+      "candidate_runtime_exceptions": 0,
+      "candidate_side_effect_failure_count": 0,
+      "candidate_side_effect_failures": [],
+      "control_cache": {
+        "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+        "cache_match_policy": "task_name_agent_user_base_tool_policy_min3",
+        "cached_control_tasks": 500,
+        "fresh_control_tasks": 0,
+        "source": "cached"
+      },
+      "dashboard": {
+        "index": "http://127.0.0.1:62332/outputs/praxis_final_hardening/registry_only/v2_6_reference_formal500/full_benchmark_20260510_223731/dashboard/index.html",
+        "task_compare": null,
+        "task_focus": "http://127.0.0.1:62332/outputs/praxis_final_hardening/registry_only/v2_6_reference_formal500/full_benchmark_20260510_223731/dashboard/task_focus.html"
+      },
+      "exact_success_delta_vs_control": 63,
+      "gain_count": 258,
+      "helper_called_total": 163,
+      "helper_counts": {
+        "extract_contact_field_from_search_result": {
+          "called_count": 7,
+          "called_subset_outcome_delta_mean": 0.13721316277707257,
+          "called_subset_outcome_delta_n": 7,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 24,
+          "visible_not_called_count": 17
+        },
+        "plan_contact_lookup_query": {
+          "called_count": 11,
+          "called_subset_outcome_delta_mean": 0.3185901864883889,
+          "called_subset_outcome_delta_n": 11,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 24,
+          "visible_not_called_count": 13
+        },
+        "plan_contact_search_from_scalar_constraint": {
+          "called_count": 13,
+          "called_subset_outcome_delta_mean": 0.05879351303978194,
+          "called_subset_outcome_delta_n": 13,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 40,
+          "visible_not_called_count": 27
+        },
+        "relative_day_time_to_timestamp": {
+          "called_count": 47,
+          "called_subset_outcome_delta_mean": 0.260658041145846,
+          "called_subset_outcome_delta_n": 41,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 51,
+          "visible_not_called_count": 4
+        },
+        "resolve_search_window_or_bounds": {
+          "called_count": 43,
+          "called_subset_outcome_delta_mean": 0.16311771385432125,
+          "called_subset_outcome_delta_n": 43,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 94,
+          "visible_not_called_count": 51
+        },
+        "select_record_by_timestamp_extreme": {
+          "called_count": 42,
+          "called_subset_outcome_delta_mean": 0.28047788967447496,
+          "called_subset_outcome_delta_n": 42,
+          "failed_attempt_count": 0,
+          "runtime_incident_count": 0,
+          "side_effect_incident_count": 0,
+          "visible_count": 58,
+          "visible_not_called_count": 16
+        }
+      },
+      "helper_summary_sha256": "7181e3742d409cb7e05c9852ab374f61a7303b337daec8202340e03c9faf8b8a",
+      "helper_visible_not_called_total": 128,
+      "helper_visible_total": 291,
+      "label": "V2.6 reference",
+      "mean_outcome_similarity_delta_vs_control": 0.06941408084092172,
+      "mean_similarity_delta_vs_control": 0.04349383733734748,
+      "outcome_gain_count": 182,
+      "outcome_preserved_count": 97,
+      "outcome_regression_count": 105,
+      "preserved_count": 80,
+      "registry_dir": "artifacts/praxis_final_hardening/registries/v2_6_reference",
+      "registry_sha256": "ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582",
+      "regression_count": 162,
+      "route_mismatch_qualified": false,
+      "run_controls": {
+        "active_diagnostic_force_env": [],
+        "generation_enabled": false,
+        "openai_response_cache_enabled": false,
+        "protocol_gate_passed": false,
+        "protocol_gate_reasons": [
+          "confirmation_outcome_delta_below_0_08"
+        ],
+        "routing_evidence_mode": "disabled"
+      },
+      "run_root": "outputs/praxis_final_hardening/registry_only/v2_6_reference_formal500/full_benchmark_20260510_223731",
+      "runtime_exception_count": 0
+    }
+  },
+  "conclusion": {
+    "blocker": "Praxis registry-only run had 13 helper side-effect preservation failures under the protected-base checker.",
+    "praxis_protected_claim_ready": false,
+    "praxis_reproduced_outcome_lift": true
+  },
+  "pairwise": [
+    {
+      "canonical_difference_right_minus_left": {
+        "ci95_high": 0.013955539550535507,
+        "ci95_low": -0.03229181493588143,
+        "mean": -0.009215180225967026,
+        "permutation_p_value_two_sided": 0.43865613438656137,
+        "preserved_tie": 240,
+        "right_gain": 124,
+        "right_regression": 136,
+        "rounds": 5000.0
+      },
+      "exact_success_difference_right_minus_left": {
+        "ci95_high": 0.014,
+        "ci95_low": -0.034,
+        "mean": -0.01,
+        "permutation_p_value_two_sided": 0.502049795020498,
+        "preserved_tie": 465,
+        "right_gain": 15,
+        "right_regression": 20,
+        "rounds": 5000.0
+      },
+      "left": "best3",
+      "n": 500,
+      "outcome_difference_right_minus_left": {
+        "ci95_high": 0.043690037448173714,
+        "ci95_low": -0.026156997651302357,
+        "mean": 0.00900154018686824,
+        "permutation_p_value_two_sided": 0.6029397060293971,
+        "preserved_tie": 198,
+        "right_gain": 92,
+        "right_regression": 94,
+        "rounds": 5000.0
+      },
+      "outcome_n": 384,
+      "right": "v2_6"
+    },
+    {
+      "canonical_difference_right_minus_left": {
+        "ci95_high": 0.025277924723905977,
+        "ci95_low": -0.02635266389954525,
+        "mean": -5.355169299180024e-05,
+        "permutation_p_value_two_sided": 0.9956004399560044,
+        "preserved_tie": 208,
+        "right_gain": 156,
+        "right_regression": 136,
+        "rounds": 5000.0
+      },
+      "exact_success_difference_right_minus_left": {
+        "ci95_high": 0.05,
+        "ci95_low": -0.006,
+        "mean": 0.022,
+        "permutation_p_value_two_sided": 0.1688831116888311,
+        "preserved_tie": 447,
+        "right_gain": 32,
+        "right_regression": 21,
+        "rounds": 5000.0
+      },
+      "left": "best3",
+      "n": 500,
+      "outcome_difference_right_minus_left": {
+        "ci95_high": 0.07822014796523505,
+        "ci95_low": 0.004697377612623338,
+        "mean": 0.04088444711274251,
+        "permutation_p_value_two_sided": 0.0282971702829717,
+        "preserved_tie": 199,
+        "right_gain": 106,
+        "right_regression": 79,
+        "rounds": 5000.0
+      },
+      "outcome_n": 384,
+      "right": "praxis"
+    },
+    {
+      "canonical_difference_right_minus_left": {
+        "ci95_high": 0.03515213721962011,
+        "ci95_low": -0.01743260849764397,
+        "mean": 0.009161628532975225,
+        "permutation_p_value_two_sided": 0.49775022497750226,
+        "preserved_tie": 201,
+        "right_gain": 164,
+        "right_regression": 135,
+        "rounds": 5000.0
+      },
+      "exact_success_difference_right_minus_left": {
+        "ci95_high": 0.06,
+        "ci95_low": 0.004,
+        "mean": 0.032,
+        "permutation_p_value_two_sided": 0.046295370462953706,
+        "preserved_tie": 444,
+        "right_gain": 36,
+        "right_regression": 20,
+        "rounds": 5000.0
+      },
+      "left": "v2_6",
+      "n": 500,
+      "outcome_difference_right_minus_left": {
+        "ci95_high": 0.07257646448344483,
+        "ci95_low": -0.009376173204784498,
+        "mean": 0.03188290692587426,
+        "permutation_p_value_two_sided": 0.11988801119888011,
+        "preserved_tie": 178,
+        "right_gain": 113,
+        "right_regression": 93,
+        "rounds": 5000.0
+      },
+      "outcome_n": 384,
+      "right": "praxis"
+    }
+  ],
+  "schema_version": "praxis_final_hardening_stats_v1"
+}
