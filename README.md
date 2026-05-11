@@ -94,6 +94,8 @@ Example clean review run:
 ```bash
 export PYTHONPATH=src:.
 export SAGE_PRAXIS_BRIDGE_POLICY=combined
+export TOOLSANDBOX_RAPID_CACHE_MODE=read_only
+export TOOLSANDBOX_RAPID_CACHE_PATH=.secrets/rapid_api_cache.json
 
 python scripts/run_sage_protocol.py \
   --mode validate_100 \
@@ -113,6 +115,14 @@ Controls may use eligible task-level baseline cache; candidate/SAGE arms must
 remain fresh. Task Compare is the default dashboard for new runs and includes
 canonical lift, outcome lift, per-task comparisons, and generated-tool
 contribution details.
+
+When external location/weather/search tasks are in scope, use the ToolSandbox
+RapidAPI cache in `read_only` mode to avoid quota spend during review gates.
+The local cache file remains under ignored `.secrets/`; document its SHA-256,
+source run, and hit/miss policy in the run report. A read-only cache miss should
+fail visibly rather than falling through to live RapidAPI calls. This cache is
+external-service data, not SAGE task-output evidence; SAGE/candidate task cache
+must still remain off for evidence arms.
 
 ---
 

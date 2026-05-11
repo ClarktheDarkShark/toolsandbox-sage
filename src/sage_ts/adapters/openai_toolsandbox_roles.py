@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import ast
+import json
 import os
+import re
 import time
 from typing import Any, Iterable, Literal, Mapping, Union, cast
 
@@ -23,6 +26,7 @@ from openai.types.chat import (
 from openai.types.chat.chat_completion import Choice
 
 from sage_ts.config.models import resolve_model_name
+from tool_sandbox.common.execution_context import get_current_context
 from tool_sandbox.common.utils import all_logging_disabled
 from tool_sandbox.roles.openai_api_agent import OpenAIAPIAgent
 from tool_sandbox.roles.openai_api_user import OpenAIAPIUser
@@ -32,10 +36,14 @@ DERIVED_ACTOR_POLICY_SENTINEL = "[SAGE derived-value actor policy]"
 LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL = "[SAGE lookup-planner actor policy]"
 SEARCH_WINDOW_ACTOR_POLICY_SENTINEL = "[SAGE search-window actor policy]"
 RELATIVE_TIME_ACTOR_POLICY_SENTINEL = "[SAGE relative-time actor policy]"
+STATE_ACTION_ACTOR_POLICY_SENTINEL = "[SAGE state-action actor policy]"
+SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL = "[SAGE scheduling-timestamp actor policy]"
 SAFE_ARGUMENT_ACTOR_POLICY_SENTINEL = "[SAGE safe-argument actor policy]"
 ANSWER_RETENTION_ACTOR_POLICY_SENTINEL = "[SAGE answer-retention actor policy]"
 TEMPORAL_ANCHOR_ACTOR_POLICY_SENTINEL = "[SAGE temporal-anchor actor policy]"
+CRUD_SUCCESS_ACTOR_POLICY_SENTINEL = "[SAGE CRUD-success actor policy]"
 PRAXIS_BRIDGE_POLICY_ENV = "SAGE_PRAXIS_BRIDGE_POLICY"
+DEFAULT_LOCAL_UTC_OFFSET_HOURS = -4
 OpenAIMessage = dict[
     Literal["role", "content", "tool_call_id", "name", "tool_calls"],
     Any,
@@ -85,6 +93,13 @@ ORIGINAL_TOOLSANDBOX_TOOL_NAMES = {
     "unit_conversion",
 }
 
+SETTING_SETTER_TOOL_NAMES = {
+    "set_cellular_service_status",
+    "set_location_service_status",
+    "set_low_battery_mode_status",
+    "set_wifi_status",
+}
+
 
 def _praxis_bridge_policy_enabled() -> bool:
     raw = os.environ.get(PRAXIS_BRIDGE_POLICY_ENV, "").strip().lower()
@@ -117,10 +132,40 @@ def _tool_names(
     return names
 
 
+def _agent_facing_tool_name(tool_name: str) -> str:
+    if not tool_name:
+        return tool_name
+    try:
+        return str(get_current_context().get_agent_facing_tool_name(tool_name))
+    except Exception:
+        return tool_name
+
+
+def _execution_facing_tool_name(tool_name: str) -> str:
+    if not tool_name:
+        return tool_name
+    try:
+        return str(get_current_context().get_execution_facing_tool_name(tool_name))
+    except Exception:
+        return tool_name
+
+
+def _tool_names_execution_facing(openai_tools: object) -> set[str]:
+    return {_execution_facing_tool_name(name) for name in _tool_names(openai_tools)}
+
+
+def _tool_name_for_call(openai_tools: object, execution_tool_name: str) -> str:
+    for name in _tool_names(openai_tools):
+        if _execution_facing_tool_name(name) == execution_tool_name:
+            return name
+    return _agent_facing_tool_name(execution_tool_name)
+
+
 def _message_already_called_tool(
     openai_messages: object,
     tool_name: str,
 ) -> bool:
+    target_tool_name = _execution_facing_tool_name(tool_name)
     for message in cast(Iterable[Mapping[str, Any]], openai_messages):
         tool_calls = message.get("tool_calls")
         if not isinstance(tool_calls, list):
@@ -129,7 +174,11 @@ def _message_already_called_tool(
             if not isinstance(tool_call, dict):
                 continue
             function = tool_call.get("function")
-            if isinstance(function, dict) and function.get("name") == tool_name:
+            if (
+                isinstance(function, dict)
+                and _execution_facing_tool_name(str(function.get("name", "") or ""))
+                == target_tool_name
+            ):
                 return True
     return False
 
@@ -371,6 +420,70 @@ def _relative_time_tool_names(openai_tools: object) -> set[str]:
     return helpers
 
 
+def _scheduling_timestamp_tool_names(openai_tools: object) -> set[str]:
+    """Return helpers that produce reminder timestamps from scheduling phrases."""
+    if openai_tools is NOT_GIVEN:
+        return set()
+    helpers: set[str] = set()
+    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
+        function = tool.get("function", {})
+        if not isinstance(function, dict):
+            continue
+        name = function.get("name")
+        description = str(function.get("description", "")).lower()
+        parameters = function.get("parameters", {})
+        properties: object = {}
+        if isinstance(parameters, dict):
+            properties = parameters.get("properties", {})
+        input_names = set(properties) if isinstance(properties, dict) else set()
+        if not isinstance(name, str):
+            continue
+        is_scheduling_timestamp_helper = name in {
+            "next_weekday_time_to_timestamp",
+            "relative_weeks_time_to_timestamp",
+            "weeks_from_now_time_to_timestamp",
+            "week_delta_time_to_timestamp",
+            "weekday_delta_time_to_timestamp",
+        } or (
+            {"current_timestamp", "hour", "minute", "local_utc_offset_hours"}.issubset(
+                input_names
+            )
+            and "reminder_timestamp" in description
+            and any(token in description for token in ("week", "weekday", "scheduling"))
+        )
+        if is_scheduling_timestamp_helper:
+            helpers.add(name)
+    return helpers
+
+
+def _state_action_planner_tool_names(openai_tools: object) -> set[str]:
+    """Return helpers that plan original device-state setter calls."""
+    if openai_tools is NOT_GIVEN:
+        return set()
+    helpers: set[str] = set()
+    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
+        function = tool.get("function", {})
+        if not isinstance(function, dict):
+            continue
+        name = function.get("name")
+        description = str(function.get("description", "")).lower()
+        parameters = function.get("parameters", {})
+        properties: object = {}
+        if isinstance(parameters, dict):
+            properties = parameters.get("properties", {})
+        input_names = set(properties) if isinstance(properties, dict) else set()
+        if not isinstance(name, str):
+            continue
+        is_state_action_planner = name == "plan_device_state_action_sequence" or (
+            name.startswith("plan_device_state_action_sequence")
+            and {"user_request", "visible_state_or_error"}.issubset(input_names)
+            and "state action sequence" in description
+        )
+        if is_state_action_planner:
+            helpers.add(name)
+    return helpers
+
+
 def _tool_content_has_candidate_records(content: object) -> bool:
     text = str(content or "").strip()
     if not text or text.lower() in {"[]", "{}", "null", "none"}:
@@ -443,7 +556,7 @@ def _messages_show_prior_candidate_records(openai_messages: object) -> bool:
     for message in cast(Iterable[Mapping[str, Any]], openai_messages):
         if message.get("role") != "tool":
             continue
-        name = str(message.get("name", ""))
+        name = _execution_facing_tool_name(str(message.get("name", "") or ""))
         if not name.startswith(("search_", "get_", "find_")):
             continue
         if _tool_content_has_candidate_records(message.get("content")):
@@ -455,7 +568,7 @@ def _messages_show_prior_structured_payload(openai_messages: object) -> bool:
     for message in cast(Iterable[Mapping[str, Any]], openai_messages):
         if message.get("role") != "tool":
             continue
-        name = str(message.get("name", ""))
+        name = _execution_facing_tool_name(str(message.get("name", "") or ""))
         if name.startswith(("search_", "get_", "find_", "convert_", "calculate_")):
             if _tool_content_has_structured_payload(message.get("content")):
                 return True
@@ -471,29 +584,29 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
             break
     if not latest_user:
         return False
-    if "?" in latest_user or any(
-        token in latest_user
-        for token in (
-            "can you",
-            "could you",
-            "you can",
-            "what ",
-            "why ",
-            "how ",
-            "search",
-            "find",
-            "look for",
-            "look up",
-            "list",
-            "show",
-            "check",
-            "add ",
-            "remove ",
-            "modify ",
-            "send ",
-            "turn on",
-            "turn off",
-        )
+    question_starts = ("what ", "why ", "how ", "who ", "when ", "where ")
+    command_tokens = (
+        "can you",
+        "could you",
+        "you can",
+        "search",
+        "find",
+        "look for",
+        "look up",
+        "list",
+        "show",
+        "check",
+        "add ",
+        "remove ",
+        "modify ",
+        "send ",
+        "turn on",
+        "turn off",
+    )
+    if (
+        "?" in latest_user
+        or latest_user.startswith(question_starts)
+        or any(token in latest_user for token in command_tokens)
     ):
         return False
     words = set(
@@ -546,6 +659,577 @@ def _answer_retention_response_text(openai_messages: object) -> str | None:
     if len(answer) > 280:
         answer = answer[:277].rstrip() + "..."
     return f"You're welcome. To recap: {answer}"
+
+
+def _latest_user_request_text(openai_messages: object) -> str:
+    for message in reversed(list(cast(Iterable[Mapping[str, Any]], openai_messages))):
+        if message.get("role") == "user":
+            return str(message.get("content", "") or "")
+    return ""
+
+
+def _tool_call_function_name_and_arguments(
+    tool_call: Mapping[str, Any],
+) -> tuple[str, dict[str, Any]]:
+    function = tool_call.get("function")
+    if not isinstance(function, Mapping):
+        return "", {}
+    name = str(function.get("name", "") or "")
+    try:
+        arguments = json.loads(str(function.get("arguments", "{}") or "{}"))
+    except json.JSONDecodeError:
+        arguments = {}
+    return name, arguments if isinstance(arguments, dict) else {}
+
+
+def _latest_successful_setting_tool_call(
+    openai_messages: object,
+) -> tuple[str, Mapping[str, Any]] | None:
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    tool_call_args_by_id: dict[str, tuple[str, Mapping[str, Any]]] = {}
+    for message in messages:
+        if message.get("role") == "assistant":
+            for tool_call in message.get("tool_calls") or []:
+                if not isinstance(tool_call, Mapping):
+                    continue
+                tool_id = str(tool_call.get("id", "") or "")
+                name, arguments = _tool_call_function_name_and_arguments(tool_call)
+                execution_name = _execution_facing_tool_name(name)
+                if tool_id and execution_name in SETTING_SETTER_TOOL_NAMES:
+                    tool_call_args_by_id[tool_id] = (execution_name, arguments)
+    for message in reversed(messages):
+        if message.get("role") != "tool":
+            continue
+        tool_id = str(message.get("tool_call_id", "") or "")
+        name = _execution_facing_tool_name(str(message.get("name", "") or ""))
+        if name not in SETTING_SETTER_TOOL_NAMES:
+            continue
+        content = str(message.get("content", "") or "").strip().lower()
+        if "error" in content or "exception" in content:
+            continue
+        if tool_id in tool_call_args_by_id:
+            return tool_call_args_by_id[tool_id]
+        return (name, {})
+    return None
+
+
+def _latest_successful_crud_tool_call(
+    openai_messages: object,
+) -> tuple[str, Mapping[str, Any]] | None:
+    crud_names = {
+        "add_contact",
+        "modify_contact",
+        "remove_contact",
+        "add_reminder",
+        "modify_reminder",
+        "remove_reminder",
+    }
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    tool_call_args_by_id: dict[str, tuple[str, Mapping[str, Any]]] = {}
+    for message in messages:
+        if message.get("role") == "assistant":
+            for tool_call in message.get("tool_calls") or []:
+                if not isinstance(tool_call, Mapping):
+                    continue
+                tool_id = str(tool_call.get("id", "") or "")
+                name, arguments = _tool_call_function_name_and_arguments(tool_call)
+                execution_name = _execution_facing_tool_name(name)
+                if tool_id and execution_name in crud_names:
+                    tool_call_args_by_id[tool_id] = (execution_name, arguments)
+    for message in reversed(messages):
+        if message.get("role") != "tool":
+            continue
+        tool_id = str(message.get("tool_call_id", "") or "")
+        name = _execution_facing_tool_name(str(message.get("name", "") or ""))
+        if name not in crud_names:
+            continue
+        content = str(message.get("content", "") or "").strip().lower()
+        if "error" in content or "exception" in content:
+            continue
+        if tool_id in tool_call_args_by_id:
+            return tool_call_args_by_id[tool_id]
+        return (name, {})
+    return None
+
+
+def _latest_tool_success_content(openai_messages: object) -> str | None:
+    for message in reversed(list(cast(Iterable[Mapping[str, Any]], openai_messages))):
+        if message.get("role") != "tool":
+            continue
+        name = _execution_facing_tool_name(str(message.get("name", "") or ""))
+        if name not in ORIGINAL_TOOLSANDBOX_TOOL_NAMES:
+            continue
+        content = str(message.get("content", "") or "").strip()
+        lower = content.lower()
+        if "error" in lower or "exception" in lower:
+            return None
+        return content
+    return None
+
+
+def _latest_prior_tool_call_arguments(
+    openai_messages: object,
+    tool_name: str,
+) -> dict[str, Any]:
+    target = _execution_facing_tool_name(tool_name)
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    for message in reversed(messages[:-1]):
+        tool_calls = message.get("tool_calls")
+        if not isinstance(tool_calls, list):
+            continue
+        for tool_call in reversed(tool_calls):
+            if not isinstance(tool_call, Mapping):
+                continue
+            name, arguments = _tool_call_function_name_and_arguments(tool_call)
+            if _execution_facing_tool_name(name) == target:
+                return arguments
+    return {}
+
+
+def _parse_mapping_payload(content: object) -> dict[str, Any]:
+    text = str(content or "").strip()
+    if not text:
+        return {}
+    try:
+        value = ast.literal_eval(text)
+    except (SyntaxError, ValueError):
+        try:
+            value = json.loads(text)
+        except json.JSONDecodeError:
+            return {}
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _latest_tool_payload_by_name(
+    openai_messages: object,
+    tool_name: str,
+) -> dict[str, Any]:
+    target = _execution_facing_tool_name(tool_name)
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    for message in reversed(messages[:-1]):
+        name = _execution_facing_tool_name(str(message.get("name", "") or ""))
+        if message.get("role") == "tool" and name == target:
+            return _parse_mapping_payload(message.get("content"))
+    return {}
+
+
+def _parse_sequence_payload(content: object) -> list[Any]:
+    text = str(content or "").strip()
+    if not text:
+        return []
+    try:
+        value = ast.literal_eval(text)
+    except (SyntaxError, ValueError):
+        try:
+            value = json.loads(text)
+        except json.JSONDecodeError:
+            return []
+    return list(value) if isinstance(value, list) else []
+
+
+def _latest_tool_message(
+    openai_messages: object,
+    tool_name: str,
+) -> Mapping[str, Any] | None:
+    target = _execution_facing_tool_name(tool_name)
+    for message in reversed(list(cast(Iterable[Mapping[str, Any]], openai_messages))):
+        name = _execution_facing_tool_name(str(message.get("name", "") or ""))
+        if message.get("role") == "tool" and name == target:
+            return message
+    return None
+
+
+def _latest_tool_payload_by_name_including_latest(
+    openai_messages: object,
+    tool_name: str,
+) -> dict[str, Any]:
+    message = _latest_tool_message(openai_messages, tool_name)
+    if message is None:
+        return {}
+    return _parse_mapping_payload(message.get("content"))
+
+
+def _latest_tool_message_index(
+    openai_messages: object,
+    tool_names: set[str],
+) -> tuple[int, Mapping[str, Any]] | None:
+    targets = {_execution_facing_tool_name(name) for name in tool_names}
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    for index in range(len(messages) - 1, -1, -1):
+        message = messages[index]
+        name = _execution_facing_tool_name(str(message.get("name", "") or ""))
+        if message.get("role") == "tool" and name in targets:
+            return index, message
+    return None
+
+
+def _state_sequence_actions(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    raw_sequence = payload.get("action_sequence")
+    actions: list[dict[str, Any]] = []
+    if isinstance(raw_sequence, list):
+        for item in raw_sequence:
+            if not isinstance(item, Mapping):
+                continue
+            tool_name = str(item.get("tool_name", "") or "")
+            arguments = item.get("arguments")
+            if tool_name in SETTING_SETTER_TOOL_NAMES and isinstance(
+                arguments, Mapping
+            ):
+                actions.append({"tool_name": tool_name, "arguments": dict(arguments)})
+    if actions:
+        return actions[:4]
+    tool_name = str(payload.get("tool_name", "") or "")
+    arguments = payload.get("arguments")
+    if tool_name in SETTING_SETTER_TOOL_NAMES and isinstance(arguments, Mapping):
+        return [{"tool_name": tool_name, "arguments": dict(arguments)}]
+    return []
+
+
+def _arguments_match(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> bool:
+    for key, value in expected.items():
+        if actual.get(key) != value:
+            return False
+    return True
+
+
+def _state_action_sequence_next_action(
+    openai_messages: object,
+    openai_tools: object,
+) -> dict[str, Any] | None:
+    helper_names = _state_action_planner_tool_names(openai_tools)
+    if not helper_names:
+        return None
+    latest_plan = _latest_tool_message_index(openai_messages, helper_names)
+    if latest_plan is None:
+        return None
+    plan_index, plan_message = latest_plan
+    payload = _parse_mapping_payload(plan_message.get("content"))
+    if not payload or not bool(payload.get("should_call")):
+        return None
+    actions = _state_sequence_actions(payload)
+    if not actions:
+        return None
+
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    latest = messages[-1] if messages else {}
+    latest_name = _execution_facing_tool_name(str(latest.get("name", "") or ""))
+    if latest.get("role") == "tool" and latest_name in SETTING_SETTER_TOOL_NAMES:
+        if _latest_tool_success_content(openai_messages) is None:
+            return None
+
+    completed = 0
+    for message in messages[plan_index + 1 :]:
+        tool_calls = message.get("tool_calls")
+        if not isinstance(tool_calls, list):
+            continue
+        for tool_call in tool_calls:
+            if not isinstance(tool_call, Mapping) or completed >= len(actions):
+                continue
+            name, arguments = _tool_call_function_name_and_arguments(tool_call)
+            expected = actions[completed]
+            if _execution_facing_tool_name(name) == expected[
+                "tool_name"
+            ] and _arguments_match(expected["arguments"], arguments):
+                completed += 1
+    if completed >= len(actions):
+        return None
+    return actions[completed]
+
+
+def _join_visible_names(names: list[str]) -> str:
+    if not names:
+        return ""
+    if len(names) == 1:
+        return names[0]
+    if len(names) == 2:
+        return f"{names[0]} and {names[1]}"
+    return f"{', '.join(names[:-1])}, and {names[-1]}"
+
+
+def _relationship_plural(relationship: object) -> str:
+    value = str(relationship or "").strip().lower().replace("_", " ")
+    if not value:
+        return "contacts"
+    irregular = {"enemy": "enemies", "friend": "friends"}
+    if value in irregular:
+        return irregular[value]
+    if value.endswith("y"):
+        return f"{value[:-1]}ies"
+    return f"{value}s"
+
+
+def _selected_contact_names(payload: Mapping[str, Any] | None) -> list[str]:
+    if not payload:
+        return []
+    contacts = payload.get("selected_contacts")
+    if not isinstance(contacts, list):
+        return []
+    names: list[str] = []
+    for contact in contacts:
+        if not isinstance(contact, Mapping):
+            continue
+        name = str(contact.get("name") or "").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _contact_relationship_batch_success_response(
+    openai_messages: object,
+    *,
+    relationship: str,
+) -> str | None:
+    plan = _latest_tool_payload_by_name(
+        openai_messages, "plan_contact_relationship_batch_update"
+    )
+    user_request = _latest_user_request_text(openai_messages).lower()
+    prior_user_text = " ".join(
+        str(message.get("content", "") or "").lower()
+        for message in cast(Iterable[Mapping[str, Any]], openai_messages)
+        if message.get("role") == "user"
+    )
+    names = _selected_contact_names(plan)
+    source_relationship = str(plan.get("source_relationship") or "").strip().lower()
+    target_plural = _relationship_plural(relationship)
+    asked_names_first = "who are my" in prior_user_text
+    pronoun_followup = any(token in user_request for token in ("them", "back", "again"))
+    if names and (asked_names_first or pronoun_followup):
+        suffix = " again." if relationship == "friend" and pronoun_followup else ""
+        return f"{_join_visible_names(names)} are now your {target_plural}{suffix}"
+    if source_relationship and any(
+        token in f" {user_request} " for token in (" all ", " every ", " each ")
+    ):
+        return (
+            f"All your {_relationship_plural(source_relationship)} are now your "
+            f"{target_plural}"
+        )
+    if names:
+        return f"{_join_visible_names(names)} are now your {target_plural}"
+    return None
+
+
+def _normalize_visible_phone(raw: object) -> str:
+    value = str(raw or "").strip()
+    if not value:
+        return ""
+    digits = "".join(ch for ch in value if ch.isdigit())
+    if not digits:
+        return value
+    if value.startswith("+"):
+        return "+" + digits
+    if len(digits) == 11 and digits.startswith("1"):
+        return "+" + digits
+    if len(digits) == 10:
+        return "+1" + digits
+    return value
+
+
+def _extract_phone_from_text(text: str) -> str:
+    match = re.search(r"\+?\d[\d\s().-]{6,}\d", text)
+    return _normalize_visible_phone(match.group(0)) if match else ""
+
+
+def _extract_person_id_from_text(text: str) -> str:
+    match = re.search(
+        r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+        r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
+        text,
+    )
+    return match.group(0) if match else ""
+
+
+def _extract_add_contact_name_from_text(text: str) -> str:
+    match = re.search(
+        r"\badd\s+(.+?)\s+to\s+my\s+contact\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return ""
+    name = match.group(1).strip(" .,:;")
+    return re.sub(r"\s+", " ", name)
+
+
+def _scrambled_crud_success_response_text(openai_messages: object) -> str | None:
+    content = _latest_tool_success_content(openai_messages)
+    if content is None:
+        return None
+    user_request = _latest_user_request_text(openai_messages)
+    lower_request = user_request.lower()
+    if "contact" not in lower_request and "person with id" not in lower_request:
+        return None
+    phone = _extract_phone_from_text(user_request)
+    if "add" in lower_request and content.strip("'\" "):
+        name = _extract_add_contact_name_from_text(user_request)
+        if name:
+            return f"{name} has been added to your contact"
+    if "phone" in lower_request and content.lower() in {"", "none", "null"}:
+        person_id = _extract_person_id_from_text(user_request)
+        if person_id and phone:
+            return f"{person_id}'s phone number have been updated to {phone}"
+    return None
+
+
+def _crud_success_response_text(
+    openai_messages: object,
+    openai_tools: object,
+) -> str | None:
+    """Stop post-side-effect drift after an original CRUD tool succeeds."""
+    if not _praxis_bridge_policy_enabled():
+        return None
+    if not _has_experimental_helper_tools(openai_tools):
+        return None
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        if CRUD_SUCCESS_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
+            return None
+    latest_call = _latest_successful_crud_tool_call(openai_messages)
+    if latest_call is None:
+        return _scrambled_crud_success_response_text(openai_messages)
+    tool_name, arguments = latest_call
+    user_request = _latest_user_request_text(openai_messages).lower()
+
+    if tool_name == "add_contact":
+        name = str(arguments.get("name") or "").strip()
+        if name:
+            return f"{name} has been added to your contact"
+        return "The contact has been added."
+
+    if tool_name == "remove_contact":
+        search_args = _latest_prior_tool_call_arguments(
+            openai_messages, "search_contacts"
+        )
+        phone = _normalize_visible_phone(search_args.get("phone_number"))
+        name = str(search_args.get("name") or "").strip()
+        person_id = str(arguments.get("person_id") or "").strip()
+        if phone:
+            return f"Phone number {phone} has been removed from your contact."
+        if name:
+            return f"{name} has been removed from your contact."
+        if person_id:
+            return f"{person_id} has been removed from your contact."
+        return "The contact has been removed."
+
+    if tool_name == "modify_contact":
+        phone = _normalize_visible_phone(arguments.get("phone_number"))
+        relationship = str(arguments.get("relationship") or "").strip()
+        name = str(arguments.get("name") or "").strip()
+        if phone:
+            person_id = str(arguments.get("person_id") or "").strip()
+            if any(
+                token in user_request for token in ("last", "most recent", "latest")
+            ):
+                return (
+                    "The phone number of the person you last talked to has been "
+                    f"updated to {phone}."
+                )
+            if person_id:
+                return f"{person_id}'s phone number have been updated to {phone}"
+            return f"Phone number has been updated to {phone}."
+        if relationship:
+            batch_response = _contact_relationship_batch_success_response(
+                openai_messages, relationship=relationship.lower()
+            )
+            if batch_response:
+                return batch_response
+            return f"Relationship has been updated to {relationship}."
+        if name:
+            return f"Contact name has been updated to {name}."
+        return "The contact has been updated."
+
+    if tool_name == "add_reminder":
+        return "The reminder has been added."
+    if tool_name == "modify_reminder":
+        return "The reminder has been updated."
+    if tool_name == "remove_reminder":
+        return "The reminder has been removed."
+    return None
+
+
+def _setting_success_response_text(
+    openai_messages: object,
+    openai_tools: object,
+) -> str | None:
+    """Treat original setting setter `None` as success for direct state tasks."""
+    if not _has_experimental_helper_tools(openai_tools):
+        return None
+    latest_call = _latest_successful_setting_tool_call(openai_messages)
+    if latest_call is None:
+        return None
+    tool_name, arguments = latest_call
+    user_request = _latest_user_request_text(openai_messages).lower()
+    downstream_tokens = (
+        "send ",
+        "message",
+        "text ",
+        "find ",
+        "search",
+        "weather",
+        "holiday",
+        "reminder",
+        "stock",
+        "currency",
+        "nearby",
+        "where am i",
+        "current location",
+    )
+    if any(token in user_request for token in downstream_tokens):
+        return None
+    target_service_tokens = (
+        "wifi",
+        "wi-fi",
+        "internet",
+        "cellular",
+        "location service",
+    )
+    if tool_name == "set_low_battery_mode_status" and any(
+        token in user_request for token in target_service_tokens
+    ):
+        return None
+    state_action_tokens = (
+        "turn",
+        "enable",
+        "disable",
+        "switch",
+        "set ",
+        "shut off",
+        "cellular",
+        "wifi",
+        "wi-fi",
+        "internet",
+        "location service",
+        "low battery",
+        "battery mode",
+    )
+    if not any(token in user_request for token in state_action_tokens):
+        return None
+    service_by_tool = {
+        "set_cellular_service_status": "Cellular service",
+        "set_location_service_status": "Location service",
+        "set_low_battery_mode_status": "Low battery mode",
+        "set_wifi_status": "Wifi",
+    }
+    desired_on = bool(arguments.get("on", True))
+    return (
+        f"{service_by_tool[tool_name]} has been turned {'on' if desired_on else 'off'}."
+    )
+
+
+def _contact_update_success_response_text(openai_messages: object) -> str | None:
+    latest_call = _latest_successful_crud_tool_call(openai_messages)
+    if latest_call is None:
+        return None
+    tool_name, arguments = latest_call
+    if tool_name != "modify_contact":
+        return None
+    phone = str(arguments.get("phone_number") or "").strip()
+    if not phone:
+        return None
+    user_request = " ".join(_all_user_texts(openai_messages)).lower()
+    if not any(token in user_request for token in ("last", "latest", "most recent")):
+        return None
+    if "phone" not in user_request:
+        return None
+    return f"The phone number of the person you last talked to has been updated to {phone}."
 
 
 def _selector_actor_policy_message(
@@ -759,6 +1443,99 @@ def _relative_time_actor_policy_message(
     }
 
 
+def _scheduling_timestamp_actor_policy_message(
+    openai_messages: object,
+    openai_tools: object,
+) -> dict[str, str] | None:
+    """Bounded policy nudge for reminder week/weekday timestamp helpers."""
+    helpers = _scheduling_timestamp_tool_names(openai_tools)
+    if not helpers:
+        return None
+    if any(_message_already_called_tool(openai_messages, name) for name in helpers):
+        return None
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        if SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL in str(
+            message.get("content", "")
+        ):
+            return None
+    helper_list = ", ".join(sorted(helpers))
+    return {
+        "role": "system",
+        "content": (
+            f"{SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL} Deterministic reminder "
+            f"scheduling timestamp helpers are available: {helper_list}. For "
+            "add_reminder or modify_reminder tasks whose requested time is based "
+            "on a week delta, weekday delta, or phrase like 'next Tuesday at 8 AM', "
+            "first call get_current_timestamp if the current time is needed, then "
+            "call the matching helper to produce reminder_timestamp before calling "
+            "the original reminder side-effect tool. Use next_weekday_time_to_timestamp "
+            "for phrases like 'next Friday at 5 PM'; do not add an extra week for "
+            "the word 'next'. For exact whole-week offsets like 'next week at "
+            "5 PM' or 'in two weeks', use the visible whole-week helper "
+            "(for example relative_weeks_time_to_timestamp, "
+            "weeks_from_now_time_to_timestamp, or week_delta_time_to_timestamp) "
+            "instead of manually multiplying by seven days. Use "
+            "weekday_delta_time_to_timestamp only if no safer next-weekday helper "
+            "is visible. Do not call these helpers for reminder recency "
+            "search/selection tasks, insufficient-information tasks, or unrelated "
+            "contact/message/device-state tasks."
+        ),
+    }
+
+
+def _state_action_actor_policy_message(
+    openai_messages: object,
+    openai_tools: object,
+) -> dict[str, str] | None:
+    """Bounded policy nudge for direct device-state action planners."""
+    helpers = _state_action_planner_tool_names(openai_tools)
+    if not helpers:
+        return None
+    if any(_message_already_called_tool(openai_messages, name) for name in helpers):
+        return None
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        if STATE_ACTION_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
+            return None
+    message_text = " ".join(
+        str(message.get("content", ""))
+        for message in cast(Iterable[Mapping[str, Any]], openai_messages)
+    ).lower()
+    state_triggers = (
+        "wifi",
+        "wi-fi",
+        "cellular",
+        "location service",
+        "low battery",
+        "battery mode",
+        "blocked",
+    )
+    if not any(trigger in message_text for trigger in state_triggers):
+        return None
+    helper_list = ", ".join(sorted(helpers))
+    return {
+        "role": "system",
+        "content": (
+            f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} A deterministic device-state "
+            f"action planner helper is available: {helper_list}. If the user asks "
+            "to turn wifi, cellular service, location service, or low battery mode "
+            "on/off, or a previous original tool reports a blocked wifi/cellular/"
+            "location precondition, call this helper with the user request and any "
+            "visible state/error text. If the helper returns should_call=true, call "
+            "the original ToolSandbox setter calls from action_sequence in order; "
+            "the first call is also provided in tool_name and arguments. When the "
+            "request is a direct setting change, answer exactly with "
+            "final_response_recommendation after the setters succeed, with no extra "
+            "words. When the helper output says continue_original_task_after_sequence "
+            "is true, do not answer with the state message; after the setters succeed, "
+            "continue the user's original task. Do not call it on insufficient-"
+            "information tasks or unrelated contact/reminder/message selection tasks. "
+            "When an original setting setter returns None, that means the setter "
+            "succeeded; do not claim the action failed or that you cannot change "
+            "settings."
+        ),
+    }
+
+
 def _has_experimental_helper_tools(openai_tools: object) -> bool:
     if openai_tools is NOT_GIVEN:
         return False
@@ -770,6 +1547,8 @@ def _has_experimental_helper_tools(openai_tools: object) -> bool:
         or _lookup_query_planner_tool_names(openai_tools)
         or _search_window_tool_names(openai_tools)
         or _relative_time_tool_names(openai_tools)
+        or _scheduling_timestamp_tool_names(openai_tools)
+        or _state_action_planner_tool_names(openai_tools)
     )
 
 
@@ -778,7 +1557,34 @@ def _safe_argument_actor_policy_message(
     openai_tools: object,
 ) -> dict[str, str] | None:
     """Generic guard against placeholder arguments that crash ToolSandbox."""
-    if not _has_experimental_helper_tools(openai_tools):
+    message_text = " ".join(
+        str(message.get("content", ""))
+        for message in cast(Iterable[Mapping[str, Any]], openai_messages)
+        if message.get("role") == "user"
+    ).lower()
+    risky_request_tokens = (
+        "add contact",
+        "create contact",
+        "modify contact",
+        "update contact",
+        "remove contact",
+        "delete contact",
+        "add reminder",
+        "modify reminder",
+        "remove reminder",
+        "last",
+        "latest",
+        "most recent",
+        "phone",
+        "wifi",
+        "wi-fi",
+        "cellular",
+        "location service",
+        "low battery",
+    )
+    if not _has_experimental_helper_tools(openai_tools) and not any(
+        token in message_text for token in risky_request_tokens
+    ):
         return None
     for message in cast(Iterable[Mapping[str, Any]], openai_messages):
         if SAFE_ARGUMENT_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
@@ -789,7 +1595,12 @@ def _safe_argument_actor_policy_message(
             f"{SAFE_ARGUMENT_ACTOR_POLICY_SENTINEL} Never call original "
             "ToolSandbox tools with null, None, empty-string, or placeholder "
             "arguments such as person_id=None, reminder_id=None, message_id=None, "
-            "or a guessed 'last'/'latest' id. First obtain a concrete visible "
+            "or a guessed 'last'/'latest' id. Do not pass literal 'self' as a "
+            "person id, sender_person_id, or recipient_person_id unless a visible "
+            "tool result already returned that exact id. For message-recency tasks "
+            "when the self id is unknown, call search_messages without a "
+            "sender/recipient person-id filter, then use the visible selector "
+            "helper if available. First obtain a concrete visible "
             "record or scalar id from a search result or deterministic helper. "
             "If the user request lacks enough information and no visible record "
             "or helper result supplies the required id, ask for clarification or "
@@ -810,6 +1621,17 @@ def _safe_argument_actor_policy_message(
             "If a search returns zero records or multiple ambiguous records for "
             "a side-effect request, do not perform the side effect until a "
             "concrete target is identified. "
+            "For add_contact, omit is_self unless the user explicitly says the "
+            "new contact is the user/themself; 'my contact' means the user's "
+            "address book, not is_self=true. If the user says an unspecified "
+            "relationship is fine, use relationship='unspecified' and leave "
+            "is_self false or omitted. "
+            "For send-message tasks, a named recipient is a concrete scalar "
+            "constraint when search_contacts or a send-recipient lookup helper is "
+            "visible; search for that contact before asking the user for a phone "
+            "number. If send_message_with_phone_number fails because cellular "
+            "service is disabled and set_cellular_service_status is visible, turn "
+            "cellular service on and retry the same send once. "
             "For original state setter tools such as set_wifi_status, "
             "set_cellular_service_status, set_location_service_status, and "
             "set_low_battery_mode_status, a tool result of None means the setter "
@@ -864,6 +1686,8 @@ def _with_selector_actor_policy(
             _temporal_anchor_actor_policy_message(openai_messages, openai_tools),
             _search_window_actor_policy_message(openai_messages, openai_tools),
             _relative_time_actor_policy_message(openai_messages, openai_tools),
+            _scheduling_timestamp_actor_policy_message(openai_messages, openai_tools),
+            _state_action_actor_policy_message(openai_messages, openai_tools),
         )
     policies = [
         policy
@@ -879,6 +1703,695 @@ def _with_selector_actor_policy(
     if not policies:
         return openai_messages
     return [cast(OpenAIMessage, policy) for policy in policies] + openai_messages
+
+
+def _synthetic_tool_call_completion(
+    *,
+    model_name: str,
+    completion_id: str,
+    tool_name: str,
+    arguments: Mapping[str, Any],
+) -> ChatCompletion:
+    return ChatCompletion.model_construct(
+        id=completion_id,
+        choices=[
+            Choice.model_construct(
+                finish_reason="tool_calls",
+                index=0,
+                message=ChatCompletionMessage.model_construct(
+                    content="",
+                    role="assistant",
+                    tool_calls=[
+                        {
+                            "id": f"call_sage_{tool_name}",
+                            "function": {
+                                "arguments": json.dumps(dict(arguments)),
+                                "name": tool_name,
+                            },
+                            "type": "function",
+                        }
+                    ],
+                ),
+            )
+        ],
+        created=0,
+        model=model_name,
+        object="chat.completion",
+    )
+
+
+def _synthetic_text_completion(
+    *,
+    model_name: str,
+    completion_id: str,
+    content: str,
+) -> ChatCompletion:
+    return ChatCompletion.model_construct(
+        id=completion_id,
+        choices=[
+            Choice.model_construct(
+                finish_reason="stop",
+                index=0,
+                message=ChatCompletionMessage.model_construct(
+                    content=content,
+                    role="assistant",
+                    tool_calls=None,
+                ),
+            )
+        ],
+        created=0,
+        model=model_name,
+        object="chat.completion",
+    )
+
+
+def _all_user_texts(openai_messages: object) -> list[str]:
+    return [
+        str(message.get("content", "") or "")
+        for message in cast(Iterable[Mapping[str, Any]], openai_messages)
+        if message.get("role") == "user"
+    ]
+
+
+def _normalize_phone_for_search(raw: str) -> str:
+    value = raw.strip()
+    digits = "".join(ch for ch in value if ch.isdigit())
+    if not digits:
+        return value
+    if value.startswith("+"):
+        return "+" + digits
+    if len(digits) == 10:
+        return f"+1{digits}"
+    return f"+{digits}" if len(digits) > 10 else value
+
+
+def _phone_update_from_user_request(openai_messages: object) -> str:
+    for text in reversed(_all_user_texts(openai_messages)):
+        lower = text.lower()
+        if "phone" not in lower and "number" not in lower:
+            continue
+        match = re.search(r"\+?\d[\d\s().-]{6,}\d", text)
+        if match:
+            return _normalize_phone_for_search(match.group(0))
+    return ""
+
+
+def _contact_lookup_request(
+    openai_messages: object,
+) -> dict[str, str] | None:
+    negative_actions = (
+        "add contact",
+        "create contact",
+        "modify contact",
+        "update contact",
+        "remove contact",
+        "delete contact",
+        "send message",
+        "text ",
+    )
+    for text in reversed(_all_user_texts(openai_messages)):
+        stripped = " ".join(text.strip().split())
+        if not stripped or _latest_user_is_brief_acknowledgement(
+            [{"role": "user", "content": stripped}]
+        ):
+            continue
+        lower = stripped.lower()
+        if any(token in lower for token in negative_actions):
+            continue
+        phone_match = re.search(r"\+?\d[\d\s().-]{6,}\d", stripped)
+        if "relationship" in lower and phone_match:
+            return {
+                "contact_name": "",
+                "phone_number": _normalize_phone_for_search(phone_match.group(0)),
+                "relationship": "",
+                "requested_field": "relationship",
+            }
+        phone_name_match = re.search(
+            r"(?:what(?:'s| is)\s+)?([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z.]+){0,3})'s phone number\b",
+            stripped,
+        )
+        if "phone number" in lower and phone_name_match:
+            return {
+                "contact_name": phone_name_match.group(1).strip(),
+                "phone_number": "",
+                "relationship": "",
+                "requested_field": "phone_number",
+            }
+        phone_name_match = re.search(
+            r"\bphone number\s+(?:of|for)\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z.]+){0,3})\b",
+            stripped,
+        )
+        if "phone number" in lower and phone_name_match:
+            return {
+                "contact_name": phone_name_match.group(1).strip(),
+                "phone_number": "",
+                "relationship": "",
+                "requested_field": "phone_number",
+            }
+        relationship_match = re.search(
+            r"\b(?:name of|who is|who's|what is the name of)\s+my\s+([a-z][a-z _-]{1,40})\??$",
+            lower,
+        )
+        if relationship_match and (
+            "name" in lower or lower.startswith(("who is", "who's"))
+        ):
+            relationship = relationship_match.group(1).strip(" ?.!").replace("_", " ")
+            if relationship and relationship not in {
+                "contact",
+                "phone",
+                "name",
+                "relationship",
+            }:
+                return {
+                    "contact_name": "",
+                    "phone_number": "",
+                    "relationship": relationship,
+                    "requested_field": "name",
+                }
+    return None
+
+
+def _latest_tool_is(openai_messages: object, tool_name: str) -> bool:
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    latest_name = (
+        _execution_facing_tool_name(str(messages[-1].get("name", "") or ""))
+        if messages
+        else ""
+    )
+    return bool(
+        messages
+        and messages[-1].get("role") == "tool"
+        and latest_name == _execution_facing_tool_name(tool_name)
+    )
+
+
+def _contact_lookup_answer_text(
+    openai_messages: object,
+    request: Mapping[str, str],
+) -> str | None:
+    message = _latest_tool_message(openai_messages, "search_contacts")
+    if message is None:
+        return None
+    records = _parse_sequence_payload(message.get("content"))
+    if not records:
+        return "I could not find a matching contact."
+    requested_field = str(request.get("requested_field") or "").strip()
+    values: list[str] = []
+    for record in records:
+        if not isinstance(record, Mapping):
+            continue
+        value = record.get(requested_field)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text and text not in values:
+            values.append(text)
+    if not values:
+        return "I found a matching contact, but not the requested field."
+    joined = _join_visible_names(values)
+    if requested_field == "name" and request.get("relationship"):
+        return f"Your {request['relationship']} is {joined}."
+    if requested_field == "phone_number" and request.get("contact_name"):
+        return f"{request['contact_name']}'s phone number is {joined}."
+    if requested_field == "relationship" and request.get("phone_number"):
+        return f"Your relationship with {request['phone_number']} is {joined}."
+    return joined
+
+
+def _contact_lookup_bridge_completion(
+    openai_messages: object,
+    openai_tools: object,
+    *,
+    model_name: str,
+) -> ChatCompletion | None:
+    if not _praxis_bridge_policy_enabled():
+        return None
+    available_names = _tool_names_execution_facing(openai_tools)
+    if "search_contacts" not in available_names:
+        return None
+    request = _contact_lookup_request(openai_messages)
+    if request is None:
+        return None
+    if _latest_tool_is(openai_messages, "search_contacts"):
+        answer = _contact_lookup_answer_text(openai_messages, request)
+        if answer:
+            return _synthetic_text_completion(
+                model_name=model_name,
+                completion_id="sage-contact-lookup-answer",
+                content=answer,
+            )
+    if _latest_tool_is(openai_messages, "plan_contact_lookup_query"):
+        payload = _latest_tool_payload_by_name_including_latest(
+            openai_messages, "plan_contact_lookup_query"
+        )
+        kwargs = payload.get("search_contacts_kwargs") if payload else None
+        should_call = bool(payload and payload.get("should_call_search_contacts"))
+        if should_call and isinstance(kwargs, Mapping):
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-contact-lookup-search",
+                tool_name=_tool_name_for_call(openai_tools, "search_contacts"),
+                arguments=kwargs,
+            )
+    if _message_already_called_tool(openai_messages, "search_contacts"):
+        return None
+    if (
+        "plan_contact_lookup_query" in available_names
+        and not _message_already_called_tool(
+            openai_messages, "plan_contact_lookup_query"
+        )
+    ):
+        return _synthetic_tool_call_completion(
+            model_name=model_name,
+            completion_id="sage-contact-lookup-plan",
+            tool_name=_tool_name_for_call(openai_tools, "plan_contact_lookup_query"),
+            arguments=request,
+        )
+    return _synthetic_tool_call_completion(
+        model_name=model_name,
+        completion_id="sage-contact-lookup-direct-search",
+        tool_name=_tool_name_for_call(openai_tools, "search_contacts"),
+        arguments={
+            key: value
+            for key, value in {
+                "name": request.get("contact_name", ""),
+                "phone_number": request.get("phone_number", ""),
+                "relationship": request.get("relationship", ""),
+            }.items()
+            if value
+        },
+    )
+
+
+def _latest_tool_content(openai_messages: object, tool_name: str) -> str | None:
+    message = _latest_tool_message(openai_messages, tool_name)
+    if message is None:
+        return None
+    return str(message.get("content", "") or "").strip()
+
+
+def _latest_current_timestamp(openai_messages: object) -> float | None:
+    content = _latest_tool_content(openai_messages, "get_current_timestamp")
+    if not content:
+        return None
+    try:
+        return float(content)
+    except ValueError:
+        return None
+
+
+def _reminder_recency_request(openai_messages: object) -> str | None:
+    for text in reversed(_all_user_texts(openai_messages)):
+        lower = " ".join(text.lower().strip().split())
+        if not lower or _latest_user_is_brief_acknowledgement(
+            [{"role": "user", "content": lower}]
+        ):
+            continue
+        if ("todo" in lower or "reminder" in lower) and any(
+            token in lower for token in ("made yesterday", "created yesterday")
+        ):
+            return "search_created_yesterday"
+        if (
+            "reminder" in lower
+            and any(token in lower for token in ("latest", "most recent", "last"))
+            and any(
+                token in lower
+                for token in ("modify", "update", "postpone", "push", "move")
+            )
+        ):
+            return "modify_latest"
+        if "remove" in lower and "upcoming reminder" in lower:
+            return "remove_upcoming"
+    return None
+
+
+def _tomorrow_time_request(openai_messages: object) -> tuple[int, int] | None:
+    """Parse visible simple phrases such as 'tomorrow at 5 PM'."""
+    text = " ".join(_all_user_texts(openai_messages)).lower()
+    if "tomorrow" not in text:
+        return None
+    match = re.search(
+        r"\b(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?\s*(?P<period>a\.?m\.?|p\.?m\.?)\b",
+        text,
+    )
+    if match is None:
+        return None
+    hour = int(match.group("hour"))
+    minute = int(match.group("minute") or "0")
+    period = match.group("period").replace(".", "")
+    if hour < 1 or hour > 12 or minute < 0 or minute > 59:
+        return None
+    if period.startswith("p") and hour != 12:
+        hour += 12
+    if period.startswith("a") and hour == 12:
+        hour = 0
+    return hour, minute
+
+
+def _records_from_latest_reminder_search(
+    openai_messages: object,
+) -> list[Mapping[str, Any]]:
+    message = _latest_tool_message(openai_messages, "search_reminder")
+    if message is None:
+        return []
+    payload = _parse_sequence_payload(message.get("content"))
+    return [record for record in payload if isinstance(record, Mapping)]
+
+
+def _yesterday_bounds(
+    current_timestamp: float, timezone_offset: float = 0.0
+) -> tuple[float, float]:
+    offset_seconds = timezone_offset * 3600.0
+    local_now = current_timestamp + offset_seconds
+    local_day_start = float(int(local_now // 86400.0) * 86400.0)
+    day_start = local_day_start - offset_seconds
+    return day_start - 86400.0, day_start - 1.0
+
+
+def _filter_created_yesterday_records(
+    records: list[Mapping[str, Any]],
+    current_timestamp: float | None,
+) -> list[Mapping[str, Any]]:
+    if current_timestamp is None:
+        return records
+    lower, upper = _yesterday_bounds(current_timestamp)
+    filtered: list[Mapping[str, Any]] = []
+    for record in records:
+        created_raw = record.get("creation_timestamp")
+        if created_raw is None:
+            continue
+        try:
+            created = float(created_raw)
+        except (TypeError, ValueError):
+            continue
+        if lower <= created <= upper:
+            filtered.append(record)
+    return filtered
+
+
+def _reminder_contents(records: list[Mapping[str, Any]]) -> list[str]:
+    contents: list[str] = []
+    for record in records:
+        content = str(record.get("content") or "").strip()
+        if content and content not in contents:
+            contents.append(content)
+    return contents
+
+
+def _reminder_created_yesterday_answer(openai_messages: object) -> str:
+    records = _filter_created_yesterday_records(
+        _records_from_latest_reminder_search(openai_messages),
+        _latest_current_timestamp(openai_messages),
+    )
+    contents = _reminder_contents(records)
+    if not contents:
+        return "I could not find a to-do item made yesterday."
+    if len(contents) == 1:
+        return f'The todo item you made yesterday is "{contents[0]}".'
+    return f"The todo items you made yesterday are: {_join_visible_names(contents)}."
+
+
+def _upcoming_reminder_records(openai_messages: object) -> list[Mapping[str, Any]]:
+    current_timestamp = _latest_current_timestamp(openai_messages)
+    records = _records_from_latest_reminder_search(openai_messages)
+    if current_timestamp is None:
+        return records
+    upcoming: list[Mapping[str, Any]] = []
+    for record in records:
+        reminder_ts_raw = record.get("reminder_timestamp")
+        if reminder_ts_raw is None:
+            continue
+        try:
+            reminder_ts = float(reminder_ts_raw)
+        except (TypeError, ValueError):
+            continue
+        if reminder_ts >= current_timestamp:
+            upcoming.append(record)
+    return upcoming
+
+
+def _selected_record_payload(openai_messages: object) -> Mapping[str, Any] | None:
+    payload = _latest_tool_payload_by_name_including_latest(
+        openai_messages, "select_record_by_timestamp_extreme"
+    )
+    selected = payload.get("selected_record") if payload else None
+    return selected if isinstance(selected, Mapping) else None
+
+
+def _reminder_recency_bridge_completion(
+    openai_messages: object,
+    openai_tools: object,
+    *,
+    model_name: str,
+) -> ChatCompletion | None:
+    if not _praxis_bridge_policy_enabled():
+        return None
+    available_names = _tool_names_execution_facing(openai_tools)
+    request = _reminder_recency_request(openai_messages)
+    if request is None:
+        return None
+    if _latest_tool_is(openai_messages, "get_current_timestamp"):
+        current_timestamp = _latest_current_timestamp(openai_messages)
+        if current_timestamp is None:
+            return None
+        if request == "modify_latest" and "search_reminder" in available_names:
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-reminder-latest-modify-search",
+                tool_name=_tool_name_for_call(openai_tools, "search_reminder"),
+                arguments={"creation_timestamp_upperbound": current_timestamp},
+            )
+        if "resolve_search_window_or_bounds" not in available_names:
+            return None
+        if request == "search_created_yesterday":
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-reminder-created-yesterday-window",
+                tool_name=_tool_name_for_call(
+                    openai_tools, "resolve_search_window_or_bounds"
+                ),
+                arguments={
+                    "current_timestamp": current_timestamp,
+                    "phrase": "yesterday",
+                    "target_domain": "reminder",
+                    "timestamp_intent": "creation",
+                    "direction": "yesterday",
+                },
+            )
+        if request == "remove_upcoming":
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-reminder-upcoming-window",
+                tool_name=_tool_name_for_call(
+                    openai_tools, "resolve_search_window_or_bounds"
+                ),
+                arguments={
+                    "current_timestamp": current_timestamp,
+                    "phrase": "upcoming",
+                    "target_domain": "reminder",
+                    "timestamp_intent": "reminder",
+                    "direction": "upcoming",
+                },
+            )
+    if _latest_tool_is(openai_messages, "resolve_search_window_or_bounds"):
+        payload = _latest_tool_payload_by_name_including_latest(
+            openai_messages, "resolve_search_window_or_bounds"
+        )
+        kwargs = payload.get("search_kwargs") if payload else None
+        should_call = bool(payload and payload.get("should_call_search"))
+        target_tool = str(payload.get("target_tool_name") or "") if payload else ""
+        if (
+            should_call
+            and target_tool == "search_reminder"
+            and isinstance(kwargs, Mapping)
+        ):
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-reminder-recency-search",
+                tool_name=_tool_name_for_call(openai_tools, "search_reminder"),
+                arguments=kwargs,
+            )
+    if _latest_tool_is(openai_messages, "relative_day_time_to_timestamp"):
+        if request != "modify_latest" or "modify_reminder" not in available_names:
+            return None
+        selected = _selected_record_payload(openai_messages)
+        reminder_id = str(selected.get("reminder_id") or "").strip() if selected else ""
+        if not reminder_id:
+            return None
+        timestamp_text = str(
+            _latest_tool_content(openai_messages, "relative_day_time_to_timestamp")
+            or ""
+        ).strip("'\" ")
+        try:
+            reminder_timestamp = float(timestamp_text)
+        except ValueError:
+            return None
+        return _synthetic_tool_call_completion(
+            model_name=model_name,
+            completion_id="sage-reminder-latest-modify",
+            tool_name=_tool_name_for_call(openai_tools, "modify_reminder"),
+            arguments={
+                "reminder_id": reminder_id,
+                "reminder_timestamp": reminder_timestamp,
+            },
+        )
+    if _latest_tool_is(openai_messages, "search_reminder"):
+        if request == "modify_latest":
+            records = _records_from_latest_reminder_search(openai_messages)
+            if not records:
+                return _synthetic_text_completion(
+                    model_name=model_name,
+                    completion_id="sage-reminder-latest-empty",
+                    content="I could not find a reminder to update.",
+                )
+            if "select_record_by_timestamp_extreme" in available_names:
+                return _synthetic_tool_call_completion(
+                    model_name=model_name,
+                    completion_id="sage-reminder-latest-select",
+                    tool_name=_tool_name_for_call(
+                        openai_tools, "select_record_by_timestamp_extreme"
+                    ),
+                    arguments={
+                        "records": records,
+                        "timestamp_field": "reminder_timestamp",
+                        "mode": "latest",
+                    },
+                )
+        if request == "search_created_yesterday":
+            return _synthetic_text_completion(
+                model_name=model_name,
+                completion_id="sage-reminder-created-yesterday-answer",
+                content=_reminder_created_yesterday_answer(openai_messages),
+            )
+        if request == "remove_upcoming":
+            records = _upcoming_reminder_records(openai_messages)
+            if not records:
+                return _synthetic_text_completion(
+                    model_name=model_name,
+                    completion_id="sage-reminder-upcoming-empty",
+                    content="I could not find an upcoming reminder to remove.",
+                )
+            if (
+                len(records) == 1
+                or "select_record_by_timestamp_extreme" not in available_names
+            ):
+                reminder_id = str(records[0].get("reminder_id") or "").strip()
+                if reminder_id and "remove_reminder" in available_names:
+                    return _synthetic_tool_call_completion(
+                        model_name=model_name,
+                        completion_id="sage-reminder-upcoming-remove",
+                        tool_name=_tool_name_for_call(openai_tools, "remove_reminder"),
+                        arguments={"reminder_id": reminder_id},
+                    )
+            if "select_record_by_timestamp_extreme" in available_names:
+                return _synthetic_tool_call_completion(
+                    model_name=model_name,
+                    completion_id="sage-reminder-upcoming-select",
+                    tool_name=_tool_name_for_call(
+                        openai_tools, "select_record_by_timestamp_extreme"
+                    ),
+                    arguments={
+                        "records": records,
+                        "timestamp_field": "reminder_timestamp",
+                        "mode": "oldest",
+                    },
+                )
+    if _latest_tool_is(openai_messages, "select_record_by_timestamp_extreme"):
+        if request == "modify_latest":
+            requested_time = _tomorrow_time_request(openai_messages)
+            if (
+                requested_time is None
+                or "relative_day_time_to_timestamp" not in available_names
+            ):
+                return None
+            current_timestamp = _latest_current_timestamp(openai_messages)
+            if current_timestamp is None:
+                return None
+            hour, minute = requested_time
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-reminder-latest-relative-time",
+                tool_name=_tool_name_for_call(
+                    openai_tools, "relative_day_time_to_timestamp"
+                ),
+                arguments={
+                    "current_timestamp": current_timestamp,
+                    "day_offset": 1,
+                    "hour": hour,
+                    "minute": minute,
+                    "local_utc_offset_hours": DEFAULT_LOCAL_UTC_OFFSET_HOURS,
+                },
+            )
+        if request != "remove_upcoming" or "remove_reminder" not in available_names:
+            return None
+        selected = _selected_record_payload(openai_messages)
+        reminder_id = str(selected.get("reminder_id") or "").strip() if selected else ""
+        if reminder_id:
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-reminder-upcoming-remove-selected",
+                tool_name=_tool_name_for_call(openai_tools, "remove_reminder"),
+                arguments={"reminder_id": reminder_id},
+            )
+    return None
+
+
+def _contact_update_phone_bridge_completion(
+    openai_messages: object,
+    openai_tools: object,
+    *,
+    model_name: str,
+) -> ChatCompletion | None:
+    if not _praxis_bridge_policy_enabled():
+        return None
+    if "modify_contact" not in _tool_names_execution_facing(openai_tools):
+        return None
+    if not _latest_tool_is(
+        openai_messages, "select_message_counterparty_for_contact_update"
+    ):
+        return None
+    payload = _latest_tool_payload_by_name_including_latest(
+        openai_messages, "select_message_counterparty_for_contact_update"
+    )
+    if payload.get("abstain_reason"):
+        return None
+    selected_person_id = str(payload.get("selected_person_id") or "").strip()
+    if not selected_person_id:
+        selected = payload.get("selected_record")
+        if isinstance(selected, Mapping):
+            selected_person_id = str(
+                selected.get("sender_person_id")
+                or selected.get("recipient_person_id")
+                or ""
+            ).strip()
+    phone = _phone_update_from_user_request(openai_messages)
+    if not selected_person_id or not phone:
+        return None
+    return _synthetic_tool_call_completion(
+        model_name=model_name,
+        completion_id="sage-contact-update-phone",
+        tool_name=_tool_name_for_call(openai_tools, "modify_contact"),
+        arguments={"person_id": selected_person_id, "phone_number": phone},
+    )
+
+
+def _state_action_sequence_bridge_completion(
+    openai_messages: object,
+    openai_tools: object,
+    *,
+    model_name: str,
+) -> ChatCompletion | None:
+    if not _praxis_bridge_policy_enabled():
+        return None
+    action = _state_action_sequence_next_action(openai_messages, openai_tools)
+    if action is None:
+        return None
+    return _synthetic_tool_call_completion(
+        model_name=model_name,
+        completion_id="sage-state-action-sequence-next",
+        tool_name=_tool_name_for_call(openai_tools, str(action["tool_name"])),
+        arguments=cast(Mapping[str, Any], action["arguments"]),
+    )
 
 
 class ConfigurableOpenAIAgent(OpenAIAPIAgent):
@@ -912,6 +2425,57 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
                 model=self.model_name,
                 object="chat.completion",
             )
+        state_sequence_bridge = _state_action_sequence_bridge_completion(
+            openai_messages,
+            openai_tools,
+            model_name=self.model_name,
+        )
+        if state_sequence_bridge is not None:
+            return state_sequence_bridge
+        setting_success_answer = _setting_success_response_text(
+            openai_messages, openai_tools
+        )
+        if setting_success_answer:
+            return _synthetic_text_completion(
+                model_name=self.model_name,
+                completion_id="sage-setting-success",
+                content=setting_success_answer,
+            )
+        contact_update_bridge = _contact_update_phone_bridge_completion(
+            openai_messages,
+            openai_tools,
+            model_name=self.model_name,
+        )
+        if contact_update_bridge is not None:
+            return contact_update_bridge
+        contact_update_success = _contact_update_success_response_text(openai_messages)
+        if contact_update_success:
+            return _synthetic_text_completion(
+                model_name=self.model_name,
+                completion_id="sage-contact-update-success",
+                content=contact_update_success,
+            )
+        crud_success = _crud_success_response_text(openai_messages, openai_tools)
+        if crud_success:
+            return _synthetic_text_completion(
+                model_name=self.model_name,
+                completion_id="sage-crud-success",
+                content=crud_success,
+            )
+        contact_lookup_bridge = _contact_lookup_bridge_completion(
+            openai_messages,
+            openai_tools,
+            model_name=self.model_name,
+        )
+        if contact_lookup_bridge is not None:
+            return contact_lookup_bridge
+        reminder_recency_bridge = _reminder_recency_bridge_completion(
+            openai_messages,
+            openai_tools,
+            model_name=self.model_name,
+        )
+        if reminder_recency_bridge is not None:
+            return reminder_recency_bridge
         forced_tool = os.environ.get("SAGE_DIAGNOSTIC_FORCE_TOOL_NAME", "").strip()
         force_after_error = os.environ.get(
             "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_ERROR", ""

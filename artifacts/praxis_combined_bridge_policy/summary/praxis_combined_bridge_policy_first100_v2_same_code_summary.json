@@ -1,0 +1,92 @@
+{
+  "summary_type": "praxis_combined_bridge_policy_first100_v2_same_code_summary",
+  "generated_at": "2026-05-11T12:05:00-04:00",
+  "treatment": "frozen Praxis BridgePack registry + SAGE_PRAXIS_BRIDGE_POLICY=combined",
+  "registry_manifest_sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+  "runs": [
+    {
+      "name": "formal500_order_broad60_v2_policy_repair",
+      "path": "outputs/praxis_combined_bridge_policy/formal500_order_broad60_v2_policy_repair/mechanism_60_20260511_113538/paired_comparison.json",
+      "scenario_count": 60,
+      "outcome_scenario_count": 47,
+      "control_mean_similarity": 0.6949830460520086,
+      "candidate_mean_similarity": 0.750898633232641,
+      "mean_similarity_delta": 0.05591558718063256,
+      "control_mean_outcome_similarity": 0.6059446675007324,
+      "candidate_mean_outcome_similarity": 0.7829072407025957,
+      "mean_outcome_similarity_delta": 0.1769625732018633,
+      "control_exact_successes": 4,
+      "candidate_exact_successes": 13,
+      "gain_count": 36,
+      "regression_count": 16,
+      "outcome_gain_count": 30,
+      "outcome_regression_count": 7,
+      "runtime_exception_count": 0,
+      "protocol_gate_passed": true,
+      "protocol_gate_reasons": [],
+      "control_cache": {
+        "mode": "use-if-eligible",
+        "control_source": "cached",
+        "cached_control_tasks": 60,
+        "fresh_control_tasks": 0,
+        "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2"
+      }
+    },
+    {
+      "name": "formal500_order_061_100_broad40_v2_policy_repair",
+      "path": "outputs/praxis_combined_bridge_policy/formal500_order_061_100_broad40_v2_policy_repair/mechanism_40_20260511_115212/paired_comparison.json",
+      "scenario_count": 40,
+      "outcome_scenario_count": 27,
+      "control_mean_similarity": 0.5917830457401437,
+      "candidate_mean_similarity": 0.6810329069734379,
+      "mean_similarity_delta": 0.0892498612332941,
+      "control_mean_outcome_similarity": 0.5994292743762132,
+      "candidate_mean_outcome_similarity": 0.6559441679877864,
+      "mean_outcome_similarity_delta": 0.05651489361157328,
+      "control_exact_successes": 1,
+      "candidate_exact_successes": 7,
+      "gain_count": 23,
+      "regression_count": 12,
+      "outcome_gain_count": 10,
+      "outcome_regression_count": 9,
+      "runtime_exception_count": 0,
+      "protocol_gate_passed": false,
+      "protocol_gate_reasons": [
+        "confirmation_outcome_delta_below_0_08",
+        "gain_regression_ratio_below_1_4"
+      ],
+      "control_cache": {
+        "mode": "use-if-eligible",
+        "control_source": "cached",
+        "cached_control_tasks": 40,
+        "fresh_control_tasks": 0,
+        "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2"
+      }
+    }
+  ],
+  "aggregate": {
+    "scenario_count": 100,
+    "outcome_scenario_count": 74,
+    "control_mean_similarity": 0.6537030459272626,
+    "candidate_mean_similarity": 0.7229523427289598,
+    "mean_similarity_delta": 0.06924929680169722,
+    "relative_canonical_lift": 0.10593387507238658,
+    "control_mean_outcome_similarity": 0.6035674294688131,
+    "candidate_mean_outcome_similarity": 0.7365828763336788,
+    "mean_outcome_similarity_delta": 0.13301544686486566,
+    "relative_outcome_lift": 0.2203820822172756,
+    "control_exact_successes": 5,
+    "candidate_exact_successes": 20,
+    "gain_count": 59,
+    "regression_count": 28,
+    "outcome_gain_count": 40,
+    "outcome_regression_count": 16,
+    "runtime_exception_count": 0,
+    "side_effect_preservation_reports_found": []
+  },
+  "cache_policy": "controls use task-level cache when eligible; candidate/SAGE cache off; OpenAI response cache disabled",
+  "routing_evidence_mode": "disabled",
+  "generation": "off",
+  "diagnostic_force_env": "absent",
+  "dashboard_default": "task_compare"
+}

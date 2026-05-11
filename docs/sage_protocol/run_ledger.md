@@ -844,3 +844,19 @@
 - Report: `docs/sage_protocol/praxis_combined_bridge_policy_recovery_report.md`.
 - Decision label: `PROMISING_BUT_NOT_CLAIM_READY: combined_treatment_requires_clean_formal_rerun`.
 - Next action: commit the dashboard/bridge/checker repairs, then run a clean same-code formal100 or formal500 with Task Compare default and zero side-effect rows before any claim update.
+
+## 2026-05-11 - Praxis Bridge-Policy RapidAPI Cache Recovery Gate
+
+- Objective: continue the combined-treatment recovery after the quota-limited RapidAPI path blocked location-reminder tasks, while keeping SAGE/candidate task evidence fresh and non-forced.
+- External-service cache installed locally at ignored path `.secrets/rapid_api_cache.json` from `../toolsandbox-sage-gap-closure-lab/.secrets/rapid_api_cache.json`; SHA-256 `3ed7732443c44d7d26e0f46ac32fa2e09fc773278368c6f13131021afafdbf25`; entry count `71`.
+- Integrity classification: ToolSandbox external-service response fixture only. It is not SAGE task cache, does not contain labels or expected answers, and was used in `read_only` mode so misses fail visibly rather than falling through to live RapidAPI calls.
+- Verified exact no-key cache hit: `search_location_around_lat_lon("Whole Foods on Stevens Creek")` returned `Whole Foods Market, 20955 Stevens Creek Blvd, Cupertino, CA 95014`.
+- Gap12 v3 bridge-repair run: `outputs/praxis_combined_bridge_policy/bridge_recovery_gap12_v3_bridge_repair_rapid_cache/mechanism_12_20260511_164415`; control cache `12 cached / 0 fresh`; canonical `0.644 -> 0.886`, delta `+0.242`, relative lift `+37.6%`; outcome `0.348 -> 0.869`, delta `+0.520`, relative lift `+149.3%`; visible/called generated-tool scenarios `11 / 11`; runtime/generated-tool failures `0 / 0`.
+- Formal-order broad60 v4 run: `outputs/praxis_combined_bridge_policy/formal500_order_broad60_v4_bridge_repair_rapid_cache/mechanism_60_20260511_164637`; control cache `60 cached / 0 fresh`; generation off; candidate task cache off; OpenAI response cache disabled; routing evidence disabled; diagnostic force env vars absent.
+- Broad60 v4 metrics: canonical `0.695 -> 0.821`, delta `+0.126`, relative lift `+18.1%`; outcome `0.606 -> 0.916`, delta `+0.310`, relative lift `+51.2%`; canonical gains/regressions/preserved `43 / 9 / 8`; outcome gains/regressions/preserved `37 / 3 / 7`; generated-tool visible/called/attempted scenarios `39 / 27 / 27`; runtime/generated-tool failures `0 / 0`.
+- Broad60 v4 dashboard default: `http://127.0.0.1:62538/outputs/praxis_combined_bridge_policy/formal500_order_broad60_v4_bridge_repair_rapid_cache/mechanism_60_20260511_164637/dashboard/task_compare.html`.
+- Machine summary: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_broad60_v4_bridge_repair_rapid_cache_summary.json`, SHA-256 `c58b45cd67f5b6ff714f3f7569fc3c5e71752880e763eedebdd54abf9f89ea07`.
+- Same-slice comparison: prior high Praxis formal500 on these same 60 formal-order tasks had canonical lift `+9.3%` and outcome lift `+46.4%`; the v4 broad60 gate exceeded both while preserving zero runtime/generated-tool failures.
+- Validation: focused role/policy/RapidAPI-cache tests `35 passed, 2 warnings`; cache smoke passed without `RAPID_API_KEY`.
+- Decision label: `ON_TRACK_FOR_SCALE_GATE: combined_treatment_broad60_exceeds_prior_high_same60`.
+- Next action: update docs and commit; next spend should be a clean same-code 100 or 250 gate, not an immediate formal500, unless budget and preflight are explicitly cleared.

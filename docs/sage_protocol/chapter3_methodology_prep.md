@@ -22,7 +22,7 @@ Outcome/task-completion is the primary endpoint. Canonical/reference similarity 
 | Feedback packets | `src/sage_ts/evaluation/feedback_packets.py`, `scripts/export_v2_6_feedback_packets.py` | Per-task feedback records trace summaries, helper calls, routing decisions, scores, safety, and missing deterministic steps. | Cached-control trace completeness must be read from `control_trace_completeness`. |
 | Contribution analysis | `src/sage_ts/evaluation/helper_contribution.py`, `helper_contribution_summary.json` | Helper visible/called/VNC and called-subset deltas are exported for tool-driven interpretation. | Called-subset estimates are descriptive and may be sparse. |
 | Safety checks | side-effect preservation reports, minefield/outcome checks, runtime exception counts | Final claims require zero runtime exceptions and zero helper side-effect incidents. | Negative/insufficient-information tasks require abstention/clarification behavior. |
-| Cache policy | OpenAI response cache in `src/sage_ts/cache/openai_response_cache.py`; task-level control cache in `src/sage_ts/evaluation/control_baseline_cache.py` | Provider-response caching and task-level baseline caching are separate mechanisms. | SAGE/candidate arms are not treated as cached claim evidence. |
+| Cache policy | OpenAI response cache in `src/sage_ts/cache/openai_response_cache.py`; task-level control cache in `src/sage_ts/evaluation/control_baseline_cache.py`; external-service cache manifest in `docs/sage_protocol/praxis_external_service_cache_manifest.md` | Provider-response caching, task-level baseline caching, and external-service response fixtures are separate mechanisms. | SAGE/candidate task arms are not treated as cached claim evidence; external-service fixtures must be read-only, hash-recorded, and task-selection-neutral. |
 | Cohort quality gates | `src/sage_ts/evaluation/task_strata.py::cohort_policy_report` | Cohorts can be blocked for low quality, near-duplicate dominance, or contamination. | Diagnostic overrides must not be used for final claims. |
 | Statistical comparison plan | `scripts/write_final_statistical_analysis.py`, `docs/sage_protocol/final_statistical_analysis_report.md` | Use paired scenario-level deltas, bootstrap CIs, and paired randomization tests. | Cache variance is summarized separately and not folded into the primary bootstrap. |
 | Limitations and non-claims | `docs/sage_protocol/final_limitations_and_future_work.md` | Best3 broad claim and V2.6 secondary evidence are separated. | V2.6 is non-harmful/variance-limited at current-code 500 and below the 10% broad gap target. |
@@ -62,6 +62,7 @@ The policy includes:
 - Setter-success clarification: a `None` return from original ToolSandbox state setters is interpreted as success, not failure.
 - Insufficient-information discipline: do not substitute self records, unrelated domains, broad guesses, or ambiguous search results for a missing target.
 - Trace plus conversation-visible side-effect checking to avoid both missed preservation failures and checker false positives.
+- Optional read-only ToolSandbox external-service response fixtures for quota-limited RapidAPI-backed tools, with cache hash and miss policy recorded. This is distinct from SAGE task caching and may not be used for scenario selection, labels, expected answers, or prior SAGE traces.
 
 Methodology language should therefore say "Praxis combined treatment" or "Praxis registry plus bridge policy" unless an ablation has separately validated registry-only value.
 
@@ -79,6 +80,7 @@ for each sealed scenario in manifest order:
         assert generation == off
         assert candidate task cache == off
         assert OpenAI response cache == disabled
+        assert external service cache == off or read_only_with_hash_recorded
         load frozen registry by hash
         route a bounded helper bundle without mtime-selected evidence
 

@@ -1,18 +1,39 @@
+import json
+from typing import Any
+
 import pytest
 
 from sage_ts.adapters.openai_toolsandbox_roles import (
     ANSWER_RETENTION_ACTOR_POLICY_SENTINEL,
     LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL,
     RELATIVE_TIME_ACTOR_POLICY_SENTINEL,
+    SAFE_ARGUMENT_ACTOR_POLICY_SENTINEL,
+    SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL,
+    STATE_ACTION_ACTOR_POLICY_SENTINEL,
     ConfigurableOpenAIAgent,
     ConfigurableOpenAIUser,
     _answer_retention_actor_policy_message,
     _answer_retention_response_text,
+    _contact_lookup_bridge_completion,
+    _contact_update_phone_bridge_completion,
+    _crud_success_response_text,
     _lookup_planner_actor_policy_message,
     _relative_time_actor_policy_message,
+    _reminder_recency_bridge_completion,
+    _safe_argument_actor_policy_message,
+    _scheduling_timestamp_actor_policy_message,
+    _state_action_actor_policy_message,
+    _state_action_sequence_bridge_completion,
 )
 from sage_ts.adapters.role_factory import make_agent, make_user
 from tool_sandbox.roles.unhelpful_agent import UnhelpfulAgent
+
+
+def _first_tool_call(completion: Any) -> Any:
+    tool_calls = completion.choices[0].message.tool_calls
+    assert tool_calls is not None
+    assert tool_calls
+    return tool_calls[0]
 
 
 def test_role_factory_preserves_upstream_agent() -> None:
@@ -244,3 +265,424 @@ def test_relative_time_actor_policy_shows_for_timestamp_helper() -> None:
     assert (
         "does not replace the original reminder side-effect tool" in policy["content"]
     )
+
+
+def test_state_action_policy_shows_for_device_state_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_device_state_action_sequence_v3",
+                "description": "Plan a state action sequence for device settings.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "user_request": {"type": "string"},
+                        "visible_state_or_error": {"type": "string"},
+                    },
+                },
+            },
+        }
+    ]
+
+    policy = _state_action_actor_policy_message(
+        [{"role": "user", "content": "Turn on wifi while low battery mode is on."}],
+        tools,
+    )
+
+    assert policy is not None
+    assert STATE_ACTION_ACTOR_POLICY_SENTINEL in policy["content"]
+    assert "setter calls from action_sequence in order" in policy["content"]
+
+
+def test_scheduling_timestamp_policy_shows_for_week_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "relative_weeks_time_to_timestamp",
+                "description": "Convert week scheduling into a reminder_timestamp.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "current_timestamp": {"type": "number"},
+                        "weeks_from_now": {"type": "integer"},
+                        "hour": {"type": "integer"},
+                        "minute": {"type": "integer"},
+                        "local_utc_offset_hours": {"type": "number"},
+                    },
+                },
+            },
+        }
+    ]
+
+    policy = _scheduling_timestamp_actor_policy_message(
+        [{"role": "user", "content": "Add a reminder for next week at 5 PM."}],
+        tools,
+    )
+
+    assert policy is not None
+    assert SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL in policy["content"]
+    assert "whole-week helper" in policy["content"]
+
+
+def test_state_action_bridge_calls_next_setter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_device_state_action_sequence_v3",
+                "description": "Plan a state action sequence for device settings.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "user_request": {"type": "string"},
+                        "visible_state_or_error": {"type": "string"},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {"name": "set_low_battery_mode_status"},
+        },
+    ]
+    messages = [
+        {
+            "role": "tool",
+            "name": "plan_device_state_action_sequence_v3",
+            "content": (
+                "{'should_call': True, 'action_sequence': "
+                "[{'tool_name': 'set_low_battery_mode_status', "
+                "'arguments': {'on': False}}]}"
+            ),
+        }
+    ]
+
+    completion = _state_action_sequence_bridge_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "set_low_battery_mode_status"
+    assert '"on": false' in call.function.arguments
+
+
+def test_contact_lookup_bridge_calls_planner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "plan_contact_lookup_query"}},
+        {"type": "function", "function": {"name": "search_contacts"}},
+    ]
+
+    completion = _contact_lookup_bridge_completion(
+        [{"role": "user", "content": "What is the name of my boss?"}],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "plan_contact_lookup_query"
+    assert '"relationship": "boss"' in call.function.arguments
+
+
+def test_contact_lookup_bridge_calls_search_after_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "plan_contact_lookup_query"}},
+        {"type": "function", "function": {"name": "search_contacts"}},
+    ]
+    messages = [
+        {"role": "user", "content": "What is the name of my boss?"},
+        {
+            "role": "tool",
+            "name": "plan_contact_lookup_query",
+            "content": (
+                "{'should_call_search_contacts': True, "
+                "'search_contacts_kwargs': {'relationship': 'boss'}}"
+            ),
+        },
+    ]
+
+    completion = _contact_lookup_bridge_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "search_contacts"
+    assert '"relationship": "boss"' in call.function.arguments
+
+
+def test_contact_update_bridge_preserves_required_modify_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [{"type": "function", "function": {"name": "modify_contact"}}]
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                "Update the phone number of the last person I sent a message to "
+                "to +10293847563"
+            ),
+        },
+        {
+            "role": "tool",
+            "name": "select_message_counterparty_for_contact_update",
+            "content": (
+                "{'selected_person_id': 'person-1', 'abstain_reason': '', "
+                "'downstream_tool_name': 'modify_contact'}"
+            ),
+        },
+    ]
+
+    completion = _contact_update_phone_bridge_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "modify_contact"
+    assert '"person_id": "person-1"' in call.function.arguments
+    assert '"phone_number": "+10293847563"' in call.function.arguments
+
+
+def test_crud_success_retains_reminder_update_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    messages = [
+        {"role": "user", "content": "Modify my latest reminder to tomorrow at 5 PM."},
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "call_modify",
+                    "type": "function",
+                    "function": {
+                        "name": "modify_reminder",
+                        "arguments": '{"reminder_id": "r1", "reminder_timestamp": 1}',
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call_modify",
+            "name": "modify_reminder",
+            "content": "None",
+        },
+    ]
+
+    assert (
+        _crud_success_response_text(
+            messages,
+            [
+                {
+                    "type": "function",
+                    "function": {"name": "relative_day_time_to_timestamp"},
+                }
+            ],
+        )
+        == "The reminder has been updated."
+    )
+
+
+def test_answer_retention_allows_acknowledgement_with_what_clause() -> None:
+    messages = [
+        {"role": "user", "content": "What's the todo item I made yesterday?"},
+        {
+            "role": "tool",
+            "name": "search_reminder",
+            "content": "[{'content': 'Buy tickets'}]",
+        },
+        {
+            "role": "assistant",
+            "content": 'The todo item you made yesterday is "Buy tickets".',
+        },
+        {"role": "user", "content": "Thanks, that's what I needed!"},
+    ]
+
+    assert _answer_retention_response_text(messages) == (
+        'You\'re welcome. To recap: The todo item you made yesterday is "Buy tickets".'
+    )
+
+
+def test_reminder_latest_modify_bridge_uses_search_select_timestamp_then_modify(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "search_reminder"}},
+        {
+            "type": "function",
+            "function": {"name": "select_record_by_timestamp_extreme"},
+        },
+        {"type": "function", "function": {"name": "relative_day_time_to_timestamp"}},
+        {"type": "function", "function": {"name": "modify_reminder"}},
+    ]
+    messages = [
+        {
+            "role": "user",
+            "content": "Postpone my most recent reminder to tomorrow 5PM.",
+        },
+        {"role": "tool", "name": "get_current_timestamp", "content": "1778531841.0"},
+    ]
+
+    search_completion = _reminder_recency_bridge_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert search_completion is not None
+    search_call = _first_tool_call(search_completion)
+    assert search_call.function.name == "search_reminder"
+    search_args = json.loads(search_call.function.arguments)
+    assert search_args == {"creation_timestamp_upperbound": 1778531841.0}
+
+    records = [
+        {"reminder_id": "old", "reminder_timestamp": 1778531000.0},
+        {"reminder_id": "latest", "reminder_timestamp": 1778535000.0},
+    ]
+    select_completion = _reminder_recency_bridge_completion(
+        [
+            *messages,
+            {"role": "tool", "name": "search_reminder", "content": repr(records)},
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert select_completion is not None
+    select_call = _first_tool_call(select_completion)
+    assert select_call.function.name == "select_record_by_timestamp_extreme"
+    select_args = json.loads(select_call.function.arguments)
+    assert select_args["timestamp_field"] == "reminder_timestamp"
+    assert select_args["mode"] == "latest"
+
+    selected_payload = {
+        "selected_record": {
+            "reminder_id": "latest",
+            "reminder_timestamp": 1778535000.0,
+        },
+        "abstain_reason": "",
+    }
+    relative_completion = _reminder_recency_bridge_completion(
+        [
+            *messages,
+            {"role": "tool", "name": "search_reminder", "content": repr(records)},
+            {
+                "role": "tool",
+                "name": "select_record_by_timestamp_extreme",
+                "content": repr(selected_payload),
+            },
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert relative_completion is not None
+    relative_call = _first_tool_call(relative_completion)
+    assert relative_call.function.name == "relative_day_time_to_timestamp"
+    relative_args = json.loads(relative_call.function.arguments)
+    assert relative_args["day_offset"] == 1
+    assert relative_args["hour"] == 17
+
+    modify_completion = _reminder_recency_bridge_completion(
+        [
+            *messages,
+            {"role": "tool", "name": "search_reminder", "content": repr(records)},
+            {
+                "role": "tool",
+                "name": "select_record_by_timestamp_extreme",
+                "content": repr(selected_payload),
+            },
+            {
+                "role": "tool",
+                "name": "relative_day_time_to_timestamp",
+                "content": "1778619600.0",
+            },
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert modify_completion is not None
+    modify_call = _first_tool_call(modify_completion)
+    assert modify_call.function.name == "modify_reminder"
+    modify_args = json.loads(modify_call.function.arguments)
+    assert modify_args == {
+        "reminder_id": "latest",
+        "reminder_timestamp": 1778619600.0,
+    }
+
+
+def test_reminder_recency_bridge_calls_search_after_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "resolve_search_window_or_bounds"}},
+        {"type": "function", "function": {"name": "search_reminder"}},
+    ]
+    messages = [
+        {"role": "user", "content": "Which todo was made yesterday?"},
+        {
+            "role": "tool",
+            "name": "resolve_search_window_or_bounds",
+            "content": (
+                "{'should_call_search': True, 'target_tool_name': 'search_reminder', "
+                "'search_kwargs': {'creation_timestamp_lowerbound': 10, "
+                "'creation_timestamp_upperbound': 20}}"
+            ),
+        },
+    ]
+
+    completion = _reminder_recency_bridge_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "search_reminder"
+    assert "creation_timestamp_lowerbound" in call.function.arguments
+
+
+def test_safe_argument_policy_blocks_inferred_self_contact() -> None:
+    policy = _safe_argument_actor_policy_message(
+        [
+            {
+                "role": "user",
+                "content": (
+                    "Add Stephen Sondheim to my contact, his phone_number is "
+                    "+19876543210"
+                ),
+            }
+        ],
+        [{"type": "function", "function": {"name": "add_contact"}}],
+    )
+
+    assert policy is not None
+    assert SAFE_ARGUMENT_ACTOR_POLICY_SENTINEL in policy["content"]
+    assert "omit is_self" in policy["content"]

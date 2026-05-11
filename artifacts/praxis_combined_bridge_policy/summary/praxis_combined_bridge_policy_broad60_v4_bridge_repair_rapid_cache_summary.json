@@ -1,0 +1,71 @@
+{
+  "bridge_policy_env": {
+    "SAGE_PRAXIS_BRIDGE_POLICY": "combined"
+  },
+  "comparison_to_prior_high_same60": {
+    "current_canonical_lift_percent": 18.068698235412704,
+    "current_outcome_lift_percent": 51.21884247269104,
+    "interpretation": "current broad60 gate exceeds prior high formal500 on the same first-60 formal-order tasks",
+    "prior_high_same60_canonical_lift_percent": 9.27,
+    "prior_high_same60_outcome_lift_percent": 46.41
+  },
+  "dashboard_url": "http://127.0.0.1:62538/outputs/praxis_combined_bridge_policy/formal500_order_broad60_v4_bridge_repair_rapid_cache/mechanism_60_20260511_164637/dashboard/task_compare.html",
+  "default_dashboard": "task_compare",
+  "manifest": "artifacts/praxis_combined_bridge_policy/manifests/formal500_order_broad60.json",
+  "metrics": {
+    "candidate_mean_outcome_similarity": 0.916302512219604,
+    "candidate_mean_similarity": 0.8205574354304251,
+    "control_mean_outcome_similarity": 0.6059446675007324,
+    "control_mean_similarity": 0.6949830460520086,
+    "gain_count": 43,
+    "mean_outcome_similarity_delta": 0.3103578447188716,
+    "mean_similarity_delta": 0.12557438937841672,
+    "outcome_gain_count": 37,
+    "outcome_preserved_count": 7,
+    "outcome_regression_count": 3,
+    "outcome_scenario_count": 47,
+    "preserved_count": 8,
+    "regression_count": 9,
+    "relative_outcome_lift_percent": 51.21884247269104,
+    "relative_similarity_lift_percent": 18.068698235412704,
+    "runtime_exception_count": 0,
+    "scenario_count": 60
+  },
+  "next_gate": "clean same-code 100 or 250 before any formal500 spend",
+  "rapid_api_cache": {
+    "entry_count": 71,
+    "mode": "read_only",
+    "path": ".secrets/rapid_api_cache.json",
+    "purpose": "external_service_fixture_not_sage_task_cache",
+    "sha256": "3ed7732443c44d7d26e0f46ac32fa2e09fc773278368c6f13131021afafdbf25"
+  },
+  "registry": "artifacts/praxis_safety_repair/registries/praxis_bridgepack_combined_bridge_policy_v1/registry_manifest.json",
+  "registry_sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+  "run_controls": {
+    "candidate_task_cache": "off",
+    "control_cache": {
+      "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+      "cache_match_policy": "task_name_agent_user_base_tool_policy_min3",
+      "cached_control_tasks": 60,
+      "cohort_selection_influenced_by_cache": false,
+      "confidence_intervals_account_for_cached_control_variance": true,
+      "control_source": "cached",
+      "fresh_control_tasks": 0,
+      "mode": "use-if-eligible",
+      "task_level_fields": [
+        "scenario_key",
+        "agent_model",
+        "user_model",
+        "base_tool_policy"
+      ]
+    },
+    "diagnostic_force_calls": "absent",
+    "generation": "off",
+    "openai_response_cache": "disabled",
+    "routing_evidence": "disabled"
+  },
+  "run_name": "praxis_combined_bridge_policy_broad60_v4_bridge_repair_rapid_cache",
+  "run_root": "outputs/praxis_combined_bridge_policy/formal500_order_broad60_v4_bridge_repair_rapid_cache/mechanism_60_20260511_164637",
+  "status": "experimental_review_gate_not_protected_final_evidence",
+  "treatment": "praxis_registry_plus_feature_flagged_bridge_policy"
+}

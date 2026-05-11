@@ -1,8 +1,8 @@
 # Current State
 
 - Date: 2026-05-11
-- Last completed step: `praxis_combined_bridge_policy_first100_v2_same_code`
-- Last decision: `PROMISING_BUT_NOT_CLAIM_READY: combined_treatment_requires_clean_formal500`
+- Last completed step: `praxis_combined_bridge_policy_broad60_v4_bridge_repair_rapid_cache`
+- Last decision: `ON_TRACK_FOR_SCALE_GATE: combined_treatment_broad60_exceeds_prior_high_same60_but_requires_clean_100_or_250_before_formal500`
 - Primary metric: outcome/task-completion
 - Active frozen helpers: protected best3 remains `relative_day_time_to_timestamp, resolve_search_window_or_bounds, select_record_by_timestamp_extreme`; repaired Praxis v2 remains a registry-only review candidate; combined Praxis BridgePack is an experimental combined-treatment candidate only.
 - Active protected registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`
@@ -12,6 +12,7 @@
 - Praxis combined-treatment registry: `artifacts/praxis_safety_repair/registries/praxis_bridgepack_combined_bridge_policy_v1/registry_manifest.json`
 - Praxis combined-treatment registry SHA-256: `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`
 - Praxis combined-treatment runtime flag: `SAGE_PRAXIS_BRIDGE_POLICY=combined`
+- Praxis combined external-service cache: RapidAPI cache `read_only`, local ignored path `.secrets/rapid_api_cache.json`, SHA-256 `3ed7732443c44d7d26e0f46ac32fa2e09fc773278368c6f13131021afafdbf25`; this is an external ToolSandbox response fixture, not SAGE task cache.
 - Final-run preflight: `scripts/preflight_final_run.py`
 - Final-run preflight config: `docs/sage_protocol/final_run_preflight_config.json`
 - Final statistical analysis report: `docs/sage_protocol/final_statistical_analysis_report.md`
@@ -22,7 +23,10 @@
 - Current Task Compare dashboard default: `task_compare.html`; it is dark mode and reports paired completion as `min(baseline completed, SAGE completed)`.
 - Praxis combined first100 v2 same-code aggregate: canonical `0.654 -> 0.723`, delta `+0.069`, relative lift `+10.6%`; outcome `0.604 -> 0.737`, delta `+0.133`, relative lift `+22.0%`; exact successes `5 -> 20`; runtime exceptions `0`; side-effect preservation reports `0`.
 - Praxis combined first100 v2 summary: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_first100_v2_same_code_summary.json`
-- Praxis combined next step: clean matched formal500 under the declared combined treatment only after commit/preflight; do not update protected final claim artifacts from this branch.
+- Praxis combined broad60 v4 bridge-repair/RapidAPI-cache gate: canonical `0.695 -> 0.821`, delta `+0.126`, relative lift `+18.1%`; outcome `0.606 -> 0.916`, delta `+0.310`, relative lift `+51.2%`; control cache `60 cached / 0 fresh`; generated-tool called scenarios `27`; runtime exceptions `0`; generated-tool failures `0`.
+- Praxis combined broad60 v4 summary: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_broad60_v4_bridge_repair_rapid_cache_summary.json`, SHA-256 `c58b45cd67f5b6ff714f3f7569fc3c5e71752880e763eedebdd54abf9f89ea07`.
+- Praxis combined latest dashboard: `http://127.0.0.1:62538/outputs/praxis_combined_bridge_policy/formal500_order_broad60_v4_bridge_repair_rapid_cache/mechanism_60_20260511_164637/dashboard/task_compare.html`.
+- Praxis combined next step: clean same-code 100 or 250 scale gate under the declared combined treatment before spending a formal500; do not update protected final claim artifacts from this branch.
 - Cache/feedback trace caveat: cached controls are score-complete for metrics, but cached-only synthetic rows are labeled trace-incomplete in feedback packets when historical trajectories are unavailable.
 - Formal 100 run: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428`
 - Formal 100 dashboard: `outputs/v2_formal100_clean_20260504_025812_frozen_best3_relative_20260504_050423/validate_100_20260504_050428/dashboard/index.html`

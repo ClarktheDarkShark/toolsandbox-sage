@@ -26,6 +26,11 @@ It adds general task-solving policy, not benchmark answers:
 - Prefer retained helpers when a task asks for deterministic recency,
   selection, timestamp conversion, precondition planning, contact lookup, or
   final-action preparation.
+- Compose common helper sequences when the sequence is mechanically implied by
+  visible state, such as current timestamp -> bounded reminder search ->
+  visible-record selector -> timestamp conversion -> original `modify_reminder`.
+- Use scrambled-name compatibility so the same policy applies when ToolSandbox
+  exposes agent-facing tool aliases.
 - Pass scalar or list arguments from visible tool outputs into helpers instead
   of opaque state dictionaries.
 - Treat helper output as a prepared action or final-answer-ready value, while
@@ -53,6 +58,25 @@ The bridge policy does not:
 - enable SAGE/candidate task caching;
 - reuse prior SAGE traces as outcome evidence;
 - change the scorer.
+
+## External-Service Cache Policy
+
+RapidAPI-backed ToolSandbox tools are external service dependencies, not SAGE
+task caches. During quota-limited repair/review gates, the declared treatment
+may use the existing ToolSandbox RapidAPI request cache in read-only mode:
+
+```text
+TOOLSANDBOX_RAPID_CACHE_MODE=read_only
+TOOLSANDBOX_RAPID_CACHE_PATH=.secrets/rapid_api_cache.json
+```
+
+The cache is keyed by request URL, RapidAPI host, and request parameters. A
+cache hit returns the same external-service payload that a live call would have
+returned; a cache miss fails visibly instead of spending quota. This does not
+reuse prior SAGE traces or outcome evidence. Reports must record the cache
+hash and hit/miss policy. The cache used for the 2026-05-11 recovery gates had
+SHA-256 `3ed7732443c44d7d26e0f46ac32fa2e09fc773278368c6f13131021afafdbf25`;
+see `docs/sage_protocol/praxis_external_service_cache_manifest.md`.
 
 ## Research Integrity Controls
 
@@ -84,6 +108,7 @@ preflight:
     assert generation == off
     assert candidate_task_cache == off
     assert openai_response_cache == disabled
+    assert external_service_cache in {off, read_only_declared}
     assert routing_evidence in {disabled, pinned}
     assert no diagnostic force-call env vars
 
@@ -95,6 +120,7 @@ for task t in M:
 
     if B == combined:
         candidate_context += bridge_actor_rules
+        candidate_context += bridge_composers_for_visible_tool_outputs
 
     trajectory = run_candidate_fresh(t, candidate_context)
 
@@ -160,3 +186,9 @@ rules that make retained tools usable in natural runs.
 This branch is validating the combined treatment with the frozen high-lift
 registry and `SAGE_PRAXIS_BRIDGE_POLICY=combined`. Protected-claim promotion
 still requires clean matched formal validation with zero side-effect incidents.
+
+The latest same-code broad60 recovery gate used read-only RapidAPI external
+service cache and produced canonical lift `+18.1%` and outcome lift `+51.2%`
+with zero runtime or generated-tool failures. This is an encouraging scale-gate
+signal, not protected final evidence; the next expensive validation should be a
+clean 100 or 250 gate before any formal500 spend.
