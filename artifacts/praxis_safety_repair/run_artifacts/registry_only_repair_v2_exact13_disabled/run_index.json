@@ -1,0 +1,92 @@
+{
+  "runs": [
+    {
+      "updated_at": "2026-05-11T05:51:00.608100+00:00",
+      "run_root": "outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626",
+      "mode": "mechanism_40",
+      "manifest_type": "praxis_safety_repair_v2_exact13_formal_failure_recheck",
+      "status": "complete",
+      "agent": "gpt-4o-mini",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "user": {
+          "requested_model": "GPT_4_o_2024_05_13",
+          "resolved_model": "GPT_4_o_2024_05_13",
+          "known_model": false,
+          "comparison_key": "GPT_4_o_2024_05_13"
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+        "mixed_model_warning": null
+      },
+      "comparison_model_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+      "generation_enabled": false,
+      "base_tool_policy": "upstream",
+      "scenario_count": 13,
+      "control_dir": "outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626/control/mechanism_40_control_cached_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_11_2026_01_46_33",
+      "candidate_dir": "outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626/candidate/mechanism_40_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_11_2026_01_46_33",
+      "registry_dir": "artifacts/praxis_safety_repair/registries/praxis_bridgepack_registry_only_repair_v2",
+      "registry_gate_snapshot": {
+        "registry_dir": "artifacts/praxis_safety_repair/registries/praxis_bridgepack_registry_only_repair_v2",
+        "manifest_existed_before_run": true,
+        "snapshot_path": "outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626/registry_gate/registry_manifest_before_run.json",
+        "manifest_digest_before_run": "24e5ca815c6f3c11a8b226f10abbfba3216f854a5dcb284df860c4131a01cc35"
+      },
+      "registry_gate_restore": null,
+      "registry_manifest_digest_after_run": "24e5ca815c6f3c11a8b226f10abbfba3216f854a5dcb284df860c4131a01cc35",
+      "cohort_preflight_report": "outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626/cohort_preflight_report.json",
+      "cohort_preflight_warnings": [
+        "low_expected_helper_fit_share"
+      ],
+      "cohort_quality_gate_status": "pass",
+      "cohort_quality_gate_failures": [],
+      "comparison_path": "outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626/paired_comparison.json",
+      "control_cache_mode": "use-if-eligible",
+      "control_source": "cached",
+      "cached_control_tasks": 13,
+      "fresh_control_tasks": 0,
+      "control_cache_report_path": "outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626/control_cache_report.json",
+      "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+      "helper_contribution_summary_path": "outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626/helper_contribution_summary.json",
+      "helper_contribution_artifact_path": "artifacts/praxis_safety_repair/run_artifacts/registry_only_repair_v2_exact13_disabled/summaries/mechanism_40_20260511_014626/helper_contribution_summary.json",
+      "routing_evidence_mode": "disabled",
+      "routing_evidence_path": null,
+      "accepted_but_uncalled_tools": [],
+      "dashboard_path": "outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626/dashboard/index.html",
+      "dashboard_url": "http://127.0.0.1:62403/outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626/dashboard/index.html",
+      "dashboard_task_focus_url": "http://127.0.0.1:62403/outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626/dashboard/task_focus.html",
+      "parallel_arms": true,
+      "mean_similarity_delta": 0.05634422071725668,
+      "mean_outcome_similarity_delta": 0.26465018361591186,
+      "protocol_gate_passed": true,
+      "protocol_gate_reasons": []
+    }
+  ],
+  "updated_at": "2026-05-11T05:51:00.608117+00:00"
+}

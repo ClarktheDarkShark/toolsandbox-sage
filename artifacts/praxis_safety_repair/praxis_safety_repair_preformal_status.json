@@ -1,0 +1,52 @@
+{
+  "base_commit": "672af8ae6ea13770166e5f0e4e4dc01ece698497",
+  "branch": "repair/praxis-side-effect-zero",
+  "exact13_diagnostic": {
+    "candidate_canonical": 0.6510713957458931,
+    "candidate_outcome": 0.6107089765839506,
+    "candidate_task_cache": "off",
+    "canonical_delta": 0.05634422071725653,
+    "cohort_preflight_warnings": [
+      "low_expected_helper_fit_share"
+    ],
+    "cohort_quality_gate_status": "pass",
+    "control_cache": {
+      "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+      "cached_control_tasks": 13,
+      "fresh_control_tasks": 0,
+      "mode": "use-if-eligible"
+    },
+    "control_canonical": 0.5947271750286366,
+    "control_outcome": 0.34605879296803876,
+    "generation": "off",
+    "helper_side_effect_preservation_failures": 0,
+    "manifest": "artifacts/praxis_safety_repair/praxis_repair_v2_exact13_manifest.json",
+    "manifest_sha256": "ba510dc37147a4729b00b0ce2738c373a2ef555b9d852ad462f075f71ddc660f",
+    "openai_response_cache": "disabled",
+    "outcome_delta": 0.26465018361591186,
+    "routing_evidence_mode": "disabled",
+    "run_root": "outputs/praxis_safety_repair/registry_only_repair_v2_exact13_disabled/mechanism_40_20260511_014626",
+    "runtime_exceptions": 0,
+    "scenario_count": 13,
+    "side_effect_report_present": false
+  },
+  "experimental_source_commit_reference": "7793c8ca29ab4e121d302c777c4e4ad273226470",
+  "next_gate": "clean-tree preflight then matched formal500 best3, V2.6, repaired Praxis v2 with no code or registry changes between arms",
+  "registry_only_repair_status": "passed_narrow_safety_gate_pending_matched_formal500",
+  "repaired_registry": {
+    "active_entries": 12,
+    "path": "artifacts/praxis_safety_repair/registries/praxis_bridgepack_registry_only_repair_v2/registry_manifest.json",
+    "retired_entries": [
+      "plan_contact_relationship_batch_update"
+    ],
+    "sha256": "24e5ca815c6f3c11a8b226f10abbfba3216f854a5dcb284df860c4131a01cc35"
+  },
+  "schema_version": "praxis_safety_repair_preformal_status_v1",
+  "source_review_branch": "review/praxis-final-hardening",
+  "validation": {
+    "diff_check": "passed",
+    "minefield_checks": "passed; see artifacts/praxis_safety_repair/repair_v2_minefield_checks.json",
+    "registry_checks": "passed for best3 reference, V2.6 reference, repaired Praxis v2",
+    "unit_tests": "45 passed via python -m pytest on final preflight, control cache, routing scorer, helper contribution"
+  }
+}

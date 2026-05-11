@@ -1,0 +1,436 @@
+{
+  "check_count": 20,
+  "checks": [
+    {
+      "name": "ambiguous_contact_match_abstains",
+      "passed": true,
+      "result": {
+        "abstain_reason": "ambiguous_timestamp_tie",
+        "downstream_tool_kwargs": {},
+        "downstream_tool_name": "",
+        "final_answer_recommendation": "abstain:ambiguous_timestamp_tie",
+        "safety_notes": "abstain; no unique safe contact update target",
+        "selected_message": {},
+        "selected_message_id": "",
+        "selected_person_id": "",
+        "selected_phone_number": "",
+        "selected_record": {},
+        "selected_timestamp": 100.0,
+        "should_call_tool": false,
+        "tie_candidates": [
+          {
+            "creation_timestamp": 100.0,
+            "message_id": "m1",
+            "recipient_person_id": "22222222-2222-4222-8222-222222222222",
+            "recipient_phone_number": "+10000000002",
+            "sender_person_id": "11111111-1111-4111-8111-111111111111",
+            "sender_phone_number": "+10000000001"
+          },
+          {
+            "creation_timestamp": 100.0,
+            "message_id": "m2",
+            "recipient_person_id": "22222222-2222-4222-8222-222222222222",
+            "recipient_phone_number": "+10000000002",
+            "sender_person_id": "33333333-3333-4333-8333-333333333333",
+            "sender_phone_number": "+10000000003"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_contact_field_abstains",
+      "passed": true,
+      "result": {
+        "abstain_reason": "missing_counterparty_identity",
+        "downstream_tool_kwargs": {},
+        "downstream_tool_name": "",
+        "final_answer_recommendation": "abstain:missing_counterparty_identity",
+        "safety_notes": "abstain; no unique safe contact update target",
+        "selected_message": {
+          "creation_timestamp": 101.0,
+          "message_id": "m1"
+        },
+        "selected_message_id": "",
+        "selected_person_id": "",
+        "selected_phone_number": "",
+        "selected_record": {
+          "creation_timestamp": 101.0,
+          "message_id": "m1"
+        },
+        "selected_timestamp": 101.0,
+        "should_call_tool": false,
+        "tie_candidates": []
+      }
+    },
+    {
+      "name": "contact_update_missing_update_value_abstains",
+      "passed": true,
+      "result": {
+        "abstain_reason": "",
+        "downstream_tool_kwargs": {},
+        "downstream_tool_name": "modify_contact",
+        "final_answer_recommendation": "abstain:missing_update_fields",
+        "safety_notes": "safe target selected, but no user-visible contact update fields were provided",
+        "selected_message": {
+          "creation_timestamp": 102.0,
+          "message_id": "m3",
+          "recipient_person_id": "22222222-2222-4222-8222-222222222222",
+          "recipient_phone_number": "+10000000002",
+          "sender_person_id": "33333333-3333-4333-8333-333333333333",
+          "sender_phone_number": "+10000000003"
+        },
+        "selected_message_id": "m3",
+        "selected_person_id": "33333333-3333-4333-8333-333333333333",
+        "selected_phone_number": "+10000000003",
+        "selected_record": {
+          "creation_timestamp": 102.0,
+          "message_id": "m3",
+          "recipient_person_id": "22222222-2222-4222-8222-222222222222",
+          "recipient_phone_number": "+10000000002",
+          "sender_person_id": "33333333-3333-4333-8333-333333333333",
+          "sender_phone_number": "+10000000003"
+        },
+        "selected_timestamp": 102.0,
+        "should_call_tool": false,
+        "tie_candidates": []
+      }
+    },
+    {
+      "name": "contact_update_visible_value_is_checker_ready",
+      "passed": true,
+      "result": {
+        "abstain_reason": "",
+        "downstream_tool_kwargs": {
+          "person_id": "33333333-3333-4333-8333-333333333333"
+        },
+        "downstream_tool_name": "modify_contact",
+        "final_answer_recommendation": "call:modify_contact_with_selected_person_id_and_visible_update_fields",
+        "safety_notes": "safe contact id selected; call modify_contact next with selected_person_id and the user-visible update fields from the request",
+        "selected_message": {
+          "creation_timestamp": 102.0,
+          "message_id": "m3",
+          "recipient_person_id": "22222222-2222-4222-8222-222222222222",
+          "recipient_phone_number": "+10000000002",
+          "sender_person_id": "33333333-3333-4333-8333-333333333333",
+          "sender_phone_number": "+10000000003"
+        },
+        "selected_message_id": "m3",
+        "selected_person_id": "33333333-3333-4333-8333-333333333333",
+        "selected_phone_number": "+10000000003",
+        "selected_record": {
+          "creation_timestamp": 102.0,
+          "message_id": "m3",
+          "recipient_person_id": "22222222-2222-4222-8222-222222222222",
+          "recipient_phone_number": "+10000000002",
+          "sender_person_id": "33333333-3333-4333-8333-333333333333",
+          "sender_phone_number": "+10000000003"
+        },
+        "selected_timestamp": 102.0,
+        "should_call_tool": true,
+        "tie_candidates": []
+      }
+    },
+    {
+      "name": "relationship_update_missing_target_abstains",
+      "passed": true,
+      "result": {
+        "abstain_reason": "missing_target_relationship",
+        "downstream_tool_kwargs_list": [],
+        "downstream_tool_name": "",
+        "final_answer_recommendation": "abstain:missing_target_relationship",
+        "phase": "abstain",
+        "search_contacts_kwargs": {},
+        "selected_contacts": [],
+        "should_call_search_contacts": false,
+        "should_call_tool": false,
+        "should_call_tools": false,
+        "source_relationship": "friend",
+        "target_relationship": ""
+      }
+    },
+    {
+      "name": "relationship_self_update_abstains",
+      "passed": true,
+      "result": {
+        "abstain_reason": "unsafe_self_relationship_update",
+        "downstream_tool_kwargs_list": [],
+        "downstream_tool_name": "",
+        "final_answer_recommendation": "abstain:unsafe_self_relationship_update",
+        "phase": "abstain",
+        "search_contacts_kwargs": {},
+        "selected_contacts": [],
+        "should_call_search_contacts": false,
+        "should_call_tool": false,
+        "should_call_tools": false,
+        "source_relationship": "self",
+        "target_relationship": "enemy"
+      }
+    },
+    {
+      "name": "relationship_search_phase_not_immediate_side_effect",
+      "passed": true,
+      "result": {
+        "abstain_reason": "",
+        "downstream_tool_kwargs_list": [],
+        "downstream_tool_name": "",
+        "final_answer_recommendation": "call:search_contacts",
+        "phase": "search_required",
+        "search_contacts_kwargs": {
+          "relationship": "friend"
+        },
+        "selected_contacts": [],
+        "should_call_search_contacts": true,
+        "should_call_tool": false,
+        "should_call_tools": false,
+        "source_relationship": "friend",
+        "target_relationship": "enemy"
+      }
+    },
+    {
+      "name": "duplicate_names_do_not_block_id_based_relationship_update",
+      "passed": true,
+      "result": {
+        "abstain_reason": "",
+        "downstream_tool_kwargs_list": [
+          {
+            "person_id": "33333333-3333-4333-8333-333333333333",
+            "relationship": "enemy"
+          },
+          {
+            "person_id": "44444444-4444-4444-8444-444444444444",
+            "relationship": "enemy"
+          }
+        ],
+        "downstream_tool_name": "modify_contact",
+        "final_answer_recommendation": "call:modify_contact_for_each_selected_contact",
+        "phase": "action_batch_ready",
+        "search_contacts_kwargs": {
+          "relationship": "friend"
+        },
+        "selected_contacts": [
+          {
+            "is_self": false,
+            "name": "Duplicate Name",
+            "person_id": "33333333-3333-4333-8333-333333333333",
+            "relationship": "friend"
+          },
+          {
+            "is_self": false,
+            "name": "Duplicate Name",
+            "person_id": "44444444-4444-4444-8444-444444444444",
+            "relationship": "friend"
+          }
+        ],
+        "should_call_search_contacts": false,
+        "should_call_tool": true,
+        "should_call_tools": true,
+        "source_relationship": "friend",
+        "target_relationship": "enemy"
+      }
+    },
+    {
+      "name": "send_message_missing_recipient_abstains",
+      "passed": true,
+      "result": {
+        "abstain_reason": "missing_recipient_name",
+        "downstream_tool_name": "",
+        "final_answer_recommendation": "I need the recipient name or phone number before I can send that message.",
+        "message_content": "hello",
+        "next_step": "ask_for_recipient_or_phone_number",
+        "search_contacts_kwargs": {},
+        "should_call_search_contacts": false,
+        "should_call_tool": false
+      }
+    },
+    {
+      "name": "send_message_missing_content_abstains",
+      "passed": true,
+      "result": {
+        "abstain_reason": "missing_message_content",
+        "downstream_tool_name": "",
+        "final_answer_recommendation": "I need the message content before I can send that message.",
+        "message_content": "",
+        "next_step": "ask_for_message_content",
+        "search_contacts_kwargs": {},
+        "should_call_search_contacts": false,
+        "should_call_tool": false
+      }
+    },
+    {
+      "name": "send_message_contact_lookup_not_immediate_send",
+      "passed": true,
+      "result": {
+        "abstain_reason": "",
+        "downstream_tool_name": "send_message_with_phone_number",
+        "final_answer_recommendation": "search_contacts first; if cellular is disabled during send, enable cellular and retry once",
+        "message_content": "hello",
+        "next_step": "call search_contacts, then send_message_with_phone_number using the returned phone_number and this message_content",
+        "search_contacts_kwargs": {
+          "name": "Ada"
+        },
+        "should_call_search_contacts": true,
+        "should_call_tool": false
+      }
+    },
+    {
+      "name": "reminder_missing_weekday_abstains",
+      "passed": true,
+      "result": {
+        "add_reminder_kwargs": {},
+        "day_offset": 0,
+        "final_answer_recommendation": "abstain:invalid_reminder_time",
+        "ok": false,
+        "reason": "invalid_weekday_or_time",
+        "reminder_timestamp": 0.0,
+        "should_call_tool": false,
+        "timestamp": 0.0
+      }
+    },
+    {
+      "name": "reminder_weekday_positive_is_checker_ready",
+      "passed": true,
+      "result": {
+        "add_reminder_kwargs": {
+          "reminder_timestamp": 1778851800.0
+        },
+        "day_offset": 5,
+        "final_answer_recommendation": "use reminder_timestamp for add_reminder or modify_reminder",
+        "ok": true,
+        "reason": "next_weekday_time_resolved",
+        "reminder_timestamp": 1778851800.0,
+        "should_call_tool": true,
+        "timestamp": 1778851800.0,
+        "weekday_index": 4
+      }
+    },
+    {
+      "decision": {
+        "fair_chance_candidate": false,
+        "fair_chance_reason": "",
+        "matched_negative_triggers": [
+          "tool_name_scrambled"
+        ],
+        "matched_positive_triggers": [],
+        "matched_task_families": [],
+        "reason": "blocked_by_negative_trigger",
+        "score": -50,
+        "status": "hidden",
+        "tool_name": "plan_contact_relationship_batch_update",
+        "visible": false
+      },
+      "name": "plan_contact_relationship_batch_update_hidden_on_tool_name_scrambled",
+      "passed": true
+    },
+    {
+      "decision": {
+        "fair_chance_candidate": false,
+        "fair_chance_reason": "",
+        "matched_negative_triggers": [
+          "tool_name_scrambled"
+        ],
+        "matched_positive_triggers": [],
+        "matched_task_families": [],
+        "reason": "blocked_by_negative_trigger",
+        "score": -50,
+        "status": "hidden",
+        "tool_name": "next_weekday_time_to_timestamp",
+        "visible": false
+      },
+      "name": "next_weekday_time_to_timestamp_hidden_on_tool_name_scrambled",
+      "passed": true
+    },
+    {
+      "decision": {
+        "fair_chance_candidate": false,
+        "fair_chance_reason": "",
+        "matched_negative_triggers": [
+          "tool_name_scrambled"
+        ],
+        "matched_positive_triggers": [],
+        "matched_task_families": [],
+        "reason": "blocked_by_negative_trigger",
+        "score": -50,
+        "status": "hidden",
+        "tool_name": "plan_send_message_contact_lookup",
+        "visible": false
+      },
+      "name": "plan_send_message_contact_lookup_hidden_on_tool_name_scrambled",
+      "passed": true
+    },
+    {
+      "decision": {
+        "fair_chance_candidate": false,
+        "fair_chance_reason": "",
+        "matched_negative_triggers": [],
+        "matched_positive_triggers": [
+          "modify_contact_with_message_recency"
+        ],
+        "matched_task_families": [
+          "modify_contact_with_message_recency",
+          "trigger_or_family_fit"
+        ],
+        "reason": "blocked_by_missing_downstream_original_tool",
+        "score": 10,
+        "status": "hidden",
+        "tool_name": "select_message_counterparty_for_contact_update",
+        "visible": false
+      },
+      "name": "original_side_effect_tool_absent_hides_contact_update_selector",
+      "passed": true
+    },
+    {
+      "decision": {
+        "fair_chance_candidate": false,
+        "fair_chance_reason": "",
+        "matched_negative_triggers": [],
+        "matched_positive_triggers": [],
+        "matched_task_families": [],
+        "reason": "generic_relevance_score_insufficient",
+        "score": 2,
+        "status": "defer",
+        "tool_name": "select_message_counterparty_for_contact_update",
+        "visible": false
+      },
+      "name": "select_message_counterparty_for_contact_update_hidden_on_irrelevant_weather_family",
+      "passed": true
+    },
+    {
+      "decision": {
+        "fair_chance_candidate": false,
+        "fair_chance_reason": "",
+        "matched_negative_triggers": [],
+        "matched_positive_triggers": [],
+        "matched_task_families": [],
+        "reason": "generic_relevance_score_insufficient",
+        "score": 2,
+        "status": "defer",
+        "tool_name": "plan_contact_relationship_batch_update",
+        "visible": false
+      },
+      "name": "plan_contact_relationship_batch_update_hidden_on_irrelevant_weather_family",
+      "passed": true
+    },
+    {
+      "decision": {
+        "fair_chance_candidate": false,
+        "fair_chance_reason": "",
+        "matched_negative_triggers": [
+          "weather"
+        ],
+        "matched_positive_triggers": [],
+        "matched_task_families": [],
+        "reason": "blocked_by_negative_trigger",
+        "score": -50,
+        "status": "hidden",
+        "tool_name": "plan_send_message_contact_lookup",
+        "visible": false
+      },
+      "name": "plan_send_message_contact_lookup_hidden_on_irrelevant_weather_family",
+      "passed": true
+    }
+  ],
+  "failure_count": 0,
+  "registry_dir": "artifacts/praxis_safety_repair/registries/praxis_bridgepack_registry_only_repair_v1",
+  "registry_sha256": "83ec3734dfda2b3ab756e6ba3ed947a3e6a9864b18508a9fa9d75e6dc14aa733",
+  "schema_version": "praxis_safety_repair_minefield_v1"
+}

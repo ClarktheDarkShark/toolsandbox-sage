@@ -12,6 +12,24 @@
       "path": "artifacts/registry_candidates/v2_6_expanded_contact_scalar_pack/registry_manifest.json",
       "sha256": "ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582",
       "status": "secondary current-code candidate evidence"
+    },
+    {
+      "label": "praxis_review_best3_reference_copy",
+      "path": "artifacts/praxis_final_hardening/registries/best3_reference/registry_manifest.json",
+      "sha256": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf",
+      "status": "review-only reference copy of protected best3"
+    },
+    {
+      "label": "praxis_review_v2_6_reference_copy",
+      "path": "artifacts/praxis_final_hardening/registries/v2_6_reference/registry_manifest.json",
+      "sha256": "ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582",
+      "status": "review-only reference copy of V2.6"
+    },
+    {
+      "label": "praxis_registry_only_safety_repair_v2",
+      "path": "artifacts/praxis_safety_repair/registries/praxis_bridgepack_registry_only_repair_v2/registry_manifest.json",
+      "sha256": "24e5ca815c6f3c11a8b226f10abbfba3216f854a5dcb284df860c4131a01cc35",
+      "status": "review-only repaired Praxis candidate; not protected claim evidence unless matched validation passes"
     }
   ],
   "methodology_heuristics_path": "docs/sage_protocol/protocol_heuristics_v1.json",

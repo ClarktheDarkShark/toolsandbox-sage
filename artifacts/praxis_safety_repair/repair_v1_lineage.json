@@ -1,0 +1,18 @@
+{
+  "base_commit": "672af8ae6ea13770166e5f0e4e4dc01ece698497",
+  "branch": "repair/praxis-side-effect-zero",
+  "created_at": "2026-05-11T05:12:22.245517+00:00",
+  "experimental_source_commit_reference": "7793c8ca29ab4e121d302c777c4e4ad273226470",
+  "registry_sha256": "83ec3734dfda2b3ab756e6ba3ed947a3e6a9864b18508a9fa9d75e6dc14aa733",
+  "repair_summary": [
+    "select_message_counterparty_for_contact_update emits checker-visible should_call_tool=True when selected id and update fields are visible",
+    "plan_contact_relationship_batch_update emits singular should_call_tool and instructs later-batch modify_contact calls",
+    "next_weekday_time_to_timestamp, plan_send_message_contact_lookup, and plan_contact_relationship_batch_update are suppressed on tool_name_scrambled variants under registry-only repair v1",
+    "next_weekday_time_to_timestamp emits should_call_tool true/false for schedule success/abstain",
+    "plan_send_message_contact_lookup emits should_call_tool false because it prepares search_contacts before the original send tool"
+  ],
+  "repaired_registry": "artifacts/praxis_safety_repair/registries/praxis_bridgepack_registry_only_repair_v1",
+  "schema_version": "praxis_safety_repair_lineage_v1",
+  "source_registry": "artifacts/praxis_final_hardening/registries/praxis_bridgepack_frozen_candidate",
+  "source_review_branch": "review/praxis-final-hardening"
+}

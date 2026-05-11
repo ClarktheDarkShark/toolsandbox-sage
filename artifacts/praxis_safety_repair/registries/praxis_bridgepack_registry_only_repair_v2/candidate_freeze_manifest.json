@@ -1,0 +1,23 @@
+{
+  "schema_version": "sage_gap_closure_lab_candidate_freeze_v1",
+  "candidate_name": "Praxis BridgePack Frozen Candidate",
+  "frozen_at": "2026-05-10",
+  "branch": "exp/sage-gap-closure-lab",
+  "source_registry": "artifacts/registry_experiments/gap_closure_lab/action_precondition_loop/full_state_send_contact_relationship_pack/registry_manifest.json",
+  "registry_manifest_sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+  "source_experimental_evidence": "artifacts/experiment_manifests/gap_closure_lab/action_precondition_loop/bridgepack_clean_broad500_summary.json",
+  "claim_status": "experimental_candidate_frozen_for_locked_matched_formal_validation_not_final_claim",
+  "protected_assets_modified": false,
+  "formal_validation_plan": {
+    "manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+    "mode": "full_benchmark",
+    "generation": "off",
+    "control_cache": "use-if-eligible",
+    "candidate_task_cache": "off",
+    "openai_response_cache": "disabled",
+    "matched_reference_registries": [
+      "artifacts/registry_experiments/gap_closure_lab/best3_reference_copy",
+      "artifacts/registry_experiments/gap_closure_lab/best3_v26_reference_copy"
+    ]
+  }
+}

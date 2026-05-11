@@ -1,0 +1,62 @@
+{
+  "runs": [
+    {
+      "updated_at": "2026-05-11T05:16:16.133502+00:00",
+      "run_root": "outputs/praxis_safety_repair/registry_only_repair_v1_targeted77/mechanism_40_20260511_011606",
+      "mode": "mechanism_40",
+      "manifest_type": "praxis_safety_repair_v1_targeted_side_effect_and_family_variants",
+      "status": "running",
+      "agent": "gpt-4o-mini",
+      "model_metadata": {
+        "agent": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "generation": {
+          "api_model": "gpt-4o-mini",
+          "family": "gpt-4o",
+          "context_window": 128000,
+          "max_output_tokens": 16384,
+          "chat_completions": true,
+          "function_calling": true,
+          "structured_outputs": true,
+          "temperature_supported": true,
+          "requested_model": "gpt-4o-mini",
+          "resolved_model": "gpt-4o-mini",
+          "known_model": true,
+          "comparison_key": "gpt-4o-mini"
+        },
+        "user": {
+          "requested_model": "GPT_4_o_2024_05_13",
+          "resolved_model": "GPT_4_o_2024_05_13",
+          "known_model": false,
+          "comparison_key": "GPT_4_o_2024_05_13"
+        },
+        "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=GPT_4_o_2024_05_13",
+        "mixed_model_warning": null
+      },
+      "generation_enabled": false,
+      "base_tool_policy": "upstream",
+      "scenario_count": 77,
+      "cohort_preflight_report": "outputs/praxis_safety_repair/registry_only_repair_v1_targeted77/mechanism_40_20260511_011606/cohort_preflight_report.json",
+      "cohort_preflight_warnings": [
+        "too_few_base_families",
+        "near_duplicate_family_variants_above_limit",
+        "low_expected_helper_fit_share"
+      ],
+      "cohort_quality_gate_status": "fail",
+      "routing_evidence_mode": "auto"
+    }
+  ],
+  "updated_at": "2026-05-11T05:16:16.133514+00:00"
+}

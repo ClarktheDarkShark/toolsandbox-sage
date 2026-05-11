@@ -1,0 +1,73 @@
+{
+  "cache_policy": {
+    "candidate": "fresh; task cache off; OpenAI response cache disabled",
+    "control": "use-if-eligible task-level control cache"
+  },
+  "cohort_diversity_report": {
+    "near_duplicate_assessment": "intentionally concentrated by failure mode; not used for outcome claims",
+    "purpose": "contains only the formal500 side-effect failure scenarios for exact safety regression testing",
+    "scenario_count": 13
+  },
+  "labels_inspected": false,
+  "manifest_type": "praxis_safety_repair_v2_exact13_formal_failure_recheck",
+  "routing_evidence_policy": "disabled for final-style safety recheck",
+  "source_blocker_summary": "artifacts/praxis_final_hardening/praxis_final_hardening_summary.json",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "splits": {
+    "mechanism_40": [
+      {
+        "name": "modify_contact_with_message_recency",
+        "source_failure_helper": "select_message_counterparty_for_contact_update"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools",
+        "source_failure_helper": "plan_contact_relationship_batch_update"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled",
+        "source_failure_helper": "plan_contact_relationship_batch_update"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+        "source_failure_helper": "plan_contact_relationship_batch_update"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_tool_name_scrambled",
+        "source_failure_helper": "next_weekday_time_to_timestamp"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_name_scrambled",
+        "source_failure_helper": "plan_send_message_contact_lookup"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_tool_name_scrambled",
+        "source_failure_helper": "plan_contact_relationship_batch_update"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled",
+        "source_failure_helper": "plan_contact_relationship_batch_update"
+      },
+      {
+        "name": "modify_contact_with_message_recency_all_tools",
+        "source_failure_helper": "select_message_counterparty_for_contact_update"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt",
+        "source_failure_helper": "select_message_counterparty_for_contact_update"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_10_distraction_tools",
+        "source_failure_helper": "select_message_counterparty_for_contact_update"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_3_distraction_tools",
+        "source_failure_helper": "select_message_counterparty_for_contact_update"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_3_distraction_tools",
+        "source_failure_helper": "plan_contact_relationship_batch_update"
+      }
+    ]
+  },
+  "strategy": "Exact 13-scenario recheck of the Praxis final-hardening side-effect preservation failures using the repaired registry. This is safety diagnostic evidence only, not promotion evidence."
+}

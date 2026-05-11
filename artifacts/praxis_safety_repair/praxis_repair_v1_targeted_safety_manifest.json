@@ -1,0 +1,483 @@
+{
+  "manifest_type": "praxis_safety_repair_v1_targeted_side_effect_and_family_variants",
+  "strategy": "Targeted safety diagnostic manifest for Praxis registry-only side-effect repair. Contains the 13 formal500 side-effect failure scenarios plus nearby family variants; not claim evidence.",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "splits": {
+    "mechanism_40": [
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time"
+      },
+      {
+        "name": "modify_contact_with_message_recency"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_all_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_all_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_all_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_all_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_all_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_all_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_arg_description_scrambled"
+      }
+    ],
+    "full_benchmark": [
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time"
+      },
+      {
+        "name": "modify_contact_with_message_recency"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_all_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_all_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_all_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_all_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_all_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_all_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_all_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_alt_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_alt_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_alt_3_distraction_tools_arg_description_scrambled"
+      }
+    ]
+  },
+  "cohort_diversity_report": {
+    "scenario_count": 77,
+    "families": [
+      "modify_contact_with_message_recency",
+      "update_contact_relationship_with_relationship",
+      "add_reminder_content_and_weekday_delta_and_time",
+      "send_message_with_contact_content_cellular_off"
+    ],
+    "label_access": "no hidden labels used; selected by failing side-effect report and explicit family prefixes only"
+  }
+}
