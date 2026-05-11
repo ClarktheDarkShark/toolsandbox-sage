@@ -1,0 +1,40 @@
+{
+  "schema_version": "sage_final_run_preflight_config_v1",
+  "protected_registries": [
+    {
+      "label": "praxis_review_best3_reference_copy",
+      "path": "artifacts/praxis_final_hardening/registries/best3_reference/registry_manifest.json",
+      "sha256": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf",
+      "status": "review-only copy of protected best3 reference"
+    },
+    {
+      "label": "praxis_review_v2_6_reference_copy",
+      "path": "artifacts/praxis_final_hardening/registries/v2_6_reference/registry_manifest.json",
+      "sha256": "ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582",
+      "status": "review-only copy of V2.6 contact-scalar reference"
+    },
+    {
+      "label": "praxis_bridgepack_frozen_candidate",
+      "path": "artifacts/praxis_final_hardening/registries/praxis_bridgepack_frozen_candidate/registry_manifest.json",
+      "sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+      "status": "review-only frozen Praxis BridgePack candidate"
+    }
+  ],
+  "methodology_heuristics_path": "docs/sage_protocol/protocol_heuristics_v1.json",
+  "final_frozen_modes": [
+    "validate_100",
+    "validate_250",
+    "promotion_250",
+    "full_benchmark"
+  ],
+  "required_control_cache_mode": "use-if-eligible",
+  "allowed_final_routing_evidence_modes": [
+    "disabled",
+    "pinned"
+  ],
+  "diagnostic_force_env_vars": [
+    "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME",
+    "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_ERROR",
+    "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_BASE_TOOL"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "cache_index_sha256": "a44ec43354df7a1ee0356ab1b6be16a03375ea0852a5b2531319ecfd6588d507",
+  "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+  "cache_match_policy": "task_name_agent_user_base_tool_policy_min3",
+  "cached": 500,
+  "fresh": 0,
+  "root": "artifacts/baselines/control_task_baselines",
+  "scenario_count": 500,
+  "task_level_fields": [
+    "scenario_key",
+    "agent_model",
+    "user_model",
+    "base_tool_policy"
+  ]
+}

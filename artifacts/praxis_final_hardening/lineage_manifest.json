@@ -1,0 +1,60 @@
+{
+  "base_commit": "2898c7e502ec75ad5e1fc65c5ffe7a80f5605f4a",
+  "branch": "review/praxis-final-hardening",
+  "control_cache_plan": {
+    "cache_index_sha256": "a44ec43354df7a1ee0356ab1b6be16a03375ea0852a5b2531319ecfd6588d507",
+    "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "cache_match_policy": "task_name_agent_user_base_tool_policy_min3",
+    "cached": 500,
+    "fresh": 0,
+    "root": "artifacts/baselines/control_task_baselines",
+    "scenario_count": 500,
+    "task_level_fields": [
+      "scenario_key",
+      "agent_model",
+      "user_model",
+      "base_tool_policy"
+    ]
+  },
+  "created_at_utc": "2026-05-11T02:32:07.657016+00:00",
+  "experimental_source_commit": "7793c8ca29ab4e121d302c777c4e4ad273226470",
+  "formal_manifest": {
+    "path": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+    "sha256": "093547e7a89e704e67d4cea85fd96511063becd0b5542ba3abf21c242453bbbf"
+  },
+  "imported_files": [
+    {
+      "path": "artifacts/praxis_final_hardening/registries/best3_reference/registry_manifest.json",
+      "sha256": "76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf",
+      "source": "artifacts/registry_experiments/gap_closure_lab/best3_reference_copy/registry_manifest.json"
+    },
+    {
+      "path": "artifacts/praxis_final_hardening/registries/v2_6_reference/registry_manifest.json",
+      "sha256": "ab5f5c369717ce4a5bf0d0a7262a4f44f7f13bab1bf69eb38041392986b0e582",
+      "source": "artifacts/registry_experiments/gap_closure_lab/best3_v26_reference_copy/registry_manifest.json"
+    },
+    {
+      "path": "artifacts/praxis_final_hardening/registries/praxis_bridgepack_frozen_candidate/registry_manifest.json",
+      "sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+      "source": "artifacts/registry_experiments/gap_closure_lab/praxis_bridgepack_frozen_candidate/registry_manifest.json"
+    },
+    {
+      "path": "src/sage_ts/evaluation/control_baseline_cache.py",
+      "sha256": "3aa53e925ef284c5cab06686021504abc4cd4cea8e5ac80a4cf158f2eb9c7886",
+      "source": "src/sage_ts/evaluation/control_baseline_cache.py"
+    },
+    {
+      "path": "tests/unit/test_control_baseline_cache.py",
+      "sha256": "4b349ea796bacc76c5649df5e2ad64175a590fcc244964755b18c415be50a844",
+      "source": "tests/unit/test_control_baseline_cache.py"
+    }
+  ],
+  "intentionally_not_imported": [
+    "scripts/run_sage_protocol.py experimental changes",
+    "src/sage_ts/adapters/openai_toolsandbox_roles.py experimental bridge-policy changes for initial registry-only validation",
+    "src/sage_ts/evaluation/outcome_score.py experimental scoring changes",
+    "src/sage_ts/runtime/routing_scorer.py experimental routing changes",
+    "dashboard/task-compare experimental exports until after validation setup"
+  ],
+  "schema_version": "praxis_final_hardening_lineage_v1"
+}

@@ -131,15 +131,47 @@ def test_eligibility_requires_three_compatible_completed_runs(tmp_path: Path) ->
     assert lookup.stats["canonical_variance"] > 0
 
 
-def test_incompatibility_after_model_scorer_or_scenario_change(tmp_path: Path) -> None:
+def test_task_level_cache_ignores_state_runner_scorer_and_sandbox_changes(
+    tmp_path: Path,
+) -> None:
     cache = ControlBaselineCache(tmp_path / "cache")
     ctx = _context()
     for _ in range(3):
         _add(cache, ctx, _row(), tmp_path)
 
-    assert cache.lookup(_context(model="gpt-4o-mini")).eligible
+    changed = {
+        **ctx,
+        "scenario_checksum": "different-scenario-checksum",
+        "initial_state_checksum": "different-initial-state",
+        "runner_version": "different-runner",
+        "scorer_version": "different-scorer",
+        "toolsandbox_version": "different-sandbox",
+        "manifest_checksum": "different-manifest",
+        "prompt_hashes": {"agent_role": "changed", "user_role": "changed"},
+        "model_version": "different-model-version-string",
+        "model_parameters_hash": "different-model-params",
+    }
+
+    lookup = cache.lookup(changed)
+
+    assert lookup.eligible
+    assert lookup.stats is not None
+    assert lookup.stats["cache_match_policy"] == (
+        "task_name_agent_user_base_tool_policy_min3"
+    )
+
+
+def test_task_level_cache_still_separates_model_user_policy_and_task(
+    tmp_path: Path,
+) -> None:
+    cache = ControlBaselineCache(tmp_path / "cache")
+    ctx = _context()
+    for _ in range(3):
+        _add(cache, ctx, _row(), tmp_path)
+
     assert not cache.lookup(_context(model="different-model")).eligible
-    assert not cache.lookup(_context(scorer="new-scorer")).eligible
+    assert not cache.lookup({**ctx, "user_model": "different-user"}).eligible
+    assert not cache.lookup({**ctx, "base_tool_policy": "different-policy"}).eligible
     assert not cache.lookup(_context(name="different-task")).eligible
 
 
