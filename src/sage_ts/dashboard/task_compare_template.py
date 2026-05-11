@@ -344,6 +344,30 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     const relLift = (delta, baseline) => finite(delta) && finite(baseline) && Number(baseline) !== 0 ? Number(delta) / Number(baseline) : null;
     const cls = (v) => Number(v || 0) > 0 ? "good" : Number(v || 0) < 0 ? "bad" : "";
     const outcome = (row) => row?.outcome_similarity ?? row?.outcome_milestone_similarity ?? null;
+    const completeStatus = (row) => row?.status === "complete" || row?.status === "cached" || row?.status === "done";
+    const mean = (values) => {
+      const nums = values.filter(finite).map(Number);
+      return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+    };
+    const pairedMetricRows = () => pairs.filter((pair) => completeStatus(pair.control) && completeStatus(pair.candidate));
+    function pairedMetrics(summary) {
+      const paired = pairedMetricRows();
+      const scoreRows = paired.filter((pair) => finite(pair.control?.similarity) && finite(pair.candidate?.similarity));
+      const outcomeRows = paired.filter((pair) => finite(outcome(pair.control)) && finite(outcome(pair.candidate)));
+      const baselineScore = mean(scoreRows.map((pair) => pair.control.similarity));
+      const sageScore = mean(scoreRows.map((pair) => pair.candidate.similarity));
+      const baselineOutcome = mean(outcomeRows.map((pair) => outcome(pair.control)));
+      const sageOutcome = mean(outcomeRows.map((pair) => outcome(pair.candidate)));
+      return {
+        pairedCount: paired.length,
+        scoreCount: scoreRows.length,
+        outcomeCount: outcomeRows.length,
+        baselineScore: baselineScore ?? summary.balanced_control_mean_similarity ?? null,
+        sageScore: sageScore ?? summary.balanced_candidate_mean_similarity ?? null,
+        baselineOutcome: baselineOutcome ?? summary.balanced_control_mean_outcome_similarity ?? null,
+        sageOutcome: sageOutcome ?? summary.balanced_candidate_mean_outcome_similarity ?? null,
+      };
+    }
     let payload = null;
     let pairs = [];
     let selected = 0;
@@ -364,23 +388,25 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const baselineDone = s.control_completed ?? 0;
       const sageDone = s.candidate_completed ?? s.current_completed ?? 0;
       const matched = Math.min(baselineDone, sageDone);
-      const baselineScore = s.balanced_control_mean_similarity ?? s.control_mean_similarity ?? null;
-      const sageScore = s.balanced_candidate_mean_similarity ?? s.candidate_mean_similarity ?? s.current_mean_similarity ?? null;
-      const scoreDelta = s.balanced_delta ?? (finite(baselineScore) && finite(sageScore) ? Number(sageScore) - Number(baselineScore) : null);
-      const scoreLift = finite(s.balanced_lift_percent) ? Number(s.balanced_lift_percent) / 100 : relLift(scoreDelta, baselineScore);
-      const baselineOutcome = s.balanced_control_mean_outcome_similarity ?? s.control_mean_outcome_similarity ?? null;
-      const sageOutcome = s.balanced_candidate_mean_outcome_similarity ?? s.candidate_mean_outcome_similarity ?? null;
-      const outcomeDelta = s.balanced_outcome_delta ?? (finite(baselineOutcome) && finite(sageOutcome) ? Number(sageOutcome) - Number(baselineOutcome) : null);
+      const paired = pairedMetrics(s);
+      const baselineScore = paired.baselineScore;
+      const sageScore = paired.sageScore;
+      const scoreDelta = finite(baselineScore) && finite(sageScore) ? Number(sageScore) - Number(baselineScore) : null;
+      const scoreLift = relLift(scoreDelta, baselineScore);
+      const baselineOutcome = paired.baselineOutcome;
+      const sageOutcome = paired.sageOutcome;
+      const outcomeDelta = finite(baselineOutcome) && finite(sageOutcome) ? Number(sageOutcome) - Number(baselineOutcome) : null;
       const outcomeLift = relLift(outcomeDelta, baselineOutcome);
       const used = tools.called_tool_count ?? 0;
       const total = tools.registry_tool_count ?? tools.tool_count ?? 0;
       document.getElementById("metrics").innerHTML = [
         metric("Run Progress", `${matched || 0}/${totalTasks || 0}`, `paired complete; baseline ${baselineDone}/${totalTasks || 0} · SAGE ${sageDone}/${totalTasks || 0}`),
-        metric("Baseline Score", num(baselineScore), `${matched || 0} matched tasks`),
-        metric("SAGE Score", num(sageScore), `${s.candidate_completed || 0}/${s.scenario_count || 0} candidate done`),
-        metric("Score Delta", signedNum(scoreDelta), `${signedPct(scoreLift)} lift vs baseline`, cls(scoreDelta)),
-        metric("Baseline Outcome", num(baselineOutcome), "task completion"),
-        metric("SAGE Outcome", num(sageOutcome), "task completion"),
+        metric("Baseline Score", num(baselineScore), `${paired.scoreCount || matched || 0} paired score tasks`),
+        metric("SAGE Score", num(sageScore), `${paired.scoreCount || matched || 0} paired score tasks`),
+        metric("Score Delta", signedNum(scoreDelta), "absolute score change", cls(scoreDelta)),
+        metric("Score Lift", signedPct(scoreLift), `${signedNum(scoreDelta)} score delta`, cls(scoreDelta)),
+        metric("Baseline Outcome", num(baselineOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
+        metric("SAGE Outcome", num(sageOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("Outcome Lift", signedPct(outcomeLift), `${signedNum(outcomeDelta)} outcome delta`, cls(outcomeDelta)),
         metric("Tools Born / Used", `${tools.generated_tool_birth_count || 0} / ${used}`, `${total} registry tools; click for contribution`, "warn", true),
       ].join("");
@@ -464,6 +490,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
             <div class="mini"><div class="label">Baseline Score</div><div class="value">${pct(control.similarity)}</div></div>
             <div class="mini"><div class="label">SAGE Score</div><div class="value">${pct(candidate.similarity)}</div></div>
             <div class="mini"><div class="label">Score Delta</div><div class="value ${cls(d.scoreDelta)}">${signedNum(d.scoreDelta)}</div><div class="hint">${signedPct(relLift(d.scoreDelta, control.similarity))} lift</div></div>
+            <div class="mini"><div class="label">Score Lift</div><div class="value ${cls(d.scoreDelta)}">${signedPct(relLift(d.scoreDelta, control.similarity))}</div><div class="hint">${signedNum(d.scoreDelta)} score delta</div></div>
             <div class="mini"><div class="label">Outcome Lift</div><div class="value ${cls(d.outcomeDelta)}">${signedPct(relLift(d.outcomeDelta, outcome(control)))}</div><div class="hint">${num(outcome(control))} -> ${num(outcome(candidate))}; delta ${signedNum(d.outcomeDelta)}</div></div>
             <div class="mini"><div class="label">Baseline Turns</div><div class="value">${esc(control.turn_count ?? "-")}</div></div>
             <div class="mini"><div class="label">SAGE Turns</div><div class="value">${esc(candidate.turn_count ?? "-")}</div></div>

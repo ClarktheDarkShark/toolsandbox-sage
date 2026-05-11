@@ -1,0 +1,20 @@
+{
+  "manifest_type": "praxis_timeout_recheck_single_task_diagnostic",
+  "source_manifest": "artifacts/praxis_combined_bridge_policy/manifests/praxis_fragile_adoption_screen20.json",
+  "selection_rule": "Re-run only the task that hit a transient OpenAI timeout in the fragile screen after adding transient API retry logic. Diagnostic only; not claim evidence.",
+  "labels_inspected": false,
+  "cache_selection_used": false,
+  "splits": {
+    "mechanism_12": [
+      {"name": "search_relationship_with_phone_number"}
+    ]
+  },
+  "integrity_controls": {
+    "final_claim_evidence": false,
+    "candidate_cache_allowed": false,
+    "control_cache_policy": "use-if-eligible",
+    "openai_response_cache": "disabled",
+    "routing_evidence_mode": "disabled",
+    "generation": "off"
+  }
+}

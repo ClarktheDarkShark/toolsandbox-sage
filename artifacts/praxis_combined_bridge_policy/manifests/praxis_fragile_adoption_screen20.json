@@ -1,0 +1,52 @@
+{
+  "manifest_type": "praxis_fragile_adoption_screen20_diagnostic",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "source_manifest_sha256": "093547e7a89e704e67d4cea85fd96511063becd0b5542ba3abf21c242453bbbf",
+  "selection_rule": "Diagnostic-only mix of broad formal tasks that showed low or high-variance Praxis contribution in prior first-60 screens, plus nearby recency/action/contact/settings tasks. Scenario names only; no truth labels inspected for tool logic.",
+  "labels_inspected": false,
+  "cache_selection_used": false,
+  "splits": {
+    "mechanism_40": [
+      {"name": "search_phone_number_with_name"},
+      {"name": "search_relationship_with_phone_number"},
+      {"name": "search_name_with_relationship"},
+      {"name": "modify_reminder_with_recency_latest"},
+      {"name": "modify_reminder_with_recency_latest_insufficient_information"},
+      {"name": "remove_reminder_with_recency_latest"},
+      {"name": "search_reminder_with_recency_upcoming"},
+      {"name": "search_reminder_with_recency_upcoming_implicit"},
+      {"name": "search_reminder_with_recency_yesterday"},
+      {"name": "search_reminder_with_recency_yesterday_implicit"},
+      {"name": "turn_on_cellular_low_battery_mode_implicit"},
+      {"name": "turn_on_cellular_low_battery_mode"},
+      {"name": "turn_on_wifi_low_battery_mode"},
+      {"name": "turn_on_location_low_battery_mode_implicit"},
+      {"name": "turn_on_location_low_battery_mode"},
+      {"name": "update_contact_with_id_and_phone_number"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information"},
+      {"name": "send_message_with_contact_content_cellular_off"},
+      {"name": "send_message_with_contact_content_cellular_off_insufficient_information"},
+      {"name": "add_reminder_content_and_week_delta_and_time"}
+    ]
+  },
+  "cohort_diversity_report": {
+    "scenario_count": 20,
+    "diagnostic_buckets": [
+      "contact scalar lookup",
+      "reminder recency search/action",
+      "relative reminder timestamp conversion",
+      "settings/device-state preconditions",
+      "send-message preconditions",
+      "safe insufficient-information abstention"
+    ],
+    "near_duplicate_risk": "Intentional diagnostic concentration across fragile buckets; not claim evidence."
+  },
+  "integrity_controls": {
+    "final_claim_evidence": false,
+    "candidate_cache_allowed": false,
+    "control_cache_policy": "use-if-eligible",
+    "openai_response_cache": "disabled",
+    "routing_evidence_mode": "disabled",
+    "generation": "off"
+  }
+}

@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Iterable, Literal, Mapping, Union, cast
 
-from openai import NOT_GIVEN, NotGiven
+from openai import (
+    NOT_GIVEN,
+    APIConnectionError,
+    APITimeoutError,
+    InternalServerError,
+    NotGiven,
+    RateLimitError,
+)
 from openai.types.chat import (
     ChatCompletion,
     ChatCompletionMessage,
@@ -23,6 +31,7 @@ SELECTOR_ACTOR_POLICY_SENTINEL = "[SAGE selector actor policy]"
 DERIVED_ACTOR_POLICY_SENTINEL = "[SAGE derived-value actor policy]"
 LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL = "[SAGE lookup-planner actor policy]"
 SEARCH_WINDOW_ACTOR_POLICY_SENTINEL = "[SAGE search-window actor policy]"
+RELATIVE_TIME_ACTOR_POLICY_SENTINEL = "[SAGE relative-time actor policy]"
 SAFE_ARGUMENT_ACTOR_POLICY_SENTINEL = "[SAGE safe-argument actor policy]"
 ANSWER_RETENTION_ACTOR_POLICY_SENTINEL = "[SAGE answer-retention actor policy]"
 TEMPORAL_ANCHOR_ACTOR_POLICY_SENTINEL = "[SAGE temporal-anchor actor policy]"
@@ -31,6 +40,13 @@ OpenAIMessage = dict[
     Literal["role", "content", "tool_call_id", "name", "tool_calls"],
     Any,
 ]
+TRANSIENT_OPENAI_EXCEPTIONS = (
+    APIConnectionError,
+    APITimeoutError,
+    InternalServerError,
+    RateLimitError,
+)
+TRANSIENT_OPENAI_RETRY_DELAYS = (1.0, 3.0)
 
 ORIGINAL_TOOLSANDBOX_TOOL_NAMES = {
     "add_contact",
@@ -73,6 +89,18 @@ ORIGINAL_TOOLSANDBOX_TOOL_NAMES = {
 def _praxis_bridge_policy_enabled() -> bool:
     raw = os.environ.get(PRAXIS_BRIDGE_POLICY_ENV, "").strip().lower()
     return raw in {"1", "true", "yes", "on", "combined", "full"}
+
+
+def _with_transient_openai_retries(call: Any) -> ChatCompletion:
+    """Retry only transient OpenAI transport/service failures."""
+    for attempt in range(len(TRANSIENT_OPENAI_RETRY_DELAYS) + 1):
+        try:
+            return cast(ChatCompletion, call())
+        except TRANSIENT_OPENAI_EXCEPTIONS:
+            if attempt >= len(TRANSIENT_OPENAI_RETRY_DELAYS):
+                raise
+            time.sleep(TRANSIENT_OPENAI_RETRY_DELAYS[attempt])
+    raise RuntimeError("unreachable_openai_retry_state")
 
 
 def _tool_names(
@@ -308,6 +336,41 @@ def _search_window_tool_names(openai_tools: object) -> set[str]:
     return helpers
 
 
+def _relative_time_tool_names(openai_tools: object) -> set[str]:
+    """Return helpers that convert visible relative local times to timestamps."""
+    if openai_tools is NOT_GIVEN:
+        return set()
+    helpers: set[str] = set()
+    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
+        function = tool.get("function", {})
+        if not isinstance(function, dict):
+            continue
+        name = function.get("name")
+        description = str(function.get("description", "")).lower()
+        parameters = function.get("parameters", {})
+        properties: object = {}
+        if isinstance(parameters, dict):
+            properties = parameters.get("properties", {})
+        input_names = set(properties) if isinstance(properties, dict) else set()
+        if not isinstance(name, str):
+            continue
+        is_relative_time_helper = name == "relative_day_time_to_timestamp" or (
+            {"current_timestamp", "day_offset", "hour", "minute"}.issubset(input_names)
+            and any(
+                token in f"{name} {description}"
+                for token in (
+                    "relative local day",
+                    "relative day",
+                    "tomorrow",
+                    "timestamp",
+                )
+            )
+        )
+        if is_relative_time_helper:
+            helpers.add(name)
+    return helpers
+
+
 def _tool_content_has_candidate_records(content: object) -> bool:
     text = str(content or "").strip()
     if not text or text.lower() in {"[]", "{}", "null", "none"}:
@@ -440,25 +503,23 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
 
 
 def _recent_tool_backed_answer_text(openai_messages: object) -> str | None:
-    saw_tool = False
+    pending_tool_result = False
     answer: str | None = None
     for message in cast(Iterable[Mapping[str, Any]], openai_messages):
         role = message.get("role")
         if role == "tool":
-            saw_tool = True
+            pending_tool_result = True
             continue
-        if role != "assistant" or not saw_tool:
+        if role == "user":
             continue
-        content = str(message.get("content", "") or "").strip()
-        if len(content) < 8:
-            continue
-        lower = content.lower()
-        if lower.startswith(("you're welcome", "you are welcome")):
-            continue
-        if any(
-            token in lower
-            for token in (" is ", " are ", "phone", "+", "boss", "message", "says")
-        ):
+        if role == "assistant" and pending_tool_result:
+            pending_tool_result = False
+            content = str(message.get("content", "") or "").strip()
+            if len(content) < 8:
+                continue
+            lower = content.lower()
+            if lower.startswith(("you're welcome", "you are welcome")):
+                continue
             answer = content
     return answer
 
@@ -638,11 +699,47 @@ def _search_window_actor_policy_message(
             "search tool in target_tool_name with search_kwargs. Never call "
             "search_messages or search_reminder with blank strings, null values, "
             "or no criteria when a recency phrase can be converted into bounds. "
+            "For modify/remove actions targeting the latest, oldest, most recent, "
+            "or upcoming reminder/message, first use the helper to locate the "
+            "target record with a bounded original search, then call the original "
+            "side-effect tool only with the concrete visible id from that result. "
             "If that search returns multiple records and a visible-record selector "
             "helper is also available, call the selector before answering; do not "
             "manually pick the first returned record when the user asked for latest "
             "or oldest. Do not call this helper on insufficient-information tasks "
             "or when no time/recency search phrase is present."
+        ),
+    }
+
+
+def _relative_time_actor_policy_message(
+    openai_messages: object,
+    openai_tools: object,
+) -> dict[str, str] | None:
+    """Bounded policy nudge for relative day/time conversion helpers."""
+    helpers = _relative_time_tool_names(openai_tools)
+    if not helpers:
+        return None
+    if any(_message_already_called_tool(openai_messages, name) for name in helpers):
+        return None
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        if RELATIVE_TIME_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
+            return None
+    helper_list = ", ".join(sorted(helpers))
+    return {
+        "role": "system",
+        "content": (
+            f"{RELATIVE_TIME_ACTOR_POLICY_SENTINEL} A deterministic relative "
+            f"day/time timestamp helper is available: {helper_list}. If the user "
+            "asks to add or modify a reminder for a relative day plus explicit "
+            "time, such as tomorrow at 5 PM, first call get_current_timestamp "
+            "when available and then call this helper with the visible day offset, "
+            "hour, minute, and local UTC offset. Use the returned timestamp in "
+            "the original add_reminder or modify_reminder call. Do not call the "
+            "helper when the user omitted the target day or time, when the current "
+            "timestamp is unavailable, or when the local offset cannot be inferred "
+            "from visible runtime context. This helper does not replace the "
+            "original reminder side-effect tool."
         ),
     }
 
@@ -657,6 +754,7 @@ def _has_experimental_helper_tools(openai_tools: object) -> bool:
         or _derived_value_tool_names(openai_tools)
         or _lookup_query_planner_tool_names(openai_tools)
         or _search_window_tool_names(openai_tools)
+        or _relative_time_tool_names(openai_tools)
     )
 
 
@@ -750,6 +848,7 @@ def _with_selector_actor_policy(
             _safe_argument_actor_policy_message(openai_messages, openai_tools),
             _temporal_anchor_actor_policy_message(openai_messages, openai_tools),
             _search_window_actor_policy_message(openai_messages, openai_tools),
+            _relative_time_actor_policy_message(openai_messages, openai_tools),
         )
     policies = [
         policy
@@ -819,13 +918,19 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
         )
         prompted_messages = _with_selector_actor_policy(openai_messages, openai_tools)
         if not should_force:
-            return super().model_inference(prompted_messages, openai_tools)
+            return _with_transient_openai_retries(
+                lambda: super(ConfigurableOpenAIAgent, self).model_inference(
+                    prompted_messages, openai_tools
+                )
+            )
         with all_logging_disabled():
-            return self.openai_client.chat.completions.create(
-                model=self.model_name,
-                messages=cast(list[ChatCompletionMessageParam], prompted_messages),
-                tools=openai_tools,
-                tool_choice={"type": "function", "function": {"name": forced_tool}},
+            return _with_transient_openai_retries(
+                lambda: self.openai_client.chat.completions.create(
+                    model=self.model_name,
+                    messages=cast(list[ChatCompletionMessageParam], prompted_messages),
+                    tools=openai_tools,
+                    tool_choice={"type": "function", "function": {"name": forced_tool}},
+                )
             )
 
 
