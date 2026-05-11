@@ -1,0 +1,23 @@
+{
+  "manifest_type": "praxis_combined_bridge_policy_cellular_off_safety_diagnostic_v1",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "selection_rule": "single targeted safety diagnostic for broad60 side-effect checker false-positive and setter-None actor repair; not promotion evidence",
+  "labels_inspected": false,
+  "diagnostic_reason": "broad60 emitted one side_effect_preservation_report row for plan_device_state_action_sequence_v3 on cellular_off after a redundant setter retry",
+  "splits": {
+    "mechanism_12": [
+      {
+        "name": "cellular_off"
+      }
+    ]
+  },
+  "integrity_controls": {
+    "generation": "off",
+    "candidate_task_cache": "off",
+    "openai_response_cache": "disabled",
+    "control_cache": "use-if-eligible",
+    "routing_evidence": "disabled",
+    "diagnostic_force_env_vars": "absent",
+    "force_calls_as_evidence": false
+  }
+}

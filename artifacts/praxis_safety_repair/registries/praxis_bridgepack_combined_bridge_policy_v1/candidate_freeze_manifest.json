@@ -1,0 +1,29 @@
+{
+  "schema_version": "sage_praxis_combined_treatment_candidate_v1",
+  "candidate_name": "Praxis BridgePack Combined Bridge Policy v1",
+  "created_at": "2026-05-11",
+  "branch": "repair/praxis-combined-bridge-policy",
+  "base_review_branch": "repair/praxis-side-effect-zero",
+  "base_commit_at_creation": "9ad003efd546df2d978b2448f3d9b2ea16f0c568",
+  "source_review_branch": "review/praxis-final-hardening",
+  "experimental_source_commit_reference_only": "7793c8ca29ab4e121d302c777c4e4ad273226470",
+  "source_registry": "artifacts/praxis_final_hardening/registries/praxis_bridgepack_frozen_candidate/registry_manifest.json",
+  "registry_manifest_sha256": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+  "treatment_classification": "registry_plus_feature_flagged_actor_checker_bridge_policy_under_review",
+  "bridge_policy_env": {
+    "name": "SAGE_PRAXIS_BRIDGE_POLICY",
+    "evidence_value": "combined",
+    "scope": "general actor/tool-use affordance and checker-visible side-effect preservation accounting; no force calls"
+  },
+  "claim_status": "experimental_repair_candidate_not_protected_claim",
+  "protected_assets_modified": false,
+  "integrity_controls": {
+    "generation": "off",
+    "control_cache": "use-if-eligible",
+    "candidate_task_cache": "off",
+    "openai_response_cache": "disabled",
+    "diagnostic_force_env_vars": "absent",
+    "routing_evidence": "disabled unless explicitly pinned and reported",
+    "force_calls_as_evidence": false
+  }
+}

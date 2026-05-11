@@ -39,7 +39,13 @@ from sage_ts.campaign.artifacts import (
 )
 from sage_ts.config.models import DEFAULT_MODEL, paired_model_metadata
 from sage_ts.config.splits import load_split_names, scenario_records
-from sage_ts.dashboard.exporters import open_dashboard, write_protocol_dashboard
+from sage_ts.dashboard.exporters import (
+    dashboard_url as make_dashboard_url,
+)
+from sage_ts.dashboard.exporters import (
+    open_dashboard,
+    write_protocol_dashboard,
+)
 from sage_ts.evaluation.control_baseline_cache import (
     ControlBaselineCache,
     build_control_cache_report,
@@ -1138,18 +1144,25 @@ def main() -> None:
     # Dashboard visibility is part of the experiment surface. Keep it on by
     # default for every run; only the explicit CLI flag should suppress it.
     should_open_dashboard = not args.no_dashboard_open
-    dashboard_url = dashboard_task_focus_url = None
+    dashboard_url = dashboard_task_focus_url = dashboard_task_compare_url = None
     if should_open_dashboard:
-        dashboard_url = open_dashboard(dashboard_index, port=args.dashboard_port)
-        dashboard_task_focus_url = open_dashboard(
+        dashboard_task_compare_url = open_dashboard(
+            dashboard_index.with_name("task_compare.html"),
+            port=args.dashboard_port,
+        )
+        dashboard_url = make_dashboard_url(dashboard_index, port=args.dashboard_port)
+        dashboard_task_focus_url = make_dashboard_url(
             dashboard_index.with_name("task_focus.html"),
             port=args.dashboard_port,
         )
         (run_root / "dashboard_urls.json").write_text(
             json.dumps(
                 {
-                    "dashboard_url": dashboard_url,
+                    "dashboard_url": dashboard_task_compare_url,
+                    "dashboard_standard_url": dashboard_url,
                     "dashboard_task_focus_url": dashboard_task_focus_url,
+                    "dashboard_task_compare_url": dashboard_task_compare_url,
+                    "default_dashboard": "task_compare",
                 },
                 indent=2,
             )
@@ -1625,6 +1638,7 @@ def main() -> None:
         "dashboard_path": str(dashboard_index),
         "dashboard_url": dashboard_url,
         "dashboard_task_focus_url": dashboard_task_focus_url,
+        "dashboard_task_compare_url": dashboard_task_compare_url,
         "parallel_arms": args.parallel_arms,
         "parallel_cache_policy": "per_arm" if args.parallel_arms else "shared_process",
         "openai_response_cache_enabled": response_cache_enabled,
@@ -1689,6 +1703,7 @@ def main() -> None:
             "dashboard_path": str(dashboard_index),
             "dashboard_url": dashboard_url,
             "dashboard_task_focus_url": dashboard_task_focus_url,
+            "dashboard_task_compare_url": dashboard_task_compare_url,
             "parallel_arms": args.parallel_arms,
             "mean_similarity_delta": comparison.get("mean_similarity_delta"),
             "mean_outcome_similarity_delta": comparison.get(

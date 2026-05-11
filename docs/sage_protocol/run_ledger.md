@@ -821,3 +821,21 @@
 - Treatment classification: registry-only helper-contract repair; no experimental bridge policy, checker behavior, scoring change, or mtime-selected routing evidence was imported.
 - Decision label: `READY_FOR_PROTECTED_REVIEW: registry_only_praxis_repair_v2`.
 - Next action: prepare a protected final-claim update review for repaired Praxis v2; do not claim the retired relationship batch helper or experimental bridge policy.
+
+## 2026-05-11 - Praxis Combined Bridge-Policy Recovery Diagnostics
+
+- Objective: recover the earlier high-lift Praxis behavior without force calls or leakage by testing the frozen high-lift registry as an explicit registry plus feature-flagged actor/checker bridge-policy treatment.
+- Branch: `repair/praxis-combined-bridge-policy`.
+- Treatment: `artifacts/praxis_safety_repair/registries/praxis_bridgepack_combined_bridge_policy_v1/registry_manifest.json`, SHA `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`, with `SAGE_PRAXIS_BRIDGE_POLICY=combined`.
+- Integrity controls: generation off; candidate task cache off; OpenAI response cache disabled; control cache `use-if-eligible`; routing evidence disabled; no diagnostic force-call env vars; no force calls counted as evidence.
+- Dashboard update: imported Task Compare dashboard and made it the default dashboard for future runs. It reports score lift and outcome lift plus clickable generated-tool contribution details.
+- Exact13 safety diagnostic: `outputs/praxis_combined_bridge_policy/exact13_safety/mechanism_40_20260511_100905`; control cache `13 cached / 0 fresh`; runtime exceptions `0`; generated-tool failures `0`; no side-effect preservation report emitted; canonical delta `+0.188655`; outcome delta `+0.352609`.
+- Broad60 diagnostic: `outputs/praxis_combined_bridge_policy/formal500_order_broad60/mechanism_60_20260511_101421`; control cache `60 cached / 0 fresh`; canonical `0.695 -> 0.782`, delta `+0.087`, relative lift `+12.5%`; outcome `0.606 -> 0.751`, delta `+0.145`, relative lift `+24.0%`; natural generated-tool called scenarios `26`; runtime exceptions `0`; generated-tool failures `0`.
+- Broad60 safety note: this run started before the setter-`None` actor-policy/checker repair and emitted one side-effect checker row for `plan_device_state_action_sequence_v3` on `cellular_off`. Autopsy found the original setter had succeeded and returned `None`; the actor misread this as failure and retried. A repaired checker fallback reclassifies that existing trajectory as not a preservation failure, but the run itself remains pre-repair and should not be used as claim evidence.
+- Setter safety diagnostic after repair: `outputs/praxis_combined_bridge_policy/cellular_off_safety1/mechanism_12_20260511_102820`; control cache `1 cached / 0 fresh`; SAGE canonical `0.937`; SAGE outcome `1.000`; no generated-tool call; runtime exceptions `0`; side-effect preservation rows `0`.
+- Formal-order 61-100 holdout40 after repair: `outputs/praxis_combined_bridge_policy/formal500_order_061_100_broad40/mechanism_40_20260511_102941`; control cache `40 cached / 0 fresh`; canonical `0.592 -> 0.618`, delta `+0.026`, relative lift `+4.4%`; outcome `0.599 -> 0.763`, delta `+0.164`, relative lift `+27.3%`; natural generated-tool called scenarios `15`; runtime/side-effect `0 / 0`.
+- Disjoint first100 aggregate: canonical `0.654 -> 0.716`, delta `+0.063`, relative lift `+9.6%`; outcome `0.603 -> 0.756`, delta `+0.153`, relative lift `+25.3%`; natural generated-tool called scenarios `41`; runtime exceptions `0`.
+- Machine summary: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_first100_summary.json`, SHA `9f0447a7e4fbab38a3fd8e4b13ee3aaffa5502aed93ffb34d7b4ec99ecde211c`.
+- Report: `docs/sage_protocol/praxis_combined_bridge_policy_recovery_report.md`.
+- Decision label: `PROMISING_BUT_NOT_CLAIM_READY: combined_treatment_requires_clean_formal_rerun`.
+- Next action: commit the dashboard/bridge/checker repairs, then run a clean same-code formal100 or formal500 with Task Compare default and zero side-effect rows before any claim update.

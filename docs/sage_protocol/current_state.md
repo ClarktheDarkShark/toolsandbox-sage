@@ -503,3 +503,21 @@
 - Treatment classification: registry-only helper-contract repair; no experimental actor/router bridge policy or checker change imported.
 - Decision label: `READY_FOR_PROTECTED_REVIEW: registry_only_praxis_repair_v2`.
 - Next action: protected final-claim update review may be opened for repaired Praxis v2, but protected final claim artifacts remain unchanged on this branch.
+
+## Praxis Combined Bridge-Policy Recovery Status
+- Date: `2026-05-11T14:45:00Z`
+- Branch: `repair/praxis-combined-bridge-policy`
+- Status: experimental combined-treatment recovery, not protected final evidence.
+- Treatment: frozen Praxis BridgePack registry SHA `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349` plus `SAGE_PRAXIS_BRIDGE_POLICY=combined`.
+- Integrity controls: generation off; candidate task cache off; OpenAI response cache disabled; controls cached task-by-task with `use-if-eligible`; routing evidence disabled; no diagnostic force calls.
+- Dashboard state: Task Compare is now generated and is the default auto-open dashboard. It includes outcome lift and generated-tool contribution details.
+- Best current diagnostic aggregate: first 100 formal-order tasks, split into broad60 plus holdout40.
+  - Canonical: `0.654 -> 0.716`, delta `+0.063`, relative lift `+9.6%`.
+  - Outcome: `0.603 -> 0.756`, delta `+0.153`, relative lift `+25.3%`.
+  - Natural generated-tool called scenarios: `41 / 100`.
+  - Runtime exceptions: `0`.
+- Safety: broad60 was pre-repair and emitted one checker row on `cellular_off`; autopsy classified this as setter-`None` misinterpretation plus trace-checker omission. Post-repair `cellular_off_safety1` had runtime/side-effect `0 / 0`, and post-repair holdout40 had runtime/side-effect `0 / 0`.
+- Report: `docs/sage_protocol/praxis_combined_bridge_policy_recovery_report.md`.
+- Machine summary: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_first100_summary.json`, SHA `9f0447a7e4fbab38a3fd8e4b13ee3aaffa5502aed93ffb34d7b4ec99ecde211c`.
+- Decision: `PROMISING_BUT_NOT_CLAIM_READY`; the honest classification is registry plus bridge-policy combined treatment.
+- Next action: commit repairs, then run a clean same-code formal100 or formal500 before any protected claim update.

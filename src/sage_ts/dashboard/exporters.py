@@ -16,6 +16,7 @@ from typing import Any, cast
 from urllib.parse import quote
 
 from sage_ts.campaign.artifacts import ARTIFACT_ROOT, read_jsonl
+from sage_ts.dashboard.task_compare_template import TASK_COMPARE_HTML
 from sage_ts.dashboard.task_focus_template import TASK_FOCUS_HTML
 from sage_ts.dashboard.template import DASHBOARD_HTML
 from sage_ts.evaluation.run_metrics import compare_runs, summarize_run
@@ -1275,7 +1276,7 @@ def _write_task_focus_dashboard(
     data: dict[str, Any],
     control_dir: Path | None,
     candidate_dir: Path | None,
-) -> None:
+) -> dict[str, Any]:
     control_tasks = _task_focus_rows(run_root, control_dir)
     candidate_tasks = _task_focus_rows(run_root, candidate_dir)
     tasks = [*control_tasks, *candidate_tasks]
@@ -1381,6 +1382,179 @@ def _write_task_focus_dashboard(
         json.dumps(payload, indent=2) + "\n", encoding="utf-8"
     )
     (dashboard_dir / "task_focus.html").write_text(TASK_FOCUS_HTML, encoding="utf-8")
+    return payload
+
+
+def _count_incidents(value: Any) -> int:
+    if isinstance(value, list):
+        return len(value)
+    if isinstance(value, int):
+        return value
+    return 0
+
+
+def _tool_count(row: dict[str, Any], count_key: str, list_key: str) -> int:
+    count = row.get(count_key)
+    if isinstance(count, int):
+        return count
+    values = row.get(list_key)
+    if isinstance(values, list):
+        return len(values)
+    return 0
+
+
+def _task_compare_tool_summary(
+    run_root: Path,
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    contribution = _read_json(run_root / "helper_contribution_summary.json")
+    helpers = contribution.get("helpers") if isinstance(contribution, dict) else {}
+    tools: list[dict[str, Any]] = []
+    if isinstance(helpers, dict):
+        for name, raw in helpers.items():
+            if not isinstance(raw, dict):
+                continue
+            called_subset = raw.get("called_subset")
+            if not isinstance(called_subset, dict):
+                called_subset = {}
+            tool = {
+                "name": str(name),
+                "origin": raw.get("origin"),
+                "visible_count": _tool_count(raw, "visible_count", "visible_scenarios"),
+                "called_count": _tool_count(raw, "called_count", "called_scenarios"),
+                "visible_not_called_count": _tool_count(
+                    raw, "visible_not_called_count", "visible_not_called_scenarios"
+                ),
+                "failed_attempt_count": _tool_count(
+                    raw, "failed_attempt_count", "failed_attempt_scenarios"
+                ),
+                "called_subset_scenario_count": called_subset.get("scenario_count"),
+                "called_subset_mean_canonical_delta": called_subset.get(
+                    "mean_canonical_delta"
+                ),
+                "called_subset_mean_outcome_delta": called_subset.get(
+                    "mean_outcome_delta"
+                ),
+                "canonical_gains": called_subset.get("canonical_gains"),
+                "canonical_regressions": called_subset.get("canonical_regressions"),
+                "outcome_gains": called_subset.get("outcome_gains"),
+                "outcome_regressions": called_subset.get("outcome_regressions"),
+                "outcome_preserved": called_subset.get("outcome_preserved"),
+                "side_effect_incident_count": _count_incidents(
+                    raw.get("side_effect_incidents")
+                ),
+                "runtime_incident_count": _count_incidents(
+                    raw.get("runtime_incidents")
+                ),
+            }
+            if tool["side_effect_incident_count"] or tool["runtime_incident_count"]:
+                tool["decision"] = "inspect"
+            elif (
+                tool["called_count"]
+                and (_optional_float(tool["called_subset_mean_outcome_delta"]) or 0.0)
+                > 0
+            ):
+                tool["decision"] = "positive called subset"
+            elif tool["called_count"]:
+                tool["decision"] = "called; mixed or negative subset"
+            else:
+                tool["decision"] = "visible or retained; no natural call"
+            tools.append(tool)
+
+    if not tools:
+        reuse_counts: dict[str, int] = {}
+        for event in data.get("reuse_events", []) or []:
+            tool_name = str(event.get("tool_name") or event.get("tool") or "")
+            if tool_name:
+                reuse_counts[tool_name] = reuse_counts.get(tool_name, 0) + 1
+        born = {
+            str(event.get("tool_name") or event.get("tool") or "")
+            for event in data.get("birth_events", []) or []
+            if event.get("accepted") and (event.get("tool_name") or event.get("tool"))
+        }
+        for name in sorted(set(reuse_counts) | born):
+            tools.append(
+                {
+                    "name": name,
+                    "origin": "generated" if name in born else "retained",
+                    "visible_count": None,
+                    "called_count": reuse_counts.get(name, 0),
+                    "visible_not_called_count": None,
+                    "failed_attempt_count": 0,
+                    "called_subset_mean_canonical_delta": None,
+                    "called_subset_mean_outcome_delta": None,
+                    "outcome_gains": None,
+                    "outcome_regressions": None,
+                    "side_effect_incident_count": 0,
+                    "runtime_incident_count": 0,
+                    "decision": "reuse event fallback",
+                }
+            )
+
+    tools = sorted(
+        tools,
+        key=lambda item: (
+            -int(item.get("called_count") or 0),
+            str(item.get("name") or ""),
+        ),
+    )
+    birth_count = sum(
+        1 for event in data.get("birth_events", []) or [] if event.get("accepted")
+    )
+    called_tool_count = sum(
+        1 for tool in tools if int(tool.get("called_count") or 0) > 0
+    )
+    return {
+        "registry_tool_count": contribution.get("registry_size")
+        if isinstance(contribution, dict)
+        else len(tools),
+        "runtime_bundle_size": contribution.get("runtime_bundle_size")
+        if isinstance(contribution, dict)
+        else None,
+        "tool_count": len(tools),
+        "generated_tool_birth_count": birth_count,
+        "called_tool_count": called_tool_count,
+        "visible_tool_count": sum(
+            1 for tool in tools if (tool.get("visible_count") or 0) > 0
+        ),
+        "outcome_gains": sum(int(tool.get("outcome_gains") or 0) for tool in tools),
+        "outcome_regressions": sum(
+            int(tool.get("outcome_regressions") or 0) for tool in tools
+        ),
+        "side_effect_incident_count": sum(
+            int(tool.get("side_effect_incident_count") or 0) for tool in tools
+        ),
+        "runtime_incident_count": sum(
+            int(tool.get("runtime_incident_count") or 0) for tool in tools
+        ),
+        "accepted_tools": contribution.get("accepted_tools", [])
+        if isinstance(contribution, dict)
+        else [],
+        "accepted_but_uncalled_tools": contribution.get(
+            "accepted_but_uncalled_tools", []
+        )
+        if isinstance(contribution, dict)
+        else [],
+        "tools": tools,
+    }
+
+
+def _write_task_compare_dashboard(
+    dashboard_dir: Path,
+    run_root: Path,
+    data: dict[str, Any],
+    focus_payload: dict[str, Any],
+) -> None:
+    payload = {
+        **focus_payload,
+        "tool_summary": _task_compare_tool_summary(run_root, data),
+    }
+    (dashboard_dir / "task_compare_data.json").write_text(
+        json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+    )
+    (dashboard_dir / "task_compare.html").write_text(
+        TASK_COMPARE_HTML, encoding="utf-8"
+    )
 
 
 def _scenario_table(
@@ -1560,17 +1734,29 @@ def write_protocol_dashboard(
         json.dumps(data, indent=2) + "\n", encoding="utf-8"
     )
     (dashboard_dir / "index.html").write_text(DASHBOARD_HTML, encoding="utf-8")
-    _write_task_focus_dashboard(
+    task_focus_payload = _write_task_focus_dashboard(
         dashboard_dir,
         run_root,
         data,
         control_dir,
         candidate_dir,
     )
-    _write_latest_pointer(dashboard_dir / "index.html", name="latest_sage_ts.html")
+    _write_task_compare_dashboard(dashboard_dir, run_root, data, task_focus_payload)
+    _write_latest_pointer(
+        dashboard_dir / "task_compare.html",
+        name="latest_sage_ts.html",
+    )
     _write_latest_pointer(
         dashboard_dir / "task_focus.html",
         name="latest_sage_ts_task_focus.html",
+    )
+    _write_latest_pointer(
+        dashboard_dir / "index.html",
+        name="latest_sage_ts_standard.html",
+    )
+    _write_latest_pointer(
+        dashboard_dir / "task_compare.html",
+        name="latest_sage_ts_task_compare.html",
     )
     return dashboard_dir / "index.html"
 
