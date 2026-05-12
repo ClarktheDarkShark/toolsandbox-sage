@@ -1,0 +1,73 @@
+{
+  "artifact_type": "self_evolving_sage_mini60_summary",
+  "final_claim_evidence": false,
+  "branch": "codex/self-evolving-sage-mini60",
+  "source_plan": "docs/sage_protocol/praxis_next_gap_and_self_evolving_sage_plan.md",
+  "run_root": "outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904",
+  "dashboard_url": "http://127.0.0.1:62618/outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904/dashboard/task_compare.html",
+  "strategy": "praxis_current_pack",
+  "selected_bucket": "contact_lookup_update_search_crud",
+  "sample_size": 60,
+  "models": {
+    "agent": "gpt-4o-mini",
+    "user": "gpt-4o-mini",
+    "generation": "gpt-4o-mini"
+  },
+  "preparation": {
+    "starting_registry_tool_count": 0,
+    "generated_tool_count": 13,
+    "registry_path": "artifacts/self_evolving_sage/current_mini60_praxis_pack/registry/registry_manifest.json",
+    "registry_sha256": "3ee0719ddc87a774fc18d48365c36e9dea7cce70f65f6f28574afd60ddc9e99c",
+    "manifest_path": "artifacts/self_evolving_sage/current_mini60_praxis_pack/self_evolving_mini60_manifest.json",
+    "manifest_sha256": "e7278b67d682d3be59d764e59e73094548e7ea965ec25003bda8b6a41935a51a"
+  },
+  "cache_policy": {
+    "control_cache_mode": "use-if-eligible",
+    "cached_control_tasks": 33,
+    "fresh_control_tasks": 27,
+    "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "candidate_task_cache": "off",
+    "openai_response_cache": "disabled",
+    "routing_evidence_mode": "disabled"
+  },
+  "metrics": {
+    "baseline_score": 0.7638214638123125,
+    "sage_score": 0.845360588229735,
+    "score_delta": 0.08153912441742249,
+    "baseline_outcome": 0.5365385188701539,
+    "sage_outcome": 0.655420894874781,
+    "outcome_delta": 0.11888237600462706,
+    "control_exact_successes": 13,
+    "candidate_exact_successes": 22,
+    "exact_success_delta": 9,
+    "canonical_gain_count": 35,
+    "canonical_regression_count": 11,
+    "outcome_gain_count": 24,
+    "outcome_regression_count": 15,
+    "outcome_preserved_count": 6,
+    "protocol_gate_passed": true
+  },
+  "adoption": {
+    "visible_scenarios": 36,
+    "called_scenarios": 23,
+    "attempted_scenarios": 23,
+    "failed_scenarios": 0
+  },
+  "safety": {
+    "runtime_exceptions": 0,
+    "helper_failed_attempts": 0,
+    "helper_side_effect_incidents": 0,
+    "diagnostic_force_allowed": false,
+    "active_diagnostic_force_env": []
+  },
+  "leakage_review": {
+    "hidden_labels_inspected": false,
+    "expected_answers_encoded": false,
+    "scenario_selection_by_cache_availability": false,
+    "diagnostic_force_path_active": false,
+    "scenario_names_in_execution_manifest": true,
+    "task_family_trigger_labels_in_recipe_metadata": true,
+    "note": "Task-family trigger labels are inherited from current SAGE routing metadata. They are not hidden labels or expected answers, but should be semantically normalized or explicitly audited before protected-claim use."
+  },
+  "interpretation": "Experimental implementation proof. The controller started from an empty runtime registry, selected the contact gap from a gap packet, materialized validated current-SAGE recipes, and recovered near-formal500 score lift on a capped all-gpt-4o-mini mini60 run. Not protected final-claim evidence."
+}

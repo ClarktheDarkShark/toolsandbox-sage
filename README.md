@@ -125,6 +125,80 @@ final-claim update. A protected claim should run a dedicated matched ablation
 under the same committed runtime for best3, V2.6, Praxis registry-only, and
 Praxis combined bridge-policy arms.
 
+## Self-Evolving Mini60 Current Approach
+
+The current SAGE development approach now includes an explicit self-evolving
+controller slice:
+
+1. observe a machine-readable gap packet from a completed run,
+2. rank unsupported or regressing task buckets,
+3. select the next high-opportunity bucket without inspecting hidden labels,
+4. start from an empty runtime generated-tool registry,
+5. materialize validated recipe helpers when available, or generate new helpers
+   when no recipe covers the gap,
+6. run a capped natural-adoption gate with cached controls and fresh SAGE arms,
+7. reflect with a `scale`, `refine`, `recombine`, `park`, or `block` decision.
+
+Low-cost discovery campaigns can be forced to `gpt-4o-mini` for every model role
+and capped at 60 tasks:
+
+```bash
+PYTHONPATH=src:. python scripts/prepare_self_evolving_sage_mini60.py \
+  --output-root artifacts/self_evolving_sage/current_mini60_praxis_pack \
+  --max-samples 60 \
+  --agent gpt-4o-mini \
+  --user gpt-4o-mini \
+  --generation-model gpt-4o-mini \
+  --tool-strategy praxis_current_pack
+```
+
+Then run the prepared manifest with cached controls and fresh candidate/SAGE
+tasks:
+
+```bash
+env \
+  SAGE_PRAXIS_BRIDGE_POLICY=combined \
+  SAGE_TS_MODEL=gpt-4o-mini \
+  PYTHONPATH=src:. \
+  python scripts/run_sage_protocol.py \
+    --mode transfer_60 \
+    --manifest artifacts/self_evolving_sage/current_mini60_praxis_pack/self_evolving_mini60_manifest.json \
+    --registry-dir artifacts/self_evolving_sage/current_mini60_praxis_pack/registry \
+    --agent gpt-4o-mini \
+    --user gpt-4o-mini \
+    --generation-model gpt-4o-mini \
+    --generation off \
+    --disable-openai-response-cache \
+    --cache-mode off \
+    --parallel-arms \
+    --control-cache use-if-eligible \
+    --routing-evidence-mode disabled \
+    --allow-low-quality-cohort \
+    --output-root outputs/self_evolving_sage/mini60_praxis_pack_v2 \
+    --artifact-root artifacts/self_evolving_sage/campaign_artifacts_mini60_praxis_pack_v2
+```
+
+Latest mini60 proof:
+
+- report:
+  `docs/sage_protocol/self_evolving_sage_mini60_report.md`
+- summary:
+  `artifacts/self_evolving_sage/summary/self_evolving_mini60_praxis_pack_v2_summary.json`
+- score delta:
+  `+0.081539`
+- outcome delta:
+  `+0.118882`
+- exact successes:
+  `13 -> 22`
+- generated-tool visibility/calls/failures:
+  `36 / 23 / 0`
+- runtime exceptions and helper side-effect incidents:
+  `0 / 0`
+
+This is experimental implementation evidence, not protected final-claim
+evidence. It demonstrates that the next-gap loop can recover near-current score
+lift under strict low-cost model and sample constraints.
+
 When external location/weather/search tasks are in scope, use the ToolSandbox
 RapidAPI cache in `read_only` mode to avoid quota spend during review gates.
 The local cache file remains under ignored `.secrets/`; document its SHA-256,

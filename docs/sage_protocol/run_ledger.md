@@ -1,5 +1,32 @@
 # Run Ledger
 
+## 2026-05-11
+
+- `Self-evolving SAGE mini60 praxis-pack proof` completed.
+  - Branch: `codex/self-evolving-sage-mini60`
+  - Report: `docs/sage_protocol/self_evolving_sage_mini60_report.md`
+  - Summary: `artifacts/self_evolving_sage/summary/self_evolving_mini60_praxis_pack_v2_summary.json`
+  - Run: `outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904`
+  - Dashboard: `http://127.0.0.1:62618/outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904/dashboard/task_compare.html`
+  - Source plan: `docs/sage_protocol/praxis_next_gap_and_self_evolving_sage_plan.md`
+  - Strategy: start from an empty runtime registry, select the contact gap from the formal500 gap packet, and materialize the current validated Praxis recipe pack under the self-evolving controller.
+  - Registry: `artifacts/self_evolving_sage/current_mini60_praxis_pack/registry/registry_manifest.json`
+  - Registry SHA-256: `3ee0719ddc87a774fc18d48365c36e9dea7cce70f65f6f28574afd60ddc9e99c`
+  - Manifest: `artifacts/self_evolving_sage/current_mini60_praxis_pack/self_evolving_mini60_manifest.json`
+  - Manifest SHA-256: `e7278b67d682d3be59d764e59e73094548e7ea965ec25003bda8b6a41935a51a`
+  - Models: agent/user/generation all `gpt-4o-mini`
+  - Sample size: `60`
+  - Control cache: `use-if-eligible`, `33 cached / 27 fresh`, cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
+  - Candidate task cache: `off`; OpenAI response cache: `disabled`; routing evidence: `disabled`; diagnostic force env vars: none.
+  - Canonical/reference delta: `+0.081539` (`0.763821 -> 0.845361`)
+  - Outcome delta: `+0.118882` (`0.536539 -> 0.655421`)
+  - Exact successes: `13 -> 22`
+  - Generated-tool natural visibility/calls/failures: `36 / 23 / 0`
+  - Runtime exceptions: `0`
+  - Helper side-effect incidents: `0`
+  - Protocol gate: `PASS`
+  - Decision: `self_evolving_controller_proof_positive`; not protected final-claim evidence.
+
 ## 2026-05-02
 
 - `Phase B` passed after calling-convention repair for `prepare_reminder_creation_args`.

@@ -27,6 +27,28 @@ Completed formal500 source for final gap update:
 - Runtime exceptions: 0
 - Helper failures / side-effect incidents: `0 / 0`
 
+Mini60 self-evolving implementation proof:
+
+- Branch: `codex/self-evolving-sage-mini60`
+- Report: `docs/sage_protocol/self_evolving_sage_mini60_report.md`
+- Summary: `artifacts/self_evolving_sage/summary/self_evolving_mini60_praxis_pack_v2_summary.json`
+- Run: `outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904`
+- Dashboard: `http://127.0.0.1:62618/outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904/dashboard/task_compare.html`
+- Strategy: start from an empty runtime registry, observe the contact gap, then materialize the current validated Praxis recipe pack under the self-evolving controller.
+- Models: agent/user/generation all `gpt-4o-mini`
+- Sample cap: `60`
+- Baseline/control cache: `33 cached / 27 fresh`, `use-if-eligible`
+- Candidate/SAGE cache: off
+- OpenAI response cache: disabled
+- Score: `0.763821 -> 0.845361`, delta `+0.081539`
+- Outcome/task completion: `0.536539 -> 0.655421`, delta `+0.118882`
+- Exact successes: `13 -> 22`
+- Natural generated-tool adoption: visible `36 / 60`, called `23 / 60`, failed `0`
+- Runtime exceptions / helper side-effect incidents: `0 / 0`
+- Protocol gate: `PASS`
+- Evidence status: experimental implementation proof only, not protected final-claim evidence.
+- Leakage note: no labels or expected answers were used; recipe metadata still contains task-family trigger labels inherited from current SAGE routing and should be semantically normalized or explicitly audited before protected claims.
+
 ## Interim Finding
 
 The next plausible lift bucket is contact lookup/update/search, not another broad generic helper.
@@ -276,4 +298,12 @@ def self_evolve_sage(seed_registry, validation_manifest):
 
 ## Immediate Next Action
 
-The formal500 confirms the combined bridge-policy lift with zero safety incidents. The next tool campaign should target `prepare_contact_lookup_or_update_action_v2` on the contact lookup/update/search bucket, using a narrow 20-task natural-adoption loop first, then a 60-task contact-focused expansion before recombining into a broad gate.
+The formal500 confirms the combined bridge-policy lift with zero safety incidents. The first self-evolving controller slice is now implemented and has passed a capped all-`gpt-4o-mini` mini60 proof by materializing validated current-SAGE recipes from an empty runtime registry.
+
+The next action is to generalize this controller beyond recipe materialization:
+
+1. mine gap packets directly from a run root,
+2. rank contact, reminder, settings/device-state, and abstention opportunities,
+3. generate minefield tests per selected bucket,
+4. use validated recipes when available and freeform generation only when no recipe covers the bucket,
+5. keep discovery runs capped at 60 unless explicitly approved.

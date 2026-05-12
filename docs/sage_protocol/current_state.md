@@ -1,9 +1,15 @@
 # Current State
 
 - Date: 2026-05-11
-- Last completed step: `praxis_combined_bridge_policy_formal500_v2_bridge_repair_rapid_cache_polars1`
-- Last decision: `PROMISING_COMBINED_TREATMENT_FORMAL500_POSITIVE_NOT_PROTECTED_CLAIM_READY`
+- Last completed step: `self_evolving_sage_mini60_praxis_pack_v2`
+- Last decision: `SELF_EVOLVING_CONTROLLER_MINI60_PROOF_POSITIVE_NOT_PROTECTED_CLAIM_EVIDENCE`
 - Primary metric: outcome/task-completion
+- Current SAGE approach: combined Praxis bridge-policy remains the current high-lift SAGE treatment under review; self-evolving SAGE now maintains the next-gap loop by observing gap packets, selecting a bucket, starting from an empty runtime generated-tool registry, and materializing or generating validated helpers for capped low-cost natural-adoption runs.
+- Self-evolving mini60 proof: score `0.763821 -> 0.845361`, delta `+0.081539`; outcome `0.536539 -> 0.655421`, delta `+0.118882`; exact successes `13 -> 22`; generated-tool visible/called `36 / 23`; runtime exceptions `0`; helper side-effect incidents `0`.
+- Self-evolving mini60 models: agent/user/generation all `gpt-4o-mini`; sample cap `60`; controls `33 cached / 27 fresh`; candidate task cache off; OpenAI response cache disabled; routing evidence disabled.
+- Self-evolving mini60 run: `outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904`.
+- Self-evolving mini60 report: `docs/sage_protocol/self_evolving_sage_mini60_report.md`.
+- Self-evolving mini60 summary: `artifacts/self_evolving_sage/summary/self_evolving_mini60_praxis_pack_v2_summary.json`.
 - Active frozen helpers: protected best3 remains `relative_day_time_to_timestamp, resolve_search_window_or_bounds, select_record_by_timestamp_extreme`; repaired Praxis v2 remains a registry-only review candidate; combined Praxis BridgePack is an experimental combined-treatment candidate only.
 - Active protected registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`
 - Protected registry SHA-256: `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`
