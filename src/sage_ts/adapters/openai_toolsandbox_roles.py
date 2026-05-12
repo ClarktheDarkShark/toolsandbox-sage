@@ -2411,6 +2411,13 @@ def _selected_record_payload(openai_messages: object) -> Mapping[str, Any] | Non
     return selected if isinstance(selected, Mapping) else None
 
 
+def _selected_action_payload(openai_messages: object) -> Mapping[str, Any] | None:
+    payload = _latest_tool_payload_by_name_including_latest(
+        openai_messages, "select_action_target_by_recency"
+    )
+    return payload if isinstance(payload, Mapping) else None
+
+
 def _reminder_recency_bridge_completion(
     openai_messages: object,
     openai_tools: object,
@@ -2423,6 +2430,18 @@ def _reminder_recency_bridge_completion(
     request = _reminder_recency_request(openai_messages)
     if request is None:
         return None
+    if (
+        request == "remove_upcoming"
+        and "get_current_timestamp" in available_names
+        and not _message_already_called_tool(openai_messages, "get_current_timestamp")
+        and _latest_tool_message(openai_messages, "get_current_timestamp") is None
+    ):
+        return _synthetic_tool_call_completion(
+            model_name=model_name,
+            completion_id="sage-reminder-upcoming-current-timestamp",
+            tool_name=_tool_name_for_call(openai_tools, "get_current_timestamp"),
+            arguments={},
+        )
     if _latest_tool_is(openai_messages, "get_current_timestamp"):
         current_timestamp = _latest_current_timestamp(openai_messages)
         if current_timestamp is None:
@@ -2433,6 +2452,17 @@ def _reminder_recency_bridge_completion(
                 completion_id="sage-reminder-latest-modify-search",
                 tool_name=_tool_name_for_call(openai_tools, "search_reminder"),
                 arguments={"creation_timestamp_upperbound": current_timestamp},
+            )
+        if (
+            request == "remove_upcoming"
+            and "resolve_search_window_or_bounds" not in available_names
+            and "search_reminder" in available_names
+        ):
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-reminder-upcoming-search-all",
+                tool_name=_tool_name_for_call(openai_tools, "search_reminder"),
+                arguments={},
             )
         if "resolve_search_window_or_bounds" not in available_names:
             return None
@@ -2544,6 +2574,22 @@ def _reminder_recency_bridge_completion(
                     completion_id="sage-reminder-upcoming-empty",
                     content="I could not find an upcoming reminder to remove.",
                 )
+            if "select_action_target_by_recency" in available_names:
+                return _synthetic_tool_call_completion(
+                    model_name=model_name,
+                    completion_id="sage-reminder-upcoming-action-select",
+                    tool_name=_tool_name_for_call(
+                        openai_tools, "select_action_target_by_recency"
+                    ),
+                    arguments={
+                        "records": records,
+                        "timestamp_key": "reminder_timestamp",
+                        "selection_mode": "oldest",
+                        "action_type": "remove_reminder",
+                        "constraints": {},
+                        "updates": {},
+                    },
+                )
             if (
                 len(records) == 1
                 or "select_record_by_timestamp_extreme" not in available_names
@@ -2568,6 +2614,33 @@ def _reminder_recency_bridge_completion(
                         "timestamp_field": "reminder_timestamp",
                         "mode": "oldest",
                     },
+                )
+    if _latest_tool_is(openai_messages, "select_action_target_by_recency"):
+        if request != "remove_upcoming" or "remove_reminder" not in available_names:
+            return None
+        action_payload = _selected_action_payload(openai_messages)
+        if not action_payload:
+            return None
+        if action_payload.get("abstain_reason"):
+            return _synthetic_text_completion(
+                model_name=model_name,
+                completion_id="sage-reminder-upcoming-action-abstain",
+                content="I could not identify a single upcoming reminder to remove.",
+            )
+        downstream_tool = str(action_payload.get("downstream_tool_name") or "")
+        downstream_kwargs = action_payload.get("downstream_tool_kwargs")
+        if (
+            bool(action_payload.get("should_call_tool"))
+            and downstream_tool == "remove_reminder"
+            and isinstance(downstream_kwargs, Mapping)
+        ):
+            reminder_id = str(downstream_kwargs.get("reminder_id") or "").strip()
+            if reminder_id:
+                return _synthetic_tool_call_completion(
+                    model_name=model_name,
+                    completion_id="sage-reminder-upcoming-remove-action-selected",
+                    tool_name=_tool_name_for_call(openai_tools, "remove_reminder"),
+                    arguments={"reminder_id": reminder_id},
                 )
     if _latest_tool_is(openai_messages, "select_record_by_timestamp_extreme"):
         if request == "modify_latest":

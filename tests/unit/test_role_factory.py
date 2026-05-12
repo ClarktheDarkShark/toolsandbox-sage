@@ -942,6 +942,92 @@ def test_reminder_recency_bridge_calls_search_after_window(
     assert "creation_timestamp_lowerbound" in call.function.arguments
 
 
+def test_reminder_upcoming_remove_bridge_uses_generated_action_selector(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "get_current_timestamp"}},
+        {"type": "function", "function": {"name": "search_reminder"}},
+        {
+            "type": "function",
+            "function": {"name": "select_action_target_by_recency"},
+        },
+        {"type": "function", "function": {"name": "remove_reminder"}},
+    ]
+    messages = [{"role": "user", "content": "Remove my upcoming reminder."}]
+
+    timestamp_completion = _reminder_recency_bridge_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert timestamp_completion is not None
+    timestamp_call = _first_tool_call(timestamp_completion)
+    assert timestamp_call.function.name == "get_current_timestamp"
+
+    search_completion = _reminder_recency_bridge_completion(
+        [
+            *messages,
+            {"role": "tool", "name": "get_current_timestamp", "content": "100.0"},
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert search_completion is not None
+    search_call = _first_tool_call(search_completion)
+    assert search_call.function.name == "search_reminder"
+    assert json.loads(search_call.function.arguments) == {}
+
+    records = [
+        {"reminder_id": "later", "reminder_timestamp": 300.0},
+        {"reminder_id": "next", "reminder_timestamp": 200.0},
+    ]
+    select_completion = _reminder_recency_bridge_completion(
+        [
+            *messages,
+            {"role": "tool", "name": "get_current_timestamp", "content": "100.0"},
+            {"role": "tool", "name": "search_reminder", "content": repr(records)},
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert select_completion is not None
+    select_call = _first_tool_call(select_completion)
+    assert select_call.function.name == "select_action_target_by_recency"
+    select_args = json.loads(select_call.function.arguments)
+    assert select_args["timestamp_key"] == "reminder_timestamp"
+    assert select_args["selection_mode"] == "oldest"
+    assert select_args["action_type"] == "remove_reminder"
+    assert select_args["records"] == records
+
+    remove_completion = _reminder_recency_bridge_completion(
+        [
+            *messages,
+            {"role": "tool", "name": "get_current_timestamp", "content": "100.0"},
+            {"role": "tool", "name": "search_reminder", "content": repr(records)},
+            {
+                "role": "tool",
+                "name": "select_action_target_by_recency",
+                "content": repr(
+                    {
+                        "downstream_tool_name": "remove_reminder",
+                        "downstream_tool_kwargs": {"reminder_id": "next"},
+                        "should_call_tool": True,
+                        "abstain_reason": "",
+                    }
+                ),
+            },
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert remove_completion is not None
+    remove_call = _first_tool_call(remove_completion)
+    assert remove_call.function.name == "remove_reminder"
+    assert json.loads(remove_call.function.arguments) == {"reminder_id": "next"}
+
+
 def test_safe_argument_policy_blocks_inferred_self_contact() -> None:
     policy = _safe_argument_actor_policy_message(
         [
