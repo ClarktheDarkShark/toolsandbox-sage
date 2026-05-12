@@ -120,6 +120,17 @@ remain fresh. Task Compare is the default dashboard for new runs and includes
 canonical lift, outcome lift, per-task comparisons, and generated-tool
 contribution details.
 
+To browse prior run dashboards from one port, use the dashboard picker:
+
+```bash
+python3 scripts/serve_dashboard_picker.py --host 127.0.0.1 --port 62624 --root .
+```
+
+Then open `http://127.0.0.1:62624/`. The picker lists all
+`outputs/**/dashboard/task_compare.html` dashboards, newest first, and falls
+back to Task Focus or the standard dashboard for older runs that do not have
+Task Compare.
+
 The combined result is promising but remains a review treatment, not a protected
 final-claim update. A protected claim should run a dedicated matched ablation
 under the same committed runtime for best3, V2.6, Praxis registry-only, and

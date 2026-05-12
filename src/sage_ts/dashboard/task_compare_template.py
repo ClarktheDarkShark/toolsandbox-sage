@@ -169,6 +169,42 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       margin-top: 3px;
       font-variant-numeric: tabular-nums;
     }
+    .tool-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+      min-height: 18px;
+    }
+    .tool-chip {
+      border: 1px solid #345371;
+      background: #102337;
+      color: var(--blue);
+      border-radius: 999px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 800;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tool-chip.born {
+      border-color: #8b6b20;
+      background: #31250d;
+      color: var(--amber);
+    }
+    .tool-chip.called {
+      border-color: #21794e;
+      background: #0d2d20;
+      color: var(--green);
+    }
+    .tool-chip.visible {
+      color: #b7c8dc;
+    }
+    .tool-chip.observed {
+      color: var(--muted);
+    }
     .detail {
       padding: 18px 22px 28px;
       overflow: hidden;
@@ -227,6 +263,11 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
+    .transaction-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
     .box {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -250,6 +291,10 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       font-size: 12px;
       line-height: 1.45;
       color: var(--ink);
+    }
+    .transcript {
+      max-height: 520px;
+      overflow: auto;
     }
     table {
       width: 100%;
@@ -320,7 +365,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       }
     }
     @media (max-width: 760px) {
-      .metrics, .compare-grid, .split { grid-template-columns: 1fr; }
+      .metrics, .compare-grid, .split, .transaction-grid { grid-template-columns: 1fr; }
       .detail { padding: 14px; }
       header { position: relative; }
       .header-row { flex-direction: column; }
@@ -381,6 +426,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       });
     }
     const completeStatus = (row) => row?.status === "complete" || row?.status === "cached" || row?.status === "done";
+    const toolEvents = (pair) => pair?.candidate?.generated_tool_events || pair?.candidate?.generated_tools?.map((tool) => ({kind: "called", tool})) || [];
+    const toolEventLabel = (event) => `${event.kind || "tool"}: ${event.tool || ""}`;
+    const compactToolName = (name) => String(name || "").replace(/^.*:/, "").replace(/_/g, " ");
     const mean = (values) => {
       const nums = values.filter(finite).map(Number);
       return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
@@ -439,7 +487,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         metric("Run Progress", `${matched || 0}/${totalTasks || 0}`, `paired complete; baseline ${baselineDone}/${totalTasks || 0} · SAGE ${sageDone}/${totalTasks || 0}`),
         metric("Baseline Score", num(baselineScore), `${paired.scoreCount || matched || 0} paired score tasks`),
         metric("SAGE Score", num(sageScore), `${paired.scoreCount || matched || 0} paired score tasks`),
-        metric("Score Delta", signedNum(scoreDelta), "absolute score change", cls(scoreDelta)),
         metric("Score Lift", signedPct(scoreLift), `${signedNum(scoreDelta)} score delta`, cls(scoreDelta)),
         metric("Baseline Outcome", num(baselineOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("SAGE Outcome", num(sageOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
@@ -468,9 +515,13 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         .filter(({pair}) => !query || String(pair.short_name || pair.scenario).toLowerCase().includes(query) || String(pair.scenario).toLowerCase().includes(query));
       document.getElementById("taskList").innerHTML = filtered.map(({pair, index}) => {
         const d = pairDelta(pair);
+        const events = toolEvents(pair);
+        const chips = events.slice(0, 3).map((event) => `<span class="tool-chip ${esc(event.kind)}" title="${esc(toolEventLabel(event))}">${esc(event.kind || "tool")} · ${esc(compactToolName(event.tool))}</span>`).join("");
+        const overflow = events.length > 3 ? `<span class="tool-chip" title="${esc(events.slice(3).map(toolEventLabel).join("\\n"))}">+${events.length - 3}</span>` : "";
         return `<button class="task-btn ${index === selected ? "active" : ""}" data-index="${index}">
           <div class="task-name">${esc(pair.display_index || index + 1)}. ${esc(pair.short_name || pair.scenario)}</div>
           <div class="task-meta"><span class="${cls(d.scoreDelta)}">${signedNum(d.scoreDelta)}</span><span class="${cls(d.outcomeDelta)}">${signedNum(d.outcomeDelta)}</span></div>
+          ${events.length ? `<div class="tool-badges">${chips}${overflow}</div>` : ""}
         </button>`;
       }).join("");
       document.querySelectorAll(".task-btn").forEach((btn) => btn.addEventListener("click", () => {
@@ -487,19 +538,36 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <tr><td>${idx + 1}</td><td>${esc(check.kind || "-")}</td><td>${esc(check.included)}</td><td>${num(check.score)}</td></tr>`).join("")}</tbody></table>`;
     }
 
-    function finalMessages(row) {
+    function transcriptMessages(row) {
       const messages = row?.messages || [];
-      const selectedMessages = messages.slice(-4).map((message) => {
-        const sender = message.sender || message.role || "-";
+      const selectedMessages = messages.map((message) => {
+        const sender = message.label || message.sender || message.role || "-";
         const content = message.content || message.message || "";
-        return `${sender}: ${content}`;
+        return `#${Number(message.index ?? 0) + 1} ${sender}\n${content}`;
       });
       if (!selectedMessages.length) {
+        if (row?.control_cache_source === "cached") {
+          const ids = row?.control_cache?.record_ids || [];
+          return `Cached control row has no local transcript export in this run.${ids.length ? "\\nCache record IDs: " + ids.join(", ") : ""}`;
+        }
         const checks = row?.outcome_checks || [];
         const observed = checks.flatMap((check) => check.observed_messages || []).slice(-3);
         if (observed.length) return observed.join("\n\n");
       }
       return selectedMessages.join("\n\n") || "No transcript messages exported.";
+    }
+
+    function toolEventHtml(pair) {
+      const events = toolEvents(pair);
+      if (!events.length) return "<span class='small'>No generated-tool birth, visibility, or call event recorded for this task.</span>";
+      return events.map((event) => `<span class="tool-chip ${esc(event.kind)}" title="${esc(toolEventLabel(event))}">${esc(event.kind || "tool")} · ${esc(event.tool || "")}</span>`).join("");
+    }
+
+    function transcriptSource(row) {
+      const source = row?.transcript_source;
+      if (!source) return "";
+      const bits = [source.source, source.record_id ? `record ${source.record_id}` : "", source.transcript_path || ""].filter(Boolean);
+      return bits.length ? `<div class="small" style="margin-bottom:8px">${esc(bits.join(" · "))}</div>` : "";
     }
 
     function renderDetail() {
@@ -531,8 +599,12 @@ TASK_COMPARE_HTML = r"""<!doctype html>
             <div class="mini"><div class="label">Baseline Turns</div><div class="value">${esc(control.turn_count ?? "-")}</div></div>
             <div class="mini"><div class="label">SAGE Turns</div><div class="value">${esc(candidate.turn_count ?? "-")}</div></div>
             <div class="mini"><div class="label">Control Cache</div><div class="value">${esc(control.control_cache_source || "-")}</div></div>
-            <div class="mini"><div class="label">SAGE Tools</div><div class="value">${esc((candidate.generated_tools || []).length)}</div></div>
+            <div class="mini"><div class="label">SAGE Tool Events</div><div class="value">${esc(toolEvents(pair).length)}</div></div>
           </div>
+        </div>
+        <div class="section">
+          <h3 style="margin-top:0">Generated Tool Events On This Task</h3>
+          <div class="pill-row">${toolEventHtml(pair)}</div>
         </div>
         <div class="section split">
           <div class="box">
@@ -544,19 +616,20 @@ TASK_COMPARE_HTML = r"""<!doctype html>
             ${summarizeChecks(candidate)}
           </div>
         </div>
-        <div class="section split">
-          <div class="box">
-            <h3>Baseline Final Evidence</h3>
-            <pre>${esc(finalMessages(control))}</pre>
-          </div>
-          <div class="box">
-            <h3>SAGE Final Evidence</h3>
-            <pre>${esc(finalMessages(candidate))}</pre>
-          </div>
-        </div>
         <div class="section">
-          <h3 style="margin-top:0">Generated Tools Used On This Task</h3>
-          <div class="pill-row">${(candidate.generated_tools || []).length ? candidate.generated_tools.map((tool) => `<span class="pill">${esc(tool)}</span>`).join("") : "<span class='small'>No generated or retained helper recorded for this task.</span>"}</div>
+          <h3 style="margin-top:0">Full Transaction</h3>
+          <div class="transaction-grid">
+          <div class="box">
+            <h3>Baseline Transaction</h3>
+            ${transcriptSource(control)}
+            <pre class="transcript">${esc(transcriptMessages(control))}</pre>
+          </div>
+          <div class="box">
+            <h3>SAGE Transaction</h3>
+            ${transcriptSource(candidate)}
+            <pre class="transcript">${esc(transcriptMessages(candidate))}</pre>
+          </div>
+          </div>
         </div>
       `;
     }

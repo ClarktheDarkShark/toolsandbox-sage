@@ -155,6 +155,103 @@ def _generated_tool_usage(run_dir: Path) -> dict[str, list[str]]:
     return usage
 
 
+def _add_tool_event(
+    events: dict[str, list[dict[str, str]]],
+    scenario: Any,
+    tool: Any,
+    kind: str,
+) -> None:
+    if not scenario or not tool:
+        return
+    scenario_key = str(scenario)
+    tool_name = str(tool)
+    row = {"kind": kind, "tool": tool_name}
+    rows = events.setdefault(scenario_key, [])
+    if row not in rows:
+        rows.append(row)
+
+
+def _generated_tool_events(
+    run_root: Path,
+    run_dir: Path,
+) -> dict[str, list[dict[str, str]]]:
+    run_dir = _resolve_run_dir(run_dir) or run_dir
+    events: dict[str, list[dict[str, str]]] = {}
+    for event in _read_jsonl(run_dir / "reuse_events.jsonl"):
+        _add_tool_event(events, event.get("scenario"), event.get("tool_name"), "called")
+    for event in _read_jsonl(run_dir / "sage_run_events.jsonl"):
+        event_name = str(event.get("event") or "")
+        if event_name == "registry_save":
+            _add_tool_event(
+                events,
+                event.get("birth_scenario"),
+                event.get("tool_name"),
+                "born",
+            )
+        elif event_name == "tool_birth_heuristic_unverified":
+            _add_tool_event(
+                events,
+                event.get("scenario"),
+                event.get("canonical_key"),
+                "observed",
+            )
+
+    contribution = _read_json(run_root / "helper_contribution_summary.json")
+    helpers = contribution.get("helpers") if isinstance(contribution, dict) else {}
+    if isinstance(helpers, dict):
+        for name, raw in helpers.items():
+            if not isinstance(raw, dict):
+                continue
+            for scenario in raw.get("visible_scenarios") or []:
+                _add_tool_event(events, scenario, name, "visible")
+            for scenario in raw.get("called_scenarios") or []:
+                _add_tool_event(events, scenario, name, "called")
+
+    priority = {"born": 0, "called": 1, "visible": 2, "observed": 3}
+    return {
+        scenario: sorted(
+            rows,
+            key=lambda row: (priority.get(row.get("kind", ""), 9), row.get("tool", "")),
+        )
+        for scenario, rows in events.items()
+    }
+
+
+def _cached_control_transcript(
+    control_cache: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    record_ids = control_cache.get("record_ids")
+    if not isinstance(record_ids, list):
+        return [], None
+    records_dir = (
+        _repo_root() / "artifacts" / "baselines" / "control_task_baselines" / "records"
+    )
+    for record_id in record_ids:
+        if not isinstance(record_id, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", record_id
+        ):
+            continue
+        record_path = records_dir / f"{record_id}.json"
+        record = _read_json(record_path)
+        transcript_path = record.get("transcript_path")
+        if not isinstance(transcript_path, str) or not transcript_path:
+            continue
+        transcript = Path(transcript_path)
+        if not transcript.is_absolute():
+            transcript = _repo_root() / transcript
+        conversation = _read_json_value(transcript, [])
+        raw_messages = [m for m in conversation if isinstance(m, dict)]
+        if raw_messages:
+            return raw_messages, {
+                "source": "control_task_baseline_cache",
+                "record_id": record_id,
+                "record_path": str(record_path),
+                "transcript_path": transcript_path,
+                "transcript_hash": record.get("transcript_hash"),
+            }
+    return [], None
+
+
 def _compact_content(value: Any, *, limit: int = 10000) -> str:
     if value is None:
         return ""
@@ -1078,6 +1175,7 @@ def _task_focus_rows(
     }
     order = _manifest_order(run_dir)
     usage = _generated_tool_usage(run_dir)
+    tool_events = _generated_tool_events(run_root, run_dir)
     trajectory_dir = run_dir / "trajectories"
     trajectory_names = (
         {path.name for path in trajectory_dir.iterdir() if path.is_dir()}
@@ -1104,8 +1202,6 @@ def _task_focus_rows(
             run_dir / "trajectories" / scenario / "conversation.json", []
         )
         raw_messages = [m for m in conversation if isinstance(m, dict)]
-        generated_tools = usage.get(scenario, [])
-        generated_set = set(generated_tools)
         phase = run_dir.relative_to(run_root).parts[0]
         milestones = _milestones_from_result(result or {}, raw_messages)
         minefields = _minefields_from_result(result or {}, raw_messages)
@@ -1115,6 +1211,19 @@ def _task_focus_rows(
         control_cache_source = (
             result.get("control_cache_source") if isinstance(result, dict) else None
         ) or (control_cache.get("source") if isinstance(control_cache, dict) else None)
+        transcript_source = None
+        if not raw_messages and control_cache_source == "cached":
+            raw_messages, transcript_source = _cached_control_transcript(control_cache)
+            if raw_messages:
+                milestones = _milestones_from_result(result or {}, raw_messages)
+                minefields = _minefields_from_result(result or {}, raw_messages)
+        generated_tools = usage.get(scenario, [])
+        generated_events = tool_events.get(scenario, [])
+        generated_set = set(generated_tools) | {
+            str(event.get("tool"))
+            for event in generated_events
+            if event.get("kind") == "called" and event.get("tool")
+        }
         tasks.append(
             {
                 "id": f"{phase}:{run_dir.name}:{scenario}",
@@ -1132,8 +1241,10 @@ def _task_focus_rows(
                 if order.get(scenario) is None
                 else int(order[scenario]) + 1,
                 "generated_tools": generated_tools,
+                "generated_tool_events": generated_events,
                 "control_cache_source": control_cache_source,
                 "control_cache": control_cache,
+                "transcript_source": transcript_source,
                 "similarity": None if result is None else result.get("similarity"),
                 "outcome_similarity": None
                 if result is None
