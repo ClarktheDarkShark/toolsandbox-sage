@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Open the strongest Praxis combined-treatment validation dashboards in the
-# default macOS browser. The original run ports were transient; this script
-# serves the same dashboard files through a live local dashboard picker port.
+# Open the completed high-lift SAGE/Praxis validation sequence in the default
+# macOS browser. The original run ports were transient; this script serves the
+# same dashboard files through a live local dashboard picker port.
 
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-62536}"
@@ -18,9 +18,9 @@ LOG_DIR="${REPO_ROOT}/outputs/dashboard_picker"
 LOG_FILE="${LOG_DIR}/port_${PORT}.log"
 
 declare -a DASHBOARD_PATHS=(
-  "/outputs/praxis_combined_bridge_policy/formal500_order_first100_v3_bridge_repair_rapid_cache/validate_100_20260511_171441/dashboard/task_compare.html"
-  "/outputs/praxis_combined_bridge_policy/formal500_order_first250_v2_bridge_repair_rapid_cache/validate_250_20260511_172919/dashboard/task_compare.html"
-  "/outputs/praxis_combined_bridge_policy/formal500_full_v1_bridge_repair_rapid_cache/full_benchmark_20260511_180755/dashboard/task_compare.html"
+  "/outputs/gap_closure_lab/action_precondition_loop/state_sequence_bridge_broad100_taskcache_rerun/confirm_100_20260510_150154/dashboard/task_focus.html"
+  "/outputs/gap_closure_lab/action_precondition_loop/state_sequence_bridge_broad250_taskcache_rerun/promotion_250_20260510_151300/dashboard/task_focus.html"
+  "/outputs/gap_closure_lab/action_precondition_loop/state_sequence_bridge_broad500_taskcache_clean_rerun/full_benchmark_20260510_164959/dashboard/task_focus.html"
 )
 
 url_for_path() {
