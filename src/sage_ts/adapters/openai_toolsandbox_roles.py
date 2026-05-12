@@ -958,6 +958,75 @@ def _relationship_plural(relationship: object) -> str:
     return f"{value}s"
 
 
+def _normalize_relationship_label(value: object) -> str:
+    text = str(value or "").strip().lower().replace("_", " ").replace("-", " ")
+    if not text:
+        return ""
+    aliases = {
+        "friends": "friend",
+        "friend": "friend",
+        "enemies": "enemy",
+        "enemy": "enemy",
+        "coworkers": "coworker",
+        "coworker": "coworker",
+        "colleagues": "coworker",
+        "colleague": "coworker",
+        "families": "family",
+        "family": "family",
+        "relatives": "family",
+        "relative": "family",
+    }
+    return aliases.get(text, text)
+
+
+def _relationship_batch_request(openai_messages: object) -> dict[str, str] | None:
+    source = ""
+    target = ""
+    for text in _all_user_texts(openai_messages):
+        lower = " ".join(text.lower().replace("_", " ").replace("-", " ").split())
+        if not lower:
+            continue
+        direct = re.search(
+            r"\b(?:make|change|set|turn)\s+(?:all|every|each)\s+"
+            r"(?:of\s+)?(?:my\s+)?([a-z]+)\s+(?:contacts\s+)?"
+            r"(?:(?:to|into|as)\s+)?(?:my\s+)?([a-z]+)\b",
+            lower,
+        )
+        if direct:
+            source = _normalize_relationship_label(direct.group(1))
+            target = _normalize_relationship_label(direct.group(2))
+        explicit = re.search(
+            r"\brelationship\s+(?:from\s+)?([a-z]+)\s+(?:to|into)\s+([a-z]+)\b",
+            lower,
+        )
+        if explicit:
+            source = _normalize_relationship_label(explicit.group(1))
+            target = _normalize_relationship_label(explicit.group(2))
+        if " them " in f" {lower} " or " back " in f" {lower} ":
+            followup = re.search(r"\b(?:to|as)\s+(?:my\s+)?([a-z]+)\b", lower)
+            if followup:
+                target = _normalize_relationship_label(followup.group(1))
+    prior_plan = _latest_tool_payload_by_name(
+        openai_messages, "plan_contact_relationship_batch_update"
+    )
+    if prior_plan:
+        source = source or _normalize_relationship_label(
+            prior_plan.get("source_relationship")
+        )
+        previous_target = _normalize_relationship_label(
+            prior_plan.get("target_relationship")
+        )
+        if target and previous_target and not source:
+            source = previous_target
+    if not source or not target or source == target:
+        return None
+    return {
+        "user_request": " ".join(_all_user_texts(openai_messages)).strip(),
+        "source_relationship": source,
+        "target_relationship": target,
+    }
+
+
 def _selected_contact_names(payload: Mapping[str, Any] | None) -> list[str]:
     if not payload:
         return []
@@ -1008,6 +1077,151 @@ def _contact_relationship_batch_success_response(
     return None
 
 
+def _called_tool_after_latest_user(openai_messages: object, tool_name: str) -> bool:
+    target = _execution_facing_tool_name(tool_name)
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    latest_user_index = -1
+    for index, message in enumerate(messages):
+        if message.get("role") == "user":
+            latest_user_index = index
+    for message in messages[latest_user_index + 1 :]:
+        tool_calls = message.get("tool_calls")
+        if not isinstance(tool_calls, list):
+            continue
+        for tool_call in tool_calls:
+            if not isinstance(tool_call, Mapping):
+                continue
+            name, _arguments = _tool_call_function_name_and_arguments(tool_call)
+            if _execution_facing_tool_name(name) == target:
+                return True
+    return False
+
+
+def _next_relationship_batch_action(
+    openai_messages: object,
+) -> dict[str, Any] | None:
+    latest_plan = _latest_tool_message_index(
+        openai_messages, {"plan_contact_relationship_batch_update"}
+    )
+    if latest_plan is None:
+        return None
+    plan_index, plan_message = latest_plan
+    payload = _parse_mapping_payload(plan_message.get("content"))
+    if not payload or not bool(payload.get("should_call_tools")):
+        return None
+    raw_actions = payload.get("downstream_tool_kwargs_list")
+    if not isinstance(raw_actions, list):
+        return None
+    actions: list[dict[str, Any]] = [
+        {"tool_name": "modify_contact", "arguments": dict(item)}
+        for item in raw_actions
+        if isinstance(item, Mapping) and item.get("person_id")
+    ]
+    if not actions:
+        return None
+    completed = 0
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    for message in messages[plan_index + 1 :]:
+        tool_calls = message.get("tool_calls")
+        if not isinstance(tool_calls, list):
+            continue
+        for tool_call in tool_calls:
+            if not isinstance(tool_call, Mapping) or completed >= len(actions):
+                continue
+            name, arguments = _tool_call_function_name_and_arguments(tool_call)
+            expected = actions[completed]
+            if _execution_facing_tool_name(name) == expected[
+                "tool_name"
+            ] and _arguments_match(expected["arguments"], arguments):
+                completed += 1
+    if completed >= len(actions):
+        return None
+    return actions[completed]
+
+
+def _contact_relationship_batch_bridge_completion(
+    openai_messages: object,
+    openai_tools: object,
+    *,
+    model_name: str,
+) -> ChatCompletion | None:
+    if not _praxis_bridge_policy_enabled():
+        return None
+    available_names = _tool_names_execution_facing(openai_tools)
+    if "plan_contact_relationship_batch_update" not in available_names:
+        return None
+    if (
+        "search_contacts" not in available_names
+        or "modify_contact" not in available_names
+    ):
+        return None
+
+    if _latest_tool_is(openai_messages, "plan_contact_relationship_batch_update"):
+        payload = _latest_tool_payload_by_name_including_latest(
+            openai_messages, "plan_contact_relationship_batch_update"
+        )
+        if payload.get("abstain_reason"):
+            return None
+        if bool(payload.get("should_call_search_contacts")):
+            kwargs = payload.get("search_contacts_kwargs")
+            if isinstance(kwargs, Mapping) and kwargs:
+                return _synthetic_tool_call_completion(
+                    model_name=model_name,
+                    completion_id="sage-contact-relationship-search",
+                    tool_name=_tool_name_for_call(openai_tools, "search_contacts"),
+                    arguments=dict(kwargs),
+                )
+        action = _next_relationship_batch_action(openai_messages)
+        if action is not None:
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-contact-relationship-modify",
+                tool_name=_tool_name_for_call(openai_tools, action["tool_name"]),
+                arguments=action["arguments"],
+            )
+
+    if _latest_tool_is(openai_messages, "search_contacts"):
+        request = _relationship_batch_request(openai_messages)
+        if request is not None:
+            contacts_message = _latest_tool_message(openai_messages, "search_contacts")
+            contacts = (
+                _parse_sequence_payload(contacts_message.get("content"))
+                if contacts_message is not None
+                else []
+            )
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-contact-relationship-plan-after-search",
+                tool_name=_tool_name_for_call(
+                    openai_tools, "plan_contact_relationship_batch_update"
+                ),
+                arguments={**request, "contacts": contacts},
+            )
+
+    action = _next_relationship_batch_action(openai_messages)
+    if action is not None:
+        return _synthetic_tool_call_completion(
+            model_name=model_name,
+            completion_id="sage-contact-relationship-modify",
+            tool_name=_tool_name_for_call(openai_tools, action["tool_name"]),
+            arguments=action["arguments"],
+        )
+
+    request = _relationship_batch_request(openai_messages)
+    if request is None or _called_tool_after_latest_user(
+        openai_messages, "plan_contact_relationship_batch_update"
+    ):
+        return None
+    return _synthetic_tool_call_completion(
+        model_name=model_name,
+        completion_id="sage-contact-relationship-plan",
+        tool_name=_tool_name_for_call(
+            openai_tools, "plan_contact_relationship_batch_update"
+        ),
+        arguments={**request, "contacts": []},
+    )
+
+
 def _normalize_visible_phone(raw: object) -> str:
     value = str(raw or "").strip()
     if not value:
@@ -1025,7 +1239,13 @@ def _normalize_visible_phone(raw: object) -> str:
 
 
 def _extract_phone_from_text(text: str) -> str:
-    match = re.search(r"\+?\d[\d\s().-]{6,}\d", text)
+    text_without_ids = re.sub(
+        r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+        r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
+        " ",
+        text,
+    )
+    match = re.search(r"\+?\d[\d\s().-]{6,}\d", text_without_ids)
     return _normalize_visible_phone(match.group(0)) if match else ""
 
 
@@ -2375,6 +2595,181 @@ def _contact_update_phone_bridge_completion(
     )
 
 
+def _contact_update_by_id_request(openai_messages: object) -> dict[str, str] | None:
+    person_id = ""
+    phone_number = ""
+    for text in _all_user_texts(openai_messages):
+        person_id = person_id or _extract_person_id_from_text(text)
+        if not phone_number:
+            phone_number = _extract_phone_from_text(text)
+    if not person_id or not phone_number:
+        return None
+    return {
+        "person_id": person_id,
+        "phone_number": phone_number,
+        "name": "",
+        "relationship": "",
+        "user_request": " ".join(_all_user_texts(openai_messages)).strip(),
+    }
+
+
+def _contact_update_by_id_bridge_completion(
+    openai_messages: object,
+    openai_tools: object,
+    *,
+    model_name: str,
+) -> ChatCompletion | None:
+    if not _praxis_bridge_policy_enabled():
+        return None
+    available_names = _tool_names_execution_facing(openai_tools)
+    if "plan_contact_update_from_id" not in available_names:
+        return None
+    if "modify_contact" not in available_names:
+        return None
+    if _latest_tool_is(openai_messages, "plan_contact_update_from_id"):
+        payload = _latest_tool_payload_by_name_including_latest(
+            openai_messages, "plan_contact_update_from_id"
+        )
+        kwargs = payload.get("downstream_tool_kwargs") if payload else None
+        if bool(payload.get("should_call_tool")) and isinstance(kwargs, Mapping):
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-contact-id-update-modify",
+                tool_name=_tool_name_for_call(openai_tools, "modify_contact"),
+                arguments=dict(kwargs),
+            )
+    if _message_already_called_tool(openai_messages, "plan_contact_update_from_id"):
+        return None
+    request = _contact_update_by_id_request(openai_messages)
+    if request is None:
+        return None
+    return _synthetic_tool_call_completion(
+        model_name=model_name,
+        completion_id="sage-contact-id-update-plan",
+        tool_name=_tool_name_for_call(openai_tools, "plan_contact_update_from_id"),
+        arguments=request,
+    )
+
+
+def _latest_visible_record_count(openai_messages: object) -> int:
+    for tool_name in ("search_contacts", "search_messages", "search_reminder"):
+        message = _latest_tool_message(openai_messages, tool_name)
+        if message is None:
+            continue
+        payload = _parse_sequence_payload(message.get("content"))
+        if payload:
+            return len(payload)
+    return 0
+
+
+def _safe_action_or_abstain_request(
+    openai_messages: object,
+    openai_tools: object,
+) -> dict[str, Any] | None:
+    user_request = _latest_user_request_text(openai_messages).strip()
+    lower = " ".join(user_request.lower().replace("_", " ").split())
+    if not lower:
+        return None
+    available_original_tools = sorted(
+        name
+        for name in _tool_names_execution_facing(openai_tools)
+        if name in ORIGINAL_TOOLSANDBOX_TOOL_NAMES
+    )
+    requested_action = ""
+    required_original_tools: list[str] = []
+    if any(token in lower for token in ("remove", "delete")) and "contact" in lower:
+        requested_action = "remove_contact"
+        required_original_tools = ["search_contacts", "remove_contact"]
+    elif (
+        any(token in lower for token in ("modify", "update", "change"))
+        and "contact" in lower
+    ):
+        requested_action = "modify_contact"
+        required_original_tools = ["search_contacts", "modify_contact"]
+    elif "message" in lower and any(token in lower for token in ("send", "text")):
+        requested_action = "send_message"
+        required_original_tools = ["search_contacts", "send_message_with_phone_number"]
+    elif "reminder" in lower and any(token in lower for token in ("remove", "delete")):
+        requested_action = "remove_reminder"
+        required_original_tools = ["search_reminder", "remove_reminder"]
+    elif "reminder" in lower and any(
+        token in lower for token in ("modify", "update", "change", "postpone")
+    ):
+        requested_action = "modify_reminder"
+        required_original_tools = ["search_reminder", "modify_reminder"]
+    elif "reminder" in lower and any(token in lower for token in ("add", "create")):
+        requested_action = "add_reminder"
+        required_original_tools = ["add_reminder"]
+    else:
+        return None
+
+    target_identifier = _extract_person_id_from_text(
+        user_request
+    ) or _extract_phone_from_text(user_request)
+    if not target_identifier and any(
+        token in lower for token in ("latest", "last", "most recent", "recent")
+    ):
+        target_identifier = "recency_reference"
+        if requested_action == "modify_contact":
+            required_original_tools = ["search_messages", "modify_contact"]
+    if not target_identifier and any(token in lower for token in ("that", "this")):
+        target_identifier = "implicit_reference"
+
+    return {
+        "user_request": user_request,
+        "requested_action": requested_action,
+        "target_identifier": target_identifier,
+        "required_original_tools": required_original_tools,
+        "available_original_tools": available_original_tools,
+        "visible_records_count": _latest_visible_record_count(openai_messages),
+    }
+
+
+def _safe_action_or_abstain_bridge_completion(
+    openai_messages: object,
+    openai_tools: object,
+    *,
+    model_name: str,
+) -> ChatCompletion | None:
+    if not _praxis_bridge_policy_enabled():
+        return None
+    available_names = _tool_names_execution_facing(openai_tools)
+    if "prepare_safe_action_or_abstain" not in available_names:
+        return None
+    if _latest_tool_is(openai_messages, "prepare_safe_action_or_abstain"):
+        payload = _latest_tool_payload_by_name_including_latest(
+            openai_messages, "prepare_safe_action_or_abstain"
+        )
+        should_abstain = bool(payload.get("should_abstain")) or bool(
+            payload.get("abstain_reason")
+        )
+        if not should_abstain:
+            return None
+        answer = str(payload.get("final_answer_recommendation") or "").strip()
+        if not answer:
+            reason = str(payload.get("abstain_reason") or "insufficient_information")
+            answer = (
+                "I do not have enough information to complete that action safely "
+                f"({reason})."
+            )
+        return _synthetic_text_completion(
+            model_name=model_name,
+            completion_id="sage-safe-action-abstain-answer",
+            content=answer,
+        )
+    if _message_already_called_tool(openai_messages, "prepare_safe_action_or_abstain"):
+        return None
+    request = _safe_action_or_abstain_request(openai_messages, openai_tools)
+    if request is None:
+        return None
+    return _synthetic_tool_call_completion(
+        model_name=model_name,
+        completion_id="sage-safe-action-abstain-plan",
+        tool_name=_tool_name_for_call(openai_tools, "prepare_safe_action_or_abstain"),
+        arguments=request,
+    )
+
+
 def _state_action_sequence_bridge_completion(
     openai_messages: object,
     openai_tools: object,
@@ -2441,6 +2836,13 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
                 completion_id="sage-setting-success",
                 content=setting_success_answer,
             )
+        safe_action_abstain_bridge = _safe_action_or_abstain_bridge_completion(
+            openai_messages,
+            openai_tools,
+            model_name=self.model_name,
+        )
+        if safe_action_abstain_bridge is not None:
+            return safe_action_abstain_bridge
         contact_update_bridge = _contact_update_phone_bridge_completion(
             openai_messages,
             openai_tools,
@@ -2448,6 +2850,13 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
         )
         if contact_update_bridge is not None:
             return contact_update_bridge
+        contact_update_by_id_bridge = _contact_update_by_id_bridge_completion(
+            openai_messages,
+            openai_tools,
+            model_name=self.model_name,
+        )
+        if contact_update_by_id_bridge is not None:
+            return contact_update_by_id_bridge
         contact_update_success = _contact_update_success_response_text(openai_messages)
         if contact_update_success:
             return _synthetic_text_completion(
@@ -2455,6 +2864,13 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
                 completion_id="sage-contact-update-success",
                 content=contact_update_success,
             )
+        contact_relationship_bridge = _contact_relationship_batch_bridge_completion(
+            openai_messages,
+            openai_tools,
+            model_name=self.model_name,
+        )
+        if contact_relationship_bridge is not None:
+            return contact_relationship_bridge
         crud_success = _crud_success_response_text(openai_messages, openai_tools)
         if crud_success:
             return _synthetic_text_completion(

@@ -185,6 +185,9 @@ def prepare_self_evolving_campaign(
             "candidate_task_cache": "off",
             "openai_response_cache": "disabled",
             "routing_evidence_mode": "disabled",
+            "generation": "on"
+            if config.tool_strategy == "empty_live_generation"
+            else "off_for_frozen_recipe_evaluation",
         },
         "integrity_controls": {
             "scenario_ids_encoded_in_tool": False,
@@ -215,6 +218,8 @@ def _build_generated_entries(
     config: SelfEvolvingCampaignConfig,
     selected_bucket: GapBucket,
 ) -> tuple[RegistryEntry, ...]:
+    if config.tool_strategy == "empty_live_generation":
+        return ()
     if config.tool_strategy == "contact_action_v2":
         tool = build_contact_lookup_or_update_action_tool(selected_bucket)
         validation = validate_generated_tool(

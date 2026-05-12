@@ -118,6 +118,21 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 10px 15px;
       font-weight: 800;
     }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .dashboard-switch {
+      flex: 0 0 auto;
+      min-width: 150px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--blue);
+      background: #0d1630;
+    }
     input, select {
       background: #0b132a;
       color: var(--text);
@@ -131,6 +146,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     @media (max-width: 950px) {
       .timeline, .event-list, .triple { grid-template-columns: 1fr; }
       .wrap { padding: 22px; }
+      .topbar { flex-direction: column; }
     }
     @media (max-width: 560px) {
       .grid { grid-template-columns: 1fr; }
@@ -139,8 +155,17 @@ DASHBOARD_HTML = r"""<!doctype html>
 </head>
 <body>
   <main class="wrap">
-    <h1>ToolSandbox SAGE</h1>
-    <div class="sub" id="subtitle">Loading dashboard data...</div>
+    <div class="topbar">
+      <div>
+        <h1>ToolSandbox SAGE</h1>
+        <div class="sub" id="subtitle">Loading dashboard data...</div>
+      </div>
+      <select id="dashboardSwitch" class="dashboard-switch" aria-label="Switch dashboard">
+        <option value="index.html">Overview</option>
+        <option value="task_focus.html">Task Focus</option>
+        <option value="task_compare.html">Task Compare</option>
+      </select>
+    </div>
     <div class="links"><a class="btn" href="task_compare.html">Task Compare</a><a class="btn" href="task_focus.html">Task Focus</a></div>
     <section class="grid" id="metricGrid"></section>
     <section class="panel">
@@ -198,6 +223,15 @@ DASHBOARD_HTML = r"""<!doctype html>
     const fmt = (n, digits = 3) => present(n) ? Number(n).toFixed(digits) : "-";
     const pct = (n) => present(n) ? (Number(n) * 100).toFixed(1) + "%" : "-";
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    function initDashboardSwitch() {
+      const select = document.getElementById("dashboardSwitch");
+      if (!select) return;
+      const current = location.pathname.split("/").pop() || "index.html";
+      select.value = current;
+      select.addEventListener("change", () => {
+        if (select.value && select.value !== current) location.href = select.value;
+      });
+    }
     function metric(label, value, hint, cls = "") {
       return `<div class="card"><div class="label">${label}</div><div class="value ${cls}">${value}</div><div class="hint">${hint}</div></div>`;
     }
@@ -340,6 +374,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     document.getElementById("search").addEventListener("input", renderRows);
     document.getElementById("filter").addEventListener("change", renderRows);
+    initDashboardSwitch();
     refresh();
     setInterval(refresh, 5000);
   </script>

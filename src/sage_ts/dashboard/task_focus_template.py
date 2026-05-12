@@ -28,6 +28,7 @@ TASK_FOCUS_HTML = r"""<!doctype html>
     .arm-btn { padding: 3px 12px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
     .arm-btn:hover { border-color: var(--blue); color: var(--text); }
     .arm-btn.active { border-color: var(--blue); color: var(--blue); background: rgba(120,200,255,.1); }
+    .dashboard-switch { border: 1px solid var(--border); border-radius: 999px; background: rgba(13,28,56,.95); color: var(--blue); padding: 4px 9px; font: inherit; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; max-width: 142px; }
     #topMetrics { display: flex; gap: 7px; }
     .metric { flex: 1; border: 1px solid var(--border); border-radius: 9px; padding: 5px 9px; background: rgba(13,28,56,.7); min-width: 0; }
     .mlabel { color: var(--muted); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
@@ -153,6 +154,7 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       aside { max-height: 36vh; border-right: 0; border-bottom: 1px solid var(--border); }
       section.detail { height: 64vh; }
       #topMetrics { flex-wrap: wrap; }
+      .dashboard-switch { max-width: 100%; }
       .eval-top, .check-grid, .paired-eval-top, .paired-check-grid, .paired-chat { grid-template-columns: 1fr; }
       .check-head, .paired-check-head, .paired-run-metrics { grid-template-columns: 1fr; }
       .check-col + .check-col, .pair-cell + .pair-cell { border-left: 0; border-top: 1px solid rgba(28,52,96,.65); }
@@ -169,7 +171,11 @@ TASK_FOCUS_HTML = r"""<!doctype html>
         <button class="arm-btn active" data-arm="paired">Paired</button>
         <button class="arm-btn" data-arm="candidate">SAGE</button>
       </div>
-      <a href="index.html" style="font-size:11px;white-space:nowrap">main ↗</a>
+      <select id="dashboardSwitch" class="dashboard-switch" aria-label="Switch dashboard">
+        <option value="index.html">Overview</option>
+        <option value="task_focus.html">Task Focus</option>
+        <option value="task_compare.html">Task Compare</option>
+      </select>
     </div>
     <div id="topMetrics"></div>
   </header>
@@ -190,6 +196,16 @@ TASK_FOCUS_HTML = r"""<!doctype html>
     const fmt = (n, d=3) => present(n) ? Number(n).toFixed(d) : "—";
     const fmtD = n => { if (!present(n)) return "—"; const v=Number(n); return (v>0?"+":"")+v.toFixed(3); };
     const fmtPct = n => { if (!present(n)) return "—"; const v=Number(n); return (v>0?"+":"")+v.toFixed(1)+"%"; };
+
+    function initDashboardSwitch() {
+      const select = document.getElementById("dashboardSwitch");
+      if (!select) return;
+      const current = location.pathname.split("/").pop() || "index.html";
+      select.value = current;
+      select.addEventListener("change", () => {
+        if (select.value && select.value !== current) location.href = select.value;
+      });
+    }
 
     /* Return the list of visible entries for the current arm */
     function entries() {
@@ -691,6 +707,7 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       render();
     });
 
+    initDashboardSwitch();
     refresh();
     setInterval(refresh, 3000);
   </script>

@@ -157,6 +157,44 @@ def _normalize_composite_workflow_output(
     return normalized
 
 
+def _normalize_validation_abstention_output(
+    value: dict[str, Any],
+    *,
+    inputs: dict[str, Any] | None,
+) -> dict[str, Any]:
+    normalized = dict(value)
+    missing_information = _dedupe_strings(normalized.get("missing_information"))
+    required_original_tools = _dedupe_strings(normalized.get("required_original_tools"))
+    if not required_original_tools and inputs:
+        required_original_tools = _dedupe_strings(inputs.get("required_original_tools"))
+    normalized["missing_information"] = missing_information
+    normalized["required_original_tools"] = required_original_tools
+
+    should_abstain = bool(normalized.get("should_abstain"))
+    missing_lower = {item.lower() for item in missing_information}
+    if missing_information:
+        should_abstain = True
+    normalized["should_abstain"] = should_abstain
+
+    if should_abstain:
+        reason = str(normalized.get("abstain_reason") or "").strip()
+        if "target_identifier" in missing_lower or "target" in missing_lower:
+            reason = "missing_target_identifier"
+        elif missing_information:
+            reason = "missing_required_original_tool"
+        normalized["safe_next_action"] = "ask_user_or_abstain"
+        normalized["abstain_reason"] = reason or "insufficient_information"
+        normalized["final_answer_recommendation"] = (
+            "I do not have enough information to complete the action."
+        )
+    else:
+        normalized["missing_information"] = []
+        normalized["safe_next_action"] = "continue_with_original_tool"
+        normalized["final_answer_recommendation"] = ""
+        normalized["abstain_reason"] = ""
+    return normalized
+
+
 def normalize_generated_tool_output(
     tool: GeneratedTool,
     value: Any,
@@ -186,6 +224,8 @@ def normalize_generated_tool_output(
         } <= set(output_props):
             return _normalize_composite_workflow_output(value, inputs=inputs)
         return value
+    if tool.spec.family == ToolFamily.VALIDATION_ABSTENTION_HELPER:
+        return _normalize_validation_abstention_output(value, inputs=inputs)
     if tool.spec.family != ToolFamily.SEARCH_FILTER_RANKING_HELPER:
         return value
 

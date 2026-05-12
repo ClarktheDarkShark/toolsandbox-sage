@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,6 +15,8 @@ from sage_ts.generation.tool_spec import StructuredInadequacyEvidence, ToolFamil
 from sage_ts.validation.sandbox_validator import ToolExample
 from tool_sandbox.common.execution_context import ScenarioCategories
 from tool_sandbox.common.scenario import Scenario
+
+SAFE_ABSTAIN_BIRTH_ENV = "SAGE_ENABLE_SAFE_ABSTAIN_BIRTH"
 
 
 def _similarity(result: dict[str, Any]) -> float:
@@ -103,6 +106,162 @@ def _is_medium_grain_constraint_action_scenario(scenario_name: str) -> bool:
             "search_sender_phone_number_with_content",
             "search_name_with_relationship",
         )
+    )
+
+
+def _is_contact_lookup_query_scenario(scenario_name: str) -> bool:
+    if "ambiguous" in scenario_name or "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith(
+        (
+            "search_name_with_relationship",
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number",
+        )
+    )
+
+
+def _is_contact_relationship_batch_update_scenario(scenario_name: str) -> bool:
+    if "ambiguous" in scenario_name or "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith("update_contact_relationship_with_relationship")
+
+
+def _is_contact_update_by_id_scenario(scenario_name: str) -> bool:
+    if "ambiguous" in scenario_name or "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith("update_contact_with_id_and_phone_number")
+
+
+def _safe_abstain_birth_enabled() -> bool:
+    return os.environ.get(SAFE_ABSTAIN_BIRTH_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObservation:
+    enabled = _safe_abstain_birth_enabled()
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="validation:prepare_safe_action_or_abstain",
+        observation=(
+            "Repeated insufficient-information and missing-precondition failures "
+            "need a side-effect-free helper that decides whether the actor has "
+            "enough visible information and original ToolSandbox affordances to "
+            "continue, or must abstain instead of guessing. Generate a deterministic "
+            "validation helper named prepare_safe_action_or_abstain. Inputs must be "
+            "user_request: str, requested_action: str, target_identifier: str, "
+            "required_original_tools: list, available_original_tools: list, and "
+            "visible_records_count: int. Return exactly should_abstain, "
+            "missing_information, required_original_tools, safe_next_action, "
+            "final_answer_recommendation, and abstain_reason. If any required "
+            "original ToolSandbox tool is absent from available_original_tools, "
+            "set should_abstain true, missing_information to those missing tool "
+            "names, safe_next_action to ask_user_or_abstain, and a final answer "
+            "recommendation that says the action cannot be completed with the "
+            "currently available information/tools. If requested_action is a "
+            "contact or reminder side-effect and target_identifier is blank, "
+            "abstain with missing_target_identifier. If visible_records_count is "
+            "greater than 1 and the target is not unique, abstain for ambiguity. "
+            "If required tools are available and a unique target identifier is "
+            "present, set should_abstain false, missing_information empty, "
+            "safe_next_action continue_with_original_tool, and blank final answer "
+            "recommendation. The helper must never call, select, modify, remove, "
+            "send, create, or guess records; it only prepares a final abstention "
+            "or safe-continue recommendation. The spec must list the original "
+            "ToolSandbox calls it protects in both required_original_tool_calls "
+            "and preserves_side_effect_tools, including search_contacts, "
+            "remove_contact, modify_contact, search_messages, search_reminder, "
+            "remove_reminder, modify_reminder, add_reminder, and "
+            "send_message_with_phone_number when those actions are supported. "
+            "Include positive triggers for "
+            "insufficient_information, missing original tool, missing precondition, "
+            "missing target, unavailable search tool, and ambiguous target. "
+            "Include negative triggers for complete safe requests, known unique "
+            "records, and tasks where the original side-effect tool is visible and "
+            "all required user information is present."
+        ),
+        allowed_families=(str(ToolFamily.VALIDATION_ABSTENTION_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "user_request": "Remove the contact with phone +15550100",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "+15550100",
+                    "required_original_tools": ["search_contacts"],
+                    "available_original_tools": ["remove_contact"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["search_contacts"],
+                    "required_original_tools": ["search_contacts"],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "I do not have enough information to complete the action."
+                    ),
+                    "abstain_reason": "missing_required_original_tool",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Remove the contact with phone +15550100",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "+15550100",
+                    "required_original_tools": ["search_contacts", "remove_contact"],
+                    "available_original_tools": ["search_contacts", "remove_contact"],
+                    "visible_records_count": 1,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": ["search_contacts", "remove_contact"],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Update that contact",
+                    "requested_action": "modify_contact",
+                    "target_identifier": "",
+                    "required_original_tools": ["modify_contact"],
+                    "available_original_tools": ["modify_contact"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["target_identifier"],
+                    "required_original_tools": ["modify_contact"],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "I do not have enough information to complete the action."
+                    ),
+                    "abstain_reason": "missing_target_identifier",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=enabled,
+        reason=(
+            "insufficient_information_safe_abstain_birth_enabled"
+            if enabled
+            else "insufficient_information_safe_abstain_birth_parked_pending_benchmark_phrasing"
+        ),
+        inadequacy_signals=(
+            "missing_user_information",
+            "missing_original_tool_precondition",
+            "unsafe_guess_before_side_effect",
+        ),
+        planner_failures=("abstain_or_clarify_instead_of_guessing",),
+        visible_data_gaps=(
+            "visible request and available tool list must be converted into a safe abstention decision",
+        ),
     )
 
 
@@ -511,6 +670,360 @@ def _days_between_timestamps_observation(
         inadequacy_signals=("visible_raw_data_lacking_deterministic_transform",),
         visible_data_gaps=(
             "holiday timestamp and current timestamp need day-distance computation",
+        ),
+    )
+
+
+def _contact_lookup_query_planner_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:plan_contact_lookup_query",
+        observation=(
+            "Repeated contact lookup failures happen before any side effect: the "
+            "agent has a visible scalar contact constraint from the user request "
+            "but fails to turn it into the original search_contacts kwargs and "
+            "the answer field to extract afterward. Generate a deterministic "
+            "pre-search lookup planner named plan_contact_lookup_query. Inputs "
+            "must be scalar strings only: contact_name, phone_number, "
+            "relationship, and requested_field. Return exactly "
+            "should_call_search_contacts, search_contacts_kwargs, answer_field, "
+            "and abstain_reason. When one or more safe visible constraints are "
+            "present, set should_call_search_contacts true and include only "
+            "nonblank original search_contacts kwargs: name from contact_name, "
+            "phone_number from phone_number, and relationship from relationship. "
+            "Preserve requested_field as answer_field so the actor can answer "
+            "after the original search_contacts result is visible. Abstain when "
+            "requested_field is blank, when no lookup constraint is supplied, "
+            "when requested_field is unsupported, or when the task asks to add, "
+            "modify, remove, send, or handle insufficient information instead of "
+            "answering a scalar lookup. The helper must never call "
+            "search_contacts and must never modify contacts; it only prepares "
+            "the next original ToolSandbox search call. Include positive "
+            "triggers for search_name_with_relationship, "
+            "search_phone_number_with_name, and "
+            "search_relationship_with_phone_number. Include negative triggers "
+            "for add_contact, remove_contact, modify_contact, send_message, "
+            "insufficient_information, ambiguous contacts, and non-contact "
+            "tasks. List search_contacts in required_original_tool_calls and "
+            "preserves_side_effect_tools."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "contact_name": "Homer S",
+                    "phone_number": "",
+                    "relationship": "",
+                    "requested_field": "phone_number",
+                },
+                {
+                    "should_call_search_contacts": True,
+                    "search_contacts_kwargs": {"name": "Homer S"},
+                    "answer_field": "phone_number",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "contact_name": "",
+                    "phone_number": "",
+                    "relationship": "boss",
+                    "requested_field": "name",
+                },
+                {
+                    "should_call_search_contacts": True,
+                    "search_contacts_kwargs": {"relationship": "boss"},
+                    "answer_field": "name",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "contact_name": "",
+                    "phone_number": "+10000000000",
+                    "relationship": "",
+                    "requested_field": "relationship",
+                },
+                {
+                    "should_call_search_contacts": True,
+                    "search_contacts_kwargs": {"phone_number": "+10000000000"},
+                    "answer_field": "relationship",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "contact_name": "",
+                    "phone_number": "",
+                    "relationship": "",
+                    "requested_field": "phone_number",
+                },
+                {
+                    "should_call_search_contacts": False,
+                    "search_contacts_kwargs": {},
+                    "answer_field": "phone_number",
+                    "abstain_reason": "missing_lookup_constraint",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="contact_scalar_lookup_needs_pre_search_planner",
+        inadequacy_signals=(
+            "planner_failed_to_issue_available_search",
+            "visible_contact_scalar_constraint_unused",
+        ),
+        failed_tool_calls=("search_contacts",),
+        visible_data_gaps=(
+            "visible scalar contact constraint must become original search_contacts kwargs",
+            "requested answer field must be preserved after search",
+        ),
+        planner_failures=(
+            "prepare contact lookup before original search_contacts call",
+        ),
+    )
+
+
+def _contact_relationship_batch_update_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:plan_contact_relationship_batch_update",
+        observation=(
+            "Relationship-group contact update scenarios repeatedly fail because "
+            "the agent asks for identifiers or updates only one contact even "
+            "though the user supplied a visible source relationship and target "
+            "relationship. Generate a deterministic side-effect-free planner "
+            "named plan_contact_relationship_batch_update. Inputs should be "
+            "user_request, source_relationship, target_relationship, and "
+            "contacts as an optional visible list from search_contacts. The first "
+            "call may happen before search_contacts; when source and target "
+            "relationships are known but contacts is empty, return "
+            "should_call_search_contacts true with search_contacts_kwargs using "
+            "the source relationship. After contacts are visible, return "
+            "selected_contacts and downstream_tool_kwargs_list containing one "
+            "modify_contact kwargs object per selected non-self contact, plus "
+            "downstream_tool_name='modify_contact' and should_call_tools true. "
+            "This helper must not call search_contacts or modify_contact itself; "
+            "it only prepares the original calls the actor must make next. "
+            "Abstain when source_relationship or target_relationship is missing, "
+            "when they are equal, when the requested update is self-only, when "
+            "contacts are ambiguous or missing required person_id values, or "
+            "when the task is add/remove/send/reminder/search-only. Include "
+            "positive triggers for relationship group update wording such as "
+            "'all friends to enemies' and scenario families beginning "
+            "update_contact_relationship_with_relationship. Include "
+            "search_contacts and modify_contact in required_original_tool_calls "
+            "and preserves_side_effect_tools so side-effect preservation remains "
+            "checker-visible."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "user_request": "Make all my friends enemies",
+                    "source_relationship": "friend",
+                    "target_relationship": "enemy",
+                    "contacts": [],
+                },
+                {
+                    "phase": "search_required",
+                    "source_relationship": "friend",
+                    "target_relationship": "enemy",
+                    "should_call_search_contacts": True,
+                    "search_contacts_kwargs": {"relationship": "friend"},
+                    "selected_contacts": [],
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs_list": [],
+                    "should_call_tools": False,
+                    "abstain_reason": "",
+                    "final_answer_recommendation": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Make all my friends enemies",
+                    "source_relationship": "friend",
+                    "target_relationship": "enemy",
+                    "contacts": [
+                        {
+                            "person_id": "p1",
+                            "name": "Ada",
+                            "relationship": "friend",
+                        },
+                        {
+                            "person_id": "p2",
+                            "name": "Grace",
+                            "relationship": "friend",
+                        },
+                    ],
+                },
+                {
+                    "phase": "modify_required",
+                    "source_relationship": "friend",
+                    "target_relationship": "enemy",
+                    "should_call_search_contacts": False,
+                    "search_contacts_kwargs": {},
+                    "selected_contacts": [
+                        {
+                            "person_id": "p1",
+                            "name": "Ada",
+                            "relationship": "friend",
+                        },
+                        {
+                            "person_id": "p2",
+                            "name": "Grace",
+                            "relationship": "friend",
+                        },
+                    ],
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs_list": [
+                        {"person_id": "p1", "relationship": "enemy"},
+                        {"person_id": "p2", "relationship": "enemy"},
+                    ],
+                    "should_call_tools": True,
+                    "abstain_reason": "",
+                    "final_answer_recommendation": "All matching contacts can be updated after the original modify_contact calls.",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Make all my friends friends",
+                    "source_relationship": "friend",
+                    "target_relationship": "friend",
+                    "contacts": [],
+                },
+                {
+                    "phase": "abstain",
+                    "source_relationship": "friend",
+                    "target_relationship": "friend",
+                    "should_call_search_contacts": False,
+                    "search_contacts_kwargs": {},
+                    "selected_contacts": [],
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs_list": [],
+                    "should_call_tools": False,
+                    "abstain_reason": "source equals target",
+                    "final_answer_recommendation": "No relationship change is needed.",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="contact_relationship_group_update_needs_batch_planner",
+        inadequacy_signals=(
+            "planner_failed_to_issue_available_search",
+            "side_effect_argument_preparation_failure",
+            "batch_update_incomplete",
+        ),
+        failed_tool_calls=("search_contacts", "modify_contact"),
+        visible_data_gaps=(
+            "relationship labels must become search_contacts kwargs and batched modify_contact kwargs",
+        ),
+        planner_failures=(
+            "plan relationship-group search then original modify_contact calls",
+        ),
+    )
+
+
+def _contact_update_by_id_observation(scenario_name: str) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:plan_contact_update_from_id",
+        observation=(
+            "Direct contact-id update tasks repeatedly fail even though the user "
+            "has supplied the stable contact/person id and a new visible phone "
+            "number. Generate a deterministic side-effect-free planner named "
+            "plan_contact_update_from_id. Inputs must be scalar strings: "
+            "person_id, phone_number, name, relationship, and user_request. "
+            "Return downstream_tool_name, downstream_tool_kwargs, "
+            "should_call_tool, and abstain_reason. "
+            "When person_id is present and at least one update field is present, "
+            "return should_call_tool true, downstream_tool_name='modify_contact', "
+            "and downstream_tool_kwargs containing person_id plus only nonblank "
+            "update fields among phone_number, name, and relationship. The "
+            "phone_number should be normalized only by removing spaces, dashes, "
+            "and parentheses while preserving a leading plus. This helper must "
+            "never call modify_contact itself and must never search or guess a "
+            "missing id. It prepares the original ToolSandbox modify_contact "
+            "call and then the actor must call modify_contact with exactly the "
+            "returned kwargs. Abstain when person_id is missing, no update field "
+            "is present, the task is add/remove/search/send/reminder, or the "
+            "request is insufficient information. Include positive triggers for "
+            "update_contact_with_id_and_phone_number and update contact id phone "
+            "number. Include modify_contact in required_original_tool_calls and "
+            "preserves_side_effect_tools."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "person_id": "11111111-1111-1111-1111-111111111111",
+                    "phone_number": "+1 (555) 0100",
+                    "name": "",
+                    "relationship": "",
+                    "user_request": "Update this contact phone number",
+                },
+                {
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": "11111111-1111-1111-1111-111111111111",
+                        "phone_number": "+15550100",
+                    },
+                    "should_call_tool": True,
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "person_id": "22222222-2222-2222-2222-222222222222",
+                    "phone_number": "",
+                    "name": "Ada Lovelace",
+                    "relationship": "",
+                    "user_request": "Update contact name",
+                },
+                {
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": "22222222-2222-2222-2222-222222222222",
+                        "name": "Ada Lovelace",
+                    },
+                    "should_call_tool": True,
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "person_id": "",
+                    "phone_number": "+15550100",
+                    "name": "",
+                    "relationship": "",
+                    "user_request": "Update contact phone number",
+                },
+                {
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "should_call_tool": False,
+                    "abstain_reason": "missing_person_id",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="contact_id_update_needs_modify_contact_argument_planner",
+        inadequacy_signals=("side_effect_argument_preparation_failure",),
+        failed_tool_calls=("modify_contact",),
+        visible_data_gaps=(
+            "visible person_id and update fields must become original modify_contact kwargs",
+        ),
+        planner_failures=(
+            "prepare modify_contact kwargs from visible scalar id update",
         ),
     )
 
@@ -1506,22 +2019,7 @@ def classify_scenario_observations(
         outcome_similarity is not None and outcome_similarity > similarity
     )
     if ScenarioCategories.INSUFFICIENT_INFORMATION in scenario.categories:
-        return (
-            CapabilityObservation(
-                scenario_name=scenario_name,
-                canonical_key="insufficient_information",
-                observation=(
-                    "Scenario is marked insufficient-information; this should be "
-                    "stored as abstention/guard evidence, not immediate tool birth."
-                ),
-                allowed_families=(str(ToolFamily.VALIDATION_ABSTENTION_HELPER),),
-                validation_examples=(),
-                generation_allowed=False,
-                reason="insufficient_information_observation_only",
-                inadequacy_signals=("missing_user_information",),
-                planner_failures=("abstain_or_clarify_instead_of_birth",),
-            ),
-        )
+        return (_safe_action_or_abstain_observation(scenario_name),)
 
     if similarity < 1.0 and (
         "recency" in scenario_name
@@ -1645,6 +2143,9 @@ def classify_scenario_observations(
     ):
         return (_reminder_optional_location_argument_observation(scenario_name),)
 
+    if similarity < 1.0 and _is_contact_update_by_id_scenario(scenario_name):
+        return (_contact_update_by_id_observation(scenario_name),)
+
     if similarity < 1.0 and _is_medium_grain_constraint_action_scenario(scenario_name):
         return (_constraint_to_action_planner_observation(scenario_name),)
 
@@ -1695,7 +2196,17 @@ def classify_scenario_observations(
         return tuple(observations)
 
     if similarity < 1.0 and _is_visible_record_constraint_scenario(scenario_name):
-        observations = [_contact_constraint_observation(scenario_name)]
+        observations = []
+        if _is_contact_lookup_query_scenario(scenario_name):
+            observations.append(
+                _contact_lookup_query_planner_observation(scenario_name)
+            )
+        if _is_contact_relationship_batch_update_scenario(scenario_name):
+            observations.append(
+                _contact_relationship_batch_update_observation(scenario_name)
+            )
+        if not observations:
+            observations.append(_contact_constraint_observation(scenario_name))
         if _is_post_selection_side_effect_prep_scenario(scenario_name):
             observations.append(
                 _post_selection_side_effect_args_observation(scenario_name)

@@ -1,0 +1,118 @@
+{
+  "artifact_type": "self_evolving_sage_live_generation_diag24_summary",
+  "date": "2026-05-11",
+  "branch": "codex/self-evolving-sage-mini60",
+  "final_claim_evidence": false,
+  "mechanism_claim": "empty generated registry plus generation-on live tool birth",
+  "model_policy": {
+    "agent_model": "gpt-4o-mini",
+    "user_model": "gpt-4o-mini",
+    "generation_model": "gpt-4o-mini"
+  },
+  "preparation": {
+    "path": "artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_preparation.json",
+    "manifest_path": "artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_manifest.json",
+    "manifest_sha256": "5337bf7bef2cb32679955bcf27b68cf06495d00c905a02c66766ae261b0176bc",
+    "starting_registry_path": "artifacts/self_evolving_sage/current_mini60_live_generation_v2/registry/registry_manifest.json",
+    "starting_registry_sha256": "61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713",
+    "starting_registry_tool_count": 0,
+    "selected_bucket": "contact_lookup_update_search_crud",
+    "selected_scenario_count": 24,
+    "sample_cap": 60
+  },
+  "cache_policy": {
+    "control_cache": "use-if-eligible",
+    "candidate_task_cache": "off",
+    "openai_response_cache": "disabled",
+    "routing_evidence_mode": "disabled",
+    "candidate_prior_sage_traces_reused": false
+  },
+  "positive_live_generation_run": {
+    "run_root": "outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431",
+    "dashboard": "http://127.0.0.1:62628/outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431/dashboard/task_compare.html",
+    "generation_enabled": true,
+    "scenario_count": 24,
+    "control_source": "cached",
+    "cached_control_tasks": 24,
+    "fresh_control_tasks": 0,
+    "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "registry_manifest_digest_before_run": "61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713",
+    "registry_manifest_digest_after_run": "92559066516f9751b730bb92f6e267640c6e8c6506b9068cc436751f2bebf052",
+    "mean_similarity_delta": 0.04056856138521164,
+    "mean_outcome_similarity_delta": 0.047045397198517684,
+    "canonical_gains": 13,
+    "canonical_regressions": 7,
+    "outcome_gains": 9,
+    "outcome_regressions": 5,
+    "exact_success_delta": 6,
+    "runtime_exception_count": 0,
+    "helper_side_effect_incidents": 0,
+    "protocol_gate_passed": true,
+    "accepted_tools": [
+      "plan_contact_relationship_batch_update",
+      "plan_contact_update_from_id",
+      "prepare_side_effect_args_from_selected_record"
+    ],
+    "newly_generated_helper_called_tools": [
+      "plan_contact_relationship_batch_update"
+    ],
+    "called_subset": {
+      "plan_contact_relationship_batch_update": {
+        "visible_count": 3,
+        "called_count": 3,
+        "visible_not_called_count": 0,
+        "mean_canonical_delta": 0.10269380136855576,
+        "mean_outcome_delta": 0.3421974138502637,
+        "canonical_gains": 2,
+        "canonical_regressions": 1,
+        "outcome_gains": 2,
+        "outcome_regressions": 1
+      }
+    }
+  },
+  "negative_birth_diagnostic": {
+    "run_root": "outputs/self_evolving_sage/live_generation_v9_diag24/mechanism_60_20260511_233101",
+    "helper": "prepare_safe_action_or_abstain",
+    "visible_count": 8,
+    "called_count": 6,
+    "visible_not_called_count": 2,
+    "called_subset_mean_canonical_delta": -0.5054543045858361,
+    "called_subset_mean_outcome_delta": -0.03056176561104515,
+    "decision": "park_by_default_pending_benchmark_faithful_phrasing",
+    "diagnostic_opt_in_env": "SAGE_ENABLE_SAFE_ABSTAIN_BIRTH=1"
+  },
+  "latest_parking_check": {
+    "run_root": "outputs/self_evolving_sage/live_generation_v10_diag24/mechanism_60_20260511_233833",
+    "generation_enabled": true,
+    "scenario_count": 24,
+    "control_source": "cached",
+    "cached_control_tasks": 24,
+    "fresh_control_tasks": 0,
+    "registry_manifest_digest_before_run": "61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713",
+    "registry_manifest_digest_after_run": "61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713",
+    "mean_similarity_delta": -0.01882476797199246,
+    "mean_outcome_similarity_delta": -0.011708359234188746,
+    "canonical_gains": 9,
+    "canonical_regressions": 11,
+    "outcome_gains": 5,
+    "outcome_regressions": 9,
+    "exact_success_delta": 4,
+    "runtime_exception_count": 0,
+    "helper_side_effect_incidents": 0,
+    "protocol_gate_passed": false,
+    "protocol_gate_reasons": [
+      "non_positive_outcome_delta",
+      "outcome_gains_do_not_exceed_regressions",
+      "non_positive_canonical_delta",
+      "gains_do_not_exceed_regressions"
+    ]
+  },
+  "superseded_recipe_transfer_run": {
+    "run_root": "outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904",
+    "mean_similarity_delta": 0.081539,
+    "mean_outcome_similarity_delta": 0.118882,
+    "exact_success_delta": 9,
+    "status": "useful_transfer_diagnostic_but_not_live_generation_proof"
+  },
+  "decision": "SELF_EVOLVING_LIVE_GENERATION_MECHANISM_POSITIVE_BUT_NOT_SCALE_READY"
+}

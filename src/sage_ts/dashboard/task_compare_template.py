@@ -31,7 +31,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       color: var(--text);
       font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    button, input {
+    button, input, select {
       font: inherit;
     }
     header {
@@ -46,6 +46,23 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       margin: 0;
       font-size: 22px;
       letter-spacing: 0;
+    }
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .dashboard-switch {
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel2);
+      color: var(--blue);
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      min-width: 140px;
     }
     .subtitle {
       color: var(--muted);
@@ -306,13 +323,23 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       .metrics, .compare-grid, .split { grid-template-columns: 1fr; }
       .detail { padding: 14px; }
       header { position: relative; }
+      .header-row { flex-direction: column; }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>Task Compare</h1>
-    <div class="subtitle" id="subtitle">Loading run data...</div>
+    <div class="header-row">
+      <div>
+        <h1>Task Compare</h1>
+        <div class="subtitle" id="subtitle">Loading run data...</div>
+      </div>
+      <select id="dashboardSwitch" class="dashboard-switch" aria-label="Switch dashboard">
+        <option value="index.html">Overview</option>
+        <option value="task_focus.html">Task Focus</option>
+        <option value="task_compare.html">Task Compare</option>
+      </select>
+    </div>
     <div class="metrics" id="metrics"></div>
   </header>
   <main>
@@ -344,6 +371,15 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     const relLift = (delta, baseline) => finite(delta) && finite(baseline) && Number(baseline) !== 0 ? Number(delta) / Number(baseline) : null;
     const cls = (v) => Number(v || 0) > 0 ? "good" : Number(v || 0) < 0 ? "bad" : "";
     const outcome = (row) => row?.outcome_similarity ?? row?.outcome_milestone_similarity ?? null;
+    function initDashboardSwitch() {
+      const select = document.getElementById("dashboardSwitch");
+      if (!select) return;
+      const current = location.pathname.split("/").pop() || "index.html";
+      select.value = current;
+      select.addEventListener("change", () => {
+        if (select.value && select.value !== current) location.href = select.value;
+      });
+    }
     const completeStatus = (row) => row?.status === "complete" || row?.status === "cached" || row?.status === "done";
     const mean = (values) => {
       const nums = values.filter(finite).map(Number);
@@ -571,6 +607,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       await refresh();
       if (!handlersBound) {
         handlersBound = true;
+        initDashboardSwitch();
         document.getElementById("search").addEventListener("input", renderList);
         document.getElementById("closeTools").addEventListener("click", closeTools);
         document.getElementById("toolDrawer").addEventListener("click", (event) => {

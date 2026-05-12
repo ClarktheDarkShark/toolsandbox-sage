@@ -42,6 +42,7 @@ def main() -> None:
     parser.add_argument(
         "--tool-strategy",
         choices=(
+            "empty_live_generation",
             "contact_action_v2",
             "praxis_contact_bridgepack",
             "praxis_current_pack",

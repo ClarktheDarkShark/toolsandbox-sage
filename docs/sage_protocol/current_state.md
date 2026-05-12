@@ -1,15 +1,16 @@
 # Current State
 
 - Date: 2026-05-11
-- Last completed step: `self_evolving_sage_mini60_praxis_pack_v2`
-- Last decision: `SELF_EVOLVING_CONTROLLER_MINI60_PROOF_POSITIVE_NOT_PROTECTED_CLAIM_EVIDENCE`
+- Last completed step: `self_evolving_sage_empty_registry_live_generation_diag24`
+- Last decision: `SELF_EVOLVING_LIVE_GENERATION_MECHANISM_POSITIVE_BUT_NOT_SCALE_READY`
 - Primary metric: outcome/task-completion
-- Current SAGE approach: combined Praxis bridge-policy remains the current high-lift SAGE treatment under review; self-evolving SAGE now maintains the next-gap loop by observing gap packets, selecting a bucket, starting from an empty runtime generated-tool registry, and materializing or generating validated helpers for capped low-cost natural-adoption runs.
-- Self-evolving mini60 proof: score `0.763821 -> 0.845361`, delta `+0.081539`; outcome `0.536539 -> 0.655421`, delta `+0.118882`; exact successes `13 -> 22`; generated-tool visible/called `36 / 23`; runtime exceptions `0`; helper side-effect incidents `0`.
-- Self-evolving mini60 models: agent/user/generation all `gpt-4o-mini`; sample cap `60`; controls `33 cached / 27 fresh`; candidate task cache off; OpenAI response cache disabled; routing evidence disabled.
-- Self-evolving mini60 run: `outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904`.
+- Current SAGE approach: combined Praxis bridge-policy remains the current high-lift SAGE treatment under review; self-evolving SAGE discovery now starts from an empty generated-tool registry, keeps generation on during the candidate run, generates tools from online gap observations, and retains or parks tools based on natural adoption and downstream value.
+- Self-evolving live-generation proof: run `outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431`; starting registry SHA `61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713`; final generated registry SHA `92559066516f9751b730bb92f6e267640c6e8c6506b9068cc436751f2bebf052`; score delta `+0.040569`; outcome delta `+0.047045`; exact success delta `+6`; generated tool `plan_contact_relationship_batch_update` visible/called `3 / 3`; runtime exceptions `0`; helper side-effect incidents `0`; protocol gate `PASS`.
+- Self-evolving live-generation models: agent/user/generation all `gpt-4o-mini`; sample cap `60`; matched contact scenarios `24`; controls `24 cached / 0 fresh`; candidate task cache off; OpenAI response cache disabled; routing evidence disabled; generation on.
+- Safe-abstention birth status: `prepare_safe_action_or_abstain` is parked by default after v9 called-subset canonical delta `-0.505454` and outcome delta `-0.030562`; diagnostic opt-in is `SAGE_ENABLE_SAFE_ABSTAIN_BIRTH=1`.
+- Superseded self-evolving transfer diagnostic: `outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904` had stronger deltas, but used pre-existing Praxis recipe tools and generation off, so it is not counted as proof of live self-evolution.
 - Self-evolving mini60 report: `docs/sage_protocol/self_evolving_sage_mini60_report.md`.
-- Self-evolving mini60 summary: `artifacts/self_evolving_sage/summary/self_evolving_mini60_praxis_pack_v2_summary.json`.
+- Self-evolving live-generation summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_diag24_summary.json`, SHA-256 `1807c4fb597199130acfe1861360591e1abbc315de79ec90e35c98778fa14d89`.
 - Active frozen helpers: protected best3 remains `relative_day_time_to_timestamp, resolve_search_window_or_bounds, select_record_by_timestamp_extreme`; repaired Praxis v2 remains a registry-only review candidate; combined Praxis BridgePack is an experimental combined-treatment candidate only.
 - Active protected registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`
 - Protected registry SHA-256: `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`

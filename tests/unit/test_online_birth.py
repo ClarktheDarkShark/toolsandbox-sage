@@ -822,6 +822,29 @@ def test_direct_contact_remove_by_phone_failure_births_constraint_helpers() -> N
     ]
 
 
+def test_contact_lookup_failure_births_scalar_lookup_planner() -> None:
+    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
+
+    observations = classify_scenario_observations(
+        "search_phone_number_with_name_3_distraction_tools",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    assert [item.canonical_key for item in observations] == [
+        "composite:plan_contact_lookup_query",
+    ]
+    observation = observations[0]
+    assert observation.allowed_families == (str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),)
+    assert observation.failed_tool_calls == ("search_contacts",)
+    assert observation.validation_examples[0].inputs == {
+        "contact_name": "Homer S",
+        "phone_number": "",
+        "relationship": "",
+        "requested_field": "phone_number",
+    }
+
+
 def test_ambiguous_contact_lookup_failure_does_not_birth_helper() -> None:
     scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
 
@@ -844,9 +867,61 @@ def test_contact_update_failure_births_contact_selection_helper() -> None:
     )
 
     assert [item.canonical_key for item in observations] == [
-        "search_filter:select_visible_record_by_constraints",
+        "composite:plan_contact_relationship_batch_update",
         "composite:prepare_side_effect_args_from_selected_record",
     ]
+    assert observations[0].failed_tool_calls == ("search_contacts", "modify_contact")
+
+
+def test_contact_id_update_failure_births_scalar_update_planner() -> None:
+    scenario = Scenario(categories=[ScenarioCategories.SINGLE_TOOL_CALL])
+
+    observations = classify_scenario_observations(
+        "update_contact_with_id_and_phone_number_3_distraction_tools",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    assert [item.canonical_key for item in observations] == [
+        "composite:plan_contact_update_from_id",
+    ]
+    assert observations[0].failed_tool_calls == ("modify_contact",)
+
+
+def test_insufficient_information_safe_abstain_birth_is_flagged(monkeypatch) -> None:
+    monkeypatch.setenv("SAGE_ENABLE_SAFE_ABSTAIN_BIRTH", "1")
+    scenario = Scenario(categories=[ScenarioCategories.INSUFFICIENT_INFORMATION])
+
+    observations = classify_scenario_observations(
+        "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    assert [item.canonical_key for item in observations] == [
+        "validation:prepare_safe_action_or_abstain",
+    ]
+    observation = observations[0]
+    assert observation.allowed_families == (
+        str(ToolFamily.VALIDATION_ABSTENTION_HELPER),
+    )
+    assert observation.generation_allowed
+    assert observation.validation_examples[0].expected["should_abstain"] is True
+
+
+def test_insufficient_information_safe_abstain_birth_is_parked_by_default() -> None:
+    scenario = Scenario(categories=[ScenarioCategories.INSUFFICIENT_INFORMATION])
+
+    observations = classify_scenario_observations(
+        "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    assert [item.canonical_key for item in observations] == [
+        "validation:prepare_safe_action_or_abstain",
+    ]
+    assert not observations[0].generation_allowed
 
 
 def test_recency_action_failure_births_action_target_and_arg_prep_helpers() -> None:

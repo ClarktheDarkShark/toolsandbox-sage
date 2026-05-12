@@ -62,16 +62,35 @@ def test_ambiguous_contact_lookup_is_not_birth_opportunity() -> None:
 def test_contact_update_tasks_have_birth_opportunity_and_retained_fit() -> None:
     scenario = "update_contact_relationship_with_relationship_3_distraction_tools"
 
-    assert "search_filter:select_visible_record_by_constraints" in (
+    assert "plan_contact_relationship_batch_update" in expected_helper_fit(scenario)
+    assert "composite:plan_contact_relationship_batch_update" in (
         expected_birth_opportunities(scenario)
     )
     assert "composite:prepare_side_effect_args_from_selected_record" in (
         expected_birth_opportunities(scenario)
     )
-    assert "composite:constraint_to_action_planner" in (
+    assert "search_filter:select_visible_record_by_constraints" not in (
         expected_birth_opportunities(scenario)
     )
     assert "constraint_to_action_planner" not in expected_helper_fit(scenario)
+
+
+def test_contact_id_update_tasks_match_update_planner() -> None:
+    scenario = "update_contact_with_id_and_phone_number_3_distraction_tools"
+
+    assert "plan_contact_update_from_id" in expected_helper_fit(scenario)
+    assert "composite:plan_contact_update_from_id" in expected_birth_opportunities(
+        scenario
+    )
+
+
+def test_insufficient_information_tasks_match_safe_abstain_planner() -> None:
+    scenario = "remove_contact_by_phone_no_search_contacts_insufficient_information"
+
+    assert "prepare_safe_action_or_abstain" in expected_helper_fit(scenario)
+    assert "validation:prepare_safe_action_or_abstain" in (
+        expected_birth_opportunities(scenario)
+    )
 
 
 def test_contact_lookup_tasks_match_lookup_query_helpers() -> None:
@@ -82,7 +101,7 @@ def test_contact_lookup_tasks_match_lookup_query_helpers() -> None:
     assert "composite:plan_contact_lookup_query" in expected_birth_opportunities(
         scenario
     )
-    assert "derived_value:extract_contact_field_from_search_result" in (
+    assert "search_filter:select_visible_record_by_constraints" not in (
         expected_birth_opportunities(scenario)
     )
 
@@ -152,8 +171,10 @@ def test_remove_latest_reminder_matches_search_window_and_selector() -> None:
 def test_message_helpers_do_not_fit_insufficient_information_tasks() -> None:
     scenario = "modify_contact_with_message_recency_insufficient_information"
 
-    assert expected_helper_fit(scenario) == []
-    assert expected_birth_opportunities(scenario) == []
+    assert expected_helper_fit(scenario) == ["prepare_safe_action_or_abstain"]
+    assert expected_birth_opportunities(scenario) == [
+        "validation:prepare_safe_action_or_abstain"
+    ]
 
 
 def test_holiday_task_matches_day_distance_helper() -> None:

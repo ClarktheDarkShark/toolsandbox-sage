@@ -72,6 +72,18 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "contact_message_search_disambiguation",
         "generic_multi_tool_composition",
     ),
+    "plan_contact_relationship_batch_update": (
+        "contact_message_search_disambiguation",
+        "generic_multi_tool_composition",
+    ),
+    "plan_contact_update_from_id": (
+        "contact_message_search_disambiguation",
+        "generic_multi_tool_composition",
+    ),
+    "prepare_safe_action_or_abstain": (
+        "insufficient_information_clarification",
+        "generic_multi_tool_composition",
+    ),
     "extract_contact_field_from_search_result": (
         "contact_message_search_disambiguation",
     ),
@@ -92,6 +104,11 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
         "select_contact_field_by_constraint",
     ),
     "composite:plan_contact_lookup_query": ("plan_contact_lookup_query",),
+    "composite:plan_contact_relationship_batch_update": (
+        "plan_contact_relationship_batch_update",
+    ),
+    "composite:plan_contact_update_from_id": ("plan_contact_update_from_id",),
+    "validation:prepare_safe_action_or_abstain": ("prepare_safe_action_or_abstain",),
     "derived_value:extract_contact_field_from_search_result": (
         "extract_contact_field_from_search_result",
     ),
@@ -376,6 +393,16 @@ def expected_helper_fit(
     ):
         helpers.append("plan_contact_lookup_query")
         helpers.append("extract_contact_field_from_search_result")
+    if "insufficient_information" not in name and name.startswith(
+        "update_contact_relationship_with_relationship"
+    ):
+        helpers.append("plan_contact_relationship_batch_update")
+    if "insufficient_information" not in name and name.startswith(
+        "update_contact_with_id_and_phone_number"
+    ):
+        helpers.append("plan_contact_update_from_id")
+    if "insufficient_information" in name:
+        helpers.append("prepare_safe_action_or_abstain")
     return helpers
 
 
@@ -388,7 +415,7 @@ def expected_birth_opportunities(
     name = scenario_name.lower()
     category_set = {category.upper() for category in categories or ()}
     if "INSUFFICIENT_INFORMATION" in category_set or "insufficient_information" in name:
-        return []
+        return ["validation:prepare_safe_action_or_abstain"]
 
     opportunities: list[str] = []
     if "recency" in name and "CANONICALIZATION" in category_set:
@@ -418,10 +445,22 @@ def expected_birth_opportunities(
         opportunities.append("derived_value:resolve_search_window_or_bounds")
     # Do not count bounds-only message window helpers as claim-grade birth
     # opportunities; latest/oldest failures need selection/action helpers.
+    scalar_contact_lookup = name.startswith(
+        (
+            "search_name_with_relationship",
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number",
+        )
+    )
+    relationship_batch_update = name.startswith(
+        "update_contact_relationship_with_relationship"
+    )
     if (
         "ambiguous" not in name
         and "insufficient_information" not in name
         and name.startswith(VISIBLE_RECORD_CONSTRAINT_PREFIXES)
+        and not scalar_contact_lookup
+        and not relationship_batch_update
     ):
         opportunities.append("search_filter:select_visible_record_by_constraints")
     if "insufficient_information" not in name and name.startswith(
@@ -434,17 +473,20 @@ def expected_birth_opportunities(
         and name.startswith(SIDE_EFFECT_PREP_PREFIXES)
     ):
         opportunities.append("composite:prepare_side_effect_args_from_selected_record")
+    if "ambiguous" not in name and "insufficient_information" not in name:
+        if scalar_contact_lookup:
+            opportunities.append("composite:plan_contact_lookup_query")
+        if relationship_batch_update:
+            opportunities.append("composite:plan_contact_relationship_batch_update")
+        if name.startswith("update_contact_with_id_and_phone_number"):
+            opportunities.append("composite:plan_contact_update_from_id")
     if (
         "ambiguous" not in name
         and "insufficient_information" not in name
         and name.startswith(
             (
                 "remove_contact_by_phone",
-                "update_contact_relationship_with_relationship",
-                "search_phone_number_with_name",
-                "search_relationship_with_phone_number",
                 "search_sender_phone_number_with_content",
-                "search_name_with_relationship",
             )
         )
     ):

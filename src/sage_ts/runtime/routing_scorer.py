@@ -89,9 +89,18 @@ def _family_match(label: str, scenario_strata: set[str], scenario_name: str) -> 
     label = label.strip().lower()
     if not label:
         return False
-    if _token_match(label, scenario_name):
+    label_variants = {label}
+    for suffix in (
+        "_once",
+        "_twice",
+        "_twice_multiple_user_turn",
+        "_multiple_user_turn",
+    ):
+        if label.endswith(suffix):
+            label_variants.add(label[: -len(suffix)])
+    if any(_token_match(variant, scenario_name) for variant in label_variants):
         return True
-    label_parts = _family_parts(label)
+    label_parts = set().union(*(_family_parts(variant) for variant in label_variants))
     for stratum in scenario_strata:
         stratum_parts = _family_parts(stratum)
         shared_part_threshold = 2 if len(label_parts) <= 2 else 3
@@ -302,7 +311,13 @@ def _is_insufficient_information_guard(spec: Any) -> bool:
     ).lower()
     has_abstention_contract = (
         "should_abstain" in output_props
-        and "clarification_prompt" in output_props
+        and (
+            "clarification_prompt" in output_props
+            or "final_answer_recommendation" in output_props
+        )
+        and (
+            "safe_next_action" in output_props or "clarification_prompt" in output_props
+        )
         and (
             "missing_information" in output_props
             or "forbidden_downstream_tools" in output_props

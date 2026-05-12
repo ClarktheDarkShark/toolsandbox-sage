@@ -2,7 +2,38 @@
 
 ## 2026-05-11
 
+- `Self-evolving SAGE empty-registry live-generation diag24` completed.
+  - Branch: `codex/self-evolving-sage-mini60`
+  - Report: `docs/sage_protocol/self_evolving_sage_mini60_report.md`
+  - Summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_diag24_summary.json`
+  - Summary SHA-256: `1807c4fb597199130acfe1861360591e1abbc315de79ec90e35c98778fa14d89`
+  - Preparation: `artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_preparation.json`
+  - Manifest: `artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_manifest.json`
+  - Manifest SHA-256: `5337bf7bef2cb32679955bcf27b68cf06495d00c905a02c66766ae261b0176bc`
+  - Starting registry: `artifacts/self_evolving_sage/current_mini60_live_generation_v2/registry/registry_manifest.json`
+  - Starting registry SHA-256: `61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713`
+  - Positive run: `outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431`
+  - Dashboard: `http://127.0.0.1:62628/outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431/dashboard/task_compare.html`
+  - Source plan: `docs/sage_protocol/praxis_next_gap_and_self_evolving_sage_plan.md`
+  - Strategy: start from an empty generated-tool registry, keep generation on, generate tools online from gap observations, validate accepted tools, and use natural routing/calling without force calls.
+  - Models: agent/user/generation all `gpt-4o-mini`.
+  - Sample cap: `60`; matched contact scenarios: `24`.
+  - Control cache: `use-if-eligible`, `24 cached / 0 fresh`, cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`.
+  - Candidate task cache: `off`; OpenAI response cache: `disabled`; routing evidence: `disabled`; diagnostic force env vars: none.
+  - Generation: `on`.
+  - Accepted live-born tools: `plan_contact_relationship_batch_update`, `plan_contact_update_from_id`, `prepare_side_effect_args_from_selected_record`.
+  - Natural call evidence: `plan_contact_relationship_batch_update` visible/called/VNC `3 / 3 / 0`, called-subset outcome delta `+0.342197`.
+  - Canonical/reference delta: `+0.040569`.
+  - Outcome delta: `+0.047045`.
+  - Exact success delta: `+6`.
+  - Runtime exceptions: `0`.
+  - Helper side-effect incidents: `0`.
+  - Protocol gate: `PASS`.
+  - Safe-abstention diagnostic: `prepare_safe_action_or_abstain` generated and callable, but parked by default after v9 called-subset canonical delta `-0.505454` and outcome delta `-0.030562`; diagnostic opt-in is `SAGE_ENABLE_SAFE_ABSTAIN_BIRTH=1`.
+  - Decision: `SELF_EVOLVING_LIVE_GENERATION_MECHANISM_POSITIVE_BUT_NOT_SCALE_READY`; not protected final-claim evidence.
+
 - `Self-evolving SAGE mini60 praxis-pack proof` completed.
+  - Status: superseded as the live self-evolving proof because it used pre-existing Praxis recipe tools and generation was off during the run. Retained as a recipe-pack transfer diagnostic.
   - Branch: `codex/self-evolving-sage-mini60`
   - Report: `docs/sage_protocol/self_evolving_sage_mini60_report.md`
   - Summary: `artifacts/self_evolving_sage/summary/self_evolving_mini60_praxis_pack_v2_summary.json`

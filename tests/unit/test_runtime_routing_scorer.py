@@ -723,6 +723,97 @@ def test_insufficient_information_guard_shows_despite_missing_original_tool() ->
     assert decisions["detect_missing_information_before_minefield"].visible
 
 
+def test_safe_action_abstention_guard_shows_despite_missing_original_tool(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setattr(
+        routing_scorer, "has_current_validation_proof", lambda _entry: True
+    )
+    monkeypatch.setattr(
+        toolsandbox_integration, "has_current_validation_proof", lambda _entry: True
+    )
+    base = _entry()
+    tool = GeneratedTool(
+        spec=replace(
+            base.tool.spec,
+            tool_name="prepare_safe_action_or_abstain",
+            family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+            description=(
+                "Return a safe abstention plan for insufficient_information "
+                "requests with missing original tools or target identifiers."
+            ),
+            inputs=(
+                ToolInput("user_request", "str", "The current user request."),
+                ToolInput("requested_action", "str", "Requested action."),
+                ToolInput("target_identifier", "str", "Visible target id."),
+                ToolInput("required_original_tools", "list", "Required tools."),
+                ToolInput("available_original_tools", "list", "Visible tools."),
+                ToolInput("visible_records_count", "int", "Visible record count."),
+            ),
+            positive_triggers=(
+                "insufficient_information",
+                "missing original tool",
+            ),
+            negative_triggers=("complete safe request",),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "required_original_tools": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "safe_next_action": {"type": "string"},
+                    "final_answer_recommendation": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            applicable_task_families=(
+                "remove_contact_by_phone_no_search_contacts_insufficient_information",
+            ),
+            required_original_tool_calls=("search_contacts", "remove_contact"),
+            preserves_side_effect_tools=("search_contacts", "remove_contact"),
+            abstain_behavior=(
+                "Return should_abstain=True when required information or "
+                "original tools are missing."
+            ),
+            shortfall_cluster_evidence=("insufficient_information_clarification",),
+            known_failure_mechanisms_addressed=("missing_original_tool_precondition",),
+        ),
+        code=(
+            "def prepare_safe_action_or_abstain(user_request: str, "
+            "requested_action: str, target_identifier: str, "
+            "required_original_tools: list, available_original_tools: list, "
+            "visible_records_count: int) -> dict:\n"
+            "    return {'should_abstain': True, "
+            "'missing_information': ['search_contacts'], "
+            "'required_original_tools': required_original_tools, "
+            "'safe_next_action': 'ask_user_or_abstain', "
+            "'final_answer_recommendation': 'I do not have enough information "
+            "to complete the action.', "
+            "'abstain_reason': 'missing_required_original_tool'}\n"
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="remove_contact_by_phone_no_search_contacts_insufficient_information",
+    )
+
+    selected, decisions = route_registry_entries(
+        {"prepare_safe_action_or_abstain": entry},
+        "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        available_base_tools={"remove_contact"},
+    )
+
+    assert selected == [entry]
+    assert decisions["prepare_safe_action_or_abstain"].visible
+
+
 def test_derived_calculator_with_original_call_requires_trigger_match() -> None:
     base = _entry()
     tool = GeneratedTool(
@@ -1416,6 +1507,56 @@ def test_explicit_contact_lookup_contract_blocks_non_matching_all_tools() -> Non
         "plan_contact_lookup_query"
     ]
     assert decisions["plan_contact_lookup_query"].visible
+
+
+def test_generated_family_once_suffix_matches_base_relationship_update_family(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setattr(
+        routing_scorer, "has_current_validation_proof", lambda _entry: True
+    )
+    monkeypatch.setattr(
+        toolsandbox_integration, "has_current_validation_proof", lambda _entry: True
+    )
+    base = _entry()
+    entry = RegistryEntry.accepted(
+        replace(
+            base.tool,
+            spec=replace(
+                base.tool.spec,
+                tool_name="plan_contact_relationship_batch_update",
+                family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+                positive_triggers=("Update contact relationships with relationship",),
+                negative_triggers=("insufficient_information",),
+                applicable_task_families=(
+                    "update_contact_relationship_with_relationship_once",
+                ),
+                required_original_tool_calls=("search_contacts", "modify_contact"),
+                preserves_side_effect_tools=("search_contacts", "modify_contact"),
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "should_call_search_contacts": {"type": "boolean"},
+                        "search_contacts_kwargs": {"type": "object"},
+                        "downstream_tool_kwargs_list": {"type": "array"},
+                    },
+                },
+            ),
+        ),
+        base.validation,
+        birth_scenario="update_contact_relationship_with_relationship",
+    )
+
+    selected, decisions = route_registry_entries(
+        {"plan_contact_relationship_batch_update": entry},
+        "update_contact_relationship_with_relationship",
+        available_base_tools={"search_contacts", "modify_contact"},
+    )
+
+    assert [item.tool.spec.tool_name for item in selected] == [
+        "plan_contact_relationship_batch_update"
+    ]
+    assert decisions["plan_contact_relationship_batch_update"].visible
 
 
 def test_scalar_phone_normalizer_compiles_with_optional_defaults() -> None:

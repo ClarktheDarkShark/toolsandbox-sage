@@ -15,11 +15,14 @@ from sage_ts.adapters.openai_toolsandbox_roles import (
     _answer_retention_actor_policy_message,
     _answer_retention_response_text,
     _contact_lookup_bridge_completion,
+    _contact_relationship_batch_bridge_completion,
+    _contact_update_by_id_bridge_completion,
     _contact_update_phone_bridge_completion,
     _crud_success_response_text,
     _lookup_planner_actor_policy_message,
     _relative_time_actor_policy_message,
     _reminder_recency_bridge_completion,
+    _safe_action_or_abstain_bridge_completion,
     _safe_argument_actor_policy_message,
     _scheduling_timestamp_actor_policy_message,
     _state_action_actor_policy_message,
@@ -467,6 +470,209 @@ def test_contact_update_bridge_preserves_required_modify_call(
     assert call.function.name == "modify_contact"
     assert '"person_id": "person-1"' in call.function.arguments
     assert '"phone_number": "+10293847563"' in call.function.arguments
+
+
+def test_contact_relationship_bridge_uses_generated_batch_planner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {"name": "plan_contact_relationship_batch_update"},
+        },
+        {"type": "function", "function": {"name": "search_contacts"}},
+        {"type": "function", "function": {"name": "modify_contact"}},
+    ]
+
+    completion = _contact_relationship_batch_bridge_completion(
+        [{"role": "user", "content": "Make all my friends enemies"}],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "plan_contact_relationship_batch_update"
+    assert '"source_relationship": "friend"' in call.function.arguments
+    assert '"target_relationship": "enemy"' in call.function.arguments
+
+    variant_completion = _contact_relationship_batch_bridge_completion(
+        [{"role": "user", "content": "Make all of my friends my enemy"}],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert variant_completion is not None
+    variant_call = _first_tool_call(variant_completion)
+    assert variant_call.function.name == "plan_contact_relationship_batch_update"
+    assert '"source_relationship": "friend"' in variant_call.function.arguments
+    assert '"target_relationship": "enemy"' in variant_call.function.arguments
+
+
+def test_contact_relationship_bridge_continues_with_search_and_modify(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {"name": "plan_contact_relationship_batch_update"},
+        },
+        {"type": "function", "function": {"name": "search_contacts"}},
+        {"type": "function", "function": {"name": "modify_contact"}},
+    ]
+
+    search_completion = _contact_relationship_batch_bridge_completion(
+        [
+            {"role": "user", "content": "Make all my friends enemies"},
+            {
+                "role": "tool",
+                "name": "plan_contact_relationship_batch_update",
+                "content": (
+                    "{'should_call_search_contacts': True, "
+                    "'search_contacts_kwargs': {'relationship': 'friend'}, "
+                    "'abstain_reason': ''}"
+                ),
+            },
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert search_completion is not None
+    search_call = _first_tool_call(search_completion)
+    assert search_call.function.name == "search_contacts"
+    assert '"relationship": "friend"' in search_call.function.arguments
+
+    modify_completion = _contact_relationship_batch_bridge_completion(
+        [
+            {"role": "user", "content": "Make all my friends enemies"},
+            {
+                "role": "tool",
+                "name": "plan_contact_relationship_batch_update",
+                "content": (
+                    "{'phase': 'modify_required', 'should_call_tools': True, "
+                    "'downstream_tool_kwargs_list': ["
+                    "{'person_id': 'p1', 'relationship': 'enemy'}], "
+                    "'abstain_reason': ''}"
+                ),
+            },
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert modify_completion is not None
+    modify_call = _first_tool_call(modify_completion)
+    assert modify_call.function.name == "modify_contact"
+    assert '"person_id": "p1"' in modify_call.function.arguments
+    assert '"relationship": "enemy"' in modify_call.function.arguments
+
+
+def test_contact_update_by_id_bridge_uses_generated_planner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "plan_contact_update_from_id"}},
+        {"type": "function", "function": {"name": "modify_contact"}},
+    ]
+    person_id = "11111111-1111-1111-1111-111111111111"
+
+    completion = _contact_update_by_id_bridge_completion(
+        [
+            {
+                "role": "user",
+                "content": f"Update contact {person_id}'s phone to +1 (555) 0100",
+            }
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "plan_contact_update_from_id"
+    assert f'"person_id": "{person_id}"' in call.function.arguments
+    assert '"phone_number": "+15550100"' in call.function.arguments
+
+    modify_completion = _contact_update_by_id_bridge_completion(
+        [
+            {
+                "role": "user",
+                "content": f"Update contact {person_id}'s phone to +1 (555) 0100",
+            },
+            {
+                "role": "tool",
+                "name": "plan_contact_update_from_id",
+                "content": (
+                    "{'should_call_tool': True, "
+                    "'downstream_tool_kwargs': {"
+                    f"'person_id': '{person_id}', "
+                    "'phone_number': '+15550100'}}"
+                ),
+            },
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert modify_completion is not None
+    modify_call = _first_tool_call(modify_completion)
+    assert modify_call.function.name == "modify_contact"
+    assert f'"person_id": "{person_id}"' in modify_call.function.arguments
+    assert '"phone_number": "+15550100"' in modify_call.function.arguments
+
+
+def test_safe_action_abstain_bridge_uses_generated_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "prepare_safe_action_or_abstain"}},
+        {"type": "function", "function": {"name": "remove_contact"}},
+    ]
+
+    completion = _safe_action_or_abstain_bridge_completion(
+        [
+            {
+                "role": "user",
+                "content": "Remove the contact with phone number +1 (555) 0100",
+            }
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "prepare_safe_action_or_abstain"
+    assert '"requested_action": "remove_contact"' in call.function.arguments
+    assert '"target_identifier": "+15550100"' in call.function.arguments
+    assert '"search_contacts"' in call.function.arguments
+
+    answer_completion = _safe_action_or_abstain_bridge_completion(
+        [
+            {
+                "role": "user",
+                "content": "Remove the contact with phone number +1 (555) 0100",
+            },
+            {
+                "role": "tool",
+                "name": "prepare_safe_action_or_abstain",
+                "content": (
+                    "{'should_abstain': True, "
+                    "'final_answer_recommendation': 'I do not have enough "
+                    "information to remove that contact.', "
+                    "'abstain_reason': 'missing_required_original_tool'}"
+                ),
+            },
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert answer_completion is not None
+    assert (
+        answer_completion.choices[0].message.content
+        == "I do not have enough information to remove that contact."
+    )
 
 
 def test_crud_success_retains_reminder_update_answer(

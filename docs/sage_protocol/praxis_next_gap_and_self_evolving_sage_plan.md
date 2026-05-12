@@ -27,27 +27,46 @@ Completed formal500 source for final gap update:
 - Runtime exceptions: 0
 - Helper failures / side-effect incidents: `0 / 0`
 
-Mini60 self-evolving implementation proof:
+Mini60 self-evolving live-generation implementation proof:
 
 - Branch: `codex/self-evolving-sage-mini60`
 - Report: `docs/sage_protocol/self_evolving_sage_mini60_report.md`
-- Summary: `artifacts/self_evolving_sage/summary/self_evolving_mini60_praxis_pack_v2_summary.json`
-- Run: `outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904`
-- Dashboard: `http://127.0.0.1:62618/outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904/dashboard/task_compare.html`
-- Strategy: start from an empty runtime registry, observe the contact gap, then materialize the current validated Praxis recipe pack under the self-evolving controller.
+- Summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_diag24_summary.json`
+- Preparation: `artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_preparation.json`
+- Starting registry: `artifacts/self_evolving_sage/current_mini60_live_generation_v2/registry/registry_manifest.json`
+- Starting registry SHA-256: `61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713`
+- Manifest: `artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_manifest.json`
+- Manifest SHA-256: `5337bf7bef2cb32679955bcf27b68cf06495d00c905a02c66766ae261b0176bc`
+- Positive run: `outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431`
+- Dashboard: `http://127.0.0.1:62628/outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431/dashboard/task_compare.html`
+- Strategy: start from an empty generated-tool registry, keep generation on during the candidate run, generate tools from online inadequacy observations, validate them, and let natural routing/calling decide value.
 - Models: agent/user/generation all `gpt-4o-mini`
-- Sample cap: `60`
-- Baseline/control cache: `33 cached / 27 fresh`, `use-if-eligible`
+- Sample cap: `60`; matched scenarios in this contact-gap manifest: `24`
+- Baseline/control cache: `24 cached / 0 fresh`, `use-if-eligible`
 - Candidate/SAGE cache: off
 - OpenAI response cache: disabled
-- Score: `0.763821 -> 0.845361`, delta `+0.081539`
-- Outcome/task completion: `0.536539 -> 0.655421`, delta `+0.118882`
-- Exact successes: `13 -> 22`
-- Natural generated-tool adoption: visible `36 / 60`, called `23 / 60`, failed `0`
+- Score delta: `+0.040569`
+- Outcome/task completion delta: `+0.047045`
+- Exact success delta: `+6`
+- Natural generated-tool birth: accepted `plan_contact_relationship_batch_update`, `plan_contact_update_from_id`, and `prepare_side_effect_args_from_selected_record`
+- Natural generated-tool adoption: `plan_contact_relationship_batch_update` visible/called/VNC `3 / 3 / 0`, called-subset outcome delta `+0.342197`
 - Runtime exceptions / helper side-effect incidents: `0 / 0`
 - Protocol gate: `PASS`
-- Evidence status: experimental implementation proof only, not protected final-claim evidence.
-- Leakage note: no labels or expected answers were used; recipe metadata still contains task-family trigger labels inherited from current SAGE routing and should be semantically normalized or explicitly audited before protected claims.
+- Evidence status: experimental mechanism proof only, not protected final-claim evidence.
+- Leakage note: no labels, expected answers, scenario IDs, or benchmark facts were encoded into generated tools or routing logic; scenario IDs appear only in the executable split manifest.
+
+Superseded recipe-pack transfer result:
+
+- Run: `outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904`
+- Score delta: `+0.081539`; outcome delta: `+0.118882`; exact success delta: `+9`
+- Status: useful transfer diagnostic, but no longer counted as the self-evolving proof because it materialized pre-existing Praxis recipe tools before the run and ran with generation off.
+
+Live-generation negative/parking diagnostic:
+
+- Run: `outputs/self_evolving_sage/live_generation_v9_diag24/mechanism_60_20260511_233101`
+- Generated helper: `prepare_safe_action_or_abstain`
+- Called-subset canonical delta: `-0.505454`; called-subset outcome delta: `-0.030562`
+- Decision: safe-abstention birth is parked by default pending benchmark-faithful phrasing and minefield validation; diagnostic opt-in is `SAGE_ENABLE_SAFE_ABSTAIN_BIRTH=1`.
 
 ## Interim Finding
 
@@ -127,22 +146,25 @@ Expected first tests:
 
 ## Self-Evolving SAGE: Current State
 
-The current system already has several pieces of a self-evolving loop:
+The current system now has an initial live self-evolving slice:
 
 - Registry-backed helper reuse.
 - Tool generation and repair stages.
+- Gap packet loading and bucket selection through `sage_ts.evaluation.gap_observer`.
+- Empty generated-registry campaign preparation through `sage_ts.orchestration.self_evolving_campaign`.
+- Online birth observations for contact relationship updates, contact-id updates, side-effect argument prep, and safe abstention.
 - Routing, visibility, called/VNC, and contribution export.
 - Progressive validation runs with baseline task cache and fresh SAGE arms.
 - Dashboard views for per-task comparison and helper contribution.
 - Safety checks for runtime exceptions, side-effect preservation, force-call exclusion, cache policy, and registry hashes.
 
-But the system is not yet fully self-evolving. The human operator is still doing the highest-level campaign control:
+The v6 diagnostic proves live birth from an empty generated registry can work. The system is still not fully self-evolving because the human operator is still doing several high-level campaign decisions:
 
 - Identifying the next bucket from regressions and no-helper cases.
-- Deciding which bucket deserves a new helper.
-- Turning a bucket diagnosis into a tool spec.
+- Deciding which bucket deserves a new helper after a failed or marginal run.
+- Turning some bucket diagnoses into robust, benchmark-faithful tool specs.
 - Choosing the progressive run schedule.
-- Deciding when to repair, park, recombine, or scale.
+- Deciding when to repair, park, recombine, or scale after mixed evidence.
 
 ## Target Architecture
 
@@ -238,10 +260,10 @@ The system already has most primitives, but they are not wired into one autonomo
 
 | Need | Existing code to build on | Missing work |
 |---|---|---|
-| Extract run deltas, gains, regressions, and cache status | `src/sage_ts/evaluation/run_metrics.py`, `src/sage_ts/dashboard/exporters.py`, `src/sage_ts/evaluation/helper_contribution.py` | Add a reusable `sage_ts.evaluation.gap_observer` module that emits stable gap packets like `praxis_combined_bridge_policy_first250_gap_packets.json`. |
-| Classify task pain points without labels | `src/sage_ts/adequacy/inadequacy_classifier.py`, `src/sage_ts/evaluation/feedback_packets.py` | Convert heuristic classifications into bucket objects with regression mass, no-visible/VNC/called-negative counts, and safety risk. |
-| Choose the next tool family | `src/sage_ts/adequacy/failure_memory.py`, `scripts/build_v2_5_tool_foundry_artifacts.py` | Add an opportunity scorer that ranks buckets by expected outcome lift first, canonical lift second, then adoption feasibility and cost. |
-| Generate candidate specs | `src/sage_ts/generation/tool_generator.py`, `src/sage_ts/generation/tool_spec.py` | Feed gap packets directly into generation with negative examples and minefield requirements. |
+| Extract run deltas, gains, regressions, and cache status | `src/sage_ts/evaluation/run_metrics.py`, `src/sage_ts/dashboard/exporters.py`, `src/sage_ts/evaluation/helper_contribution.py`, `src/sage_ts/evaluation/gap_observer.py` | Extend the observer from prepared gap packets to direct run-root mining. |
+| Classify task pain points without labels | `src/sage_ts/adequacy/inadequacy_classifier.py`, `src/sage_ts/evaluation/feedback_packets.py` | Broaden heuristic classifications into bucket objects with regression mass, no-visible/VNC/called-negative counts, and safety risk. |
+| Choose the next tool family | `src/sage_ts/adequacy/failure_memory.py`, `scripts/build_v2_5_tool_foundry_artifacts.py`, `src/sage_ts/orchestration/self_evolving_campaign.py` | Add an opportunity scorer that ranks buckets by expected outcome lift first, canonical lift second, then adoption feasibility and cost. |
+| Generate candidate specs | `src/sage_ts/generation/tool_generator.py`, `src/sage_ts/generation/tool_spec.py`, `src/sage_ts/adequacy/inadequacy_classifier.py` | Feed gap packets directly into generation with negative examples and minefield requirements across contact, reminder, settings, send-message, and abstention buckets. |
 | Reject unsafe or leaky helpers | `src/sage_ts/validation/ast_safety.py`, `src/sage_ts/validation/schema_check.py`, `src/sage_ts/validation/live_candidate_check.py`, `src/sage_ts/adequacy/candidate_gate.py` | Add policy checks for scenario-ID/task-string leakage, side-effect action substitution, and force-call leakage before a helper reaches any natural run. |
 | Route a small relevant bundle | `src/sage_ts/runtime/routing_scorer.py`, `src/sage_ts/runtime/toolsandbox_integration.py` | Add bucket-aware routing constraints so low-frequency high-value helpers are retained without polluting broad context. |
 | Run progressive fair-chance gates | `scripts/run_sage_protocol.py`, `src/sage_ts/campaign/artifacts.py`, `src/sage_ts/evaluation/control_baseline_cache.py` | Add a campaign controller that automatically launches 20/60/100/250 gates, uses cached controls, and keeps candidate arms fresh. |
@@ -249,11 +271,11 @@ The system already has most primitives, but they are not wired into one autonomo
 
 Minimal implementation sequence:
 
-1. Build `sage_ts.evaluation.gap_observer` and a CLI `scripts/build_gap_packets.py`.
-2. Build `sage_ts.orchestration.self_evolving_campaign` that consumes gap packets and writes candidate tool-spec requests.
-3. Extend candidate validation with minefield generation from the selected bucket.
+1. Extend `sage_ts.evaluation.gap_observer` from prepared gap packets to direct run-root mining.
+2. Extend `sage_ts.orchestration.self_evolving_campaign` from a contact-only mini-campaign to multi-bucket campaign planning.
+3. Add minefield generation from the selected bucket before the helper is exposed broadly.
 4. Add progressive gate orchestration with hard controls: cached baseline only, fresh candidate, generation policy explicit, routing evidence disabled or pinned.
-5. Add a dashboard panel and report export that shows the system's chosen bucket, candidate spec, fair-chance decision, and next action.
+5. Add a dashboard panel and report export that shows the system's chosen bucket, generated candidate, fair-chance decision, and next action.
 
 This would let SAGE perform the same loop now being done manually: detect unsupported buckets, estimate lift, generate a targeted helper, validate safety, test natural adoption, repair if needed, and recombine only when evidence supports it.
 
@@ -298,12 +320,13 @@ def self_evolve_sage(seed_registry, validation_manifest):
 
 ## Immediate Next Action
 
-The formal500 confirms the combined bridge-policy lift with zero safety incidents. The first self-evolving controller slice is now implemented and has passed a capped all-`gpt-4o-mini` mini60 proof by materializing validated current-SAGE recipes from an empty runtime registry.
+The formal500 confirms the combined bridge-policy lift with zero safety incidents. The first self-evolving controller slice is now implemented and has passed a capped all-`gpt-4o-mini` mechanism proof with an empty generated registry and generation on during the run.
 
-The next action is to generalize this controller beyond recipe materialization:
+The next action is to stabilize and generalize this controller:
 
 1. mine gap packets directly from a run root,
 2. rank contact, reminder, settings/device-state, and abstention opportunities,
 3. generate minefield tests per selected bucket,
-4. use validated recipes when available and freeform generation only when no recipe covers the bucket,
-5. keep discovery runs capped at 60 unless explicitly approved.
+4. keep generation on during discovery campaigns,
+5. park safe-but-negative births automatically and only re-enable them after repair,
+6. keep discovery runs capped at 60 unless explicitly approved.

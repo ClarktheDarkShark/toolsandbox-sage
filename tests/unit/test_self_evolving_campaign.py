@@ -94,3 +94,31 @@ def test_prepare_self_evolving_campaign_starts_empty_then_generates_tool(
     assert prepared.selected_scenario_count == 2
     assert len(manifest["splits"]["transfer_60"]) == 2
     assert Path(str(prepared.registry_dir / "registry_manifest.json")).exists()
+
+
+def test_prepare_self_evolving_campaign_can_leave_registry_empty_for_live_generation(
+    tmp_path: Path,
+) -> None:
+    prepared = prepare_self_evolving_campaign(
+        SelfEvolvingCampaignConfig(
+            source_gap_packet=_write_gap_packet(tmp_path / "gap_packet.json"),
+            source_manifest=_write_manifest(tmp_path / "formal_manifest.json"),
+            output_root=tmp_path / "live_generation",
+            max_samples=2,
+            split_name="mechanism_60",
+            tool_strategy="empty_live_generation",
+        )
+    )
+
+    summary = json.loads(prepared.summary_path.read_text(encoding="utf-8"))
+    registry = json.loads(
+        (prepared.registry_dir / "registry_manifest.json").read_text(encoding="utf-8")
+    )
+    manifest = json.loads(prepared.manifest_path.read_text(encoding="utf-8"))
+
+    assert prepared.generated_tool_names == ()
+    assert summary["starting_registry_tool_count"] == 0
+    assert summary["generated_tool_count"] == 0
+    assert summary["cache_policy_for_run"]["generation"] == "on"
+    assert registry == {"tools": {}}
+    assert len(manifest["splits"]["mechanism_60"]) == 2

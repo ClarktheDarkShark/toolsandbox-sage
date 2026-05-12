@@ -127,33 +127,34 @@ Praxis combined bridge-policy arms.
 
 ## Self-Evolving Mini60 Current Approach
 
-The current SAGE development approach now includes an explicit self-evolving
-controller slice:
+The current SAGE development approach now includes an explicit live
+self-evolving controller slice:
 
 1. observe a machine-readable gap packet from a completed run,
 2. rank unsupported or regressing task buckets,
 3. select the next high-opportunity bucket without inspecting hidden labels,
-4. start from an empty runtime generated-tool registry,
-5. materialize validated recipe helpers when available, or generate new helpers
-   when no recipe covers the gap,
-6. run a capped natural-adoption gate with cached controls and fresh SAGE arms,
-7. reflect with a `scale`, `refine`, `recombine`, `park`, or `block` decision.
+4. start from an empty generated-tool registry,
+5. keep generation on during the candidate run,
+6. generate and validate tools from online inadequacy observations,
+7. run a capped natural-adoption gate with cached controls and fresh SAGE arms,
+8. reflect with a `scale`, `refine`, `recombine`, `park`, or `block` decision.
 
 Low-cost discovery campaigns can be forced to `gpt-4o-mini` for every model role
 and capped at 60 tasks:
 
 ```bash
 PYTHONPATH=src:. python scripts/prepare_self_evolving_sage_mini60.py \
-  --output-root artifacts/self_evolving_sage/current_mini60_praxis_pack \
+  --output-root artifacts/self_evolving_sage/current_mini60_live_generation_v2 \
   --max-samples 60 \
   --agent gpt-4o-mini \
   --user gpt-4o-mini \
   --generation-model gpt-4o-mini \
-  --tool-strategy praxis_current_pack
+  --split-name mechanism_60 \
+  --tool-strategy empty_live_generation
 ```
 
 Then run the prepared manifest with cached controls and fresh candidate/SAGE
-tasks:
+tasks. Generation must stay on for this live self-evolving proof:
 
 ```bash
 env \
@@ -161,43 +162,50 @@ env \
   SAGE_TS_MODEL=gpt-4o-mini \
   PYTHONPATH=src:. \
   python scripts/run_sage_protocol.py \
-    --mode transfer_60 \
-    --manifest artifacts/self_evolving_sage/current_mini60_praxis_pack/self_evolving_mini60_manifest.json \
-    --registry-dir artifacts/self_evolving_sage/current_mini60_praxis_pack/registry \
+    --mode mechanism_60 \
+    --manifest artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_manifest.json \
+    --registry-dir artifacts/self_evolving_sage/current_mini60_live_generation_v2/registry \
     --agent gpt-4o-mini \
     --user gpt-4o-mini \
     --generation-model gpt-4o-mini \
-    --generation off \
+    --generation on \
     --disable-openai-response-cache \
     --cache-mode off \
     --parallel-arms \
     --control-cache use-if-eligible \
     --routing-evidence-mode disabled \
     --allow-low-quality-cohort \
-    --output-root outputs/self_evolving_sage/mini60_praxis_pack_v2 \
-    --artifact-root artifacts/self_evolving_sage/campaign_artifacts_mini60_praxis_pack_v2
+    --output-root outputs/self_evolving_sage/live_generation_v_next_diag24 \
+    --artifact-root artifacts/self_evolving_sage/campaign_artifacts_live_generation_v_next_diag24
 ```
 
-Latest mini60 proof:
+Latest live-generation mechanism proof:
 
 - report:
   `docs/sage_protocol/self_evolving_sage_mini60_report.md`
 - summary:
-  `artifacts/self_evolving_sage/summary/self_evolving_mini60_praxis_pack_v2_summary.json`
+  `artifacts/self_evolving_sage/summary/self_evolving_live_generation_diag24_summary.json`
+- positive run:
+  `outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431`
 - score delta:
-  `+0.081539`
+  `+0.040569`
 - outcome delta:
-  `+0.118882`
-- exact successes:
-  `13 -> 22`
-- generated-tool visibility/calls/failures:
-  `36 / 23 / 0`
+  `+0.047045`
+- exact success delta:
+  `+6`
+- live-born retained tools:
+  `plan_contact_relationship_batch_update`, `plan_contact_update_from_id`, `prepare_side_effect_args_from_selected_record`
+- natural call evidence:
+  `plan_contact_relationship_batch_update` visible/called/VNC `3 / 3 / 0`, called-subset outcome delta `+0.342197`
 - runtime exceptions and helper side-effect incidents:
   `0 / 0`
 
 This is experimental implementation evidence, not protected final-claim
-evidence. It demonstrates that the next-gap loop can recover near-current score
-lift under strict low-cost model and sample constraints.
+evidence. It demonstrates empty-registry, generation-on tool birth under strict
+low-cost model and sample constraints. The earlier
+`mini60_praxis_pack_v2` run remains useful as a recipe-pack transfer
+diagnostic, but it used pre-existing Praxis recipe tools and generation off, so
+it is not proof of autonomous live self-evolution.
 
 When external location/weather/search tasks are in scope, use the ToolSandbox
 RapidAPI cache in `read_only` mode to avoid quota spend during review gates.

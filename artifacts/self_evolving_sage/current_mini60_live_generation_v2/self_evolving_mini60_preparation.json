@@ -1,0 +1,210 @@
+{
+  "artifact_type": "self_evolving_sage_mini60_preparation",
+  "labels_inspected": false,
+  "final_claim_evidence": false,
+  "source_gap_packet": "artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_formal500_v2_gap_packets.json",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "selected_bucket": {
+    "bucket": "contact_lookup_update_search_crud",
+    "scenario_count": 140,
+    "outcome_regression_count": 17,
+    "score_regression_count": 32,
+    "negative_outcome_mass": 4.605959151745374,
+    "negative_score_mass": 8.564828470204823,
+    "no_visible_helper_count": 62,
+    "no_called_helper_count": 98,
+    "opportunity_score": 60.17441998765857,
+    "top_scenarios": [
+      {
+        "scenario": "search_phone_number_with_name_3_distraction_tools",
+        "score_delta": 0.004255708376782907,
+        "outcome_delta": -0.5714285714285714,
+        "visible_tools": [
+          "plan_contact_lookup_query",
+          "plan_contact_search_from_scalar_constraint"
+        ],
+        "called_tools": []
+      },
+      {
+        "scenario": "update_contact_with_id_and_phone_number_10_distraction_tools",
+        "score_delta": -0.04123636719006685,
+        "outcome_delta": -0.5,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools",
+        "score_delta": -0.029037298287861724,
+        "outcome_delta": -0.5,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+        "score_delta": -0.029755531515543887,
+        "outcome_delta": -0.4838709677419355,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+        "score_delta": -0.5278402978630865,
+        "outcome_delta": -0.4621674757413547,
+        "visible_tools": [
+          "plan_contact_relationship_batch_update"
+        ],
+        "called_tools": []
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+        "score_delta": -0.3336575200192271,
+        "outcome_delta": -0.3790548413532903,
+        "visible_tools": [
+          "plan_contact_relationship_batch_update"
+        ],
+        "called_tools": [
+          "plan_contact_relationship_batch_update"
+        ]
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools",
+        "score_delta": -0.028900551064392987,
+        "outcome_delta": -0.3230034787585003,
+        "visible_tools": [
+          "plan_contact_relationship_batch_update",
+          "select_message_content_by_recency"
+        ],
+        "called_tools": []
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_3_distraction_tools_tool_description_scrambled",
+        "score_delta": -0.2874734294299395,
+        "outcome_delta": -0.26773111001401106,
+        "visible_tools": [
+          "plan_contact_relationship_batch_update"
+        ],
+        "called_tools": []
+      },
+      {
+        "scenario": "search_name_with_relationship_all_tools",
+        "score_delta": 0.669992146754693,
+        "outcome_delta": -0.24949530107901147,
+        "visible_tools": [
+          "plan_contact_lookup_query",
+          "select_message_content_by_recency"
+        ],
+        "called_tools": [
+          "plan_contact_lookup_query"
+        ]
+      },
+      {
+        "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools",
+        "score_delta": -0.03825544399071712,
+        "outcome_delta": -0.23585623741414008,
+        "visible_tools": [
+          "plan_contact_relationship_batch_update"
+        ],
+        "called_tools": [
+          "plan_contact_relationship_batch_update"
+        ]
+      },
+      {
+        "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+        "score_delta": -1.0,
+        "outcome_delta": null,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "score_delta": -1.0,
+        "outcome_delta": null,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_name_scrambled",
+        "score_delta": -0.8333333333333334,
+        "outcome_delta": null,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled",
+        "score_delta": -0.8,
+        "outcome_delta": null,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt",
+        "score_delta": -0.75,
+        "outcome_delta": null,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_10_distraction_tools",
+        "score_delta": -0.6379101039333952,
+        "outcome_delta": -0.09530608846465623,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+        "score_delta": -0.6363636363636364,
+        "outcome_delta": null,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+        "score_delta": -0.625,
+        "outcome_delta": null,
+        "visible_tools": [],
+        "called_tools": []
+      },
+      {
+        "scenario": "modify_contact_with_message_recency_insufficient_information",
+        "score_delta": -0.6190476190476191,
+        "outcome_delta": null,
+        "visible_tools": [],
+        "called_tools": []
+      }
+    ]
+  },
+  "starting_registry_tool_count": 0,
+  "starting_registry_hash": "61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713",
+  "tool_strategy": "empty_live_generation",
+  "recipe_registry": "artifacts/praxis_safety_repair/registries/praxis_bridgepack_combined_bridge_policy_v1",
+  "generated_tool_count": 0,
+  "generated_tool_names": [],
+  "generated_tool_specs": [],
+  "validation": [],
+  "registry_dir": "artifacts/self_evolving_sage/current_mini60_live_generation_v2/registry",
+  "registry_hash": "61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713",
+  "manifest_path": "artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_manifest.json",
+  "manifest_hash": "5337bf7bef2cb32679955bcf27b68cf06495d00c905a02c66766ae261b0176bc",
+  "split_name": "mechanism_60",
+  "selected_scenario_count": 24,
+  "sample_cap": 60,
+  "model_policy": {
+    "agent_model": "gpt-4o-mini",
+    "user_model": "gpt-4o-mini",
+    "generation_model": "gpt-4o-mini",
+    "all_models_forced_to": "gpt-4o-mini"
+  },
+  "cache_policy_for_run": {
+    "control_cache": "use-if-eligible",
+    "candidate_task_cache": "off",
+    "openai_response_cache": "disabled",
+    "routing_evidence_mode": "disabled",
+    "generation": "on"
+  },
+  "integrity_controls": {
+    "scenario_ids_encoded_in_tool": false,
+    "labels_or_expected_answers_used": false,
+    "force_call_allowed": false,
+    "generated_helper_side_effects": false
+  }
+}

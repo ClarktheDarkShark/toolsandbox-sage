@@ -8,7 +8,7 @@ Branch: `codex/self-evolving-sage-mini60`
 
 ## Objective
 
-Implement the first executable slice of `praxis_next_gap_and_self_evolving_sage_plan.md` under a strict token-conservation setup:
+Implement and test the first executable slice of `praxis_next_gap_and_self_evolving_sage_plan.md` under a strict token-conservation setup:
 
 - maximum sample size `60`
 - agent model `gpt-4o-mini`
@@ -20,180 +20,219 @@ Implement the first executable slice of `praxis_next_gap_and_self_evolving_sage_
 - routing evidence disabled
 - diagnostic force-call disabled
 
-The goal was to prove that SAGE can start from an empty runtime generated-tool registry, observe a gap packet, choose a next gap, generate or materialize the needed helper set, and recover a high-lift natural-adoption result without force-calling tools or inspecting hidden labels.
+The corrected objective is stronger than the earlier recipe-pack proof: SAGE must start with no generated tools, keep generation on during the run, observe gaps online, generate and validate tools during the run, and reuse accepted tools naturally. Pre-generated tools plus generation off are not sufficient evidence for this mechanism.
 
-## Implemented Slice
+## Corrected Mechanism
 
-New implementation:
+New implementation and repairs:
 
 - `src/sage_ts/evaluation/gap_observer.py`
 - `src/sage_ts/orchestration/self_evolving_campaign.py`
 - `scripts/prepare_self_evolving_sage_mini60.py`
-- `tests/unit/test_self_evolving_campaign.py`
+- `src/sage_ts/adequacy/inadequacy_classifier.py`
+- `src/sage_ts/adapters/openai_toolsandbox_roles.py`
+- `src/sage_ts/evaluation/task_strata.py`
+- `src/sage_ts/runtime/routing_scorer.py`
+- `src/sage_ts/validation/output_normalization.py`
 
-The controller performs this initial loop:
+The active live-generation loop is:
 
 ```text
 gap packet
   -> ranked gap buckets
   -> contact lookup/update/search bucket selected
-  -> empty runtime registry written
-  -> helper strategy applied
-  -> generated/materialized helpers validated
-  -> <=60 task manifest written
-  -> natural SAGE run with cached controls and fresh candidate arm
+  -> empty generated-tool registry written
+  -> natural candidate run starts with generation ON
+  -> gap observations trigger online candidate births
+  -> generated candidates pass static/schema/runtime validation
+  -> accepted tools enter the registry
+  -> routing exposes the accepted tools on later matching tasks
+  -> natural calls decide whether the tool is retained, refined, or parked
 ```
 
-Two strategies were tested:
+This is now a true live tool-birth mechanism proof. The candidate registry starts as:
 
-1. `contact_action_v2`: one broad final-action-ready helper. It was safe, but adoption was poor.
-2. `praxis_current_pack`: materialize the current validated Praxis recipe pack into the empty runtime registry. This restored natural calls and high lift.
+```json
+{
+  "tools": {}
+}
+```
 
-This is best described as an early self-evolving controller with a recipe library, not as unconstrained novel tool invention. That distinction should remain explicit in methodology.
+Starting registry path:
+
+`artifacts/self_evolving_sage/current_mini60_live_generation_v2/registry/registry_manifest.json`
+
+Starting registry SHA-256:
+
+`61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713`
+
+Preparation artifact:
+
+`artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_preparation.json`
+
+Manifest:
+
+`artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_manifest.json`
+
+Manifest SHA-256:
+
+`5337bf7bef2cb32679955bcf27b68cf06495d00c905a02c66766ae261b0176bc`
+
+Only 24 scenarios matched the selected contact gap under the current capped manifest builder. This is therefore a `diag24` mechanism proof under the <=60 requirement, not a full 60-task claim.
 
 ## Source Inputs
 
 - Source gap packet: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_formal500_v2_gap_packets.json`
 - Source formal manifest: `docs/sage_protocol/manifests/v2_1_formal_500.json`
 - Selected bucket: `contact_lookup_update_search_crud`
-- Recipe registry: `artifacts/praxis_safety_repair/registries/praxis_bridgepack_combined_bridge_policy_v1`
 
-No labels, expected answers, scenario-specific facts, or cache availability were used to select scenarios or build tool code. The materialized recipe registry does inherit some task-family trigger labels, such as contact lookup/update family names, as routing metadata. Those are not hidden labels or expected answers, but this remains an experimental routing-policy dependency that should be replaced with semantic trigger descriptors or explicitly audited before any protected claim.
+No labels, expected answers, hidden benchmark facts, or cache availability were used to generate tool code or select scenarios. Scenario IDs appear in the split manifest because the harness requires executable scenario names, but they are not encoded into generated tools, routing rules, or repair logic.
 
-## Failed First Attempt
-
-Run:
-
-`outputs/self_evolving_sage/mini60_contact_v1/transfer_60_20260511_203023`
-
-Result:
-
-- score delta: `-0.009128`
-- outcome delta: `-0.001289`
-- generated tools visible: `39`
-- generated tools called: `2`
-- visible-not-called: `37`
-- runtime exceptions: `0`
-
-Diagnosis: one broad helper did not get natural adoption. The failure was adoption/affordance and granularity, not safety.
-
-## Passing Mini60 Proof
-
-Preparation artifact:
-
-- `artifacts/self_evolving_sage/current_mini60_praxis_pack/self_evolving_mini60_preparation.json`
-- generated/runtime registry: `artifacts/self_evolving_sage/current_mini60_praxis_pack/registry/registry_manifest.json`
-- registry SHA-256: `3ee0719ddc87a774fc18d48365c36e9dea7cce70f65f6f28574afd60ddc9e99c`
-- manifest: `artifacts/self_evolving_sage/current_mini60_praxis_pack/self_evolving_mini60_manifest.json`
-- manifest SHA-256: `e7278b67d682d3be59d764e59e73094548e7ea965ec25003bda8b6a41935a51a`
+## Positive Live-Generation Proof
 
 Run:
 
-`outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904`
+`outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431`
 
 Dashboard:
 
-`http://127.0.0.1:62618/outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904/dashboard/task_compare.html`
-
-Metrics:
-
-| Metric | Baseline | SAGE | Delta |
-|---|---:|---:|---:|
-| Canonical/reference score | `0.763821` | `0.845361` | `+0.081539` |
-| Outcome/task completion | `0.536539` | `0.655421` | `+0.118882` |
-| Exact successes | `13` | `22` | `+9` |
-| Canonical gains / regressions | - | - | `35 / 11` |
-| Outcome gains / regressions / preserved | - | - | `24 / 15 / 6` |
-
-Protocol gate: `PASS`.
+`http://127.0.0.1:62628/outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431/dashboard/task_compare.html`
 
 Controls:
 
 - control cache mode: `use-if-eligible`
-- cached controls: `33`
-- fresh controls: `27`
+- cached controls: `24`
+- fresh controls: `0`
 - cache manifest hash: `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
-- cohort selection influenced by cache: `false`
 
 Candidate/SAGE:
 
-- task cache: off
+- starting generated registry: empty
+- generation: on
+- candidate task cache: off
 - OpenAI response cache: disabled
-- generation: off during the run after preparation
 - routing evidence: disabled
 - active diagnostic force env vars: none
+- agent/user/generation model: `gpt-4o-mini`
 - runtime exceptions: `0`
-- helper failed attempts: `0`
 - helper side-effect incidents: `0`
 
-Leakage review:
+Metrics:
 
-- hidden labels inspected: no
-- expected answers encoded: no
-- scenario selection by cache availability: no
-- diagnostic force-call path active: no
-- exact scenario names present in split manifest: yes, as required for execution
-- task-family trigger labels present in recipe metadata: yes, inherited from the current validated recipe registry and treated as an experimental routing-policy dependency
+| Metric | Delta |
+|---|---:|
+| Canonical/reference score | `+0.040569` |
+| Outcome/task completion | `+0.047045` |
+| Canonical gains / regressions | `13 / 7` |
+| Outcome gains / regressions | `9 / 5` |
+| Exact successes | `+6` |
 
-Model policy:
+Protocol gate: `PASS`.
 
-- agent: `gpt-4o-mini`
-- user simulator: `gpt-4o-mini`
-- generation model: `gpt-4o-mini`
+Live accepted tools:
 
-Natural adoption:
+| Helper | Visible | Called | VNC | Called-subset canonical delta | Called-subset outcome delta | Decision |
+|---|---:|---:|---:|---:|---:|---|
+| `plan_contact_relationship_batch_update` | 3 | 3 | 0 | `+0.102694` | `+0.342197` | Keep and retest on broader relationship/update opportunities |
+| `plan_contact_update_from_id` | 0 | 0 | 0 | n/a | n/a | Retain as accepted but unresolved; needs later post-birth exposure |
+| `prepare_side_effect_args_from_selected_record` | 4 | 0 | 4 | n/a | n/a | Retain as unresolved; not promoted from this run |
 
-- generated-tool visible scenarios: `36 / 60`
-- generated-tool called scenarios: `23 / 60`
-- generated-tool attempted scenarios: `23 / 60`
-- generated-tool failed scenarios: `0`
+This run answers the core objection: no generated tools existed at the start, generation was on, accepted tools were born online, one generated tool was naturally called, and the run produced positive canonical and outcome lift without force calls.
 
-Called positive tools:
+## Negative Birth And Parking
 
-| Helper | Visible | Called | VNC | Called-subset score delta | Called-subset outcome delta |
-|---|---:|---:|---:|---:|---:|
-| `plan_contact_lookup_query` | 11 | 8 | 3 | `+0.360822` | `+0.431630` |
-| `plan_contact_relationship_batch_update` | 10 | 8 | 2 | `+0.191414` | `+0.252275` |
-| `plan_send_message_contact_lookup` | 4 | 4 | 0 | `+0.015989` | `+0.064914` |
-| `select_message_counterparty_for_contact_update` | 4 | 3 | 1 | `+0.291408` | `+0.805556` |
+The live loop also generated a safe insufficient-information / abstention candidate:
 
-Visible-not-called positive support was also seen for `resolve_search_window_or_bounds`, `select_record_by_timestamp_extreme`, `select_message_content_by_recency`, and `plan_contact_search_from_scalar_constraint`, which supports retaining sparse high-value helpers under small-bundle routing rather than judging value only by global call frequency.
+`prepare_safe_action_or_abstain`
+
+Diagnostic run:
+
+`outputs/self_evolving_sage/live_generation_v9_diag24/mechanism_60_20260511_233101`
+
+Called-subset result:
+
+- visible/called/VNC: `8 / 6 / 2`
+- called-subset canonical delta: `-0.505454`
+- called-subset outcome delta: `-0.030562`
+
+Diagnosis: the helper was safe and callable, but generic abstention wording scored poorly against the benchmark's original canonical/reference answers on these insufficient-information cases. It is a real generated candidate, but not a retained default tool.
+
+Repair:
+
+- default behavior now parks safe-abstention birth with reason `insufficient_information_safe_abstain_birth_parked_pending_benchmark_phrasing`
+- explicit diagnostic opt-in: `SAGE_ENABLE_SAFE_ABSTAIN_BIRTH=1`
+
+Follow-up run after parking:
+
+`outputs/self_evolving_sage/live_generation_v10_diag24/mechanism_60_20260511_233833`
+
+Result:
+
+- starting generated registry: empty
+- generation: on
+- controls: `24 cached / 0 fresh`
+- canonical delta: `-0.018825`
+- outcome delta: `-0.011708`
+- runtime exceptions: `0`
+- side-effect incidents: `0`
+- protocol gate: `FAIL`
+
+The v10 result confirms the system can park a harmful birth, but it did not reproduce the v6 positive gate. The current evidence is therefore: live generation works in v6, safe-abstention is parked, and the next required improvement is stabilizing retention/reuse across broader and less near-duplicate manifests.
+
+## Superseded Recipe-Pack Result
+
+Earlier run:
+
+`outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904`
+
+This run achieved a strong mini60 result:
+
+- canonical delta: `+0.081539`
+- outcome delta: `+0.118882`
+- exact successes: `+9`
+
+But it used recipe-pack materialization before the run and generation was off during the run. It remains useful as a low-cost recipe-library transfer diagnostic, but it is no longer presented as proof of autonomous live tool birth.
 
 ## Interpretation
 
-This run gets close to the previous combined-treatment formal500 score lift under much cheaper conditions:
+The corrected mechanism is promising but early:
 
-- formal500 combined score delta: `+0.087344`
-- self-evolving mini60 score delta: `+0.081539`
+- It can start from an empty registry.
+- It can generate valid tools online using only `gpt-4o-mini`.
+- It can naturally call a live-born helper and produce positive lift.
+- It can diagnose and park a generated helper that is safe but outcome/canonical negative.
 
-Outcome lift is positive but lower than the full combined formal500 treatment:
+The limits are also clear:
 
-- formal500 combined outcome delta: `+0.245071`
-- self-evolving mini60 outcome delta: `+0.118882`
-
-That difference is expected because this run is capped at 60, uses `gpt-4o-mini` for all roles, and is focused on the selected contact gap rather than the full broad Praxis treatment. It is sufficient as an implementation proof of the self-evolving controller, but it is not a replacement for formal500 validation.
+- The current contact manifest has only 24 matching scenarios and is near-duplicate dominated.
+- Tool birth order matters: some accepted tools had no later exposure after birth.
+- The safe-abstention lane needs benchmark-faithful final-answer phrasing before it can be enabled by default.
+- This is not formal evidence and should not update protected claims.
 
 ## Current SAGE Approach
 
-The current SAGE approach should be maintained as:
+The current self-evolving SAGE approach is:
 
-1. Use the combined Praxis bridge-policy treatment as the current high-lift SAGE treatment under review.
-2. Use the self-evolving controller to observe residual gap packets and select the next bucket.
-3. Start each mini-campaign from an empty runtime generated-tool registry.
-4. Prefer recipe-library materialization for validated helper families when token budget is constrained.
-5. Use new freeform generation only after the gap observer identifies an unsupported bucket with no adequate recipe.
-6. Run no more than 60 tasks for budgeted discovery unless explicitly approved.
-7. Keep all roles on `gpt-4o-mini` for low-cost discovery campaigns when requested.
+1. Start discovery campaigns from an empty generated-tool registry.
+2. Keep generation on during the candidate run.
+3. Use `gpt-4o-mini` for agent, user simulator, and generation in budgeted discovery.
+4. Use cached controls where eligible.
+5. Keep SAGE/candidate task cache off and OpenAI response cache disabled.
+6. Generate tools from observed gap packets and online inadequacy observations.
+7. Retain a generated tool only if natural calls or downstream diagnostics show safe value.
+8. Park generated tools that are safe but scoring-negative until their contract/phrasing is repaired.
+9. Treat recipe-pack materialization as a separate transfer mode, not as evidence of live self-evolution.
 
 ## Next Work
 
-The next self-evolving increment is to add the missing automation layers around the controller:
+The next self-evolving increment should focus on stability rather than scale:
 
-- mine gap packets directly from a completed run root
-- auto-rank opportunities across contact, reminder, settings/device-state, and abstention buckets
-- synthesize candidate specs when no validated recipe exists
-- generate minefield tests per bucket
-- implement reflection decisions: `scale`, `refine`, `recombine`, `park`, `block`
-- recombine generated packs into the combined Praxis treatment only after a natural-adoption positive mini60 gate
+- build a less near-duplicate <=60 manifest with later post-birth opportunities for `plan_contact_update_from_id`
+- add reflection logic that keeps the relationship-batch planner and suppresses/parks abstention by default
+- generate benchmark-faithful abstention phrasing tests before re-enabling `prepare_safe_action_or_abstain`
+- extend the gap observer to choose between contact, reminder, settings/device-state, and send-message precondition buckets
+- only after repeated <=60 positive gates, recombine retained live-born tools with the Praxis combined treatment for a broader 100/250 validation
 
-Protected final claims should not be updated from this branch. The result is an experimental proof that the self-evolving loop can reproduce near-current score lift on a capped gap-focused run under strict mini-model constraints.
+Decision label:
+
+`SELF_EVOLVING_LIVE_GENERATION_MECHANISM_POSITIVE_BUT_NOT_SCALE_READY`
