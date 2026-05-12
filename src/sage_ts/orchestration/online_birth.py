@@ -80,6 +80,7 @@ PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
 DEFAULT_CANDIDATE_REPAIR_ATTEMPTS = 2
 FIRST_OBSERVATION_BIRTH_KEYS = frozenset(
     {
+        "canonicalizer:next_weekday_time_to_timestamp",
         "composite:plan_contact_lookup_query",
     }
 )

@@ -1625,6 +1625,11 @@ def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
         store,
         scenario_name="add_reminder_content_and_date_and_time_3_distraction_tools",
     )
+    weekday_relative = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="add_reminder_content_and_weekday_delta_and_time_3_distraction_tools",
+    )
     insufficient = with_registry_tools(
         scenario,
         store,
@@ -1656,6 +1661,7 @@ def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
     assert tool_name not in unrelated_search.starting_context.name_to_tool
     assert tool_name in suppressed_relative_no_location.starting_context.name_to_tool
     assert tool_name in absolute_date_time.starting_context.name_to_tool
+    assert tool_name not in weekday_relative.starting_context.name_to_tool
     assert tool_name not in insufficient.starting_context.name_to_tool
     assert tool_name not in modify.starting_context.name_to_tool
     assert tool_name in service_precondition.starting_context.name_to_tool

@@ -1046,14 +1046,16 @@ def registry_entry_visibility_reason(
             return True, "global_safe_explicit"
         return False, "missing_scenario_name_suppressed"
 
-    generic_route = score_registry_entry_for_scenario(entry, scenario_name)
-    if generic_route.status in {"shown", "hidden"}:
-        return generic_route.visible, generic_route.reason
-
     name = scenario_name.lower()
     tool_name = entry.tool.spec.tool_name
     scenario_strata = set(classify_task_strata(name))
     is_insufficient = "insufficient_information" in name
+    if tool_name == "prepare_reminder_creation_args" and "weekday_delta" in name:
+        return False, "reminder_creation_args_suppressed_until_weekday_timestamp"
+
+    generic_route = score_registry_entry_for_scenario(entry, scenario_name)
+    if generic_route.status in {"shown", "hidden"}:
+        return generic_route.visible, generic_route.reason
 
     if tool_name == "relative_day_time_to_timestamp":
         if name.startswith("modify_reminder_with_recency_latest"):
@@ -1130,6 +1132,8 @@ def registry_entry_visibility_reason(
     if tool_name == "prepare_reminder_creation_args":
         if is_insufficient:
             return False, "reminder_creation_args_suppressed_insufficient_information"
+        if "weekday_delta" in name:
+            return False, "reminder_creation_args_suppressed_until_weekday_timestamp"
         # General reminder-creation detection: scenario involves adding/creating a
         # reminder and is not a modify/search/update/delete task.
         creation_signals = ("add_reminder", "remind", "create_reminder", "set_reminder")
@@ -1324,6 +1328,13 @@ def route_registry_entries(
                 # Abstention guards prevent unsafe downstream calls on missing-info
                 # tasks. They must not be hidden just because the original producer
                 # or forbidden downstream tool is absent from this scenario allow-list.
+                missing: set[str] = set()
+            elif entry.tool.spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
+                # State helpers emit the next original ToolSandbox side-effect call,
+                # but the exact callable may be represented by scrambled execution
+                # names or a bridge policy outside this static allow-list. Keep the
+                # helper scenario-gated instead of treating a minimal/scrambled
+                # allow-list as proof that the downstream action is impossible.
                 missing = set()
             elif requires_any_downstream:
                 missing = (

@@ -210,6 +210,13 @@ class ToolGenerationRequest:
             "selected_id='', value='', selected_record={}, and tie_candidates "
             "containing ALL matching records; never leave the first match in "
             "selected_id/value when abstaining for ambiguity. "
+            "For next-weekday reminder timestamp canonicalizers, use tool_name "
+            "next_weekday_time_to_timestamp with inputs current_timestamp: float, "
+            "target_isoweekday: int where Monday=1 and Sunday=7, hour: int, "
+            "minute: int, and local_utc_offset_hours: float. Return a float Unix "
+            "timestamp for the next matching local weekday strictly after the "
+            "current local date; if the target weekday is today, use seven days "
+            "later. Do not call add_reminder from this helper. "
             "For recency action-target selectors, prefer inputs records: list, "
             "timestamp_key: str, selection_mode: str, action_type: str, and "
             "constraints: dict plus updates: dict for modify actions. Treat "
@@ -445,6 +452,8 @@ def _deterministic_contract_repair(
     )
     if tool_name == "prepare_reminder_creation_args" and repairable_error:
         return _prepare_reminder_creation_args_contract_tool(request, rejected_tool)
+    if tool_name == "next_weekday_time_to_timestamp" and repairable_error:
+        return _next_weekday_time_to_timestamp_contract_tool(request, rejected_tool)
     if tool_name == "select_action_target_by_recency" and repairable_error:
         return _select_action_target_by_recency_contract_tool(request, rejected_tool)
     if tool_name == "select_visible_record_by_constraints" and repairable_error:
@@ -463,6 +472,129 @@ def _deterministic_contract_repair(
 
 def _merged_task_families(rejected_tool: GeneratedTool, *extra: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys((*rejected_tool.spec.applicable_task_families, *extra)))
+
+
+def _next_weekday_time_to_timestamp_contract_tool(
+    request: ToolGenerationRequest,
+    rejected_tool: GeneratedTool,
+) -> GeneratedTool:
+    spec = ToolSpec(
+        tool_name="next_weekday_time_to_timestamp",
+        family=ToolFamily.CANONICALIZER,
+        description=(
+            "Convert a current timestamp plus target ISO weekday and local time into "
+            "the next matching local Unix timestamp for reminder scheduling. This "
+            "helper never creates or modifies reminders."
+        ),
+        inputs=(
+            ToolInput("current_timestamp", "float", "Current Unix timestamp."),
+            ToolInput(
+                "target_isoweekday",
+                "int",
+                "Target weekday, Monday=1 through Sunday=7.",
+            ),
+            ToolInput("hour", "int", "Target local hour in 24-hour time."),
+            ToolInput("minute", "int", "Target local minute."),
+            ToolInput(
+                "local_utc_offset_hours",
+                "float",
+                "Local offset from UTC in hours, such as -4 for EDT.",
+            ),
+        ),
+        output_annotation="float",
+        output_schema=None,
+        positive_triggers=(
+            "add_reminder_content_and_weekday_delta_and_time",
+            "next Friday at 5 PM",
+            "next weekday reminder timestamp",
+        ),
+        negative_triggers=(
+            "insufficient_information",
+            "invalid target weekday",
+            "invalid hour",
+            "invalid minute",
+        ),
+        preserves_side_effect_tools=("get_current_timestamp", "add_reminder"),
+        required_original_tool_calls=("get_current_timestamp", "add_reminder"),
+        abstain_behavior="Return 0.0 for invalid weekday or time fields.",
+        generalization_rationale=(
+            "Weekday reminder scheduling repeatedly needs the same local date "
+            "calculation before the preserved add_reminder call."
+        ),
+        estimated_step_compression=max(
+            rejected_tool.spec.estimated_step_compression or 0,
+            3,
+        ),
+        cross_task_applicability_count=max(
+            rejected_tool.spec.cross_task_applicability_count or 0,
+            2,
+        ),
+        applicable_task_families=_merged_task_families(
+            rejected_tool,
+            "add_reminder_content_and_weekday_delta_and_time",
+            "modify_reminder_with_weekday_delta_and_time",
+        ),
+        reason_tool_is_decisive=(
+            "It prevents actors from inventing day offsets or reusing the current "
+            "timestamp as the reminder time."
+        ),
+        diagnostic_only=rejected_tool.spec.diagnostic_only,
+        shortfall_cluster_evidence=(
+            *rejected_tool.spec.shortfall_cluster_evidence,
+            "deterministic_next_weekday_timestamp_contract_repair",
+        ),
+        known_failure_mechanisms_addressed=(
+            *rejected_tool.spec.known_failure_mechanisms_addressed,
+            "weekday_phrase_timestamp_miscalculation",
+            "current_timestamp_reused_as_reminder_timestamp",
+        ),
+        canonical_route_substitution_risk="none",
+        expected_milestone_calls_replaced=(),
+        final_state_preservation_plan=(
+            "The helper returns only the timestamp; the actor must still call the "
+            "original add_reminder ToolSandbox side-effect tool."
+        ),
+        grading_accounting_note=(
+            "Timestamp canonicalization is intermediate; final outcome remains the "
+            "add_reminder state."
+        ),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary=(
+                "Weekday reminder tasks failed because the actor invented a day "
+                "offset or reused current_timestamp as reminder_timestamp."
+            ),
+            signals=("visible_raw_data_lacking_deterministic_transform",),
+            failed_tool_calls=("add_reminder",),
+            repeated_failed_tool_calls=("add_reminder",),
+            visible_data_gaps=(
+                "next weekday phrase must become exact local reminder timestamp",
+            ),
+            planner_failures=("compute weekday timestamp before add_reminder",),
+            final_answer_route_mismatch=False,
+        ),
+    )
+    code = """
+def next_weekday_time_to_timestamp(current_timestamp: float, target_isoweekday: int, hour: int, minute: int, local_utc_offset_hours: float) -> float:
+    if target_isoweekday < 1 or target_isoweekday > 7:
+        return 0.0
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return 0.0
+    offset_seconds = float(local_utc_offset_hours) * 3600.0
+    local_seconds = float(current_timestamp) + offset_seconds
+    local_midnight = int(local_seconds // 86400.0) * 86400.0
+    current_isoweekday = int((local_midnight // 86400.0 + 3) % 7) + 1
+    days_ahead = (int(target_isoweekday) - current_isoweekday) % 7
+    if days_ahead == 0:
+        days_ahead = 7
+    return (
+        local_midnight
+        + days_ahead * 86400.0
+        - offset_seconds
+        + int(hour) * 3600.0
+        + int(minute) * 60.0
+    )
+"""
+    return GeneratedTool(spec=spec, code=code)
 
 
 def _select_action_target_by_recency_contract_tool(
@@ -1167,7 +1299,6 @@ def _prepare_reminder_creation_args_contract_tool(
             *rejected_tool.spec.applicable_task_families,
             "add_reminder_content_and_date_and_time",
             "add_reminder_content_and_week_delta_and_time",
-            "add_reminder_content_and_weekday_delta_and_time",
             "add_reminder_content_and_time_and_location",
         ),
         reason_tool_is_decisive=(

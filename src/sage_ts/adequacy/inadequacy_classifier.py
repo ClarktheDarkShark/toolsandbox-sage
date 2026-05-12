@@ -295,6 +295,13 @@ def _is_reminder_optional_location_argument_scenario(scenario_name: str) -> bool
         "insufficient_information" not in scenario_name
         and scenario_name.startswith("add_reminder_content_and_")
         and "_time" in scenario_name
+        and "weekday_delta" not in scenario_name
+    )
+
+
+def _is_next_weekday_reminder_scenario(scenario_name: str) -> bool:
+    return "insufficient_information" not in scenario_name and scenario_name.startswith(
+        "add_reminder_content_and_weekday_delta_and_time"
     )
 
 
@@ -475,6 +482,73 @@ def _reminder_optional_location_argument_observation(
         visible_data_gaps=(
             "relative day/time and optional location must be converted into add_reminder kwargs",
         ),
+    )
+
+
+def _next_weekday_timestamp_observation(scenario_name: str) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="canonicalizer:next_weekday_time_to_timestamp",
+        observation=(
+            "Reminder creation tasks with phrases like 'next Friday at 5 PM' "
+            "require converting the current timestamp plus a target ISO weekday "
+            "and local time into the next matching local Unix timestamp before "
+            "calling add_reminder. Generate a deterministic canonicalizer named "
+            "next_weekday_time_to_timestamp. Inputs: current_timestamp, "
+            "target_isoweekday where Monday=1 and Sunday=7, hour, minute, and "
+            "local_utc_offset_hours. Return a float Unix timestamp for the next "
+            "occurrence of that weekday strictly after the current local date; if "
+            "the target weekday is today, use seven days later. Use local day "
+            "arithmetic with local_utc_offset_hours; do not ask the user for a "
+            "timezone when the task already provides or implies one. The helper "
+            "must not call add_reminder; the actor must still call the original "
+            "ToolSandbox add_reminder with the returned reminder_timestamp."
+        ),
+        allowed_families=(str(ToolFamily.CANONICALIZER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "current_timestamp": 1778595707.0,
+                    "target_isoweekday": 5,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": -4,
+                },
+                1778878800.0,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1778860800.0,
+                    "target_isoweekday": 5,
+                    "hour": 8,
+                    "minute": 30,
+                    "local_utc_offset_hours": -4,
+                },
+                1779453000.0,
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1778595707.0,
+                    "target_isoweekday": 8,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": -4,
+                },
+                0.0,
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="next_weekday_reminder_timestamp_failure",
+        inadequacy_signals=("visible_raw_data_lacking_deterministic_transform",),
+        visible_data_gaps=(
+            "next weekday phrase must become exact local reminder timestamp",
+        ),
+        planner_failures=(
+            "actor invented day offset or reused current timestamp as reminder time",
+        ),
+        final_answer_route_mismatch=False,
     )
 
 
@@ -2456,6 +2530,9 @@ def classify_scenario_observations(
         ) or _is_message_recency_extreme_scenario(scenario_name):
             observations.append(_message_search_window_observation(scenario_name))
         return tuple(observations)
+
+    if similarity < 1.0 and _is_next_weekday_reminder_scenario(scenario_name):
+        return (_next_weekday_timestamp_observation(scenario_name),)
 
     if similarity < 1.0 and _is_reminder_optional_location_argument_scenario(
         scenario_name

@@ -1154,6 +1154,22 @@ def test_recency_action_failure_births_action_target_and_arg_prep_helpers() -> N
     assert "composite:prepare_side_effect_args_from_selected_record" in keys
 
 
+def test_weekday_reminder_failure_births_next_weekday_timestamp_helper() -> None:
+    scenario = Scenario(categories=[ScenarioCategories.CANONICALIZATION])
+
+    observations = classify_scenario_observations(
+        "add_reminder_content_and_weekday_delta_and_time",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    assert [item.canonical_key for item in observations] == [
+        "canonicalizer:next_weekday_time_to_timestamp",
+    ]
+    assert observations[0].generation_allowed
+    assert observations[0].validation_examples[0].expected == 1778878800.0
+
+
 def test_stock_symbol_failure_births_symbol_extraction_helper() -> None:
     scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
 

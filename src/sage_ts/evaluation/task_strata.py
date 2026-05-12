@@ -553,12 +553,15 @@ def expected_birth_opportunities(
     if (
         name.startswith("add_reminder_content_and_")
         and "_time" in name
+        and "weekday_delta" not in name
         and not (
             name.startswith("add_reminder_content_and_week_delta_and_time")
             and "_location" not in name
         )
     ):
         opportunities.append("composite:prepare_reminder_creation_args")
+    if name.startswith("add_reminder_content_and_weekday_delta_and_time"):
+        opportunities.append("canonicalizer:next_weekday_time_to_timestamp")
     return opportunities
 
 

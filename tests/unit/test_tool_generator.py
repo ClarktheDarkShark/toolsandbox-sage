@@ -586,6 +586,91 @@ def test_action_selector_repair_uses_final_action_ready_contract(
     assert result.accepted, result.errors
 
 
+def test_next_weekday_repair_uses_deterministic_timestamp_contract(
+    tmp_path: Path,
+) -> None:
+    completer = FakeCompleter()
+    generator = ToolGenerator(completer=completer, cache=PromptCache(tmp_path))
+    request = ToolGenerationRequest(
+        scenario_name="add_reminder_content_and_weekday_delta_and_time",
+        observation="Need a next weekday reminder timestamp canonicalizer.",
+        allowed_families=("canonicalizer",),
+        suggested_tool_name="next_weekday_time_to_timestamp",
+    )
+    rejected = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="next_weekday_time_to_timestamp",
+            family=ToolFamily.CANONICALIZER,
+            description="Rejected weekday timestamp helper.",
+            inputs=(ToolInput("current_timestamp", "float", "current"),),
+            output_annotation="float",
+            positive_triggers=("next Friday reminder",),
+            negative_triggers=("invalid weekday",),
+            preserves_side_effect_tools=("get_current_timestamp", "add_reminder"),
+            required_original_tool_calls=("get_current_timestamp", "add_reminder"),
+            abstain_behavior="Return 0 for invalid fields.",
+            generalization_rationale="Weekday scheduling recurs.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "add_reminder_content_and_weekday_delta_and_time",
+                "modify_reminder_with_weekday_delta_and_time",
+            ),
+            reason_tool_is_decisive="It computes the timestamp before add_reminder.",
+            diagnostic_only=True,
+            known_failure_mechanisms_addressed=("weekday_timestamp_wrong",),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Weekday timestamp was wrong.",
+                signals=("visible_raw_data_lacking_deterministic_transform",),
+            ),
+        ),
+        code="def next_weekday_time_to_timestamp(current_timestamp: float) -> float:\n    return current_timestamp\n",
+    )
+
+    repaired = generator.repair(request, rejected, ("source_0_mismatch",))
+
+    assert completer.calls == 0
+    assert repaired.spec.tool_name == "next_weekday_time_to_timestamp"
+    result = validate_generated_tool(
+        repaired,
+        examples=(
+            ToolExample(
+                {
+                    "current_timestamp": 1778595707.0,
+                    "target_isoweekday": 5,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": -4,
+                },
+                1778878800.0,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1778860800.0,
+                    "target_isoweekday": 5,
+                    "hour": 8,
+                    "minute": 30,
+                    "local_utc_offset_hours": -4,
+                },
+                1779453000.0,
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1778595707.0,
+                    "target_isoweekday": 8,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": -4,
+                },
+                0.0,
+                negative_applicability=True,
+            ),
+        ),
+    )
+    assert result.accepted, result.errors
+
+
 def test_constraint_selector_repair_abstains_on_ambiguous_matches(
     tmp_path: Path,
 ) -> None:

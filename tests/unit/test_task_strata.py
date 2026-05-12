@@ -183,6 +183,17 @@ def test_remove_latest_reminder_matches_search_window_and_selector() -> None:
     )
 
 
+def test_weekday_reminder_births_timestamp_helper_not_final_arg_helper() -> None:
+    scenario = "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools"
+
+    assert "canonicalizer:next_weekday_time_to_timestamp" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "composite:prepare_reminder_creation_args" not in (
+        expected_birth_opportunities(scenario)
+    )
+
+
 def test_message_helpers_do_not_fit_insufficient_information_tasks() -> None:
     scenario = "modify_contact_with_message_recency_insufficient_information"
 
