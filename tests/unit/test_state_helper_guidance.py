@@ -1099,6 +1099,8 @@ def test_search_filter_helper_defaults_optional_constraints() -> None:
                     "selected_timestamp": {"type": "number"},
                     "action_type": {"type": "string"},
                     "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
                     "tie_candidates": {"type": "array"},
                     "abstain_reason": {"type": "string"},
                 },
@@ -1144,7 +1146,9 @@ def test_search_filter_helper_defaults_optional_constraints() -> None:
             "    return {'selected_record': selected, 'selected_index': records.index(selected), "
             "'selected_id': selected.get('reminder_id', ''), "
             "'selected_timestamp': selected[timestamp_key], 'action_type': action_type, "
-            "'downstream_tool_name': action_type, 'tie_candidates': [], 'abstain_reason': ''}\n"
+            "'downstream_tool_name': action_type, "
+            "'downstream_tool_kwargs': {'reminder_id': selected.get('reminder_id', '')}, "
+            "'should_call_tool': True, 'tie_candidates': [], 'abstain_reason': ''}\n"
         ),
     )
     entry = RegistryEntry.accepted(
@@ -1163,6 +1167,7 @@ def test_search_filter_helper_defaults_optional_constraints() -> None:
     assert "Selection/action usage:" in docstring
     assert "after an original search tool returns visible" in docstring
     assert "constraints is optional" in docstring
+    assert "immediately call downstream_tool_name next" in docstring
 
     fn = compile_toolsandbox_tool(entry)
 
@@ -1177,6 +1182,7 @@ def test_search_filter_helper_defaults_optional_constraints() -> None:
     )
 
     assert result["selected_id"] == "newer"
+    assert result["downstream_tool_kwargs"] == {"reminder_id": "newer"}
     assert result["abstain_reason"] == ""
 
 

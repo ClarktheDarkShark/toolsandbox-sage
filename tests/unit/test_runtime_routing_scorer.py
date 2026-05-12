@@ -384,6 +384,8 @@ def test_route_registry_entries_allows_action_selector_one_of_many_downstream_to
                 "properties": {
                     "selected_record": {"type": "object"},
                     "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
                     "abstain_reason": {"type": "string"},
                 },
             },
@@ -403,6 +405,7 @@ def test_route_registry_entries_allows_action_selector_one_of_many_downstream_to
         code=(
             "def select_action_target_by_recency(records: list) -> dict:\n"
             "    return {'selected_record': {}, 'downstream_tool_name': '', "
+            "'downstream_tool_kwargs': {}, 'should_call_tool': False, "
             "'abstain_reason': 'test'}\n"
         ),
     )
@@ -453,6 +456,8 @@ def test_recency_action_selector_hides_on_non_recency_contact_tasks() -> None:
                 "properties": {
                     "selected_record": {"type": "object"},
                     "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
                     "abstain_reason": {"type": "string"},
                 },
             },
@@ -463,6 +468,7 @@ def test_recency_action_selector_hides_on_non_recency_contact_tasks() -> None:
             "def select_action_target_by_recency(records: list, timestamp_key: str, "
             "selection_mode: str, action_type: str) -> dict:\n"
             "    return {'selected_record': {}, 'downstream_tool_name': '', "
+            "'downstream_tool_kwargs': {}, 'should_call_tool': False, "
             "'abstain_reason': 'test'}\n"
         ),
     )
@@ -507,6 +513,8 @@ def test_side_effect_selector_hides_on_insufficient_information() -> None:
                 "properties": {
                     "selected_record": {"type": "object"},
                     "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
                     "abstain_reason": {"type": "string"},
                 },
             },
@@ -517,6 +525,7 @@ def test_side_effect_selector_hides_on_insufficient_information() -> None:
             "def select_action_target_by_recency(records: list, timestamp_key: str, "
             "selection_mode: str, action_type: str) -> dict:\n"
             "    return {'selected_record': {}, 'downstream_tool_name': '', "
+            "'downstream_tool_kwargs': {}, 'should_call_tool': False, "
             "'abstain_reason': 'test'}\n"
         ),
     )

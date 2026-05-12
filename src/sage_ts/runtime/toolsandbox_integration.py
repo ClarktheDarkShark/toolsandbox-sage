@@ -337,15 +337,30 @@ def _search_filter_action_usage_note(spec: ToolSpec) -> list[str]:
                 " no extra user constraints beyond recency/timestamp/action type.",
             ]
         )
-    lines.extend(
-        [
-            "    If abstain_reason is empty, use selected_record/selected_id for",
-            " the next original ToolSandbox action. This helper does not perform",
-            " the action.",
-            "    If abstain_reason is non-empty, do not guess before a side-effect",
-            " action; search further or ask for clarification.",
-        ]
-    )
+    if "downstream_tool_kwargs" in output_properties:
+        lines.extend(
+            [
+                "    If abstain_reason is empty and should_call_tool is true,",
+                " immediately call downstream_tool_name next with",
+                " downstream_tool_kwargs unchanged. This helper does not perform",
+                " the action.",
+                "    If should_call_tool is false, do not guess; use safety_notes,",
+                " search further, or ask for clarification before any side-effect",
+                " action.",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "    If abstain_reason is empty, use selected_record/selected_id for",
+                " the next original ToolSandbox action. For older retained tools",
+                " without downstream_tool_kwargs, map selected_id to reminder_id for",
+                " remove_reminder/modify_reminder and to person_id for",
+                " remove_contact/modify_contact.",
+                "    If abstain_reason is non-empty, do not guess before a",
+                " side-effect action; search further or ask for clarification.",
+            ]
+        )
     return lines
 
 

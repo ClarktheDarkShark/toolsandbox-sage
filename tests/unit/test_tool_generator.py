@@ -132,6 +132,8 @@ def test_generation_request_includes_family_contract_guidance(
     assert "raw formatted phone strings" in prompt
     assert "selected_index=-1" in prompt
     assert "tie_candidates containing ALL matching records" in prompt
+    assert "downstream_tool_kwargs, should_call_tool" in prompt
+    assert "do not use message_id as a contact id" in prompt
     assert "prefer low-friction call patterns" in prompt
     assert "autofill selected_record from the latest original search_*" in prompt
     assert "Normalize common action aliases" in prompt
@@ -362,7 +364,6 @@ def test_reminder_repair_uses_deterministic_contract_fallback(tmp_path: Path) ->
                     "location_status": "omitted_optional",
                     "timestamp_source": "resolved",
                 },
-                held_out=True,
             ),
             ToolExample(
                 {
@@ -413,6 +414,290 @@ def test_reminder_repair_uses_deterministic_contract_fallback(tmp_path: Path) ->
                     ),
                     "location_status": "lookup_pending",
                     "timestamp_source": "resolved",
+                },
+                negative_applicability=True,
+            ),
+        ),
+    )
+    assert result.accepted, result.errors
+
+
+def test_action_selector_repair_uses_final_action_ready_contract(
+    tmp_path: Path,
+) -> None:
+    completer = FakeCompleter()
+    generator = ToolGenerator(completer=completer, cache=PromptCache(tmp_path))
+    request = ToolGenerationRequest(
+        scenario_name="remove_reminder_with_recency_latest",
+        observation="Need a recency action target selector.",
+        allowed_families=("search_filter_ranking_helper",),
+        suggested_tool_name="select_action_target_by_recency",
+    )
+    rejected = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="select_action_target_by_recency",
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            description="Rejected action selector.",
+            inputs=(ToolInput("records", "list", "records"),),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "selected_record": {"type": "object"},
+                    "selected_id": {"type": "string"},
+                    "downstream_tool_name": {"type": "string"},
+                },
+            },
+            positive_triggers=("remove_reminder_with_recency_latest",),
+            negative_triggers=("ambiguous_tie",),
+            preserves_side_effect_tools=("remove_reminder",),
+            required_original_tool_calls=("search_reminder",),
+            abstain_behavior="Abstain on ambiguity.",
+            generalization_rationale="Recency action targeting recurs.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=("remove_reminder_with_recency_latest",),
+            reason_tool_is_decisive="It selects the action target.",
+            diagnostic_only=True,
+            known_failure_mechanisms_addressed=("visible_not_called_action_selector",),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Selector lacked downstream kwargs.",
+                signals=("visible_not_called",),
+            ),
+        ),
+        code="def select_action_target_by_recency(records: list) -> dict:\n    return {}\n",
+    )
+
+    repaired = generator.repair(
+        request,
+        rejected,
+        ("action_selector_missing_downstream_kwargs_contract",),
+    )
+
+    assert completer.calls == 0
+    assert repaired.spec.tool_name == "select_action_target_by_recency"
+    result = validate_generated_tool(
+        repaired,
+        examples=(
+            ToolExample(
+                {
+                    "records": [
+                        {"reminder_id": "old", "reminder_timestamp": 1.0},
+                        {"reminder_id": "new", "reminder_timestamp": 2.0},
+                    ],
+                    "timestamp_key": "reminder_timestamp",
+                    "selection_mode": "latest",
+                    "action_type": "remove_reminder",
+                    "constraints": {},
+                    "updates": {},
+                },
+                {
+                    "selected_record": {
+                        "reminder_id": "new",
+                        "reminder_timestamp": 2.0,
+                    },
+                    "selected_index": 1,
+                    "selected_id": "new",
+                    "selected_timestamp": 2.0,
+                    "action_type": "remove_reminder",
+                    "downstream_tool_name": "remove_reminder",
+                    "downstream_tool_kwargs": {"reminder_id": "new"},
+                    "should_call_tool": True,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": (
+                        "call downstream ToolSandbox side-effect with "
+                        "downstream_tool_kwargs"
+                    ),
+                },
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "m2",
+                            "sender_person_id": "p2",
+                            "creation_timestamp": 50.0,
+                        }
+                    ],
+                    "timestamp_key": "creation_timestamp",
+                    "selection_mode": "latest",
+                    "action_type": "modify_contact",
+                    "constraints": {},
+                    "updates": {"relationship": "friend"},
+                },
+                {
+                    "selected_record": {
+                        "message_id": "m2",
+                        "sender_person_id": "p2",
+                        "creation_timestamp": 50.0,
+                    },
+                    "selected_index": 0,
+                    "selected_id": "p2",
+                    "selected_timestamp": 50.0,
+                    "action_type": "modify_contact",
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": "p2",
+                        "relationship": "friend",
+                    },
+                    "should_call_tool": True,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": (
+                        "call downstream ToolSandbox side-effect with "
+                        "downstream_tool_kwargs"
+                    ),
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {"reminder_id": "a", "reminder_timestamp": 3.0},
+                        {"reminder_id": "b", "reminder_timestamp": 3.0},
+                    ],
+                    "timestamp_key": "reminder_timestamp",
+                    "selection_mode": "latest",
+                    "action_type": "remove_reminder",
+                    "constraints": {},
+                    "updates": {},
+                },
+                {
+                    "selected_record": {},
+                    "selected_index": -1,
+                    "selected_id": "",
+                    "selected_timestamp": 3.0,
+                    "action_type": "remove_reminder",
+                    "downstream_tool_name": "remove_reminder",
+                    "downstream_tool_kwargs": {},
+                    "should_call_tool": False,
+                    "tie_candidates": [
+                        {"reminder_id": "a", "reminder_timestamp": 3.0},
+                        {"reminder_id": "b", "reminder_timestamp": 3.0},
+                    ],
+                    "abstain_reason": "ambiguous_timestamp_tie",
+                    "safety_notes": "do not guess before side-effect action",
+                },
+                negative_applicability=True,
+            ),
+        ),
+    )
+    assert result.accepted, result.errors
+
+
+def test_constraint_selector_repair_abstains_on_ambiguous_matches(
+    tmp_path: Path,
+) -> None:
+    completer = FakeCompleter()
+    generator = ToolGenerator(completer=completer, cache=PromptCache(tmp_path))
+    request = ToolGenerationRequest(
+        scenario_name="search_relationship_with_phone_number",
+        observation="Need exact visible record selection.",
+        allowed_families=("search_filter_ranking_helper",),
+        suggested_tool_name="select_visible_record_by_constraints",
+    )
+    rejected = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="select_visible_record_by_constraints",
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            description="Rejected constraint selector.",
+            inputs=(ToolInput("records", "list", "records"),),
+            output_annotation="dict",
+            output_schema={"type": "object", "properties": {"selected_record": {}}},
+            positive_triggers=("search_relationship_with_phone_number",),
+            negative_triggers=("ambiguous_matches",),
+            preserves_side_effect_tools=("search_contacts",),
+            required_original_tool_calls=("search_contacts",),
+            abstain_behavior="Abstain on ambiguity.",
+            generalization_rationale="Constraint selection recurs.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=("contact_lookup",),
+            reason_tool_is_decisive="It avoids ambiguous selected records.",
+            diagnostic_only=True,
+            known_failure_mechanisms_addressed=("ambiguous_constraint_match",),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Selector retained first ambiguous match.",
+                signals=("wrong_selected_record",),
+            ),
+        ),
+        code="def select_visible_record_by_constraints(records: list) -> dict:\n    return {}\n",
+    )
+
+    repaired = generator.repair(request, rejected, ("negative_0_mismatch",))
+
+    assert completer.calls == 0
+    assert repaired.spec.tool_name == "select_visible_record_by_constraints"
+    result = validate_generated_tool(
+        repaired,
+        examples=(
+            ToolExample(
+                {
+                    "records": [
+                        {"person_id": "p1", "phone_number": "+1 (555) 0100"},
+                    ],
+                    "field_name": "phone_number",
+                    "expected_value": "15550100",
+                    "return_field": "person_id",
+                },
+                {
+                    "selected_record": {
+                        "person_id": "p1",
+                        "phone_number": "+1 (555) 0100",
+                    },
+                    "selected_index": 0,
+                    "selected_id": "p1",
+                    "value": "p1",
+                    "matched_constraints": ["phone_number"],
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {"person_id": "p9", "name": "Ada Lovelace"},
+                    ],
+                    "field_name": "name",
+                    "expected_value": "ada lovelace",
+                    "return_field": "person_id",
+                },
+                {
+                    "selected_record": {
+                        "person_id": "p9",
+                        "name": "Ada Lovelace",
+                    },
+                    "selected_index": 0,
+                    "selected_id": "p9",
+                    "value": "p9",
+                    "matched_constraints": ["name"],
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {"person_id": "p1", "relationship": "friend"},
+                        {"person_id": "p2", "relationship": "friend"},
+                    ],
+                    "field_name": "relationship",
+                    "expected_value": "friend",
+                    "return_field": "person_id",
+                },
+                {
+                    "selected_record": {},
+                    "selected_index": -1,
+                    "selected_id": "",
+                    "value": "",
+                    "matched_constraints": ["relationship"],
+                    "tie_candidates": [
+                        {"person_id": "p1", "relationship": "friend"},
+                        {"person_id": "p2", "relationship": "friend"},
+                    ],
+                    "abstain_reason": "ambiguous_multiple_matches",
                 },
                 negative_applicability=True,
             ),

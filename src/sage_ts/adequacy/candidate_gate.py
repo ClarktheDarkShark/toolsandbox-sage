@@ -37,6 +37,18 @@ SEARCH_FILTER_ACTIONABLE_TOKENS = (
     "timestamp",
     "constraint",
 )
+SIDE_EFFECT_ACTION_TOOLS = frozenset(
+    {
+        "add_contact",
+        "add_reminder",
+        "modify_contact",
+        "modify_reminder",
+        "remove_contact",
+        "remove_reminder",
+        "send_message",
+        "send_message_with_phone_number",
+    }
+)
 STATE_ALLOWED_TOOL_NAMES = frozenset(
     {
         "",
@@ -451,6 +463,27 @@ def evaluate_candidate_gate(
             return GateDecision(
                 False, "search_filter_missing_output_contract", grading_classification
             )
+        if "downstream_tool_name" in props:
+            required_action_props = {
+                "downstream_tool_kwargs",
+                "should_call_tool",
+            }
+            if not required_action_props.issubset(props):
+                return GateDecision(
+                    False,
+                    "action_selector_missing_downstream_kwargs_contract",
+                    grading_classification,
+                )
+            preserved = set(spec.preserves_side_effect_tools)
+            required = set(spec.required_original_tool_calls)
+            if preserved & SIDE_EFFECT_ACTION_TOOLS and not (
+                required & SIDE_EFFECT_ACTION_TOOLS
+            ):
+                return GateDecision(
+                    False,
+                    "action_selector_missing_required_side_effect_call",
+                    grading_classification,
+                )
         ambiguity_text = " ".join(
             [
                 spec.description,

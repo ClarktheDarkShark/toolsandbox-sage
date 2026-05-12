@@ -212,16 +212,24 @@ class ToolGenerationRequest:
             "selected_id/value when abstaining for ambiguity. "
             "For recency action-target selectors, prefer inputs records: list, "
             "timestamp_key: str, selection_mode: str, action_type: str, and "
-            "constraints: dict. Treat constraints as optional; the generated "
-            "function must work when constraints is omitted or {}, using {} as "
-            "the default no-extra-filter case. Return selected_record, selected_index, "
-            "selected_id, selected_timestamp, action_type, downstream_tool_name, "
-            "tie_candidates, and abstain_reason. For unique matches, tie_candidates "
-            "must be an empty list. selected_id should use the first available "
-            "stable id key among reminder_id, message_id, person_id, "
-            "sender_person_id, recipient_person_id, or id. On timestamp ties, "
-            "selected_record must be empty and tie_candidates must include every "
-            "record sharing the best timestamp, including the first best record. "
+            "constraints: dict plus updates: dict for modify actions. Treat "
+            "constraints and updates as optional; the generated function must work "
+            "when either is omitted or {}, using {} as the default case. Return "
+            "selected_record, selected_index, selected_id, selected_timestamp, "
+            "action_type, downstream_tool_name, downstream_tool_kwargs, "
+            "should_call_tool, tie_candidates, abstain_reason, and safety_notes. "
+            "For unique matches, tie_candidates must be an empty list. For "
+            "reminder actions, selected_id and downstream_tool_kwargs must use "
+            "reminder_id. For contact actions, selected_id and "
+            "downstream_tool_kwargs must use person_id; do not use message_id as "
+            "a contact id. If only one of sender_person_id or recipient_person_id "
+            "is present, that can be used as person_id, but if both are present "
+            "and differ, abstain unless the record already has person_id. Remove "
+            "actions may set should_call_tool true with only the id. Modify "
+            "actions must merge explicit updates and abstain when updates is {}. "
+            "On timestamp ties, selected_record must be empty and tie_candidates "
+            "must include every record sharing the best timestamp, including the "
+            "first best record. "
             "If family is state_precondition_helper, output_schema must be a JSON "
             "Schema object with type 'object' and properties exactly covering the "
             "runtime contract: tool_name, arguments, should_call, and reason. "
@@ -348,6 +356,12 @@ class ToolGenerator:
             "If it returns downstream_tool_name/downstream_tool_kwargs, include "
             "that downstream original ToolSandbox action in both "
             "preserves_side_effect_tools and required_original_tool_calls. If a "
+            "recency action-target selector failed the candidate gate for "
+            "action_selector_missing_downstream_kwargs_contract or "
+            "action_selector_missing_required_side_effect_call, repair it to "
+            "return downstream_tool_kwargs, should_call_tool, and safety_notes; "
+            "use reminder_id for reminder actions, person_id for contact actions, "
+            "and never use message_id as a contact id. If a "
             "post-selection side-effect preparer failed or abstained too often, "
             "normalize action_type aliases such as remove/delete and modify/update "
             "before branching, while preserving abstention on missing records or "
@@ -421,17 +435,625 @@ def _deterministic_contract_repair(
     """
 
     tool_name = request.suggested_tool_name or rejected_tool.spec.tool_name
-    if tool_name != "prepare_reminder_creation_args":
-        return None
     joined_errors = " ".join(errors)
-    if not (
+    repairable_error = (
         "negative_" in joined_errors
         or "held_out_" in joined_errors
         or "annotation" in joined_errors
         or "mismatch" in joined_errors
+        or "action_selector_missing" in joined_errors
+    )
+    if tool_name == "prepare_reminder_creation_args" and repairable_error:
+        return _prepare_reminder_creation_args_contract_tool(request, rejected_tool)
+    if tool_name == "select_action_target_by_recency" and repairable_error:
+        return _select_action_target_by_recency_contract_tool(request, rejected_tool)
+    if tool_name == "select_visible_record_by_constraints" and repairable_error:
+        return _select_visible_record_by_constraints_contract_tool(
+            request, rejected_tool
+        )
+    if (
+        tool_name == "prepare_side_effect_args_from_selected_record"
+        and repairable_error
     ):
-        return None
-    return _prepare_reminder_creation_args_contract_tool(request, rejected_tool)
+        return _prepare_side_effect_args_from_selected_record_contract_tool(
+            request, rejected_tool
+        )
+    return None
+
+
+def _merged_task_families(rejected_tool: GeneratedTool, *extra: str) -> tuple[str, ...]:
+    return tuple(dict.fromkeys((*rejected_tool.spec.applicable_task_families, *extra)))
+
+
+def _select_action_target_by_recency_contract_tool(
+    request: ToolGenerationRequest,
+    rejected_tool: GeneratedTool,
+) -> GeneratedTool:
+    output_schema = {
+        "type": "object",
+        "properties": {
+            "selected_record": {"type": "object"},
+            "selected_index": {"type": "integer"},
+            "selected_id": {"type": "string"},
+            "selected_timestamp": {"type": "number"},
+            "action_type": {"type": "string"},
+            "downstream_tool_name": {"type": "string"},
+            "downstream_tool_kwargs": {"type": "object"},
+            "should_call_tool": {"type": "boolean"},
+            "tie_candidates": {"type": "array"},
+            "abstain_reason": {"type": "string"},
+            "safety_notes": {"type": "string"},
+        },
+        "required": [
+            "selected_record",
+            "selected_index",
+            "selected_id",
+            "selected_timestamp",
+            "action_type",
+            "downstream_tool_name",
+            "downstream_tool_kwargs",
+            "should_call_tool",
+            "tie_candidates",
+            "abstain_reason",
+            "safety_notes",
+        ],
+    }
+    spec = ToolSpec(
+        tool_name="select_action_target_by_recency",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description=(
+            "Select one visible reminder/contact action target by timestamp recency "
+            "and return final-action-ready downstream ToolSandbox kwargs when safe. "
+            "The helper never performs the side effect."
+        ),
+        inputs=(
+            ToolInput("records", "list", "Visible candidate records."),
+            ToolInput("timestamp_key", "str", "Numeric timestamp field to rank."),
+            ToolInput("selection_mode", "str", "latest or oldest."),
+            ToolInput("action_type", "str", "Downstream action type."),
+            ToolInput("constraints", "dict", "Optional exact-match filters."),
+            ToolInput(
+                "updates",
+                "dict",
+                "Explicit update fields for modify actions; {} for remove actions.",
+            ),
+        ),
+        output_annotation="dict",
+        output_schema=output_schema,
+        positive_triggers=(
+            "remove_reminder_with_recency_latest",
+            "modify_reminder_with_recency_latest",
+            "modify_contact_with_message_recency",
+            "recency action target selection",
+        ),
+        negative_triggers=(
+            "insufficient_information",
+            "ambiguous timestamp tie",
+            "missing target id",
+            "modify action without update fields",
+        ),
+        preserves_side_effect_tools=(
+            "search_reminder",
+            "search_messages",
+            "modify_contact",
+            "modify_reminder",
+            "remove_contact",
+            "remove_reminder",
+        ),
+        required_original_tool_calls=(
+            "search_reminder",
+            "search_messages",
+            "modify_contact",
+            "modify_reminder",
+            "remove_contact",
+            "remove_reminder",
+        ),
+        abstain_behavior=(
+            "Return should_call_tool false with empty downstream kwargs when no "
+            "unique record, numeric timestamp, safe target id, or required update "
+            "fields are available."
+        ),
+        generalization_rationale=(
+            "Recency-selected side-effect tasks repeatedly need deterministic target "
+            "choice followed by safe downstream kwargs."
+        ),
+        estimated_step_compression=max(
+            rejected_tool.spec.estimated_step_compression or 0,
+            3,
+        ),
+        cross_task_applicability_count=max(
+            rejected_tool.spec.cross_task_applicability_count or 0,
+            2,
+        ),
+        applicable_task_families=_merged_task_families(
+            rejected_tool,
+            "remove_reminder_with_recency_latest",
+            "modify_reminder_with_recency_latest",
+            "modify_contact_with_message_recency",
+        ),
+        reason_tool_is_decisive=(
+            "It converts visible timestamp-ranked records into the exact preserved "
+            "ToolSandbox action kwargs, which makes the generated helper naturally "
+            "adoptable instead of merely diagnostic."
+        ),
+        diagnostic_only=rejected_tool.spec.diagnostic_only,
+        shortfall_cluster_evidence=(
+            *rejected_tool.spec.shortfall_cluster_evidence,
+            "deterministic_action_selector_contract_repair",
+        ),
+        known_failure_mechanisms_addressed=(
+            *rejected_tool.spec.known_failure_mechanisms_addressed,
+            "visible_not_called_action_selector_missing_downstream_kwargs",
+        ),
+        canonical_route_substitution_risk="none",
+        expected_milestone_calls_replaced=(),
+        final_state_preservation_plan=(
+            "The helper prepares kwargs only; the actor must still call the original "
+            "ToolSandbox side-effect tool named by downstream_tool_name."
+        ),
+        grading_accounting_note=(
+            "Generated helper contribution is counted separately from the preserved "
+            "original side-effect call."
+        ),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary=(
+                "A prior recency action selector was retained but had weak adoption "
+                "because it returned only a selected id instead of final-action-ready "
+                "kwargs."
+            ),
+            signals=("visible_not_called", "side_effect_target_selection"),
+            visible_data_gaps=(
+                "selected recency target must become downstream action kwargs",
+            ),
+            planner_failures=(
+                "actor did not bridge selected id into original side-effect call",
+            ),
+            final_answer_route_mismatch=False,
+        ),
+    )
+    code = """
+def select_action_target_by_recency(records: list, timestamp_key: str, selection_mode: str, action_type: str, constraints: dict = {}, updates: dict = {}) -> dict:
+    constraints = constraints or {}
+    updates = updates or {}
+    mode = (selection_mode or "").strip().lower()
+    action = (action_type or "").strip().lower()
+    alias_map = {
+        "delete_contact": "remove_contact",
+        "delete_reminder": "remove_reminder",
+        "update_contact": "modify_contact",
+        "update_reminder": "modify_reminder",
+    }
+    action = alias_map.get(action, action)
+
+    def empty(reason: str, timestamp: float = 0.0, ties: list = None) -> dict:
+        return {
+            "selected_record": {},
+            "selected_index": -1,
+            "selected_id": "",
+            "selected_timestamp": float(timestamp),
+            "action_type": action,
+            "downstream_tool_name": action if action in {"modify_contact", "modify_reminder", "remove_contact", "remove_reminder"} else "",
+            "downstream_tool_kwargs": {},
+            "should_call_tool": False,
+            "tie_candidates": list(ties or []),
+            "abstain_reason": reason,
+            "safety_notes": "do not guess before side-effect action",
+        }
+
+    if not isinstance(records, list) or not records:
+        return empty("no_records")
+    if mode not in {"latest", "oldest"}:
+        return empty("invalid_selection_mode")
+    if action not in {"modify_contact", "modify_reminder", "remove_contact", "remove_reminder"}:
+        return empty("unsupported_action_type")
+
+    def norm(value):
+        if value is None:
+            return ""
+        return str(value).strip().lower()
+
+    filtered = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        ok = True
+        for key, expected in constraints.items():
+            if norm(record.get(key)) != norm(expected):
+                ok = False
+                break
+        if ok:
+            value = record.get(timestamp_key)
+            if isinstance(value, (int, float)):
+                filtered.append((float(value), record))
+    if not filtered:
+        return empty("no_matching_numeric_timestamp")
+
+    best_timestamp = max(ts for ts, _ in filtered) if mode == "latest" else min(ts for ts, _ in filtered)
+    best_records = [record for ts, record in filtered if ts == best_timestamp]
+    if len(best_records) != 1:
+        return empty("ambiguous_timestamp_tie", best_timestamp, best_records)
+
+    selected_record = best_records[0]
+    selected_index = records.index(selected_record)
+    if action.endswith("_reminder"):
+        id_key = "reminder_id"
+        selected_id = selected_record.get(id_key, "")
+    else:
+        id_key = "person_id"
+        selected_id = selected_record.get("person_id", "")
+        if not selected_id:
+            sender = selected_record.get("sender_person_id", "")
+            recipient = selected_record.get("recipient_person_id", "")
+            candidates = [item for item in [sender, recipient] if item]
+            unique = list(dict.fromkeys(candidates))
+            if len(unique) == 1:
+                selected_id = unique[0]
+            else:
+                return empty("missing_or_ambiguous_person_id", best_timestamp)
+    if not selected_id:
+        return empty("missing_target_id", best_timestamp)
+
+    downstream_kwargs = {id_key: selected_id}
+    if action.startswith("modify_"):
+        concrete_updates = {k: v for k, v in updates.items() if v not in (None, "")}
+        if not concrete_updates:
+            return empty("missing_update_fields", best_timestamp)
+        downstream_kwargs.update(concrete_updates)
+
+    return {
+        "selected_record": selected_record,
+        "selected_index": selected_index,
+        "selected_id": str(selected_id),
+        "selected_timestamp": float(best_timestamp),
+        "action_type": action,
+        "downstream_tool_name": action,
+        "downstream_tool_kwargs": downstream_kwargs,
+        "should_call_tool": True,
+        "tie_candidates": [],
+        "abstain_reason": "",
+        "safety_notes": "call downstream ToolSandbox side-effect with downstream_tool_kwargs",
+    }
+"""
+    return GeneratedTool(spec=spec, code=code)
+
+
+def _select_visible_record_by_constraints_contract_tool(
+    request: ToolGenerationRequest,
+    rejected_tool: GeneratedTool,
+) -> GeneratedTool:
+    output_schema = {
+        "type": "object",
+        "properties": {
+            "selected_record": {"type": "object"},
+            "selected_index": {"type": "integer"},
+            "selected_id": {"type": "string"},
+            "value": {"type": "string"},
+            "matched_constraints": {"type": "array"},
+            "tie_candidates": {"type": "array"},
+            "abstain_reason": {"type": "string"},
+        },
+    }
+    spec = ToolSpec(
+        tool_name="select_visible_record_by_constraints",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description=(
+            "Select exactly one visible record by a scalar field constraint, "
+            "normalizing phone-like fields and abstaining on ambiguous matches."
+        ),
+        inputs=(
+            ToolInput("records", "list", "Visible candidate records."),
+            ToolInput("field_name", "str", "Field to match."),
+            ToolInput("expected_value", "str", "Expected visible scalar value."),
+            ToolInput("return_field", "str", "Field to return from the match."),
+        ),
+        output_annotation="dict",
+        output_schema=output_schema,
+        positive_triggers=(
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number",
+            "remove_contact_by_phone",
+            "visible record constraint selection",
+        ),
+        negative_triggers=(
+            "no records",
+            "missing field",
+            "no matching record",
+            "ambiguous multiple matches",
+        ),
+        preserves_side_effect_tools=(
+            *rejected_tool.spec.preserves_side_effect_tools,
+            "search_contacts",
+            "search_messages",
+            "search_reminder",
+        ),
+        required_original_tool_calls=(
+            *rejected_tool.spec.required_original_tool_calls,
+            "search_contacts",
+        ),
+        abstain_behavior=(
+            "Return selected_record {}, selected_id '', value '', and all matching "
+            "tie_candidates when zero or multiple records match."
+        ),
+        generalization_rationale=(
+            "Many lookup and side-effect tasks need the same deterministic visible "
+            "record selection step before answering or acting."
+        ),
+        estimated_step_compression=max(
+            rejected_tool.spec.estimated_step_compression or 0,
+            3,
+        ),
+        cross_task_applicability_count=max(
+            rejected_tool.spec.cross_task_applicability_count or 0,
+            2,
+        ),
+        applicable_task_families=_merged_task_families(
+            rejected_tool,
+            "search_phone_number_with_name",
+            "search_relationship_with_phone_number",
+            "remove_contact_by_phone",
+        ),
+        reason_tool_is_decisive=(
+            "It repairs the recurring ambiguous-tie failure by returning no selected "
+            "record unless exactly one visible candidate matches."
+        ),
+        diagnostic_only=rejected_tool.spec.diagnostic_only,
+        shortfall_cluster_evidence=(
+            *rejected_tool.spec.shortfall_cluster_evidence,
+            "deterministic_constraint_selector_contract_repair",
+        ),
+        known_failure_mechanisms_addressed=(
+            *rejected_tool.spec.known_failure_mechanisms_addressed,
+            "ambiguous_constraint_match_not_abstained",
+        ),
+        canonical_route_substitution_risk="none",
+        expected_milestone_calls_replaced=(),
+        final_state_preservation_plan=(
+            "The helper only selects from visible records; original search/action "
+            "tools remain responsible for state changes."
+        ),
+        grading_accounting_note=(
+            "Selection helper output is intermediate evidence and does not replace "
+            "protected outcome scoring."
+        ),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Generated constraint selectors repeatedly retained the first match during ambiguity.",
+            signals=("wrong_selected_record", "ambiguity_abstention_failure"),
+            visible_data_gaps=("visible constraints need exact one-match selection",),
+            final_answer_route_mismatch=False,
+        ),
+    )
+    code = """
+def select_visible_record_by_constraints(records: list, field_name: str, expected_value: str, return_field: str) -> dict:
+    def empty(reason: str, ties: list = None) -> dict:
+        return {
+            "selected_record": {},
+            "selected_index": -1,
+            "selected_id": "",
+            "value": "",
+            "matched_constraints": [field_name] if field_name else [],
+            "tie_candidates": list(ties or []),
+            "abstain_reason": reason,
+        }
+
+    if not isinstance(records, list) or not records:
+        return empty("no_records")
+    if not field_name or expected_value is None:
+        return empty("missing_constraint")
+
+    def normalize(field: str, value) -> str:
+        text = "" if value is None else str(value)
+        if "phone" in field or "number" in field:
+            return "".join(ch for ch in text if ch.isdigit())
+        return text.strip().lower()
+
+    expected = normalize(field_name, expected_value)
+    matches = []
+    for record in records:
+        if not isinstance(record, dict) or field_name not in record:
+            continue
+        if normalize(field_name, record.get(field_name)) == expected:
+            matches.append(record)
+    if len(matches) != 1:
+        return empty("ambiguous_multiple_matches" if matches else "no_match", matches)
+
+    record = matches[0]
+    selected_id = (
+        record.get("person_id")
+        or record.get("message_id")
+        or record.get("reminder_id")
+        or record.get("sender_person_id")
+        or record.get("recipient_person_id")
+        or record.get("id")
+        or ""
+    )
+    value = record.get(return_field, selected_id)
+    return {
+        "selected_record": record,
+        "selected_index": records.index(record),
+        "selected_id": str(selected_id),
+        "value": "" if value is None else str(value),
+        "matched_constraints": [field_name],
+        "tie_candidates": [],
+        "abstain_reason": "",
+    }
+"""
+    return GeneratedTool(spec=spec, code=code)
+
+
+def _prepare_side_effect_args_from_selected_record_contract_tool(
+    request: ToolGenerationRequest,
+    rejected_tool: GeneratedTool,
+) -> GeneratedTool:
+    output_schema = {
+        "type": "object",
+        "properties": {
+            "downstream_tool_name": {"type": "string"},
+            "downstream_tool_kwargs": {"type": "object"},
+            "should_call_tool": {"type": "boolean"},
+            "abstain_reason": {"type": "string"},
+        },
+    }
+    spec = ToolSpec(
+        tool_name="prepare_side_effect_args_from_selected_record",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        description=(
+            "Prepare the exact kwargs for a preserved ToolSandbox side-effect call "
+            "from one already-selected visible record and explicit user updates."
+        ),
+        inputs=(
+            ToolInput("selected_record", "dict", "The unique selected visible record."),
+            ToolInput("action_type", "str", "modify/remove/send action type."),
+            ToolInput("updates", "dict", "Explicit fields to update or send."),
+            ToolInput("user_intent", "str", "Brief visible user intent."),
+        ),
+        output_annotation="dict",
+        output_schema=output_schema,
+        positive_triggers=(
+            "selected record exists before side-effect action",
+            "remove_contact_by_phone",
+            "modify_contact_with_message_recency",
+        ),
+        negative_triggers=(
+            "missing selected record",
+            "missing required id",
+            "modify action without update fields",
+            "unsupported action",
+        ),
+        preserves_side_effect_tools=(
+            "modify_contact",
+            "remove_contact",
+            "modify_reminder",
+            "remove_reminder",
+            "send_message",
+        ),
+        required_original_tool_calls=(
+            "modify_contact",
+            "remove_contact",
+            "modify_reminder",
+            "remove_reminder",
+            "send_message",
+        ),
+        abstain_behavior=(
+            "Abstain with should_call_tool false unless exactly one selected record "
+            "has the required id and any modify/send action has required fields."
+        ),
+        generalization_rationale=(
+            "Post-selection workflows repeatedly fail while translating the selected "
+            "record into preserved ToolSandbox action kwargs."
+        ),
+        estimated_step_compression=max(
+            rejected_tool.spec.estimated_step_compression or 0,
+            3,
+        ),
+        cross_task_applicability_count=max(
+            rejected_tool.spec.cross_task_applicability_count or 0,
+            2,
+        ),
+        applicable_task_families=_merged_task_families(
+            rejected_tool,
+            "remove_contact_by_phone",
+            "modify_contact_with_message_recency",
+            "remove_reminder_with_recency_latest",
+        ),
+        reason_tool_is_decisive=(
+            "It returns final-action-ready kwargs and preserves the original "
+            "ToolSandbox side-effect call."
+        ),
+        diagnostic_only=rejected_tool.spec.diagnostic_only,
+        shortfall_cluster_evidence=(
+            *rejected_tool.spec.shortfall_cluster_evidence,
+            "deterministic_side_effect_kwargs_contract_repair",
+        ),
+        known_failure_mechanisms_addressed=(
+            *rejected_tool.spec.known_failure_mechanisms_addressed,
+            "post_selection_kwargs_missing_or_over_abstained",
+        ),
+        canonical_route_substitution_risk="none",
+        expected_milestone_calls_replaced=(),
+        final_state_preservation_plan=(
+            "The helper returns kwargs only; the actor must still call the original "
+            "downstream ToolSandbox side-effect tool."
+        ),
+        grading_accounting_note="Side-effect preservation remains explicit.",
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Generated post-selection helpers failed to convert selected records into action kwargs.",
+            signals=("side_effect_argument_preparation_failure",),
+            planner_failures=("prepare kwargs before original side-effect tool call",),
+            final_answer_route_mismatch=False,
+        ),
+    )
+    code = """
+def prepare_side_effect_args_from_selected_record(selected_record: dict, action_type: str, updates: dict = {}, user_intent: str = "") -> dict:
+    selected_record = selected_record or {}
+    updates = updates or {}
+    action = (action_type or "").strip().lower()
+    alias_map = {
+        "delete_contact": "remove_contact",
+        "delete_reminder": "remove_reminder",
+        "update_contact": "modify_contact",
+        "update_reminder": "modify_reminder",
+    }
+    action = alias_map.get(action, action)
+
+    def abstain(reason: str) -> dict:
+        return {
+            "downstream_tool_name": "",
+            "downstream_tool_kwargs": {},
+            "should_call_tool": False,
+            "abstain_reason": reason,
+        }
+
+    if not isinstance(selected_record, dict) or not selected_record:
+        return abstain("missing_selected_record")
+    if action in {"modify_contact", "remove_contact"}:
+        person_id = selected_record.get("person_id", "")
+        if not person_id:
+            return abstain("missing_person_id")
+        kwargs = {"person_id": person_id}
+        if action == "modify_contact":
+            concrete = {k: v for k, v in updates.items() if v not in (None, "")}
+            if not concrete:
+                return abstain("missing_update_fields")
+            kwargs.update(concrete)
+        return {
+            "downstream_tool_name": action,
+            "downstream_tool_kwargs": kwargs,
+            "should_call_tool": True,
+            "abstain_reason": "",
+        }
+    if action in {"modify_reminder", "remove_reminder"}:
+        reminder_id = selected_record.get("reminder_id", "")
+        if not reminder_id:
+            return abstain("missing_reminder_id")
+        kwargs = {"reminder_id": reminder_id}
+        if action == "modify_reminder":
+            concrete = {k: v for k, v in updates.items() if v not in (None, "")}
+            if not concrete:
+                return abstain("missing_update_fields")
+            kwargs.update(concrete)
+        return {
+            "downstream_tool_name": action,
+            "downstream_tool_kwargs": kwargs,
+            "should_call_tool": True,
+            "abstain_reason": "",
+        }
+    if action == "send_message":
+        phone_number = updates.get("phone_number") or selected_record.get("phone_number")
+        content = updates.get("content") or updates.get("message")
+        if not phone_number or not content:
+            return abstain("missing_send_message_fields")
+        return {
+            "downstream_tool_name": "send_message",
+            "downstream_tool_kwargs": {
+                "phone_number": phone_number,
+                "content": content,
+            },
+            "should_call_tool": True,
+            "abstain_reason": "",
+        }
+    return abstain("unsupported_action_type")
+"""
+    return GeneratedTool(spec=spec, code=code)
 
 
 def _prepare_reminder_creation_args_contract_tool(

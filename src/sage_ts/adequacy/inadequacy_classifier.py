@@ -1464,19 +1464,28 @@ def _recency_action_target_observation(
             "select_action_target_by_recency. Inputs: records as visible candidate "
             "dictionaries, timestamp_key, selection_mode latest or oldest, "
             "action_type such as modify_contact, modify_reminder, remove_reminder, "
-            "or remove_contact, and constraints as an optional dict. The generated "
+            "or remove_contact, constraints as an optional dict, and updates as an "
+            "optional dict for modify actions. The generated "
             "function must treat omitted constraints as {} and {} as no additional "
-            "filter. Return "
+            "filter, and omitted updates as {}. Return "
             "selected_record, selected_index, selected_id, selected_timestamp, "
-            "action_type, downstream_tool_name, tie_candidates, and abstain_reason. "
+            "action_type, downstream_tool_name, downstream_tool_kwargs, "
+            "should_call_tool, tie_candidates, abstain_reason, and safety_notes. "
             "Abstain on no records, no numeric timestamp, invalid mode, ties, "
             "constraints not met, or missing target id. The helper must preserve "
             "the original search tool and downstream side-effect tool; it only "
-            "selects the target and labels the next action. When exactly one best "
-            "record exists, tie_candidates must be empty. selected_id must use the "
-            "first available stable id among reminder_id, message_id, person_id, "
-            "sender_person_id, recipient_person_id, or id. It must never execute "
-            "modify/remove/send/add itself. On a timestamp tie, tie_candidates "
+            "selects the target and prepares the next call arguments. When exactly "
+            "one best record exists, tie_candidates must be empty. For reminder "
+            "actions, selected_id and downstream_tool_kwargs must use reminder_id. "
+            "For contact actions, selected_id and downstream_tool_kwargs must use "
+            "person_id; do not use message_id as a contact id. If only one of "
+            "sender_person_id or recipient_person_id is present, that can be used "
+            "as the contact id, but if both are present and differ the helper must "
+            "abstain unless the selected record already has person_id. Remove "
+            "actions may set should_call_tool true with only the selected id. "
+            "Modify actions must merge explicit updates and abstain when updates "
+            "is empty. It must never execute modify/remove/send/add itself. On a "
+            "timestamp tie, tie_candidates "
             "must include every record sharing the selected timestamp, including "
             "the first best record; selected_record must remain empty."
         ),
@@ -1500,6 +1509,7 @@ def _recency_action_target_observation(
                     "selection_mode": "latest",
                     "action_type": "remove_reminder",
                     "constraints": {"content": "call Sam"},
+                    "updates": {},
                 },
                 {
                     "selected_record": {
@@ -1512,8 +1522,11 @@ def _recency_action_target_observation(
                     "selected_timestamp": 20.0,
                     "action_type": "remove_reminder",
                     "downstream_tool_name": "remove_reminder",
+                    "downstream_tool_kwargs": {"reminder_id": "new"},
+                    "should_call_tool": True,
                     "tie_candidates": [],
                     "abstain_reason": "",
+                    "safety_notes": "call remove_reminder with downstream_tool_kwargs",
                 },
             ),
             ToolExample(
@@ -1534,6 +1547,7 @@ def _recency_action_target_observation(
                     "selection_mode": "latest",
                     "action_type": "modify_contact",
                     "constraints": {},
+                    "updates": {"relationship": "friend"},
                 },
                 {
                     "selected_record": {
@@ -1542,12 +1556,18 @@ def _recency_action_target_observation(
                         "creation_timestamp": 50.0,
                     },
                     "selected_index": 1,
-                    "selected_id": "m2",
+                    "selected_id": "p2",
                     "selected_timestamp": 50.0,
                     "action_type": "modify_contact",
                     "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": "p2",
+                        "relationship": "friend",
+                    },
+                    "should_call_tool": True,
                     "tie_candidates": [],
                     "abstain_reason": "",
+                    "safety_notes": "call modify_contact with downstream_tool_kwargs",
                 },
                 held_out=True,
             ),
@@ -1561,6 +1581,7 @@ def _recency_action_target_observation(
                     "selection_mode": "latest",
                     "action_type": "modify_reminder",
                     "constraints": {},
+                    "updates": {"content": "new"},
                 },
                 {
                     "selected_record": {},
@@ -1569,11 +1590,14 @@ def _recency_action_target_observation(
                     "selected_timestamp": 20.0,
                     "action_type": "modify_reminder",
                     "downstream_tool_name": "modify_reminder",
+                    "downstream_tool_kwargs": {},
+                    "should_call_tool": False,
                     "tie_candidates": [
                         {"reminder_id": "a", "reminder_timestamp": 20.0},
                         {"reminder_id": "b", "reminder_timestamp": 20.0},
                     ],
                     "abstain_reason": "ambiguous_timestamp_tie",
+                    "safety_notes": "do not guess before side-effect action",
                 },
                 negative_applicability=True,
             ),

@@ -229,6 +229,94 @@ def test_search_filter_gate_accepts_ambiguity_abstention_without_literal_tie() -
     assert decision.allowed
 
 
+def test_action_selector_gate_requires_final_action_ready_kwargs() -> None:
+    spec = ToolSpec(
+        tool_name="select_action_target_by_recency",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description="Select a visible record for a downstream action by recency.",
+        inputs=(ToolInput("records", "list", "Visible records."),),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "selected_record": {"type": "object"},
+                "selected_id": {"type": "string"},
+                "downstream_tool_name": {"type": "string"},
+                "abstain_reason": {"type": "string"},
+            },
+        },
+        positive_triggers=("remove_reminder_with_recency_latest",),
+        negative_triggers=("no_candidates", "ambiguous_tie"),
+        preserves_side_effect_tools=("search_reminder", "remove_reminder"),
+        required_original_tool_calls=("search_reminder", "remove_reminder"),
+        abstain_behavior="Abstain on no unique safe action target.",
+        generalization_rationale="Recency action target selection recurs.",
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=(
+            "remove_reminder_with_recency_latest",
+            "modify_reminder_with_recency_latest",
+        ),
+        reason_tool_is_decisive="It selects the action target before removal.",
+        shortfall_cluster_evidence=("search_filter:select_action_target_by_recency",),
+        known_failure_mechanisms_addressed=("visible_not_called_action_selector",),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents miss recency action targets.",
+            signals=("wrong_selected_record",),
+        ),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert not decision.allowed
+    assert decision.reason == "action_selector_missing_downstream_kwargs_contract"
+
+
+def test_action_selector_gate_requires_side_effect_required_call() -> None:
+    spec = ToolSpec(
+        tool_name="select_action_target_by_recency",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description="Select a visible record for a downstream action by recency.",
+        inputs=(ToolInput("records", "list", "Visible records."),),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "selected_record": {"type": "object"},
+                "selected_id": {"type": "string"},
+                "downstream_tool_name": {"type": "string"},
+                "downstream_tool_kwargs": {"type": "object"},
+                "should_call_tool": {"type": "boolean"},
+                "abstain_reason": {"type": "string"},
+            },
+        },
+        positive_triggers=("remove_reminder_with_recency_latest",),
+        negative_triggers=("no_candidates", "ambiguous_tie"),
+        preserves_side_effect_tools=("search_reminder", "remove_reminder"),
+        required_original_tool_calls=("search_reminder",),
+        abstain_behavior="Abstain on no unique safe action target.",
+        generalization_rationale="Recency action target selection recurs.",
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=(
+            "remove_reminder_with_recency_latest",
+            "modify_reminder_with_recency_latest",
+        ),
+        reason_tool_is_decisive="It selects the action target before removal.",
+        shortfall_cluster_evidence=("search_filter:select_action_target_by_recency",),
+        known_failure_mechanisms_addressed=("visible_not_called_action_selector",),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents miss recency action targets.",
+            signals=("wrong_selected_record",),
+        ),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert not decision.allowed
+    assert decision.reason == "action_selector_missing_required_side_effect_call"
+
+
 def test_decisive_gate_rejects_thin_helper() -> None:
     spec = replace(
         _state_spec("Return a concrete next_action and readiness predicate."),
