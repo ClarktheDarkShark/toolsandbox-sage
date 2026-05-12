@@ -170,11 +170,8 @@ def test_send_message_contact_content_matches_lookup_planner() -> None:
 def test_remove_latest_reminder_matches_search_window_and_selector() -> None:
     scenario = "remove_reminder_with_recency_latest_3_distraction_tools"
 
-    assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
+    assert "select_action_target_by_recency" in expected_helper_fit(scenario)
     assert "resolve_search_window_or_bounds" in expected_helper_fit(scenario)
-    assert "search_filter:select_record_by_timestamp_extreme" in (
-        expected_birth_opportunities(scenario)
-    )
     assert "search_filter:select_action_target_by_recency" in (
         expected_birth_opportunities(scenario)
     )

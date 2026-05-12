@@ -1161,7 +1161,6 @@ def registry_entry_visibility_reason(
             if "insufficient_information" not in name and name.startswith(
                 (
                     "modify_contact_with_message_recency",
-                    "remove_reminder_with_recency_latest",
                     "search_message_with_recency_latest",
                     "search_message_with_recency_oldest",
                 )

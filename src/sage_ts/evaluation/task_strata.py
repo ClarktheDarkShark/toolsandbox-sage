@@ -383,10 +383,13 @@ def expected_helper_fit(
             "modify_contact_with_message_recency",
             "search_message_with_recency_latest",
             "search_message_with_recency_oldest",
-            "remove_reminder_with_recency_latest",
         )
     ):
         helpers.append("select_record_by_timestamp_extreme")
+    if "insufficient_information" not in name and name.startswith(
+        ACTION_TARGET_PREFIXES
+    ):
+        helpers.append("select_action_target_by_recency")
     if "insufficient_information" not in name and name.startswith(
         "modify_contact_with_message_recency"
     ):
@@ -455,7 +458,6 @@ def expected_birth_opportunities(
         opportunities.append("canonicalizer:relative_day_time_timestamp")
         opportunities.append("derived_value:resolve_search_window_or_bounds")
     if name.startswith("remove_reminder_with_recency_latest"):
-        opportunities.append("search_filter:select_record_by_timestamp_extreme")
         opportunities.append("derived_value:resolve_search_window_or_bounds")
     if name.startswith(
         (

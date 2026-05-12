@@ -117,6 +117,35 @@ def test_helper_trigger_strata_do_not_expose_without_specific_match() -> None:
     assert decision.reason == "generic_relevance_score_insufficient"
 
 
+def test_timestamp_extreme_hides_on_reminder_action_tasks() -> None:
+    base = _entry()
+    tool = replace(
+        base.tool,
+        spec=replace(
+            base.tool.spec,
+            tool_name="select_record_by_timestamp_extreme",
+            family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+            positive_triggers=("search_message_with_recency_latest",),
+            applicable_task_families=(
+                "search_message_with_recency_latest",
+                "search_message_with_recency_oldest",
+            ),
+        ),
+    )
+    entry = RegistryEntry.accepted(
+        tool,
+        base.validation,
+        birth_scenario="search_message_with_recency_latest",
+    )
+
+    visible, reason = toolsandbox_integration.registry_entry_visibility_reason(
+        entry, "remove_reminder_with_recency_latest"
+    )
+
+    assert not visible
+    assert reason == "timestamp_extreme_suppressed_outside_message_ranking_tasks"
+
+
 def test_family_matching_ignores_connector_words_for_contact_scalar_planner(
     monkeypatch: Any,
 ) -> None:
