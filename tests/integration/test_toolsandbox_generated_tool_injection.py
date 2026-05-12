@@ -1605,7 +1605,9 @@ def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
 ) -> None:
     store = _registry_with_reminder_creation_args(tmp_path)
     scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        starting_context=ExecutionContext(
+            tool_allow_list=["add_reminder", "end_conversation"]
+        )
     )
 
     unrelated_search = with_registry_tools(
@@ -1652,9 +1654,7 @@ def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
 
     tool_name = "prepare_reminder_creation_args"
     assert tool_name not in unrelated_search.starting_context.name_to_tool
-    assert (
-        tool_name not in suppressed_relative_no_location.starting_context.name_to_tool
-    )
+    assert tool_name in suppressed_relative_no_location.starting_context.name_to_tool
     assert tool_name in absolute_date_time.starting_context.name_to_tool
     assert tool_name not in insufficient.starting_context.name_to_tool
     assert tool_name not in modify.starting_context.name_to_tool
@@ -1676,7 +1676,9 @@ def test_reminder_creation_args_routing_hides_on_modify_scenario(
 ) -> None:
     store = _registry_with_reminder_creation_args(tmp_path)
     scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        starting_context=ExecutionContext(
+            tool_allow_list=["add_reminder", "end_conversation"]
+        )
     )
     result = with_registry_tools(
         scenario,
@@ -1691,7 +1693,9 @@ def test_reminder_creation_args_routing_hides_on_search_scenario(
 ) -> None:
     store = _registry_with_reminder_creation_args(tmp_path)
     scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        starting_context=ExecutionContext(
+            tool_allow_list=["add_reminder", "end_conversation"]
+        )
     )
     result = with_registry_tools(
         scenario,
@@ -1706,7 +1710,9 @@ def test_reminder_creation_args_routing_shows_on_add_reminder_scenario(
 ) -> None:
     store = _registry_with_reminder_creation_args(tmp_path)
     scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        starting_context=ExecutionContext(
+            tool_allow_list=["add_reminder", "end_conversation"]
+        )
     )
     result = with_registry_tools(
         scenario,
@@ -1716,19 +1722,21 @@ def test_reminder_creation_args_routing_shows_on_add_reminder_scenario(
     assert "prepare_reminder_creation_args" in result.starting_context.name_to_tool
 
 
-def test_reminder_creation_args_routing_hides_on_relative_no_location_scenario(
+def test_reminder_creation_args_routing_shows_on_relative_no_location_scenario(
     tmp_path: Path,
 ) -> None:
     store = _registry_with_reminder_creation_args(tmp_path)
     scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        starting_context=ExecutionContext(
+            tool_allow_list=["add_reminder", "end_conversation"]
+        )
     )
     result = with_registry_tools(
         scenario,
         store,
         scenario_name="add_reminder_content_and_week_delta_and_time_3_distraction_tools",
     )
-    assert "prepare_reminder_creation_args" not in result.starting_context.name_to_tool
+    assert "prepare_reminder_creation_args" in result.starting_context.name_to_tool
 
 
 def test_reminder_creation_args_routing_shows_on_create_reminder_scenario(
@@ -1736,7 +1744,9 @@ def test_reminder_creation_args_routing_shows_on_create_reminder_scenario(
 ) -> None:
     store = _registry_with_reminder_creation_args(tmp_path)
     scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        starting_context=ExecutionContext(
+            tool_allow_list=["add_reminder", "end_conversation"]
+        )
     )
     result = with_registry_tools(
         scenario,

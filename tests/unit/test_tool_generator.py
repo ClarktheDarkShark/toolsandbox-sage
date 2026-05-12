@@ -7,6 +7,14 @@ import pytest
 from sage_ts.adapters.openai_agent_adapter import ChatRequest
 from sage_ts.generation.prompt_cache import PromptCache
 from sage_ts.generation.tool_generator import ToolGenerationRequest, ToolGenerator
+from sage_ts.generation.tool_spec import (
+    GeneratedTool,
+    StructuredInadequacyEvidence,
+    ToolFamily,
+    ToolInput,
+    ToolSpec,
+)
+from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 
 
 @dataclass
@@ -239,3 +247,175 @@ def test_repair_prompt_includes_selector_and_action_alias_contract(
         "optional_location_lookup_pending_do_not_call_add_reminder" in prompt
         for prompt in seen
     )
+
+
+def test_reminder_repair_uses_deterministic_contract_fallback(tmp_path: Path) -> None:
+    completer = FakeCompleter()
+    generator = ToolGenerator(completer=completer, cache=PromptCache(tmp_path))
+    request = ToolGenerationRequest(
+        scenario_name="add_reminder_content_and_week_delta_and_time_and_location",
+        observation="Reminder creation needs final add_reminder kwargs.",
+        allowed_families=("composite_workflow_helper",),
+        suggested_tool_name="prepare_reminder_creation_args",
+    )
+    rejected = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_reminder_creation_args",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Rejected reminder helper.",
+            inputs=(
+                ToolInput("content", "str", "content"),
+                ToolInput("resolved_reminder_timestamp", "float", "timestamp"),
+            ),
+            output_annotation="dict",
+            output_schema={"type": "object", "properties": {"add_reminder_kwargs": {}}},
+            positive_triggers=("add_reminder",),
+            negative_triggers=("missing_time_info",),
+            preserves_side_effect_tools=("add_reminder",),
+            required_original_tool_calls=("add_reminder",),
+            abstain_behavior="Abstain when information is missing.",
+            generalization_rationale="Reminder tasks need reusable argument prep.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "add_reminder_content_and_week_delta_and_time",
+                "add_reminder_content_and_week_delta_and_time_and_location",
+            ),
+            reason_tool_is_decisive="It prepares final add_reminder arguments.",
+            diagnostic_only=True,
+            known_failure_mechanisms_addressed=("bad_optional_location_contract",),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Reminder helper had a repairable validation mismatch.",
+                signals=("reminder_argument_prep",),
+            ),
+        ),
+        code="def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: float) -> dict:\n    return {}\n",
+    )
+
+    repaired = generator.repair(
+        request,
+        rejected,
+        (
+            "negative_1_mismatch:{'should_call_add_reminder': True}!={'should_call_add_reminder': False}",
+        ),
+    )
+
+    assert completer.calls == 0
+    assert repaired.spec.tool_name == "prepare_reminder_creation_args"
+    result = validate_generated_tool(
+        repaired,
+        examples=(
+            ToolExample(
+                {
+                    "content": "Buy tickets",
+                    "resolved_reminder_timestamp": None,
+                    "current_timestamp": 0.0,
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "location_requested": False,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": True,
+                },
+                {
+                    "add_reminder_kwargs": {
+                        "content": "Buy tickets",
+                        "reminder_timestamp": 147600.0,
+                        "latitude": None,
+                        "longitude": None,
+                    },
+                    "should_call_add_reminder": True,
+                    "abstain_reason": "",
+                    "location_status": "omitted_optional",
+                    "timestamp_source": "relative_fields",
+                },
+            ),
+            ToolExample(
+                {
+                    "content": "Team meeting",
+                    "resolved_reminder_timestamp": 1777500000.0,
+                    "current_timestamp": 1777428906.0,
+                    "day_offset": 0,
+                    "hour": 0,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "location_requested": False,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {
+                        "content": "Team meeting",
+                        "reminder_timestamp": 1777500000.0,
+                        "latitude": None,
+                        "longitude": None,
+                    },
+                    "should_call_add_reminder": True,
+                    "abstain_reason": "",
+                    "location_status": "omitted_optional",
+                    "timestamp_source": "resolved",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "content": "Meet at park",
+                    "resolved_reminder_timestamp": None,
+                    "current_timestamp": 0.0,
+                    "day_offset": 1,
+                    "hour": 14,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "location_requested": True,
+                    "location_required": True,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": True,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "abstain_reason": "required_location_unresolved",
+                    "location_status": "required_missing",
+                    "timestamp_source": "relative_fields",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "Buy chocolate milk at Whole Foods",
+                    "resolved_reminder_timestamp": 1777776000.0,
+                    "current_timestamp": 1777687768.0,
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "location_requested": True,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "abstain_reason": (
+                        "optional_location_lookup_pending_do_not_call_add_reminder"
+                    ),
+                    "location_status": "lookup_pending",
+                    "timestamp_source": "resolved",
+                },
+                negative_applicability=True,
+            ),
+        ),
+    )
+    assert result.accepted, result.errors

@@ -775,17 +775,20 @@ def _google_docstring(entry: RegistryEntry) -> str:
                 " datetime_info_to_timestamp, wait for the result, then call this",
                 " helper in a later turn.",
                 "    If you have already called datetime_info_to_timestamp and have",
-                " a timestamp, pass it as resolved_reminder_timestamp and set",
-                " time_fields_complete=False.",
+                " a timestamp, pass it as resolved_reminder_timestamp.",
                 "    For plain relative times ('tomorrow at 5 PM', 'next Friday'),",
-                " set time_fields_complete=True and supply day_offset, hour, minute,",
-                " local_utc_offset_hours only when that offset is explicitly known.",
+                " supply day_offset, hour, minute, and local_utc_offset_hours only",
+                " when those fields are visible or already resolved.",
+                "    Set location_requested=True when the user mentioned an optional",
+                " location that might still need lookup.",
                 "    Set location_required=True only when the user explicitly requires",
                 " a location on the reminder. A mentioned location is not required.",
-                "    If location_available=False or lookup failed and location is not",
-                " required, set latitude=0.0, longitude=0.0 and proceed without coords.",
-                "    If the user is still choosing or refining the location, set",
-                " location_refinement_in_progress=True so the helper abstains.",
+                "    If optional location is mentioned but not resolved and lookup",
+                " has not failed, the helper abstains so the actor can search or",
+                " ask instead of creating the reminder prematurely.",
+                "    If optional location lookup failed or no location was requested,",
+                " pass latitude=0.0 and longitude=0.0; the helper proceeds without",
+                " coordinates.",
                 "    If result['should_call_add_reminder'] is True, immediately call",
                 " add_reminder(**result['add_reminder_kwargs']) unchanged.",
                 "    If result['should_call_add_reminder'] is False, check",
@@ -1123,14 +1126,6 @@ def registry_entry_visibility_reason(
         )
         if any(token in name for token in suppress_signals):
             return False, "reminder_creation_args_suppressed_non_creation_task"
-        if (
-            name.startswith("add_reminder_content_and_week_delta_and_time")
-            and "_location" not in name
-        ):
-            return (
-                False,
-                "reminder_creation_args_suppressed_relative_no_location_lane",
-            )
         if any(token in name for token in creation_signals):
             return True, "reminder_creation_args_narrow_creation_task"
         # No creation signal detected — hide (safe default).
