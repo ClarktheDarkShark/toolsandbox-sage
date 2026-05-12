@@ -627,7 +627,7 @@ def test_next_weekday_repair_uses_deterministic_timestamp_contract(
         code="def next_weekday_time_to_timestamp(current_timestamp: float) -> float:\n    return current_timestamp\n",
     )
 
-    repaired = generator.repair(request, rejected, ("source_0_mismatch",))
+    repaired = generator.repair(request, rejected, ("denied_node:Import",))
 
     assert completer.calls == 0
     assert repaired.spec.tool_name == "next_weekday_time_to_timestamp"

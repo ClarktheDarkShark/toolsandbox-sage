@@ -449,6 +449,8 @@ def _deterministic_contract_repair(
         or "annotation" in joined_errors
         or "mismatch" in joined_errors
         or "action_selector_missing" in joined_errors
+        or "denied_node:Import" in joined_errors
+        or "denied_node:ImportFrom" in joined_errors
     )
     if tool_name == "prepare_reminder_creation_args" and repairable_error:
         return _prepare_reminder_creation_args_contract_tool(request, rejected_tool)
