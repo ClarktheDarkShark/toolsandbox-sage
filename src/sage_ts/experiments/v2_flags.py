@@ -12,10 +12,11 @@ CONTRACT_SYNTHESIS = "contract_synthesis"
 EVIDENCE_ROUTING = "evidence_routing"
 MEDIUM_GRAIN_SKILLS = "medium_grain_skills"
 
-# Evidence-backed current stack from the fair-chance confirmation run:
-# contract synthesis improved outcome, canonical score, exact success, and adoption.
-# Other matrix ideas remain opt-in until they show positive called-tool contribution.
-CURRENT_REPAIRED_DEFAULTS = frozenset({CONTRACT_SYNTHESIS})
+# Evidence-backed current stack from the fair-chance confirmation run plus the
+# self-evolving repair loop: contract synthesis improves tool specs, while
+# candidate repair lets online birth fix schema/example mismatches before
+# parking a generated helper.
+CURRENT_REPAIRED_DEFAULTS = frozenset({CONTRACT_SYNTHESIS, CANDIDATE_REPAIR})
 ALL_FEATURES = frozenset(
     {
         GRADING_ACCOUNTING,

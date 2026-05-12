@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass
 from types import FunctionType
 from typing import Any
@@ -39,6 +40,43 @@ class SchemaResult:
     valid: bool
     errors: tuple[str, ...]
     function: FunctionType | None = None
+
+
+def _annotation_text(annotation: object) -> str:
+    return str(getattr(annotation, "__name__", "") or str(annotation))
+
+
+def _annotation_tokens(annotation: str) -> set[str]:
+    text = annotation.strip().lower()
+    text = text.replace("typing.", "")
+    text = text.replace("nonetype", "none")
+    text = text.replace("null", "none")
+    text = re.sub(r"\s+", "", text)
+    if text.startswith("optional[") and text.endswith("]"):
+        inner = text[len("optional[") : -1]
+        return _annotation_tokens(inner) | {"none"}
+    if text.startswith("union[") and text.endswith("]"):
+        inner = text[len("union[") : -1]
+        return {
+            token
+            for part in inner.split(",")
+            for token in _annotation_tokens(part)
+            if token
+        }
+    return {part for part in re.split(r"\|", text) if part}
+
+
+def _annotation_compatible(actual: object, expected: str) -> bool:
+    actual_name = _annotation_text(actual)
+    if actual_name == expected:
+        return True
+    actual_tokens = _annotation_tokens(actual_name)
+    expected_tokens = _annotation_tokens(expected)
+    if actual_tokens == expected_tokens:
+        return True
+    if "none" in expected_tokens and actual_tokens <= (expected_tokens - {"none"}):
+        return True
+    return False
 
 
 def compile_generated_tool(tool: GeneratedTool) -> SchemaResult:
@@ -103,15 +141,15 @@ def compile_generated_tool(tool: GeneratedTool) -> SchemaResult:
         actual = annotations.get(name)
         if actual is None:
             continue  # unannotated is allowed; wrong annotation is not
-        actual_name = getattr(actual, "__name__", str(actual))
-        if actual_name != annotation:
+        actual_name = _annotation_text(actual)
+        if not _annotation_compatible(actual, annotation):
             errors.append(
                 f"input_annotation_mismatch:{name}:{actual_name}!={annotation}"
             )
     ret = annotations.get("return")
     if ret is not None:
-        ret_name = getattr(ret, "__name__", str(ret))
-        if ret_name != tool.spec.output_annotation:
+        ret_name = _annotation_text(ret)
+        if not _annotation_compatible(ret, tool.spec.output_annotation):
             errors.append(
                 f"return_annotation_mismatch:{ret_name}!={tool.spec.output_annotation}"
             )

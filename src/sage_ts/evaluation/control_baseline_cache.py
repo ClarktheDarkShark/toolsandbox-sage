@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -23,6 +24,10 @@ MIN_COMPATIBLE_RUNS = 3
 CACHE_ROOT = Path("artifacts/baselines/control_task_baselines")
 DEFAULT_TOOL_BACKEND = ToolBackend("DEFAULT")
 CACHE_MATCH_POLICY = "task_name_agent_user_base_tool_policy_min3"
+EXPERIMENTAL_TASK_ONLY_CACHE_ENV = "SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY"
+EXPERIMENTAL_TASK_ONLY_CACHE_POLICY = (
+    "experimental_task_name_base_tool_policy_min3_model_user_bypassed"
+)
 
 COMPATIBILITY_FIELDS = (
     "scenario_key",
@@ -42,6 +47,10 @@ TASK_LEVEL_CACHE_FIELDS = (
     "scenario_key",
     "agent_model",
     "user_model",
+    "base_tool_policy",
+)
+EXPERIMENTAL_TASK_ONLY_CACHE_FIELDS = (
+    "scenario_key",
     "base_tool_policy",
 )
 ORDER_INSENSITIVE_LIST_KEYS = frozenset(
@@ -66,6 +75,27 @@ def _json_default(value: Any) -> Any:
     if hasattr(value, "to_dicts"):
         return value.to_dicts()
     return repr(value)
+
+
+def _experimental_task_only_cache_enabled() -> bool:
+    return os.environ.get(EXPERIMENTAL_TASK_ONLY_CACHE_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def active_cache_match_policy() -> str:
+    if _experimental_task_only_cache_enabled():
+        return EXPERIMENTAL_TASK_ONLY_CACHE_POLICY
+    return CACHE_MATCH_POLICY
+
+
+def active_task_level_cache_fields() -> tuple[str, ...]:
+    if _experimental_task_only_cache_enabled():
+        return EXPERIMENTAL_TASK_ONLY_CACHE_FIELDS
+    return TASK_LEVEL_CACHE_FIELDS
 
 
 def stable_json(value: Any) -> str:
@@ -292,7 +322,7 @@ def _record_matches_context(record: dict[str, Any], context: dict[str, Any]) -> 
     manifest checksum in this match; those fields fragmented otherwise valid
     task-level baselines and made reuse stochastic.
     """
-    for field in TASK_LEVEL_CACHE_FIELDS:
+    for field in active_task_level_cache_fields():
         if stable_json(record.get(field)) != stable_json(context.get(field)):
             return False
     return True
@@ -512,8 +542,11 @@ class ControlBaselineCache:
                 "traceback": None,
                 "control_cache": {
                     "source": "cached",
-                    "cache_match_policy": CACHE_MATCH_POLICY,
-                    "task_level_fields": list(TASK_LEVEL_CACHE_FIELDS),
+                    "cache_match_policy": active_cache_match_policy(),
+                    "task_level_fields": list(active_task_level_cache_fields()),
+                    "experimental_model_user_bypass": (
+                        _experimental_task_only_cache_enabled()
+                    ),
                     "compatible_count": len(records),
                     "canonical_mean": sum(canonical) / len(canonical),
                     "canonical_variance": _variance(canonical),
@@ -726,8 +759,9 @@ def build_control_cache_report(
     )
     return {
         "mode": mode,
-        "cache_match_policy": CACHE_MATCH_POLICY,
-        "task_level_fields": list(TASK_LEVEL_CACHE_FIELDS),
+        "cache_match_policy": active_cache_match_policy(),
+        "task_level_fields": list(active_task_level_cache_fields()),
+        "experimental_model_user_bypass": _experimental_task_only_cache_enabled(),
         "control_source": control_source,
         "cached_control_tasks": len(cached_scenarios),
         "fresh_control_tasks": len(fresh_scenarios),

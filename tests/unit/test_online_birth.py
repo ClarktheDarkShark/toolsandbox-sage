@@ -823,6 +823,8 @@ def test_candidate_repair_pass_can_accept_initial_rejection(
     birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
     assert birth_event["accepted"] is True
     assert birth_event["repair_attempted"] is True
+    assert birth_event["repair_attempt_count"] == 1
+    assert birth_event["repair_final_errors"] == []
 
 
 def test_near_duplicate_only_birth_is_marked_diagnostic(tmp_path: Path) -> None:

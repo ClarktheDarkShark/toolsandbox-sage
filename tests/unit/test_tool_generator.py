@@ -232,3 +232,10 @@ def test_repair_prompt_includes_selector_and_action_alias_contract(
     assert any("remove/delete" in prompt for prompt in seen)
     assert any("Exact E.164 repair rule" in prompt for prompt in seen)
     assert any("search_kwargs must be {}" in prompt for prompt in seen)
+    assert any(
+        "prepare_reminder_creation_args failed validation" in prompt for prompt in seen
+    )
+    assert any(
+        "optional_location_lookup_pending_do_not_call_add_reminder" in prompt
+        for prompt in seen
+    )

@@ -175,6 +175,34 @@ def test_task_level_cache_still_separates_model_user_policy_and_task(
     assert not cache.lookup(_context(name="different-task")).eligible
 
 
+def test_experimental_task_only_cache_can_bypass_model_and_user(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = ControlBaselineCache(tmp_path / "cache")
+    ctx = _context()
+    for _ in range(3):
+        _add(cache, ctx, _row(), tmp_path)
+
+    monkeypatch.setenv("SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY", "1")
+    lookup = cache.lookup(
+        {
+            **ctx,
+            "agent_model": "different-agent",
+            "user_model": "different-user",
+        }
+    )
+
+    assert lookup.eligible
+    assert lookup.stats is not None
+    assert lookup.stats["cache_match_policy"] == (
+        "experimental_task_name_base_tool_policy_min3_model_user_bypassed"
+    )
+    assert lookup.stats["task_level_fields"] == ["scenario_key", "base_tool_policy"]
+    assert lookup.stats["experimental_model_user_bypass"] is True
+    assert not cache.lookup({**ctx, "base_tool_policy": "different-policy"}).eligible
+    assert not cache.lookup(_context(name="different-task")).eligible
+
+
 def test_manifest_checksum_change_does_not_reset_task_level_eligibility(
     tmp_path: Path,
 ) -> None:

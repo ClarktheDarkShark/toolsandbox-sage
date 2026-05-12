@@ -77,6 +77,7 @@ BROADER_HELPER_OVERLAPS = {
 
 
 PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
+DEFAULT_CANDIDATE_REPAIR_ATTEMPTS = 2
 FIRST_OBSERVATION_BIRTH_KEYS = frozenset(
     {
         "composite:plan_contact_lookup_query",
@@ -501,36 +502,47 @@ class OnlineBirthController:
                 observation,
             )
             repair_attempted = False
+            repair_attempt_count = 0
             repair_errors: tuple[str, ...] = ()
+            repair_history: list[dict[str, Any]] = []
             repair_method = getattr(self.generator, "repair", None)
             if (
                 not validation.accepted
                 and feature_enabled(CANDIDATE_REPAIR)
                 and callable(repair_method)
             ):
-                repair_attempted = True
                 repair_errors = tuple(validation.errors)
-                repaired_tool = repair_method(request, tool, repair_errors)
-                repaired_tool = _normalize_live_birth_routing_metadata(
-                    repaired_tool,
-                    observation,
-                    tuple(self._cluster_context(observation)["base_task_families"]),
-                )
-                repaired_gate, repaired_live_check, repaired_validation = (
-                    self._gate_and_validate(repaired_tool, observation)
-                )
-                self._event(
-                    "tool_repair_attempted",
-                    {
-                        "canonical_key": observation.canonical_key,
-                        "tool_name": tool.spec.tool_name,
-                        "repaired_tool_name": repaired_tool.spec.tool_name,
-                        "initial_errors": list(repair_errors),
+                for attempt in range(1, DEFAULT_CANDIDATE_REPAIR_ATTEMPTS + 1):
+                    if validation.accepted:
+                        break
+                    repair_attempted = True
+                    repair_attempt_count = attempt
+                    current_errors = tuple(validation.errors)
+                    repaired_tool = repair_method(request, tool, current_errors)
+                    repaired_tool = _normalize_live_birth_routing_metadata(
+                        repaired_tool,
+                        observation,
+                        tuple(self._cluster_context(observation)["base_task_families"]),
+                    )
+                    repaired_gate, repaired_live_check, repaired_validation = (
+                        self._gate_and_validate(repaired_tool, observation)
+                    )
+                    repair_record = {
+                        "attempt": attempt,
+                        "input_errors": list(current_errors),
                         "repaired_errors": list(repaired_validation.errors),
                         "accepted": repaired_validation.accepted,
-                    },
-                )
-                if repaired_validation.accepted or not validation.accepted:
+                        "repaired_tool_name": repaired_tool.spec.tool_name,
+                    }
+                    repair_history.append(repair_record)
+                    self._event(
+                        "tool_repair_attempted",
+                        {
+                            "canonical_key": observation.canonical_key,
+                            "tool_name": tool.spec.tool_name,
+                            **repair_record,
+                        },
+                    )
                     tool = repaired_tool
                     memory_gate = repaired_gate
                     live_check = repaired_live_check
@@ -584,7 +596,12 @@ class OnlineBirthController:
                     live_check.to_json() if live_check is not None else None
                 ),
                 "repair_attempted": repair_attempted,
+                "repair_attempt_count": repair_attempt_count,
                 "repair_errors": list(repair_errors),
+                "repair_final_errors": list(validation.errors)
+                if repair_attempted
+                else [],
+                "repair_history": repair_history,
             },
         )
         self._event(
@@ -608,6 +625,7 @@ class OnlineBirthController:
                     live_check.to_json() if live_check is not None else None
                 ),
                 "repair_attempted": repair_attempted,
+                "repair_attempt_count": repair_attempt_count,
             },
         )
         if validation.accepted:
