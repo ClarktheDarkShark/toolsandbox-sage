@@ -860,3 +860,29 @@
 - Validation: focused role/policy/RapidAPI-cache tests `35 passed, 2 warnings`; cache smoke passed without `RAPID_API_KEY`.
 - Decision label: `ON_TRACK_FOR_SCALE_GATE: combined_treatment_broad60_exceeds_prior_high_same60`.
 - Next action: update docs and commit; next spend should be a clean same-code 100 or 250 gate, not an immediate formal500, unless budget and preflight are explicitly cleared.
+
+## 2026-05-11 - Praxis Combined Bridge-Policy Formal500 V2
+
+- Objective: validate whether restoring the declared SAGE bridge policy recovers the prior high-lift Praxis behavior without force calls, label leakage, scenario hard-coding, or candidate task-cache reuse.
+- Branch: `repair/praxis-combined-bridge-policy`.
+- Treatment classification: frozen Praxis registry plus feature-flagged actor/checker bridge policy; not registry-only.
+- Registry: `artifacts/praxis_safety_repair/registries/praxis_bridgepack_combined_bridge_policy_v1/registry_manifest.json`, SHA `7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349`.
+- Runtime flag: `SAGE_PRAXIS_BRIDGE_POLICY=combined`.
+- Formal manifest: `docs/sage_protocol/manifests/v2_1_formal_500.json`.
+- Run root: `outputs/praxis_combined_bridge_policy/formal500_full_v2_bridge_repair_rapid_cache_polars1/full_benchmark_20260511_190013`.
+- Dashboard default: `http://127.0.0.1:62543/outputs/praxis_combined_bridge_policy/formal500_full_v2_bridge_repair_rapid_cache_polars1/full_benchmark_20260511_190013/dashboard/task_compare.html`.
+- Integrity controls: generation off; candidate task cache off; OpenAI response cache disabled; control cache `use-if-eligible`; routing evidence disabled; diagnostic force env vars absent; RapidAPI external-service cache read-only; `POLARS_MAX_THREADS=1` used after a diagnostic showed a prior local Polars stall.
+- Control cache: `500 cached / 0 fresh`; cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`.
+- Formal500 metrics: canonical `0.670025 -> 0.757369`, delta `+0.087344`, relative lift `+13.04%`; outcome `0.594872 -> 0.839943`, delta `+0.245071`, relative lift `+41.20%`.
+- Prior high-run comparison: exceeded the cited prior `0.670 -> 0.751` canonical (`+12.1%`) and `0.595 -> 0.813` outcome (`+0.219`) dashboard result.
+- Paired run-vs-control statistics: canonical delta 95% bootstrap CI `[+0.063776, +0.111818]`, sign-flip p `<0.0001`; outcome delta 95% bootstrap CI `[+0.213219, +0.276059]`, sign-flip p `<0.0001`.
+- Gains/regressions/preserved: canonical `316 / 114 / 70`; outcome `252 / 41 / 91`.
+- Helper usage: natural helper-called scenarios `230`; helper-attempted scenarios `208`; helper failures `0`; runtime exceptions `0`; helper side-effect incidents `0`.
+- Machine-readable summary: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_formal500_v2_bridge_repair_rapid_cache_polars1_summary.json`, SHA `060d3ba14ae1b8b8d15290d8286092a68053347fd207e46ade89c5fba0cc61e6`.
+- Machine-readable statistics: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_formal500_v2_statistics.json`, SHA `e064e9f3cec303d2a657063132549e8cfda2fdb1a946e0405649449ca21ddf6f`.
+- Gap packet: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_formal500_v2_gap_packets.json`, SHA `708abc10ec97a2bc36f703a27702abbd50dcdf39b3dc4f265ff08a52dd03db60`.
+- Leading residual bucket after formal500: `contact_lookup_update_search_crud` with 140 tasks, 17 outcome regressions, negative outcome mass `4.606`, 32 canonical regressions, negative canonical mass `8.565`, and 62 no-visible-helper cases.
+- Next candidate tool family: `prepare_contact_lookup_or_update_action_v2`, with minefields for duplicate names, missing phone/relationship fields, missing update values, ambiguous message-counterparty evidence, and absent original side-effect tools.
+- Reports updated: `docs/sage_protocol/praxis_combined_bridge_policy_recovery_report.md`, `docs/sage_protocol/praxis_bridge_policy_methodology.md`, `docs/sage_protocol/praxis_combined_bridge_policy_formal500_report.md`, `docs/sage_protocol/praxis_next_gap_and_self_evolving_sage_plan.md`, and `docs/sage_protocol/current_state.md`.
+- Decision label: `PROMISING_COMBINED_TREATMENT_FORMAL500_POSITIVE_NOT_PROTECTED_CLAIM_READY`.
+- Next action: run a dedicated matched ablation under the same committed runtime with best3, V2.6, Praxis registry-only repair v2, and Praxis combined bridge-policy v2 before any protected final-claim update.

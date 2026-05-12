@@ -1,0 +1,120 @@
+{
+  "cache_selection_used": false,
+  "final_claim_evidence": false,
+  "integrity_controls": {
+    "candidate_cache_allowed": false,
+    "control_cache_policy": "use-if-eligible",
+    "force_call": "diagnostic only, not promotion evidence",
+    "generation": "off for frozen Praxis comparison; on only if explicitly running a new experimental generation loop",
+    "openai_response_cache": "disabled",
+    "routing_evidence_mode": "disabled_or_explicitly_pinned"
+  },
+  "labels_inspected": false,
+  "manifest_type": "praxis_contact_lookup_update_search_gap_loop20_seed_experimental",
+  "selection_rule": "Top residual contact lookup/update/search CRUD cases from the first250 combined-policy gate, prioritized by outcome regression, score regression, and missing helper visibility. Experimental development only; not final claim evidence.",
+  "source_gap_packet": "artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_first250_gap_packets.json",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "splits": {
+    "confirm_100": [],
+    "mechanism_12": [
+      {
+        "name": "search_sender_phone_number_with_content_10_distraction_tools"
+      },
+      {
+        "name": "search_phone_number_with_name"
+      },
+      {
+        "name": "search_name_with_relationship"
+      },
+      {
+        "name": "search_phone_number_with_name_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools"
+      }
+    ],
+    "mechanism_40": [
+      {
+        "name": "search_sender_phone_number_with_content_10_distraction_tools"
+      },
+      {
+        "name": "search_phone_number_with_name"
+      },
+      {
+        "name": "search_name_with_relationship"
+      },
+      {
+        "name": "search_phone_number_with_name_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools"
+      }
+    ]
+  }
+}

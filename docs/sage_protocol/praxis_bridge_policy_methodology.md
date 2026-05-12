@@ -179,16 +179,27 @@ Use this classification table in Chapter 3 and review reports:
 ## Current Validation Posture
 
 The earlier registry-only repair is clean and promising, but it did not recover
-the highest canonical lift. The combined policy is the proper way to recover
-the high-lift Praxis behavior because it restores the missing SAGE operating
-rules that make retained tools usable in natural runs.
+the highest canonical lift. The combined policy recovered that behavior because
+it restores the missing SAGE operating rules that make retained tools usable in
+natural runs.
 
-This branch is validating the combined treatment with the frozen high-lift
-registry and `SAGE_PRAXIS_BRIDGE_POLICY=combined`. Protected-claim promotion
-still requires clean matched formal validation with zero side-effect incidents.
+The completed combined-treatment formal500 gate used the frozen high-lift
+registry, `SAGE_PRAXIS_BRIDGE_POLICY=combined`, read-only RapidAPI external
+service cache, cached controls, fresh candidate execution, generation off,
+OpenAI response cache disabled, routing evidence disabled, and no diagnostic
+force-call environment variables.
 
-The latest same-code broad60 recovery gate used read-only RapidAPI external
-service cache and produced canonical lift `+18.1%` and outcome lift `+51.2%`
-with zero runtime or generated-tool failures. This is an encouraging scale-gate
-signal, not protected final evidence; the next expensive validation should be a
-clean 100 or 250 gate before any formal500 spend.
+Formal500 result:
+
+- Canonical/reference: `0.670025 -> 0.757369`, delta `+0.087344`, relative lift `+13.04%`.
+- Outcome/task completion: `0.594872 -> 0.839943`, delta `+0.245071`, relative lift `+41.20%`.
+- Runtime exceptions: `0`.
+- Helper failures / side-effect incidents: `0 / 0`.
+- Natural helper-called scenarios: `230`.
+- Run root: `outputs/praxis_combined_bridge_policy/formal500_full_v2_bridge_repair_rapid_cache_polars1/full_benchmark_20260511_190013`.
+- Task Compare dashboard: `http://127.0.0.1:62543/outputs/praxis_combined_bridge_policy/formal500_full_v2_bridge_repair_rapid_cache_polars1/full_benchmark_20260511_190013/dashboard/task_compare.html`.
+
+This is a positive combined-treatment formal500 review result, not a
+registry-only protected claim. Protected-claim promotion still requires a
+dedicated matched ablation transaction under the same committed runtime,
+including best3, V2.6, Praxis registry-only, and Praxis combined-policy arms.

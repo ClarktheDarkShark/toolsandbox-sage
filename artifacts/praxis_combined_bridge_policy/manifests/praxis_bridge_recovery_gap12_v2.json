@@ -1,0 +1,59 @@
+{
+  "manifest_type": "praxis_combined_bridge_policy_recovery_gap12_v2",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "selection_rule": "Twelve mechanism tasks selected from the first250 gate gap analysis after restoring feature-flagged bridge-policy components. Selected to stress reminder recency, scheduling, contact CRUD retention, contact lookup, and state precondition behavior. Not claim evidence; no labels inspected for selection; baseline/control must use task-level cache when eligible.",
+  "label_inspection": "none",
+  "splits": {
+    "mechanism_12": [
+      {
+        "name": "modify_reminder_with_recency_latest"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools"
+      },
+      {
+        "name": "search_name_with_relationship"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools"
+      }
+    ]
+  },
+  "cohort_diversity_report": {
+    "scenario_count": 12,
+    "families": [
+      "reminder recency action",
+      "reminder scheduling",
+      "contact update",
+      "contact lookup",
+      "contact relationship batch update",
+      "device-state precondition",
+      "send-message precondition"
+    ],
+    "cache_selection": "none"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "manifest_type": "praxis_combined_bridge_policy_targeted_repair_screen",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "selection_rule": "All find_days_till_holiday family scenarios in formal500 positions 1-250; selected to diagnose retiring days_between_timestamps after observed canonical-negative/outcome-neutral calls; not claim evidence.",
+  "label_inspection": "none",
+  "splits": {
+    "mechanism_40": [
+      {
+        "name": "find_days_till_holiday"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information"
+      },
+      {
+        "name": "find_days_till_holiday_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      }
+    ]
+  },
+  "cohort_diversity_report": {
+    "scenario_count": 15,
+    "family": "find_days_till_holiday variants through formal250 prefix",
+    "cache_selection": "none; controls cached only after task selection"
+  }
+}

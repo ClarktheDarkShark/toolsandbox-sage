@@ -1,0 +1,83 @@
+{
+  "manifest_type": "praxis_combined_bridge_policy_targeted_recovery_diagnostic",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "source_split": "full_benchmark",
+  "selection_rule": "Targeted mechanism diagnostic selected from formal500 scenarios where the prior high-lift Praxis run used device-state/contact-lookup/contact-update helpers more successfully than the current 250 gate. This is not claim evidence; no truth labels or expected answers are encoded into tools or runtime policy.",
+  "label_inspection": "none for repair; scenario names used only to target visible adoption and side-effect preservation mechanisms",
+  "splits": {
+    "mechanism_40": [
+      {
+        "name": "find_days_till_holiday_wifi_off"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "search_name_with_relationship"
+      },
+      {
+        "name": "search_name_with_relationship_10_distraction_tools"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_relationship_with_phone_number"
+      },
+      {
+        "name": "search_relationship_with_phone_number_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt"
+      }
+    ]
+  },
+  "cohort_diversity_report": {
+    "scenario_count": 20,
+    "families": [
+      "device-state preconditions",
+      "direct device-state setters",
+      "contact lookup",
+      "contact update from message recency",
+      "reminder scheduling with device-state precondition"
+    ],
+    "near_duplicate_assessment": "Mechanism-targeted by design, but includes five task buckets and multiple perturbation styles; not suitable as broad evidence.",
+    "cache_selection": "none; controls may be cached only after task selection"
+  }
+}

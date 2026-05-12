@@ -1,0 +1,198 @@
+{
+  "manifest_type": "praxis_combined_bridge_policy_broad_scrambled60_recovery_gate",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "source_split": "full_benchmark",
+  "selection_rule": "Contiguous formal500 positions 191-250 selected before this run as a broad scrambled-tool/argument stress gate after a targeted mechanism20 repair passed. This is not claim evidence; no labels inspected and no cache-based task selection.",
+  "label_inspection": "none",
+  "splits": {
+    "mechanism_60": [
+      {
+        "name": "search_name_with_relationship_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_phone_number_with_name_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_relationship_with_phone_number_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "wifi_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "cellular_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "get_cellular_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "get_wifi_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_with_id_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_phone_number_with_name_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_relationship_with_phone_number_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      }
+    ]
+  },
+  "cohort_diversity_report": {
+    "scenario_count": 60,
+    "formal_positions": "191-250 inclusive, one-indexed",
+    "families": "contiguous formal order block spanning contact lookup, reminders, messages, device state, contact CRUD, insufficient-information, and scrambled argument variants",
+    "near_duplicate_assessment": "Contains perturbation variants by construction but is a contiguous locked formal-order stress block rather than a cache-selected or outcome-selected cohort.",
+    "cache_selection": "none; controls may be cached only after task selection"
+  }
+}

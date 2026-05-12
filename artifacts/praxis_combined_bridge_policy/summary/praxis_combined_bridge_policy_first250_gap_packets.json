@@ -1,0 +1,5090 @@
+{
+  "artifact_type": "praxis_combined_bridge_policy_first250_gap_packets",
+  "cache_policy": {
+    "cached_control_tasks": 250,
+    "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "controls": "task-level cache use-if-eligible",
+    "fresh_control_tasks": 0,
+    "openai_response_cache": "disabled",
+    "rapidapi": "read-only external-service fixture, not task cache",
+    "sage_candidate_task_cache": "off"
+  },
+  "labels_inspected": false,
+  "overall": {
+    "outcome_delta": 0.21320232114497648,
+    "outcome_gains": 129,
+    "outcome_regressions": 23,
+    "runtime_exception_count": 0,
+    "scenario_count": 250,
+    "score_delta": 0.07990944607807765,
+    "score_gains": 162,
+    "score_regressions": 57
+  },
+  "ranked_gap_buckets": [
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_count": 26,
+      "negative_outcome_mass": 6.642008883547336,
+      "negative_score_mass": 5.1316959209278945,
+      "no_visible_helper_count": 55,
+      "outcome_gain_count": 42,
+      "outcome_preserved_count": 25,
+      "outcome_regression_count": 14,
+      "positive_outcome_mass": 11.624015103775147,
+      "positive_score_mass": 9.149972791267423,
+      "runtime_exception_count": 0,
+      "scenario_count": 81,
+      "score_gain_count": 54,
+      "score_preserved_count": 7,
+      "score_regression_count": 20,
+      "top_outcome_regressions": [
+        {
+          "called_tools": [],
+          "outcome_delta": -1.0,
+          "scenario": "search_sender_phone_number_with_content_10_distraction_tools",
+          "score_delta": 0.005383536744615225,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.8421052631578947,
+          "scenario": "search_phone_number_with_name",
+          "score_delta": 1.1102230246251565e-16,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [
+            "plan_contact_lookup_query"
+          ],
+          "outcome_delta": -0.7339267902722911,
+          "scenario": "search_name_with_relationship",
+          "score_delta": 0.2793972175335532,
+          "visible_tools": [
+            "plan_contact_lookup_query"
+          ]
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.7142857142857143,
+          "scenario": "search_phone_number_with_name_10_distraction_tools",
+          "score_delta": 0.009309870787587826,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.5,
+          "scenario": "update_contact_with_id_and_phone_number_10_distraction_tools",
+          "score_delta": -0.02446709249436607,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.5,
+          "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools",
+          "score_delta": -0.029037298287861724,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.5,
+          "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.014142720359317296,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [
+            "plan_contact_lookup_query"
+          ],
+          "outcome_delta": -0.48431568431568434,
+          "scenario": "search_name_with_relationship_3_distraction_tools",
+          "score_delta": 0.6976098678708871,
+          "visible_tools": [
+            "plan_contact_lookup_query"
+          ]
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.4375,
+          "scenario": "update_contact_with_id_and_phone_number",
+          "score_delta": 0.015201065543701153,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.29249178588737795,
+          "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn",
+          "score_delta": -0.35870781392795803,
+          "visible_tools": []
+        }
+      ],
+      "top_score_regressions": [
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+          "score_delta": -1.0,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools",
+          "score_delta": -1.0,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.8,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+          "score_delta": -0.6363636363636364,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools",
+          "score_delta": -0.5714285714285714,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.29249178588737795,
+          "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn",
+          "score_delta": -0.35870781392795803,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [
+            "plan_contact_relationship_batch_update"
+          ],
+          "outcome_delta": -0.2672901354709374,
+          "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.31149486385980574,
+          "visible_tools": [
+            "plan_contact_relationship_batch_update"
+          ]
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.23585623741414008,
+          "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools",
+          "score_delta": -0.22164549423239477,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools",
+          "score_delta": -0.08333333333333333,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.5,
+          "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools",
+          "score_delta": -0.029037298287861724,
+          "visible_tools": []
+        }
+      ],
+      "top_unhelped_cases": [
+        {
+          "called_tools": [],
+          "outcome_delta": -1.0,
+          "scenario": "search_sender_phone_number_with_content_10_distraction_tools",
+          "score_delta": 0.005383536744615225,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.8421052631578947,
+          "scenario": "search_phone_number_with_name",
+          "score_delta": 1.1102230246251565e-16,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.7142857142857143,
+          "scenario": "search_phone_number_with_name_10_distraction_tools",
+          "score_delta": 0.009309870787587826,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.5,
+          "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools",
+          "score_delta": -0.029037298287861724,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.5,
+          "scenario": "update_contact_with_id_and_phone_number_10_distraction_tools",
+          "score_delta": -0.02446709249436607,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.5,
+          "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.014142720359317296,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.4375,
+          "scenario": "update_contact_with_id_and_phone_number",
+          "score_delta": 0.015201065543701153,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.29249178588737795,
+          "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn",
+          "score_delta": -0.35870781392795803,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.23585623741414008,
+          "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools",
+          "score_delta": -0.22164549423239477,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": -0.07092014542516695,
+          "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools",
+          "score_delta": -0.0021962860928725902,
+          "visible_tools": []
+        }
+      ],
+      "visible_not_called_count": 0
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_count": 18,
+      "negative_outcome_mass": 2.085714285714286,
+      "negative_score_mass": 2.4792693583190406,
+      "no_visible_helper_count": 35,
+      "outcome_gain_count": 30,
+      "outcome_preserved_count": 17,
+      "outcome_regression_count": 6,
+      "positive_outcome_mass": 4.728769154719876,
+      "positive_score_mass": 4.055742277886289,
+      "runtime_exception_count": 0,
+      "scenario_count": 53,
+      "score_gain_count": 41,
+      "score_preserved_count": 0,
+      "score_regression_count": 12,
+      "top_outcome_regressions": [
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.5333333333333333,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools",
+          "score_delta": -0.42,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.3333333333333333,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+          "score_delta": -0.22499999999999998,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.3333333333333333,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools",
+          "score_delta": -0.2533333333333333,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.3333333333333333,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+          "score_delta": -0.2,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ],
+          "outcome_delta": -0.2857142857142857,
+          "scenario": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.36125121717881925,
+          "visible_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.26666666666666666,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.18,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        }
+      ],
+      "top_score_regressions": [
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.5333333333333333,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools",
+          "score_delta": -0.42,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ],
+          "outcome_delta": -0.2857142857142857,
+          "scenario": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.36125121717881925,
+          "visible_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ]
+        },
+        {
+          "called_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ],
+          "outcome_delta": 0.0,
+          "scenario": "find_days_till_holiday_wifi_off",
+          "score_delta": -0.33333333333333326,
+          "visible_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.3333333333333333,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools",
+          "score_delta": -0.2533333333333333,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.3333333333333333,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+          "score_delta": -0.22499999999999998,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ],
+          "outcome_delta": 0.0,
+          "scenario": "find_days_till_holiday_wifi_off_10_distraction_tools",
+          "score_delta": -0.20000000000000018,
+          "visible_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.3333333333333333,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+          "score_delta": -0.2,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.26666666666666666,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.18,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ],
+          "outcome_delta": 0.0,
+          "scenario": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_type_scrambled",
+          "score_delta": -0.15714285714285714,
+          "visible_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ]
+        },
+        {
+          "called_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ],
+          "outcome_delta": 0.0,
+          "scenario": "find_days_till_holiday_wifi_off_3_distraction_tools",
+          "score_delta": -0.12857142857142856,
+          "visible_tools": [
+            "plan_device_state_action_sequence_v3",
+            "days_between_timestamps"
+          ]
+        }
+      ],
+      "top_unhelped_cases": [
+        {
+          "called_tools": [],
+          "outcome_delta": 0.0,
+          "scenario": "get_cellular",
+          "score_delta": -0.01579899856198108,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": 0.0,
+          "scenario": "get_cellular_3_distraction_tools_arg_type_scrambled",
+          "score_delta": -0.004838190197287373,
+          "visible_tools": []
+        }
+      ],
+      "visible_not_called_count": 0
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_count": 51,
+      "negative_outcome_mass": 0.35462938734661487,
+      "negative_score_mass": 0.1976211515280808,
+      "no_visible_helper_count": 5,
+      "outcome_gain_count": 46,
+      "outcome_preserved_count": 7,
+      "outcome_regression_count": 3,
+      "positive_outcome_mass": 27.400505857884692,
+      "positive_score_mass": 13.515609752376355,
+      "runtime_exception_count": 0,
+      "scenario_count": 56,
+      "score_gain_count": 46,
+      "score_preserved_count": 6,
+      "score_regression_count": 4,
+      "top_outcome_regressions": [
+        {
+          "called_tools": [
+            "resolve_search_window_or_bounds"
+          ],
+          "outcome_delta": -0.17031566185641878,
+          "scenario": "search_reminder_with_recency_upcoming_3_distraction_tools_arg_description_scrambled",
+          "score_delta": 0.0141295054037196,
+          "visible_tools": [
+            "resolve_search_window_or_bounds"
+          ]
+        },
+        {
+          "called_tools": [
+            "next_weekday_time_to_timestamp"
+          ],
+          "outcome_delta": -0.11764705882352941,
+          "scenario": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.05882352941176472,
+          "visible_tools": [
+            "next_weekday_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.06666666666666667,
+          "scenario": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.033333333333333326,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        }
+      ],
+      "top_score_regressions": [
+        {
+          "called_tools": [
+            "resolve_search_window_or_bounds"
+          ],
+          "outcome_delta": 0.1391415486811285,
+          "scenario": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.08165476497345892,
+          "visible_tools": [
+            "resolve_search_window_or_bounds"
+          ]
+        },
+        {
+          "called_tools": [
+            "next_weekday_time_to_timestamp"
+          ],
+          "outcome_delta": -0.11764705882352941,
+          "scenario": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.05882352941176472,
+          "visible_tools": [
+            "next_weekday_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": -0.06666666666666667,
+          "scenario": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.033333333333333326,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": 0.0,
+          "scenario": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.023809523809523836,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        }
+      ],
+      "top_unhelped_cases": [],
+      "visible_not_called_count": 0
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_count": 1,
+      "negative_outcome_mass": 0.0,
+      "negative_score_mass": 7.590597461395424,
+      "no_visible_helper_count": 34,
+      "outcome_gain_count": 0,
+      "outcome_preserved_count": 35,
+      "outcome_regression_count": 0,
+      "positive_outcome_mass": 0.0,
+      "positive_score_mass": 2.4140464798359536,
+      "runtime_exception_count": 0,
+      "scenario_count": 35,
+      "score_gain_count": 5,
+      "score_preserved_count": 14,
+      "score_regression_count": 16,
+      "top_outcome_regressions": [],
+      "top_score_regressions": [
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools",
+          "score_delta": -0.8333333333333334,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.7142857142857143,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+          "score_delta": -0.7142857142857143,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information",
+          "score_delta": -0.7,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_10_distraction_tools",
+          "score_delta": -0.6842105263157895,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+          "score_delta": -0.65,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [
+            "relative_day_time_to_timestamp"
+          ],
+          "outcome_delta": null,
+          "scenario": "modify_reminder_with_recency_latest_insufficient_information",
+          "score_delta": -0.6129032258064516,
+          "visible_tools": [
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+          "score_delta": -0.5833333333333334,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.42857142857142855,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "remove_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+          "score_delta": -0.42105263157894735,
+          "visible_tools": []
+        }
+      ],
+      "top_unhelped_cases": [
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools",
+          "score_delta": -0.8333333333333334,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.7142857142857143,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+          "score_delta": -0.7142857142857143,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information",
+          "score_delta": -0.7,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_10_distraction_tools",
+          "score_delta": -0.6842105263157895,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+          "score_delta": -0.65,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+          "score_delta": -0.5833333333333334,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.42857142857142855,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "remove_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+          "score_delta": -0.42105263157894735,
+          "visible_tools": []
+        },
+        {
+          "called_tools": [],
+          "outcome_delta": null,
+          "scenario": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.4166666666666667,
+          "visible_tools": []
+        }
+      ],
+      "visible_not_called_count": 0
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_count": 5,
+      "negative_outcome_mass": 0.0,
+      "negative_score_mass": 1.3711869396517193,
+      "no_visible_helper_count": 10,
+      "outcome_gain_count": 1,
+      "outcome_preserved_count": 14,
+      "outcome_regression_count": 0,
+      "positive_outcome_mass": 0.08333333333333337,
+      "positive_score_mass": 2.7648809523809526,
+      "runtime_exception_count": 0,
+      "scenario_count": 15,
+      "score_gain_count": 5,
+      "score_preserved_count": 5,
+      "score_regression_count": 5,
+      "top_outcome_regressions": [],
+      "top_score_regressions": [
+        {
+          "called_tools": [
+            "days_between_timestamps"
+          ],
+          "outcome_delta": 0.08333333333333337,
+          "scenario": "find_days_till_holiday_3_distraction_tools_arg_description_scrambled",
+          "score_delta": -0.4775361460009254,
+          "visible_tools": [
+            "days_between_timestamps"
+          ]
+        },
+        {
+          "called_tools": [
+            "days_between_timestamps"
+          ],
+          "outcome_delta": 0.0,
+          "scenario": "find_days_till_holiday_3_distraction_tools_arg_type_scrambled",
+          "score_delta": -0.25,
+          "visible_tools": [
+            "days_between_timestamps"
+          ]
+        },
+        {
+          "called_tools": [
+            "days_between_timestamps"
+          ],
+          "outcome_delta": 0.0,
+          "scenario": "find_days_till_holiday_3_distraction_tools",
+          "score_delta": -0.22499999999999998,
+          "visible_tools": [
+            "days_between_timestamps"
+          ]
+        },
+        {
+          "called_tools": [
+            "days_between_timestamps"
+          ],
+          "outcome_delta": 0.0,
+          "scenario": "find_days_till_holiday",
+          "score_delta": -0.22222222222222232,
+          "visible_tools": [
+            "days_between_timestamps"
+          ]
+        },
+        {
+          "called_tools": [
+            "days_between_timestamps"
+          ],
+          "outcome_delta": 0.0,
+          "scenario": "find_days_till_holiday_10_distraction_tools",
+          "score_delta": -0.1964285714285715,
+          "visible_tools": [
+            "days_between_timestamps"
+          ]
+        }
+      ],
+      "top_unhelped_cases": [],
+      "visible_not_called_count": 0
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_count": 10,
+      "negative_outcome_mass": 0.0,
+      "negative_score_mass": 0.0,
+      "no_visible_helper_count": 0,
+      "outcome_gain_count": 10,
+      "outcome_preserved_count": 0,
+      "outcome_regression_count": 0,
+      "positive_outcome_mass": 5.754170124440717,
+      "positive_score_mass": 4.847480097594599,
+      "runtime_exception_count": 0,
+      "scenario_count": 10,
+      "score_gain_count": 10,
+      "score_preserved_count": 0,
+      "score_regression_count": 0,
+      "top_outcome_regressions": [],
+      "top_score_regressions": [],
+      "top_unhelped_cases": [],
+      "visible_not_called_count": 0
+    }
+  ],
+  "raw_scenario_rows": [
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.95,
+      "control_score": 0.9272458286951905,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.050000000000000044,
+      "scenario": "remove_contact_by_phone",
+      "score_delta": 0.07275417130480955,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 1.0,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "add_reminder_content_and_date_and_time",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.4666666666666667,
+      "control_score": 0.6666666666666666,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.5333333333333333,
+      "scenario": "add_reminder_content_and_week_delta_and_time",
+      "score_delta": 0.33333333333333337,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.0,
+      "control_score": 0.4375,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 1.0,
+      "scenario": "add_reminder_content_and_week_delta_and_time_and_location",
+      "score_delta": 0.5625,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "next_weekday_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.5333333333333333,
+      "control_score": 0.7666666666666667,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.4666666666666667,
+      "scenario": "add_reminder_content_and_weekday_delta_and_time",
+      "score_delta": 0.23333333333333328,
+      "visible_tools": [
+        "next_weekday_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "select_message_counterparty_for_contact_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.8,
+      "control_outcome": 0.047619047619047616,
+      "control_score": 0.4648718662979706,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.9523809523809523,
+      "scenario": "modify_contact_with_message_recency",
+      "score_delta": 0.33512813370202943,
+      "visible_tools": [
+        "select_message_counterparty_for_contact_update"
+      ]
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_tools": [
+        "select_message_content_by_recency"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.4199432077213863,
+      "control_score": 0.5205544427390187,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.5800567922786137,
+      "scenario": "search_message_with_recency_latest",
+      "score_delta": 0.47944555726098126,
+      "visible_tools": [
+        "select_message_content_by_recency"
+      ]
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_tools": [
+        "select_record_by_timestamp_extreme"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.657252160393822,
+      "control_score": 0.8143647020239101,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.34274783960617805,
+      "scenario": "search_message_with_recency_oldest",
+      "score_delta": 0.1856352979760899,
+      "visible_tools": [
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_send_message_contact_lookup"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.9090909090909091,
+      "candidate_score": 0.9748221566586271,
+      "control_outcome": 0.8687945180497023,
+      "control_score": 0.9614548174389848,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.04029639104120675,
+      "scenario": "send_message_with_contact_content_cellular_off",
+      "score_delta": 0.013367339219642393,
+      "visible_tools": [
+        "plan_send_message_contact_lookup"
+      ]
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [
+        "days_between_timestamps"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.727737037578667,
+      "control_outcome": 1.0,
+      "control_score": 0.9499592598008894,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "find_days_till_holiday",
+      "score_delta": -0.22222222222222232,
+      "visible_tools": [
+        "days_between_timestamps"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3",
+        "days_between_timestamps"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.5821896300629337,
+      "control_outcome": 1.0,
+      "control_score": 0.9155229633962669,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "find_days_till_holiday_wifi_off",
+      "score_delta": -0.33333333333333326,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3",
+        "days_between_timestamps"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_relationship_batch_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.983304750543636,
+      "control_outcome": 0.2793724254030587,
+      "control_score": 0.4117353794050289,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.7206275745969413,
+      "scenario": "update_contact_relationship_with_relationship",
+      "score_delta": 0.5715693711386071,
+      "visible_tools": [
+        "plan_contact_relationship_batch_update"
+      ]
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "find_days_till_holiday_insufficient_information",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.6190476190476191,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "modify_contact_with_message_recency_insufficient_information",
+      "score_delta": 0.38095238095238093,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "select_record_by_timestamp_extreme",
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.0,
+      "control_score": 0.5925925925925926,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 1.0,
+      "scenario": "modify_reminder_with_recency_latest",
+      "score_delta": 0.40740740740740744,
+      "visible_tools": [
+        "select_record_by_timestamp_extreme",
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.10526315789473684,
+      "candidate_score": 0.693361242214871,
+      "control_outcome": 0.16858028521286583,
+      "control_score": 0.6141415087893403,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -0.063317127318129,
+      "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information",
+      "score_delta": 0.07921973342553079,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information",
+      "score_delta": -1.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.3,
+      "control_score": 0.7,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.7,
+      "scenario": "remove_reminder_with_recency_latest",
+      "score_delta": 0.30000000000000004,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "send_message_with_contact_content_cellular_off_insufficient_information",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.956671137514194,
+      "control_outcome": 0.8050049115140726,
+      "control_score": 0.8769722911792173,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.1949950884859274,
+      "scenario": "add_contact_with_name_and_phone_number",
+      "score_delta": 0.0796988463349767,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.2,
+      "control_outcome": 0.3333333333333333,
+      "control_score": 0.425,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.3333333333333333,
+      "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt",
+      "score_delta": -0.22499999999999998,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9496443133172543,
+      "control_outcome": 1.0,
+      "control_score": 0.8526523556145821,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "cellular_off",
+      "score_delta": 0.09699195770267222,
+      "visible_tools": []
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.5625,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "find_thanksgiving_timestamp",
+      "score_delta": 0.4375,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9496443133172543,
+      "control_outcome": 1.0,
+      "control_score": 0.9654433118792354,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "get_cellular",
+      "score_delta": -0.01579899856198108,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9367902340968035,
+      "control_outcome": 0.7760141093474426,
+      "control_score": 0.9287578170725342,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.22398589065255736,
+      "scenario": "get_wifi",
+      "score_delta": 0.008032417024269267,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.6129032258064516,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": null,
+      "scenario": "modify_reminder_with_recency_latest_insufficient_information",
+      "score_delta": -0.6129032258064516,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.8889111136575754,
+      "control_outcome": 0.975,
+      "control_score": 0.9070307183478874,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.025000000000000022,
+      "scenario": "remove_contact_with_id",
+      "score_delta": -0.01811960469031204,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.07142857142857142,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "remove_reminder_with_recency_latest_insufficient_information",
+      "score_delta": -0.07142857142857142,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_lookup_query"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.7339267902722911,
+      "control_score": 0.7206027824664468,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.7339267902722911,
+      "scenario": "search_name_with_relationship",
+      "score_delta": 0.2793972175335532,
+      "visible_tools": [
+        "plan_contact_lookup_query"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.9817462422837965,
+      "control_outcome": 0.8421052631578947,
+      "control_score": 0.9817462422837964,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -0.8421052631578947,
+      "scenario": "search_phone_number_with_name",
+      "score_delta": 1.1102230246251565e-16,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_lookup_query"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9217163312118808,
+      "control_outcome": 0.8698358800226372,
+      "control_score": 0.8235116027585302,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.13016411997736277,
+      "scenario": "search_relationship_with_phone_number",
+      "score_delta": 0.0982047284533506,
+      "visible_tools": [
+        "plan_contact_lookup_query"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7637626158259734,
+      "candidate_score": 0.9713613470914607,
+      "control_outcome": 0.33977928050064254,
+      "control_score": 0.8922649709515695,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.42398333532533083,
+      "scenario": "search_reminder_with_creation_recency_yesterday",
+      "score_delta": 0.07909637613989118,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7637626158259734,
+      "candidate_score": 0.9713613470914607,
+      "control_outcome": 0.30138626781466427,
+      "control_score": 0.8640097062112698,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.4623763480113091,
+      "scenario": "search_reminder_with_creation_recency_yesterday_implicit",
+      "score_delta": 0.10735164088019089,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.9325048082403138,
+      "candidate_score": 0.9923251796804173,
+      "control_outcome": 0.5455979282266797,
+      "control_score": 0.8656700810937656,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.38690688001363405,
+      "scenario": "search_reminder_with_recency_upcoming",
+      "score_delta": 0.1266550985866517,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.6575959492214292,
+      "candidate_score": 0.9565334494476591,
+      "control_outcome": 0.6122363241186186,
+      "control_score": 0.8748821749234591,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.04535962510281055,
+      "scenario": "search_reminder_with_recency_upcoming_implicit",
+      "score_delta": 0.08165127452419996,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.05,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_upcoming_insufficient_information",
+      "score_delta": -0.05,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_upcoming_insufficient_information_implicit",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7878385971583354,
+      "candidate_score": 0.9745298984753004,
+      "control_outcome": 0.16818220042632173,
+      "control_score": 0.7529154387481061,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.6196563967320137,
+      "scenario": "search_reminder_with_recency_yesterday",
+      "score_delta": 0.2216144597271943,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7302967433402214,
+      "candidate_score": 0.9668444418161227,
+      "control_outcome": 0.1467568688377947,
+      "control_score": 0.7178793578759769,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.5835398745024267,
+      "scenario": "search_reminder_with_recency_yesterday_implicit",
+      "score_delta": 0.24896508394014583,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.7,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_yesterday_insufficient_information",
+      "score_delta": -0.7,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.65,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit",
+      "score_delta": -0.65,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9367902340968035,
+      "control_outcome": 0.8490909090909091,
+      "control_score": 0.9269867476189388,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.15090909090909088,
+      "scenario": "search_sender_phone_number_with_content",
+      "score_delta": 0.009803486477864665,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9694338714784028,
+      "control_outcome": 0.9861111111111112,
+      "control_score": 0.9423636978439703,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.01388888888888884,
+      "scenario": "send_message_with_phone_number_and_content",
+      "score_delta": 0.027070173634432426,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.9331457592327158,
+      "control_score": 0.8971312957326917,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.06685424076728419,
+      "scenario": "turn_on_cellular_low_battery_mode",
+      "score_delta": 0.10286870426730832,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.8888888888888888,
+      "candidate_score": 0.9578601560645357,
+      "control_outcome": 0.778416282337851,
+      "control_score": 0.8386746301717549,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.11047260655103786,
+      "scenario": "turn_on_cellular_low_battery_mode_implicit",
+      "score_delta": 0.11918552589278075,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.862491930164344,
+      "control_score": 0.8668834834385999,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.137508069835656,
+      "scenario": "turn_on_location_low_battery_mode",
+      "score_delta": 0.1331165165614001,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.7552690652819023,
+      "control_score": 0.8408503533852617,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.2447309347180977,
+      "scenario": "turn_on_location_low_battery_mode_implicit",
+      "score_delta": 0.1591496466147383,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.8812238930659984,
+      "control_score": 0.8814736111157355,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.11877610693400165,
+      "scenario": "turn_on_wifi_low_battery_mode",
+      "score_delta": 0.11852638888426448,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.7308346660060122,
+      "control_score": 0.8271081188947248,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.2691653339939878,
+      "scenario": "turn_on_wifi_low_battery_mode_implicit",
+      "score_delta": 0.1728918811052752,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.135632183908046,
+      "candidate_score": 0.27547031625937934,
+      "control_outcome": 0.42812396979542394,
+      "control_score": 0.6341781301873374,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -0.29249178588737795,
+      "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn",
+      "score_delta": -0.35870781392795803,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.5,
+      "candidate_score": 0.8864019353975985,
+      "control_outcome": 0.9375,
+      "control_score": 0.8712008698538973,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -0.4375,
+      "scenario": "update_contact_with_id_and_phone_number",
+      "score_delta": 0.015201065543701153,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9367902340968035,
+      "control_outcome": 0.8329448329448329,
+      "control_score": 0.8228519862471843,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.1670551670551671,
+      "scenario": "wifi_off",
+      "score_delta": 0.11393824784961926,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 1.0,
+      "control_score": 0.9203708786759321,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "remove_contact_by_phone_10_distraction_tools",
+      "score_delta": 0.07962912132406785,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 1.0,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "add_reminder_content_and_date_and_time_10_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.0,
+      "control_score": 0.5,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 1.0,
+      "scenario": "add_reminder_content_and_week_delta_and_time_10_distraction_tools",
+      "score_delta": 0.5,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.0,
+      "control_score": 0.46153846153846156,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 1.0,
+      "scenario": "add_reminder_content_and_week_delta_and_time_and_location_10_distraction_tools",
+      "score_delta": 0.5384615384615384,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "next_weekday_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.13333333333333333,
+      "control_score": 0.5,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.8666666666666667,
+      "scenario": "add_reminder_content_and_weekday_delta_and_time_10_distraction_tools",
+      "score_delta": 0.5,
+      "visible_tools": [
+        "next_weekday_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "select_message_counterparty_for_contact_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.8,
+      "control_outcome": 0.23019281819771414,
+      "control_score": 0.5088755362144742,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.7698071818022858,
+      "scenario": "modify_contact_with_message_recency_10_distraction_tools",
+      "score_delta": 0.2911244637855258,
+      "visible_tools": [
+        "select_message_counterparty_for_contact_update"
+      ]
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_tools": [
+        "select_message_content_by_recency"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.05420686118162592,
+      "control_score": 0.09801585586209713,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.9457931388183741,
+      "scenario": "search_message_with_recency_latest_10_distraction_tools",
+      "score_delta": 0.9019841441379028,
+      "visible_tools": [
+        "select_message_content_by_recency"
+      ]
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_tools": [
+        "resolve_search_window_or_bounds",
+        "select_record_by_timestamp_extreme"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.6141702565885039,
+      "control_score": 0.6712681389686521,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.3858297434114961,
+      "scenario": "search_message_with_recency_oldest_10_distraction_tools",
+      "score_delta": 0.3287318610313479,
+      "visible_tools": [
+        "resolve_search_window_or_bounds",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_send_message_contact_lookup"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.9090909090909091,
+      "candidate_score": 0.9748221566586271,
+      "control_outcome": 0.8907190370605004,
+      "control_score": 0.9680436034585859,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.018371872030408687,
+      "scenario": "send_message_with_contact_content_cellular_off_10_distraction_tools",
+      "score_delta": 0.006778553200041282,
+      "visible_tools": [
+        "plan_send_message_contact_lookup"
+      ]
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [
+        "days_between_timestamps"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.727737037578667,
+      "control_outcome": 1.0,
+      "control_score": 0.9241656090072385,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "find_days_till_holiday_10_distraction_tools",
+      "score_delta": -0.1964285714285715,
+      "visible_tools": [
+        "days_between_timestamps"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3",
+        "days_between_timestamps"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.7821896300629336,
+      "control_outcome": 1.0,
+      "control_score": 0.9821896300629338,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "find_days_till_holiday_wifi_off_10_distraction_tools",
+      "score_delta": -0.20000000000000018,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3",
+        "days_between_timestamps"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_relationship_batch_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.1599570834796465,
+      "control_score": 0.34307287810777615,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.8400429165203536,
+      "scenario": "update_contact_relationship_with_relationship_10_distraction_tools",
+      "score_delta": 0.6569271218922239,
+      "visible_tools": [
+        "plan_contact_relationship_batch_update"
+      ]
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "find_days_till_holiday_insufficient_information_10_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools",
+      "score_delta": -1.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "select_record_by_timestamp_extreme",
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.0,
+      "control_score": 0.4666666666666667,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 1.0,
+      "scenario": "modify_reminder_with_recency_latest_10_distraction_tools",
+      "score_delta": 0.5333333333333333,
+      "visible_tools": [
+        "select_record_by_timestamp_extreme",
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.17391304347826086,
+      "candidate_score": 0.6716793747481042,
+      "control_outcome": 0.1648429002710057,
+      "control_score": 0.6349713963911152,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.00907014320725516,
+      "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+      "score_delta": 0.036707978356989024,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.6363636363636364,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+      "score_delta": -0.6363636363636364,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.043478260869565216,
+      "control_score": 0.40579710144927533,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.9565217391304348,
+      "scenario": "remove_reminder_with_recency_latest_10_distraction_tools",
+      "score_delta": 0.5942028985507246,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.08333333333333333,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools",
+      "score_delta": -0.08333333333333333,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.956671137514194,
+      "control_outcome": 0.7999511383848109,
+      "control_score": 0.8962527699947151,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.2000488616151891,
+      "scenario": "add_contact_with_name_and_phone_number_10_distraction_tools",
+      "score_delta": 0.06041836751947882,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.2,
+      "control_outcome": 0.3333333333333333,
+      "control_score": 0.4533333333333333,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.3333333333333333,
+      "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools",
+      "score_delta": -0.2533333333333333,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9496443133172543,
+      "control_outcome": 1.0,
+      "control_score": 0.8727363831552498,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "cellular_off_10_distraction_tools",
+      "score_delta": 0.07690793016200448,
+      "visible_tools": []
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.7142857142857143,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "find_thanksgiving_timestamp_10_distraction_tools",
+      "score_delta": 0.2857142857142857,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9641588839091166,
+      "control_outcome": 1.0,
+      "control_score": 0.9552268404679706,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "get_cellular_10_distraction_tools",
+      "score_delta": 0.008932043441146065,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9367902340968035,
+      "control_outcome": 0.8683760683760684,
+      "control_score": 0.9243798626255688,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.1316239316239316,
+      "scenario": "get_wifi_10_distraction_tools",
+      "score_delta": 0.012410371471234694,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.3684210526315789,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "modify_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+      "score_delta": 0.631578947368421,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.8889111136575754,
+      "control_outcome": 1.0,
+      "control_score": 0.9133863329488463,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "remove_contact_with_id_10_distraction_tools",
+      "score_delta": -0.024475219291270944,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.42105263157894735,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "remove_reminder_with_recency_latest_insufficient_information_10_distraction_tools",
+      "score_delta": -0.42105263157894735,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_lookup_query"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.6625301329788474,
+      "control_score": 0.4008667741625117,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.33746986702115256,
+      "scenario": "search_name_with_relationship_10_distraction_tools",
+      "score_delta": 0.5991332258374883,
+      "visible_tools": [
+        "plan_contact_lookup_query"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.9817462422837965,
+      "control_outcome": 0.7142857142857143,
+      "control_score": 0.9724363714962087,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -0.7142857142857143,
+      "scenario": "search_phone_number_with_name_10_distraction_tools",
+      "score_delta": 0.009309870787587826,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_lookup_query"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9217163312118808,
+      "control_outcome": 0.8571428571428571,
+      "control_score": 0.7856957471218752,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.1428571428571429,
+      "scenario": "search_relationship_with_phone_number_10_distraction_tools",
+      "score_delta": 0.13602058409000561,
+      "visible_tools": [
+        "plan_contact_lookup_query"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7637626158259734,
+      "candidate_score": 0.9713613470914607,
+      "control_outcome": 0.2948173879451541,
+      "control_score": 0.7995207951450166,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.46894522788081927,
+      "scenario": "search_reminder_with_creation_recency_yesterday_10_distraction_tools",
+      "score_delta": 0.1718405519464441,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7637626158259734,
+      "candidate_score": 0.9713613470914607,
+      "control_outcome": 0.3924222570823013,
+      "control_score": 0.8382232917171465,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.3713403587436721,
+      "scenario": "search_reminder_with_creation_recency_yesterday_implicit_10_distraction_tools",
+      "score_delta": 0.13313805537431422,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_10_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7559289460184545,
+      "candidate_score": 0.9782184223445256,
+      "control_outcome": 0.3907589176993303,
+      "control_score": 0.40864299722541264,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.3651700283191242,
+      "scenario": "search_reminder_with_recency_upcoming_10_distraction_tools",
+      "score_delta": 0.569575425119113,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7844645405527361,
+      "candidate_score": 0.9740897808996692,
+      "control_outcome": 0.5205595210408483,
+      "control_score": 0.666158573761395,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.2639050195118877,
+      "scenario": "search_reminder_with_recency_upcoming_implicit_10_distraction_tools",
+      "score_delta": 0.30793120713827427,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_upcoming_insufficient_information_10_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_upcoming_insufficient_information_implicit_10_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.6666666666666666,
+      "candidate_score": 0.965208447415438,
+      "control_outcome": 0.19582463437239048,
+      "control_score": 0.7421370486295361,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.4708420322942761,
+      "scenario": "search_reminder_with_recency_yesterday_10_distraction_tools",
+      "score_delta": 0.22307139878590188,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.6831300510639732,
+      "candidate_score": 0.9602377028018633,
+      "control_outcome": 0.22721404606525264,
+      "control_score": 0.6320941847111743,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.45591600499872054,
+      "scenario": "search_reminder_with_recency_yesterday_implicit_10_distraction_tools",
+      "score_delta": 0.328143518090689,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.6842105263157895,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_yesterday_insufficient_information_10_distraction_tools",
+      "score_delta": -0.6842105263157895,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.21052631578947367,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_10_distraction_tools",
+      "score_delta": -0.21052631578947367,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.9367902340968035,
+      "control_outcome": 1.0,
+      "control_score": 0.9314066973521883,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -1.0,
+      "scenario": "search_sender_phone_number_with_content_10_distraction_tools",
+      "score_delta": 0.005383536744615225,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9412935369625568,
+      "control_outcome": 1.0,
+      "control_score": 0.9490707704275286,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "send_message_with_phone_number_and_content_10_distraction_tools",
+      "score_delta": -0.007777233464971833,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 1.0,
+      "control_score": 0.9173689650572578,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "turn_on_cellular_low_battery_mode_10_distraction_tools",
+      "score_delta": 0.08263103494274215,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.8347753361458357,
+      "control_score": 0.876060614655292,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.16522466385416434,
+      "scenario": "turn_on_cellular_low_battery_mode_implicit_10_distraction_tools",
+      "score_delta": 0.12393938534470805,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 1.0,
+      "control_score": 0.8949863052000094,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "turn_on_location_low_battery_mode_10_distraction_tools",
+      "score_delta": 0.10501369479999056,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.8676683881362244,
+      "control_score": 0.840549798785955,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.13233161186377562,
+      "scenario": "turn_on_location_low_battery_mode_implicit_10_distraction_tools",
+      "score_delta": 0.15945020121404496,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.9349019607843138,
+      "control_score": 0.8969263288975449,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.06509803921568624,
+      "scenario": "turn_on_wifi_low_battery_mode_10_distraction_tools",
+      "score_delta": 0.10307367110245513,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.6749697881047528,
+      "control_score": 0.7696351123530859,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.32503021189524717,
+      "scenario": "turn_on_wifi_low_battery_mode_implicit_10_distraction_tools",
+      "score_delta": 0.2303648876469141,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.2833333333333333,
+      "candidate_score": 0.5021745812308998,
+      "control_outcome": 0.3542534787585003,
+      "control_score": 0.5043708673237723,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -0.07092014542516695,
+      "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools",
+      "score_delta": -0.0021962860928725902,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.5,
+      "candidate_score": 0.8684031464052085,
+      "control_outcome": 1.0,
+      "control_score": 0.8928702388995746,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -0.5,
+      "scenario": "update_contact_with_id_and_phone_number_10_distraction_tools",
+      "score_delta": -0.02446709249436607,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9367902340968035,
+      "control_outcome": 0.8482142857142857,
+      "control_score": 0.8192906844348877,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.1517857142857143,
+      "scenario": "wifi_off_10_distraction_tools",
+      "score_delta": 0.11749954966191578,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.6989389920424404,
+      "control_score": 0.8617205692251951,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.30106100795755963,
+      "scenario": "remove_contact_by_phone_3_distraction_tools",
+      "score_delta": 0.13827943077480487,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 1.0,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "add_reminder_content_and_date_and_time_3_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.23076923076923078,
+      "control_score": 0.6153846153846154,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.7692307692307692,
+      "scenario": "add_reminder_content_and_week_delta_and_time_3_distraction_tools",
+      "score_delta": 0.3846153846153846,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.0,
+      "control_score": 0.4166666666666667,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 1.0,
+      "scenario": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
+      "score_delta": 0.5833333333333333,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "next_weekday_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.4666666666666667,
+      "control_score": 0.7,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.5333333333333333,
+      "scenario": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools",
+      "score_delta": 0.30000000000000004,
+      "visible_tools": [
+        "next_weekday_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "select_message_counterparty_for_contact_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.8,
+      "control_outcome": 0.10526315789473684,
+      "control_score": 0.5051089040697297,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.8947368421052632,
+      "scenario": "modify_contact_with_message_recency_3_distraction_tools",
+      "score_delta": 0.2948910959302703,
+      "visible_tools": [
+        "select_message_counterparty_for_contact_update"
+      ]
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_tools": [
+        "select_message_content_by_recency"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.011932272535059428,
+      "control_score": 0.0625,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.9880677274649405,
+      "scenario": "search_message_with_recency_latest_3_distraction_tools",
+      "score_delta": 0.9375,
+      "visible_tools": [
+        "select_message_content_by_recency"
+      ]
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_tools": [
+        "resolve_search_window_or_bounds",
+        "select_record_by_timestamp_extreme"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.5082162671937394,
+      "control_score": 0.5732747480375509,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.49178373280626064,
+      "scenario": "search_message_with_recency_oldest_3_distraction_tools",
+      "score_delta": 0.42672525196244915,
+      "visible_tools": [
+        "resolve_search_window_or_bounds",
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_send_message_contact_lookup"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.9090909090909091,
+      "candidate_score": 0.9748221566586271,
+      "control_outcome": 0.8481132276044419,
+      "control_score": 0.9526811144712914,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.060977681486467206,
+      "scenario": "send_message_with_contact_content_cellular_off_3_distraction_tools",
+      "score_delta": 0.022141042187335702,
+      "visible_tools": [
+        "plan_send_message_contact_lookup"
+      ]
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [
+        "days_between_timestamps"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.727737037578667,
+      "control_outcome": 1.0,
+      "control_score": 0.952737037578667,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "find_days_till_holiday_3_distraction_tools",
+      "score_delta": -0.22499999999999998,
+      "visible_tools": [
+        "days_between_timestamps"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3",
+        "days_between_timestamps"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.7821896300629336,
+      "control_outcome": 1.0,
+      "control_score": 0.9107610586343622,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "find_days_till_holiday_wifi_off_3_distraction_tools",
+      "score_delta": -0.12857142857142856,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3",
+        "days_between_timestamps"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_relationship_batch_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.983304750543636,
+      "control_outcome": 0.4160687339269394,
+      "control_score": 0.6297616060422664,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.5839312660730607,
+      "scenario": "update_contact_relationship_with_relationship_3_distraction_tools",
+      "score_delta": 0.3535431445013696,
+      "visible_tools": [
+        "plan_contact_relationship_batch_update"
+      ]
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "find_days_till_holiday_insufficient_information_3_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "select_record_by_timestamp_extreme",
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.0,
+      "control_score": 0.5897435897435896,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 1.0,
+      "scenario": "modify_reminder_with_recency_latest_3_distraction_tools",
+      "score_delta": 0.41025641025641035,
+      "visible_tools": [
+        "select_record_by_timestamp_extreme",
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.16666666666666666,
+      "candidate_score": 0.6626014796630167,
+      "control_outcome": 0.12675754287090987,
+      "control_score": 0.6143740562871546,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.039909123795756785,
+      "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools",
+      "score_delta": 0.048227423375862166,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.625,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+      "score_delta": 0.375,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.6153846153846154,
+      "control_score": 0.6923076923076923,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.3846153846153846,
+      "scenario": "remove_reminder_with_recency_latest_3_distraction_tools",
+      "score_delta": 0.3076923076923077,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.5714285714285714,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools",
+      "score_delta": -0.5714285714285714,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.956671137514194,
+      "control_outcome": 0.9139654981948888,
+      "control_score": 0.9159101830175396,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.08603450180511119,
+      "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools",
+      "score_delta": 0.0407609544966544,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.2,
+      "control_outcome": 0.5333333333333333,
+      "control_score": 0.62,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.5333333333333333,
+      "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools",
+      "score_delta": -0.42,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9496443133172543,
+      "control_outcome": 1.0,
+      "control_score": 0.8458168092789232,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "cellular_off_3_distraction_tools",
+      "score_delta": 0.10382750403833108,
+      "visible_tools": []
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.6666666666666666,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "find_thanksgiving_timestamp_3_distraction_tools",
+      "score_delta": 0.33333333333333337,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9641588839091166,
+      "control_outcome": 1.0,
+      "control_score": 0.9532729559652199,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "get_cellular_3_distraction_tools",
+      "score_delta": 0.010885927943896756,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.954280141608879,
+      "control_outcome": 0.8800000000000001,
+      "control_score": 0.9248618073096921,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.11999999999999988,
+      "scenario": "get_wifi_3_distraction_tools",
+      "score_delta": 0.029418334299186832,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.5,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools",
+      "score_delta": 0.5,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9167251281832597,
+      "control_outcome": 1.0,
+      "control_score": 0.9078609621088192,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "remove_contact_with_id_3_distraction_tools",
+      "score_delta": 0.008864166074440516,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.6818181818181818,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools",
+      "score_delta": 0.31818181818181823,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_lookup_query"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.48431568431568434,
+      "control_score": 0.302390132129113,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.48431568431568434,
+      "scenario": "search_name_with_relationship_3_distraction_tools",
+      "score_delta": 0.6976098678708871,
+      "visible_tools": [
+        "plan_contact_lookup_query"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9817462422837965,
+      "control_outcome": 0.5714285714285714,
+      "control_score": 0.9774905339070136,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.4285714285714286,
+      "scenario": "search_phone_number_with_name_3_distraction_tools",
+      "score_delta": 0.004255708376782907,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_lookup_query"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9217163312118808,
+      "control_outcome": 0.9401709401709402,
+      "control_score": 0.8201968730229954,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.05982905982905984,
+      "scenario": "search_relationship_with_phone_number_3_distraction_tools",
+      "score_delta": 0.10151945818888541,
+      "visible_tools": [
+        "plan_contact_lookup_query"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7637626158259734,
+      "candidate_score": 0.9713613470914607,
+      "control_outcome": 0.6428752327008586,
+      "control_score": 0.954360638819319,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.12088738312511482,
+      "scenario": "search_reminder_with_creation_recency_yesterday_3_distraction_tools",
+      "score_delta": 0.01700070827214173,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7637626158259734,
+      "candidate_score": 0.9713613470914607,
+      "control_outcome": 0.2990897235617898,
+      "control_score": 0.7910765929477285,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.46467289226418357,
+      "scenario": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools",
+      "score_delta": 0.18028475414373224,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.9325048082403138,
+      "candidate_score": 0.9923251796804173,
+      "control_outcome": 0.46062606201478645,
+      "control_score": 0.7924050260427156,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.47187874622552733,
+      "scenario": "search_reminder_with_recency_upcoming_3_distraction_tools",
+      "score_delta": 0.19992015363770177,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7844645405527361,
+      "candidate_score": 0.9740897808996692,
+      "control_outcome": 0.6056978538594597,
+      "control_score": 0.6857039834484974,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.17876668669327633,
+      "scenario": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools",
+      "score_delta": 0.2883857974511719,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.8846517369293827,
+      "candidate_score": 0.9866565062791355,
+      "control_outcome": 0.2648979976559196,
+      "control_score": 0.7947659475316132,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.6197537392734631,
+      "scenario": "search_reminder_with_recency_yesterday_3_distraction_tools",
+      "score_delta": 0.19189055874752226,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.6948083337796511,
+      "candidate_score": 0.9619011481837831,
+      "control_outcome": 0.09409690626381104,
+      "control_score": 0.625,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.6007114275158401,
+      "scenario": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools",
+      "score_delta": 0.33690114818378314,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.8333333333333334,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools",
+      "score_delta": -0.8333333333333334,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.35714285714285715,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools",
+      "score_delta": -0.35714285714285715,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9217163312118808,
+      "control_outcome": 0.8571428571428571,
+      "control_score": 0.9346368193989575,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.1428571428571429,
+      "scenario": "search_sender_phone_number_with_content_3_distraction_tools",
+      "score_delta": -0.012920488187076695,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.954280141608879,
+      "control_outcome": 0.9735576923076923,
+      "control_score": 0.9449503605041651,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.02644230769230771,
+      "scenario": "send_message_with_phone_number_and_content_3_distraction_tools",
+      "score_delta": 0.00932978110471383,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.9287166085946574,
+      "control_score": 0.8925097048520491,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.07128339140534257,
+      "scenario": "turn_on_cellular_low_battery_mode_3_distraction_tools",
+      "score_delta": 0.10749029514795094,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.889021164021164,
+      "control_score": 0.8679383575034407,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.11097883597883595,
+      "scenario": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools",
+      "score_delta": 0.13206164249655927,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.9405864197530863,
+      "control_score": 0.9031542935466996,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.05941358024691368,
+      "scenario": "turn_on_location_low_battery_mode_3_distraction_tools",
+      "score_delta": 0.09684570645330037,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.87665349970505,
+      "control_outcome": 0.7853449091113565,
+      "control_score": 0.8452877799252737,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.21465509088864354,
+      "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools",
+      "score_delta": 0.03136571977977631,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.826500144172558,
+      "control_score": 0.8518858591210227,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.17349985582744198,
+      "scenario": "turn_on_wifi_low_battery_mode_3_distraction_tools",
+      "score_delta": 0.14811414087897734,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.7311458299795014,
+      "control_score": 0.8568096573401612,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.2688541700204986,
+      "scenario": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools",
+      "score_delta": 0.14319034265983877,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.2833333333333333,
+      "candidate_score": 0.5021745812308998,
+      "control_outcome": 0.5191895707474734,
+      "control_score": 0.7238200754632945,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -0.23585623741414008,
+      "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools",
+      "score_delta": -0.22164549423239477,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.5,
+      "candidate_score": 0.8516338717095078,
+      "control_outcome": 1.0,
+      "control_score": 0.8806711699973695,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -0.5,
+      "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools",
+      "score_delta": -0.029037298287861724,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9367902340968035,
+      "control_outcome": 0.95,
+      "control_score": 0.8315916614368417,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.050000000000000044,
+      "scenario": "wifi_off_3_distraction_tools",
+      "score_delta": 0.1051985726599618,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.9333333333333333,
+      "control_score": 0.9148692022887027,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.06666666666666665,
+      "scenario": "remove_contact_by_phone_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.08513079771129728,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 1.0,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "add_reminder_content_and_date_and_time_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.5,
+      "control_outcome": 0.06666666666666667,
+      "control_score": 0.5333333333333333,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.06666666666666667,
+      "scenario": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.033333333333333326,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.3333333333333333,
+      "control_outcome": 0.0,
+      "control_score": 0.35714285714285715,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.023809523809523836,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "next_weekday_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.5,
+      "control_outcome": 0.11764705882352941,
+      "control_score": 0.5588235294117647,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.11764705882352941,
+      "scenario": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.05882352941176472,
+      "visible_tools": [
+        "next_weekday_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "select_message_counterparty_for_contact_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.5,
+      "candidate_score": 0.6,
+      "control_outcome": 0.17096802860787264,
+      "control_score": 0.4568240376021221,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.32903197139212736,
+      "scenario": "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.1431759623978779,
+      "visible_tools": [
+        "select_message_counterparty_for_contact_update"
+      ]
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_tools": [
+        "select_message_content_by_recency"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.5737174253479577,
+      "control_score": 0.8421044222417061,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.42628257465204233,
+      "scenario": "search_message_with_recency_latest_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.15789557775829388,
+      "visible_tools": [
+        "select_message_content_by_recency"
+      ]
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_tools": [
+        "select_record_by_timestamp_extreme"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.7162075578064324,
+      "control_score": 0.7866818812038519,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.2837924421935676,
+      "scenario": "search_message_with_recency_oldest_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.21331811879614815,
+      "visible_tools": [
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_send_message_contact_lookup"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.9032258064516129,
+      "candidate_score": 0.9729942495250252,
+      "control_outcome": 0.896126231492085,
+      "control_score": 0.970323721065048,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0070995749595278435,
+      "scenario": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.002670528459977173,
+      "visible_tools": [
+        "plan_send_message_contact_lookup"
+      ]
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [
+        "days_between_timestamps"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.47773703757866703,
+      "control_outcome": 0.9166666666666666,
+      "control_score": 0.9552731835795925,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.08333333333333337,
+      "scenario": "find_days_till_holiday_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.4775361460009254,
+      "visible_tools": [
+        "days_between_timestamps"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3",
+        "days_between_timestamps"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.5,
+      "candidate_score": 0.4,
+      "control_outcome": 0.7857142857142857,
+      "control_score": 0.7612512171788193,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.2857142857142857,
+      "scenario": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.36125121717881925,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3",
+        "days_between_timestamps"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_relationship_batch_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.983304750543636,
+      "control_outcome": 0.4889715029384056,
+      "control_score": 0.6571236546655008,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.5110284970615944,
+      "scenario": "update_contact_relationship_with_relationship_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.32618109587813515,
+      "visible_tools": [
+        "plan_contact_relationship_batch_update"
+      ]
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.9090909090909091,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.09090909090909094,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "select_record_by_timestamp_extreme",
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.0,
+      "control_score": 0.6349206349206349,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 1.0,
+      "scenario": "modify_reminder_with_recency_latest_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.3650793650793651,
+      "visible_tools": [
+        "select_record_by_timestamp_extreme",
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.1707317073170732,
+      "candidate_score": 0.7314279364584086,
+      "control_outcome": 0.16171506250797296,
+      "control_score": 0.6249216265098756,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.00901664480910025,
+      "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.10650630994853305,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.8,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.8,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.38095238095238093,
+      "control_score": 0.5714285714285714,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.6190476190476191,
+      "scenario": "remove_reminder_with_recency_latest_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.4285714285714286,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.8571428571428571,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.1428571428571429,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9496443133172543,
+      "control_outcome": 0.8678059536693312,
+      "control_score": 0.9168657041584147,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.13219404633066878,
+      "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.03277860915883957,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.2,
+      "control_outcome": 0.26666666666666666,
+      "control_score": 0.38,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.26666666666666666,
+      "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.18,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9496443133172543,
+      "control_outcome": 1.0,
+      "control_score": 0.8543404342362939,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "cellular_off_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.09530387908096039,
+      "visible_tools": []
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.125,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "find_thanksgiving_timestamp_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.875,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9641588839091166,
+      "control_outcome": 1.0,
+      "control_score": 0.9548280885286337,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "get_cellular_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.009330795380482981,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.954280141608879,
+      "control_outcome": 1.0,
+      "control_score": 0.9411627109748224,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "get_wifi_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.01311743063405657,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.25,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.75,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.92044608562895,
+      "control_outcome": 1.0,
+      "control_score": 0.9098401071604164,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "remove_contact_with_id_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.010605978468533617,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.4166666666666667,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.4166666666666667,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_lookup_query"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.4727398205659075,
+      "control_score": 0.42493641615146777,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.5272601794340925,
+      "scenario": "search_name_with_relationship_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.5750635838485323,
+      "visible_tools": [
+        "plan_contact_lookup_query"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9817462422837965,
+      "control_outcome": 1.0,
+      "control_score": 0.9836427349262922,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "search_phone_number_with_name_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.0018964926424956952,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_lookup_query"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9217163312118808,
+      "control_outcome": 0.5714285714285714,
+      "control_score": 0.8357732703414291,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.4285714285714286,
+      "scenario": "search_relationship_with_phone_number_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.08594306087045167,
+      "visible_tools": [
+        "plan_contact_lookup_query"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7637626158259734,
+      "candidate_score": 0.9713613470914607,
+      "control_outcome": 0.3727615200353445,
+      "control_score": 0.8253924436077034,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.39100109579062886,
+      "scenario": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.14596890348375735,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7637626158259734,
+      "candidate_score": 0.9713613470914607,
+      "control_outcome": 0.2577529982770988,
+      "control_score": 0.8450494506231205,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.5060096175488746,
+      "scenario": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.12631189646834018,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.5129891760425771,
+      "candidate_score": 0.9335049528391558,
+      "control_outcome": 0.6833048378989959,
+      "control_score": 0.9193754474354362,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.17031566185641878,
+      "scenario": "search_reminder_with_recency_upcoming_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.0141295054037196,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.6030226891555273,
+      "candidate_score": 0.6149488792538342,
+      "control_outcome": 0.46388114047439877,
+      "control_score": 0.6966036442272932,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.1391415486811285,
+      "scenario": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.08165476497345892,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.14285714285714285,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.14285714285714285,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.42857142857142855,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.42857142857142855,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9923251796804173,
+      "control_outcome": 0.14568750056948407,
+      "control_score": 0.7318938799062822,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.8543124994305159,
+      "scenario": "search_reminder_with_recency_yesterday_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.26043129977413515,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.816496580927726,
+      "candidate_score": 0.9782184223445256,
+      "control_outcome": 0.18413230108623954,
+      "control_score": 0.7310347215976426,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.6323642798414865,
+      "scenario": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.247183700746883,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.7857142857142857,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.2142857142857143,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.7142857142857143,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.7142857142857143,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9367902340968035,
+      "control_outcome": 1.0,
+      "control_score": 0.9324834047011112,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "search_sender_phone_number_with_content_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.004306829395692269,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9641588839091166,
+      "control_outcome": 1.0,
+      "control_score": 0.9492448023076656,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "send_message_with_phone_number_and_content_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.014914081601451024,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.9067885763792196,
+      "control_score": 0.891223093399224,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.09321142362078039,
+      "scenario": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.10877690660077599,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9578601560645357,
+      "control_outcome": 0.7915035921776118,
+      "control_score": 0.8725811325177811,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.2084964078223882,
+      "scenario": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.08527902354675454,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.8945767195767196,
+      "control_score": 0.8863703721495464,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.10542328042328042,
+      "scenario": "turn_on_location_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.11362962785045361,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.983304750543636,
+      "control_outcome": 0.75401623358207,
+      "control_score": 0.8386770801164356,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.24598376641792996,
+      "scenario": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.14462767042720037,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.8600306629967647,
+      "control_score": 0.8848690347636198,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.13996933700323533,
+      "scenario": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.11513096523638022,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.7103048458440615,
+      "control_score": 0.8168239839565815,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.2896951541559385,
+      "scenario": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.1831760160434185,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_relationship_batch_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.2833333333333333,
+      "candidate_score": 0.5021745812308998,
+      "control_outcome": 0.5506234688042707,
+      "control_score": 0.8136694450907055,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.2672901354709374,
+      "scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.31149486385980574,
+      "visible_tools": [
+        "plan_contact_relationship_batch_update"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.5,
+      "candidate_score": 0.8684031464052085,
+      "control_outcome": 1.0,
+      "control_score": 0.8825458667645258,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": -0.5,
+      "scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled",
+      "score_delta": -0.014142720359317296,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9367902340968035,
+      "control_outcome": 0.9123376623376623,
+      "control_score": 0.8154281312529553,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.08766233766233766,
+      "scenario": "wifi_off_3_distraction_tools_arg_description_scrambled",
+      "score_delta": 0.12136210284384819,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.8574074074074074,
+      "control_score": 0.871176216656288,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.1425925925925926,
+      "scenario": "remove_contact_by_phone_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.12882378334371203,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 1.0,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "add_reminder_content_and_date_and_time_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.2,
+      "control_score": 0.6,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.8,
+      "scenario": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.4,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.3333333333333333,
+      "control_outcome": 0.0,
+      "control_score": 0.3333333333333333,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "next_weekday_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.45454545454545453,
+      "control_score": 0.7272727272727273,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.5454545454545454,
+      "scenario": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.2727272727272727,
+      "visible_tools": [
+        "next_weekday_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "select_message_counterparty_for_contact_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.8,
+      "control_outcome": 0.0627998376822702,
+      "control_score": 0.4728684808795344,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.9372001623177298,
+      "scenario": "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.3271315191204656,
+      "visible_tools": [
+        "select_message_counterparty_for_contact_update"
+      ]
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_tools": [
+        "select_message_content_by_recency"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.028626439389215462,
+      "control_score": 0.11789633377465612,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.9713735606107845,
+      "scenario": "search_message_with_recency_latest_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.8821036662253439,
+      "visible_tools": [
+        "select_message_content_by_recency"
+      ]
+    },
+    {
+      "bucket": "message_search_send_preconditions",
+      "called_tools": [
+        "select_record_by_timestamp_extreme"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.6615574274015408,
+      "control_score": 0.6658593775539581,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.3384425725984592,
+      "scenario": "search_message_with_recency_oldest_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.3341406224460419,
+      "visible_tools": [
+        "select_record_by_timestamp_extreme"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_send_message_contact_lookup"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.9090909090909091,
+      "candidate_score": 0.9748221566586271,
+      "control_outcome": 0.8572420634920634,
+      "control_score": 0.9572742988959207,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.051848845598845617,
+      "scenario": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.017547857762706398,
+      "visible_tools": [
+        "plan_send_message_contact_lookup"
+      ]
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [
+        "days_between_timestamps"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.727737037578667,
+      "control_outcome": 1.0,
+      "control_score": 0.977737037578667,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "find_days_till_holiday_3_distraction_tools_arg_type_scrambled",
+      "score_delta": -0.25,
+      "visible_tools": [
+        "days_between_timestamps"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "plan_device_state_action_sequence_v3",
+        "days_between_timestamps"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.7821896300629336,
+      "control_outcome": 1.0,
+      "control_score": 0.9393324872057908,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_type_scrambled",
+      "score_delta": -0.15714285714285714,
+      "visible_tools": [
+        "plan_device_state_action_sequence_v3",
+        "days_between_timestamps"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_relationship_batch_update"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.3232071033541622,
+      "control_score": 0.6235186506897407,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.6767928966458379,
+      "scenario": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.37648134931025934,
+      "visible_tools": [
+        "plan_contact_relationship_batch_update"
+      ]
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "select_record_by_timestamp_extreme",
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.0,
+      "control_score": 0.631578947368421,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 1.0,
+      "scenario": "modify_reminder_with_recency_latest_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.368421052631579,
+      "visible_tools": [
+        "select_record_by_timestamp_extreme",
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.2571428571428572,
+      "candidate_score": 0.6420780958944459,
+      "control_outcome": 0.1852154341460572,
+      "control_score": 0.6530905320314696,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.07192742299679997,
+      "scenario": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "score_delta": -0.01101243613702374,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 0.4444444444444444,
+      "control_score": 0.6481481481481481,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.5555555555555556,
+      "scenario": "remove_reminder_with_recency_latest_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.35185185185185186,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 1.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 0.8636363636363636,
+      "candidate_score": 0.9496443133172543,
+      "control_outcome": 0.7797040713169745,
+      "control_score": 0.8539487571631141,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.08393229231938915,
+      "scenario": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.09569555615414016,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [
+        "relative_day_time_to_timestamp"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.0,
+      "candidate_score": 0.2,
+      "control_outcome": 0.3333333333333333,
+      "control_score": 0.4,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": -0.3333333333333333,
+      "scenario": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled",
+      "score_delta": -0.2,
+      "visible_tools": [
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9496443133172543,
+      "control_outcome": 1.0,
+      "control_score": 0.8563088275959003,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "cellular_off_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.09333548572135397,
+      "visible_tools": []
+    },
+    {
+      "bucket": "date_holiday_timestamp",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 1.0,
+      "control_outcome": null,
+      "control_score": 0.16666666666666666,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "find_thanksgiving_timestamp_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.8333333333333334,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9496443133172543,
+      "control_outcome": 1.0,
+      "control_score": 0.9544825035145417,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "get_cellular_3_distraction_tools_arg_type_scrambled",
+      "score_delta": -0.004838190197287373,
+      "visible_tools": []
+    },
+    {
+      "bucket": "settings_device_state_preconditions",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9367902340968035,
+      "control_outcome": 0.8200000000000001,
+      "control_score": 0.9174401016234633,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.17999999999999994,
+      "scenario": "get_wifi_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.019350132473340165,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.7142857142857143,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "score_delta": -0.7142857142857143,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9167251281832597,
+      "control_outcome": 1.0,
+      "control_score": 0.9194024643178854,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.0,
+      "scenario": "remove_contact_with_id_3_distraction_tools_arg_type_scrambled",
+      "score_delta": -0.0026773361346257296,
+      "visible_tools": []
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.5833333333333334,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "score_delta": -0.5833333333333334,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_lookup_query"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 1.0,
+      "control_outcome": 1.0,
+      "control_score": 0.4560172689236408,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.0,
+      "scenario": "search_name_with_relationship_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.5439827310763592,
+      "visible_tools": [
+        "plan_contact_lookup_query"
+      ]
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9817462422837965,
+      "control_outcome": 0.8571428571428571,
+      "control_score": 0.9817462422837965,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": 0.1428571428571429,
+      "scenario": "search_phone_number_with_name_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    },
+    {
+      "bucket": "contact_lookup_update_search_crud",
+      "called_tools": [
+        "plan_contact_lookup_query"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 1.0,
+      "candidate_score": 0.9217163312118808,
+      "control_outcome": 0.7142857142857143,
+      "control_score": 0.8206709523585632,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.2857142857142857,
+      "scenario": "search_relationship_with_phone_number_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.10104537885331755,
+      "visible_tools": [
+        "plan_contact_lookup_query"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7637626158259734,
+      "candidate_score": 0.9713613470914607,
+      "control_outcome": 0.3209636356157052,
+      "control_score": 0.8174407274568954,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.4427989802102682,
+      "scenario": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.15392061963456527,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_scheduling_search_crud",
+      "called_tools": [
+        "resolve_search_window_or_bounds"
+      ],
+      "candidate_exception": null,
+      "candidate_outcome": 0.7637626158259734,
+      "candidate_score": 0.9713613470914607,
+      "control_outcome": 0.4339223990119205,
+      "control_score": 0.8922349820941767,
+      "generated_called": true,
+      "generated_visible": true,
+      "outcome_delta": 0.3298402168140529,
+      "scenario": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.07912636499728398,
+      "visible_tools": [
+        "resolve_search_window_or_bounds"
+      ]
+    },
+    {
+      "bucket": "reminder_insufficient_info_abstention",
+      "called_tools": [],
+      "candidate_exception": null,
+      "candidate_outcome": null,
+      "candidate_score": 0.0,
+      "control_outcome": null,
+      "control_score": 0.0,
+      "generated_called": false,
+      "generated_visible": false,
+      "outcome_delta": null,
+      "scenario": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "score_delta": 0.0,
+      "visible_tools": []
+    }
+  ],
+  "recommended_next_bucket": "contact_lookup_update_search_crud",
+  "recommended_next_tool_family": "prepare_contact_lookup_or_update_action_v2",
+  "registry_hash": "7867cde8c8709f31efb02006e8c0743bbf890f2ede1519de99155e4631614349",
+  "source_paired_comparison": "outputs/praxis_combined_bridge_policy/formal500_order_first250_v2_bridge_repair_rapid_cache/validate_250_20260511_172919/paired_comparison.json",
+  "source_run": "outputs/praxis_combined_bridge_policy/formal500_order_first250_v2_bridge_repair_rapid_cache/validate_250_20260511_172919",
+  "source_task_compare_data": "outputs/praxis_combined_bridge_policy/formal500_order_first250_v2_bridge_repair_rapid_cache/validate_250_20260511_172919/dashboard/task_compare_data.json",
+  "status": "experimental_review_note_not_claim_evidence",
+  "treatment": "frozen Praxis registry plus feature-flagged combined bridge policy"
+}

@@ -1,0 +1,766 @@
+{
+  "manifest_type": "praxis_combined_bridge_policy_scale_gate",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "source_split": "full_benchmark",
+  "selection_rule": "first 250 scenarios from locked formal500 order; created after first100 and 101-160 holdout were positive; no labels inspected; no cache-based selection; used as scale gate before any full500.",
+  "splits": {
+    "validate_250": [
+      {
+        "name": "remove_contact_by_phone"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time"
+      },
+      {
+        "name": "modify_contact_with_message_recency"
+      },
+      {
+        "name": "search_message_with_recency_latest"
+      },
+      {
+        "name": "search_message_with_recency_oldest"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off"
+      },
+      {
+        "name": "find_days_till_holiday"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt"
+      },
+      {
+        "name": "cellular_off"
+      },
+      {
+        "name": "find_thanksgiving_timestamp"
+      },
+      {
+        "name": "get_cellular"
+      },
+      {
+        "name": "get_wifi"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information"
+      },
+      {
+        "name": "remove_contact_with_id"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information"
+      },
+      {
+        "name": "search_name_with_relationship"
+      },
+      {
+        "name": "search_phone_number_with_name"
+      },
+      {
+        "name": "search_relationship_with_phone_number"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit"
+      },
+      {
+        "name": "search_sender_phone_number_with_content"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number"
+      },
+      {
+        "name": "wifi_off"
+      },
+      {
+        "name": "remove_contact_by_phone_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_10_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_10_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_10_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_10_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_10_distraction_tools"
+      },
+      {
+        "name": "cellular_off_10_distraction_tools"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_10_distraction_tools"
+      },
+      {
+        "name": "get_cellular_10_distraction_tools"
+      },
+      {
+        "name": "get_wifi_10_distraction_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_with_id_10_distraction_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "search_name_with_relationship_10_distraction_tools"
+      },
+      {
+        "name": "search_phone_number_with_name_10_distraction_tools"
+      },
+      {
+        "name": "search_relationship_with_phone_number_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_10_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_10_distraction_tools"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_10_distraction_tools"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_10_distraction_tools"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_10_distraction_tools"
+      },
+      {
+        "name": "wifi_off_10_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_latest_3_distraction_tools"
+      },
+      {
+        "name": "search_message_with_recency_oldest_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_3_distraction_tools"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools"
+      },
+      {
+        "name": "cellular_off_3_distraction_tools"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_3_distraction_tools"
+      },
+      {
+        "name": "get_cellular_3_distraction_tools"
+      },
+      {
+        "name": "get_wifi_3_distraction_tools"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_with_id_3_distraction_tools"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools"
+      },
+      {
+        "name": "search_phone_number_with_name_3_distraction_tools"
+      },
+      {
+        "name": "search_relationship_with_phone_number_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_3_distraction_tools"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_3_distraction_tools"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools"
+      },
+      {
+        "name": "wifi_off_3_distraction_tools"
+      },
+      {
+        "name": "remove_contact_by_phone_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "cellular_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "get_cellular_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "get_wifi_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_with_id_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_phone_number_with_name_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_relationship_with_phone_number_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "search_sender_phone_number_with_content_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "send_message_with_phone_number_and_content_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_cellular_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_location_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "wifi_off_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_latest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_message_with_recency_oldest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "cellular_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_thanksgiving_timestamp_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "get_cellular_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "get_wifi_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_contact_with_id_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_phone_number_with_name_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_relationship_with_phone_number_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      }
+    ]
+  },
+  "cohort_diversity_report": {
+    "scenario_count": 250,
+    "near_duplicate_policy": "locked formal500 prefix scale gate; includes base, distraction, and scrambled variants from the formal order",
+    "label_inspection": "none before run",
+    "cache_selection": "none; baseline/control cache applied only after manifest freeze"
+  }
+}

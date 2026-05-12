@@ -1,0 +1,24 @@
+{
+  "manifest_type": "praxis_full500_polars_hang_probe1_diagnostic",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "selection_rule": "Diagnostic-only re-run of the scenario active when the first combined-policy full500 attempt stopped advancing in local Polars processing. Not claim evidence.",
+  "labels_inspected": false,
+  "cache_selection_used": false,
+  "splits": {
+    "mechanism_12": [
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_type_scrambled"
+      }
+    ]
+  },
+  "integrity_controls": {
+    "final_claim_evidence": false,
+    "candidate_cache_allowed": false,
+    "control_cache_policy": "use-if-eligible",
+    "openai_response_cache": "disabled",
+    "routing_evidence_mode": "disabled",
+    "generation": "off",
+    "diagnostic_force_call": "absent",
+    "polars_max_threads": 1
+  }
+}

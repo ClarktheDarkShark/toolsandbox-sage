@@ -88,6 +88,10 @@ bridge-disabled ablation reproduces it.
   `SAGE_PRAXIS_BRIDGE_POLICY=combined`
 - Methodology note:
   `docs/sage_protocol/praxis_bridge_policy_methodology.md`
+- Latest combined-treatment formal500 review:
+  canonical/reference `0.670 -> 0.757` (`+13.0%` relative lift), outcome/task completion `0.595 -> 0.840` (`+41.2%` relative lift), runtime exceptions `0`, helper side-effect incidents `0`.
+- Latest formal500 report:
+  `docs/sage_protocol/praxis_combined_bridge_policy_formal500_report.md`
 
 Example clean review run:
 
@@ -115,6 +119,11 @@ Controls may use eligible task-level baseline cache; candidate/SAGE arms must
 remain fresh. Task Compare is the default dashboard for new runs and includes
 canonical lift, outcome lift, per-task comparisons, and generated-tool
 contribution details.
+
+The combined result is promising but remains a review treatment, not a protected
+final-claim update. A protected claim should run a dedicated matched ablation
+under the same committed runtime for best3, V2.6, Praxis registry-only, and
+Praxis combined bridge-policy arms.
 
 When external location/weather/search tasks are in scope, use the ToolSandbox
 RapidAPI cache in `read_only` mode to avoid quota spend during review gates.

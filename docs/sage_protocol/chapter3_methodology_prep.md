@@ -66,6 +66,20 @@ The policy includes:
 
 Methodology language should therefore say "Praxis combined treatment" or "Praxis registry plus bridge policy" unless an ablation has separately validated registry-only value.
 
+Completed review result to describe only as combined-treatment evidence:
+
+- Formal500 run: `outputs/praxis_combined_bridge_policy/formal500_full_v2_bridge_repair_rapid_cache_polars1/full_benchmark_20260511_190013`.
+- Canonical/reference: `0.670025 -> 0.757369`, delta `+0.087344`, relative lift `+13.04%`.
+- Outcome/task completion: `0.594872 -> 0.839943`, delta `+0.245071`, relative lift `+41.20%`.
+- Runtime exceptions: `0`.
+- Helper failures / side-effect incidents: `0 / 0`.
+- Controls: `500 cached / 0 fresh`; candidate arm fresh; OpenAI response cache disabled; generation off; routing evidence disabled; diagnostic force env vars absent.
+- External-service fixture: RapidAPI cache read-only, SHA-256 `3ed7732443c44d7d26e0f46ac32fa2e09fc773278368c6f13131021afafdbf25`.
+
+This result can support a chapter discussion of the combined SAGE bridge policy,
+but not a registry-only claim. A protected claim requires a same-runtime matched
+ablation for best3, V2.6, registry-only Praxis, and combined Praxis.
+
 ### Bridge Policy Pseudocode
 
 ```text

@@ -1,0 +1,39 @@
+{
+  "manifest_type": "praxis_combined_bridge_policy_post_crud_policy_smoke6",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "selection_rule": "Six mechanism tasks selected to smoke-test the feature-flagged bridge after adding direct CRUD is_self safety. Not claim evidence; no labels inspected.",
+  "label_inspection": "none",
+  "splits": {
+    "mechanism_12": [
+      {
+        "name": "add_contact_with_name_and_phone_number_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "modify_contact_with_message_recency_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "search_name_with_relationship_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off_3_distraction_tools_arg_type_scrambled"
+      },
+      {
+        "name": "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools_arg_description_scrambled"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt_3_distraction_tools_arg_type_scrambled"
+      }
+    ]
+  },
+  "cohort_diversity_report": {
+    "scenario_count": 6,
+    "families": [
+      "contact CRUD",
+      "contact update",
+      "contact lookup",
+      "device-state precondition",
+      "reminder scheduling/device state"
+    ],
+    "cache_selection": "none"
+  }
+}
