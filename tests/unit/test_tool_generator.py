@@ -505,10 +505,7 @@ def test_action_selector_repair_uses_final_action_ready_contract(
                     "should_call_tool": True,
                     "tie_candidates": [],
                     "abstain_reason": "",
-                    "safety_notes": (
-                        "call downstream ToolSandbox side-effect with "
-                        "downstream_tool_kwargs"
-                    ),
+                    "safety_notes": "call remove_reminder with downstream_tool_kwargs",
                 },
             ),
             ToolExample(
@@ -544,10 +541,7 @@ def test_action_selector_repair_uses_final_action_ready_contract(
                     "should_call_tool": True,
                     "tie_candidates": [],
                     "abstain_reason": "",
-                    "safety_notes": (
-                        "call downstream ToolSandbox side-effect with "
-                        "downstream_tool_kwargs"
-                    ),
+                    "safety_notes": "call modify_contact with downstream_tool_kwargs",
                 },
                 held_out=True,
             ),

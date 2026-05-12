@@ -845,7 +845,7 @@ def select_action_target_by_recency(records: list, timestamp_key: str, selection
         "should_call_tool": True,
         "tie_candidates": [],
         "abstain_reason": "",
-        "safety_notes": "call downstream ToolSandbox side-effect with downstream_tool_kwargs",
+        "safety_notes": f"call {action} with downstream_tool_kwargs",
     }
 """
     return GeneratedTool(spec=spec, code=code)
