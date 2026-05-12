@@ -6,6 +6,9 @@ It serves the repository as static files and adds a generated index page that
 lists every `outputs/**/dashboard/task_compare.html` dashboard, newest first.
 If Task Compare is missing for an older run, it falls back to Task Focus or the
 standard dashboard.
+By default it also discovers sibling worktrees named `toolsandbox-sage*`, so a
+single port can browse dashboards produced on the experimental, repair, and
+review branches.
 """
 
 from __future__ import annotations
@@ -64,6 +67,30 @@ def _dashboard_activity(path: Path) -> tuple[float, bool]:
             except (OSError, json.JSONDecodeError):
                 pass
     return latest_mtime, running
+
+
+def _candidate_roots(root: Path) -> list[Path]:
+    roots = [root.resolve()]
+    for sibling in sorted(root.parent.glob("toolsandbox-sage*")):
+        try:
+            resolved = sibling.resolve()
+        except OSError:
+            continue
+        if resolved == roots[0] or not (resolved / "outputs").exists():
+            continue
+        roots.append(resolved)
+    return roots
+
+
+def _preferred_dashboard(path: Path) -> Path:
+    dashboard_dir = path.parent if path.parent.name == "dashboard" else path
+    if not dashboard_dir.is_dir():
+        dashboard_dir = path.parent
+    for name in ("task_compare.html", "task_focus.html", "index.html"):
+        candidate = dashboard_dir / name
+        if candidate.exists():
+            return candidate.resolve()
+    return path.resolve()
 
 
 def _process_cwd(pid: str) -> Path | None:
@@ -147,34 +174,37 @@ def _recent_dashboard_paths(root: Path, recent_minutes: int) -> set[Path]:
     dashboards = set()
     for line in output.splitlines():
         path = Path(line)
-        if path.name == "task_focus_data.json":
-            path = path.with_name("task_focus.html")
         if path.exists():
-            dashboards.add(path.resolve())
+            dashboards.add(_preferred_dashboard(path))
     return dashboards
 
 
 def _dashboard_paths(root: Path, recent_seconds: int) -> tuple[set[Path], set[Path]]:
-    active = set()
-    for output_root in _running_output_roots(root):
-        for path in output_root.glob("*/dashboard/task_focus.html"):
-            active.add(path.resolve())
-        direct = output_root / "dashboard" / "task_focus.html"
-        if direct.exists():
-            active.add(direct.resolve())
-    dashboards = set()
-    outputs = root / "outputs"
-    if outputs.exists():
-        for dashboard_dir in outputs.rglob("dashboard"):
-            if not dashboard_dir.is_dir():
-                continue
-            for name in ("task_compare.html", "task_focus.html", "index.html"):
-                path = dashboard_dir / name
-                if path.exists():
-                    dashboards.add(path.resolve())
-                    break
-    recent = _recent_dashboard_paths(root, max(1, recent_seconds // 60))
-    return active | recent | dashboards, active
+    active: set[Path] = set()
+    for candidate_root in _candidate_roots(root):
+        running_roots = _running_output_roots(candidate_root)
+        for output_root in running_roots:
+            for path in output_root.glob("*/dashboard/task_focus.html"):
+                active.add(_preferred_dashboard(path))
+            direct = output_root / "dashboard" / "task_focus.html"
+            if direct.exists():
+                active.add(_preferred_dashboard(direct))
+    dashboards: set[Path] = set()
+    for candidate_root in _candidate_roots(root):
+        outputs = candidate_root / "outputs"
+        if outputs.exists():
+            for dashboard_dir in outputs.rglob("dashboard"):
+                if not dashboard_dir.is_dir():
+                    continue
+                for name in ("task_compare.html", "task_focus.html", "index.html"):
+                    path = dashboard_dir / name
+                    if path.exists():
+                        dashboards.add(path.resolve())
+                        break
+        dashboards.update(
+            _recent_dashboard_paths(candidate_root, max(1, recent_seconds // 60))
+        )
+    return active | dashboards, active
 
 
 def _run_token(path: Path) -> str:
@@ -211,10 +241,19 @@ def _dashboard_entries(
             dashboard_path = "/" + quote(rel.as_posix())
         except ValueError:
             run_dir = path.parent.parent
-            label = (
-                f"{run_dir.parent.parent.name} / {run_dir.parent.name} / {run_dir.name}"
+            worktree = next(
+                (
+                    candidate_root.name
+                    for candidate_root in _candidate_roots(root)
+                    if candidate_root != root and path.is_relative_to(candidate_root)
+                ),
+                run_dir.parent.parent.parent.name,
             )
-            dashboard_path = f"/external/{_run_token(path)}/dashboard/task_focus.html"
+            label = (
+                f"{worktree} / {run_dir.parent.parent.name} / "
+                f"{run_dir.parent.name} / {run_dir.name}"
+            )
+            dashboard_path = f"/external/{_run_token(path)}/dashboard/{path.name}"
         if running:
             label = "RUNNING · " + label
         dashboards.append(
@@ -344,6 +383,10 @@ class DashboardPickerHandler(SimpleHTTPRequestHandler):
         if request_path.startswith("/external/"):
             if self._serve_external(request_path):
                 return
+        if request_path.startswith("/outputs/") and self._serve_sibling_output(
+            request_path
+        ):
+            return
         super().do_GET()
 
     def _send_bytes(self, payload: bytes, content_type: str) -> None:
@@ -381,6 +424,22 @@ class DashboardPickerHandler(SimpleHTTPRequestHandler):
         )
         self._send_bytes(target.read_bytes(), content_type)
         return True
+
+    def _serve_sibling_output(self, request_path: str) -> bool:
+        suffix = unquote(request_path.lstrip("/"))
+        for root in _candidate_roots(self.root):
+            if root == self.root:
+                continue
+            target = (root / suffix).resolve()
+            try:
+                target.relative_to(root)
+            except ValueError:
+                continue
+            if not target.is_file():
+                continue
+            self._send_bytes(target.read_bytes(), self.guess_type(str(target)))
+            return True
+        return False
 
 
 def main() -> None:
