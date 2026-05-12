@@ -1,5 +1,41 @@
 # Run Ledger
 
+## 2026-05-12
+
+- `Self-evolving SAGE empty-registry live-generation 60` completed.
+  - Branch: `codex/self-evolving-sage-mini60`
+  - Report: `docs/sage_protocol/self_evolving_sage_mini60_report.md`
+  - Summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v21_60_summary.json`
+  - Summary SHA-256: `828ea32146a778f1b5b371bc837a683594967d1744ab7dce4bf9f285b1125de0`
+  - Preparation: `artifacts/self_evolving_sage/current_mini60_live_generation_v21_60_safe_remove_bridge/self_evolving_mini60_preparation.json`
+  - Preparation SHA-256: `db48663860cbddbf104feffb2158457b16e33ac6d63c00ae2ffb3a0b26eff5f9`
+  - Manifest: `artifacts/self_evolving_sage/current_mini60_live_generation_v21_60_safe_remove_bridge/self_evolving_mini60_manifest.json`
+  - Manifest SHA-256: `6038613ee3b254a4c6b2b1219feee39c9d8ac98052d9857b39f67cb06e577ced`
+  - Starting registry: `artifacts/self_evolving_sage/current_mini60_live_generation_v21_60_safe_remove_bridge/registry/registry_manifest.json`
+  - Starting registry SHA-256: `61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713`
+  - Final generated registry SHA-256: `9e887a9199f53b5b1f28d7d76b158a2de6a397b617c1af8bb39932ac7bff6d0d`
+  - Positive run: `outputs/self_evolving_sage/live_generation_v21_60_safe_remove_bridge/mechanism_60_20260512_073507`
+  - Dashboard: `http://127.0.0.1:62624/outputs/self_evolving_sage/live_generation_v21_60_safe_remove_bridge/mechanism_60_20260512_073507/dashboard/task_compare.html`
+  - Dashboard default/open policy: `task_compare.html` is the default run dashboard and is opened through macOS `open` in the external browser unless `--no-dashboard-open` is set.
+  - Source plan: `docs/sage_protocol/praxis_next_gap_and_self_evolving_sage_plan.md`
+  - Strategy: start from an empty generated-tool registry, keep generation on, generate tools online from gap observations, validate accepted tools, and use natural routing/calling without force calls.
+  - Models: agent/user/generation all `gpt-4o-mini`.
+  - Sample cap: `60`; matched contact scenarios: `60`.
+  - Control cache: `use-if-eligible`, `60 cached / 0 fresh`, cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`; cohort selection influenced by cache: `false`.
+  - Candidate task cache: `off`; OpenAI response cache: `disabled`; routing evidence: `disabled`; diagnostic force env vars: none.
+  - Generation: `on`.
+  - Accepted live-born tools: `plan_contact_lookup_query`, `plan_contact_relationship_batch_update`, `plan_contact_update_from_id`, `prepare_side_effect_args_from_selected_record`, `select_action_target_by_recency`, `select_record_by_timestamp_extreme`.
+  - Natural call evidence: `18` generated-tool called scenarios, `0` generated-tool failed scenarios.
+  - Strongest tools: `plan_contact_lookup_query` called `8` times with called-subset outcome delta `+0.473296`; `plan_contact_relationship_batch_update` called `8` times with called-subset outcome delta `+0.436380`; `plan_contact_update_from_id` called `2` times with called-subset outcome delta `+0.166667`.
+  - Canonical/reference score: `0.755622 -> 0.855260`, delta `+0.099638`, relative lift `+13.19%`.
+  - Outcome score: `0.523942 -> 0.667092`, delta `+0.143150`.
+  - Exact successes: `10 -> 26`, delta `+16`.
+  - Runtime exceptions: `0`.
+  - Helper side-effect incidents: `0`.
+  - Protocol gate: `PASS`.
+  - Treatment caveat: includes documented combined bridge-policy safe-abstention repair for remove-by-phone requests when `search_contacts` is unavailable; this is experimental implementation evidence, not protected final-claim evidence.
+  - Decision: `SELF_EVOLVING_LIVE_GENERATION_60_POSITIVE_EXPERIMENTAL`; prepare broader matched validation after treatment definition is frozen.
+
 ## 2026-05-11
 
 - `Self-evolving SAGE empty-registry live-generation diag24` completed.

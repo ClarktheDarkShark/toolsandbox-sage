@@ -1,16 +1,17 @@
 # Current State
 
-- Date: 2026-05-11
-- Last completed step: `self_evolving_sage_empty_registry_live_generation_diag24`
-- Last decision: `SELF_EVOLVING_LIVE_GENERATION_MECHANISM_POSITIVE_BUT_NOT_SCALE_READY`
+- Date: 2026-05-12
+- Last completed step: `self_evolving_sage_empty_registry_live_generation_60`
+- Last decision: `SELF_EVOLVING_LIVE_GENERATION_60_POSITIVE_EXPERIMENTAL`
 - Primary metric: outcome/task-completion
 - Current SAGE approach: combined Praxis bridge-policy remains the current high-lift SAGE treatment under review; self-evolving SAGE discovery now starts from an empty generated-tool registry, keeps generation on during the candidate run, generates tools from online gap observations, and retains or parks tools based on natural adoption and downstream value.
-- Self-evolving live-generation proof: run `outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431`; starting registry SHA `61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713`; final generated registry SHA `92559066516f9751b730bb92f6e267640c6e8c6506b9068cc436751f2bebf052`; score delta `+0.040569`; outcome delta `+0.047045`; exact success delta `+6`; generated tool `plan_contact_relationship_batch_update` visible/called `3 / 3`; runtime exceptions `0`; helper side-effect incidents `0`; protocol gate `PASS`.
-- Self-evolving live-generation models: agent/user/generation all `gpt-4o-mini`; sample cap `60`; matched contact scenarios `24`; controls `24 cached / 0 fresh`; candidate task cache off; OpenAI response cache disabled; routing evidence disabled; generation on.
+- Self-evolving live-generation proof: run `outputs/self_evolving_sage/live_generation_v21_60_safe_remove_bridge/mechanism_60_20260512_073507`; starting registry SHA `61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713`; final generated registry SHA `9e887a9199f53b5b1f28d7d76b158a2de6a397b617c1af8bb39932ac7bff6d0d`; score delta `+0.099638`; score lift `+13.19%`; outcome delta `+0.143150`; generated-tool call scenarios `18`; generated-tool failures `0`; runtime exceptions `0`; helper side-effect incidents `0`; protocol gate `PASS`.
+- Self-evolving live-generation models: agent/user/generation all `gpt-4o-mini`; sample cap `60`; matched contact scenarios `60`; controls `60 cached / 0 fresh`; candidate task cache off; OpenAI response cache disabled; routing evidence disabled; generation on.
+- Self-evolving live-generation dashboard: `http://127.0.0.1:62624/outputs/self_evolving_sage/live_generation_v21_60_safe_remove_bridge/mechanism_60_20260512_073507/dashboard/task_compare.html`.
 - Safe-abstention birth status: `prepare_safe_action_or_abstain` is parked by default after v9 called-subset canonical delta `-0.505454` and outcome delta `-0.030562`; diagnostic opt-in is `SAGE_ENABLE_SAFE_ABSTAIN_BIRTH=1`.
 - Superseded self-evolving transfer diagnostic: `outputs/self_evolving_sage/mini60_praxis_pack_v2/transfer_60_20260511_204904` had stronger deltas, but used pre-existing Praxis recipe tools and generation off, so it is not counted as proof of live self-evolution.
 - Self-evolving mini60 report: `docs/sage_protocol/self_evolving_sage_mini60_report.md`.
-- Self-evolving live-generation summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_diag24_summary.json`, SHA-256 `1807c4fb597199130acfe1861360591e1abbc315de79ec90e35c98778fa14d89`.
+- Self-evolving live-generation summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v21_60_summary.json`, SHA-256 `828ea32146a778f1b5b371bc837a683594967d1744ab7dce4bf9f285b1125de0`.
 - Active frozen helpers: protected best3 remains `relative_day_time_to_timestamp, resolve_search_window_or_bounds, select_record_by_timestamp_extreme`; repaired Praxis v2 remains a registry-only review candidate; combined Praxis BridgePack is an experimental combined-treatment candidate only.
 - Active protected registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`
 - Protected registry SHA-256: `76de726d25f7f959744704d18a5cf69ff807ca3e3daa7616876e5699ce783caf`
@@ -27,7 +28,7 @@
 - Chapter 3 methodology prep: `docs/sage_protocol/chapter3_methodology_prep.md`
 - Versioned methodology heuristics: `docs/sage_protocol/protocol_heuristics_v1.json`
 - Final frozen run requirements: generation OFF, control cache `use-if-eligible`, routing evidence `disabled` or explicitly `pinned`, no diagnostic force-call env vars, no low-quality override.
-- Current Task Compare dashboard default: `task_compare.html`; it is dark mode and reports paired completion as `min(baseline completed, SAGE completed)`.
+- Current Task Compare dashboard default: `task_compare.html`; it is dark mode, reports paired completion as `min(baseline completed, SAGE completed)`, and is opened in the external browser for each run through macOS `open` unless `--no-dashboard-open` is set.
 - Praxis combined first100 v2 same-code aggregate: canonical `0.654 -> 0.723`, delta `+0.069`, relative lift `+10.6%`; outcome `0.604 -> 0.737`, delta `+0.133`, relative lift `+22.0%`; exact successes `5 -> 20`; runtime exceptions `0`; side-effect preservation reports `0`.
 - Praxis combined first100 v2 summary: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_first100_v2_same_code_summary.json`
 - Praxis combined broad60 v4 bridge-repair/RapidAPI-cache gate: canonical `0.695 -> 0.821`, delta `+0.126`, relative lift `+18.1%`; outcome `0.606 -> 0.916`, delta `+0.310`, relative lift `+51.2%`; control cache `60 cached / 0 fresh`; generated-tool called scenarios `27`; runtime exceptions `0`; generated-tool failures `0`.

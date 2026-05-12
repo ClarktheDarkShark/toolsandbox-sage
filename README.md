@@ -190,30 +190,44 @@ env \
     --artifact-root artifacts/self_evolving_sage/campaign_artifacts_live_generation_v_next_diag24
 ```
 
+By default, each protocol run opens the new Task Compare dashboard
+(`dashboard/task_compare.html`) in the external browser. The runner also writes
+`dashboard_urls.json` with `default_dashboard: "task_compare"`. Use
+`--no-dashboard-open` only when running unattended.
+
 Latest live-generation mechanism proof:
 
 - report:
   `docs/sage_protocol/self_evolving_sage_mini60_report.md`
 - summary:
-  `artifacts/self_evolving_sage/summary/self_evolving_live_generation_diag24_summary.json`
+  `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v21_60_summary.json`
 - positive run:
-  `outputs/self_evolving_sage/live_generation_v6_diag24/mechanism_60_20260511_225431`
+  `outputs/self_evolving_sage/live_generation_v21_60_safe_remove_bridge/mechanism_60_20260512_073507`
+- dashboard:
+  `http://127.0.0.1:62624/outputs/self_evolving_sage/live_generation_v21_60_safe_remove_bridge/mechanism_60_20260512_073507/dashboard/task_compare.html`
 - score delta:
-  `+0.040569`
+  `+0.099638`
+- score lift:
+  `+13.19%`
 - outcome delta:
-  `+0.047045`
-- exact success delta:
-  `+6`
+  `+0.143150`
 - live-born retained tools:
-  `plan_contact_relationship_batch_update`, `plan_contact_update_from_id`, `prepare_side_effect_args_from_selected_record`
+  `plan_contact_lookup_query`, `plan_contact_relationship_batch_update`,
+  `plan_contact_update_from_id`, `prepare_side_effect_args_from_selected_record`,
+  `select_action_target_by_recency`, `select_record_by_timestamp_extreme`
 - natural call evidence:
-  `plan_contact_relationship_batch_update` visible/called/VNC `3 / 3 / 0`, called-subset outcome delta `+0.342197`
+  `18` generated-tool call scenarios, `0` generated-tool failures;
+  `plan_contact_lookup_query` called `8` times, called-subset outcome delta
+  `+0.473296`; `plan_contact_relationship_batch_update` called `8` times,
+  called-subset outcome delta `+0.436380`
 - runtime exceptions and helper side-effect incidents:
   `0 / 0`
 
 This is experimental implementation evidence, not protected final-claim
 evidence. It demonstrates empty-registry, generation-on tool birth under strict
-low-cost model and sample constraints. The earlier
+low-cost model and sample constraints, plus a documented combined bridge-policy
+safe-abstention repair for remove-by-phone requests when contact search is not
+available. The earlier
 `mini60_praxis_pack_v2` run remains useful as a recipe-pack transfer
 diagnostic, but it used pre-existing Praxis recipe tools and generation off, so
 it is not proof of autonomous live self-evolution.

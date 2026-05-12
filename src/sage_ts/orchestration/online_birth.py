@@ -77,6 +77,99 @@ BROADER_HELPER_OVERLAPS = {
 
 
 PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
+FIRST_OBSERVATION_BIRTH_KEYS = frozenset(
+    {
+        "composite:plan_contact_lookup_query",
+    }
+)
+CHAIN_ROUTING_FAMILIES_BY_KEY = {
+    "composite:plan_contact_lookup_query": (
+        "update_contact_relationship_with_relationship_twice",
+        "update_contact_relationship_with_relationship",
+        "remove_contact_by_phone",
+    ),
+}
+
+
+def _dedupe_nonempty(items: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    seen: set[str] = set()
+    kept: list[str] = []
+    for item in items:
+        value = str(item or "").strip()
+        if not value:
+            continue
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(value)
+    return tuple(kept)
+
+
+def _normalize_family_label(label: str) -> str:
+    normalized = str(label or "").strip().lower().replace(" ", "_").replace("-", "_")
+    if not normalized:
+        return ""
+    return base_task_family(normalized)
+
+
+def _expanded_family_labels(label: str) -> tuple[str, ...]:
+    normalized = _normalize_family_label(label)
+    if not normalized:
+        return ()
+    expanded = [normalized]
+    for suffix in (
+        "_twice",
+        "_once",
+        "_multiple_user_turn",
+    ):
+        if normalized.endswith(suffix):
+            expanded.append(normalized[: -len(suffix)])
+    return _dedupe_nonempty(expanded)
+
+
+def _normalize_live_birth_routing_metadata(
+    tool: GeneratedTool,
+    observation: CapabilityObservation,
+    base_families: tuple[str, ...],
+) -> GeneratedTool:
+    """Stabilize generated routing metadata before validation and registry save.
+
+    Generation models sometimes emit full robustness-variant scenario names as
+    ``applicable_task_families``. Those names are valid evidence lineage, but
+    they are too narrow for natural reuse and can hide an otherwise useful
+    helper on later tasks from the same base family. Normalize them into base
+    family labels derived only from visible scenario names, and add the same
+    labels as trigger tokens so routing does not depend on exact variants.
+    """
+
+    family_candidates: list[str] = []
+    for item in tool.spec.applicable_task_families:
+        family_candidates.extend(_expanded_family_labels(item))
+    for item in base_families:
+        family_candidates.extend(_expanded_family_labels(item))
+    family_candidates.extend(_expanded_family_labels(observation.scenario_name))
+    for item in CHAIN_ROUTING_FAMILIES_BY_KEY.get(observation.canonical_key, ()):
+        family_candidates.extend(_expanded_family_labels(item))
+    normalized_families = _dedupe_nonempty(family_candidates)
+    if not normalized_families:
+        return tool
+    positive_triggers = _dedupe_nonempty(
+        [*tool.spec.positive_triggers, *normalized_families]
+    )
+    if (
+        normalized_families == tool.spec.applicable_task_families
+        and positive_triggers == tool.spec.positive_triggers
+    ):
+        return tool
+    return replace(
+        tool,
+        spec=replace(
+            tool.spec,
+            applicable_task_families=normalized_families,
+            positive_triggers=positive_triggers,
+        ),
+    )
 
 
 def existing_broader_helper(
@@ -148,6 +241,11 @@ class OnlineBirthController:
     def _event(self, event: str, payload: dict[str, Any]) -> None:
         if self.event_hook is not None:
             self.event_hook(event, payload)
+
+    def _required_recurrence_threshold(self, observation: CapabilityObservation) -> int:
+        if observation.canonical_key in FIRST_OBSERVATION_BIRTH_KEYS:
+            return 1
+        return self.recurrence_threshold
 
     def _check_heuristic_signal(self, observation: CapabilityObservation) -> bool:
         """Attempt lightweight transcript verification for heuristic observations.
@@ -273,7 +371,9 @@ class OnlineBirthController:
                 },
             )
             return
-        if self.counts[observation.canonical_key] < self.recurrence_threshold:
+        if self.counts[observation.canonical_key] < self._required_recurrence_threshold(
+            observation
+        ):
             return
 
         suggested_name = suggested_tool_name(observation.canonical_key)
@@ -368,6 +468,11 @@ class OnlineBirthController:
         try:
             tool = self.generator.generate(request)
             cluster_context = self._cluster_context(observation)
+            tool = _normalize_live_birth_routing_metadata(
+                tool,
+                observation,
+                tuple(cluster_context["base_task_families"]),
+            )
             if (
                 not cluster_context["non_diagnostic_birth_allowed"]
                 and not tool.spec.diagnostic_only
@@ -406,6 +511,11 @@ class OnlineBirthController:
                 repair_attempted = True
                 repair_errors = tuple(validation.errors)
                 repaired_tool = repair_method(request, tool, repair_errors)
+                repaired_tool = _normalize_live_birth_routing_metadata(
+                    repaired_tool,
+                    observation,
+                    tuple(self._cluster_context(observation)["base_task_families"]),
+                )
                 repaired_gate, repaired_live_check, repaired_validation = (
                     self._gate_and_validate(repaired_tool, observation)
                 )

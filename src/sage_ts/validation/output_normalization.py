@@ -77,6 +77,72 @@ def _stable_record_id(record: dict[str, Any]) -> str:
     return ""
 
 
+def _normalize_abstain_reason(value: Any) -> str:
+    reason = str(value or "").strip()
+    if not reason:
+        return ""
+    # Generated helpers often vary harmless punctuation/case in negative examples.
+    return reason.rstrip(".!").strip().lower()
+
+
+def _has_contact_lookup_constraint(inputs: dict[str, Any] | None) -> bool:
+    if not inputs:
+        return False
+    for key in (
+        "contact_name",
+        "name",
+        "target_name",
+        "phone_number",
+        "target_phone_number",
+        "relationship",
+    ):
+        if str(inputs.get(key) or "").strip():
+            return True
+    return False
+
+
+def _normalize_generic_composite_output(
+    value: dict[str, Any],
+    *,
+    inputs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Make abstaining composite helper outputs side-effect safe and comparable."""
+    normalized = dict(value)
+    abstain_reason = _normalize_abstain_reason(normalized.get("abstain_reason"))
+    if (
+        not abstain_reason
+        and "should_call_search_contacts" in normalized
+        and "search_contacts_kwargs" in normalized
+        and "answer_field" in normalized
+        and not bool(normalized.get("should_call_search_contacts"))
+        and not normalized.get("search_contacts_kwargs")
+    ):
+        requested = str(
+            (inputs or {}).get("requested_field")
+            or normalized.get("answer_field")
+            or ""
+        ).strip()
+        abstain_reason = (
+            "missing_lookup_constraint"
+            if requested and not _has_contact_lookup_constraint(inputs)
+            else "missing_requested_field"
+        )
+    if not abstain_reason:
+        return normalized
+    normalized["abstain_reason"] = abstain_reason
+    should_call_tool = bool(normalized.get("should_call_tool"))
+    should_call_tools = bool(normalized.get("should_call_tools"))
+    should_call_search = bool(normalized.get("should_call_search_contacts"))
+    if not should_call_tool and not should_call_tools and not should_call_search:
+        if "downstream_tool_name" in normalized:
+            normalized["downstream_tool_name"] = ""
+        if "downstream_tool_kwargs" in normalized:
+            normalized["downstream_tool_kwargs"] = {}
+        if "downstream_tool_kwargs_list" in normalized:
+            normalized["downstream_tool_kwargs_list"] = []
+    return normalized
+
+
 def _record_index(inputs: dict[str, Any] | None, record: dict[str, Any]) -> int:
     if not inputs:
         return -1
@@ -94,13 +160,13 @@ def _normalize_composite_workflow_output(
     *,
     inputs: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    normalized = dict(value)
+    normalized = _normalize_generic_composite_output(value, inputs=inputs)
     selected_record = normalized.get("selected_record")
     if not isinstance(selected_record, dict):
         selected_record = {}
         normalized["selected_record"] = selected_record
 
-    abstain_reason = str(normalized.get("abstain_reason", "")).lower()
+    abstain_reason = _normalize_abstain_reason(normalized.get("abstain_reason"))
     ambiguous = any(
         token in abstain_reason
         for token in ("ambig", "tie", "multiple_match", "multiple match")
@@ -213,6 +279,16 @@ def normalize_generated_tool_output(
     if tool.spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
         output_schema = tool.spec.output_schema or {}
         output_props = output_schema.get("properties", {})
+        if isinstance(output_props, dict) and not {
+            "selected_record",
+            "selected_id",
+            "value",
+            "downstream_tool_name",
+            "downstream_tool_kwargs",
+            "should_call_tool",
+            "abstain_reason",
+        } <= set(output_props):
+            return _normalize_generic_composite_output(value, inputs=inputs)
         if isinstance(output_props, dict) and {
             "selected_record",
             "selected_id",

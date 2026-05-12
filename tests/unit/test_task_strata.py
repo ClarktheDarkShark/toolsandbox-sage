@@ -125,7 +125,13 @@ def test_modify_contact_message_recency_matches_trace_compatible_helpers() -> No
 
     assert "contact_message_search_disambiguation" in classify_task_strata(scenario)
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
+    assert "select_message_counterparty_for_contact_update" in expected_helper_fit(
+        scenario
+    )
     assert "search_filter:select_record_by_timestamp_extreme" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "composite:select_message_counterparty_for_contact_update" in (
         expected_birth_opportunities(scenario)
     )
     assert "search_filter:select_action_target_by_recency" in (
@@ -145,6 +151,18 @@ def test_oldest_message_matches_retrieval_window_and_selector() -> None:
         expected_birth_opportunities(scenario)
     )
     assert "derived_value:resolve_search_window_or_bounds" in (
+        expected_birth_opportunities(scenario)
+    )
+
+
+def test_send_message_contact_content_matches_lookup_planner() -> None:
+    scenario = "send_message_with_contact_content_cellular_off_3_distraction_tools"
+
+    assert "plan_send_message_contact_lookup" in expected_helper_fit(scenario)
+    assert "composite:plan_send_message_contact_lookup" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "state_precondition:next_service_tool_call" in (
         expected_birth_opportunities(scenario)
     )
 

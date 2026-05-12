@@ -133,6 +133,18 @@ def _is_contact_update_by_id_scenario(scenario_name: str) -> bool:
     return scenario_name.startswith("update_contact_with_id_and_phone_number")
 
 
+def _is_send_message_contact_lookup_scenario(scenario_name: str) -> bool:
+    if "ambiguous" in scenario_name or "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith("send_message_with_contact_content")
+
+
+def _is_message_counterparty_contact_update_scenario(scenario_name: str) -> bool:
+    if "ambiguous" in scenario_name or "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith("modify_contact_with_message_recency")
+
+
 def _safe_abstain_birth_enabled() -> bool:
     return os.environ.get(SAFE_ABSTAIN_BIRTH_ENV, "").strip().lower() in {
         "1",
@@ -787,6 +799,118 @@ def _contact_lookup_query_planner_observation(
     )
 
 
+def _send_message_contact_lookup_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:plan_send_message_contact_lookup",
+        observation=(
+            "Send-message tasks with a named recipient repeatedly fail because "
+            "the agent asks for a phone number or tries the send before using "
+            "the visible original search_contacts tool. Generate a deterministic "
+            "side-effect-free lookup planner named "
+            "plan_send_message_contact_lookup. Inputs must be scalar strings: "
+            "recipient_name and message_content. Return exactly "
+            "should_call_search_contacts, search_contacts_kwargs, "
+            "downstream_tool_name, message_content, abstain_reason, next_step, "
+            "and final_answer_recommendation. If recipient_name and "
+            "message_content are both present, set should_call_search_contacts "
+            "true, search_contacts_kwargs to {'name': recipient_name}, "
+            "downstream_tool_name to send_message_with_phone_number, and carry "
+            "message_content forward unchanged except for trimming outer "
+            "whitespace. The helper must not send a message or enable cellular; "
+            "after search_contacts returns a unique visible phone number, the "
+            "actor must call the original send_message_with_phone_number tool "
+            "with that phone number and the returned message_content. If the send "
+            "fails because cellular is disabled and the original cellular setter "
+            "is visible, the actor may turn cellular on and retry the same send "
+            "once. Abstain when recipient_name or message_content is blank, when "
+            "the task is insufficient-information, when the recipient is already "
+            "a phone number, or when search_contacts is unavailable. Include "
+            "search_contacts and send_message_with_phone_number in "
+            "required_original_tool_calls and preserves_side_effect_tools."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "recipient_name": "Ada Lovelace",
+                    "message_content": "Please call me.",
+                },
+                {
+                    "should_call_search_contacts": True,
+                    "search_contacts_kwargs": {"name": "Ada Lovelace"},
+                    "downstream_tool_name": "send_message_with_phone_number",
+                    "message_content": "Please call me.",
+                    "abstain_reason": "",
+                    "next_step": (
+                        "call search_contacts, then send_message_with_phone_number"
+                    ),
+                    "final_answer_recommendation": (
+                        "search_contacts first; if cellular is disabled during "
+                        "send, enable cellular and retry once"
+                    ),
+                },
+            ),
+            ToolExample(
+                {
+                    "recipient_name": " Grace Hopper ",
+                    "message_content": "  ETA is 5.  ",
+                },
+                {
+                    "should_call_search_contacts": True,
+                    "search_contacts_kwargs": {"name": "Grace Hopper"},
+                    "downstream_tool_name": "send_message_with_phone_number",
+                    "message_content": "ETA is 5.",
+                    "abstain_reason": "",
+                    "next_step": (
+                        "call search_contacts, then send_message_with_phone_number"
+                    ),
+                    "final_answer_recommendation": (
+                        "search_contacts first; if cellular is disabled during "
+                        "send, enable cellular and retry once"
+                    ),
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "recipient_name": "",
+                    "message_content": "Please call me.",
+                },
+                {
+                    "should_call_search_contacts": False,
+                    "search_contacts_kwargs": {},
+                    "downstream_tool_name": "",
+                    "message_content": "Please call me.",
+                    "abstain_reason": "missing_recipient_name",
+                    "next_step": "ask_for_recipient_or_phone_number",
+                    "final_answer_recommendation": (
+                        "I need the recipient name or phone number before I can "
+                        "send that message."
+                    ),
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="send_message_named_recipient_needs_contact_lookup_planner",
+        inadequacy_signals=(
+            "planner_failed_to_issue_available_search",
+            "visible_recipient_name_unused",
+            "side_effect_precondition_requires_lookup",
+        ),
+        failed_tool_calls=("search_contacts", "send_message_with_phone_number"),
+        visible_data_gaps=(
+            "named recipient and message content must become search_contacts kwargs before original send",
+        ),
+        planner_failures=(
+            "prepare contact lookup before original send_message_with_phone_number",
+        ),
+    )
+
+
 def _contact_relationship_batch_update_observation(
     scenario_name: str,
 ) -> CapabilityObservation:
@@ -927,6 +1051,173 @@ def _contact_relationship_batch_update_observation(
         ),
         planner_failures=(
             "plan relationship-group search then original modify_contact calls",
+        ),
+    )
+
+
+def _message_counterparty_contact_update_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    latest_person_id = "11111111-1111-1111-1111-111111111111"
+    oldest_person_id = "22222222-2222-2222-2222-222222222222"
+    latest_record = {
+        "message_id": "m2",
+        "sender_person_id": "self",
+        "recipient_person_id": latest_person_id,
+        "recipient_phone_number": "+15550100",
+        "creation_timestamp": 20.0,
+    }
+    oldest_record = {
+        "message_id": "m0",
+        "sender_person_id": "self",
+        "recipient_person_id": oldest_person_id,
+        "recipient_phone_number": "+15550001",
+        "creation_timestamp": 5.0,
+    }
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:select_message_counterparty_for_contact_update",
+        observation=(
+            "Contact updates based on the latest or oldest message counterparty "
+            "repeatedly fail after search_messages returns visible records: the "
+            "agent updates the self contact, asks for an id, or guesses an id "
+            "instead of selecting the non-self counterparty. Generate a "
+            "deterministic side-effect-free helper named "
+            "select_message_counterparty_for_contact_update. Inputs must be "
+            "records, selection_mode, updates, and self_person_id. It must choose "
+            "the latest or oldest visible message by numeric creation_timestamp, "
+            "identify the non-self counterparty person id and phone number from "
+            "visible sender/recipient fields, and return a final-action-ready "
+            "modify_contact plan. Return exactly selected_record, "
+            "selected_message, selected_message_id, selected_person_id, "
+            "selected_phone_number, selected_timestamp, downstream_tool_name, "
+            "downstream_tool_kwargs, should_call_tool, tie_candidates, "
+            "abstain_reason, safety_notes, and final_answer_recommendation. "
+            "When a unique non-self person_id and at least one update field are "
+            "present, downstream_tool_name must be modify_contact and "
+            "downstream_tool_kwargs must contain person_id plus the update fields. "
+            "The helper must never call search_messages or modify_contact; it "
+            "only prepares the original modify_contact call. Abstain on no "
+            "records, invalid selection_mode, timestamp ties, missing non-self "
+            "counterparty id, missing updates, or insufficient-information tasks. "
+            "Include modify_contact in required_original_tool_calls and "
+            "preserves_side_effect_tools."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "m1",
+                            "sender_person_id": "self",
+                            "recipient_person_id": oldest_person_id,
+                            "recipient_phone_number": "+15550000",
+                            "creation_timestamp": 10.0,
+                        },
+                        latest_record,
+                    ],
+                    "selection_mode": "latest",
+                    "updates": {"phone_number": "+15550999"},
+                    "self_person_id": "self",
+                },
+                {
+                    "selected_record": latest_record,
+                    "selected_message": latest_record,
+                    "selected_message_id": "m2",
+                    "selected_person_id": latest_person_id,
+                    "selected_phone_number": "+15550100",
+                    "selected_timestamp": 20.0,
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": latest_person_id,
+                        "phone_number": "+15550999",
+                    },
+                    "should_call_tool": True,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": ("call modify_contact with downstream_tool_kwargs"),
+                    "final_answer_recommendation": (
+                        "call modify_contact with downstream_tool_kwargs"
+                    ),
+                },
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        oldest_record,
+                        {
+                            "message_id": "m3",
+                            "sender_person_id": "self",
+                            "recipient_person_id": latest_person_id,
+                            "recipient_phone_number": "+15550100",
+                            "creation_timestamp": 30.0,
+                        },
+                    ],
+                    "selection_mode": "oldest",
+                    "updates": {"relationship": "friend"},
+                    "self_person_id": "self",
+                },
+                {
+                    "selected_record": oldest_record,
+                    "selected_message": oldest_record,
+                    "selected_message_id": "m0",
+                    "selected_person_id": oldest_person_id,
+                    "selected_phone_number": "+15550001",
+                    "selected_timestamp": 5.0,
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": oldest_person_id,
+                        "relationship": "friend",
+                    },
+                    "should_call_tool": True,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": ("call modify_contact with downstream_tool_kwargs"),
+                    "final_answer_recommendation": (
+                        "call modify_contact with downstream_tool_kwargs"
+                    ),
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "records": [latest_record],
+                    "selection_mode": "latest",
+                    "updates": {},
+                    "self_person_id": "self",
+                },
+                {
+                    "selected_record": {},
+                    "selected_message": {},
+                    "selected_message_id": "",
+                    "selected_person_id": "",
+                    "selected_phone_number": "",
+                    "selected_timestamp": 0.0,
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "should_call_tool": False,
+                    "tie_candidates": [],
+                    "abstain_reason": "missing_updates",
+                    "safety_notes": "abstain; no safe contact update target",
+                    "final_answer_recommendation": "abstain:missing_updates",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="message_recency_contact_update_needs_counterparty_selector",
+        inadequacy_signals=(
+            "wrong_selected_record",
+            "unsafe_guess_before_side_effect",
+            "side_effect_argument_preparation_failure",
+        ),
+        failed_tool_calls=("modify_contact",),
+        visible_data_gaps=(
+            "visible message records must identify the non-self contact update target",
+        ),
+        planner_failures=(
+            "select message counterparty then prepare original modify_contact kwargs",
         ),
     )
 
@@ -2122,6 +2413,10 @@ def classify_scenario_observations(
             scenario_name
         ) or _is_message_recency_extreme_scenario(scenario_name):
             observations.append(_latest_record_selection_observation(scenario_name))
+        if _is_message_counterparty_contact_update_scenario(scenario_name):
+            observations.append(
+                _message_counterparty_contact_update_observation(scenario_name)
+            )
         if _is_recency_action_target_scenario(scenario_name):
             observations.append(_recency_action_target_observation(scenario_name))
         if _is_post_selection_side_effect_prep_scenario(scenario_name):
@@ -2159,6 +2454,10 @@ def classify_scenario_observations(
             scenario_name
         ) or _is_message_recency_extreme_scenario(scenario_name):
             observations.append(_latest_record_selection_observation(scenario_name))
+        if _is_message_counterparty_contact_update_scenario(scenario_name):
+            observations.append(
+                _message_counterparty_contact_update_observation(scenario_name)
+            )
         if _is_recency_action_target_scenario(scenario_name):
             observations.append(_recency_action_target_observation(scenario_name))
         if _is_post_selection_side_effect_prep_scenario(scenario_name):
@@ -2230,6 +2529,8 @@ def classify_scenario_observations(
 
     if similarity < 1.0 and _is_direct_service_precondition_scenario(scenario_name):
         observations = [_next_service_tool_call_observation(scenario_name)]
+        if _is_send_message_contact_lookup_scenario(scenario_name):
+            observations.append(_send_message_contact_lookup_observation(scenario_name))
         if feature_enabled(DEPENDENCY_LOGIC) and _generic_precondition_tools(scenario):
             observations.append(
                 _dependency_precondition_observation(

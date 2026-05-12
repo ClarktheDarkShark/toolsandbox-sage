@@ -290,6 +290,132 @@ def test_composite_output_normalization_fills_safe_defaults() -> None:
     assert normalized["safety_notes"] == "call downstream ToolSandbox side-effect next"
 
 
+def test_generic_composite_abstention_clears_downstream_action() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="plan_contact_update_from_id",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare modify_contact kwargs from a visible id.",
+            inputs=(
+                ToolInput("person_id", "str", "Visible person id."),
+                ToolInput("phone_number", "str", "New phone number."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "should_call_tool": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("update_contact_with_id",),
+            negative_triggers=("missing person id",),
+            preserves_side_effect_tools=("modify_contact",),
+            required_original_tool_calls=("modify_contact",),
+            generalization_rationale="Contact id updates recur.",
+            estimated_step_compression=2,
+            cross_task_applicability_count=2,
+            applicable_task_families=("contact_update",),
+            reason_tool_is_decisive="Prepares original modify_contact kwargs.",
+            shortfall_cluster_evidence=("composite:plan_contact_update_from_id",),
+            known_failure_mechanisms_addressed=("side_effect_argument_preparation",),
+            final_state_preservation_plan="Caller executes modify_contact later.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Missing modify_contact argument planner.",
+                signals=("side_effect_argument_preparation_failure",),
+            ),
+        ),
+        code="def plan_contact_update_from_id(person_id: str, phone_number: str) -> dict:\n    return {}\n",
+    )
+    raw = {
+        "downstream_tool_name": "modify_contact",
+        "downstream_tool_kwargs": {},
+        "should_call_tool": False,
+        "abstain_reason": "Missing_Person_ID.",
+    }
+
+    normalized = normalize_generated_tool_output(tool, raw)
+
+    assert normalized == {
+        "downstream_tool_name": "",
+        "downstream_tool_kwargs": {},
+        "should_call_tool": False,
+        "abstain_reason": "missing_person_id",
+    }
+
+
+def test_generic_contact_lookup_abstention_fills_missing_constraint_reason() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="plan_contact_lookup_query",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare search_contacts kwargs from scalar contact constraints.",
+            inputs=(
+                ToolInput("contact_name", "str", "Visible contact name."),
+                ToolInput("phone_number", "str", "Visible phone number."),
+                ToolInput("relationship", "str", "Visible relationship."),
+                ToolInput("requested_field", "str", "Field to answer."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_call_search_contacts": {"type": "boolean"},
+                    "search_contacts_kwargs": {"type": "object"},
+                    "answer_field": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("search_phone_number_with_name",),
+            negative_triggers=("missing_lookup_constraint",),
+            preserves_side_effect_tools=("search_contacts",),
+            required_original_tool_calls=("search_contacts",),
+            generalization_rationale="Contact lookup planning recurs.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "search_phone_number_with_name",
+                "search_name_with_relationship",
+            ),
+            reason_tool_is_decisive="Prepares original search_contacts kwargs.",
+            shortfall_cluster_evidence=("composite:plan_contact_lookup_query",),
+            known_failure_mechanisms_addressed=("contact_lookup_argument_planning",),
+            final_state_preservation_plan="Caller executes search_contacts later.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Missing contact lookup planner.",
+                signals=("visible_contact_scalar_constraint_unused",),
+            ),
+        ),
+        code="def plan_contact_lookup_query(contact_name: str, phone_number: str, relationship: str, requested_field: str) -> dict:\n    return {}\n",
+    )
+    raw = {
+        "should_call_search_contacts": False,
+        "search_contacts_kwargs": {},
+        "answer_field": "phone_number",
+        "abstain_reason": "",
+    }
+
+    normalized = normalize_generated_tool_output(
+        tool,
+        raw,
+        inputs={
+            "contact_name": "",
+            "phone_number": "",
+            "relationship": "",
+            "requested_field": "phone_number",
+        },
+    )
+
+    assert normalized == {
+        "should_call_search_contacts": False,
+        "search_contacts_kwargs": {},
+        "answer_field": "phone_number",
+        "abstain_reason": "missing_lookup_constraint",
+    }
+
+
 def test_composite_output_normalization_enforces_ambiguity_abstention() -> None:
     tool = _composite_constraint_action_tool()
     inputs = {

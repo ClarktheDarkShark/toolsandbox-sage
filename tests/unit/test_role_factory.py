@@ -16,6 +16,7 @@ from sage_ts.adapters.openai_toolsandbox_roles import (
     _answer_retention_response_text,
     _contact_lookup_bridge_completion,
     _contact_relationship_batch_bridge_completion,
+    _contact_remove_by_phone_insufficient_response_text,
     _contact_update_by_id_bridge_completion,
     _contact_update_phone_bridge_completion,
     _crud_success_response_text,
@@ -508,6 +509,27 @@ def test_contact_relationship_bridge_uses_generated_batch_planner(
     assert '"source_relationship": "friend"' in variant_call.function.arguments
     assert '"target_relationship": "enemy"' in variant_call.function.arguments
 
+    updated_variant_completion = _contact_relationship_batch_bridge_completion(
+        [
+            {
+                "role": "user",
+                "content": (
+                    "Who are my friends? I just want all my friends in the "
+                    "contact book updated as enemies."
+                ),
+            }
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert updated_variant_completion is not None
+    updated_variant_call = _first_tool_call(updated_variant_completion)
+    assert (
+        updated_variant_call.function.name == "plan_contact_relationship_batch_update"
+    )
+    assert '"source_relationship": "friend"' in updated_variant_call.function.arguments
+    assert '"target_relationship": "enemy"' in updated_variant_call.function.arguments
+
 
 def test_contact_relationship_bridge_continues_with_search_and_modify(
     monkeypatch: pytest.MonkeyPatch,
@@ -672,6 +694,51 @@ def test_safe_action_abstain_bridge_uses_generated_helper(
     assert (
         answer_completion.choices[0].message.content
         == "I do not have enough information to remove that contact."
+    )
+
+
+def test_contact_remove_by_phone_without_search_contacts_abstains_safely(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [{"type": "function", "function": {"name": "remove_contact"}}]
+
+    answer = _contact_remove_by_phone_insufficient_response_text(
+        [
+            {
+                "role": "user",
+                "content": "Remove phone number +1 (555) 0100 from my contact",
+            }
+        ],
+        tools,
+    )
+
+    assert answer is not None
+    assert "+15550100" in answer
+    assert "name or person_id" in answer
+    assert "search contacts" in answer
+
+
+def test_contact_remove_by_phone_uses_normal_flow_when_search_contacts_visible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "remove_contact"}},
+        {"type": "function", "function": {"name": "search_contacts"}},
+    ]
+
+    assert (
+        _contact_remove_by_phone_insufficient_response_text(
+            [
+                {
+                    "role": "user",
+                    "content": "Remove phone number +1 (555) 0100 from my contact",
+                }
+            ],
+            tools,
+        )
+        is None
     )
 
 

@@ -80,6 +80,16 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "contact_message_search_disambiguation",
         "generic_multi_tool_composition",
     ),
+    "plan_send_message_contact_lookup": (
+        "contact_message_search_disambiguation",
+        "direct_state_precondition_service_enablement",
+        "generic_multi_tool_composition",
+    ),
+    "select_message_counterparty_for_contact_update": (
+        "contact_message_search_disambiguation",
+        "record_filtering_ranking_latest_selection",
+        "generic_multi_tool_composition",
+    ),
     "prepare_safe_action_or_abstain": (
         "insufficient_information_clarification",
         "generic_multi_tool_composition",
@@ -108,6 +118,10 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
         "plan_contact_relationship_batch_update",
     ),
     "composite:plan_contact_update_from_id": ("plan_contact_update_from_id",),
+    "composite:plan_send_message_contact_lookup": ("plan_send_message_contact_lookup",),
+    "composite:select_message_counterparty_for_contact_update": (
+        "select_message_counterparty_for_contact_update",
+    ),
     "validation:prepare_safe_action_or_abstain": ("prepare_safe_action_or_abstain",),
     "derived_value:extract_contact_field_from_search_result": (
         "extract_contact_field_from_search_result",
@@ -159,6 +173,7 @@ DIRECT_SERVICE_HELPER_PREFIXES = (
     "turn_on_wifi_low_battery_mode",
     "turn_on_cellular_low_battery_mode",
     "turn_on_location_low_battery_mode",
+    "send_message_with_contact_content_cellular_off",
 )
 
 DOWNSTREAM_SERVICE_HELPER_PREFIXES = (
@@ -373,6 +388,10 @@ def expected_helper_fit(
     ):
         helpers.append("select_record_by_timestamp_extreme")
     if "insufficient_information" not in name and name.startswith(
+        "modify_contact_with_message_recency"
+    ):
+        helpers.append("select_message_counterparty_for_contact_update")
+    if "insufficient_information" not in name and name.startswith(
         (
             "modify_contact_with_message_recency",
             "modify_reminder_with_recency_latest",
@@ -401,6 +420,10 @@ def expected_helper_fit(
         "update_contact_with_id_and_phone_number"
     ):
         helpers.append("plan_contact_update_from_id")
+    if "insufficient_information" not in name and name.startswith(
+        "send_message_with_contact_content"
+    ):
+        helpers.append("plan_send_message_contact_lookup")
     if "insufficient_information" in name:
         helpers.append("prepare_safe_action_or_abstain")
     return helpers
@@ -443,6 +466,12 @@ def expected_birth_opportunities(
     ):
         opportunities.append("search_filter:select_record_by_timestamp_extreme")
         opportunities.append("derived_value:resolve_search_window_or_bounds")
+    if (
+        "ambiguous" not in name
+        and "insufficient_information" not in name
+        and name.startswith("modify_contact_with_message_recency")
+    ):
+        opportunities.append("composite:select_message_counterparty_for_contact_update")
     # Do not count bounds-only message window helpers as claim-grade birth
     # opportunities; latest/oldest failures need selection/action helpers.
     scalar_contact_lookup = name.startswith(
@@ -513,6 +542,12 @@ def expected_birth_opportunities(
         opportunities.append("state_precondition:next_service_tool_call")
     if name.startswith(DOWNSTREAM_SERVICE_HELPER_PREFIXES):
         opportunities.append("state_precondition:recover_from_tool_error")
+    if (
+        "ambiguous" not in name
+        and "insufficient_information" not in name
+        and name.startswith("send_message_with_contact_content")
+    ):
+        opportunities.append("composite:plan_send_message_contact_lookup")
     if (
         name.startswith("add_reminder_content_and_")
         and "_time" in name

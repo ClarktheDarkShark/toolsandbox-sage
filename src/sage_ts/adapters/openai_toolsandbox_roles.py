@@ -668,6 +668,18 @@ def _latest_user_request_text(openai_messages: object) -> str:
     return ""
 
 
+def _latest_assistant_text_contains(openai_messages: object, needle: str) -> bool:
+    target = str(needle or "").strip().lower()
+    if not target:
+        return False
+    for message in reversed(list(cast(Iterable[Mapping[str, Any]], openai_messages))):
+        if message.get("role") != "assistant":
+            continue
+        content = str(message.get("content", "") or "").lower()
+        return target in content
+    return False
+
+
 def _tool_call_function_name_and_arguments(
     tool_call: Mapping[str, Any],
 ) -> tuple[str, dict[str, Any]]:
@@ -958,25 +970,47 @@ def _relationship_plural(relationship: object) -> str:
     return f"{value}s"
 
 
+_RELATIONSHIP_ALIASES = {
+    "boss": "boss",
+    "bosses": "boss",
+    "friend": "friend",
+    "friends": "friend",
+    "enemy": "enemy",
+    "enemies": "enemy",
+    "coworker": "coworker",
+    "coworkers": "coworker",
+    "colleague": "coworker",
+    "colleagues": "coworker",
+    "family": "family",
+    "families": "family",
+    "relative": "family",
+    "relatives": "family",
+}
+
+_KNOWN_RELATIONSHIP_LABELS = set(_RELATIONSHIP_ALIASES.values())
+
+
 def _normalize_relationship_label(value: object) -> str:
     text = str(value or "").strip().lower().replace("_", " ").replace("-", " ")
     if not text:
         return ""
-    aliases = {
-        "friends": "friend",
-        "friend": "friend",
-        "enemies": "enemy",
-        "enemy": "enemy",
-        "coworkers": "coworker",
-        "coworker": "coworker",
-        "colleagues": "coworker",
-        "colleague": "coworker",
-        "families": "family",
-        "family": "family",
-        "relatives": "family",
-        "relative": "family",
-    }
-    return aliases.get(text, text)
+    return _RELATIONSHIP_ALIASES.get(text, text)
+
+
+def _known_relationship_label(value: object) -> str:
+    label = _normalize_relationship_label(value)
+    return label if label in _KNOWN_RELATIONSHIP_LABELS else ""
+
+
+def _relationship_from_lookup_prompt(text: str) -> str:
+    lower = " ".join(text.lower().replace("_", " ").replace("-", " ").split())
+    match = re.search(r"\bwho\s+are\s+my\s+([a-z]+)\b", lower)
+    if match:
+        return _known_relationship_label(match.group(1))
+    match = re.search(r"\bmy\s+([a-z]+)\b", lower)
+    if match:
+        return _known_relationship_label(match.group(1))
+    return ""
 
 
 def _relationship_batch_request(openai_messages: object) -> dict[str, str] | None:
@@ -986,6 +1020,19 @@ def _relationship_batch_request(openai_messages: object) -> dict[str, str] | Non
         lower = " ".join(text.lower().replace("_", " ").replace("-", " ").split())
         if not lower:
             continue
+        source = source or _relationship_from_lookup_prompt(lower)
+        broad_update = re.search(
+            r"\b(?:all|every|each)\s+(?:of\s+)?(?:my\s+)?([a-z]+)\b.*?"
+            r"\b(?:updated|changed|set|turned|made)\s+(?:to|into|as)\s+"
+            r"(?:my\s+)?([a-z]+)\b",
+            lower,
+        )
+        if broad_update:
+            parsed_source = _known_relationship_label(broad_update.group(1))
+            parsed_target = _known_relationship_label(broad_update.group(2))
+            if parsed_source and parsed_target:
+                source = parsed_source
+                target = parsed_target
         direct = re.search(
             r"\b(?:make|change|set|turn)\s+(?:all|every|each)\s+"
             r"(?:of\s+)?(?:my\s+)?([a-z]+)\s+(?:contacts\s+)?"
@@ -993,19 +1040,25 @@ def _relationship_batch_request(openai_messages: object) -> dict[str, str] | Non
             lower,
         )
         if direct:
-            source = _normalize_relationship_label(direct.group(1))
-            target = _normalize_relationship_label(direct.group(2))
+            parsed_source = _known_relationship_label(direct.group(1))
+            parsed_target = _known_relationship_label(direct.group(2))
+            if parsed_source and parsed_target:
+                source = parsed_source
+                target = parsed_target
         explicit = re.search(
             r"\brelationship\s+(?:from\s+)?([a-z]+)\s+(?:to|into)\s+([a-z]+)\b",
             lower,
         )
         if explicit:
-            source = _normalize_relationship_label(explicit.group(1))
-            target = _normalize_relationship_label(explicit.group(2))
+            parsed_source = _known_relationship_label(explicit.group(1))
+            parsed_target = _known_relationship_label(explicit.group(2))
+            if parsed_source and parsed_target:
+                source = parsed_source
+                target = parsed_target
         if " them " in f" {lower} " or " back " in f" {lower} ":
             followup = re.search(r"\b(?:to|as)\s+(?:my\s+)?([a-z]+)\b", lower)
             if followup:
-                target = _normalize_relationship_label(followup.group(1))
+                target = _known_relationship_label(followup.group(1)) or target
     prior_plan = _latest_tool_payload_by_name(
         openai_messages, "plan_contact_relationship_batch_update"
     )
@@ -2770,6 +2823,41 @@ def _safe_action_or_abstain_bridge_completion(
     )
 
 
+def _contact_remove_by_phone_insufficient_response_text(
+    openai_messages: object,
+    openai_tools: object,
+) -> str | None:
+    """Safe bridge for remove-by-phone requests when lookup is unavailable."""
+    if not _praxis_bridge_policy_enabled():
+        return None
+    available_names = _tool_names_execution_facing(openai_tools)
+    if "remove_contact" not in available_names or "search_contacts" in available_names:
+        return None
+    all_user_text = " ".join(_all_user_texts(openai_messages)).strip()
+    lower_all = all_user_text.lower()
+    if not any(token in lower_all for token in ("remove", "delete")):
+        return None
+    if "contact" not in lower_all or "phone" not in lower_all:
+        return None
+    phone = _extract_phone_from_text(all_user_text)
+    if not phone:
+        return None
+    latest_user = _latest_user_request_text(openai_messages).lower()
+    if not latest_user:
+        return None
+    if _latest_tool_is(openai_messages, "remove_contact"):
+        # Let the model see the tool error first, then stabilize the next turn.
+        return None
+    if _latest_assistant_text_contains(openai_messages, phone):
+        if any(token in latest_user for token in ("thank", "ok", "okay", "alright")):
+            return None
+    return (
+        "I do not have enough information to safely remove the contact with "
+        f"phone number {phone}. I would need a contact name or person_id, or "
+        "access to search contacts, before I can remove it."
+    )
+
+
 def _state_action_sequence_bridge_completion(
     openai_messages: object,
     openai_tools: object,
@@ -2835,6 +2923,17 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
                 model_name=self.model_name,
                 completion_id="sage-setting-success",
                 content=setting_success_answer,
+            )
+        contact_remove_insufficient = (
+            _contact_remove_by_phone_insufficient_response_text(
+                openai_messages, openai_tools
+            )
+        )
+        if contact_remove_insufficient:
+            return _synthetic_text_completion(
+                model_name=self.model_name,
+                completion_id="sage-contact-remove-phone-insufficient",
+                content=contact_remove_insufficient,
             )
         safe_action_abstain_bridge = _safe_action_or_abstain_bridge_completion(
             openai_messages,

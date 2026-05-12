@@ -8,6 +8,7 @@ from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.orchestration.online_birth import (
     OnlineBirthController,
+    _normalize_live_birth_routing_metadata,
     _original_tool_contract_errors,
 )
 from sage_ts.registry.manifest import RegistryEntry
@@ -20,6 +21,7 @@ _TOOL_NAME = "recency_to_timestamp_bounds"
 _RELATIVE_TIME_TOOL_NAME = "relative_day_time_to_timestamp"
 _RECORD_SELECTOR_TOOL_NAME = "select_record_by_timestamp_extreme"
 _RESOLVE_WINDOW_TOOL_NAME = "resolve_search_window_or_bounds"
+_CONTACT_LOOKUP_TOOL_NAME = "plan_contact_lookup_query"
 
 
 def test_generic_dependency_bundle_observation_uses_allowed_tool_structure(
@@ -240,6 +242,74 @@ class FakeRepairRecordSelectorGenerator(FakeRecordSelectorGenerator):
         return self.generate(request)
 
 
+@dataclass
+class FakeContactLookupGenerator:
+    calls: int = 0
+
+    def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
+        self.calls += 1
+        assert request.suggested_tool_name == _CONTACT_LOOKUP_TOOL_NAME
+        spec = ToolSpec(
+            tool_name=_CONTACT_LOOKUP_TOOL_NAME,
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare original search_contacts kwargs from scalar contact constraints.",
+            inputs=(
+                ToolInput("contact_name", "str", "Visible contact name."),
+                ToolInput("phone_number", "str", "Visible phone number."),
+                ToolInput("relationship", "str", "Visible relationship."),
+                ToolInput("requested_field", "str", "Requested answer field."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_call_search_contacts": {"type": "boolean"},
+                    "search_contacts_kwargs": {"type": "object"},
+                    "answer_field": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("search_phone_number_with_name",),
+            negative_triggers=("missing_lookup_constraint",),
+            preserves_side_effect_tools=("search_contacts",),
+            required_original_tool_calls=("search_contacts",),
+            abstain_behavior="Abstain when requested_field or contact constraints are missing.",
+            generalization_rationale="Scalar contact lookup recurs before contact actions.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "search_phone_number_with_name",
+                "search_name_with_relationship",
+            ),
+            reason_tool_is_decisive="It prepares original search_contacts kwargs and answer field.",
+            shortfall_cluster_evidence=("composite:plan_contact_lookup_query",),
+            known_failure_mechanisms_addressed=("contact_lookup_argument_planning",),
+            final_state_preservation_plan="Caller executes search_contacts later.",
+            inadequacy_evidence={
+                "summary": "Missing contact lookup planner.",
+                "signals": ("visible_contact_scalar_constraint_unused",),
+                "failed_tool_calls": ("search_contacts",),
+            },
+        )
+        code = """
+def plan_contact_lookup_query(contact_name: str = "", phone_number: str = "", relationship: str = "", requested_field: str = "") -> dict:
+    requested = str(requested_field or "").strip()
+    kwargs = {}
+    if str(contact_name or "").strip():
+        kwargs["name"] = str(contact_name).strip()
+    if str(phone_number or "").strip():
+        kwargs["phone_number"] = str(phone_number).strip()
+    if str(relationship or "").strip():
+        kwargs["relationship"] = str(relationship).strip()
+    if not requested:
+        return {"should_call_search_contacts": False, "search_contacts_kwargs": {}, "answer_field": "", "abstain_reason": "missing_requested_field"}
+    if not kwargs:
+        return {"should_call_search_contacts": False, "search_contacts_kwargs": {}, "answer_field": requested, "abstain_reason": "missing_lookup_constraint"}
+    return {"should_call_search_contacts": True, "search_contacts_kwargs": kwargs, "answer_field": requested, "abstain_reason": ""}
+""".strip()
+        return GeneratedTool(spec=spec, code=code)
+
+
 def _resolve_search_window_tool() -> GeneratedTool:
     spec = ToolSpec(
         tool_name=_RESOLVE_WINDOW_TOOL_NAME,
@@ -312,6 +382,104 @@ def _latest_record_observation():
         if observation.canonical_key
         == "search_filter:select_record_by_timestamp_extreme"
     )
+
+
+def test_live_birth_routing_metadata_normalizes_variant_family_labels() -> None:
+    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
+    observation = next(
+        item
+        for item in classify_scenario_observations(
+            "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
+            scenario,
+            {"similarity": 0.0},
+        )
+        if item.canonical_key == "composite:plan_contact_relationship_batch_update"
+    )
+    generated = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="plan_contact_relationship_batch_update",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare relationship batch update calls.",
+            inputs=(),
+            output_annotation="dict",
+            output_schema={"type": "object", "properties": {}},
+            positive_triggers=("Update contact relationships with relationship",),
+            negative_triggers=("missing relationship",),
+            preserves_side_effect_tools=("modify_contact",),
+            required_original_tool_calls=("modify_contact",),
+            abstain_behavior="Abstain when the target relationship is missing.",
+            generalization_rationale="Relationship batch updates recur across variants.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools",
+                "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
+            ),
+            reason_tool_is_decisive="It prepares every required modify_contact call.",
+            shortfall_cluster_evidence=("relationship_batch_update",),
+            known_failure_mechanisms_addressed=("batch_update_arguments",),
+            inadequacy_evidence={
+                "summary": "relationship update gap",
+                "signals": ("relationship_update",),
+            },
+        ),
+        code="def plan_contact_relationship_batch_update():\n    return {}\n",
+    )
+
+    repaired = _normalize_live_birth_routing_metadata(
+        generated,
+        observation,
+        ("update_contact_relationship_with_relationship_twice",),
+    )
+
+    assert repaired.spec.applicable_task_families == (
+        "update_contact_relationship_with_relationship_twice",
+        "update_contact_relationship_with_relationship",
+    )
+    assert (
+        "update_contact_relationship_with_relationship_twice"
+        in repaired.spec.positive_triggers
+    )
+    assert not any(
+        "3_distraction_tools" in family
+        for family in repaired.spec.applicable_task_families
+    )
+
+
+def test_contact_lookup_births_after_first_observation_and_gets_chain_families(
+    tmp_path: Path,
+) -> None:
+    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
+    observation = next(
+        item
+        for item in classify_scenario_observations(
+            "search_phone_number_with_name_3_distraction_tools",
+            scenario,
+            {"similarity": 0.0},
+        )
+        if item.canonical_key == "composite:plan_contact_lookup_query"
+    )
+    store = RegistryStore(tmp_path / "registry")
+    generator = FakeContactLookupGenerator()
+    controller = OnlineBirthController(
+        store=store,
+        generator=generator,
+        output_dir=tmp_path,
+        recurrence_threshold=2,
+        failure_memory_path=None,
+    )
+
+    controller.observe(observation)
+
+    entry = store.get(_CONTACT_LOOKUP_TOOL_NAME)
+    assert generator.calls == 1
+    assert entry is not None
+    assert "search_phone_number_with_name" in entry.tool.spec.applicable_task_families
+    assert (
+        "update_contact_relationship_with_relationship"
+        in entry.tool.spec.applicable_task_families
+    )
+    assert "remove_contact_by_phone" in entry.tool.spec.applicable_task_families
 
 
 def test_recency_observation_rejects_bounds_only_birth_after_recurrence(
@@ -730,6 +898,7 @@ def test_modify_contact_message_recency_marks_message_window_diagnostic() -> Non
 
     assert {observation.canonical_key for observation in observations} == {
         "search_filter:select_record_by_timestamp_extreme",
+        "composite:select_message_counterparty_for_contact_update",
         "search_filter:select_action_target_by_recency",
         "composite:prepare_side_effect_args_from_selected_record",
         "derived_value:message_search_time_window",
@@ -886,6 +1055,51 @@ def test_contact_id_update_failure_births_scalar_update_planner() -> None:
         "composite:plan_contact_update_from_id",
     ]
     assert observations[0].failed_tool_calls == ("modify_contact",)
+
+
+def test_send_message_contact_lookup_births_named_recipient_planner() -> None:
+    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
+
+    observations = classify_scenario_observations(
+        "send_message_with_contact_content_cellular_off_3_distraction_tools",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    assert [item.canonical_key for item in observations] == [
+        "state_precondition:next_service_tool_call",
+        "composite:plan_send_message_contact_lookup",
+    ]
+    assert observations[1].failed_tool_calls == (
+        "search_contacts",
+        "send_message_with_phone_number",
+    )
+
+
+def test_message_counterparty_update_births_contact_update_selector() -> None:
+    scenario = Scenario(
+        categories=[
+            ScenarioCategories.CANONICALIZATION,
+            ScenarioCategories.MULTIPLE_TOOL_CALL,
+        ]
+    )
+
+    observations = classify_scenario_observations(
+        "modify_contact_with_message_recency_3_distraction_tools",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    assert "composite:select_message_counterparty_for_contact_update" in [
+        item.canonical_key for item in observations
+    ]
+    counterparty = next(
+        item
+        for item in observations
+        if item.canonical_key
+        == "composite:select_message_counterparty_for_contact_update"
+    )
+    assert counterparty.failed_tool_calls == ("modify_contact",)
 
 
 def test_insufficient_information_safe_abstain_birth_is_flagged(monkeypatch) -> None:
