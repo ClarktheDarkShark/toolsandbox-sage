@@ -72,9 +72,32 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
     .metrics {
       display: grid;
-      grid-template-columns: repeat(6, minmax(140px, 1fr));
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
       gap: 10px;
-      margin-top: 14px;
+      margin-top: 10px;
+      max-width: 960px;
+    }
+    .run-progress {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel2);
+      border-radius: 999px;
+      padding: 7px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+      box-shadow: 0 8px 22px var(--shadow);
+    }
+    .run-progress .label {
+      font-size: 10px;
+    }
+    .run-progress strong {
+      color: var(--text);
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
     }
     .metric {
       border: 1px solid var(--line);
@@ -263,11 +286,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
-    .transaction-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
+    .transaction-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .transaction-head h3 { margin: 0; }
+    .transaction-select { border: 1px solid var(--line); border-radius: 999px; background: var(--panel2); color: var(--blue); padding: 7px 10px; font-size: 12px; font-weight: 800; min-width: 150px; }
     .box {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -292,10 +313,17 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       line-height: 1.45;
       color: var(--ink);
     }
-    .transcript {
-      max-height: 520px;
-      overflow: auto;
-    }
+    .transcript { max-height: 640px; overflow: auto; display: grid; gap: 8px; padding-right: 4px; }
+    .msg { display: flex; }
+    .msg.user, .msg.system, .msg.tool { justify-content: flex-start; }
+    .msg.assistant { justify-content: flex-end; }
+    .bubble { max-width: min(780px, 92%); border: 1px solid var(--line); border-radius: 13px; padding: 8px 12px; background: rgba(15,23,34,.9); }
+    .msg.assistant .bubble { background: rgba(24,64,103,.78); border-color: rgba(119,189,255,.3); }
+    .msg.tool .bubble { background: rgba(15,23,34,.9); border-color: var(--line); }
+    .msg.generated-tool .bubble { background: rgba(12,49,42,.88); border-color: rgba(65,217,150,.38); box-shadow: 0 0 0 2px rgba(65,217,150,.25); }
+    .msg-lbl { color: var(--muted); font-size: 10px; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .08em; }
+    .tbadge { display: inline-block; margin: 0 5px 6px 0; border: 1px solid rgba(65,217,150,.45); border-radius: 999px; padding: 2px 7px; color: var(--green); font-size: 11px; font-weight: 800; }
+    .empty-transcript { color: var(--muted); font-size: 13px; line-height: 1.5; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -385,7 +413,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <option value="task_compare.html">Task Compare</option>
       </select>
     </div>
+    <div class="run-progress" id="runProgress"></div>
     <div class="metrics" id="metrics"></div>
+    <div class="metrics tool-metrics" id="toolMetrics"></div>
   </header>
   <main>
     <aside>
@@ -455,6 +485,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     let payload = null;
     let pairs = [];
     let selected = 0;
+    let transactionArm = "candidate";
     let handlersBound = false;
 
     function metric(label, value, hint, className = "", clickable = false) {
@@ -465,10 +496,23 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       </div>`;
     }
 
+    function plannedTaskCount(summary) {
+      const selected = Math.max(
+        Number(summary.scenario_count || 0),
+        Number(payload?.arm_progress?.control?.scenario_count || 0),
+        Number(payload?.arm_progress?.candidate?.scenario_count || 0),
+        Number(pairs.length || 0),
+      );
+      const modeMatch = String(payload?.mode || "").match(/_(\d+)$/);
+      const modeCap = modeMatch ? Number(modeMatch[1]) : 0;
+      return Math.max(selected, modeCap);
+    }
+
     function renderMetrics() {
       const s = payload.summary || {};
       const tools = payload.tool_summary || {};
-      const totalTasks = s.scenario_count ?? pairs.length ?? 0;
+      const selectedTasks = Math.max(Number(s.scenario_count || 0), Number(pairs.length || 0));
+      const totalTasks = plannedTaskCount(s);
       const baselineDone = s.control_completed ?? 0;
       const sageDone = s.candidate_completed ?? s.current_completed ?? 0;
       const matched = Math.min(baselineDone, sageDone);
@@ -483,16 +527,17 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const outcomeLift = relLift(outcomeDelta, baselineOutcome);
       const used = tools.called_tool_count ?? 0;
       const total = tools.registry_tool_count ?? tools.tool_count ?? 0;
+      const selectedNote = selectedTasks && selectedTasks !== totalTasks ? ` · ${selectedTasks} selected/matched` : "";
+      document.getElementById("runProgress").innerHTML = `<span class="label">Run Progress</span><strong>${matched || 0}/${totalTasks || 0}</strong><span>baseline ${baselineDone}/${totalTasks || 0} · SAGE ${sageDone}/${totalTasks || 0}${selectedNote}</span>`;
       document.getElementById("metrics").innerHTML = [
-        metric("Run Progress", `${matched || 0}/${totalTasks || 0}`, `paired complete; baseline ${baselineDone}/${totalTasks || 0} · SAGE ${sageDone}/${totalTasks || 0}`),
         metric("Baseline Score", num(baselineScore), `${paired.scoreCount || matched || 0} paired score tasks`),
         metric("SAGE Score", num(sageScore), `${paired.scoreCount || matched || 0} paired score tasks`),
         metric("Score Lift", signedPct(scoreLift), `${signedNum(scoreDelta)} score delta`, cls(scoreDelta)),
         metric("Baseline Outcome", num(baselineOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("SAGE Outcome", num(sageOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("Outcome Lift", signedPct(outcomeLift), `${signedNum(outcomeDelta)} outcome delta`, cls(outcomeDelta)),
-        metric("Tools Born / Used", `${tools.generated_tool_birth_count || 0} / ${used}`, `${total} registry tools; click for contribution`, "warn", true),
       ].join("");
+      document.getElementById("toolMetrics").innerHTML = metric("Tools Born / Used", `${tools.generated_tool_birth_count || 0} / ${used}`, `${total} registry tools; click for contribution`, "warn", true);
       const cell = document.getElementById("toolsMetric");
       cell?.addEventListener("click", openTools);
       cell?.addEventListener("keydown", (event) => {
@@ -538,23 +583,55 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <tr><td>${idx + 1}</td><td>${esc(check.kind || "-")}</td><td>${esc(check.included)}</td><td>${num(check.score)}</td></tr>`).join("")}</tbody></table>`;
     }
 
-    function transcriptMessages(row) {
-      const messages = row?.messages || [];
-      const selectedMessages = messages.map((message) => {
-        const sender = message.label || message.sender || message.role || "-";
-        const content = message.content || message.message || "";
-        return `#${Number(message.index ?? 0) + 1} ${sender}\n${content}`;
-      });
-      if (!selectedMessages.length) {
-        if (row?.control_cache_source === "cached") {
-          const ids = row?.control_cache?.record_ids || [];
-          return `Cached control row has no local transcript export in this run.${ids.length ? "\\nCache record IDs: " + ids.join(", ") : ""}`;
-        }
-        const checks = row?.outcome_checks || [];
-        const observed = checks.flatMap((check) => check.observed_messages || []).slice(-3);
-        if (observed.length) return observed.join("\n\n");
+    function transcriptFallback(row) {
+      if (row?.control_cache_source === "cached") {
+        const ids = row?.control_cache?.record_ids || [];
+        return `Cached control row has no local transcript export in this run.${ids.length ? "\\nCache record IDs: " + ids.join(", ") : ""}`;
       }
-      return selectedMessages.join("\n\n") || "No transcript messages exported.";
+      const checks = row?.outcome_checks || [];
+      const observed = checks.flatMap((check) => check.observed_messages || []).slice(-3);
+      return observed.join("\\n\\n") || "No transcript messages exported.";
+    }
+
+    function messageRole(message) {
+      const raw = String(message.label || message.sender || message.role || "").toLowerCase();
+      if (raw.includes("tool")) return "tool";
+      if (raw.includes("assistant")) return "assistant";
+      if (raw.includes("user")) return "user";
+      return "system";
+    }
+
+    function messageTools(message) {
+      const tools = [...(message.generated_tools || [])];
+      if (!tools.length && message.uses_generated_tool) {
+        const label = String(message.label || "");
+        const content = String(message.content || message.message || "");
+        const labelMatch = label.match(/tool(?: call)?:\s*([A-Za-z0-9_]+)/i);
+        const contentMatch = content.match(/^\s*([A-Za-z0-9_]+)\s*\(/);
+        const tool = labelMatch?.[1] || contentMatch?.[1] || "";
+        if (tool) tools.push(tool);
+      }
+      return tools;
+    }
+
+    function messageHtml(message) {
+      const role = messageRole(message);
+      const tools = messageTools(message);
+      const label = message.label || message.sender || message.role || role;
+      const content = message.content || message.message || "[empty]";
+      return `<div class="msg ${role}${tools.length ? " generated-tool" : ""}">
+        <div class="bubble">
+          <div class="msg-lbl">${esc(`#${Number(message.index ?? 0) + 1} · ${label}`)}</div>
+          ${tools.map((tool) => `<span class="tbadge">⚡ ${esc(tool)}</span>`).join("")}
+          <pre>${esc(content)}</pre>
+        </div>
+      </div>`;
+    }
+
+    function transcriptHtml(row) {
+      const messages = row?.messages || [];
+      if (!messages.length) return `<div class="empty-transcript">${esc(transcriptFallback(row))}</div>`;
+      return `<div class="transcript">${messages.map(messageHtml).join("")}</div>`;
     }
 
     function toolEventHtml(pair) {
@@ -568,6 +645,34 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       if (!source) return "";
       const bits = [source.source, source.record_id ? `record ${source.record_id}` : "", source.transcript_path || ""].filter(Boolean);
       return bits.length ? `<div class="small" style="margin-bottom:8px">${esc(bits.join(" · "))}</div>` : "";
+    }
+
+    function transactionPanelHtml(control, candidate) {
+      const row = transactionArm === "control" ? control : candidate;
+      const title = transactionArm === "control" ? "Baseline Transaction" : "SAGE Transaction";
+      return `<div class="section">
+        <div class="transaction-head">
+          <h3>Full Transaction</h3>
+          <select id="transactionArm" class="transaction-select" aria-label="Transaction view">
+            <option value="control" ${transactionArm === "control" ? "selected" : ""}>Baseline</option>
+            <option value="candidate" ${transactionArm === "candidate" ? "selected" : ""}>SAGE</option>
+          </select>
+        </div>
+        <div class="box">
+          <h3>${title}</h3>
+          ${transcriptSource(row)}
+          ${transcriptHtml(row)}
+        </div>
+      </div>`;
+    }
+
+    function bindTransactionArm() {
+      const select = document.getElementById("transactionArm");
+      if (!select) return;
+      select.addEventListener("change", () => {
+        transactionArm = select.value;
+        renderDetail();
+      });
     }
 
     function renderDetail() {
@@ -616,22 +721,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
             ${summarizeChecks(candidate)}
           </div>
         </div>
-        <div class="section">
-          <h3 style="margin-top:0">Full Transaction</h3>
-          <div class="transaction-grid">
-          <div class="box">
-            <h3>Baseline Transaction</h3>
-            ${transcriptSource(control)}
-            <pre class="transcript">${esc(transcriptMessages(control))}</pre>
-          </div>
-          <div class="box">
-            <h3>SAGE Transaction</h3>
-            ${transcriptSource(candidate)}
-            <pre class="transcript">${esc(transcriptMessages(candidate))}</pre>
-          </div>
-          </div>
-        </div>
+        ${transactionPanelHtml(control, candidate)}
       `;
+      bindTransactionArm();
     }
 
     function openTools() {
@@ -668,8 +760,10 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const baselineDone = s.control_completed ?? 0;
       const sageDone = s.candidate_completed ?? s.current_completed ?? 0;
       const matched = Math.min(baselineDone, sageDone);
-      const totalTasks = s.scenario_count ?? pairs.length ?? 0;
-      document.getElementById("subtitle").textContent = `${payload.mode || "run"} · ${payload.status || "unknown"} · ${payload.agent || ""} · ${matched || 0}/${totalTasks || 0} matched tasks · refreshed ${new Date().toLocaleTimeString()}`;
+      const totalTasks = plannedTaskCount(s);
+      const selectedTasks = Math.max(Number(s.scenario_count || 0), Number(pairs.length || 0));
+      const matchedText = selectedTasks && selectedTasks !== totalTasks ? `${matched || 0}/${totalTasks || 0} cap · ${selectedTasks} matched tasks` : `${matched || 0}/${totalTasks || 0} matched tasks`;
+      document.getElementById("subtitle").textContent = `${payload.mode || "run"} · ${payload.status || "unknown"} · ${payload.agent || ""} · ${matchedText} · refreshed ${new Date().toLocaleTimeString()}`;
       if (selected >= pairs.length) selected = Math.max(0, pairs.length - 1);
       renderMetrics();
       renderList();

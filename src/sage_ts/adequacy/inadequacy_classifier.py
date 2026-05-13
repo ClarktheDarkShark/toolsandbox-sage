@@ -2974,9 +2974,9 @@ def classify_scenario_observations(
                     final_answer_route_mismatch=route_mismatch,
                 )
             )
-        if _is_latest_record_scenario(
-            scenario_name
-        ) or _is_message_recency_extreme_scenario(scenario_name):
+        if _is_message_recency_extreme_scenario(scenario_name):
+            observations.append(_message_content_by_recency_observation(scenario_name))
+        elif _is_latest_record_scenario(scenario_name):
             observations.append(_latest_record_selection_observation(scenario_name))
         if _is_message_counterparty_contact_update_scenario(scenario_name):
             observations.append(
@@ -3022,9 +3022,9 @@ def classify_scenario_observations(
         or _is_message_recency_extreme_scenario(scenario_name)
     ):
         observations = []
-        if _is_latest_record_scenario(
-            scenario_name
-        ) or _is_message_recency_extreme_scenario(scenario_name):
+        if _is_message_recency_extreme_scenario(scenario_name):
+            observations.append(_message_content_by_recency_observation(scenario_name))
+        elif _is_latest_record_scenario(scenario_name):
             observations.append(_latest_record_selection_observation(scenario_name))
         if _is_message_counterparty_contact_update_scenario(scenario_name):
             observations.append(

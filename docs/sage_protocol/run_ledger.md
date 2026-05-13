@@ -2,6 +2,26 @@
 
 ## 2026-05-13
 
+- `Self-evolving autonomous bucket route repair contact60` completed.
+  - Branch: `codex/self-evolving-sage-mini60`.
+  - Objective: perform one more improvement round using autonomous bucket targeting and repair, without manually exposing tools, and beat the current self-evolving lift list values before spending another broad500 run.
+  - Repair mechanism: broad generated negative triggers no longer hide a helper when the same helper has a more specific positive matching task family, e.g. `remove_contact` no longer blocks a `remove_contact_by_phone` contact lookup planner. Minefield negatives such as `insufficient_information`, `missing`, and `ambiguous` remain hard blockers. Send-message policy now blocks guessed phone-number side effects when no phone number or visible contact lookup path exists.
+  - Preparation: `artifacts/self_evolving_sage/current_formal500_live_generation_v50_auto_bucket_contact60_route_repair/self_evolving_mini60_preparation.json`.
+  - Manifest: `artifacts/self_evolving_sage/current_formal500_live_generation_v50_auto_bucket_contact60_route_repair/self_evolving_mini60_manifest.json`, SHA-256 `e852ab5f31b763ada8ad3924ee2ea07554feff3179f9c89ad331aab9d09fccaf`.
+  - Selected bucket: `contact_lookup_update_search_crud`; selected by the system from formal/broad gap packets; labels not inspected; no manual tool exposure list.
+  - Run: `outputs/self_evolving_sage/live_generation_v50_auto_bucket_contact60_route_repair/mechanism_60_20260513_105138`.
+  - Dashboard: `http://127.0.0.1:62624/outputs/self_evolving_sage/live_generation_v50_auto_bucket_contact60_route_repair/mechanism_60_20260513_105138/dashboard/task_compare.html`.
+  - Summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v50_auto_bucket_contact60_route_repair_summary.json`, SHA-256 `1c5775fa3a038242721091fc809f575d17cd7dcfa2db2902c459ada482cf8b3e`.
+  - Controls: `60 cached / 0 fresh`; cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`; SAGE/candidate task cache off; OpenAI response cache disabled; routing evidence disabled.
+  - Models: agent/user/generation all `gpt-4o-mini`.
+  - Metrics: canonical/reference `0.740335 -> 0.911396`, delta `+0.171061`, relative lift `+23.11%`; outcome `0.437475 -> 0.758516`, delta `+0.321042`, relative lift `+73.39%`.
+  - Gains/regressions/preserved: canonical `46 / 10 / 4`; outcome `36 / 9 / 0`.
+  - Generated helpers: `8` accepted from an empty starting registry; `7` naturally called; generated-tool called scenarios `32`; generated-tool failures `2`, both nonfatal planner attempts; accepted-but-uncalled `prepare_side_effect_args_from_selected_record`.
+  - Safety: runtime exceptions `0`; helper side-effect incidents `0`; runtime incidents `0`; protocol gate `PASS`.
+  - Comparison to current list values: targeted contact60 score lift `+23.11%` exceeds self-evolving broad250 `+16.46%`, self-evolving broad500 `+12.31%`, and fixed Praxis formal500 `+13.04%`; outcome delta `+0.321042` exceeds the fixed Praxis formal500 outcome delta `+0.245071` and self-evolving broad500 outcome delta `+0.205052` on this selected bucket.
+  - Decision label: `SELF_EVOLVING_AUTONOMOUS_BUCKET_REPAIR_BEATS_CURRENT_LIFT_LIST_ON_TARGETED_CONTACT_BUCKET`.
+  - Next action: do not immediately spend a broad500. Run one 100/250 broad checkpoint only after the same autonomous bucket-selection/repair logic is committed and the next residual bucket is selected by the system, not by a hand-authored exposure list.
+
 - `Self-evolving SAGE empty-registry broad250 and broad500 scale validation` completed.
   - Branch: `codex/self-evolving-sage-mini60`
   - Strategy: start from no accepted generated helpers, keep generation on, let the SAGE lifecycle/router decide helper birth, validation, retention, route repair, and visibility from natural run feedback. No force calls counted as evidence.

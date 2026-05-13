@@ -679,8 +679,30 @@ def resolve_search_window_or_bounds(current_timestamp: float, phrase: str, targe
         return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False, "abstain_reason": "unsupported_timestamp_intent", "interpretation": "", "bounds_source": "abstain"}
     normalized_direction = str(direction or "").strip().lower()
     normalized_phrase = str(phrase or "").strip().lower()
-    if not normalized_direction:
-        if normalized_phrase in ("yesterday", "today", "later today", "later_today", "upcoming", "recent", "latest", "oldest"):
+    phrase_direction = ""
+    if (
+        "oldest" in normalized_phrase
+        or "earliest" in normalized_phrase
+        or "first" in normalized_phrase
+    ):
+        phrase_direction = "oldest"
+    elif "latest" in normalized_phrase or "most recent" in normalized_phrase or "newest" in normalized_phrase:
+        phrase_direction = "latest"
+    if phrase_direction:
+        normalized_direction = phrase_direction
+    elif not normalized_direction:
+        if normalized_phrase in (
+            "yesterday",
+            "today",
+            "later today",
+            "later_today",
+            "upcoming",
+            "recent",
+            "latest",
+            "oldest",
+            "first",
+            "earliest",
+        ):
             normalized_direction = normalized_phrase.replace(" ", "_")
         else:
             return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False, "abstain_reason": "ambiguous_phrase", "interpretation": "", "bounds_source": "abstain"}
@@ -2121,7 +2143,7 @@ def _select_message_counterparty_for_contact_update_contract_tool(
         applicable_task_families=_merged_task_families(
             rejected_tool,
             "modify_contact_with_message_recency",
-            "search_sender_phone_number_with_content",
+            "modify_contact_with_message_recency_alt",
         ),
         reason_tool_is_decisive=(
             "It repairs a high-value contact-update gap by translating visible "

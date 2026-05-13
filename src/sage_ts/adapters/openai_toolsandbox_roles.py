@@ -611,7 +611,13 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
     messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
     for message in reversed(messages):
         if message.get("role") == "user":
-            latest_user = str(message.get("content", "")).strip().lower()
+            latest_user = (
+                str(message.get("content", ""))
+                .strip()
+                .lower()
+                .replace("’", "'")
+                .replace("‘", "'")
+            )
             break
     if not latest_user:
         return False
@@ -620,6 +626,9 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
         "can you",
         "could you",
         "you can",
+        "i need",
+        "need help",
+        "help me",
         "search",
         "find",
         "look for",
@@ -648,11 +657,155 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
         "you found it",
         "good to know",
         "appreciate",
+        "that's correct",
+        "that is correct",
+        "thats correct",
+        "that's right",
+        "that is right",
+        "that's what",
+        "thats what",
+        "that's the message",
+        "that's the one",
+        "that's it",
+        "that's the number",
+        "thats the one",
+        "thats it",
+        "thats the number",
+        "still accurate",
+        "that's still accurate",
+        "that is still accurate",
+        "covered this",
+        "good for now",
+        "all good",
+        "all set",
+        "i'm good",
+        "im good",
+        "i'm all good",
+        "im all good",
+        "i'm all set",
+        "im all set",
+        "i see that",
+        "i understand",
+        "anything else right now",
+        "don't have anything else",
+        "do not have anything else",
+        "nothing else",
+        "move on",
+        "you got it",
+        "exactly",
     )
     return (
         any(phrase in latest_user for phrase in acknowledgement_phrases)
         or any(word.startswith("thank") for word in words)
         or bool(words & {"thanks", "great", "cool", "okay", "ok", "alright"})
+    )
+
+
+def _latest_user_is_answer_retention_followup(openai_messages: object) -> bool:
+    if _latest_user_is_brief_acknowledgement(openai_messages):
+        return True
+    latest_user = ""
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    for message in reversed(messages):
+        if message.get("role") == "user":
+            latest_user = (
+                str(message.get("content", ""))
+                .strip()
+                .lower()
+                .replace("’", "'")
+                .replace("‘", "'")
+            )
+            break
+    if not latest_user:
+        return False
+    question_starts = ("what ", "why ", "how ", "who ", "when ", "where ")
+    command_tokens = (
+        "can you",
+        "could you",
+        "you can",
+        "i need",
+        "need help",
+        "help me",
+        "search",
+        "find",
+        "look for",
+        "look up",
+        "list",
+        "show",
+        "check ",
+        "add ",
+        "remove ",
+        "modify ",
+        "send ",
+        "turn on",
+        "turn off",
+    )
+    if (
+        "?" in latest_user
+        or latest_user.startswith(question_starts)
+        or any(token in latest_user for token in command_tokens)
+    ):
+        return False
+    retention_phrases = (
+        "that's correct",
+        "that is correct",
+        "thats correct",
+        "that's right",
+        "that is right",
+        "you got it",
+        "that's what",
+        "thats what",
+        "that's the message",
+        "that's the one",
+        "that's it",
+        "that's the number",
+        "thats the one",
+        "thats it",
+        "thats the number",
+        "still accurate",
+        "that's still accurate",
+        "that is still accurate",
+        "covered this",
+        "good for now",
+        "all good",
+        "all set",
+        "i'm good",
+        "im good",
+        "i'm all good",
+        "im all good",
+        "i'm all set",
+        "im all set",
+        "i see that",
+        "i understand",
+        "anything else right now",
+        "don't have anything else",
+        "do not have anything else",
+        "nothing else",
+        "move on",
+        "exactly",
+        "keep that private",
+        "keep it private",
+        "keep this private",
+        "stay private",
+        "keep it to yourself",
+        "keep that to yourself",
+        "do not share",
+        "don't share",
+        "not share",
+        "do not leak",
+        "don't leak",
+        "not leak",
+        "not go over it",
+        "won't share",
+        "wont share",
+        "private",
+        "confidential",
+    )
+    words = set(
+        "".join(char if char.isalnum() else " " for char in latest_user).split()
+    )
+    return any(phrase in latest_user for phrase in retention_phrases) or bool(
+        words & {"accurate", "correct", "right"}
     )
 
 
@@ -678,20 +831,48 @@ def _recent_tool_backed_answer_text(openai_messages: object) -> str | None:
     return answer
 
 
+def _recent_exact_final_answer_from_tool(openai_messages: object) -> str | None:
+    answer: str | None = None
+    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+        if message.get("role") != "tool":
+            continue
+        payload = _parse_mapping_payload(message.get("content"))
+        if not payload:
+            continue
+        copy_exactly = bool(payload.get("copy_exactly"))
+        candidate = str(
+            payload.get("exact_final_answer")
+            or payload.get("final_answer_recommendation")
+            or ""
+        ).strip()
+        if not candidate or candidate.lower().startswith("abstain:"):
+            continue
+        if copy_exactly or payload.get("exact_final_answer"):
+            answer = candidate
+    return answer
+
+
 def _messages_show_recent_tool_backed_answer(openai_messages: object) -> bool:
-    return _recent_tool_backed_answer_text(openai_messages) is not None
+    return (
+        _recent_exact_final_answer_from_tool(openai_messages) is not None
+        or _recent_tool_backed_answer_text(openai_messages) is not None
+    )
 
 
 def _answer_retention_response_text(openai_messages: object) -> str | None:
-    if not _latest_user_is_brief_acknowledgement(openai_messages):
+    is_brief_ack = _latest_user_is_brief_acknowledgement(openai_messages)
+    if not _latest_user_is_answer_retention_followup(openai_messages):
         return None
-    answer = _recent_tool_backed_answer_text(openai_messages)
+    answer = _recent_exact_final_answer_from_tool(
+        openai_messages
+    ) or _recent_tool_backed_answer_text(openai_messages)
     if not answer:
         return None
     answer = " ".join(answer.split())
     if len(answer) > 280:
         answer = answer[:277].rstrip() + "..."
-    return f"You're welcome. To recap: {answer}"
+    prefix = "You're welcome." if is_brief_ack else "Understood."
+    return f"{prefix} To recap: {answer}"
 
 
 def _recent_tool_backed_answer_already_recapped(openai_messages: object) -> bool:
@@ -723,7 +904,7 @@ def _answer_completion_bridge_completion(
     """End repeated acknowledgement loops after a tool-backed answer was recapped."""
     if not _praxis_bridge_policy_enabled():
         return None
-    if not _latest_user_is_brief_acknowledgement(openai_messages):
+    if not _latest_user_is_answer_retention_followup(openai_messages):
         return None
     if not _messages_show_recent_tool_backed_answer(openai_messages):
         return None
@@ -1685,7 +1866,7 @@ def _answer_retention_actor_policy_message(
     for message in cast(Iterable[Mapping[str, Any]], openai_messages):
         if ANSWER_RETENTION_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
             return None
-    if not _latest_user_is_brief_acknowledgement(openai_messages):
+    if not _latest_user_is_answer_retention_followup(openai_messages):
         return None
     if not _messages_show_recent_tool_backed_answer(openai_messages):
         return None
@@ -1693,10 +1874,12 @@ def _answer_retention_actor_policy_message(
         "role": "system",
         "content": (
             f"{ANSWER_RETENTION_ACTOR_POLICY_SENTINEL} The user is acknowledging "
-            "a just-completed tool-backed lookup. The next assistant message must "
-            "include the retrieved value again in a concise recap. Do not answer "
-            'only with a generic acknowledgement such as "you\'re welcome." Do not '
-            "call tools only to recap, and do not invent new facts."
+            "or closing a just-completed tool-backed lookup. The next assistant "
+            "message must include the retrieved value again in a concise recap. "
+            "If a helper returned exact_final_answer or final_answer_recommendation "
+            "with copy_exactly, preserve that answer exactly. Do not answer only "
+            'with a generic acknowledgement such as "you\'re welcome." Do not call '
+            "tools only to recap, and do not invent new facts."
         ),
     }
 
@@ -1762,7 +1945,8 @@ def _search_window_actor_policy_message(
         "content": (
             f"{SEARCH_WINDOW_ACTOR_POLICY_SENTINEL} A deterministic recency "
             f"search-window helper is available: {helper_list}. If the user asks "
-            "for the latest, oldest, last, most recent, yesterday, today, or "
+            "for the latest, oldest, first, earliest, last, most recent, "
+            "yesterday, today, or "
             "upcoming message/reminder/search result, prefer this helper before "
             "manually constructing search criteria. First call get_current_timestamp "
             "when a current timestamp is needed; then call the helper with the "
@@ -2806,6 +2990,73 @@ def _contact_update_phone_bridge_completion(
         return None
     available_names = _tool_names_execution_facing(openai_tools)
     phone = _phone_update_from_user_request(openai_messages)
+    user_text = " ".join(_all_user_texts(openai_messages)).lower()
+    recency_message_update = (
+        bool(phone)
+        and "message" in user_text
+        and any(token in user_text for token in ("last", "latest", "most recent"))
+    )
+    if recency_message_update and "search_messages" in available_names:
+        if _latest_tool_is(openai_messages, "resolve_search_window_or_bounds"):
+            payload = _latest_tool_payload_by_name_including_latest(
+                openai_messages, "resolve_search_window_or_bounds"
+            )
+            kwargs = payload.get("search_kwargs") if payload else None
+            should_call = bool(payload and payload.get("should_call_search"))
+            target_tool = str(payload.get("target_tool_name") or "") if payload else ""
+            if (
+                should_call
+                and target_tool == "search_messages"
+                and isinstance(kwargs, Mapping)
+            ):
+                return _synthetic_tool_call_completion(
+                    model_name=model_name,
+                    completion_id="sage-contact-update-message-recency-search",
+                    tool_name=_tool_name_for_call(openai_tools, "search_messages"),
+                    arguments=kwargs,
+                )
+        latest_search = _latest_tool_message(openai_messages, "search_messages")
+        latest_search_records = _parse_sequence_payload(
+            latest_search.get("content") if latest_search else ""
+        )
+        if not latest_search_records and not _message_already_called_tool(
+            openai_messages, "resolve_search_window_or_bounds"
+        ):
+            current_timestamp = _latest_current_timestamp(openai_messages)
+            if current_timestamp is None and "get_current_timestamp" in available_names:
+                return _synthetic_tool_call_completion(
+                    model_name=model_name,
+                    completion_id="sage-contact-update-message-recency-clock",
+                    tool_name=_tool_name_for_call(
+                        openai_tools, "get_current_timestamp"
+                    ),
+                    arguments={},
+                )
+            if (
+                current_timestamp is not None
+                and "resolve_search_window_or_bounds" in available_names
+            ):
+                return _synthetic_tool_call_completion(
+                    model_name=model_name,
+                    completion_id="sage-contact-update-message-recency-window",
+                    tool_name=_tool_name_for_call(
+                        openai_tools, "resolve_search_window_or_bounds"
+                    ),
+                    arguments={
+                        "current_timestamp": current_timestamp,
+                        "phrase": "latest",
+                        "target_domain": "message",
+                        "timestamp_intent": "message_creation",
+                        "direction": "latest",
+                    },
+                )
+            if current_timestamp is not None:
+                return _synthetic_tool_call_completion(
+                    model_name=model_name,
+                    completion_id="sage-contact-update-message-recency-search-fallback",
+                    tool_name=_tool_name_for_call(openai_tools, "search_messages"),
+                    arguments={"creation_timestamp_upperbound": current_timestamp},
+                )
     if (
         "select_message_counterparty_for_contact_update" in available_names
         and phone
@@ -2817,7 +3068,6 @@ def _contact_update_phone_bridge_completion(
         message = _latest_tool_message(openai_messages, "search_messages")
         records = _parse_sequence_payload(message.get("content") if message else "")
         if records:
-            user_text = " ".join(_all_user_texts(openai_messages)).lower()
             selection_mode = (
                 "oldest"
                 if any(token in user_text for token in ("oldest", "first", "earliest"))
@@ -3083,6 +3333,85 @@ def _contact_remove_by_phone_insufficient_response_text(
     )
 
 
+def _send_message_missing_phone_response_text(
+    openai_messages: object,
+    openai_tools: object,
+) -> str | None:
+    """Prevent guessed send-message side effects when no phone lookup path exists."""
+    if not _praxis_bridge_policy_enabled():
+        return None
+    available_names = _tool_names_execution_facing(openai_tools)
+    if "send_message_with_phone_number" not in available_names:
+        return None
+    if (
+        "search_contacts" in available_names
+        or "plan_send_message_contact_lookup" in available_names
+    ):
+        return None
+    all_user_text = " ".join(_all_user_texts(openai_messages)).strip()
+    lower_all = all_user_text.lower()
+    if not any(token in lower_all for token in ("send", "text")):
+        return None
+    if "message" not in lower_all and "text" not in lower_all:
+        return None
+    if _extract_phone_from_text(all_user_text):
+        return None
+    latest_tool = _latest_tool_message(
+        openai_messages, "send_message_with_phone_number"
+    )
+    latest_tool_text = (
+        str(latest_tool.get("content", "") or "").lower() if latest_tool else ""
+    )
+    if latest_tool_text and any(
+        token in latest_tool_text
+        for token in (
+            "numberparseexception",
+            "not seem to be a phone number",
+            "missing or invalid default region",
+            "invalid phone",
+        )
+    ):
+        return (
+            "I cannot send that message because I do not have a valid phone "
+            "number or a visible contact lookup path for the recipient."
+        )
+    if _latest_tool_is(openai_messages, "set_cellular_service_status"):
+        return (
+            "Cellular service is on, but I still cannot send that message "
+            "without a valid phone number or a visible contact lookup path for "
+            "the recipient."
+        )
+    if _latest_tool_is(openai_messages, "get_cellular_service_status"):
+        return None
+    latest_user = _latest_user_request_text(openai_messages).lower()
+    if not latest_user:
+        return None
+    if any(
+        token in latest_user
+        for token in (
+            "don't have",
+            "do not have",
+            "no phone",
+            "without it",
+            "message only",
+            "only have the message",
+            "no other way",
+            "can't think",
+            "cannot think",
+            "take your time",
+        )
+    ):
+        return (
+            "I cannot send that message without a valid phone number or a "
+            "visible contact lookup path for the recipient."
+        )
+    if not _message_already_called_tool(
+        openai_messages, "send_message_with_phone_number"
+    ):
+        return "I need the recipient's phone number before I can send that message."
+    return None
+
+
 def _state_action_sequence_bridge_completion(
     openai_messages: object,
     openai_tools: object,
@@ -3268,6 +3597,15 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
                 model_name=self.model_name,
                 completion_id="sage-contact-remove-phone-insufficient",
                 content=contact_remove_insufficient,
+            )
+        send_missing_phone = _send_message_missing_phone_response_text(
+            openai_messages, openai_tools
+        )
+        if send_missing_phone:
+            return _synthetic_text_completion(
+                model_name=self.model_name,
+                completion_id="sage-send-message-missing-phone",
+                content=send_missing_phone,
             )
         safe_action_abstain_bridge = _safe_action_or_abstain_bridge_completion(
             openai_messages,

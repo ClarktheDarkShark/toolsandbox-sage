@@ -86,8 +86,34 @@ def resolve_search_window_or_bounds(
         }
     normalized_direction = str(direction or "").strip().lower()
     normalized_phrase = str(phrase or "").strip().lower()
-    if not normalized_direction:
-        if normalized_phrase in ("yesterday", "today", "later today", "later_today", "upcoming", "recent", "latest", "oldest"):
+    phrase_direction = ""
+    if (
+        "oldest" in normalized_phrase
+        or "earliest" in normalized_phrase
+        or "first" in normalized_phrase
+    ):
+        phrase_direction = "oldest"
+    elif (
+        "latest" in normalized_phrase
+        or "most recent" in normalized_phrase
+        or "newest" in normalized_phrase
+    ):
+        phrase_direction = "latest"
+    if phrase_direction:
+        normalized_direction = phrase_direction
+    elif not normalized_direction:
+        if normalized_phrase in (
+            "yesterday",
+            "today",
+            "later today",
+            "later_today",
+            "upcoming",
+            "recent",
+            "latest",
+            "oldest",
+            "first",
+            "earliest",
+        ):
             normalized_direction = normalized_phrase.replace(" ", "_")
         else:
             return {
@@ -181,7 +207,8 @@ SPEC = ToolSpec(
     family=ToolFamily.DERIVED_VALUE_CALCULATOR,
     description=(
         "When a search task needs bounded time criteria such as yesterday, today, "
-        "later today, upcoming, recent, latest, or oldest, you MUST call this "
+        "later today, upcoming, recent, latest, oldest, first, or earliest, "
+        "you MUST call this "
         "helper after obtaining get_current_timestamp and BEFORE calling the "
         "original search tool. Call path: (1) get_current_timestamp. "
         "(2) In the NEXT turn call resolve_search_window_or_bounds with "

@@ -109,6 +109,46 @@ def _family_match(label: str, scenario_strata: set[str], scenario_name: str) -> 
     return False
 
 
+def _normalized_trigger_text(value: str) -> str:
+    return " ".join(value.strip().lower().replace("-", "_").replace("_", " ").split())
+
+
+def _specific_family_overrides_negative_trigger(
+    negative_trigger: str,
+    matched_families: tuple[str, ...],
+    scenario_name: str,
+) -> bool:
+    """Keep broad negative verbs from hiding a more specific matching family."""
+    negative = _normalized_trigger_text(negative_trigger)
+    if not negative:
+        return False
+    # These minefield-style triggers should remain hard blockers even if a broad
+    # family label also matches.
+    if any(
+        token in negative
+        for token in (
+            "insufficient",
+            "missing",
+            "ambiguous",
+            "no records",
+            "no candidates",
+            "empty",
+            "already ready",
+        )
+    ):
+        return False
+    scenario = _normalized_trigger_text(scenario_name)
+    for family in matched_families:
+        normalized_family = _normalized_trigger_text(family)
+        if (
+            negative in normalized_family
+            and normalized_family != negative
+            and normalized_family in scenario
+        ):
+            return True
+    return False
+
+
 def _summary_has_runtime_exceptions(payload: dict[str, Any]) -> bool:
     """Return whether a contribution summary points to an invalid runtime run."""
     candidate_dir = payload.get("candidate_dir")
@@ -379,8 +419,22 @@ def score_registry_entry_for_scenario(
             *spec.applicable_task_families,
         ]
     ).lower()
+    scenario_strata = set(classify_task_strata(scenario_name))
+    matched_positive = tuple(
+        token for token in spec.positive_triggers if _token_match(token, scenario_lower)
+    )
+    matched_families = tuple(
+        family
+        for family in spec.applicable_task_families
+        if _family_match(family, scenario_strata, scenario_lower)
+    )
     matched_negative = tuple(
-        token for token in spec.negative_triggers if _token_match(token, scenario_lower)
+        token
+        for token in spec.negative_triggers
+        if _token_match(token, scenario_lower)
+        and not _specific_family_overrides_negative_trigger(
+            token, matched_families, scenario_lower
+        )
     )
     if matched_negative:
         return RuntimeRoutingDecision(
@@ -392,9 +446,6 @@ def score_registry_entry_for_scenario(
             matched_negative_triggers=matched_negative,
         )
     score = 0
-    matched_positive = tuple(
-        token for token in spec.positive_triggers if _token_match(token, scenario_lower)
-    )
     if matched_positive:
         score += 4
     if _is_recency_action_selector(
@@ -463,12 +514,6 @@ def score_registry_entry_for_scenario(
             "post_selection_composite_requires_downstream_action_task",
             -20,
         )
-    scenario_strata = set(classify_task_strata(scenario_name))
-    matched_families = tuple(
-        family
-        for family in spec.applicable_task_families
-        if _family_match(family, scenario_strata, scenario_lower)
-    )
     matched_spec_families = matched_families
     if matched_families:
         score += 3

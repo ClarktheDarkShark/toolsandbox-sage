@@ -98,6 +98,74 @@ def test_generic_routing_shows_positive_trigger_and_hides_negative() -> None:
     assert hidden.reason == "blocked_by_negative_trigger"
 
 
+def test_specific_family_match_overrides_broad_action_negative(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setattr(
+        routing_scorer, "has_current_validation_proof", lambda _entry: True
+    )
+    base = _entry()
+    entry = RegistryEntry.accepted(
+        replace(
+            base.tool,
+            spec=replace(
+                base.tool.spec,
+                tool_name="plan_contact_lookup_query",
+                family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+                positive_triggers=("remove_contact_by_phone",),
+                negative_triggers=("remove_contact",),
+                applicable_task_families=("remove_contact_by_phone",),
+                required_original_tool_calls=("search_contacts",),
+                preserves_side_effect_tools=("search_contacts",),
+            ),
+        ),
+        base.validation,
+        birth_scenario="remove_contact_by_phone",
+    )
+
+    decision = score_registry_entry_for_scenario(
+        entry, "remove_contact_by_phone_3_distraction_tools"
+    )
+
+    assert decision.visible
+    assert decision.reason == "generic_relevance_score_passed"
+
+
+def test_minefield_negative_still_blocks_specific_family(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setattr(
+        routing_scorer, "has_current_validation_proof", lambda _entry: True
+    )
+    base = _entry()
+    entry = RegistryEntry.accepted(
+        replace(
+            base.tool,
+            spec=replace(
+                base.tool.spec,
+                tool_name="plan_contact_lookup_query",
+                family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+                positive_triggers=("remove_contact_by_phone",),
+                negative_triggers=("insufficient_information",),
+                applicable_task_families=(
+                    "remove_contact_by_phone_insufficient_information",
+                ),
+                required_original_tool_calls=("search_contacts",),
+                preserves_side_effect_tools=("search_contacts",),
+            ),
+        ),
+        base.validation,
+        birth_scenario="remove_contact_by_phone",
+    )
+
+    decision = score_registry_entry_for_scenario(
+        entry, "remove_contact_by_phone_insufficient_information"
+    )
+
+    assert not decision.visible
+    assert decision.reason == "blocked_by_negative_trigger"
+
+
 def test_helper_trigger_strata_do_not_expose_without_specific_match() -> None:
     base = _entry()
     tool = replace(

@@ -121,7 +121,7 @@ CHAIN_ROUTING_FAMILIES_BY_KEY = {
     ),
     "composite:select_message_counterparty_for_contact_update": (
         "modify_contact_with_message_recency",
-        "search_sender_phone_number_with_content",
+        "modify_contact_with_message_recency_alt",
     ),
     "derived_value:resolve_search_window_or_bounds": (
         "search_reminder_with_creation_recency_yesterday",

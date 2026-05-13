@@ -327,10 +327,14 @@ The formal500 confirms the combined bridge-policy lift with zero safety incident
 
 The broad500 run resumed after an OpenAI transport hang. The completed paired metrics are valid, but the lifecycle reflection state did not fully hydrate across the resume boundary. The runtime now has a tested resume-hydration repair that reloads cumulative lifecycle decisions from copied `self_evolution_task_feedback.jsonl`, plus bounded OpenAI request timeouts via `SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS`.
 
-The next action is no longer basic scale-up. It is to confirm the repaired runtime before spending another broad500 run:
+The v50 autonomous bucket repair then moved beyond human bucket/exposure steering. The controller selected `contact_lookup_update_search_crud` from gap packets, started with an empty generated-tool registry, generated and retained tools live, and routed them naturally. The run `outputs/self_evolving_sage/live_generation_v50_auto_bucket_contact60_route_repair/mechanism_60_20260513_105138` produced score lift `+23.11%` and outcome lift `+73.39%` on 60 targeted contact-bucket scenarios, with `8` accepted helpers, `7` naturally called helpers, `32` generated-tool called scenarios, cached controls `60 / 0`, runtime exceptions `0`, helper side-effect incidents `0`, and protocol gate `PASS`.
+
+The important design change was not manual exposure. It was a system policy repair: specific positive family evidence can override an overbroad action negative trigger, while true minefield negatives remain blockers. The actor bridge also blocks guessed send-message side effects when no phone/contact lookup path exists.
+
+The next action is no longer basic scale-up. It is to confirm the autonomous bucket-selection and route-repair runtime before spending another broad500 run:
 
 1. run a small intentional resume smoke test to verify cumulative lifecycle hydration,
 2. run a no-resume or resume-hydrated 100/250 checkpoint under the same committed runtime,
-3. mine the completed broad500 residual gap profile (`artifacts/self_evolving_sage/summary/self_evolving_live_generation_v38_broad500_residual_gap_profile.json`) for oldest-message recency, low-battery reminder scheduling, contact modification by message recency, device-state reads, and holiday/date calculation families,
+3. let the system select the next residual bucket from `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v38_broad500_residual_gap_profile.json`; likely high-opportunity families include oldest-message recency, low-battery reminder scheduling, contact modification by message recency, device-state reads, and holiday/date calculation,
 4. let the system generate/repair candidates from those buckets, not a human-selected exposure list,
 5. run another broad500 only if the 100/250 checkpoint matches or exceeds the fixed Praxis trajectory.

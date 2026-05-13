@@ -1,0 +1,118 @@
+{
+  "artifact_type": "self_evolving_sage_v50_autonomous_bucket_contact60_summary",
+  "candidate_cache": "off",
+  "control_cache": {
+    "cached": 60,
+    "fresh": 0,
+    "manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "mode": "use-if-eligible",
+    "policy": null
+  },
+  "dashboard_task_compare_url": "http://127.0.0.1:62624/outputs/self_evolving_sage/live_generation_v50_auto_bucket_contact60_route_repair/mechanism_60_20260513_105138/dashboard/task_compare.html",
+  "final_claim_evidence": false,
+  "final_registry_hash": "a2ce3ae7ceb13d50d772be4d2db8694913de229acbbe1200ce3abb50e4314cc8",
+  "generation_enabled": true,
+  "interpretation": "Autonomous bucket targeting plus routing/precondition self-repair beat the prior self-evolving broad250 and broad500 score-lift high-water values on the selected contact gap bucket without manual tool exposure.",
+  "labels_inspected": false,
+  "manifest_path": "artifacts/self_evolving_sage/current_formal500_live_generation_v50_auto_bucket_contact60_route_repair/self_evolving_mini60_manifest.json",
+  "metrics": {
+    "candidate_outcome": 0.7585164207526451,
+    "candidate_score": 0.9113964316543964,
+    "control_outcome": 0.4374749122700125,
+    "control_score": 0.7403350795552317,
+    "gains": 46,
+    "outcome_delta": 0.32104150848263263,
+    "outcome_gains": 36,
+    "outcome_lift_percent": 73.38512437588275,
+    "outcome_preserved": 0,
+    "outcome_regressions": 9,
+    "outcome_scenario_count": 45,
+    "preserved": 4,
+    "regressions": 10,
+    "score_delta": 0.1710613520991648,
+    "score_lift_percent": 23.10593632844369
+  },
+  "models": {
+    "agent": {
+      "api_model": "gpt-4o-mini",
+      "chat_completions": true,
+      "comparison_key": "gpt-4o-mini",
+      "context_window": 128000,
+      "family": "gpt-4o",
+      "function_calling": true,
+      "known_model": true,
+      "max_output_tokens": 16384,
+      "requested_model": "gpt-4o-mini",
+      "resolved_model": "gpt-4o-mini",
+      "structured_outputs": true,
+      "temperature_supported": true
+    },
+    "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+    "generation": {
+      "api_model": "gpt-4o-mini",
+      "chat_completions": true,
+      "comparison_key": "gpt-4o-mini",
+      "context_window": 128000,
+      "family": "gpt-4o",
+      "function_calling": true,
+      "known_model": true,
+      "max_output_tokens": 16384,
+      "requested_model": "gpt-4o-mini",
+      "resolved_model": "gpt-4o-mini",
+      "structured_outputs": true,
+      "temperature_supported": true
+    },
+    "mixed_model_warning": null,
+    "user": {
+      "api_model": "gpt-4o-mini",
+      "chat_completions": true,
+      "comparison_key": "gpt-4o-mini",
+      "context_window": 128000,
+      "family": "gpt-4o",
+      "function_calling": true,
+      "known_model": true,
+      "max_output_tokens": 16384,
+      "requested_model": "gpt-4o-mini",
+      "resolved_model": "gpt-4o-mini",
+      "structured_outputs": true,
+      "temperature_supported": true
+    }
+  },
+  "openai_response_cache": "disabled",
+  "preparation_path": "artifacts/self_evolving_sage/current_formal500_live_generation_v50_auto_bucket_contact60_route_repair/self_evolving_mini60_preparation.json",
+  "routing_evidence_mode": "disabled",
+  "run_root": "outputs/self_evolving_sage/live_generation_v50_auto_bucket_contact60_route_repair/mechanism_60_20260513_105138",
+  "safety": {
+    "active_diagnostic_force_env": [],
+    "diagnostic_force_allowed": false,
+    "helper_side_effect_incident_count": 0,
+    "protocol_gate_passed": true,
+    "protocol_gate_reasons": [],
+    "runtime_exception_count": 0,
+    "runtime_incident_count": 0
+  },
+  "scenario_count": 60,
+  "selected_bucket": "contact_lookup_update_search_crud",
+  "selected_scenario_count": 60,
+  "starting_registry_hash": "61468467448a94c5c6ced36d05894d7ba2e2f7501ca84270a30da1cd18a3c713",
+  "tooling": {
+    "accepted_but_uncalled_tools": [
+      "prepare_side_effect_args_from_selected_record"
+    ],
+    "accepted_tool_count": 8,
+    "accepted_tools": [
+      "plan_contact_lookup_query",
+      "plan_contact_relationship_batch_update",
+      "plan_contact_update_from_id",
+      "plan_device_state_action_sequence_v3",
+      "plan_send_message_contact_lookup",
+      "prepare_side_effect_args_from_selected_record",
+      "select_action_target_by_recency",
+      "select_record_by_timestamp_extreme"
+    ],
+    "generated_tool_attempted_scenarios": 32,
+    "generated_tool_called_scenarios": 32,
+    "generated_tool_failed_scenarios": 2,
+    "generated_tool_visible_scenarios": 40
+  }
+}

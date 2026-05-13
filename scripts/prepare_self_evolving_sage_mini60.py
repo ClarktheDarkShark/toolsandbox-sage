@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a <=60 task self-evolving SAGE contact-gap campaign."""
+"""Prepare a <=60 task self-evolving SAGE autonomous-gap campaign."""
 
 from __future__ import annotations
 
@@ -40,6 +40,14 @@ def main() -> None:
     parser.add_argument("--generation-model", default=MINI_MODEL)
     parser.add_argument("--split-name", default="transfer_60")
     parser.add_argument(
+        "--bucket-hint",
+        default="auto",
+        help=(
+            "Gap bucket to target. Use 'auto' to select the highest-opportunity "
+            "bucket from the source gap profile."
+        ),
+    )
+    parser.add_argument(
         "--tool-strategy",
         choices=(
             "empty_live_generation",
@@ -47,7 +55,7 @@ def main() -> None:
             "praxis_contact_bridgepack",
             "praxis_current_pack",
         ),
-        default="contact_action_v2",
+        default="empty_live_generation",
     )
     parser.add_argument(
         "--recipe-registry",
@@ -69,6 +77,7 @@ def main() -> None:
             user_model=args.user,
             generation_model=args.generation_model,
             split_name=args.split_name,
+            bucket_hint=args.bucket_hint,
             tool_strategy=args.tool_strategy,
             recipe_registry=args.recipe_registry,
         )

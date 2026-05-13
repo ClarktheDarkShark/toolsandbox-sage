@@ -100,6 +100,44 @@ def test_latest_message_path_avoids_no_criteria_search() -> None:
     }
 
 
+def test_message_phrase_overrides_bad_direction_annotation() -> None:
+    result = _call_helper(
+        current_timestamp=1777380998.0,
+        phrase="oldest message",
+        target_domain="message",
+        timestamp_intent="past",
+        direction="backward",
+        content_keyword="",
+        lookback_days=0,
+        timezone_offset=0.0,
+    )
+    assert result["should_call_search"] is True
+    assert result["target_tool_name"] == "search_messages"
+    assert result["interpretation"] == "oldest"
+    assert result["search_kwargs"] == {
+        "creation_timestamp_upperbound": 1777380998.0,
+    }
+
+
+def test_first_message_phrase_maps_to_oldest_even_with_noisy_direction() -> None:
+    result = _call_helper(
+        current_timestamp=1777380998.0,
+        phrase="first ever text",
+        target_domain="message",
+        timestamp_intent="message_creation",
+        direction="older",
+        content_keyword="",
+        lookback_days=0,
+        timezone_offset=0.0,
+    )
+    assert result["should_call_search"] is True
+    assert result["target_tool_name"] == "search_messages"
+    assert result["interpretation"] == "oldest"
+    assert result["search_kwargs"] == {
+        "creation_timestamp_upperbound": 1777380998.0,
+    }
+
+
 def test_missing_current_timestamp_abstains() -> None:
     result = _call_helper(
         current_timestamp=0.0,

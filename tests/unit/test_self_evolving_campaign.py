@@ -44,6 +44,9 @@ def _write_manifest(path: Path) -> Path:
         {"name": "search_phone_number_with_name", "categories": []},
         {"name": "update_contact_with_id_and_phone_number", "categories": []},
         {"name": "search_name_with_relationship", "categories": []},
+        {"name": "search_message_with_recency_oldest", "categories": []},
+        {"name": "search_message_with_recency_latest", "categories": []},
+        {"name": "modify_contact_with_message_recency", "categories": []},
     ]
     path.write_text(
         json.dumps({"splits": {"full_benchmark": records}}) + "\n",
@@ -79,6 +82,8 @@ def test_prepare_self_evolving_campaign_starts_empty_then_generates_tool(
             source_manifest=_write_manifest(tmp_path / "formal_manifest.json"),
             output_root=tmp_path / "campaign",
             max_samples=2,
+            bucket_hint="contact_lookup_update_search_crud",
+            tool_strategy="contact_action_v2",
         )
     )
 
@@ -122,3 +127,58 @@ def test_prepare_self_evolving_campaign_can_leave_registry_empty_for_live_genera
     assert summary["cache_policy_for_run"]["generation"] == "on"
     assert registry == {"tools": {}}
     assert len(manifest["splits"]["mechanism_60"]) == 2
+
+
+def test_prepare_self_evolving_campaign_reads_residual_profile_top_buckets(
+    tmp_path: Path,
+) -> None:
+    gap_packet = tmp_path / "residual_profile.json"
+    gap_packet.write_text(
+        json.dumps(
+            {
+                "top_buckets": [
+                    {
+                        "bucket": "search_message_with_recency_oldest",
+                        "scenario_count": 2,
+                        "outcome_regressions": 2,
+                        "score_regressions": 1,
+                        "outcome_negative_mass": 2.0,
+                        "score_negative_mass": 0.4,
+                        "opportunity_score": 22.0,
+                        "examples": [
+                            {"scenario": "search_message_with_recency_oldest"}
+                        ],
+                    },
+                    {
+                        "bucket": "contact_lookup_update_search_crud",
+                        "scenario_count": 3,
+                        "outcome_negative_mass": 1.0,
+                        "score_negative_mass": 1.0,
+                    },
+                ]
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    prepared = prepare_self_evolving_campaign(
+        SelfEvolvingCampaignConfig(
+            source_gap_packet=gap_packet,
+            source_manifest=_write_manifest(tmp_path / "formal_manifest.json"),
+            output_root=tmp_path / "auto_bucket",
+            max_samples=3,
+            split_name="auto_bucket_60",
+            tool_strategy="empty_live_generation",
+        )
+    )
+
+    summary = json.loads(prepared.summary_path.read_text(encoding="utf-8"))
+    manifest = json.loads(prepared.manifest_path.read_text(encoding="utf-8"))
+    selected = [row["name"] for row in manifest["splits"]["auto_bucket_60"]]
+
+    assert prepared.selected_bucket == "search_message_with_recency_oldest"
+    assert summary["selected_bucket"]["opportunity_score"] == 22.0
+    assert summary["generated_tool_names"] == []
+    assert "search_message_with_recency_oldest" in selected
+    assert "search_message_with_recency_latest" in selected

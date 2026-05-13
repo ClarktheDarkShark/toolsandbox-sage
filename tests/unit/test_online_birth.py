@@ -10,6 +10,7 @@ from sage_ts.adequacy.inadequacy_classifier import (
 from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.orchestration.online_birth import (
+    CHAIN_ROUTING_FAMILIES_BY_KEY,
     OnlineBirthController,
     _normalize_live_birth_routing_metadata,
     _original_tool_contract_errors,
@@ -25,6 +26,18 @@ _RELATIVE_TIME_TOOL_NAME = "relative_day_time_to_timestamp"
 _RECORD_SELECTOR_TOOL_NAME = "select_record_by_timestamp_extreme"
 _RESOLVE_WINDOW_TOOL_NAME = "resolve_search_window_or_bounds"
 _CONTACT_LOOKUP_TOOL_NAME = "plan_contact_lookup_query"
+
+
+def test_contact_update_counterparty_helper_does_not_route_to_answer_only_sender_lookup() -> (
+    None
+):
+    families = CHAIN_ROUTING_FAMILIES_BY_KEY[
+        "composite:select_message_counterparty_for_contact_update"
+    ]
+
+    assert "modify_contact_with_message_recency" in families
+    assert "modify_contact_with_message_recency_alt" in families
+    assert "search_sender_phone_number_with_content" not in families
 
 
 def test_generic_dependency_bundle_observation_uses_allowed_tool_structure(
@@ -895,6 +908,24 @@ def test_modify_contact_message_recency_requests_search_filter_helper() -> None:
         "selected_timestamp": 20.0,
         "abstain_reason": "",
     }
+
+
+def test_message_recency_answer_prioritizes_final_answer_helper() -> None:
+    scenario = Scenario(
+        categories=[
+            ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL)),
+        ]
+    )
+    observations = classify_scenario_observations(
+        "search_message_with_recency_oldest_10_distraction_tools",
+        scenario,
+        {"similarity": 0.0, "outcome_similarity": 0.2},
+    )
+    keys = [observation.canonical_key for observation in observations]
+
+    assert "search_filter:select_message_content_by_recency" in keys
+    assert "search_filter:select_record_by_timestamp_extreme" not in keys
+    assert keys[0] == "search_filter:select_message_content_by_recency"
 
 
 def test_rejected_birth_can_retry_on_later_observation(tmp_path: Path) -> None:

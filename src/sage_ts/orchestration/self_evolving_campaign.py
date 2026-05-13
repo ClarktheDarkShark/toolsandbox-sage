@@ -49,8 +49,8 @@ class SelfEvolvingCampaignConfig:
     user_model: str = MINI_MODEL
     generation_model: str = MINI_MODEL
     split_name: str = "transfer_60"
-    bucket_hint: str = "contact_lookup_update_search_crud"
-    tool_strategy: str = "contact_action_v2"
+    bucket_hint: str = "auto"
+    tool_strategy: str = "empty_live_generation"
     recipe_registry: Path | None = None
 
 
@@ -310,6 +310,11 @@ def _materialize_recipe_entries(
 
 
 def _select_bucket(buckets: tuple[GapBucket, ...], bucket_hint: str) -> GapBucket:
+    normalized_hint = bucket_hint.strip().lower()
+    if normalized_hint in {"", "auto", "top", "highest_opportunity"}:
+        if not buckets:
+            raise ValueError("no_gap_buckets_found")
+        return buckets[0]
     for bucket in buckets:
         if bucket.bucket == bucket_hint:
             return bucket
@@ -349,46 +354,106 @@ def _write_capped_manifest(
         str(record["name"]): record for record in source_records if "name" in record
     }
     priority_names = [scenario.scenario for scenario in bucket.top_scenarios]
-    contact_tokens = (
-        "search_phone_number_with_name",
-        "search_name_with_relationship",
-        "search_relationship_with_phone_number",
-        "search_sender_phone_number_with_content",
-        "update_contact_with_id_and_phone_number",
-        "update_contact_relationship_with_relationship",
-        "modify_contact_with_message_recency",
-        "remove_contact_by_phone",
-        "send_message_with_contact_content",
-    )
+    scenario_tokens = _scenario_tokens_for_bucket(bucket.bucket)
     selected: list[str] = []
     for name in priority_names:
         if name in records_by_name and name not in selected:
             selected.append(name)
     for name in records_by_name:
         lowered = name.lower()
-        if any(token in lowered for token in contact_tokens) and name not in selected:
+        if (
+            _matches_bucket_family(lowered, bucket.bucket, scenario_tokens)
+            and name not in selected
+        ):
             selected.append(name)
         if len(selected) >= max_samples:
             break
     selected = selected[:max_samples]
     output = {
-        "manifest_type": "self_evolving_sage_contact_gap_mini60_experimental",
+        "manifest_type": "self_evolving_sage_autonomous_bucket_mini60_experimental",
         "final_claim_evidence": False,
         "labels_inspected": False,
         "cache_selection_used": False,
         "selection_rule": (
-            "Autonomous gap observer selected the highest outcome-regression "
-            "bucket, then built a <=60 contact lookup/update/search mini split "
-            "from the formal manifest without using labels or expected answers."
+            "Autonomous gap observer selected a high-opportunity bucket from "
+            "run artifacts, prioritized its recorded examples, then filled a "
+            "<=60 family/affordance split from the formal manifest using only "
+            "scenario names and task metadata. Labels, expected answers, prior "
+            "SAGE traces, and cache availability were not used for selection."
         ),
         "source_manifest": str(source_manifest),
         "selected_bucket": bucket.bucket,
+        "scenario_tokens": list(scenario_tokens),
         "sample_cap": MAX_SELF_EVOLVING_SAMPLES,
         "splits": {split_name: [records_by_name[name] for name in selected]},
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
     return tuple(selected)
+
+
+def _scenario_tokens_for_bucket(bucket_name: str) -> tuple[str, ...]:
+    """Return scenario-name affordances for an autonomous residual bucket.
+
+    This is intentionally metadata-only: it never uses labels, hidden state, or
+    expected answers.  The mapping lets the self-evolving loop test near-family
+    variants of the bucket it selected instead of falling back to the old
+    contact-only split.
+    """
+
+    lowered = bucket_name.lower()
+    tokens: list[str] = [lowered]
+    if "message" in lowered and "recency" in lowered:
+        tokens.extend(
+            (
+                "search_message_with_recency",
+                "modify_contact_with_message_recency",
+                "search_sender_phone_number_with_content",
+            )
+        )
+    if "reminder" in lowered:
+        tokens.extend(
+            ("add_reminder", "modify_reminder", "remove_reminder", "reminder")
+        )
+    if "contact" in lowered:
+        tokens.extend(
+            (
+                "search_phone_number_with_name",
+                "search_name_with_relationship",
+                "search_relationship_with_phone_number",
+                "update_contact_with_id_and_phone_number",
+                "update_contact_relationship_with_relationship",
+                "modify_contact_with_message_recency",
+                "remove_contact_by_phone",
+                "send_message_with_contact_content",
+            )
+        )
+    if any(token in lowered for token in ("wifi", "cellular", "bluetooth", "location")):
+        tokens.extend(
+            (
+                "get_wifi",
+                "get_cellular",
+                "get_bluetooth",
+                "get_location_service",
+                "turn_on_wifi",
+                "turn_off_wifi",
+                "turn_on_cellular",
+                "turn_off_cellular",
+                "low_battery_mode",
+            )
+        )
+    if "holiday" in lowered:
+        tokens.extend(("find_days_till_holiday", "holiday"))
+    return tuple(dict.fromkeys(tokens))
+
+
+def _matches_bucket_family(
+    scenario_name: str, bucket_name: str, scenario_tokens: tuple[str, ...]
+) -> bool:
+    lowered_bucket = bucket_name.lower()
+    return scenario_name.startswith(lowered_bucket) or any(
+        token and token in scenario_name for token in scenario_tokens
+    )
 
 
 def build_contact_lookup_or_update_action_tool(bucket: GapBucket) -> GeneratedTool:

@@ -27,6 +27,7 @@ from sage_ts.adapters.openai_toolsandbox_roles import (
     _safe_action_or_abstain_bridge_completion,
     _safe_argument_actor_policy_message,
     _scheduling_timestamp_actor_policy_message,
+    _send_message_missing_phone_response_text,
     _state_action_actor_policy_message,
     _state_action_planner_bridge_completion,
     _state_action_sequence_bridge_completion,
@@ -194,6 +195,131 @@ def test_answer_retention_response_recaps_without_tool_call() -> None:
         _answer_retention_response_text(messages)
         == "You're welcome. To recap: Your relationship with +10000000000 is boss."
     )
+
+
+def test_answer_retention_prefers_exact_helper_final_answer() -> None:
+    messages = [
+        {"role": "user", "content": "What does my oldest message say?"},
+        {
+            "role": "tool",
+            "name": "select_message_content_by_recency",
+            "content": str(
+                {
+                    "exact_final_answer": "Your oldest message says 'GPU offer'.",
+                    "final_answer_recommendation": (
+                        "Your oldest message says 'GPU offer'."
+                    ),
+                    "copy_exactly": True,
+                }
+            ),
+        },
+        {"role": "assistant", "content": 'Your oldest message says, "GPU offer".'},
+        {"role": "user", "content": "That's correct!"},
+    ]
+
+    assert _answer_retention_response_text(messages) == (
+        "You're welcome. To recap: Your oldest message says 'GPU offer'."
+    )
+
+
+def test_answer_retention_recaps_exact_answer_on_privacy_followup() -> None:
+    messages = [
+        {"role": "user", "content": "What does my oldest message say?"},
+        {
+            "role": "tool",
+            "name": "select_message_content_by_recency",
+            "content": str(
+                {
+                    "exact_final_answer": "Your oldest message says 'GPU offer'.",
+                    "copy_exactly": True,
+                }
+            ),
+        },
+        {"role": "assistant", "content": "Your oldest message says 'GPU offer'."},
+        {"role": "user", "content": "I want to keep that message private."},
+    ]
+
+    assert _answer_retention_response_text(messages) == (
+        "Understood. To recap: Your oldest message says 'GPU offer'."
+    )
+
+
+def test_answer_retention_handles_closing_privacy_followup() -> None:
+    messages = [
+        {"role": "user", "content": "What does my oldest message say?"},
+        {
+            "role": "tool",
+            "name": "select_message_content_by_recency",
+            "content": str(
+                {
+                    "exact_final_answer": "Your oldest message says 'GPU offer'.",
+                    "copy_exactly": True,
+                }
+            ),
+        },
+        {"role": "assistant", "content": "Your oldest message says 'GPU offer'."},
+        {"role": "user", "content": "Let's move on. I'm good for now."},
+    ]
+
+    assert _answer_retention_response_text(messages) == (
+        "You're welcome. To recap: Your oldest message says 'GPU offer'."
+    )
+
+
+@pytest.mark.parametrize(
+    "followup",
+    [
+        "That’s still accurate!",
+        "Yes, that’s the one.",
+        "Yep, that's it.",
+        "I don't have anything else right now.",
+        "Exactly!",
+        "I'm all set, thanks!",
+    ],
+)
+def test_answer_retention_handles_confirmation_variants(followup: str) -> None:
+    messages = [
+        {"role": "user", "content": "What does my oldest message say?"},
+        {
+            "role": "tool",
+            "name": "select_message_content_by_recency",
+            "content": str(
+                {
+                    "exact_final_answer": "Your oldest message says 'GPU offer'.",
+                    "copy_exactly": True,
+                }
+            ),
+        },
+        {"role": "assistant", "content": "Your oldest message says 'GPU offer'."},
+        {"role": "user", "content": followup},
+    ]
+
+    assert _answer_retention_response_text(messages) == (
+        "You're welcome. To recap: Your oldest message says 'GPU offer'."
+    )
+
+
+def test_answer_retention_does_not_interrupt_need_help_followup() -> None:
+    messages = [
+        {"role": "user", "content": "What does my oldest message say?"},
+        {
+            "role": "tool",
+            "name": "select_message_content_by_recency",
+            "content": str(
+                {
+                    "exact_final_answer": "Your oldest message says 'GPU offer'.",
+                    "copy_exactly": True,
+                }
+            ),
+        },
+        {"role": "assistant", "content": "Your oldest message says 'GPU offer'."},
+        {
+            "role": "user",
+            "content": "I need help finding a different message now.",
+        },
+    ]
+
+    assert _answer_retention_response_text(messages) is None
 
 
 def test_answer_retention_uses_immediate_tool_backed_answer() -> None:
@@ -516,6 +642,50 @@ def test_state_action_planner_bridge_ignores_plain_direct_toggle(
     )
 
 
+def test_send_message_missing_phone_bridge_blocks_guess_without_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "send_message_with_phone_number"}}
+    ]
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                'Send a message to Fredrik Thordendal saying: "How is the new '
+                'album coming along."'
+            ),
+        }
+    ]
+
+    response = _send_message_missing_phone_response_text(messages, tools)
+
+    assert response is not None
+    assert "phone number" in response
+
+
+def test_send_message_missing_phone_bridge_allows_visible_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "send_message_with_phone_number"}},
+        {"type": "function", "function": {"name": "search_contacts"}},
+    ]
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                'Send a message to Fredrik Thordendal saying: "How is the new '
+                'album coming along."'
+            ),
+        }
+    ]
+
+    assert _send_message_missing_phone_response_text(messages, tools) is None
+
+
 def test_state_action_planner_bridge_ignores_status_query(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -764,6 +934,106 @@ def test_contact_update_bridge_calls_counterparty_selector_with_updates(
     assert '"selection_mode": "latest"' in call.function.arguments
     assert '"phone_number": "+10293847563"' in call.function.arguments
     assert '"self_person_id": "self-id"' in call.function.arguments
+
+
+def test_contact_update_bridge_starts_message_recency_search_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "get_current_timestamp"}},
+        {"type": "function", "function": {"name": "resolve_search_window_or_bounds"}},
+        {"type": "function", "function": {"name": "search_messages"}},
+        {"type": "function", "function": {"name": "modify_contact"}},
+    ]
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                "Update the phone number of the last person I sent a message to "
+                "to +10293847563"
+            ),
+        },
+    ]
+
+    clock_completion = _contact_update_phone_bridge_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert clock_completion is not None
+    clock_call = _first_tool_call(clock_completion)
+    assert clock_call.function.name == "get_current_timestamp"
+
+    window_completion = _contact_update_phone_bridge_completion(
+        [
+            *messages,
+            {"role": "tool", "name": "get_current_timestamp", "content": "1778679617"},
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert window_completion is not None
+    window_call = _first_tool_call(window_completion)
+    assert window_call.function.name == "resolve_search_window_or_bounds"
+    assert '"target_domain": "message"' in window_call.function.arguments
+    assert '"direction": "latest"' in window_call.function.arguments
+
+    search_completion = _contact_update_phone_bridge_completion(
+        [
+            *messages,
+            {"role": "tool", "name": "get_current_timestamp", "content": "1778679617"},
+            {
+                "role": "tool",
+                "name": "resolve_search_window_or_bounds",
+                "content": (
+                    "{'target_tool_name': 'search_messages', "
+                    "'search_kwargs': {'creation_timestamp_upperbound': 1778679617}, "
+                    "'should_call_search': True}"
+                ),
+            },
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert search_completion is not None
+    search_call = _first_tool_call(search_completion)
+    assert search_call.function.name == "search_messages"
+    assert (
+        '"creation_timestamp_upperbound": 1778679617' in search_call.function.arguments
+    )
+
+
+def test_contact_update_bridge_falls_back_to_bounded_message_search_without_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {"type": "function", "function": {"name": "get_current_timestamp"}},
+        {"type": "function", "function": {"name": "search_messages"}},
+        {"type": "function", "function": {"name": "modify_contact"}},
+    ]
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                "Update the phone number of the last person I sent a message to "
+                "to +10293847563"
+            ),
+        },
+        {"role": "tool", "name": "get_current_timestamp", "content": "1778679617"},
+    ]
+
+    completion = _contact_update_phone_bridge_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "search_messages"
+    assert '"creation_timestamp_upperbound": 1778679617' in call.function.arguments
 
 
 def test_contact_relationship_bridge_uses_generated_batch_planner(

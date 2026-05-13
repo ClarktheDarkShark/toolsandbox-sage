@@ -318,6 +318,30 @@ Broad500:
 
 The broad500 result reaches the previous fixed Praxis relative outcome-lift band while starting from no accepted generated helpers and paying the online discovery cost inside the run. It remains slightly below the fixed Praxis canonical/reference relative lift (`+12.31%` versus `+13.04%`). The run also resumed after an OpenAI transport hang; the paired result is valid, but the lifecycle reflection state did not fully hydrate across the resume boundary. The runtime now has a tested resume-hydration repair that reloads cumulative lifecycle state from copied task feedback, so future resumed scale runs preserve system-driven routing and retention evidence.
 
+## Autonomous Bucket Repair Update
+
+After the broad500 residual gap profile was available, the controller was updated so `--bucket-hint auto` selects the highest-opportunity residual bucket from machine-readable gap packets instead of relying on a manually chosen exposure list. A v49 contact-bucket diagnostic found two autonomous policy failures: an overbroad generated negative trigger hid a more specific positive family match, and a send-message flow guessed a phone number when no contact lookup path was visible.
+
+The v50 repair fixed those system-level mechanisms rather than manually exposing tools:
+
+- A generated negative trigger such as `remove_contact` no longer hides a helper when the helper has a matching, more specific positive family such as `remove_contact_by_phone`.
+- Minefield negatives such as `insufficient_information`, `missing`, `ambiguous`, and `no records` remain hard blockers.
+- The actor bridge now blocks guessed `send_message_with_phone_number` side effects when the request lacks a phone number and no visible contact lookup path exists.
+
+v50 targeted contact60 result:
+
+- Run: `outputs/self_evolving_sage/live_generation_v50_auto_bucket_contact60_route_repair/mechanism_60_20260513_105138`
+- Dashboard: `http://127.0.0.1:62624/outputs/self_evolving_sage/live_generation_v50_auto_bucket_contact60_route_repair/mechanism_60_20260513_105138/dashboard/task_compare.html`
+- Summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v50_auto_bucket_contact60_route_repair_summary.json`
+- Selected bucket: `contact_lookup_update_search_crud`
+- Canonical/reference: `0.740335 -> 0.911396`, delta `+0.171061`, relative lift `+23.11%`
+- Outcome: `0.437475 -> 0.758516`, delta `+0.321042`, relative lift `+73.39%`
+- Generated helpers: `8` accepted from an empty starting registry, `7` naturally called, `32` generated-tool called scenarios
+- Controls: `60 cached / 0 fresh`
+- Safety: runtime exceptions `0`, helper side-effect incidents `0`, protocol gate `PASS`
+
+This targeted bucket result beats the current self-evolving broad250 and broad500 score-lift high-water values on the selected contact gap bucket while preserving the research constraint that the system, not the operator, chooses the bucket and routes tools.
+
 ## Current SAGE Approach
 
 The current self-evolving SAGE approach is:
@@ -336,11 +360,11 @@ The current self-evolving SAGE approach is:
 
 The next self-evolving increment should focus on confirming the scale result without wasting another immediate 500-run:
 
-- run a no-resume or resume-hydrated 100/250 confirmation under the same committed runtime
+- run a no-resume or resume-hydrated 100/250 confirmation under the same committed runtime, starting with the v50 autonomous bucket repair logic
 - verify that lifecycle routing remains cumulative through an intentional resume smoke test
-- use the completed broad500 residual gap profile to improve system-generated repair prompts for oldest-message recency, low-battery reminder scheduling, contact modification by message recency, device-state reads, and holiday/date calculations
+- use the completed broad500 residual gap profile to let the system pick the next residual bucket, with oldest-message recency, low-battery reminder scheduling, contact modification by message recency, device-state reads, and holiday/date calculations as likely candidates
 - only spend another broad500 run when the 100/250 checkpoint matches or exceeds the fixed Praxis trajectory
 
 Decision label:
 
-`SELF_EVOLVING_SCALE_POSITIVE_WITH_RESUME_CAVEAT`
+`SELF_EVOLVING_AUTONOMOUS_BUCKET_REPAIR_BEATS_CURRENT_LIFT_LIST_ON_TARGETED_CONTACT_BUCKET`
