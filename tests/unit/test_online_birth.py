@@ -462,7 +462,7 @@ def test_live_birth_routing_metadata_normalizes_variant_family_labels() -> None:
     )
 
 
-def test_sparse_counterparty_selector_gets_second_reusable_family() -> None:
+def test_sparse_counterparty_selector_normalizes_to_base_family() -> None:
     observation = next(
         item
         for item in classify_planned_scenario_observations(
@@ -507,7 +507,6 @@ def test_sparse_counterparty_selector_gets_second_reusable_family() -> None:
 
     assert repaired.spec.applicable_task_families == (
         "modify_contact_with_message_recency",
-        "search_sender_phone_number_with_content",
     )
 
 
@@ -1067,7 +1066,8 @@ def test_raw_latest_message_births_selector_and_marks_window_diagnostic() -> Non
     )
 
     keys = {observation.canonical_key for observation in observations}
-    assert "search_filter:select_record_by_timestamp_extreme" in keys
+    assert "search_filter:select_message_content_by_recency" in keys
+    assert "search_filter:select_record_by_timestamp_extreme" not in keys
     assert "derived_value:message_search_time_window" in keys
     window = next(
         observation
@@ -1137,7 +1137,8 @@ def test_oldest_record_failure_births_trace_compatible_search_helpers() -> None:
     )
 
     keys = {observation.canonical_key for observation in observations}
-    assert "search_filter:select_record_by_timestamp_extreme" in keys
+    assert "search_filter:select_message_content_by_recency" in keys
+    assert "search_filter:select_record_by_timestamp_extreme" not in keys
     window = next(
         observation
         for observation in observations

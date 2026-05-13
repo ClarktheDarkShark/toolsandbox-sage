@@ -182,6 +182,10 @@ tasks. Generation must stay on for this live self-evolving proof:
 ```bash
 env \
   SAGE_PRAXIS_BRIDGE_POLICY=combined \
+  SAGE_SELF_EVOLVING_PROACTIVE_BIRTH=1 \
+  SAGE_SELF_EVOLVING_PROACTIVE_SCOPE=just_in_time \
+  SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE=1 \
+  SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS=4 \
   SAGE_TS_MODEL=gpt-4o-mini \
   PYTHONPATH=src:. \
   python scripts/run_sage_protocol.py \
@@ -211,6 +215,14 @@ Latest scale evidence:
 
 - report:
   `docs/sage_protocol/self_evolving_sage_mini60_report.md`
+- broad500 JIT same-task birth summary:
+  `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v70_jit_birth_retry_repair_summary.json`
+- broad500 JIT same-task birth run:
+  `outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839`
+- broad500 JIT same-task birth dashboard:
+  `http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839/dashboard/task_compare.html`
+- broad500 JIT same-task birth result:
+  score `0.656799 -> 0.827506`, lift `+25.99%`; outcome `0.494746 -> 0.872782`, lift `+76.41%`; controls `500 cached / 0 fresh`; generation on from an empty generated registry; accepted generated helpers `16`; naturally called generated-tool scenarios `295`; generated-tool failures `0`; runtime/helper incidents `0 / 0`
 - broad250 summary:
   `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v37_broad250_system_lifecycle_keyfixed_summary.json`
 - broad250 run:

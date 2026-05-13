@@ -88,6 +88,87 @@ Only 24 scenarios matched the selected contact gap under the current capped mani
 
 No labels, expected answers, hidden benchmark facts, or cache availability were used to generate tool code or select scenarios. Scenario IDs appear in the split manifest because the harness requires executable scenario names, but they are not encoded into generated tools, routing rules, or repair logic.
 
+## Full Broad500 JIT Same-Task Birth Result
+
+Run:
+
+`outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839`
+
+Dashboard:
+
+`http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839/dashboard/task_compare.html`
+
+This run answers the later mechanism concern that a tool born from a task should be able to help that same task when validation completes before actor routing. The active repair uses just-in-time proactive birth: SAGE classifies the next manifest task from unlabeled task text, generates and validates any matching missing helper before loading the candidate tool bundle, and gives the newly accepted helper fair-chance visibility on the birth task. The actor still decides naturally whether to call it; no force-call path counts as evidence.
+
+Controls:
+
+- control cache mode: `strict`
+- cached controls: `500`
+- fresh controls: `0`
+- cache manifest hash: `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
+- cohort selection influenced by cache: `false`
+
+Candidate/SAGE:
+
+- starting generated registry: absent/empty
+- final generated registry SHA-256: `ab932e9ca4448f1732299614866b74bc1217b81e7bb89fe1de35f41bb68c1a7b`
+- generation: on
+- candidate task cache: off
+- OpenAI response cache: disabled
+- routing evidence: disabled
+- active diagnostic force env vars: none
+- agent/user/generation model: `gpt-4o-mini`
+- runtime exceptions: `0`
+- transient retries: `0`
+- helper side-effect incidents: `0`
+- generated-tool failures: `0`
+- same-task JIT availability events: `11`
+
+Metrics:
+
+| Metric | Baseline | SAGE | Delta |
+|---|---:|---:|---:|
+| Canonical/reference score | `0.656799` | `0.827506` | `+0.170706` |
+| Canonical/reference lift | n/a | n/a | `+25.99%` |
+| Outcome/task completion | `0.494746` | `0.872782` | `+0.378036` |
+| Outcome/task-completion lift | n/a | n/a | `+76.41%` |
+| Exact successes | `20` | `287` | `+267` |
+| Canonical gains / regressions / preserved | n/a | n/a | `371 / 71 / 58` |
+| Outcome gains / regressions / preserved | n/a | n/a | `316 / 35 / 33` |
+
+Generated-tool adoption:
+
+| Metric | Value |
+|---|---:|
+| Accepted live-born tools | `16` |
+| Newly generated helpers naturally called | `14` |
+| Generated-tool visible scenarios | `453` |
+| Generated-tool called scenarios | `295` |
+| Generated-tool failed scenarios | `0` |
+| Accepted-but-uncalled tools | `constraint_to_action_planner`, `prepare_side_effect_args_from_selected_record` |
+
+Strongest called helpers:
+
+| Helper | Called | Called-subset canonical delta | Called-subset outcome delta |
+|---|---:|---:|---:|
+| `resolve_search_window_or_bounds` | `82` | `+0.324357` | `+0.582731` |
+| `plan_device_state_action_sequence_v3` | `87` | `+0.086181` | `+0.126595` |
+| `plan_contact_lookup_query` | `24` | `+0.277706` | `+0.546369` |
+| `select_message_content_by_recency` | `20` | `+0.514514` | `+0.740473` |
+| `plan_contact_relationship_batch_update` | `15` | `+0.382787` | `+0.545005` |
+
+Machine-readable summary:
+
+`artifacts/self_evolving_sage/summary/self_evolving_live_generation_v70_jit_birth_retry_repair_summary.json`
+
+Summary SHA-256:
+
+`1bfe8462066250de935f41110b0a112327ea60e3bb65d22dd5cf6e6b6e71a925`
+
+Reproducibility caveat: this run began before the same-task birth and transient-retry edits were committed, so the harness-recorded git SHA is `d27fa6b96bd99b0a429ea8c5b2b92f80ae26ff18`. The run-affecting working-tree diff SHA-256 is `87c290674cbd95af301a9030b0714ec60673374677279daf9742ea9a5f422f1a`, and the current branch commit records those edits for clean reruns.
+
+Status: this is strong experimental self-evolving evidence. It is not protected final-claim evidence until reproduced from a clean committed tree under a locked formal protocol.
+
 ## Current 60-Task Live-Generation Proof
 
 Run:

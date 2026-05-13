@@ -564,6 +564,28 @@ def run_sage_with_registry(
                 base_tool_policy=config.base_tool_policy,
                 manifest_path=config.manifest_path,
             )
+        if birth_controller is not None:
+            accepted_tools = birth_controller.prime_before_scenario(name)
+            if accepted_tools:
+                append_jsonl(
+                    output_directory / "sage_run_events.jsonl",
+                    {
+                        "event": "jit_birth_tools_available_for_same_task",
+                        "scenario": name,
+                        "accepted_tools": accepted_tools,
+                        "registry_dir": str(config.registry_dir),
+                    },
+                )
+                if event_hook is not None:
+                    event_hook(
+                        "jit_birth_tools_available_for_same_task",
+                        output_directory,
+                        {
+                            "scenario": name,
+                            "accepted_tools": accepted_tools,
+                            "registry_dir": str(config.registry_dir),
+                        },
+                    )
         if not registry_load_logged:
             append_jsonl(
                 output_directory / "sage_run_events.jsonl",

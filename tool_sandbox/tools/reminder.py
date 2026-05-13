@@ -2,7 +2,6 @@
 # Copyright (C) 2024 Apple Inc. All Rights Reserved.
 """A collection of tools which simulates common functions used for reminder."""
 
-import datetime
 import functools
 from typing import Dict, List, Literal, Optional, Union, cast
 from uuid import uuid4
@@ -24,6 +23,7 @@ from tool_sandbox.common.utils import (
     gt_eq_filter_dataframe,
     lt_eq_filter_dataframe,
     register_as_tool,
+    sandbox_now,
 )
 from tool_sandbox.common.validators import (
     typechecked,
@@ -68,7 +68,7 @@ def add_reminder(
             {
                 "reminder_id": reminder_id,
                 "content": content,
-                "creation_timestamp": datetime.datetime.now().timestamp(),
+                "creation_timestamp": sandbox_now().timestamp(),
                 "reminder_timestamp": reminder_timestamp,
                 "latitude": latitude,
                 "longitude": longitude,
@@ -127,7 +127,7 @@ def modify_reminder(
     # Create updated entry
     for name, value in [
         ("content", content),
-        ("creation_timestamp", datetime.datetime.now().timestamp()),
+        ("creation_timestamp", sandbox_now().timestamp()),
         ("reminder_timestamp", reminder_timestamp),
         ("latitude", latitude),
         ("longitude", longitude),

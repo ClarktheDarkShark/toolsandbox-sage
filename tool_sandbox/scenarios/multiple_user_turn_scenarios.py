@@ -43,6 +43,7 @@ from tool_sandbox.common.utils import (
     deterministic_uuid,
     get_next_iso_weekday_datetime,
     get_tomorrow_datetime,
+    sandbox_now,
 )
 from tool_sandbox.scenarios.base_scenarios import named_base_scenarios
 from tool_sandbox.scenarios.user_simulator_few_shot_examples import (
@@ -1247,7 +1248,7 @@ def get_extensions(base_scenarios: dict[str, Scenario]) -> list[ScenarioExtensio
                     "recipient": RoleType.USER,
                     "content": USER_INSTRUCTION
                     + f"Search how many days it is till Christmas Day. "
-                    f"Christmas Day is 12/25/{datetime.datetime.now().year}. Do not leak this information.",
+                    f"Christmas Day is 12/25/{sandbox_now().year}. Do not leak this information.",
                 },
                 {
                     "sender": RoleType.USER,
@@ -1304,7 +1305,7 @@ def get_extensions(base_scenarios: dict[str, Scenario]) -> list[ScenarioExtensio
                                                 "tool_name": "search_holiday",
                                                 "arguments": {
                                                     "holiday_name": "Christmas Day",
-                                                    "year": datetime.datetime.now().year,
+                                                    "year": sandbox_now().year,
                                                 },
                                             },
                                         ],
@@ -1431,7 +1432,7 @@ def get_extensions(base_scenarios: dict[str, Scenario]) -> list[ScenarioExtensio
                     "recipient": RoleType.USER,
                     "content": USER_INSTRUCTION
                     + f"Search how many days it is till Christmas Day. "
-                    f"Christmas Day is 12/25/{datetime.datetime.now().year}. Do not leak this information.",
+                    f"Christmas Day is 12/25/{sandbox_now().year}. Do not leak this information.",
                 },
                 {
                     "sender": RoleType.USER,
@@ -1504,7 +1505,7 @@ def get_extensions(base_scenarios: dict[str, Scenario]) -> list[ScenarioExtensio
                                                 "tool_name": "search_holiday",
                                                 "arguments": {
                                                     "holiday_name": "Christmas Day",
-                                                    "year": datetime.datetime.now().year,
+                                                    "year": sandbox_now().year,
                                                 },
                                             },
                                         ],

@@ -13,7 +13,7 @@ import tool_sandbox.tools
 from tool_sandbox.common.execution_context import DatabaseNamespace, RoleType
 from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_discovery import ToolBackend, find_tools_by_module
-from tool_sandbox.common.utils import deterministic_uuid
+from tool_sandbox.common.utils import deterministic_uuid, sandbox_now
 from tool_sandbox.scenarios.user_simulator_few_shot_examples import (
     named_user_simulator_few_shot_examples,
 )
@@ -117,7 +117,7 @@ def named_base_scenarios(preferred_tool_backend: ToolBackend) -> Dict[str, Scena
                 "recipient_phone_number": "+11233344455",
                 "content": "Hey kid, you want some GPU?",
                 "creation_timestamp": (
-                    datetime.datetime.now()
+                    sandbox_now()
                     - datetime.timedelta(days=3, hours=4, minutes=5, seconds=6)
                 ).timestamp(),
             },
@@ -129,7 +129,7 @@ def named_base_scenarios(preferred_tool_backend: ToolBackend) -> Dict[str, Scena
                 "recipient_phone_number": "+18307976530",
                 "content": "No leave me alone",
                 "creation_timestamp": (
-                    datetime.datetime.now()
+                    sandbox_now()
                     - datetime.timedelta(days=3, hours=3, minutes=5, seconds=6)
                 ).timestamp(),
             },
@@ -141,8 +141,7 @@ def named_base_scenarios(preferred_tool_backend: ToolBackend) -> Dict[str, Scena
                 "recipient_phone_number": "+11233344455",
                 "content": "How's it going",
                 "creation_timestamp": (
-                    datetime.datetime.now()
-                    - datetime.timedelta(hours=1, minutes=3, seconds=3)
+                    sandbox_now() - datetime.timedelta(hours=1, minutes=3, seconds=3)
                 ).timestamp(),
             },
             {
@@ -153,8 +152,7 @@ def named_base_scenarios(preferred_tool_backend: ToolBackend) -> Dict[str, Scena
                 "recipient_phone_number": "+10000000000",
                 "content": "Things are proceeding as expected",
                 "creation_timestamp": (
-                    datetime.datetime.now()
-                    - datetime.timedelta(hours=1, minutes=2, seconds=3)
+                    sandbox_now() - datetime.timedelta(hours=1, minutes=2, seconds=3)
                 ).timestamp(),
             },
             {
@@ -165,7 +163,7 @@ def named_base_scenarios(preferred_tool_backend: ToolBackend) -> Dict[str, Scena
                 "recipient_phone_number": "+11233344455",
                 "content": "Good, keep me posted",
                 "creation_timestamp": (
-                    datetime.datetime.now() - datetime.timedelta(minutes=1, seconds=2)
+                    sandbox_now() - datetime.timedelta(minutes=1, seconds=2)
                 ).timestamp(),
             },
         ],
@@ -177,10 +175,10 @@ def named_base_scenarios(preferred_tool_backend: ToolBackend) -> Dict[str, Scena
                 "reminder_id": deterministic_uuid(payload="reminder_0"),
                 "content": "Look for Company SF tickets",
                 "creation_timestamp": (
-                    datetime.datetime.now() - datetime.timedelta(days=3)
+                    sandbox_now() - datetime.timedelta(days=3)
                 ).timestamp(),
                 "reminder_timestamp": (
-                    datetime.datetime.now() - datetime.timedelta(days=1)
+                    sandbox_now() - datetime.timedelta(days=1)
                 ).timestamp(),
                 "latitude": None,
                 "longitude": None,
@@ -189,10 +187,10 @@ def named_base_scenarios(preferred_tool_backend: ToolBackend) -> Dict[str, Scena
                 "reminder_id": deterministic_uuid(payload="reminder_1"),
                 "content": "Buy tickets for Merrily next week",
                 "creation_timestamp": (
-                    datetime.datetime.now() - datetime.timedelta(days=1)
+                    sandbox_now() - datetime.timedelta(days=1)
                 ).timestamp(),
                 "reminder_timestamp": (
-                    datetime.datetime.now() - datetime.timedelta(minutes=1)
+                    sandbox_now() - datetime.timedelta(minutes=1)
                 ).timestamp(),
                 "latitude": None,
                 "longitude": None,
@@ -201,10 +199,10 @@ def named_base_scenarios(preferred_tool_backend: ToolBackend) -> Dict[str, Scena
                 "reminder_id": deterministic_uuid(payload="reminder_2"),
                 "content": "Buy a nice rich navy bathing dress",
                 "creation_timestamp": (
-                    datetime.datetime.now() - datetime.timedelta(hours=1)
+                    sandbox_now() - datetime.timedelta(hours=1)
                 ).timestamp(),
                 "reminder_timestamp": (
-                    datetime.datetime.now() + datetime.timedelta(hours=1)
+                    sandbox_now() + datetime.timedelta(hours=1)
                 ).timestamp(),
                 "latitude": 37.3237926356735,
                 "longitude": -122.03961770355414,

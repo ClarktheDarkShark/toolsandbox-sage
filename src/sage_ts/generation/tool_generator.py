@@ -672,7 +672,7 @@ def resolve_search_window_or_bounds(current_timestamp: float, phrase: str, targe
     elif intent == "creation":
         lower_key = "creation_timestamp_lowerbound"
         upper_key = "creation_timestamp_upperbound"
-    elif intent == "reminder":
+    elif intent in ("reminder", "upcoming", "due", "due_time", "reminder_time", ""):
         lower_key = "reminder_timestamp_lowerbound"
         upper_key = "reminder_timestamp_upperbound"
     else:
@@ -1010,13 +1010,17 @@ def _relative_day_time_to_timestamp_contract_tool(
         output_annotation="float",
         positive_triggers=(
             "modify_reminder_with_recency_latest",
-            "add_reminder_content_and_date_and_time",
             "add_reminder_content_and_week_delta_and_time",
             "tomorrow at",
             "in two days at",
         ),
         negative_triggers=(
             "insufficient_information",
+            "add_reminder_content_and_date_and_time",
+            "date_and_time",
+            "absolute_date",
+            "calendar_date",
+            "mm/dd/yyyy",
             "missing_current_timestamp",
             "missing_time",
             "invalid_hour_or_minute",
@@ -1036,7 +1040,6 @@ def _relative_day_time_to_timestamp_contract_tool(
         cross_task_applicability_count=3,
         applicable_task_families=(
             "modify_reminder_with_recency_latest",
-            "add_reminder_content_and_date_and_time",
             "add_reminder_content_and_week_delta_and_time",
         ),
         reason_tool_is_decisive=(
@@ -2663,7 +2666,7 @@ def _prepare_reminder_creation_args_contract_tool(
             ToolInput(
                 "local_utc_offset_hours",
                 "float",
-                "Local offset from UTC in hours for relative timestamp math.",
+                "Sandbox/user local offset from UTC in hours for relative timestamp math; do not use a searched place's timezone.",
             ),
             ToolInput(
                 "location_requested",
@@ -2711,7 +2714,9 @@ def _prepare_reminder_creation_args_contract_tool(
             "when required time information is missing, a required location is "
             "unresolved, or an optional mentioned location still needs lookup. "
             "For optional locations whose lookup failed or was not requested, "
-            "prepare add_reminder kwargs with latitude and longitude set to None."
+            "prepare add_reminder kwargs with latitude and longitude set to None. "
+            "Keep reminder content separate from location phrases, and do not let "
+            "a searched place's timezone change the reminder timestamp."
         ),
         generalization_rationale=(
             "Reminder creation tasks repeatedly require the same final argument "
@@ -2805,7 +2810,7 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
                 "timestamp_source": timestamp_source,
             }
         effective_offset_hours = float(local_utc_offset_hours)
-        if effective_offset_hours == 0.0 and float(current_timestamp) > 1000000000.0:
+        if float(current_timestamp) > 1000000000.0 and effective_offset_hours != -4.0:
             effective_offset_hours = -4.0
         offset_seconds = effective_offset_hours * 3600.0
         local_seconds = float(current_timestamp) + offset_seconds
@@ -2856,9 +2861,15 @@ def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: fl
         latitude_out = None
         longitude_out = None
         location_status = "omitted_optional"
+    content_out = str(content or "").strip()
+    if bool(location_requested) or has_complete_coordinates:
+        lowered = content_out.lower()
+        marker_index = lowered.rfind(" at ")
+        if marker_index > 0:
+            content_out = content_out[:marker_index].strip()
     return {
         "add_reminder_kwargs": {
-            "content": content,
+            "content": content_out,
             "reminder_timestamp": reminder_timestamp,
             "latitude": latitude_out,
             "longitude": longitude_out,

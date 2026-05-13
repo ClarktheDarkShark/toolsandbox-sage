@@ -6,6 +6,7 @@ import datetime
 import functools
 import json
 import logging
+import os
 import uuid
 from contextlib import contextmanager
 from inspect import getsource, isfunction, signature
@@ -28,6 +29,20 @@ from tool_sandbox.common.tool_discovery import ToolBackend
 T = TypeVar("T")
 
 LOGGER = logging.getLogger(__name__)
+
+FIXED_NOW_TIMESTAMP_ENV = "TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"
+
+
+def sandbox_now() -> datetime.datetime:
+    """Return ToolSandbox's current time, optionally frozen for reproducible runs."""
+
+    fixed_now = os.environ.get(FIXED_NOW_TIMESTAMP_ENV)
+    if fixed_now:
+        try:
+            return datetime.datetime.fromtimestamp(float(fixed_now))
+        except ValueError:
+            LOGGER.warning("Ignoring invalid %s=%r", FIXED_NOW_TIMESTAMP_ENV, fixed_now)
+    return datetime.datetime.now()
 
 
 # Taken from openai._types
@@ -428,7 +443,7 @@ def get_tomorrow_datetime() -> datetime.datetime:
     Returns:
         datetime object for exactly 1 day from now in the future.
     """
-    return datetime.datetime.now() + datetime.timedelta(days=1)
+    return sandbox_now() + datetime.timedelta(days=1)
 
 
 def get_next_iso_weekday_datetime(next_iso_weekday: int) -> datetime.datetime:
@@ -440,7 +455,7 @@ def get_next_iso_weekday_datetime(next_iso_weekday: int) -> datetime.datetime:
     Returns:
         datetime object for next weekday.
     """
-    current_datetime = datetime.datetime.now()
+    current_datetime = sandbox_now()
     return current_datetime + datetime.timedelta(
         (next_iso_weekday - current_datetime.isoweekday()) % 7
     )

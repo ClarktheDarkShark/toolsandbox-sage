@@ -889,6 +889,16 @@ def main() -> None:
         help="Authoritative completed-control baseline cache root.",
     )
     parser.add_argument(
+        "--freeze-toolsandbox-clock",
+        action="store_true",
+        default=os.environ.get("SAGE_TS_FREEZE_TOOLSANDBOX_CLOCK") == "1",
+        help=(
+            "Freeze ToolSandbox's current timestamp for the whole run. This keeps "
+            "scenario setup and timestamp tools on a single benchmark clock during "
+            "long runs."
+        ),
+    )
+    parser.add_argument(
         "--generation",
         choices=("auto", "on", "off"),
         default="auto",
@@ -946,6 +956,12 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+
+    if args.freeze_toolsandbox_clock and not os.environ.get(
+        "TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"
+    ):
+        os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = str(time.time())
+    toolsandbox_fixed_now = os.environ.get("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP")
 
     scenario_names = tuple(load_split_names(args.manifest, args.mode))
     manifest_type = _manifest_type(args.manifest)
@@ -1077,6 +1093,10 @@ def main() -> None:
             "routing_evidence_path": str(args.routing_evidence_path)
             if args.routing_evidence_path
             else None,
+            "toolsandbox_clock_policy": "frozen"
+            if args.freeze_toolsandbox_clock
+            else "wall_clock",
+            "toolsandbox_fixed_now_timestamp": toolsandbox_fixed_now,
         },
         root=args.artifact_root,
     )
@@ -1694,6 +1714,10 @@ def main() -> None:
         else None,
         "diagnostic_force_allowed": args.diagnostic_force_allowed,
         "active_diagnostic_force_env": sorted(active_force_env),
+        "toolsandbox_clock_policy": "frozen"
+        if args.freeze_toolsandbox_clock
+        else "wall_clock",
+        "toolsandbox_fixed_now_timestamp": toolsandbox_fixed_now,
         "run_affecting_sage_env": _redacted_run_affecting_sage_env(),
         "accepted_but_uncalled_tools": helper_contribution.get(
             "accepted_but_uncalled_tools", []

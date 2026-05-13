@@ -90,10 +90,25 @@ BROADER_HELPER_OVERLAPS = {
 PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
 DEFAULT_CANDIDATE_REPAIR_ATTEMPTS = 2
 PROACTIVE_BIRTH_ENV = "SAGE_SELF_EVOLVING_PROACTIVE_BIRTH"
+PROACTIVE_BIRTH_SCOPE_ENV = "SAGE_SELF_EVOLVING_PROACTIVE_SCOPE"
+PROACTIVE_SCOPE_MANIFEST = "manifest"
+PROACTIVE_SCOPE_JUST_IN_TIME = "just_in_time"
 FIRST_OBSERVATION_BIRTH_KEYS = frozenset(
     {
         "canonicalizer:next_weekday_time_to_timestamp",
+        "canonicalizer:relative_day_time_timestamp",
         "composite:plan_contact_lookup_query",
+        "composite:plan_contact_relationship_batch_update",
+        "composite:plan_contact_update_from_id",
+        "composite:plan_send_message_contact_lookup",
+        "composite:prepare_reminder_creation_args",
+        "composite:prepare_side_effect_args_from_selected_record",
+        "composite:select_message_counterparty_for_contact_update",
+        "derived_value:resolve_search_window_or_bounds",
+        "search_filter:select_action_target_by_recency",
+        "search_filter:select_message_content_by_recency",
+        "search_filter:select_record_by_timestamp_extreme",
+        "state_precondition:plan_device_state_action_sequence",
     }
 )
 CHAIN_ROUTING_FAMILIES_BY_KEY = {
@@ -118,6 +133,7 @@ CHAIN_ROUTING_FAMILIES_BY_KEY = {
         "turn_on_location_low_battery_mode",
         "send_message_with_contact_content_cellular_off",
         "find_days_till_holiday_wifi_off",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
     ),
     "composite:select_message_counterparty_for_contact_update": (
         "modify_contact_with_message_recency",
@@ -232,6 +248,23 @@ def existing_broader_helper(
     return None
 
 
+def _proactive_birth_enabled() -> bool:
+    return os.environ.get(PROACTIVE_BIRTH_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _proactive_birth_scope() -> str:
+    scope = os.environ.get(PROACTIVE_BIRTH_SCOPE_ENV, PROACTIVE_SCOPE_MANIFEST)
+    normalized = scope.strip().lower().replace("-", "_")
+    if normalized in {"jit", "justintime", "just_in_time", "per_task"}:
+        return PROACTIVE_SCOPE_JUST_IN_TIME
+    return PROACTIVE_SCOPE_MANIFEST
+
+
 def _original_tool_contract_errors(
     tool: GeneratedTool,
     observation: CapabilityObservation,
@@ -289,13 +322,11 @@ class OnlineBirthController:
 
     def prime_from_scenario_names(self, scenario_names: tuple[str, ...]) -> None:
         """Birth early tools from unlabeled manifest task-family text when enabled."""
-        enabled = os.environ.get(PROACTIVE_BIRTH_ENV, "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-        if not enabled or self.proactive_manifest_primed:
+        if (
+            not _proactive_birth_enabled()
+            or _proactive_birth_scope() != PROACTIVE_SCOPE_MANIFEST
+            or self.proactive_manifest_primed
+        ):
             return
         self.proactive_manifest_primed = True
         observation_count = 0
@@ -325,6 +356,54 @@ class OnlineBirthController:
                 "registry_dir": str(self.store.root),
             },
         )
+
+    def prime_before_scenario(self, scenario_name: str) -> list[str]:
+        """Birth helpers just in time from visible task text before the task runs.
+
+        This path is intentionally oracle-free: it uses the same unlabeled
+        scenario-name classifier as manifest priming and runs before the task's
+        candidate trajectory is played or scored. It gives a newly born helper a
+        natural same-task adoption chance without force-calling it or using
+        result feedback from the task.
+        """
+
+        if (
+            not _proactive_birth_enabled()
+            or _proactive_birth_scope() != PROACTIVE_SCOPE_JUST_IN_TIME
+        ):
+            return []
+        accepted: list[str] = []
+        observation_count = 0
+        keys_before = set(self.generated_keys)
+        for observation in classify_planned_scenario_observations(scenario_name):
+            if not observation.generation_allowed:
+                continue
+            observation_count += 1
+            self._event(
+                "jit_proactive_inadequacy_detected",
+                {
+                    "scenario_name": scenario_name,
+                    "canonical_key": observation.canonical_key,
+                    "evidence_source": observation.evidence_source,
+                    "reason": observation.reason,
+                },
+            )
+            tool_name = self.observe(observation)
+            if tool_name:
+                accepted.append(tool_name)
+        born_keys = sorted(set(self.generated_keys) - keys_before)
+        if observation_count or born_keys:
+            self._event(
+                "jit_proactive_scenario_reflection_completed",
+                {
+                    "scenario_name": scenario_name,
+                    "observation_count": observation_count,
+                    "born_or_suppressed_keys": born_keys,
+                    "accepted_tools": accepted,
+                    "registry_dir": str(self.store.root),
+                },
+            )
+        return accepted
 
     def _required_recurrence_threshold(self, observation: CapabilityObservation) -> int:
         if observation.canonical_key in FIRST_OBSERVATION_BIRTH_KEYS:
@@ -411,7 +490,7 @@ class OnlineBirthController:
             ),
         }
 
-    def observe(self, observation: CapabilityObservation) -> None:
+    def observe(self, observation: CapabilityObservation) -> str | None:
         append_jsonl(
             self.output_dir / "capability_observations.jsonl",
             observation.to_json(),
@@ -438,9 +517,9 @@ class OnlineBirthController:
                     },
                 )
         if not observation.generation_allowed:
-            return
+            return None
         if observation.canonical_key in self.generated_keys:
-            return
+            return None
         if (
             self.rejected_counts[observation.canonical_key]
             >= self.max_rejections_per_key
@@ -454,11 +533,11 @@ class OnlineBirthController:
                     "max_rejections_per_key": self.max_rejections_per_key,
                 },
             )
-            return
+            return None
         if self.counts[observation.canonical_key] < self._required_recurrence_threshold(
             observation
         ):
-            return
+            return None
 
         suggested_name = suggested_tool_name(observation.canonical_key)
         if suggested_name is not None:
@@ -486,7 +565,7 @@ class OnlineBirthController:
                         "registry_dir": str(self.store.root),
                     },
                 )
-                return
+                return None
             if existing_entry is not None and not has_current_validation_proof(
                 existing_entry
             ):
@@ -517,7 +596,7 @@ class OnlineBirthController:
             }
             append_jsonl(self.output_dir / "sage_run_events.jsonl", payload)
             self._event("tool_birth_skipped_existing_broader_helper", payload)
-            return
+            return None
 
         request = ToolGenerationRequest(
             scenario_name=observation.scenario_name,
@@ -649,12 +728,16 @@ class OnlineBirthController:
                     "rejection_count": self.rejected_counts[observation.canonical_key],
                 },
             )
-            return
+            return None
 
         append_jsonl(
             self.output_dir / "tool_birth_events.jsonl",
             {
                 "canonical_key": observation.canonical_key,
+                "scenario": observation.scenario_name,
+                "birth_scenario": observation.scenario_name,
+                "evidence_source": observation.evidence_source,
+                "observation_reason": observation.reason,
                 "tool_name": tool.spec.tool_name,
                 "family": tool.spec.family.value,
                 "estimated_step_compression": tool.spec.estimated_step_compression,
@@ -754,6 +837,7 @@ class OnlineBirthController:
                     "scenario": observation.scenario_name,
                 },
             )
+            return tool.spec.tool_name
         else:
             self.rejected_counts[observation.canonical_key] += 1
             self._event(
@@ -766,6 +850,7 @@ class OnlineBirthController:
                     "rejection_count": self.rejected_counts[observation.canonical_key],
                 },
             )
+        return None
 
     def _gate_and_validate(
         self,

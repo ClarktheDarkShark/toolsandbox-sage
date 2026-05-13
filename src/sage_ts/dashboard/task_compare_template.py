@@ -496,6 +496,16 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       </div>`;
     }
 
+    function maybeValue(value) {
+      return value === null || value === undefined ? "n/a" : value;
+    }
+
+    function gainLossText(gains, regressions) {
+      if (gains === null && regressions === null) return "n/a";
+      if (gains === undefined && regressions === undefined) return "n/a";
+      return `${gains ?? 0} gains / ${regressions ?? 0} regressions`;
+    }
+
     function plannedTaskCount(summary) {
       const selected = Math.max(
         Number(summary.scenario_count || 0),
@@ -594,10 +604,12 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
 
     function messageRole(message) {
-      const raw = String(message.label || message.sender || message.role || "").toLowerCase();
-      if (raw.includes("tool")) return "tool";
-      if (raw.includes("assistant")) return "assistant";
-      if (raw.includes("user")) return "user";
+      const role = String(message.role || "").toLowerCase();
+      const label = String(message.label || message.sender || "").toLowerCase();
+      const raw = `${role} ${label}`;
+      if (role === "assistant" || raw.includes("assistant")) return "assistant";
+      if (role === "user" || raw.includes("user")) return "user";
+      if (role === "tool" || raw.includes("tool:")) return "tool";
       return "system";
     }
 
@@ -729,16 +741,18 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     function openTools() {
       const tools = payload.tool_summary || {};
       const rows = tools.tools || [];
-      document.getElementById("toolDrawerSub").textContent = `${rows.length} tools; ${tools.called_tool_count || 0} called naturally in this run.`;
+      const visibilityKnown = rows.some((tool) => tool.visible_count !== null && tool.visible_count !== undefined);
+      const contributionKnown = rows.some((tool) => tool.called_subset_mean_outcome_delta !== null && tool.called_subset_mean_outcome_delta !== undefined);
+      document.getElementById("toolDrawerSub").textContent = `${rows.length} tools; ${tools.called_tool_count || 0} called naturally in this run.${visibilityKnown ? "" : " Visibility counts were not exported for this run."}${contributionKnown ? "" : " Contribution columns are unavailable from reuse-event fallback data."}`;
       document.getElementById("toolTable").innerHTML = `<table>
         <thead><tr><th>Tool</th><th>Origin</th><th>Visible</th><th>Called</th><th>VNC</th><th>Outcome Contribution</th><th>Score Contribution</th><th>Safety</th></tr></thead>
         <tbody>${rows.map((tool) => `<tr>
           <td><strong>${esc(tool.name)}</strong><div class="small">${esc(tool.decision || "")}</div></td>
           <td>${esc(tool.origin || "-")}</td>
-          <td>${esc(tool.visible_count ?? 0)}</td>
+          <td>${esc(maybeValue(tool.visible_count))}</td>
           <td>${esc(tool.called_count ?? 0)}</td>
-          <td>${esc(tool.visible_not_called_count ?? 0)}</td>
-          <td class="${cls(tool.called_subset_mean_outcome_delta)}">${signedNum(tool.called_subset_mean_outcome_delta)}<div class="small">${esc(tool.outcome_gains ?? 0)} gains / ${esc(tool.outcome_regressions ?? 0)} regressions</div></td>
+          <td>${esc(maybeValue(tool.visible_not_called_count))}</td>
+          <td class="${cls(tool.called_subset_mean_outcome_delta)}">${signedNum(tool.called_subset_mean_outcome_delta)}<div class="small">${esc(gainLossText(tool.outcome_gains, tool.outcome_regressions))}</div></td>
           <td class="${cls(tool.called_subset_mean_canonical_delta)}">${signedNum(tool.called_subset_mean_canonical_delta)}</td>
           <td>${esc(tool.side_effect_incident_count ?? 0)} side effects<br><span class="small">${esc(tool.runtime_incident_count ?? 0)} runtime incidents</span></td>
         </tr>`).join("")}</tbody>

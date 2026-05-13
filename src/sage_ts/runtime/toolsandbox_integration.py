@@ -68,6 +68,17 @@ OPTIONAL_HELPER_DEFAULTS: dict[str, Any] = {
     "person_id": "",
 }
 
+BIRTH_SCENARIO_FAIR_CHANCE_ENV = "SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE"
+
+
+def _birth_scenario_fair_chance_enabled() -> bool:
+    return os.environ.get(BIRTH_SCENARIO_FAIR_CHANCE_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
 
 def _call_path_note(spec: ToolSpec) -> list[str]:
     """General call-path note for any side-effect-preserving prep helper."""
@@ -795,6 +806,12 @@ def _google_docstring(entry: RegistryEntry) -> str:
                 "    For plain relative times ('tomorrow at 5 PM', 'next Friday'),",
                 " supply day_offset, hour, minute, and local_utc_offset_hours only",
                 " when those fields are visible or already resolved.",
+                "    Keep reminder content separate from location. If the user",
+                " said 'buy milk at Store', pass content='buy milk' and pass",
+                " Store only through location lookup and coordinate fields.",
+                "    Do not use a searched place's timezone as",
+                " local_utc_offset_hours; use the sandbox/user scheduling",
+                " timezone convention for reminder timestamps.",
                 "    Set location_requested=True when the user mentioned an optional",
                 " location that might still need lookup.",
                 "    Set location_required=True only when the user explicitly requires",
@@ -1028,6 +1045,38 @@ def _trigger_based_visibility(
     return None
 
 
+def _birth_scenario_fair_chance_visibility(
+    entry: RegistryEntry,
+    scenario_name: str,
+) -> tuple[bool, str] | None:
+    """Give a newly born helper a natural adoption chance on its birth task.
+
+    This is deliberately bounded to the scenario/family that produced the
+    helper from oracle-free task text. It does not force a call; it only keeps
+    routing from hiding the helper before the actor can decide whether to use
+    it.
+    """
+
+    if not _birth_scenario_fair_chance_enabled():
+        return None
+    birth_scenario = (entry.birth_scenario or "").strip().lower()
+    if not birth_scenario:
+        return None
+    name = scenario_name.lower()
+    for token in entry.tool.spec.negative_triggers:
+        if token and token.lower() in name:
+            return None
+    if name == birth_scenario:
+        return True, "birth_scenario_fair_chance_exact"
+    if base_task_family(name) != base_task_family(birth_scenario):
+        return None
+    scenario_strata = set(classify_task_strata(name))
+    birth_strata = set(classify_task_strata(birth_scenario))
+    if scenario_strata & birth_strata:
+        return True, "birth_scenario_fair_chance_family"
+    return None
+
+
 def registry_entry_visibility_reason(
     entry: RegistryEntry,
     scenario_name: str | None,
@@ -1064,6 +1113,10 @@ def registry_entry_visibility_reason(
         "add_reminder_content_and_week_delta"
     ):
         return False, "relative_time_suppressed_for_whole_week_delta_task"
+    if tool_name == "relative_day_time_to_timestamp" and name.startswith(
+        "add_reminder_content_and_date_and_time"
+    ):
+        return False, "relative_time_suppressed_for_absolute_date_task"
     if tool_name == "next_weekday_time_to_timestamp" and (
         name.startswith("add_reminder_content_and_week_delta")
         or name.startswith("add_reminder_content_and_date_and_time")
@@ -1074,11 +1127,17 @@ def registry_entry_visibility_reason(
     ):
         return False, "state_action_planner_suppressed_for_status_query"
 
+    birth_fair_chance = _birth_scenario_fair_chance_visibility(entry, name)
+    if birth_fair_chance is not None:
+        return birth_fair_chance
+
     generic_route = score_registry_entry_for_scenario(entry, scenario_name)
     if generic_route.status in {"shown", "hidden"}:
         return generic_route.visible, generic_route.reason
 
     if tool_name == "relative_day_time_to_timestamp":
+        if name.startswith("add_reminder_content_and_date_and_time"):
+            return False, "relative_time_suppressed_for_absolute_date_task"
         if name.startswith("modify_reminder_with_recency_latest"):
             return True, "relative_time_modify_latest_reminder"
         if name.startswith("add_reminder_content_and_week_delta"):

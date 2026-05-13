@@ -292,7 +292,9 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
 
 
 def _is_direct_service_precondition_scenario(scenario_name: str) -> bool:
-    return "insufficient_information" not in scenario_name and scenario_name.startswith(
+    if "insufficient_information" in scenario_name:
+        return False
+    if scenario_name.startswith(
         (
             "turn_on_wifi_low_battery_mode",
             "turn_on_cellular_low_battery_mode",
@@ -300,6 +302,16 @@ def _is_direct_service_precondition_scenario(scenario_name: str) -> bool:
             "wifi_off",
             "cellular_off",
             "send_message_with_contact_content_cellular_off",
+        )
+    ):
+        return True
+    return (
+        scenario_name.startswith("add_reminder_content_and_")
+        and "location" in scenario_name
+        and (
+            "low_battery" in scenario_name
+            or "wifi_off" in scenario_name
+            or "location_service_off" in scenario_name
         )
     )
 
@@ -881,6 +893,29 @@ def _resolve_search_window_or_bounds_observation(
                     "should_call_search": True,
                     "abstain_reason": "",
                     "interpretation": "today",
+                    "bounds_source": "resolved_direction",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1777380998.0,
+                    "phrase": "upcoming",
+                    "target_domain": "reminder",
+                    "timestamp_intent": "upcoming",
+                    "direction": "upcoming",
+                    "content_keyword": "",
+                    "lookback_days": 0,
+                    "timezone_offset": 0.0,
+                },
+                {
+                    "target_tool_name": "search_reminder",
+                    "search_kwargs": {
+                        "reminder_timestamp_lowerbound": 1777380998.0,
+                    },
+                    "should_call_search": True,
+                    "abstain_reason": "",
+                    "interpretation": "upcoming",
                     "bounds_source": "resolved_direction",
                 },
                 held_out=True,

@@ -2,6 +2,26 @@
 
 ## 2026-05-13
 
+- `Self-evolving broad500 JIT same-task birth and retry repair` completed.
+  - Branch: `codex/self-evolving-sage-mini60`.
+  - Objective: restore and exceed the v50-level lift on the full broad500 while starting from no generated tools, keeping generation on, and letting SAGE choose births, retention, and routing. Also test the same-task JIT birth repair: a helper born from a task can be visible to that same task after validation, without force-calling it.
+  - Run: `outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839`.
+  - Dashboard: `http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839/dashboard/task_compare.html`.
+  - Summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v70_jit_birth_retry_repair_summary.json`, SHA-256 `1bfe8462066250de935f41110b0a112327ea60e3bb65d22dd5cf6e6b6e71a925`.
+  - Registry: `artifacts/self_evolving_sage/current_formal500_live_generation_v70_jit_birth_retry_repair/formal500_registry/registry_manifest.json`, SHA-256 `ab932e9ca4448f1732299614866b74bc1217b81e7bb89fe1de35f41bb68c1a7b`.
+  - Starting registry: absent/empty generated registry; `manifest_existed_before_run=false`.
+  - Controls: `500 cached / 0 fresh`; cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`; SAGE/candidate task cache off; OpenAI response cache disabled; routing evidence disabled.
+  - Models: agent/user/generation all `gpt-4o-mini`.
+  - Runtime policy: `SAGE_PRAXIS_BRIDGE_POLICY=combined`; `SAGE_SELF_EVOLVING_PROACTIVE_SCOPE=just_in_time`; `SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE=1`; frozen ToolSandbox clock; bounded transient scenario retry enabled with `SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS=4`.
+  - Metrics: canonical/reference `0.656799 -> 0.827506`, delta `+0.170706`, relative lift `+25.99%`; outcome `0.494746 -> 0.872782`, delta `+0.378036`, relative lift `+76.41%`; exact successes `20 -> 287`, delta `+267`.
+  - Gains/regressions/preserved: canonical `371 / 71 / 58`; outcome `316 / 35 / 33`.
+  - Generated helpers: `16` accepted from an empty starting registry; `14` naturally called; generated-tool visible/called/failed scenarios `453 / 295 / 0`; accepted-but-uncalled `constraint_to_action_planner`, `prepare_side_effect_args_from_selected_record`; same-task JIT availability events `11`.
+  - Strong called helpers: `resolve_search_window_or_bounds` called `82` times with called-subset outcome delta `+0.582731`; `plan_device_state_action_sequence_v3` called `87` times with outcome delta `+0.126595`; `plan_contact_lookup_query` called `24` times with outcome delta `+0.546369`; `select_message_content_by_recency` called `20` times with outcome delta `+0.740473`.
+  - Safety: runtime exceptions `0`; transient retries `0`; generated-tool failures `0`; helper side-effect preservation reports `0`; protocol gate `PASS`; route mismatch qualified `false`.
+  - Reproducibility caveat: the harness recorded git SHA `d27fa6b96bd99b0a429ea8c5b2b92f80ae26ff18` because the run began before committing the same-task birth and transient-retry edits. The run-affecting working-tree diff SHA-256 is `87c290674cbd95af301a9030b0714ec60673374677279daf9742ea9a5f422f1a`; this commit records those changes.
+  - Decision label: `SELF_EVOLVING_BROAD500_BEATS_CURRENT_BEST_LIST_WITH_EMPTY_REGISTRY_LIVE_BIRTH`.
+  - Next action: reproduce once from a clean committed tree before treating this as locked final claim evidence. For methodology drafting, describe it as high-confidence experimental self-evolving evidence.
+
 - `Self-evolving autonomous bucket route repair contact60` completed.
   - Branch: `codex/self-evolving-sage-mini60`.
   - Objective: perform one more improvement round using autonomous bucket targeting and repair, without manually exposing tools, and beat the current self-evolving lift list values before spending another broad500 run.

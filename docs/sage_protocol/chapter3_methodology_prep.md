@@ -128,6 +128,56 @@ for each sealed scenario in manifest order:
 
 A clean result with this policy enabled supports a combined-treatment claim only. A registry-only claim requires the same candidate registry to reproduce without `SAGE_PRAXIS_BRIDGE_POLICY=combined` and without importing bridge/checker behavior.
 
+## Self-Evolving SAGE Treatment
+
+The self-evolving treatment is distinct from frozen final validation. It starts with no generated helpers, keeps generation enabled, observes task-local inadequacy signals, generates deterministic helper candidates, validates them, stores accepted helpers in a run-local registry, and routes a bounded subset naturally. It is appropriate for discovery and methodology evidence; a protected final claim still requires a later frozen-registry validation with generation off.
+
+The current best experimental self-evolving broad500 result is:
+
+- Run: `outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839`.
+- Canonical/reference: `0.656799 -> 0.827506`, delta `+0.170706`, lift `+25.99%`.
+- Outcome/task completion: `0.494746 -> 0.872782`, delta `+0.378036`, lift `+76.41%`.
+- Starting generated registry: absent/empty; generation on; `16` live-born helpers accepted; generated-tool visible/called/failed scenarios `453 / 295 / 0`.
+- Controls: `500 cached / 0 fresh`; candidate/SAGE task cache off; OpenAI response cache disabled; routing evidence disabled; models all `gpt-4o-mini`.
+- Safety: runtime exceptions `0`; helper side-effect incidents `0`; generated-tool failures `0`.
+
+### Self-Evolving Loop Pseudocode
+
+```text
+for each scenario in sealed manifest order:
+    prepare control
+        if strict task-level baseline cache is eligible:
+            reuse cached baseline score with cache provenance
+        else:
+            run fresh control
+
+    prepare SAGE candidate from empty-or-current run registry
+        assert generation == on
+        assert candidate task cache == off
+        assert OpenAI response cache == disabled
+        assert routing evidence == disabled or explicitly pinned
+
+        classify visible unlabeled task text for deterministic gaps
+        if just-in-time proactive birth is enabled:
+            generate candidate helper before actor routing
+            validate schema, triggers, negative cases, runtime behavior,
+            callability, and side-effect preservation
+            if accepted:
+                save helper to run-local registry
+                allow fair-chance visibility on the same birth task
+
+        route a bounded helper bundle from the registry
+        actor decides naturally whether to call visible helpers
+        original ToolSandbox side-effect tools still perform any state change
+
+    after scoring:
+        export helper visibility, calls, VNC, failures, contribution deltas
+        update lifecycle evidence for keep/refine/park/scale decisions
+        never use hidden labels, expected answers, or prior SAGE traces
+```
+
+The same-task birth rule is not a force-call mechanism. It only changes timing and fair-chance visibility: if SAGE can identify and validate the missing deterministic helper before the actor starts the task, that helper can be visible for the triggering task instead of only later tasks.
+
 ## Figure Assets Ready
 
 | Figure | Asset |

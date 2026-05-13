@@ -1615,6 +1615,7 @@ def _task_compare_tool_summary(
     called_tool_count = sum(
         1 for tool in tools if int(tool.get("called_count") or 0) > 0
     )
+    visibility_known = any(tool.get("visible_count") is not None for tool in tools)
     return {
         "registry_tool_count": contribution.get("registry_size")
         if isinstance(contribution, dict)
@@ -1625,8 +1626,10 @@ def _task_compare_tool_summary(
         "tool_count": len(tools),
         "generated_tool_birth_count": birth_count,
         "called_tool_count": called_tool_count,
-        "visible_tool_count": sum(
-            1 for tool in tools if (tool.get("visible_count") or 0) > 0
+        "visible_tool_count": (
+            sum(1 for tool in tools if (tool.get("visible_count") or 0) > 0)
+            if visibility_known
+            else None
         ),
         "outcome_gains": sum(int(tool.get("outcome_gains") or 0) for tool in tools),
         "outcome_regressions": sum(

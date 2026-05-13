@@ -12,7 +12,7 @@ from pint import UndefinedUnitError
 from rapidfuzz import fuzz, utils
 
 from tool_sandbox.common.execution_context import RoleType
-from tool_sandbox.common.utils import register_as_tool
+from tool_sandbox.common.utils import register_as_tool, sandbox_now
 from tool_sandbox.common.validators import (
     typechecked,
     validate_latitude,
@@ -30,7 +30,7 @@ def get_current_timestamp() -> float:
     Returns:
         Float value POSIX timestamp
     """
-    return datetime.datetime.now().timestamp()
+    return sandbox_now().timestamp()
 
 
 @register_as_tool(visible_to=(RoleType.AGENT,))
@@ -251,7 +251,7 @@ def search_holiday(
     if not get_wifi_status():
         raise ConnectionError("Wifi is not enabled")
     if year is None:
-        year = datetime.datetime.now().year
+        year = sandbox_now().year
     # Sort holidays by decreasing name partial match score against database.
     # Apply string normalization with default_process
     holiday_matches: list[tuple[float, datetime.date, str]] = list(

@@ -31,6 +31,7 @@ from tool_sandbox.roles.base_role import BaseRole
 from tool_sandbox.roles.execution_environment import ExecutionEnvironment
 
 DEFAULT_TOOL_BACKEND = ToolBackend("DEFAULT")
+DEFAULT_TRANSIENT_SCENARIO_RETRY_ATTEMPTS = 3
 ScenarioTransform = Callable[[str, Scenario, Path], Scenario]
 ResultHook = Callable[[str, Scenario, dict[str, Any], Path], Optional[dict[str, Any]]]
 ProgressHook = Callable[[Path, list[dict[str, Any]], str, int], None]
@@ -133,6 +134,68 @@ def _copy_resume_artifacts(
         shutil.copy2(path, output_directory / path.name)
 
 
+def _transient_scenario_retry_attempts() -> int:
+    raw = os.environ.get("SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS", "")
+    try:
+        return max(1, int(raw)) if raw else DEFAULT_TRANSIENT_SCENARIO_RETRY_ATTEMPTS
+    except ValueError:
+        return DEFAULT_TRANSIENT_SCENARIO_RETRY_ATTEMPTS
+
+
+def _is_transient_model_exception(exc: Exception, traceback_text: str) -> bool:
+    names: set[str] = set()
+    current: BaseException | None = exc
+    while current is not None:
+        names.add(type(current).__name__)
+        current = current.__cause__ or current.__context__
+    transient_names = {
+        "APIConnectionError",
+        "APITimeoutError",
+        "APIStatusError",
+        "InternalServerError",
+        "RateLimitError",
+        "RetryError",
+        "TimeoutException",
+        "ReadTimeout",
+        "ConnectTimeout",
+    }
+    if names & transient_names:
+        return True
+    transient_markers = (
+        "openai.APIConnectionError",
+        "openai.APITimeoutError",
+        "Connection error.",
+        "ReadTimeout",
+        "ConnectTimeout",
+        "RateLimitError",
+        "RetryError[",
+    )
+    return any(marker in traceback_text for marker in transient_markers)
+
+
+def _archive_transient_failed_trajectory(
+    output_directory: Path,
+    scenario_name: str,
+    *,
+    attempt: int,
+) -> str | None:
+    trajectory_dir = output_directory / "trajectories" / scenario_name
+    if not trajectory_dir.exists():
+        return None
+    archive_base = (
+        output_directory
+        / "trajectories"
+        / f"{scenario_name}__transient_retry_failed_attempt_{attempt}"
+    )
+    archive_dir = archive_base
+    suffix = 2
+    while archive_dir.exists():
+        archive_dir = archive_base.with_name(f"{archive_base.name}_{suffix}")
+        suffix += 1
+    shutil.move(str(trajectory_dir), str(archive_dir))
+    return str(archive_dir)
+
+
 def run_one_scenario(
     name: str,
     scenario: Scenario,
@@ -141,61 +204,86 @@ def run_one_scenario(
     user: str,
     output_directory: Path,
 ) -> dict[str, Any]:
-    roles: dict[RoleType, BaseRole] = {
-        RoleType("USER"): make_user(user),
-        RoleType("EXECUTION_ENVIRONMENT"): ExecutionEnvironment(),
-        RoleType("AGENT"): make_agent(agent),
-    }
-    try:
-        result = scenario.play_and_evaluate(
-            roles=roles,
-            output_directory=output_directory,
-            scenario_name=name,
-        )
-        canonical_milestone_scores = {
-            int(index): float(score)
-            for index, (_, score) in result.evaluation_result.milestone_mapping.items()
+    max_attempts = _transient_scenario_retry_attempts()
+    transient_retry_archives: list[str] = []
+    for attempt in range(1, max_attempts + 1):
+        roles: dict[RoleType, BaseRole] = {
+            RoleType("USER"): make_user(user),
+            RoleType("EXECUTION_ENVIRONMENT"): ExecutionEnvironment(),
+            RoleType("AGENT"): make_agent(agent),
         }
-        outcome = compute_outcome_score(
-            scenario,
-            result.ending_context,
-            canonical_milestone_scores=canonical_milestone_scores,
-            minefield_similarity=result.evaluation_result.minefield_similarity,
-        )
-        return {
-            "name": name,
-            "categories": scenario.categories,
-            "traceback": None,
-            "exception_type": None,
-            "milestone_similarity": result.evaluation_result.milestone_similarity,
-            "minefield_similarity": result.evaluation_result.minefield_similarity,
-            "similarity": result.evaluation_result.similarity,
-            "turn_count": result.evaluation_result.turn_count,
-            "milestone_mapping": result.evaluation_result.milestone_mapping,
-            "minefield_mapping": result.evaluation_result.minefield_mapping,
-            **outcome,
-        }
-    except Exception as exc:
-        return {
-            "name": name,
-            "categories": scenario.categories,
-            "traceback": traceback.format_exc(),
-            "exception_type": type(exc).__name__,
-            "milestone_similarity": 0,
-            "minefield_similarity": 0,
-            "similarity": 0,
-            "turn_count": scenario.max_messages,
-            "milestone_mapping": {},
-            "minefield_mapping": {},
-            "outcome_similarity": 0,
-            "outcome_milestone_similarity": 0,
-            "outcome_minefield_similarity": 0,
-            "outcome_check_count": 0,
-            "outcome_checks": [],
-        }
-    finally:
-        for role in roles.values():
-            role.teardown()
+        try:
+            result = scenario.play_and_evaluate(
+                roles=roles,
+                output_directory=output_directory,
+                scenario_name=name,
+            )
+            canonical_milestone_scores = {
+                int(index): float(score)
+                for index, (
+                    _,
+                    score,
+                ) in result.evaluation_result.milestone_mapping.items()
+            }
+            outcome = compute_outcome_score(
+                scenario,
+                result.ending_context,
+                canonical_milestone_scores=canonical_milestone_scores,
+                minefield_similarity=result.evaluation_result.minefield_similarity,
+            )
+            return {
+                "name": name,
+                "categories": scenario.categories,
+                "traceback": None,
+                "exception_type": None,
+                "transient_retry_count": attempt - 1,
+                "transient_retry_archives": transient_retry_archives,
+                "milestone_similarity": result.evaluation_result.milestone_similarity,
+                "minefield_similarity": result.evaluation_result.minefield_similarity,
+                "similarity": result.evaluation_result.similarity,
+                "turn_count": result.evaluation_result.turn_count,
+                "milestone_mapping": result.evaluation_result.milestone_mapping,
+                "minefield_mapping": result.evaluation_result.minefield_mapping,
+                **outcome,
+            }
+        except Exception as exc:
+            traceback_text = traceback.format_exc()
+            should_retry = attempt < max_attempts and _is_transient_model_exception(
+                exc, traceback_text
+            )
+            if should_retry:
+                archive = _archive_transient_failed_trajectory(
+                    output_directory,
+                    name,
+                    attempt=attempt,
+                )
+                if archive:
+                    transient_retry_archives.append(archive)
+            else:
+                return {
+                    "name": name,
+                    "categories": scenario.categories,
+                    "traceback": traceback_text,
+                    "exception_type": type(exc).__name__,
+                    "transient_retry_count": attempt - 1,
+                    "transient_retry_archives": transient_retry_archives,
+                    "milestone_similarity": 0,
+                    "minefield_similarity": 0,
+                    "similarity": 0,
+                    "turn_count": scenario.max_messages,
+                    "milestone_mapping": {},
+                    "minefield_mapping": {},
+                    "outcome_similarity": 0,
+                    "outcome_milestone_similarity": 0,
+                    "outcome_minefield_similarity": 0,
+                    "outcome_check_count": 0,
+                    "outcome_checks": [],
+                }
+        finally:
+            for role in roles.values():
+                role.teardown()
+
+    raise AssertionError("unreachable transient retry loop exit")
 
 
 def run_scenario_sequence(

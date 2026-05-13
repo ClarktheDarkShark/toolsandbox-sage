@@ -2,7 +2,6 @@
 # Copyright (C) 2024 Apple Inc. All Rights Reserved.
 """A collection of tools which simulates common functions used for messaging."""
 
-import datetime
 import functools
 from typing import Dict, List, Literal, Union, cast
 from uuid import uuid4
@@ -23,6 +22,7 @@ from tool_sandbox.common.utils import (
     gt_eq_filter_dataframe,
     lt_eq_filter_dataframe,
     register_as_tool,
+    sandbox_now,
 )
 from tool_sandbox.common.validators import (
     typechecked,
@@ -79,7 +79,7 @@ def send_message_with_phone_number(phone_number: str, content: str) -> str:
                 "recipient_person_id": recipient_person_id,
                 "recipient_phone_number": phone_number,
                 "content": content,
-                "creation_timestamp": datetime.datetime.now().timestamp(),
+                "creation_timestamp": sandbox_now().timestamp(),
             }
         ],
     )

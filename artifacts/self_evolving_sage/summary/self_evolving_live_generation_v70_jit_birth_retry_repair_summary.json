@@ -1,0 +1,142 @@
+{
+  "status": "experimental_self_evolving_scale_evidence_not_protected_final_claim",
+  "date": "2026-05-13",
+  "branch": "codex/self-evolving-sage-mini60",
+  "run_name": "formal500_live_generation_v70_jit_birth_retry_repair",
+  "run_git_sha_recorded_by_harness": "d27fa6b96bd99b0a429ea8c5b2b92f80ae26ff18",
+  "run_affecting_working_tree_diff_sha256": "87c290674cbd95af301a9030b0714ec60673374677279daf9742ea9a5f422f1a",
+  "run_root": "outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839",
+  "dashboard_task_compare": "http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839/dashboard/task_compare.html",
+  "control_dir": "outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839/control/online_build_500_control_cached_agent_gpt-4o-mini_user_gpt-4o-mini_05_13_2026_17_48_49",
+  "candidate_dir": "outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839/candidate/online_build_500_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_05_13_2026_17_48_50",
+  "registry_dir": "artifacts/self_evolving_sage/current_formal500_live_generation_v70_jit_birth_retry_repair/formal500_registry",
+  "registry_manifest_sha256": "ab932e9ca4448f1732299614866b74bc1217b81e7bb89fe1de35f41bb68c1a7b",
+  "paired_comparison_sha256": "45a458b742f39454970cfc212f3f1f023c03982872bf9cd1eb446a6eb3b0a9a6",
+  "helper_contribution_summary_sha256": "5704820f16c97f1cfb3e6fcc17cf78b96ca38462fba4f55911d91345216439f6",
+  "control_cache_report_sha256": "5f10427a9cd2354c4434429a010dfad0dde95234f218be20450d417fc6308309",
+  "setup": {
+    "manifest_type": "self_evolving_sage_formal500_online_build_v54_outcome_bridge_repair_experimental",
+    "scenario_count": 500,
+    "starting_generated_registry_empty": true,
+    "registry_manifest_existed_before_run": false,
+    "generation_enabled": true,
+    "agent_model": "gpt-4o-mini",
+    "user_model": "gpt-4o-mini",
+    "generation_model": "gpt-4o-mini",
+    "candidate_task_cache": "off",
+    "openai_response_cache": "disabled",
+    "control_cache_mode": "strict",
+    "cached_control_tasks": 500,
+    "fresh_control_tasks": 0,
+    "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "routing_evidence_mode": "disabled",
+    "diagnostic_force_allowed": false,
+    "active_diagnostic_force_env": [],
+    "toolsandbox_clock_policy": "frozen",
+    "praxis_bridge_policy": "combined",
+    "proactive_birth": true,
+    "proactive_birth_scope": "just_in_time",
+    "birth_scenario_fair_chance_visibility": true,
+    "transient_scenario_retry_attempts": 4
+  },
+  "metrics": {
+    "paired_scenarios": 500,
+    "baseline_canonical": 0.6567992510564296,
+    "sage_canonical": 0.827505528550507,
+    "canonical_delta": 0.1707062774940774,
+    "canonical_lift_pct": 25.991,
+    "outcome_pairs": 384,
+    "baseline_outcome": 0.4947458601435448,
+    "sage_outcome": 0.8727820134595983,
+    "outcome_delta": 0.3780361533160535,
+    "outcome_lift_pct": 76.41,
+    "baseline_exact_successes": 20,
+    "sage_exact_successes": 287,
+    "exact_success_delta": 267,
+    "canonical_gains": 371,
+    "canonical_regressions": 71,
+    "canonical_preserved": 58,
+    "outcome_gains": 316,
+    "outcome_regressions": 35,
+    "outcome_preserved": 33
+  },
+  "tool_lifecycle": {
+    "accepted_tools": 16,
+    "accepted_but_uncalled_tools": [
+      "constraint_to_action_planner",
+      "prepare_side_effect_args_from_selected_record"
+    ],
+    "newly_generated_helper_called_tools": 14,
+    "scenario_tool_selection_rows": 500,
+    "generated_tool_visible_scenarios": 453,
+    "generated_tool_called_scenarios": 295,
+    "generated_tool_failed_scenarios": 0,
+    "tool_birth_succeeded_events": 16,
+    "jit_birth_tools_available_for_same_task_events": 11,
+    "born_tools": [
+      "prepare_side_effect_args_from_selected_record",
+      "prepare_reminder_creation_args",
+      "next_weekday_time_to_timestamp",
+      "select_message_counterparty_for_contact_update",
+      "select_action_target_by_recency",
+      "select_message_content_by_recency",
+      "resolve_search_window_or_bounds",
+      "plan_device_state_action_sequence_v3",
+      "days_between_timestamps",
+      "plan_contact_relationship_batch_update",
+      "prepare_safe_action_or_abstain",
+      "relative_day_time_to_timestamp",
+      "plan_contact_lookup_query",
+      "constraint_to_action_planner",
+      "plan_contact_update_from_id",
+      "select_record_by_timestamp_extreme"
+    ],
+    "top_called_helpers": [
+      {
+        "name": "plan_device_state_action_sequence_v3",
+        "visible": 96,
+        "called": 87,
+        "called_subset_canonical_delta": 0.08618093861142809,
+        "called_subset_outcome_delta": 0.1265946654782811
+      },
+      {
+        "name": "resolve_search_window_or_bounds",
+        "visible": 94,
+        "called": 82,
+        "called_subset_canonical_delta": 0.32435683034231894,
+        "called_subset_outcome_delta": 0.5827307785077153
+      },
+      {
+        "name": "plan_contact_lookup_query",
+        "visible": 53,
+        "called": 24,
+        "called_subset_canonical_delta": 0.2777057088139756,
+        "called_subset_outcome_delta": 0.5463685446639405
+      },
+      {
+        "name": "select_message_content_by_recency",
+        "visible": 54,
+        "called": 20,
+        "called_subset_canonical_delta": 0.5145144329106117,
+        "called_subset_outcome_delta": 0.7404728256997741
+      },
+      {
+        "name": "plan_contact_relationship_batch_update",
+        "visible": 19,
+        "called": 15,
+        "called_subset_canonical_delta": 0.38278675370283916,
+        "called_subset_outcome_delta": 0.545004689895313
+      }
+    ]
+  },
+  "safety": {
+    "runtime_exceptions": 0,
+    "transient_retries": 0,
+    "helper_side_effect_preservation_reports": 0,
+    "helper_side_effect_incidents": 0,
+    "generated_tool_failures": 0,
+    "route_mismatch_qualified": false,
+    "protocol_gate_passed": true
+  },
+  "interpretation": "This run demonstrates broad500 self-evolving SAGE from an empty generated registry with generation on. The same-task just-in-time birth change allowed newly accepted helpers to be visible to the task that triggered birth without force-calling them. This is experimental methodology evidence, not a protected final-claim artifact."
+}
