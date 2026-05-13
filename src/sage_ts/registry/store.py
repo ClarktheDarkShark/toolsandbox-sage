@@ -52,3 +52,11 @@ class RegistryStore:
             success_flips=entry.success_flips + int(success_flip),
         )
         self.save_entries(entries)
+
+    def retire(self, tool_name: str) -> None:
+        entries = self.load_entries()
+        entry = entries.get(tool_name)
+        if entry is None or entry.retired:
+            return
+        entries[tool_name] = replace(entry, retired=True)
+        self.save_entries(entries)

@@ -320,13 +320,17 @@ def self_evolve_sage(seed_registry, validation_manifest):
 
 ## Immediate Next Action
 
-The formal500 confirms the combined bridge-policy lift with zero safety incidents. The first self-evolving controller slice is now implemented and has passed a capped all-`gpt-4o-mini` mechanism proof with an empty generated registry and generation on during the run.
+The formal500 confirms the combined bridge-policy lift with zero safety incidents. The first self-evolving controller slice has now scaled beyond the capped mini60 mechanism proof:
 
-The next action is to stabilize and generalize this controller:
+- Broad250 empty-registry live generation: score lift `+16.46%`, outcome lift `+34.59%`, `15` accepted generated helpers, `14` naturally called, controls `250 cached / 0 fresh`, runtime/helper incidents `0 / 0`.
+- Broad500 empty-registry live generation: score lift `+12.31%`, outcome lift `+41.39%`, `16` accepted generated helpers, `15` naturally called, controls `500 cached / 0 fresh`, runtime/helper incidents `0 / 0`.
 
-1. mine gap packets directly from a run root,
-2. rank contact, reminder, settings/device-state, and abstention opportunities,
-3. generate minefield tests per selected bucket,
-4. keep generation on during discovery campaigns,
-5. park safe-but-negative births automatically and only re-enable them after repair,
-6. keep discovery runs capped at 60 unless explicitly approved.
+The broad500 run resumed after an OpenAI transport hang. The completed paired metrics are valid, but the lifecycle reflection state did not fully hydrate across the resume boundary. The runtime now has a tested resume-hydration repair that reloads cumulative lifecycle decisions from copied `self_evolution_task_feedback.jsonl`, plus bounded OpenAI request timeouts via `SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS`.
+
+The next action is no longer basic scale-up. It is to confirm the repaired runtime before spending another broad500 run:
+
+1. run a small intentional resume smoke test to verify cumulative lifecycle hydration,
+2. run a no-resume or resume-hydrated 100/250 checkpoint under the same committed runtime,
+3. mine the completed broad500 residual gap profile (`artifacts/self_evolving_sage/summary/self_evolving_live_generation_v38_broad500_residual_gap_profile.json`) for oldest-message recency, low-battery reminder scheduling, contact modification by message recency, device-state reads, and holiday/date calculation families,
+4. let the system generate/repair candidates from those buckets, not a human-selected exposure list,
+5. run another broad500 only if the 100/250 checkpoint matches or exceeds the fixed Praxis trajectory.

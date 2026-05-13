@@ -136,7 +136,7 @@ final-claim update. A protected claim should run a dedicated matched ablation
 under the same committed runtime for best3, V2.6, Praxis registry-only, and
 Praxis combined bridge-policy arms.
 
-## Self-Evolving Mini60 Current Approach
+## Self-Evolving SAGE Current Approach
 
 The current SAGE development approach now includes an explicit live
 self-evolving controller slice:
@@ -195,7 +195,35 @@ By default, each protocol run opens the new Task Compare dashboard
 `dashboard_urls.json` with `default_dashboard: "task_compare"`. Use
 `--no-dashboard-open` only when running unattended.
 
-Latest live-generation mechanism proof:
+Latest scale evidence:
+
+- report:
+  `docs/sage_protocol/self_evolving_sage_mini60_report.md`
+- broad250 summary:
+  `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v37_broad250_system_lifecycle_keyfixed_summary.json`
+- broad250 run:
+  `outputs/self_evolving_sage/formal500_live_generation_v37_broad250_system_lifecycle_keyfixed/online_build_250_20260512_220851`
+- broad250 dashboard:
+  `http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v37_broad250_system_lifecycle_keyfixed/online_build_250_20260512_220851/dashboard/task_compare.html`
+- broad250 result:
+  score `0.669502 -> 0.779703`, lift `+16.46%`; outcome `0.509662 -> 0.685953`, lift `+34.59%`; controls `250 cached / 0 fresh`; accepted generated helpers `15`; runtime/helper incidents `0 / 0`
+- broad500 summary:
+  `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v38_broad500_system_lifecycle_keyfixed_summary.json`
+- broad500 run:
+  `outputs/self_evolving_sage/formal500_live_generation_v38_broad500_system_lifecycle_keyfixed/online_build_500_20260513_005654`
+- broad500 dashboard:
+  `http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v38_broad500_system_lifecycle_keyfixed/online_build_500_20260513_005654/dashboard/task_compare.html`
+- broad500 result:
+  score `0.657730 -> 0.738692`, lift `+12.31%`; outcome `0.495416 -> 0.700468`, lift `+41.39%`; controls `500 cached / 0 fresh`; accepted generated helpers `16`; naturally called generated helpers `15`; runtime/helper incidents `0 / 0`
+
+Broad500 resumed after an OpenAI transport hang, so it is reported with a
+resume caveat. The completed paired metrics are valid, but the lifecycle
+reflection state did not fully hydrate at the resume boundary. The runtime now
+hydrates cumulative lifecycle state from copied `self_evolution_task_feedback.jsonl`
+on resumed runs, and long OpenAI calls use `SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS`
+to avoid unbounded socket waits.
+
+Earlier live-generation mechanism proof:
 
 - report:
   `docs/sage_protocol/self_evolving_sage_mini60_report.md`

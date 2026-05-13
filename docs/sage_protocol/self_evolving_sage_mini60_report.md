@@ -286,6 +286,38 @@ The limits are also clear:
 - The safe-abstention lane needs benchmark-faithful final-answer phrasing before it can be enabled by default.
 - This is not formal evidence and should not update protected claims.
 
+## Scale Update
+
+After the mini60 proof, the same self-evolving mechanism was scaled to broad formal-order samples with no accepted generated helpers at run start, generation on, all models set to `gpt-4o-mini`, strict per-task cached controls, SAGE/candidate task cache off, OpenAI response cache disabled, and routing evidence disabled.
+
+Broad250:
+
+- Run: `outputs/self_evolving_sage/formal500_live_generation_v37_broad250_system_lifecycle_keyfixed/online_build_250_20260512_220851`
+- Dashboard: `http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v37_broad250_system_lifecycle_keyfixed/online_build_250_20260512_220851/dashboard/task_compare.html`
+- Summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v37_broad250_system_lifecycle_keyfixed_summary.json`
+- Canonical/reference: `0.669502 -> 0.779703`, delta `+0.110201`, relative lift `+16.46%`
+- Outcome: `0.509662 -> 0.685953`, delta `+0.176291`, relative lift `+34.59%`
+- Exact successes: `9 -> 91`
+- Generated helpers: `15` accepted, `14` naturally called
+- Controls: `250 cached / 0 fresh`
+- Safety: runtime exceptions `0`, helper side-effect incidents `0`
+
+Broad500:
+
+- Run: `outputs/self_evolving_sage/formal500_live_generation_v38_broad500_system_lifecycle_keyfixed/online_build_500_20260513_005654`
+- Dashboard: `http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v38_broad500_system_lifecycle_keyfixed/online_build_500_20260513_005654/dashboard/task_compare.html`
+- Summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v38_broad500_system_lifecycle_keyfixed_summary.json`
+- Residual gap profile: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v38_broad500_residual_gap_profile.json`
+- Canonical/reference: `0.657730 -> 0.738692`, delta `+0.080962`, relative lift `+12.31%`
+- Outcome: `0.495416 -> 0.700468`, delta `+0.205052`, relative lift `+41.39%`
+- Exact success delta: `+80`
+- Generated helpers: `16` accepted, `15` naturally called
+- Top natural calls: `resolve_search_window_or_bounds` `70`, `plan_device_state_action_sequence_v3` `59`, `prepare_reminder_creation_args` `22`, `plan_contact_lookup_query` `19`, `select_message_content_by_recency` `15`
+- Controls: `500 cached / 0 fresh`
+- Safety: runtime exceptions `0`, helper side-effect incidents `0`
+
+The broad500 result reaches the previous fixed Praxis relative outcome-lift band while starting from no accepted generated helpers and paying the online discovery cost inside the run. It remains slightly below the fixed Praxis canonical/reference relative lift (`+12.31%` versus `+13.04%`). The run also resumed after an OpenAI transport hang; the paired result is valid, but the lifecycle reflection state did not fully hydrate across the resume boundary. The runtime now has a tested resume-hydration repair that reloads cumulative lifecycle state from copied task feedback, so future resumed scale runs preserve system-driven routing and retention evidence.
+
 ## Current SAGE Approach
 
 The current self-evolving SAGE approach is:
@@ -302,14 +334,13 @@ The current self-evolving SAGE approach is:
 
 ## Next Work
 
-The next self-evolving increment should focus on stability rather than scale:
+The next self-evolving increment should focus on confirming the scale result without wasting another immediate 500-run:
 
-- build a less near-duplicate <=60 manifest with later post-birth opportunities for `plan_contact_update_from_id`
-- add reflection logic that keeps the relationship-batch planner and suppresses/parks abstention by default
-- generate benchmark-faithful abstention phrasing tests before re-enabling `prepare_safe_action_or_abstain`
-- extend the gap observer to choose between contact, reminder, settings/device-state, and send-message precondition buckets
-- only after repeated <=60 positive gates, recombine retained live-born tools with the Praxis combined treatment for a broader 100/250 validation
+- run a no-resume or resume-hydrated 100/250 confirmation under the same committed runtime
+- verify that lifecycle routing remains cumulative through an intentional resume smoke test
+- use the completed broad500 residual gap profile to improve system-generated repair prompts for oldest-message recency, low-battery reminder scheduling, contact modification by message recency, device-state reads, and holiday/date calculations
+- only spend another broad500 run when the 100/250 checkpoint matches or exceeds the fixed Praxis trajectory
 
 Decision label:
 
-`SELF_EVOLVING_LIVE_GENERATION_MECHANISM_POSITIVE_BUT_NOT_SCALE_READY`
+`SELF_EVOLVING_SCALE_POSITIVE_WITH_RESUME_CAVEAT`

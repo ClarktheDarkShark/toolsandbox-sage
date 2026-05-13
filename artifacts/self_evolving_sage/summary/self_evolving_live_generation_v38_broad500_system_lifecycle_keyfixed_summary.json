@@ -1,0 +1,121 @@
+{
+  "artifact_type": "self_evolving_sage_scale_run_summary",
+  "bridge_policy": "combined",
+  "control_cache": {
+    "cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2",
+    "cached_control_tasks": 500,
+    "cohort_selection_influenced_by_cache": false,
+    "fresh_control_tasks": 0,
+    "mode": "strict",
+    "source": "cached"
+  },
+  "dashboard_task_compare_url": "http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v38_broad500_system_lifecycle_keyfixed/online_build_500_20260513_005654/dashboard/task_compare.html",
+  "generated_tools": {
+    "accepted_but_uncalled_tools": [
+      "prepare_side_effect_args_from_selected_record"
+    ],
+    "accepted_tools": [
+      "days_between_timestamps",
+      "next_weekday_time_to_timestamp",
+      "plan_contact_lookup_query",
+      "plan_contact_relationship_batch_update",
+      "plan_contact_update_from_id",
+      "plan_device_state_action_sequence_v3",
+      "plan_send_message_contact_lookup",
+      "prepare_reminder_creation_args",
+      "prepare_side_effect_args_from_selected_record",
+      "relative_day_time_to_timestamp",
+      "resolve_search_window_or_bounds",
+      "select_action_target_by_recency",
+      "select_message_content_by_recency",
+      "select_message_counterparty_for_contact_update",
+      "select_record_by_timestamp_extreme",
+      "select_visible_record_by_constraints"
+    ],
+    "helper_call_counts": {
+      "days_between_timestamps": 10,
+      "next_weekday_time_to_timestamp": 12,
+      "plan_contact_lookup_query": 19,
+      "plan_contact_relationship_batch_update": 13,
+      "plan_contact_update_from_id": 8,
+      "plan_device_state_action_sequence_v3": 59,
+      "plan_send_message_contact_lookup": 12,
+      "prepare_reminder_creation_args": 22,
+      "prepare_side_effect_args_from_selected_record": 0,
+      "relative_day_time_to_timestamp": 3,
+      "resolve_search_window_or_bounds": 70,
+      "select_action_target_by_recency": 14,
+      "select_message_content_by_recency": 15,
+      "select_message_counterparty_for_contact_update": 2,
+      "select_record_by_timestamp_extreme": 9,
+      "select_visible_record_by_constraints": 2
+    },
+    "newly_generated_helper_called_tools": [
+      "days_between_timestamps",
+      "next_weekday_time_to_timestamp",
+      "plan_contact_lookup_query",
+      "plan_contact_relationship_batch_update",
+      "plan_contact_update_from_id",
+      "plan_device_state_action_sequence_v3",
+      "plan_send_message_contact_lookup",
+      "prepare_reminder_creation_args",
+      "relative_day_time_to_timestamp",
+      "resolve_search_window_or_bounds",
+      "select_action_target_by_recency",
+      "select_message_content_by_recency",
+      "select_message_counterparty_for_contact_update",
+      "select_record_by_timestamp_extreme",
+      "select_visible_record_by_constraints"
+    ],
+    "registry_size": 16,
+    "runtime_bundle_size": {
+      "max_available_tool_count": 39,
+      "max_generated_tool_bundle_size": 5,
+      "mean_available_tool_count": 11.632734530938123,
+      "mean_generated_tool_bundle_size": 1.2994011976047903,
+      "scenario_count": 501
+    },
+    "selection_event_count": 500,
+    "visibility_event_count": 501
+  },
+  "generation_enabled": true,
+  "manifest_path": "artifacts/self_evolving_sage/current_formal500_live_generation_v38_broad500_system_lifecycle_keyfixed/self_evolving_formal500_online_build_manifest.json",
+  "manifest_sha256": "06287423ae91ac8ab6722ec88cd2a06b96aa512b7ca52acfe76b501151ba7d70",
+  "metrics": {
+    "control_outcome": 0.49541636887233725,
+    "control_score": 0.657729871779459,
+    "exact_success_control": 21,
+    "exact_success_delta": 153,
+    "exact_success_sage": 174,
+    "outcome_delta": 0.2050515158597681,
+    "outcome_gain_count": 243,
+    "outcome_lift_percent": 41.38973371560264,
+    "outcome_preserved_count": 54,
+    "outcome_regression_count": 87,
+    "outcome_scenario_count": 384,
+    "protocol_gate_passed": true,
+    "runtime_exception_count": 0,
+    "sage_outcome": 0.7004678847321054,
+    "sage_score": 0.7386919887404124,
+    "scenario_count": 500,
+    "score_delta": 0.08096211696095341,
+    "score_gain_count": 318,
+    "score_lift_percent": 12.309326432432513,
+    "score_preserved_count": 68,
+    "score_regression_count": 114
+  },
+  "model_policy": {
+    "agent": "gpt-4o-mini",
+    "generation": "gpt-4o-mini",
+    "user": "gpt-4o-mini"
+  },
+  "notes": [
+    "resumed after OpenAI transport hang at prior run root; reflection state hydration repair was implemented after this run, so this completed result is valid but may understate lifecycle-routing performance after resume"
+  ],
+  "openai_response_cache": "disabled",
+  "registry_path": "artifacts/self_evolving_sage/current_formal500_live_generation_v38_broad500_system_lifecycle_keyfixed/registry/registry_manifest.json",
+  "registry_sha256": "300b9a2374a8582db11639922638d390b50aca455733885a3870d01ab798f527",
+  "routing_evidence_mode": "disabled",
+  "run_id": "self_evolving_live_generation_v38_broad500_system_lifecycle_keyfixed",
+  "run_root": "outputs/self_evolving_sage/formal500_live_generation_v38_broad500_system_lifecycle_keyfixed/online_build_500_20260513_005654"
+}

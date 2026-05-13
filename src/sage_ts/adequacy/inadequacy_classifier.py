@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from sage_ts.experiments.v2_flags import (
@@ -40,6 +40,20 @@ def _is_message_recency_extreme_scenario(scenario_name: str) -> bool:
         (
             "search_message_with_recency_latest",
             "search_message_with_recency_oldest",
+        )
+    )
+
+
+def _is_search_window_or_bounds_scenario(scenario_name: str) -> bool:
+    if "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith(
+        (
+            "search_reminder_with_creation_recency_",
+            "search_reminder_with_recency_",
+            "search_message_with_recency_",
+            "modify_reminder_with_recency_latest",
+            "remove_reminder_with_recency_latest",
         )
     )
 
@@ -305,6 +319,110 @@ def _is_next_weekday_reminder_scenario(scenario_name: str) -> bool:
     )
 
 
+def _plan_device_state_action_sequence_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="state_precondition:plan_device_state_action_sequence",
+        observation=(
+            "Device-state and downstream blocked-service tasks need a helper that "
+            "plans the exact original ToolSandbox setter sequence, not just a "
+            "single informal next action. Generate a deterministic helper named "
+            "plan_device_state_action_sequence_v3. Inputs: user_request and "
+            "visible_state_or_error. Return the first tool_name/arguments to call, "
+            "the full action_sequence, a final_response_recommendation, and "
+            "continue_original_task_after_sequence so the actor can resume the "
+            "original task after clearing wifi/cellular/location/low-battery "
+            "preconditions. The helper must never change device state itself; it "
+            "only prepares original setter calls."
+        ),
+        allowed_families=(str(ToolFamily.STATE_PRECONDITION_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "user_request": "Turn on wifi",
+                    "visible_state_or_error": "wifi is off and low battery mode is on",
+                },
+                {
+                    "tool_name": "set_low_battery_mode_status",
+                    "arguments": {"on": False},
+                    "should_call": True,
+                    "reason": "clear_low_battery_before_enabling_service",
+                    "action_sequence": [
+                        {
+                            "tool_name": "set_low_battery_mode_status",
+                            "arguments": {"on": False},
+                            "reason": "clear_low_battery_before_enabling_service",
+                        },
+                        {
+                            "tool_name": "set_wifi_status",
+                            "arguments": {"on": True},
+                            "reason": "set_wifi_on",
+                        },
+                    ],
+                    "final_response_recommendation": "Wifi has been turned on.",
+                    "continue_original_task_after_sequence": False,
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Send Sam the message hello",
+                    "visible_state_or_error": "cellular service is disabled",
+                },
+                {
+                    "tool_name": "set_cellular_service_status",
+                    "arguments": {"on": True},
+                    "should_call": True,
+                    "reason": "set_cellular_on",
+                    "action_sequence": [
+                        {
+                            "tool_name": "set_cellular_service_status",
+                            "arguments": {"on": True},
+                            "reason": "set_cellular_on",
+                        }
+                    ],
+                    "final_response_recommendation": "continue_original_task",
+                    "continue_original_task_after_sequence": True,
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "What is my contact's phone number?",
+                    "visible_state_or_error": "contacts are available",
+                },
+                {
+                    "tool_name": "",
+                    "arguments": {},
+                    "should_call": False,
+                    "reason": "no_device_state_target",
+                    "action_sequence": [],
+                    "final_response_recommendation": "",
+                    "continue_original_task_after_sequence": False,
+                    "abstain_reason": "no_device_state_target",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="device_state_sequence_planning_gap",
+        inadequacy_signals=("failed_base_tool_with_deterministic_fallback",),
+        failed_tool_calls=(
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+            "set_low_battery_mode_status",
+        ),
+        visible_data_gaps=(
+            "visible state/error text must become an original setter sequence",
+        ),
+        planner_failures=("continue downstream task after state precondition repair",),
+    )
+
+
 def _reminder_optional_location_argument_observation(
     scenario_name: str,
 ) -> CapabilityObservation:
@@ -468,7 +586,34 @@ def _reminder_optional_location_argument_observation(
                         "optional_location_lookup_pending_do_not_call_add_reminder"
                     ),
                     "location_status": "lookup_pending",
-                    "timestamp_source": "resolved",
+                    "timestamp_source": "relative_fields",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "Buy chocolate milk at Whole Foods",
+                    "resolved_reminder_timestamp": 1777776000.0,
+                    "current_timestamp": 0.0,
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "location_requested": False,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "abstain_reason": (
+                        "optional_location_lookup_pending_do_not_call_add_reminder"
+                    ),
+                    "location_status": "lookup_pending",
+                    "timestamp_source": "relative_fields",
                 },
                 negative_applicability=True,
             ),
@@ -552,6 +697,69 @@ def _next_weekday_timestamp_observation(scenario_name: str) -> CapabilityObserva
     )
 
 
+def _relative_day_time_timestamp_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="canonicalizer:relative_day_time_timestamp",
+        observation=(
+            "Reminder creation/modification tasks require turning a visible "
+            "relative date/time such as 'tomorrow 5 PM' into the exact local Unix "
+            "timestamp passed to the original add_reminder or modify_reminder "
+            "ToolSandbox call. Generate a deterministic canonicalizer named "
+            "relative_day_time_to_timestamp with inputs current_timestamp, "
+            "day_offset, hour, minute, and local_utc_offset_hours. Use local day "
+            "arithmetic and return only the timestamp; never create or modify the "
+            "reminder inside the helper."
+        ),
+        allowed_families=(str(ToolFamily.CANONICALIZER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "current_timestamp": 1777428906.194959,
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": -4,
+                },
+                1777496400.0,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1777428906.194959,
+                    "day_offset": 2,
+                    "hour": 8,
+                    "minute": 30,
+                    "local_utc_offset_hours": -4,
+                },
+                1777552200.0,
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1777428906.194959,
+                    "day_offset": 1,
+                    "hour": 25,
+                    "minute": 0,
+                    "local_utc_offset_hours": -4,
+                },
+                0.0,
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="relative_reminder_datetime_canonicalization_failure",
+        inadequacy_signals=("visible_raw_data_lacking_deterministic_transform",),
+        failed_tool_calls=("add_reminder", "modify_reminder"),
+        visible_data_gaps=(
+            "relative local day/time must become exact benchmark timestamp",
+        ),
+        planner_failures=("compute relative timestamp before reminder side effect",),
+        final_answer_route_mismatch=False,
+    )
+
+
 def _message_search_window_observation(scenario_name: str) -> CapabilityObservation:
     return CapabilityObservation(
         scenario_name=scenario_name,
@@ -609,6 +817,108 @@ def _message_search_window_observation(scenario_name: str) -> CapabilityObservat
         ),
         failed_tool_calls=("search_messages",),
         visible_data_gaps=("missing benchmark-compatible timestamp window",),
+    )
+
+
+def _resolve_search_window_or_bounds_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="derived_value:resolve_search_window_or_bounds",
+        observation=(
+            "Repeated reminder/message recency tasks need a final-action-ready "
+            "helper named resolve_search_window_or_bounds, not a thin bounds-only "
+            "calculator. The helper must take the current timestamp plus a natural "
+            "recency phrase/domain/intent, return the exact original search tool "
+            "name and search kwargs, and then preserve the original search call. "
+            "This is the broad Praxis-style search-window lane: call "
+            "get_current_timestamp first, call this helper second, then call "
+            "search_reminder or search_messages with the returned kwargs."
+        ),
+        allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "current_timestamp": 1777380998.0,
+                    "phrase": "yesterday",
+                    "target_domain": "reminder",
+                    "timestamp_intent": "creation",
+                    "direction": "yesterday",
+                    "content_keyword": "",
+                    "lookback_days": 0,
+                    "timezone_offset": 0.0,
+                },
+                {
+                    "target_tool_name": "search_reminder",
+                    "search_kwargs": {
+                        "creation_timestamp_lowerbound": 1777248000.0,
+                        "creation_timestamp_upperbound": 1777334399.0,
+                    },
+                    "should_call_search": True,
+                    "abstain_reason": "",
+                    "interpretation": "yesterday",
+                    "bounds_source": "resolved_direction",
+                },
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1777380998.0,
+                    "phrase": "today",
+                    "target_domain": "reminder",
+                    "timestamp_intent": "reminder",
+                    "direction": "today",
+                    "content_keyword": "",
+                    "lookback_days": 0,
+                    "timezone_offset": 0.0,
+                },
+                {
+                    "target_tool_name": "search_reminder",
+                    "search_kwargs": {
+                        "reminder_timestamp_lowerbound": 1777334400.0,
+                        "reminder_timestamp_upperbound": 1777420799.0,
+                    },
+                    "should_call_search": True,
+                    "abstain_reason": "",
+                    "interpretation": "today",
+                    "bounds_source": "resolved_direction",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 0.0,
+                    "phrase": "yesterday",
+                    "target_domain": "reminder",
+                    "timestamp_intent": "creation",
+                    "direction": "yesterday",
+                    "content_keyword": "",
+                    "lookback_days": 0,
+                    "timezone_offset": 0.0,
+                },
+                {
+                    "target_tool_name": "",
+                    "search_kwargs": {},
+                    "should_call_search": False,
+                    "abstain_reason": "missing_current_timestamp",
+                    "interpretation": "",
+                    "bounds_source": "abstain",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="search_window_final_action_ready_gap",
+        inadequacy_signals=(
+            "repeated_failed_tool_call",
+            "visible_raw_data_lacking_deterministic_transform",
+            "thin_bounds_helper_rejected",
+        ),
+        failed_tool_calls=("search_reminder", "search_messages"),
+        repeated_failed_tool_calls=("search_reminder", "search_messages"),
+        visible_data_gaps=("missing benchmark-compatible search kwargs",),
+        planner_failures=("no_criteria_search_call",),
+        final_answer_route_mismatch=False,
     )
 
 
@@ -715,6 +1025,159 @@ def _latest_record_selection_observation(
         inadequacy_signals=("wrong_selected_record",),
         visible_data_gaps=(
             "visible candidate list requires deterministic extreme selection",
+        ),
+    )
+
+
+def _message_content_by_recency_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="search_filter:select_message_content_by_recency",
+        observation=(
+            "Latest/oldest message answer tasks can still fail after "
+            "search_messages returns visible records because the actor selects "
+            "the wrong message or copies the content poorly. Generate a "
+            "side-effect-free helper named select_message_content_by_recency. "
+            "Inputs: records and selection_mode ('latest' or 'oldest'). Select "
+            "the unique visible message by numeric creation_timestamp and return "
+            "selected_content plus an exact final answer recommendation. Abstain "
+            "on missing records, missing timestamps, invalid selection mode, "
+            "timestamp ties, or missing content. The helper must not search or "
+            "send messages."
+        ),
+        allowed_families=(str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "old",
+                            "content": "bring milk",
+                            "creation_timestamp": 10.0,
+                        },
+                        {
+                            "message_id": "new",
+                            "content": "call me",
+                            "creation_timestamp": 20.0,
+                        },
+                    ],
+                    "selection_mode": "latest",
+                },
+                {
+                    "selected_record": {
+                        "message_id": "new",
+                        "content": "call me",
+                        "creation_timestamp": 20.0,
+                    },
+                    "selected_message": {
+                        "message_id": "new",
+                        "content": "call me",
+                        "creation_timestamp": 20.0,
+                    },
+                    "selected_message_id": "new",
+                    "selected_content": "call me",
+                    "selected_timestamp": 20.0,
+                    "should_answer": True,
+                    "abstain_reason": "",
+                    "tie_candidates": [],
+                    "selection_reason": "selected_latest_message_by_creation_timestamp_at_index_1",
+                    "exact_final_answer": "Your most recent message says 'call me'.",
+                    "final_answer_recommendation": "Your most recent message says 'call me'.",
+                    "copy_exactly": True,
+                },
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "old",
+                            "content": "first",
+                            "creation_timestamp": 5.0,
+                        },
+                        {
+                            "message_id": "new",
+                            "content": "second",
+                            "creation_timestamp": 15.0,
+                        },
+                    ],
+                    "selection_mode": "oldest",
+                },
+                {
+                    "selected_record": {
+                        "message_id": "old",
+                        "content": "first",
+                        "creation_timestamp": 5.0,
+                    },
+                    "selected_message": {
+                        "message_id": "old",
+                        "content": "first",
+                        "creation_timestamp": 5.0,
+                    },
+                    "selected_message_id": "old",
+                    "selected_content": "first",
+                    "selected_timestamp": 5.0,
+                    "should_answer": True,
+                    "abstain_reason": "",
+                    "tie_candidates": [],
+                    "selection_reason": "selected_oldest_message_by_creation_timestamp_at_index_0",
+                    "exact_final_answer": "Your oldest message says 'first'.",
+                    "final_answer_recommendation": "Your oldest message says 'first'.",
+                    "copy_exactly": True,
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "a",
+                            "content": "same",
+                            "creation_timestamp": 5.0,
+                        },
+                        {
+                            "message_id": "b",
+                            "content": "same",
+                            "creation_timestamp": 5.0,
+                        },
+                    ],
+                    "selection_mode": "latest",
+                },
+                {
+                    "selected_record": {},
+                    "selected_message": {},
+                    "selected_message_id": "",
+                    "selected_content": "",
+                    "selected_timestamp": 5.0,
+                    "should_answer": False,
+                    "abstain_reason": "ambiguous_timestamp_tie",
+                    "tie_candidates": [
+                        {
+                            "message_id": "a",
+                            "content": "same",
+                            "creation_timestamp": 5.0,
+                        },
+                        {
+                            "message_id": "b",
+                            "content": "same",
+                            "creation_timestamp": 5.0,
+                        },
+                    ],
+                    "selection_reason": "",
+                    "exact_final_answer": "",
+                    "final_answer_recommendation": "abstain:ambiguous_timestamp_tie",
+                    "copy_exactly": False,
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="message_recency_final_answer_selection_failure",
+        inadequacy_signals=("wrong_selected_record", "final_response_phrasing_failure"),
+        failed_tool_calls=("search_messages",),
+        visible_data_gaps=(
+            "visible message records must become selected content and final answer",
         ),
     )
 
@@ -2455,6 +2918,10 @@ def classify_scenario_observations(
                 final_answer_route_mismatch=route_mismatch,
             )
         ]
+        if _is_search_window_or_bounds_scenario(scenario_name):
+            observations.append(
+                _resolve_search_window_or_bounds_observation(scenario_name)
+            )
         if scenario_name.startswith("modify_reminder_with_recency_latest"):
             observations.append(
                 CapabilityObservation(
@@ -2529,6 +2996,10 @@ def classify_scenario_observations(
             scenario_name
         ) or _is_message_recency_extreme_scenario(scenario_name):
             observations.append(_message_search_window_observation(scenario_name))
+        if _is_search_window_or_bounds_scenario(scenario_name):
+            observations.append(
+                _resolve_search_window_or_bounds_observation(scenario_name)
+            )
         return tuple(observations)
 
     if similarity < 1.0 and _is_next_weekday_reminder_scenario(scenario_name):
@@ -2666,3 +3137,69 @@ def classify_scenario_observations(
             ),
         )
     return ()
+
+
+def classify_planned_scenario_observations(
+    scenario_name: str,
+) -> tuple[CapabilityObservation, ...]:
+    """Classify unlabeled task-family text into proactive birth observations.
+
+    This is intentionally weaker than result-backed classification: it uses only
+    visible manifest task names/family text, never labels, answers, scenario
+    state, or prior SAGE traces.  It exists to let self-evolving discovery birth
+    a coherent helper portfolio early enough for natural adoption instead of
+    paying one failure per helper family before the registry can improve.
+    """
+
+    observations: list[CapabilityObservation] = []
+
+    if "insufficient_information" in scenario_name:
+        observations.append(_safe_action_or_abstain_observation(scenario_name))
+    if _is_next_weekday_reminder_scenario(scenario_name):
+        observations.append(_next_weekday_timestamp_observation(scenario_name))
+    if _is_reminder_optional_location_argument_scenario(scenario_name):
+        observations.append(
+            _reminder_optional_location_argument_observation(scenario_name)
+        )
+    if _is_contact_update_by_id_scenario(scenario_name):
+        observations.append(_contact_update_by_id_observation(scenario_name))
+    if _is_contact_lookup_query_scenario(scenario_name):
+        observations.append(_contact_lookup_query_planner_observation(scenario_name))
+    if _is_contact_relationship_batch_update_scenario(scenario_name):
+        observations.append(
+            _contact_relationship_batch_update_observation(scenario_name)
+        )
+    if _is_send_message_contact_lookup_scenario(scenario_name):
+        observations.append(_send_message_contact_lookup_observation(scenario_name))
+    if _is_message_counterparty_contact_update_scenario(scenario_name):
+        observations.append(
+            _message_counterparty_contact_update_observation(scenario_name)
+        )
+    if _is_message_recency_extreme_scenario(scenario_name):
+        observations.append(_message_content_by_recency_observation(scenario_name))
+    if _is_recency_action_target_scenario(scenario_name):
+        observations.append(_recency_action_target_observation(scenario_name))
+    if _is_post_selection_side_effect_prep_scenario(scenario_name):
+        observations.append(_post_selection_side_effect_args_observation(scenario_name))
+    if scenario_name.startswith("modify_reminder_with_recency_latest"):
+        observations.append(_relative_day_time_timestamp_observation(scenario_name))
+    if _is_search_window_or_bounds_scenario(scenario_name):
+        observations.append(_resolve_search_window_or_bounds_observation(scenario_name))
+    if scenario_name.startswith("find_days_till_holiday"):
+        observations.append(_days_between_timestamps_observation(scenario_name))
+    if _is_direct_service_precondition_scenario(scenario_name):
+        observations.append(
+            _plan_device_state_action_sequence_observation(scenario_name)
+        )
+        observations.append(_next_service_tool_call_observation(scenario_name))
+
+    planned: list[CapabilityObservation] = []
+    for observation in observations:
+        planned.append(
+            replace(
+                observation,
+                reason=f"unlabeled_manifest_gap_plan:{observation.reason}",
+                evidence_source="unlabeled_manifest_task_text",
+            )
+        )
+    return tuple(planned)

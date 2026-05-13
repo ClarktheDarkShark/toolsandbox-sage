@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,9 +20,13 @@ from sage_ts.orchestration.online_birth import (
     GeneratedToolFactory,
     OnlineBirthController,
 )
+from sage_ts.orchestration.self_evolution_reflection import (
+    SelfEvolutionReflectionController,
+)
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 from sage_ts.runtime.toolsandbox_integration import (
+    load_tool_lifecycle_routing_state,
     route_registry_entries,
     with_registry_tools,
 )
@@ -511,6 +516,7 @@ class SageRunConfig:
     recurrence_threshold: int = 2
     base_tool_policy: str = UPSTREAM_POLICY
     resume_from_dir: Path | None = None
+    manifest_path: Path = Path("")
 
 
 def run_sage_with_registry(
@@ -526,13 +532,15 @@ def run_sage_with_registry(
     visible_generated_by_scenario: dict[str, list[str]] = {}
     called_generated_by_scenario: dict[str, list[str]] = {}
     selection_context_by_scenario: dict[str, dict[str, object]] = {}
+    baseline_scenario_by_name: dict[str, Scenario] = {}
 
     birth_controller: OnlineBirthController | None = None
+    reflection_controller: SelfEvolutionReflectionController | None = None
     registry_load_logged = False
     mutate_registry_reuse_counts = generator is not None
 
     def transform(name: str, scenario: Scenario, output_directory: Path) -> Scenario:
-        nonlocal birth_controller, registry_load_logged
+        nonlocal birth_controller, registry_load_logged, reflection_controller
         if generator is not None and birth_controller is None:
 
             def birth_event_hook(event: str, payload: dict[str, object]) -> None:
@@ -545,6 +553,16 @@ def run_sage_with_registry(
                 output_dir=output_directory,
                 recurrence_threshold=config.recurrence_threshold,
                 event_hook=birth_event_hook,
+            )
+            birth_controller.prime_from_scenario_names(config.scenario_names)
+        if generator is not None and reflection_controller is None:
+            reflection_controller = SelfEvolutionReflectionController.from_env(
+                store=store,
+                output_dir=output_directory,
+                agent=config.agent,
+                user=config.user,
+                base_tool_policy=config.base_tool_policy,
+                manifest_path=config.manifest_path,
             )
         if not registry_load_logged:
             append_jsonl(
@@ -571,6 +589,8 @@ def run_sage_with_registry(
                     },
                 )
             registry_load_logged = True
+
+        baseline_scenario_by_name[name] = scenario
 
         def record_reuse(tool_name: str) -> None:
             if mutate_registry_reuse_counts:
@@ -602,10 +622,12 @@ def run_sage_with_registry(
         available_base_tools = set(
             scenario.starting_context.get_available_tools(scrambling_allowed=False)
         )
+        lifecycle_state = load_tool_lifecycle_routing_state(store.root)
         _routed_entries, routing_decisions = route_registry_entries(
             loaded_entries,
             name,
             available_base_tools=available_base_tools,
+            lifecycle_state=lifecycle_state,
         )
         visibility_by_tool = {
             tool_name: (decision.visible, decision.reason)
@@ -846,6 +868,56 @@ def run_sage_with_registry(
                     "generated_tools_called": generated_called,
                 },
             )
+        suppress_zero_score = os.environ.get(
+            "SAGE_SELF_EVOLVING_SUPPRESS_ZERO_SCORE_TOOLS",
+            "",
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        if (
+            suppress_zero_score
+            and generated_called
+            and similarity <= 0.0
+            and not side_effect_failures
+        ):
+            for helper_name in generated_called:
+                store.retire(helper_name)
+                payload = {
+                    "event": "tool_runtime_suppressed",
+                    "tool_name": helper_name,
+                    "scenario": name,
+                    "reason": "generated_tool_called_with_zero_similarity",
+                    "similarity": similarity,
+                    "outcome_similarity": outcome_similarity,
+                    "registry_dir": str(config.registry_dir),
+                }
+                append_jsonl(output_directory / "sage_run_events.jsonl", payload)
+                if event_hook is not None:
+                    event_hook("tool_runtime_suppressed", output_directory, payload)
+
+        if reflection_controller is not None:
+            decision = reflection_controller.assess_scenario(
+                scenario_name=name,
+                baseline_scenario=baseline_scenario_by_name.get(name, scenario),
+                result=result,
+                selection_record=selection_record,
+                side_effect_failures=side_effect_failures,
+            )
+            if decision.stop_run:
+                result["_sage_stop_run"] = True
+                result["_sage_stop_reason"] = decision.reason
+                payload = {
+                    "event": "self_evolution_stop_recommended",
+                    "scenario": name,
+                    "reason": decision.reason,
+                    "completed_count": reflection_controller.completed_count,
+                    "registry_dir": str(config.registry_dir),
+                }
+                append_jsonl(output_directory / "sage_run_events.jsonl", payload)
+                if event_hook is not None:
+                    event_hook(
+                        "self_evolution_stop_recommended",
+                        output_directory,
+                        payload,
+                    )
 
         if birth_controller is None:
             return result

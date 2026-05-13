@@ -9,6 +9,7 @@ import json
 import os
 import re
 from collections.abc import Iterable, MutableMapping
+from pathlib import Path
 from typing import Any, Callable, cast
 
 from sage_ts.evaluation.task_strata import (
@@ -1052,6 +1053,26 @@ def registry_entry_visibility_reason(
     is_insufficient = "insufficient_information" in name
     if tool_name == "prepare_reminder_creation_args" and "weekday_delta" in name:
         return False, "reminder_creation_args_suppressed_until_weekday_timestamp"
+    if tool_name == "prepare_reminder_creation_args" and (
+        "low_battery_mode" in name or "wifi_off" in name or "location_off" in name
+    ):
+        return (
+            False,
+            "reminder_creation_args_suppressed_for_service_precondition_task",
+        )
+    if tool_name == "relative_day_time_to_timestamp" and name.startswith(
+        "add_reminder_content_and_week_delta"
+    ):
+        return False, "relative_time_suppressed_for_whole_week_delta_task"
+    if tool_name == "next_weekday_time_to_timestamp" and (
+        name.startswith("add_reminder_content_and_week_delta")
+        or name.startswith("add_reminder_content_and_date_and_time")
+    ):
+        return False, "next_weekday_suppressed_for_non_weekday_delta_task"
+    if tool_name.startswith("plan_device_state_action_sequence") and name.startswith(
+        ("get_wifi", "get_cellular", "get_location", "get_low_battery")
+    ):
+        return False, "state_action_planner_suppressed_for_status_query"
 
     generic_route = score_registry_entry_for_scenario(entry, scenario_name)
     if generic_route.status in {"shown", "hidden"}:
@@ -1061,7 +1082,7 @@ def registry_entry_visibility_reason(
         if name.startswith("modify_reminder_with_recency_latest"):
             return True, "relative_time_modify_latest_reminder"
         if name.startswith("add_reminder_content_and_week_delta"):
-            return True, "relative_time_add_reminder_week_delta"
+            return False, "relative_time_suppressed_for_whole_week_delta_task"
         return False, "relative_time_requires_explicit_relative_datetime_task"
 
     if tool_name == "recency_to_timestamp_bounds":
@@ -1132,6 +1153,11 @@ def registry_entry_visibility_reason(
     if tool_name == "prepare_reminder_creation_args":
         if is_insufficient:
             return False, "reminder_creation_args_suppressed_insufficient_information"
+        if "low_battery_mode" in name or "wifi_off" in name or "location_off" in name:
+            return (
+                False,
+                "reminder_creation_args_suppressed_for_service_precondition_task",
+            )
         if "weekday_delta" in name:
             return False, "reminder_creation_args_suppressed_until_weekday_timestamp"
         # General reminder-creation detection: scenario involves adding/creating a
@@ -1245,12 +1271,70 @@ def registry_entry_visibility_reason(
     return False, "state_helper_requires_direct_service_state_task"
 
 
+def load_tool_lifecycle_routing_state(registry_root: Path) -> dict[str, dict[str, Any]]:
+    """Load self-evolution lifecycle state written next to an experimental registry."""
+    lifecycle_path = registry_root / "tool_lifecycle.json"
+    if not lifecycle_path.exists():
+        return {}
+    try:
+        payload = json.loads(lifecycle_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    lifecycle = payload.get("tool_lifecycle", {})
+    if not isinstance(lifecycle, dict):
+        return {}
+    return {
+        str(tool_name): row
+        for tool_name, row in lifecycle.items()
+        if isinstance(row, dict)
+    }
+
+
+def _lifecycle_visibility_override(
+    *,
+    tool_name: str,
+    scenario_name: str | None,
+    lifecycle_state: dict[str, dict[str, Any]] | None,
+) -> tuple[bool, str] | None:
+    if not scenario_name or not lifecycle_state:
+        return None
+    row = lifecycle_state.get(tool_name)
+    if not row:
+        return None
+    decision = str(row.get("decision") or "")
+    if decision in {"park", "parked"}:
+        return False, "lifecycle_suppressed_parked_tool"
+
+    scenario_family = base_task_family(scenario_name)
+    route_repair_families = {
+        str(item) for item in row.get("route_repair_families", []) if item
+    }
+    if scenario_family in route_repair_families:
+        return False, "lifecycle_suppressed_harmful_called_family"
+    if decision not in {
+        "needs_route_repair",
+        "needs_repair",
+        "retain_with_route_repair",
+    }:
+        return None
+
+    harmful_families = {
+        base_task_family(str(item))
+        for item in row.get("harmful_called_scenarios", [])
+        if item
+    }
+    if scenario_family in harmful_families:
+        return False, "lifecycle_suppressed_harmful_called_family"
+    return None
+
+
 def route_registry_entries(
     entries: dict[str, RegistryEntry],
     scenario_name: str | None,
     *,
     max_bundle_size: int = DEFAULT_MAX_RUNTIME_BUNDLE_SIZE,
     available_base_tools: set[str] | None = None,
+    lifecycle_state: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[list[RegistryEntry], dict[str, RuntimeRoutingDecision]]:
     """Select a bounded runtime helper bundle and explain each routing decision."""
     decisions: dict[str, RuntimeRoutingDecision] = {}
@@ -1267,6 +1351,13 @@ def route_registry_entries(
     for tool_name, entry in sorted(entries.items()):
         generic = score_registry_entry_for_scenario(entry, scenario_name)
         is_visible, reason = registry_entry_visibility_reason(entry, scenario_name)
+        lifecycle_override = _lifecycle_visibility_override(
+            tool_name=tool_name,
+            scenario_name=scenario_name,
+            lifecycle_state=lifecycle_state,
+        )
+        if lifecycle_override is not None:
+            is_visible, reason = lifecycle_override
         status = "shown" if is_visible else "hidden"
         score = generic.score
         if generic.status == "hidden" and generic.reason in generic_hard_blocks:
@@ -1391,10 +1482,11 @@ def route_registry_entries(
 def retained_tool_visibility_policy_digest() -> str:
     """Return a digest that changes when retained-tool routing policy changes."""
     payload = {
-        "policy_version": "v4_failure_driven_strata_shared_birth",
+        "policy_version": "v5_self_evolution_lifecycle_route_repair",
         "helper_triggers": HELPER_TRIGGERS,
         "visibility_source": inspect.getsource(registry_entry_visibility_reason),
         "provisional_source": inspect.getsource(_provisional_birth_family_visibility),
+        "lifecycle_source": inspect.getsource(_lifecycle_visibility_override),
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
@@ -1475,6 +1567,7 @@ def with_registry_tools(
         store.load_entries(),
         scenario_name,
         available_base_tools=available_base_tools,
+        lifecycle_state=load_tool_lifecycle_routing_state(store.root),
     )
     inject_registry_tools_into_context(
         scenario_copy.starting_context,

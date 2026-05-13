@@ -1076,6 +1076,10 @@ def _registry_with_relative_time_helper(tmp_path: Path) -> RegistryStore:
         output_annotation="float",
         generalization_rationale="Reminder updates repeatedly need this conversion.",
         inadequacy_evidence="Agents miscompute local-day timestamp arithmetic.",
+        positive_triggers=(
+            "modify_reminder_with_recency_latest",
+            "add_reminder_content_and_week_delta_and_time",
+        ),
     )
     code = """
 def relative_day_time_to_timestamp(current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float) -> float:
@@ -1664,7 +1668,7 @@ def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
     assert tool_name not in weekday_relative.starting_context.name_to_tool
     assert tool_name not in insufficient.starting_context.name_to_tool
     assert tool_name not in modify.starting_context.name_to_tool
-    assert tool_name in service_precondition.starting_context.name_to_tool
+    assert tool_name not in service_precondition.starting_context.name_to_tool
     assert tool_name in applicable.starting_context.name_to_tool
     reminder_helper = applicable.starting_context.name_to_tool[tool_name]
     assert "LAST prep step immediately before" in (reminder_helper.__doc__ or "")
@@ -1940,10 +1944,16 @@ def test_relative_time_helper_only_exposed_on_relative_datetime_scenarios(
         store,
         scenario_name="modify_reminder_with_recency_latest_10_distraction_tools",
     )
+    whole_week_delta = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="add_reminder_content_and_week_delta_and_time",
+    )
 
     tool_name = "relative_day_time_to_timestamp"
     assert tool_name not in unrelated.starting_context.name_to_tool
     assert tool_name in relative.starting_context.name_to_tool
+    assert tool_name not in whole_week_delta.starting_context.name_to_tool
 
 
 def test_recency_bounds_helper_only_exposed_on_creation_recency_tasks(
@@ -2042,6 +2052,42 @@ def test_calendar_distance_helper_only_exposed_on_holiday_scenarios(
     tool_name = "days_between_timestamps"
     assert tool_name not in unrelated.starting_context.name_to_tool
     assert tool_name in holiday.starting_context.name_to_tool
+
+
+def test_lifecycle_hides_negative_called_subset_family(
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_reminder_creation_args(tmp_path)
+    (tmp_path / "tool_lifecycle.json").write_text(
+        json.dumps(
+            {
+                "artifact_type": "self_evolution_tool_lifecycle",
+                "tool_lifecycle": {
+                    "prepare_reminder_creation_args": {
+                        "decision": "needs_route_repair",
+                        "harmful_called_scenarios": [
+                            "add_reminder_content_and_week_delta_and_time"
+                        ],
+                    }
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    scenario = Scenario(
+        starting_context=ExecutionContext(
+            tool_allow_list=["add_reminder", "end_conversation"]
+        )
+    )
+
+    result = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="add_reminder_content_and_week_delta_and_time_3_distraction_tools",
+    )
+
+    assert "prepare_reminder_creation_args" not in result.starting_context.name_to_tool
 
 
 def test_contact_constraint_helper_is_suppressed_after_low_adoption(

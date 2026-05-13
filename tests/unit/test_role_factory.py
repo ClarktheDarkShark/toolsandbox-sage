@@ -12,6 +12,7 @@ from sage_ts.adapters.openai_toolsandbox_roles import (
     STATE_ACTION_ACTOR_POLICY_SENTINEL,
     ConfigurableOpenAIAgent,
     ConfigurableOpenAIUser,
+    _answer_completion_bridge_completion,
     _answer_retention_actor_policy_message,
     _answer_retention_response_text,
     _contact_lookup_bridge_completion,
@@ -27,6 +28,7 @@ from sage_ts.adapters.openai_toolsandbox_roles import (
     _safe_argument_actor_policy_message,
     _scheduling_timestamp_actor_policy_message,
     _state_action_actor_policy_message,
+    _state_action_planner_bridge_completion,
     _state_action_sequence_bridge_completion,
 )
 from sage_ts.adapters.role_factory import make_agent, make_user
@@ -238,6 +240,101 @@ def test_answer_retention_recaps_successful_setter_result() -> None:
     )
 
 
+def test_answer_retention_recaps_setting_status_after_checking_ack() -> None:
+    messages = [
+        {"role": "user", "content": "Is wifi on?"},
+        {
+            "role": "tool",
+            "name": "get_wifi_status",
+            "content": "True",
+        },
+        {"role": "assistant", "content": "Your Wi-Fi is still on."},
+        {"role": "user", "content": "Thanks for checking! That's good to know."},
+    ]
+
+    assert (
+        _answer_retention_response_text(messages)
+        == "You're welcome. To recap: Your Wi-Fi is still on."
+    )
+
+
+def test_answer_retention_recaps_after_appreciation_ack() -> None:
+    messages = [
+        {"role": "user", "content": "Is wifi on?"},
+        {
+            "role": "tool",
+            "name": "get_wifi_status",
+            "content": "True",
+        },
+        {"role": "assistant", "content": "Your Wi-Fi is still on."},
+        {"role": "user", "content": "I appreciate the confirmation!"},
+    ]
+
+    assert (
+        _answer_retention_response_text(messages)
+        == "You're welcome. To recap: Your Wi-Fi is still on."
+    )
+
+
+def test_answer_completion_bridge_ends_after_recap_ack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {"name": "end_conversation", "parameters": {"type": "object"}},
+        }
+    ]
+    messages = [
+        {"role": "user", "content": "Is wifi on?"},
+        {"role": "tool", "name": "get_wifi_status", "content": "True"},
+        {"role": "assistant", "content": "Your Wi-Fi is still on."},
+        {"role": "user", "content": "Thanks!"},
+        {
+            "role": "assistant",
+            "content": "You're welcome. To recap: Your Wi-Fi is still on.",
+        },
+        {"role": "user", "content": "Got it!"},
+    ]
+
+    completion = _answer_completion_bridge_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    assert _first_tool_call(completion).function.name == "end_conversation"
+
+
+def test_answer_completion_bridge_waits_until_value_was_recapped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {"name": "end_conversation", "parameters": {"type": "object"}},
+        }
+    ]
+    messages = [
+        {"role": "user", "content": "Is wifi on?"},
+        {"role": "tool", "name": "get_wifi_status", "content": "True"},
+        {"role": "assistant", "content": "Your Wi-Fi is still on."},
+        {"role": "user", "content": "Thanks!"},
+    ]
+
+    assert (
+        _answer_completion_bridge_completion(
+            messages,
+            tools,
+            model_name="gpt-4o-mini",
+        )
+        is None
+    )
+
+
 def test_relative_time_actor_policy_shows_for_timestamp_helper() -> None:
     tools = [
         {
@@ -280,7 +377,10 @@ def test_state_action_policy_shows_for_device_state_helper(
             "type": "function",
             "function": {
                 "name": "plan_device_state_action_sequence_v3",
-                "description": "Plan a state action sequence for device settings.",
+                "description": (
+                    "Plan the exact original ToolSandbox device-state setter "
+                    "sequence for wifi, cellular, location, or low-battery blockers."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -299,7 +399,155 @@ def test_state_action_policy_shows_for_device_state_helper(
 
     assert policy is not None
     assert STATE_ACTION_ACTOR_POLICY_SENTINEL in policy["content"]
+    assert "Prefer plan_device_state_action_sequence_v3" in policy["content"]
     assert "setter calls from action_sequence in order" in policy["content"]
+
+
+def test_state_action_planner_bridge_calls_planner_for_explicit_low_battery_action(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_device_state_action_sequence_v3",
+                "description": (
+                    "Plan the exact original ToolSandbox device-state setter "
+                    "sequence for wifi, cellular, location, or low-battery blockers."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "user_request": {"type": "string"},
+                        "visible_state_or_error": {"type": "string"},
+                    },
+                },
+            },
+        }
+    ]
+
+    completion = _state_action_planner_bridge_completion(
+        [{"role": "user", "content": "Turn on wifi while low battery mode is on."}],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "plan_device_state_action_sequence_v3"
+    assert "Turn on wifi" in call.function.arguments
+
+
+def test_state_action_planner_bridge_calls_planner_after_blocked_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_device_state_action_sequence_v3",
+                "description": (
+                    "Plan the exact original ToolSandbox device-state setter "
+                    "sequence for wifi, cellular, location, or low-battery blockers."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "user_request": {"type": "string"},
+                        "visible_state_or_error": {"type": "string"},
+                    },
+                },
+            },
+        }
+    ]
+
+    completion = _state_action_planner_bridge_completion(
+        [
+            {"role": "user", "content": "Please send Taylor the address."},
+            {
+                "role": "tool",
+                "name": "send_message_with_phone_number",
+                "content": "ValueError: Cellular service is not enabled.",
+            },
+        ],
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "plan_device_state_action_sequence_v3"
+    assert "Cellular service is not enabled" in call.function.arguments
+
+
+def test_state_action_planner_bridge_ignores_plain_direct_toggle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_device_state_action_sequence_v3",
+                "description": (
+                    "Plan the exact original ToolSandbox device-state setter "
+                    "sequence for wifi, cellular, location, or low-battery blockers."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "user_request": {"type": "string"},
+                        "visible_state_or_error": {"type": "string"},
+                    },
+                },
+            },
+        }
+    ]
+
+    assert (
+        _state_action_planner_bridge_completion(
+            [{"role": "user", "content": "Turn off cellular service."}],
+            tools,
+            model_name="gpt-4o-mini",
+        )
+        is None
+    )
+
+
+def test_state_action_planner_bridge_ignores_status_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_device_state_action_sequence_v3",
+                "description": (
+                    "Plan the exact original ToolSandbox device-state setter "
+                    "sequence for wifi, cellular, location, or low-battery blockers."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "user_request": {"type": "string"},
+                        "visible_state_or_error": {"type": "string"},
+                    },
+                },
+            },
+        }
+    ]
+
+    assert (
+        _state_action_planner_bridge_completion(
+            [{"role": "user", "content": "Can you check whether wifi is on?"}],
+            tools,
+            model_name="gpt-4o-mini",
+        )
+        is None
+    )
 
 
 def test_scheduling_timestamp_policy_shows_for_week_helper(
@@ -471,6 +719,51 @@ def test_contact_update_bridge_preserves_required_modify_call(
     assert call.function.name == "modify_contact"
     assert '"person_id": "person-1"' in call.function.arguments
     assert '"phone_number": "+10293847563"' in call.function.arguments
+
+
+def test_contact_update_bridge_calls_counterparty_selector_with_updates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+    tools = [
+        {
+            "type": "function",
+            "function": {"name": "select_message_counterparty_for_contact_update"},
+        },
+        {"type": "function", "function": {"name": "modify_contact"}},
+    ]
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                "Update the phone number of the last person I sent a message to "
+                "to +10293847563"
+            ),
+        },
+        {
+            "role": "tool",
+            "name": "search_messages",
+            "content": (
+                "[{'message_id': 'old', 'sender_person_id': 'self-id', "
+                "'recipient_person_id': 'old-person', 'creation_timestamp': 10.0}, "
+                "{'message_id': 'new', 'sender_person_id': 'self-id', "
+                "'recipient_person_id': 'new-person', 'creation_timestamp': 30.0}]"
+            ),
+        },
+    ]
+
+    completion = _contact_update_phone_bridge_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+
+    assert completion is not None
+    call = _first_tool_call(completion)
+    assert call.function.name == "select_message_counterparty_for_contact_update"
+    assert '"selection_mode": "latest"' in call.function.arguments
+    assert '"phone_number": "+10293847563"' in call.function.arguments
+    assert '"self_person_id": "self-id"' in call.function.arguments
 
 
 def test_contact_relationship_bridge_uses_generated_batch_planner(

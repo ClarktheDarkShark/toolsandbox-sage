@@ -17,6 +17,8 @@ DEFAULT_SPLIT_SIZES = {
     "smoke_10": 10,
     "mechanism_40": 40,
     "online_build_100": 100,
+    "online_build_250": 250,
+    "online_build_500": 500,
     "transfer_100": 100,
     "promotion_250": 250,
 }

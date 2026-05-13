@@ -71,6 +71,8 @@ MODES = (
     "mechanism_40",
     "mechanism_60",
     "online_build_100",
+    "online_build_250",
+    "online_build_500",
     # Frozen transfer checks
     "transfer_40",
     "transfer_60",
@@ -104,6 +106,8 @@ def _generation_enabled_by_default(mode: str, manifest_type: str) -> bool:
         "mechanism_40",
         "mechanism_60",
         "online_build_100",
+        "online_build_250",
+        "online_build_500",
         "extended_reuse_100",
     }
     if mode in generation_modes:
@@ -154,6 +158,35 @@ def _redacted_run_affecting_sage_env() -> dict[str, str]:
         else:
             values[name] = value
     return values
+
+
+def _looks_like_openai_model(model: str) -> bool:
+    name = model.strip().lower()
+    return name.startswith(("gpt-", "o1", "o3", "o4"))
+
+
+def _preflight_openai_api_key(
+    *,
+    agent_model: str,
+    user_model: str,
+    generation_model: str,
+    generation_enabled: bool,
+) -> None:
+    """Fail before task execution if an OpenAI-backed run has no API key."""
+
+    requires_openai = (
+        _looks_like_openai_model(agent_model)
+        or _looks_like_openai_model(user_model)
+        or (generation_enabled and _looks_like_openai_model(generation_model))
+    )
+    if not requires_openai:
+        return
+    key = os.environ.get("OPENAI_API_KEY", "")
+    if not key.strip():
+        raise SystemExit(
+            "OPENAI_API_KEY is required for this OpenAI-backed run but is "
+            "missing or blank. Aborting before task execution."
+        )
 
 
 def _resolve_routing_evidence_mode(requested: str, *, frozen_final_run: bool) -> str:
@@ -674,6 +707,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 resume_from_dir=Path(params["candidate_resume_dir"])
                 if params.get("candidate_resume_dir")
                 else None,
+                manifest_path=Path(params["manifest"]),
             ),
             generator=generator,
             progress_hook=progress,
@@ -688,12 +722,18 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 run_dir / "openai_response_cache_metrics.json"
             )
             write_cache_artifacts(run_root / "cache_artifacts" / "candidate")
+        live_summary = _read_metrics(run_dir / "live_result_summary.json")
+        completed_count = int(
+            live_summary.get("completed_count", len(scenario_names))
+            or len(scenario_names)
+        )
+        final_status = str(live_summary.get("status", "complete") or "complete")
         _write_arm_status(
             run_root,
             "candidate",
-            status="complete",
+            status=final_status,
             run_dir=run_dir,
-            completed_count=len(scenario_names),
+            completed_count=completed_count,
             scenario_count=len(scenario_names),
         )
     except Exception:
@@ -932,6 +972,12 @@ def main() -> None:
     elif _is_frozen_transfer_mode(args.mode):
         generation_enabled = False
     frozen_final_run = _is_frozen_transfer_mode(args.mode) and not generation_enabled
+    _preflight_openai_api_key(
+        agent_model=args.agent,
+        user_model=args.user,
+        generation_model=args.generation_model,
+        generation_enabled=generation_enabled,
+    )
     if _is_frozen_transfer_mode(args.mode) and args.generation == "on":
         raise SystemExit(
             "Final/frozen protocol modes must not run with --generation on. "
@@ -1244,6 +1290,7 @@ def main() -> None:
             "base_tool_policy": args.base_tool_policy,
             "registry_dir": str(registry_dir),
             "scenario_names": list(scenario_names),
+            "manifest": str(args.manifest),
             "cache_mode": args.cache_mode,
             "response_cache_enabled": response_cache_enabled,
             "control_resume_dir": str(control_resume_dir)
@@ -1496,6 +1543,7 @@ def main() -> None:
                 recurrence_threshold=args.recurrence_threshold,
                 base_tool_policy=args.base_tool_policy,
                 resume_from_dir=candidate_resume_dir,
+                manifest_path=args.manifest,
             ),
             generator=generator,
             progress_hook=candidate_progress,
@@ -1518,7 +1566,17 @@ def main() -> None:
         (control_dir / "control_cache_report.json").write_text(
             json.dumps(control_cache_report, indent=2) + "\n", encoding="utf-8"
         )
-    comparison = compare_runs(control_dir, candidate_dir, registry_dir=registry_dir)
+    candidate_live_summary = _read_metrics(candidate_dir / "live_result_summary.json")
+    candidate_stopped_early = (
+        str(candidate_live_summary.get("status", "")).strip().lower() == "stopped_early"
+    )
+    comparison = compare_runs(
+        control_dir,
+        candidate_dir,
+        registry_dir=registry_dir,
+        require_complete_match=not candidate_stopped_early,
+    )
+    comparison["candidate_stopped_early"] = candidate_stopped_early
     comparison["control_cache"] = control_cache_report
     comparison["model_metadata"] = model_metadata
     comparison["comparison_model_key"] = model_metadata["comparison_key"]

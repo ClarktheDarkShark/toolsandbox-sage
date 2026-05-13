@@ -29,7 +29,10 @@ class OpenAIChatAdapter:
 
     def __init__(self, model: str | None = None) -> None:
         self.model = resolve_model_name(model or os.environ.get("SAGE_TS_MODEL"))
-        self.client = OpenAI(base_url="https://api.openai.com/v1")
+        self.client = OpenAI(
+            base_url="https://api.openai.com/v1",
+            timeout=_openai_request_timeout_seconds(),
+        )
 
     def complete(self, request: ChatRequest) -> str:
         model = resolve_model_name(request.model or self.model or DEFAULT_MODEL)
@@ -54,3 +57,11 @@ class OpenAIChatAdapter:
         if content is None:
             raise ValueError("OpenAI response had no content")
         return content
+
+
+def _openai_request_timeout_seconds() -> float:
+    raw = os.environ.get("SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS", "90").strip()
+    try:
+        return max(float(raw), 1.0)
+    except ValueError:
+        return 90.0

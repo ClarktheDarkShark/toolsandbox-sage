@@ -3,7 +3,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from sage_ts.adequacy.inadequacy_classifier import classify_scenario_observations
+from sage_ts.adequacy.inadequacy_classifier import (
+    classify_planned_scenario_observations,
+    classify_scenario_observations,
+)
 from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.orchestration.online_birth import (
@@ -443,6 +446,161 @@ def test_live_birth_routing_metadata_normalizes_variant_family_labels() -> None:
     assert not any(
         "3_distraction_tools" in family
         for family in repaired.spec.applicable_task_families
+    )
+
+
+def test_sparse_counterparty_selector_gets_second_reusable_family() -> None:
+    observation = next(
+        item
+        for item in classify_planned_scenario_observations(
+            "modify_contact_with_message_recency_10_distraction_tools"
+        )
+        if item.canonical_key
+        == "composite:select_message_counterparty_for_contact_update"
+    )
+    generated = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="select_message_counterparty_for_contact_update",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Select non-self message counterparty for contact updates.",
+            inputs=(),
+            output_annotation="dict",
+            output_schema={"type": "object", "properties": {}},
+            positive_triggers=("latest message contact update",),
+            negative_triggers=("missing updates",),
+            preserves_side_effect_tools=("modify_contact",),
+            required_original_tool_calls=("modify_contact",),
+            abstain_behavior="Abstain when the counterparty is ambiguous.",
+            generalization_rationale="Message counterparty selection recurs.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=("modify_contact_with_message_recency",),
+            reason_tool_is_decisive="It prepares the non-self modify_contact target.",
+            shortfall_cluster_evidence=("message_counterparty_update",),
+            known_failure_mechanisms_addressed=("wrong_counterparty_selected",),
+            inadequacy_evidence={
+                "summary": "message counterparty contact update gap",
+                "signals": ("wrong_selected_record",),
+            },
+        ),
+        code="def select_message_counterparty_for_contact_update():\n    return {}\n",
+    )
+
+    repaired = _normalize_live_birth_routing_metadata(
+        generated,
+        observation,
+        ("modify_contact_with_message_recency",),
+    )
+
+    assert repaired.spec.applicable_task_families == (
+        "modify_contact_with_message_recency",
+        "search_sender_phone_number_with_content",
+    )
+
+
+def test_sparse_contact_id_update_planner_gets_reuse_family() -> None:
+    observation = next(
+        item
+        for item in classify_planned_scenario_observations(
+            "update_contact_with_id_and_phone_number_10_distraction_tools"
+        )
+        if item.canonical_key == "composite:plan_contact_update_from_id"
+    )
+    generated = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="plan_contact_update_from_id",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare modify_contact kwargs from a visible person id.",
+            inputs=(),
+            output_annotation="dict",
+            output_schema={"type": "object", "properties": {}},
+            positive_triggers=("update_contact_with_id",),
+            negative_triggers=("missing person id",),
+            preserves_side_effect_tools=("modify_contact",),
+            required_original_tool_calls=("modify_contact",),
+            abstain_behavior="Abstain when the person id is missing.",
+            generalization_rationale="Direct contact-id update planning recurs across variants.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=("update_contact_with_id_and_phone_number",),
+            reason_tool_is_decisive="It prepares original modify_contact kwargs.",
+            shortfall_cluster_evidence=("contact_id_update_argument_planning",),
+            known_failure_mechanisms_addressed=("side_effect_argument_preparation",),
+            inadequacy_evidence={
+                "summary": "contact id update planner gap",
+                "signals": ("side_effect_argument_preparation_failure",),
+            },
+        ),
+        code="def plan_contact_update_from_id():\n    return {}\n",
+    )
+
+    repaired = _normalize_live_birth_routing_metadata(
+        generated,
+        observation,
+        ("update_contact_with_id_and_phone_number",),
+    )
+
+    assert repaired.spec.applicable_task_families == (
+        "update_contact_with_id_and_phone_number",
+        "contact_id_update_argument_planning",
+    )
+
+
+def test_sparse_send_message_lookup_planner_gets_reuse_family() -> None:
+    observation = next(
+        item
+        for item in classify_planned_scenario_observations(
+            "send_message_with_contact_content_cellular_off_10_distraction_tools"
+        )
+        if item.canonical_key == "composite:plan_send_message_contact_lookup"
+    )
+    generated = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="plan_send_message_contact_lookup",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare contact lookup before sending a message.",
+            inputs=(),
+            output_annotation="dict",
+            output_schema={"type": "object", "properties": {}},
+            positive_triggers=("send_message_with_contact_content",),
+            negative_triggers=("missing recipient",),
+            preserves_side_effect_tools=(
+                "search_contacts",
+                "send_message_with_phone_number",
+            ),
+            required_original_tool_calls=(
+                "search_contacts",
+                "send_message_with_phone_number",
+            ),
+            abstain_behavior="Abstain when recipient or content is missing.",
+            generalization_rationale="Named-recipient message sending recurs across service variants.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=(
+                "send_message_with_contact_content_cellular_off",
+            ),
+            reason_tool_is_decisive="It prepares original search and send-message steps.",
+            shortfall_cluster_evidence=("send_message_named_recipient_lookup",),
+            known_failure_mechanisms_addressed=(
+                "planner_failed_to_issue_available_search",
+            ),
+            inadequacy_evidence={
+                "summary": "send-message contact lookup planner gap",
+                "signals": ("planner_failed_to_issue_available_search",),
+            },
+        ),
+        code="def plan_send_message_contact_lookup():\n    return {}\n",
+    )
+
+    repaired = _normalize_live_birth_routing_metadata(
+        generated,
+        observation,
+        ("send_message_with_contact_content_cellular_off",),
+    )
+
+    assert repaired.spec.applicable_task_families == (
+        "send_message_with_contact_content_cellular_off",
+        "send_message_with_contact_content",
     )
 
 
@@ -1319,3 +1477,49 @@ def test_direct_state_failure_births_trace_compatible_tool_call_helper() -> None
         "should_call": True,
         "reason": "wifi cannot be enabled while low battery mode is on",
     }
+
+
+def test_planned_manifest_observations_use_unlabeled_task_text() -> None:
+    observations = classify_planned_scenario_observations(
+        "send_message_with_contact_content_cellular_off_3_distraction_tools"
+    )
+
+    keys = {item.canonical_key for item in observations}
+    assert "state_precondition:next_service_tool_call" in keys
+    assert "composite:plan_send_message_contact_lookup" in keys
+    assert all(
+        item.evidence_source == "unlabeled_manifest_task_text" for item in observations
+    )
+    assert all(
+        item.reason.startswith("unlabeled_manifest_gap_plan:") for item in observations
+    )
+
+
+def test_proactive_manifest_reflection_births_from_empty_registry(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAGE_SELF_EVOLVING_PROACTIVE_BIRTH", "1")
+    store = RegistryStore(tmp_path / "registry")
+    generator = FakeContactLookupGenerator()
+    controller = OnlineBirthController(
+        store=store,
+        generator=generator,
+        output_dir=tmp_path,
+        recurrence_threshold=2,
+        failure_memory_path=None,
+    )
+
+    controller.prime_from_scenario_names(
+        (
+            "search_phone_number_with_name_3_distraction_tools",
+            "search_name_with_relationship_3_distraction_tools",
+        )
+    )
+
+    entry = store.get(_CONTACT_LOOKUP_TOOL_NAME)
+    assert generator.calls == 1
+    assert entry is not None
+    assert entry.birth_scenario.startswith("search_")
+    events = (tmp_path / "tool_birth_events.jsonl").read_text()
+    assert "plan_contact_lookup_query" in events

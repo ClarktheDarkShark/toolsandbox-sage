@@ -30,3 +30,32 @@ def test_tool_repair_attempt_is_valid_campaign_event(tmp_path: Path) -> None:
     payload = json.loads(latest.read_text(encoding="utf-8"))
     assert payload["tool_name"] == "thin_helper"
     assert payload["accepted"] is False
+
+
+def test_self_evolution_stop_recommendation_is_valid_campaign_event(
+    tmp_path: Path,
+) -> None:
+    row = append_event(
+        "self_evolution_stop_recommended",
+        {"reason": "pulse_lift_below_threshold"},
+        root=tmp_path,
+    )
+
+    assert row["event"] == "self_evolution_stop_recommended"
+    latest = tmp_path / "events" / "latest.jsonl"
+    payload = json.loads(latest.read_text(encoding="utf-8"))
+    assert payload["reason"] == "pulse_lift_below_threshold"
+
+
+def test_run_stopped_early_is_valid_campaign_event(tmp_path: Path) -> None:
+    row = append_event(
+        "run_stopped_early",
+        {"completed": 12, "requested": 20},
+        root=tmp_path,
+    )
+
+    assert row["event"] == "run_stopped_early"
+    latest = tmp_path / "events" / "latest.jsonl"
+    payload = json.loads(latest.read_text(encoding="utf-8").splitlines()[-1])
+    assert payload["completed"] == 12
+    assert payload["requested"] == 20

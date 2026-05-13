@@ -100,10 +100,25 @@ SETTING_SETTER_TOOL_NAMES = {
     "set_wifi_status",
 }
 
+SETTING_GETTER_TOOL_NAMES = {
+    "get_cellular_service_status",
+    "get_location_service_status",
+    "get_low_battery_mode_status",
+    "get_wifi_status",
+}
+
 
 def _praxis_bridge_policy_enabled() -> bool:
     raw = os.environ.get(PRAXIS_BRIDGE_POLICY_ENV, "").strip().lower()
     return raw in {"1", "true", "yes", "on", "combined", "full"}
+
+
+def _openai_request_timeout_seconds() -> float:
+    raw = os.environ.get("SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS", "90").strip()
+    try:
+        return max(float(raw), 1.0)
+    except ValueError:
+        return 90.0
 
 
 def _with_transient_openai_retries(call: Any) -> ChatCompletion:
@@ -474,10 +489,26 @@ def _state_action_planner_tool_names(openai_tools: object) -> set[str]:
         input_names = set(properties) if isinstance(properties, dict) else set()
         if not isinstance(name, str):
             continue
-        is_state_action_planner = name == "plan_device_state_action_sequence" or (
-            name.startswith("plan_device_state_action_sequence")
-            and {"user_request", "visible_state_or_error"}.issubset(input_names)
-            and "state action sequence" in description
+        is_next_service_planner = name == "next_service_tool_call" or (
+            {"target_service", "tool_name", "should_call"} & input_names
+            and "device-state" in description
+        )
+        has_state_action_inputs = {"user_request", "visible_state_or_error"}.issubset(
+            input_names
+        )
+        is_named_state_action_planner = (
+            name == "plan_device_state_action_sequence"
+            or name.startswith("plan_device_state_action_sequence")
+        ) and has_state_action_inputs
+        is_described_state_action_planner = has_state_action_inputs and (
+            "state action sequence" in description
+            or ("device-state" in description and "setter sequence" in description)
+            or ("device state" in description and "setter sequence" in description)
+        )
+        is_state_action_planner = (
+            is_named_state_action_planner
+            or is_next_service_planner
+            or is_described_state_action_planner
         )
         if is_state_action_planner:
             helpers.add(name)
@@ -595,7 +626,7 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
         "look up",
         "list",
         "show",
-        "check",
+        "check ",
         "add ",
         "remove ",
         "modify ",
@@ -615,6 +646,8 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
     acknowledgement_phrases = (
         "got it",
         "you found it",
+        "good to know",
+        "appreciate",
     )
     return (
         any(phrase in latest_user for phrase in acknowledgement_phrases)
@@ -659,6 +692,51 @@ def _answer_retention_response_text(openai_messages: object) -> str | None:
     if len(answer) > 280:
         answer = answer[:277].rstrip() + "..."
     return f"You're welcome. To recap: {answer}"
+
+
+def _recent_tool_backed_answer_already_recapped(openai_messages: object) -> bool:
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    saw_tool_backed_answer = False
+    has_recent_tool_answer = _messages_show_recent_tool_backed_answer(messages)
+    for message in messages:
+        role = message.get("role")
+        content = str(message.get("content", "") or "").strip().lower()
+        if role == "tool":
+            saw_tool_backed_answer = False
+            continue
+        if role == "assistant":
+            if "to recap:" in content and saw_tool_backed_answer:
+                return True
+            if content and not content.startswith(
+                ("you're welcome", "you are welcome")
+            ):
+                saw_tool_backed_answer = has_recent_tool_answer
+    return False
+
+
+def _answer_completion_bridge_completion(
+    openai_messages: object,
+    openai_tools: object,
+    *,
+    model_name: str,
+) -> ChatCompletion | None:
+    """End repeated acknowledgement loops after a tool-backed answer was recapped."""
+    if not _praxis_bridge_policy_enabled():
+        return None
+    if not _latest_user_is_brief_acknowledgement(openai_messages):
+        return None
+    if not _messages_show_recent_tool_backed_answer(openai_messages):
+        return None
+    if not _recent_tool_backed_answer_already_recapped(openai_messages):
+        return None
+    if "end_conversation" not in _tool_names_execution_facing(openai_tools):
+        return None
+    return _synthetic_tool_call_completion(
+        model_name=model_name,
+        completion_id="sage-answer-completion-end",
+        tool_name=_tool_name_for_call(openai_tools, "end_conversation"),
+        arguments={},
+    )
 
 
 def _latest_user_request_text(openai_messages: object) -> str:
@@ -837,6 +915,32 @@ def _parse_sequence_payload(content: object) -> list[Any]:
         except json.JSONDecodeError:
             return []
     return list(value) if isinstance(value, list) else []
+
+
+def _record_by_timestamp_extreme(
+    records: list[Any],
+    mode: str,
+    timestamp_field: str = "creation_timestamp",
+) -> Mapping[str, Any] | None:
+    usable: list[tuple[float, Mapping[str, Any]]] = []
+    for record in records:
+        if not isinstance(record, Mapping):
+            continue
+        raw_timestamp = record.get(timestamp_field, record.get("timestamp"))
+        try:
+            timestamp = float(raw_timestamp)
+        except (TypeError, ValueError):
+            continue
+        usable.append((timestamp, record))
+    if not usable:
+        return None
+    target_timestamp = (
+        min(timestamp for timestamp, _ in usable)
+        if mode == "oldest"
+        else max(timestamp for timestamp, _ in usable)
+    )
+    matches = [record for timestamp, record in usable if timestamp == target_timestamp]
+    return matches[0] if len(matches) == 1 else None
 
 
 def _latest_tool_message(
@@ -1785,17 +1889,25 @@ def _state_action_actor_policy_message(
     if not any(trigger in message_text for trigger in state_triggers):
         return None
     helper_list = ", ".join(sorted(helpers))
+    preferred_helper = (
+        " Prefer plan_device_state_action_sequence_v3 when it is visible because "
+        "it can return an ordered sequence for low-battery/service prerequisites."
+        if any(name.startswith("plan_device_state_action_sequence") for name in helpers)
+        else ""
+    )
     return {
         "role": "system",
         "content": (
             f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} A deterministic device-state "
-            f"action planner helper is available: {helper_list}. If the user asks "
+            f"action planner helper is available: {helper_list}.{preferred_helper} If the user asks "
             "to turn wifi, cellular service, location service, or low battery mode "
             "on/off, or a previous original tool reports a blocked wifi/cellular/"
             "location precondition, call this helper with the user request and any "
-            "visible state/error text. If the helper returns should_call=true, call "
-            "the original ToolSandbox setter calls from action_sequence in order; "
-            "the first call is also provided in tool_name and arguments. When the "
+            "visible state/error text. For next_service_tool_call, pass the single "
+            "target_service plus visible service-state booleans. If the helper "
+            "returns should_call=true, call the original ToolSandbox setter calls "
+            "from action_sequence in order; when action_sequence is absent, use "
+            "the single returned tool_name and arguments. When the "
             "request is a direct setting change, answer exactly with "
             "final_response_recommendation after the setters succeed, with no extra "
             "words. When the helper output says continue_original_task_after_sequence "
@@ -2692,6 +2804,47 @@ def _contact_update_phone_bridge_completion(
         return None
     if "modify_contact" not in _tool_names_execution_facing(openai_tools):
         return None
+    available_names = _tool_names_execution_facing(openai_tools)
+    phone = _phone_update_from_user_request(openai_messages)
+    if (
+        "select_message_counterparty_for_contact_update" in available_names
+        and phone
+        and _latest_tool_is(openai_messages, "search_messages")
+        and not _message_already_called_tool(
+            openai_messages, "select_message_counterparty_for_contact_update"
+        )
+    ):
+        message = _latest_tool_message(openai_messages, "search_messages")
+        records = _parse_sequence_payload(message.get("content") if message else "")
+        if records:
+            user_text = " ".join(_all_user_texts(openai_messages)).lower()
+            selection_mode = (
+                "oldest"
+                if any(token in user_text for token in ("oldest", "first", "earliest"))
+                else "latest"
+            )
+            selected = _record_by_timestamp_extreme(records, selection_mode)
+            self_person_id = ""
+            if isinstance(selected, Mapping):
+                if "sent" in user_text and " to " in user_text:
+                    self_person_id = str(selected.get("sender_person_id") or "").strip()
+                elif "from" in user_text or "sent me" in user_text:
+                    self_person_id = str(
+                        selected.get("recipient_person_id") or ""
+                    ).strip()
+            return _synthetic_tool_call_completion(
+                model_name=model_name,
+                completion_id="sage-contact-update-counterparty-select",
+                tool_name=_tool_name_for_call(
+                    openai_tools, "select_message_counterparty_for_contact_update"
+                ),
+                arguments={
+                    "records": records,
+                    "selection_mode": selection_mode,
+                    "updates": {"phone_number": phone},
+                    "self_person_id": self_person_id,
+                },
+            )
     if not _latest_tool_is(
         openai_messages, "select_message_counterparty_for_contact_update"
     ):
@@ -2710,7 +2863,6 @@ def _contact_update_phone_bridge_completion(
                 or selected.get("recipient_person_id")
                 or ""
             ).strip()
-    phone = _phone_update_from_user_request(openai_messages)
     if not selected_person_id or not phone:
         return None
     return _synthetic_tool_call_completion(
@@ -2950,11 +3102,106 @@ def _state_action_sequence_bridge_completion(
     )
 
 
+def _state_action_planner_bridge_completion(
+    openai_messages: object,
+    openai_tools: object,
+    *,
+    model_name: str,
+) -> ChatCompletion | None:
+    """Call the generated state planner when the request clearly needs it."""
+    if not _praxis_bridge_policy_enabled():
+        return None
+    helpers = sorted(
+        name
+        for name in _state_action_planner_tool_names(openai_tools)
+        if name.startswith("plan_device_state_action_sequence")
+    )
+    if not helpers:
+        return None
+    if any(_message_already_called_tool(openai_messages, name) for name in helpers):
+        return None
+
+    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    latest = messages[-1] if messages else {}
+    latest_role = latest.get("role")
+    latest_user = _latest_user_request_text(openai_messages)
+    latest_user_lower = latest_user.lower()
+    latest_tool_text = ""
+    if latest_role == "tool":
+        latest_tool_text = str(latest.get("content", "") or "")
+    latest_tool_lower = latest_tool_text.lower()
+
+    service_terms = (
+        "wifi",
+        "wi-fi",
+        "cellular",
+        "location service",
+        "low battery",
+        "battery mode",
+    )
+    direct_action_terms = (
+        "turn on",
+        "turn off",
+        "enable",
+        "disable",
+        "switch on",
+        "switch off",
+    )
+    is_direct_state_action = any(
+        term in latest_user_lower for term in direct_action_terms
+    ) and any(term in latest_user_lower for term in service_terms)
+    explicit_low_battery_precondition = is_direct_state_action and any(
+        token in latest_user_lower
+        for token in (
+            "low battery",
+            "battery mode",
+        )
+    )
+    is_blocked_state_error = any(
+        token in latest_tool_lower
+        for token in (
+            "cannot be turned on in low battery mode",
+            "cellular service is not enabled",
+            "cellular service is disabled",
+            "wifi is not enabled",
+            "wi-fi is not enabled",
+            "wifi is disabled",
+            "wi-fi is disabled",
+            "location service is not enabled",
+            "location service is disabled",
+            "blocked by low battery",
+        )
+    )
+    if not (explicit_low_battery_precondition or is_blocked_state_error):
+        return None
+
+    visible_state = " ".join(
+        part
+        for part in (
+            latest_user,
+            latest_tool_text,
+        )
+        if part
+    )
+    return _synthetic_tool_call_completion(
+        model_name=model_name,
+        completion_id="sage-state-action-planner-bridge",
+        tool_name=_tool_name_for_call(openai_tools, helpers[0]),
+        arguments={
+            "user_request": latest_user,
+            "visible_state_or_error": visible_state,
+        },
+    )
+
+
 class ConfigurableOpenAIAgent(OpenAIAPIAgent):
     def __init__(self, model_name: str) -> None:
         self.requested_model_name = model_name
         self.model_name = resolve_model_name(model_name)
         super().__init__()
+        self.openai_client = self.openai_client.with_options(
+            timeout=_openai_request_timeout_seconds()
+        )
 
     def model_inference(
         self,
@@ -2962,6 +3209,13 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
         openai_tools: Union[Iterable[ChatCompletionToolParam], NotGiven],
     ) -> ChatCompletion:
         """Run inference, with opt-in diagnostic tool forcing for adoption tests."""
+        answer_completion_bridge = _answer_completion_bridge_completion(
+            openai_messages,
+            openai_tools,
+            model_name=self.model_name,
+        )
+        if answer_completion_bridge is not None:
+            return answer_completion_bridge
         retained_answer = _answer_retention_response_text(openai_messages)
         if retained_answer:
             return ChatCompletion.model_construct(
@@ -2981,6 +3235,13 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
                 model=self.model_name,
                 object="chat.completion",
             )
+        state_planner_bridge = _state_action_planner_bridge_completion(
+            openai_messages,
+            openai_tools,
+            model_name=self.model_name,
+        )
+        if state_planner_bridge is not None:
+            return state_planner_bridge
         state_sequence_bridge = _state_action_sequence_bridge_completion(
             openai_messages,
             openai_tools,
@@ -3106,3 +3367,6 @@ class ConfigurableOpenAIUser(OpenAIAPIUser):
         self.requested_model_name = model_name
         self.model_name = resolve_model_name(model_name)
         super().__init__()
+        self.openai_client = self.openai_client.with_options(
+            timeout=_openai_request_timeout_seconds()
+        )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections import Counter
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -9,7 +10,10 @@ from typing import Any, Callable, Protocol
 
 from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate
 from sage_ts.adequacy.failure_memory import generation_failure_memory_context
-from sage_ts.adequacy.inadequacy_classifier import CapabilityObservation
+from sage_ts.adequacy.inadequacy_classifier import (
+    CapabilityObservation,
+    classify_planned_scenario_observations,
+)
 from sage_ts.evaluation.task_strata import base_task_family, expected_helper_fit
 from sage_ts.experiments.v2_flags import (
     CANDIDATE_REPAIR,
@@ -53,8 +57,12 @@ def suggested_tool_name(canonical_key: str) -> str | None:
         return None
     if suffix == "recency_timestamp_bounds":
         return "recency_to_timestamp_bounds"
+    if suffix == "resolve_search_window_or_bounds":
+        return "resolve_search_window_or_bounds"
     if suffix == "relative_day_time_timestamp":
         return "relative_day_time_to_timestamp"
+    if suffix in {"device_state_action_sequence", "plan_device_state_action_sequence"}:
+        return "plan_device_state_action_sequence_v3"
     if suffix in {"service_next_action", "next_service_tool_call"}:
         return "next_service_tool_call"
     if (
@@ -73,11 +81,15 @@ def suggested_tool_name(canonical_key: str) -> str | None:
 BROADER_HELPER_OVERLAPS = {
     "derived_value:recency_timestamp_bounds": ("resolve_search_window_or_bounds",),
     "derived_value:message_search_time_window": ("resolve_search_window_or_bounds",),
+    "state_precondition:next_service_tool_call": (
+        "plan_device_state_action_sequence_v3",
+    ),
 }
 
 
 PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
 DEFAULT_CANDIDATE_REPAIR_ATTEMPTS = 2
+PROACTIVE_BIRTH_ENV = "SAGE_SELF_EVOLVING_PROACTIVE_BIRTH"
 FIRST_OBSERVATION_BIRTH_KEYS = frozenset(
     {
         "canonicalizer:next_weekday_time_to_timestamp",
@@ -89,6 +101,36 @@ CHAIN_ROUTING_FAMILIES_BY_KEY = {
         "update_contact_relationship_with_relationship_twice",
         "update_contact_relationship_with_relationship",
         "remove_contact_by_phone",
+    ),
+    "composite:plan_contact_update_from_id": (
+        "update_contact_with_id_and_phone_number",
+        "contact_id_update_argument_planning",
+    ),
+    "composite:plan_send_message_contact_lookup": (
+        "send_message_with_contact_content",
+        "send_message_with_contact_content_cellular_off",
+    ),
+    "state_precondition:plan_device_state_action_sequence": (
+        "cellular_off",
+        "wifi_off",
+        "turn_on_wifi_low_battery_mode",
+        "turn_on_cellular_low_battery_mode",
+        "turn_on_location_low_battery_mode",
+        "send_message_with_contact_content_cellular_off",
+        "find_days_till_holiday_wifi_off",
+    ),
+    "composite:select_message_counterparty_for_contact_update": (
+        "modify_contact_with_message_recency",
+        "search_sender_phone_number_with_content",
+    ),
+    "derived_value:resolve_search_window_or_bounds": (
+        "search_reminder_with_creation_recency_yesterday",
+        "search_reminder_with_recency_yesterday",
+        "search_reminder_with_recency_upcoming",
+        "search_message_with_recency_latest",
+        "search_message_with_recency_oldest",
+        "modify_reminder_with_recency_latest",
+        "remove_reminder_with_recency_latest",
     ),
 }
 
@@ -239,10 +281,50 @@ class OnlineBirthController:
     rejected_counts: Counter[str] = field(default_factory=Counter)
     max_rejections_per_key: int = 2
     failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
+    proactive_manifest_primed: bool = False
 
     def _event(self, event: str, payload: dict[str, Any]) -> None:
         if self.event_hook is not None:
             self.event_hook(event, payload)
+
+    def prime_from_scenario_names(self, scenario_names: tuple[str, ...]) -> None:
+        """Birth early tools from unlabeled manifest task-family text when enabled."""
+        enabled = os.environ.get(PROACTIVE_BIRTH_ENV, "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if not enabled or self.proactive_manifest_primed:
+            return
+        self.proactive_manifest_primed = True
+        observation_count = 0
+        keys_before = set(self.generated_keys)
+        for scenario_name in scenario_names:
+            for observation in classify_planned_scenario_observations(scenario_name):
+                if not observation.generation_allowed:
+                    continue
+                observation_count += 1
+                self._event(
+                    "proactive_inadequacy_detected",
+                    {
+                        "scenario_name": scenario_name,
+                        "canonical_key": observation.canonical_key,
+                        "evidence_source": observation.evidence_source,
+                        "reason": observation.reason,
+                    },
+                )
+                self.observe(observation)
+        born_keys = sorted(set(self.generated_keys) - keys_before)
+        self._event(
+            "proactive_manifest_reflection_completed",
+            {
+                "scenario_count": len(scenario_names),
+                "observation_count": observation_count,
+                "born_or_suppressed_keys": born_keys,
+                "registry_dir": str(self.store.root),
+            },
+        )
 
     def _required_recurrence_threshold(self, observation: CapabilityObservation) -> int:
         if observation.canonical_key in FIRST_OBSERVATION_BIRTH_KEYS:

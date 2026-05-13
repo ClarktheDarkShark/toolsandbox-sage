@@ -245,6 +245,7 @@ def run_scenario_sequence(
             "running",
             len(config.scenario_names),
         )
+    final_status = "complete"
     for name, scenario in tqdm(ordered_items, desc="Scenarios"):
         os.environ["SAGE_TS_CURRENT_SCENARIO"] = name
         os.environ["SAGE_TS_SCENARIO_ORDER_INDEX"] = str(len(result_summary))
@@ -302,6 +303,8 @@ def run_scenario_sequence(
             result = (
                 result_hook(name, active_scenario, result, output_directory) or result
             )
+        stop_requested = bool(result.pop("_sage_stop_run", False))
+        stop_reason = result.pop("_sage_stop_reason", None)
         result_summary.append(result)
         if event_hook is not None:
             event_hook(
@@ -315,6 +318,8 @@ def run_scenario_sequence(
                     "exception_type": result.get("exception_type"),
                     "completed_count": len(result_summary),
                     "scenario_count": len(config.scenario_names),
+                    "stop_requested": stop_requested,
+                    "stop_reason": stop_reason,
                 },
             )
         write_live_result_summary(
@@ -330,6 +335,21 @@ def run_scenario_sequence(
                 "running",
                 len(config.scenario_names),
             )
+        if stop_requested:
+            final_status = "stopped_early"
+            if event_hook is not None:
+                event_hook(
+                    "run_stopped_early",
+                    output_directory,
+                    {
+                        "scenario": name,
+                        "run_type": config.run_type,
+                        "completed_count": len(result_summary),
+                        "scenario_count": len(config.scenario_names),
+                        "reason": stop_reason,
+                    },
+                )
+            break
 
     write_result_summary(
         result_summary=result_summary,
@@ -339,14 +359,14 @@ def run_scenario_sequence(
     write_live_result_summary(
         output_directory=output_directory,
         result_summary=result_summary,
-        status="complete",
+        status=final_status,
         scenario_count=len(config.scenario_names),
     )
     if progress_hook is not None:
         progress_hook(
             output_directory,
             result_summary,
-            "complete",
+            final_status,
             len(config.scenario_names),
         )
     return output_directory

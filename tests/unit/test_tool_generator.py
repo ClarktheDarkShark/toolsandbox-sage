@@ -338,6 +338,35 @@ def test_reminder_repair_uses_deterministic_contract_fallback(tmp_path: Path) ->
             ),
             ToolExample(
                 {
+                    "content": "Buy chocolate milk",
+                    "resolved_reminder_timestamp": 1778618400.0,
+                    "current_timestamp": 1778603855.0,
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "location_requested": False,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {
+                        "content": "Buy chocolate milk",
+                        "reminder_timestamp": 1778706000.0,
+                        "latitude": None,
+                        "longitude": None,
+                    },
+                    "should_call_add_reminder": True,
+                    "abstain_reason": "",
+                    "location_status": "omitted_optional",
+                    "timestamp_source": "relative_fields",
+                },
+            ),
+            ToolExample(
+                {
                     "content": "Team meeting",
                     "resolved_reminder_timestamp": 1777500000.0,
                     "current_timestamp": 1777428906.0,
@@ -413,7 +442,34 @@ def test_reminder_repair_uses_deterministic_contract_fallback(tmp_path: Path) ->
                         "optional_location_lookup_pending_do_not_call_add_reminder"
                     ),
                     "location_status": "lookup_pending",
-                    "timestamp_source": "resolved",
+                    "timestamp_source": "relative_fields",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "Buy chocolate milk at Whole Foods",
+                    "resolved_reminder_timestamp": 1777776000.0,
+                    "current_timestamp": 0.0,
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0.0,
+                    "location_requested": False,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "abstain_reason": (
+                        "optional_location_lookup_pending_do_not_call_add_reminder"
+                    ),
+                    "location_status": "lookup_pending",
+                    "timestamp_source": "relative_fields",
                 },
                 negative_applicability=True,
             ),
@@ -507,6 +563,114 @@ def test_action_selector_repair_uses_final_action_ready_contract(
                     "abstain_reason": "",
                     "safety_notes": "call remove_reminder with downstream_tool_kwargs",
                 },
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "m1",
+                            "sender_person_id": "p1",
+                            "sender_phone_number": "+15550111",
+                            "recipient_person_id": "self",
+                            "creation_timestamp": 10.0,
+                        },
+                        {
+                            "message_id": "m2",
+                            "sender_person_id": "self",
+                            "recipient_person_id": "p2",
+                            "recipient_phone_number": "+15550222",
+                            "creation_timestamp": 30.0,
+                        },
+                    ],
+                    "selection_mode": "oldest",
+                    "updates": {"relationship": "friend"},
+                    "self_person_id": "self",
+                },
+                {
+                    "selected_record": {
+                        "message_id": "m1",
+                        "sender_person_id": "p1",
+                        "sender_phone_number": "+15550111",
+                        "recipient_person_id": "self",
+                        "creation_timestamp": 10.0,
+                    },
+                    "selected_message": {
+                        "message_id": "m1",
+                        "sender_person_id": "p1",
+                        "sender_phone_number": "+15550111",
+                        "recipient_person_id": "self",
+                        "creation_timestamp": 10.0,
+                    },
+                    "selected_message_id": "m1",
+                    "selected_person_id": "p1",
+                    "selected_phone_number": "+15550111",
+                    "selected_timestamp": 10.0,
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": "p1",
+                        "relationship": "friend",
+                    },
+                    "should_call_tool": True,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": "call modify_contact with downstream_tool_kwargs",
+                    "final_answer_recommendation": "call modify_contact with downstream_tool_kwargs",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "m1",
+                            "sender_person_id": "p1",
+                            "sender_phone_number": "+15550111",
+                            "recipient_person_id": "self",
+                            "creation_timestamp": 10.0,
+                        },
+                        {
+                            "message_id": "m2",
+                            "sender_person_id": "self",
+                            "recipient_person_id": "p2",
+                            "recipient_phone_number": "+15550222",
+                            "creation_timestamp": 30.0,
+                        },
+                    ],
+                    "selection_mode": "oldest",
+                    "updates": {"relationship": "friend"},
+                    "self_person_id": "self",
+                },
+                {
+                    "selected_record": {
+                        "message_id": "m1",
+                        "sender_person_id": "p1",
+                        "sender_phone_number": "+15550111",
+                        "recipient_person_id": "self",
+                        "creation_timestamp": 10.0,
+                    },
+                    "selected_message": {
+                        "message_id": "m1",
+                        "sender_person_id": "p1",
+                        "sender_phone_number": "+15550111",
+                        "recipient_person_id": "self",
+                        "creation_timestamp": 10.0,
+                    },
+                    "selected_message_id": "m1",
+                    "selected_person_id": "p1",
+                    "selected_phone_number": "+15550111",
+                    "selected_timestamp": 10.0,
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": "p1",
+                        "relationship": "friend",
+                    },
+                    "should_call_tool": True,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": "call modify_contact with downstream_tool_kwargs",
+                    "final_answer_recommendation": "call modify_contact with downstream_tool_kwargs",
+                },
+                held_out=True,
             ),
             ToolExample(
                 {
@@ -640,6 +804,16 @@ def test_next_weekday_repair_uses_deterministic_timestamp_contract(
             ),
             ToolExample(
                 {
+                    "current_timestamp": 1778603870.0,
+                    "target_isoweekday": 5,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0,
+                },
+                1778878800.0,
+            ),
+            ToolExample(
+                {
                     "current_timestamp": 1778860800.0,
                     "target_isoweekday": 5,
                     "hour": 8,
@@ -658,6 +832,312 @@ def test_next_weekday_repair_uses_deterministic_timestamp_contract(
                     "local_utc_offset_hours": -4,
                 },
                 0.0,
+                negative_applicability=True,
+            ),
+        ),
+    )
+    assert result.accepted, result.errors
+
+
+def test_state_precondition_repair_handles_visible_not_called_memory(
+    tmp_path: Path,
+) -> None:
+    completer = FakeCompleter()
+    generator = ToolGenerator(completer=completer, cache=PromptCache(tmp_path))
+    request = ToolGenerationRequest(
+        scenario_name="cellular_off",
+        observation="Need an exact next service setter call.",
+        allowed_families=("state_precondition_helper",),
+        suggested_tool_name="next_service_tool_call",
+    )
+    rejected = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="next_service_tool_call",
+            family=ToolFamily.STATE_PRECONDITION_HELPER,
+            description="Rejected service helper.",
+            inputs=(ToolInput("target_service", "str", "service"),),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "tool_name": {
+                        "type": "string",
+                        "enum": ["", "set_cellular_service_status"],
+                    },
+                    "arguments": {"type": "object"},
+                    "should_call": {"type": "boolean"},
+                    "reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("cellular disabled",),
+            negative_triggers=("already_ready",),
+            preserves_side_effect_tools=("set_cellular_service_status",),
+            required_original_tool_calls=("set_cellular_service_status",),
+            abstain_behavior="Abstain when already ready.",
+            generalization_rationale="Service preconditions recur.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=("cellular_off", "wifi_off"),
+            reason_tool_is_decisive="It prepares the next setter call.",
+            diagnostic_only=False,
+            shortfall_cluster_evidence=("state_precondition",),
+            known_failure_mechanisms_addressed=("trace_compatible_service_call",),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Service helper was visible but not called.",
+                signals=("failed_base_tool_with_deterministic_fallback",),
+            ),
+        ),
+        code=(
+            "def next_service_tool_call(target_service: str) -> dict:\n    return {}\n"
+        ),
+    )
+
+    repaired = generator.repair(
+        request,
+        rejected,
+        ("unresolved_failure_memory:state_precondition_visible_not_called",),
+    )
+
+    assert completer.calls == 0
+    assert repaired.spec.tool_name == "next_service_tool_call"
+    assert (
+        "state_precondition_visible_not_called"
+        in repaired.spec.known_failure_mechanisms_addressed
+    )
+    result = validate_generated_tool(
+        repaired,
+        examples=(
+            ToolExample(
+                {
+                    "target_service": "cellular",
+                    "wifi_enabled": True,
+                    "cellular_enabled": False,
+                    "location_service_enabled": True,
+                    "low_battery_mode": False,
+                },
+                {
+                    "ready": False,
+                    "tool_name": "set_cellular_service_status",
+                    "arguments": {"on": True},
+                    "should_call": True,
+                    "reason": "cellular is disabled and must be enabled first",
+                },
+            ),
+            ToolExample(
+                {
+                    "target_service": "wifi",
+                    "wifi_enabled": False,
+                    "cellular_enabled": True,
+                    "location_service_enabled": True,
+                    "low_battery_mode": True,
+                },
+                {
+                    "ready": False,
+                    "tool_name": "set_low_battery_mode_status",
+                    "arguments": {"on": False},
+                    "should_call": True,
+                    "reason": "wifi cannot be enabled while low battery mode is on",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "target_service": "location",
+                    "wifi_enabled": True,
+                    "cellular_enabled": True,
+                    "location_service_enabled": True,
+                    "low_battery_mode": False,
+                },
+                {
+                    "ready": True,
+                    "tool_name": "",
+                    "arguments": {},
+                    "should_call": False,
+                    "reason": "location is already enabled",
+                },
+                negative_applicability=True,
+            ),
+        ),
+    )
+    assert result.accepted, result.errors
+
+
+def test_message_counterparty_repair_normalizes_abstain_contract(
+    tmp_path: Path,
+) -> None:
+    completer = FakeCompleter()
+    generator = ToolGenerator(completer=completer, cache=PromptCache(tmp_path))
+    request = ToolGenerationRequest(
+        scenario_name="modify_contact_with_message_recency",
+        observation="Need deterministic non-self message counterparty selection.",
+        allowed_families=("composite_workflow_helper",),
+        suggested_tool_name="select_message_counterparty_for_contact_update",
+    )
+    rejected = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="select_message_counterparty_for_contact_update",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Rejected counterparty selector.",
+            inputs=(ToolInput("records", "list", "records"),),
+            output_annotation="dict",
+            output_schema={"type": "object", "properties": {"selected_record": {}}},
+            positive_triggers=("modify_contact_with_message_recency",),
+            negative_triggers=("missing updates",),
+            preserves_side_effect_tools=("modify_contact",),
+            required_original_tool_calls=("modify_contact",),
+            abstain_behavior="Abstain on missing updates.",
+            generalization_rationale="Message counterparty selection recurs.",
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=("modify_contact_with_message_recency",),
+            reason_tool_is_decisive="It prepares original modify_contact kwargs.",
+            shortfall_cluster_evidence=("message_counterparty_update",),
+            known_failure_mechanisms_addressed=("wrong_selected_record",),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Counterparty selector used a non-machine-readable abstain reason.",
+                signals=("negative_example_mismatch",),
+            ),
+        ),
+        code="def select_message_counterparty_for_contact_update(records: list) -> dict:\n    return {}\n",
+    )
+
+    repaired = generator.repair(request, rejected, ("negative_0_mismatch",))
+
+    assert completer.calls == 0
+    assert repaired.spec.tool_name == "select_message_counterparty_for_contact_update"
+    result = validate_generated_tool(
+        repaired,
+        examples=(
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "m1",
+                            "sender_person_id": "self",
+                            "recipient_person_id": "p2",
+                            "recipient_phone_number": "+15550100",
+                            "creation_timestamp": 20.0,
+                        }
+                    ],
+                    "selection_mode": "latest",
+                    "updates": {"phone_number": "+15550999"},
+                    "self_person_id": "self",
+                },
+                {
+                    "selected_record": {
+                        "message_id": "m1",
+                        "sender_person_id": "self",
+                        "recipient_person_id": "p2",
+                        "recipient_phone_number": "+15550100",
+                        "creation_timestamp": 20.0,
+                    },
+                    "selected_message": {
+                        "message_id": "m1",
+                        "sender_person_id": "self",
+                        "recipient_person_id": "p2",
+                        "recipient_phone_number": "+15550100",
+                        "creation_timestamp": 20.0,
+                    },
+                    "selected_message_id": "m1",
+                    "selected_person_id": "p2",
+                    "selected_phone_number": "+15550100",
+                    "selected_timestamp": 20.0,
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": "p2",
+                        "phone_number": "+15550999",
+                    },
+                    "should_call_tool": True,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": "call modify_contact with downstream_tool_kwargs",
+                    "final_answer_recommendation": "call modify_contact with downstream_tool_kwargs",
+                },
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "m_old",
+                            "sender_person_id": "p_old",
+                            "sender_phone_number": "+15550111",
+                            "recipient_person_id": "self",
+                            "creation_timestamp": 10.0,
+                        },
+                        {
+                            "message_id": "m_new",
+                            "sender_person_id": "self",
+                            "recipient_person_id": "p_new",
+                            "recipient_phone_number": "+15550222",
+                            "creation_timestamp": 30.0,
+                        },
+                    ],
+                    "selection_mode": "oldest",
+                    "updates": {"relationship": "friend"},
+                    "self_person_id": "self",
+                },
+                {
+                    "selected_record": {
+                        "message_id": "m_old",
+                        "sender_person_id": "p_old",
+                        "sender_phone_number": "+15550111",
+                        "recipient_person_id": "self",
+                        "creation_timestamp": 10.0,
+                    },
+                    "selected_message": {
+                        "message_id": "m_old",
+                        "sender_person_id": "p_old",
+                        "sender_phone_number": "+15550111",
+                        "recipient_person_id": "self",
+                        "creation_timestamp": 10.0,
+                    },
+                    "selected_message_id": "m_old",
+                    "selected_person_id": "p_old",
+                    "selected_phone_number": "+15550111",
+                    "selected_timestamp": 10.0,
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs": {
+                        "person_id": "p_old",
+                        "relationship": "friend",
+                    },
+                    "should_call_tool": True,
+                    "tie_candidates": [],
+                    "abstain_reason": "",
+                    "safety_notes": "call modify_contact with downstream_tool_kwargs",
+                    "final_answer_recommendation": "call modify_contact with downstream_tool_kwargs",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "records": [
+                        {
+                            "message_id": "m1",
+                            "sender_person_id": "self",
+                            "recipient_person_id": "p2",
+                            "recipient_phone_number": "+15550100",
+                            "creation_timestamp": 20.0,
+                        }
+                    ],
+                    "selection_mode": "latest",
+                    "updates": {},
+                    "self_person_id": "self",
+                },
+                {
+                    "selected_record": {},
+                    "selected_message": {},
+                    "selected_message_id": "",
+                    "selected_person_id": "",
+                    "selected_phone_number": "",
+                    "selected_timestamp": 0.0,
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "should_call_tool": False,
+                    "tie_candidates": [],
+                    "abstain_reason": "missing_updates",
+                    "safety_notes": "abstain; no safe contact update target",
+                    "final_answer_recommendation": "abstain:missing_updates",
+                },
                 negative_applicability=True,
             ),
         ),

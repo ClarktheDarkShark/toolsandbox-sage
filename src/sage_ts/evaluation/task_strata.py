@@ -61,6 +61,10 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "record_filtering_ranking_latest_selection",
     ),
     "next_service_tool_call": ("direct_state_precondition_service_enablement",),
+    "plan_device_state_action_sequence_v3": (
+        "direct_state_precondition_service_enablement",
+        "generic_multi_tool_composition",
+    ),
     "recover_from_tool_error": ("direct_state_precondition_service_enablement",),
     "next_service_enablement_action": ("direct_state_precondition_service_enablement",),
     "prepare_reminder_creation_args": (
@@ -89,6 +93,10 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "contact_message_search_disambiguation",
         "record_filtering_ranking_latest_selection",
         "generic_multi_tool_composition",
+    ),
+    "select_message_content_by_recency": (
+        "record_filtering_ranking_latest_selection",
+        "contact_message_search_disambiguation",
     ),
     "prepare_safe_action_or_abstain": (
         "insufficient_information_clarification",
@@ -137,6 +145,12 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
     ),
     "composite:constraint_to_action_planner": ("constraint_to_action_planner",),
     "state_precondition:next_service_tool_call": ("next_service_tool_call",),
+    "state_precondition:plan_device_state_action_sequence": (
+        "plan_device_state_action_sequence_v3",
+    ),
+    "search_filter:select_message_content_by_recency": (
+        "select_message_content_by_recency",
+    ),
     "state_precondition:recover_from_tool_error": ("recover_from_tool_error",),
     "composite:prepare_reminder_creation_args": ("prepare_reminder_creation_args",),
 }
@@ -387,6 +401,10 @@ def expected_helper_fit(
     ):
         helpers.append("select_record_by_timestamp_extreme")
     if "insufficient_information" not in name and name.startswith(
+        ("search_message_with_recency_latest", "search_message_with_recency_oldest")
+    ):
+        helpers.append("select_message_content_by_recency")
+    if "insufficient_information" not in name and name.startswith(
         ACTION_TARGET_PREFIXES
     ):
         helpers.append("select_action_target_by_recency")
@@ -406,6 +424,10 @@ def expected_helper_fit(
         helpers.append("resolve_search_window_or_bounds")
     if any(token in name for token in ("holiday", "business_day")):
         helpers.append("days_between_timestamps")
+    if "insufficient_information" not in name and name.startswith(
+        DIRECT_SERVICE_HELPER_PREFIXES
+    ):
+        helpers.append("plan_device_state_action_sequence_v3")
     if "insufficient_information" not in name and name.startswith(
         (
             "search_name_with_relationship",
@@ -468,6 +490,10 @@ def expected_birth_opportunities(
     ):
         opportunities.append("search_filter:select_record_by_timestamp_extreme")
         opportunities.append("derived_value:resolve_search_window_or_bounds")
+    if name.startswith(
+        ("search_message_with_recency_latest", "search_message_with_recency_oldest")
+    ):
+        opportunities.append("search_filter:select_message_content_by_recency")
     if (
         "ambiguous" not in name
         and "insufficient_information" not in name
@@ -541,6 +567,7 @@ def expected_birth_opportunities(
     ):
         opportunities.append("derived_value:extract_service_answer_field")
     if name.startswith(DIRECT_SERVICE_HELPER_PREFIXES):
+        opportunities.append("state_precondition:plan_device_state_action_sequence")
         opportunities.append("state_precondition:next_service_tool_call")
     if name.startswith(DOWNSTREAM_SERVICE_HELPER_PREFIXES):
         opportunities.append("state_precondition:recover_from_tool_error")

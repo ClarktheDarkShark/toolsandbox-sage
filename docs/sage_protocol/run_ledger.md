@@ -1,5 +1,29 @@
 # Run Ledger
 
+## 2026-05-13
+
+- `Self-evolving SAGE empty-registry broad250 and broad500 scale validation` completed.
+  - Branch: `codex/self-evolving-sage-mini60`
+  - Strategy: start from no accepted generated helpers, keep generation on, let the SAGE lifecycle/router decide helper birth, validation, retention, route repair, and visibility from natural run feedback. No force calls counted as evidence.
+  - Models: agent/user/generation all `gpt-4o-mini`.
+  - Runtime policy: `SAGE_PRAXIS_BRIDGE_POLICY=combined`, routing evidence `disabled`, candidate task cache `off`, OpenAI response cache `disabled`, control cache `strict`.
+  - Broad250 run: `outputs/self_evolving_sage/formal500_live_generation_v37_broad250_system_lifecycle_keyfixed/online_build_250_20260512_220851`
+  - Broad250 dashboard: `http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v37_broad250_system_lifecycle_keyfixed/online_build_250_20260512_220851/dashboard/task_compare.html`
+  - Broad250 summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v37_broad250_system_lifecycle_keyfixed_summary.json`, SHA-256 `3f6aa9c7786fae16b16bc241d19ab5ff068a4c9bf89d77efba83ebc90a18a596`
+  - Broad250 controls: `250 cached / 0 fresh`; cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`; cohort selection influenced by cache: `false`.
+  - Broad250 metrics: canonical/reference `0.669502 -> 0.779703`, delta `+0.110201`, relative lift `+16.46%`; outcome `0.509662 -> 0.685953`, delta `+0.176291`, relative lift `+34.59%`; exact successes `9 -> 91`; score gains/regressions/preserved `168 / 48 / 34`; outcome gains/regressions/preserved `120 / 47 / 23`; runtime exceptions `0`; helper side-effect incidents `0`; protocol gate `PASS`.
+  - Broad250 generated helpers: accepted `15`; newly generated and naturally called `14`; accepted-but-uncalled `prepare_side_effect_args_from_selected_record`.
+  - Broad500 run: `outputs/self_evolving_sage/formal500_live_generation_v38_broad500_system_lifecycle_keyfixed/online_build_500_20260513_005654`
+  - Broad500 dashboard: `http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v38_broad500_system_lifecycle_keyfixed/online_build_500_20260513_005654/dashboard/task_compare.html`
+  - Broad500 summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v38_broad500_system_lifecycle_keyfixed_summary.json`, SHA-256 `794414a8f7399c26d19daca4086778a637d2ed37ece72c7aa510e3f2bff83f94`
+  - Broad500 residual gap profile: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v38_broad500_residual_gap_profile.json`, SHA-256 `5cd5bec795a947eb8d40bf47aab5fc484a76d1ca90cc66323f7330aa7c3a3aba`
+  - Broad500 controls: `500 cached / 0 fresh`; cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`; cohort selection influenced by cache: `false`.
+  - Broad500 metrics: canonical/reference `0.657730 -> 0.738692`, delta `+0.080962`, relative lift `+12.31%`; outcome `0.495416 -> 0.700468`, delta `+0.205052`, relative lift `+41.39%`; exact success delta `+80`; score gains/regressions/preserved `318 / 114 / 68`; outcome gains/regressions/preserved `243 / 87 / 54`; runtime exceptions `0`; helper side-effect incidents `0`; protocol gate `PASS`.
+  - Broad500 generated helpers: accepted `16`; newly generated and naturally called `15`; accepted-but-uncalled `prepare_side_effect_args_from_selected_record`. Top natural calls: `resolve_search_window_or_bounds` `70`, `plan_device_state_action_sequence_v3` `59`, `prepare_reminder_creation_args` `22`, `plan_contact_lookup_query` `19`, `select_message_content_by_recency` `15`.
+  - Caveat and repair: Broad500 resumed after an OpenAI transport hang. The completed paired result is valid, but the self-evolution reflection/lifecycle state did not hydrate fully across the resume boundary. A tested runtime repair now hydrates cumulative lifecycle state from copied `self_evolution_task_feedback.jsonl` on resumed runs.
+  - Transport repair: OpenAI ToolSandbox role clients and adapter clients now use bounded request timeouts via `SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS` to prevent unbounded socket hangs during long candidate arms.
+  - Decision: `SELF_EVOLVING_SCALE_POSITIVE_WITH_RESUME_CAVEAT`; next action is a no-resume or resume-hydrated 100/250 confirmation before spending another broad500 run, then a broad500 rerun only if the checkpoint matches or exceeds the fixed Praxis trajectory.
+
 ## 2026-05-12
 
 - `Self-evolving SAGE empty-registry live-generation 60` completed.
