@@ -8,6 +8,10 @@ SAGE is the research system. The coding agent is a development assistant used to
 
 Outcome/task-completion is the primary endpoint. Canonical/reference similarity is secondary and must be reported honestly, especially where deterministic helpers substitute intermediate routes.
 
+Current methodology comment: SAGE Praxis with true self-evolution working is the main SAGE system going forward for Chapter 3 drafting and future validation campaigns. This is a methodology/current-system marker, not a protected final-claim promotion.
+
+Prepared figure package: `docs/sage_protocol/chapter3_methodology_figures.md`.
+
 ## Methodology Section Map
 
 | Chapter 3 Section | Implementation / Artifact | Methodological Claim | Caveat |
@@ -124,11 +128,17 @@ for each sealed scenario in manifest order:
 
 A clean result with this policy enabled supports a combined-treatment claim only. A registry-only claim requires the same candidate registry to reproduce without `SAGE_PRAXIS_BRIDGE_POLICY=combined` and without importing bridge/checker behavior.
 
-## Diagrams Needed
+## Figure Assets Ready
 
-- Full SAGE pipeline diagram: manifest -> control cache planning -> control arm -> SAGE arm -> scoring -> dashboard/report.
-- Generated-tool lifecycle diagram: shortfall cluster -> spec -> validation -> candidate registry -> routing -> contribution -> frozen evaluation.
-- Praxis combined-treatment diagram: frozen registry + bounded routing + actor bridge policy + original side-effect preservation checker -> paired scoring.
+| Figure | Asset |
+|---|---|
+| Full SAGE + ToolSandbox pipeline | `docs/sage_protocol/figures/sage_toolsandbox_system_overview.svg` |
+| SAGE key components zoom-in | `docs/sage_protocol/figures/sage_internal_components_zoom.svg` |
+| Tool generation, validation, and repair loop | `docs/sage_protocol/figures/sage_tool_generation_validation_repair_loop.svg` |
+| Paper-ready matched-validation diagram | `docs/sage_protocol/figures/sage_peer_review_methodology_figure.svg` |
+
+Remaining tables to draft for Chapter 3:
+
 - Evidence separation table: best3 broad claim, V2.6 matched gap closure, current-code original250, current-code 500, deferred 1032.
 - Cache-policy table: OpenAI response cache vs task-level control baseline cache vs fresh runs.
 - Metric definitions table: outcome, canonical, exact success, no-current-helper-fit, VNC, called-subset contribution.

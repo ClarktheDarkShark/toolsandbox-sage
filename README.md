@@ -14,6 +14,18 @@ The research claim is not simply “better tool calling.” The claim is tool ev
 
 This repository is built on Apple’s ToolSandbox benchmark. The upstream ToolSandbox code, license, and benchmark README are retained below for attribution and reproducibility.
 
+## Current Main System: SAGE Praxis With True Self-Evolution
+
+SAGE Praxis with true self-evolution working is the current main SAGE system going forward for methodology writing and future validation campaigns. In this mode, SAGE can start from an empty generated-tool registry, keep generation on during candidate runs, identify unsupported task buckets from online gap evidence, generate and validate new helpers, retain useful tools, park harmful tools, and reuse retained helpers through system-driven routing.
+
+This is a current-system and methodology marker, not an automatic protected final-claim update. Protected claims still require locked matched validation, zero helper side-effect incidents, documented cache policy, and protected-claim review.
+
+Chapter 3 figure assets are available under `docs/sage_protocol/figures/` and are indexed in `docs/sage_protocol/chapter3_methodology_figures.md`. Regenerate them with:
+
+```bash
+python3 scripts/render_sage_methodology_diagrams.py
+```
+
 ## What SAGE Adds
 
 SAGE sits around the ToolSandbox execution loop rather than replacing it. The benchmark still provides the stateful environment, user simulator, tool calls, trajectories, and canonical milestone scoring. SAGE adds the experimental layer for autonomous helper-tool evolution.

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1250" viewBox="0 0 1900 1250">
+<defs>
+<marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 14 7 L 0 14 z" fill="#536178"/></marker>
+</defs>
+<rect x="0" y="0" width="1900" height="1250" rx="0" fill="#f7f9fc" stroke="none" stroke-width="2"/>
+<text x="60" y="82" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#172033">3. Tool Generation, Validation, And Repair Loop</text>
+<rect x="80" y="160" width="310" height="205" rx="18" fill="#e5f0fb" stroke="#245f9f" stroke-width="2"/>
+<text x="104" y="203" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Gap Packet</text>
+<text x="104" y="239" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Missing deterministic step,</text>
+<text x="104" y="260" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">no helper fit, VNC, bad</text>
+<text x="104" y="281" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">args, or called-negative</text>
+<text x="104" y="302" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">evidence.</text>
+<rect x="475" y="160" width="310" height="205" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
+<text x="499" y="203" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Candidate Designs</text>
+<text x="499" y="239" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Typed helper specs with</text>
+<text x="499" y="260" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">final-ready outputs, abstain</text>
+<text x="499" y="281" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">behavior, and negative</text>
+<text x="499" y="302" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">triggers.</text>
+<rect x="870" y="160" width="310" height="205" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
+<text x="894" y="203" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Static + Schema Gate</text>
+<text x="894" y="239" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">No unsafe imports or side</text>
+<text x="894" y="260" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">effects. Scalar/list</text>
+<text x="894" y="281" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">contracts and valid</text>
+<text x="894" y="302" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">metadata.</text>
+<rect x="1265" y="160" width="310" height="205" rx="18" fill="#fff3d8" stroke="#9a6a05" stroke-width="2"/>
+<text x="1289" y="203" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Minefield Tests</text>
+<text x="1289" y="239" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Ambiguity, duplicates,</text>
+<text x="1289" y="260" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">missing fields, wrong units,</text>
+<text x="1289" y="281" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">empty results, and</text>
+<text x="1289" y="302" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">irrelevant families.</text>
+<rect x="1265" y="520" width="310" height="205" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
+<text x="1289" y="563" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Live Smoke</text>
+<text x="1289" y="599" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Small safe examples confirm</text>
+<text x="1289" y="620" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">callability and side-effect</text>
+<text x="1289" y="641" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">preservation mechanics.</text>
+<rect x="870" y="520" width="310" height="205" rx="18" fill="#e5f0fb" stroke="#245f9f" stroke-width="2"/>
+<text x="894" y="563" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Natural Adoption Gate</text>
+<text x="894" y="599" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Visibility, calls, VNC,</text>
+<text x="894" y="620" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">called-subset outcome,</text>
+<text x="894" y="641" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">failures, and route</text>
+<text x="894" y="662" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">mismatch.</text>
+<rect x="475" y="520" width="310" height="205" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
+<text x="499" y="563" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Decision</text>
+<text x="499" y="599" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Retain, refine, route</text>
+<text x="499" y="620" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">repair, adoption repair,</text>
+<text x="499" y="641" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">schema repair, final-output</text>
+<text x="499" y="662" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">repair, or park.</text>
+<rect x="80" y="520" width="310" height="205" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
+<text x="104" y="563" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Registry Update</text>
+<text x="104" y="599" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Accepted helpers are</text>
+<text x="104" y="620" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">versioned, hashed, bounded</text>
+<text x="104" y="641" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">by routing, and tracked over</text>
+<text x="104" y="662" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">time.</text>
+<rect x="475" y="875" width="310" height="205" rx="18" fill="#fdeaea" stroke="#a13a3a" stroke-width="2"/>
+<text x="499" y="918" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#a13a3a">Repair Prompt</text>
+<text x="499" y="954" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Failed-call evidence and</text>
+<text x="499" y="975" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">lifecycle stats drive the</text>
+<text x="499" y="996" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">smallest contract or routing</text>
+<text x="499" y="1017" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">repair.</text>
+<rect x="870" y="875" width="310" height="205" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
+<text x="894" y="918" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Scale If Promising</text>
+<text x="894" y="954" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Move from 20/60 to</text>
+<text x="894" y="975" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">100/250/500 only when</text>
+<text x="894" y="996" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">outcome, calls, safety, and</text>
+<text x="894" y="1017" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">cache policy pass.</text>
+<line x1="390" y1="245" x2="475" y2="245" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="785" y1="245" x2="870" y2="245" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="1180" y1="245" x2="1265" y2="245" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="1420" y1="365" x2="1420" y2="520" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="1265" y1="622" x2="1180" y2="622" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="870" y1="622" x2="785" y2="622" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="475" y1="622" x2="390" y2="622" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="800" y1="625" x2="800" y2="875" stroke="#a13a3a" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="800" y1="875" x2="800" y2="365" stroke="#a13a3a" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="1025" y1="725" x2="1025" y2="875" stroke="#1f7a6d" stroke-width="4" marker-end="url(#arrow)"/>
+<rect x="80" y="1140" width="1495" height="70" rx="18" fill="#eef2f7" stroke="#9aa8bd" stroke-width="2"/>
+<text x="110" y="1178" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#172033">Diagnostic force-call can expose latent value or schema defects, but it is never counted as promotion evidence. Final comparisons must walk</text>
+<text x="110" y="1201" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#172033">back to natural routing and natural calls.</text>
+</svg>

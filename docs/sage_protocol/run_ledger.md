@@ -1004,3 +1004,18 @@
 - Reports updated: `docs/sage_protocol/praxis_combined_bridge_policy_recovery_report.md`, `docs/sage_protocol/praxis_bridge_policy_methodology.md`, `docs/sage_protocol/praxis_combined_bridge_policy_formal500_report.md`, `docs/sage_protocol/praxis_next_gap_and_self_evolving_sage_plan.md`, and `docs/sage_protocol/current_state.md`.
 - Decision label: `PROMISING_COMBINED_TREATMENT_FORMAL500_POSITIVE_NOT_PROTECTED_CLAIM_READY`.
 - Next action: run a dedicated matched ablation under the same committed runtime with best3, V2.6, Praxis registry-only repair v2, and Praxis combined bridge-policy v2 before any protected final-claim update.
+
+## 2026-05-13 - Chapter 3 SAGE Praxis Figure Package
+
+- Objective: prepare Chapter 3 and peer-review visual methodology assets for the current SAGE Praxis self-evolving system.
+- Branch: `codex/self-evolving-sage-mini60`.
+- Status comment: SAGE Praxis with true self-evolution working is the current main SAGE system going forward for methodology drafting and future validation campaigns; protected final claims remain separate until locked matched review.
+- Figure renderer: `scripts/render_sage_methodology_diagrams.py`.
+- Figure index: `docs/sage_protocol/chapter3_methodology_figures.md`.
+- Generated assets:
+  - `docs/sage_protocol/figures/sage_toolsandbox_system_overview.svg` and `.png`
+  - `docs/sage_protocol/figures/sage_internal_components_zoom.svg` and `.png`
+  - `docs/sage_protocol/figures/sage_tool_generation_validation_repair_loop.svg` and `.png`
+  - `docs/sage_protocol/figures/sage_peer_review_methodology_figure.svg` and `.png`
+- Documentation updated: `README.md`, `docs/sage_protocol/chapter3_methodology_prep.md`, and `docs/sage_protocol/current_state.md`.
+- Decision label: `METHODOLOGY_FIGURE_PACKAGE_READY_FOR_CHAPTER_3_DRAFTING`.

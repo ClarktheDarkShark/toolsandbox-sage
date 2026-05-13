@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1160" viewBox="0 0 1900 1160">
+<defs>
+<marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 14 7 L 0 14 z" fill="#536178"/></marker>
+</defs>
+<rect x="0" y="0" width="1900" height="1160" rx="0" fill="#f7f9fc" stroke="none" stroke-width="2"/>
+<text x="60" y="82" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#172033">2. SAGE Internal Components</text>
+<rect x="70" y="150" width="310" height="170" rx="18" fill="#e5f0fb" stroke="#245f9f" stroke-width="2"/>
+<text x="94" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Task + Trace Input</text>
+<text x="94" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Current task text,</text>
+<text x="94" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">visible state, prior tool</text>
+<text x="94" y="277" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">calls, errors, and run</text>
+<text x="94" y="300" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">feedback.</text>
+<rect x="465" y="150" width="310" height="170" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
+<text x="489" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Gap Observer</text>
+<text x="489" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Classifies missing</text>
+<text x="489" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">deterministic step</text>
+<text x="489" y="277" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">without truth labels.</text>
+<rect x="860" y="150" width="310" height="170" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
+<text x="884" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Tool Generator</text>
+<text x="884" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Creates typed scalar/list</text>
+<text x="884" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">helper specs and code.</text>
+<rect x="1255" y="150" width="310" height="170" rx="18" fill="#fff3d8" stroke="#9a6a05" stroke-width="2"/>
+<text x="1279" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Validation Gates</text>
+<text x="1279" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">AST safety, schema,</text>
+<text x="1279" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">callability, minefields,</text>
+<text x="1279" y="277" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">side-effect preservation.</text>
+<rect x="70" y="460" width="310" height="170" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
+<text x="94" y="503" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Accepted Registry</text>
+<text x="94" y="541" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Persistent helper code,</text>
+<text x="94" y="564" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">metadata, validation</text>
+<text x="94" y="587" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">evidence, known risks,</text>
+<text x="94" y="610" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">reuse counts, hashes.</text>
+<rect x="465" y="460" width="310" height="170" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
+<text x="489" y="503" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Router / Composer</text>
+<text x="489" y="541" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Small relevant helper</text>
+<text x="489" y="564" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">bundle selected by task</text>
+<text x="489" y="587" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">features and lifecycle</text>
+<text x="489" y="610" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">evidence.</text>
+<rect x="860" y="460" width="310" height="170" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
+<text x="884" y="503" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Actor Bridge Policy</text>
+<text x="884" y="541" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Natural helper adoption</text>
+<text x="884" y="564" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">while preserving original</text>
+<text x="884" y="587" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">ToolSandbox side-effect</text>
+<text x="884" y="610" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">calls.</text>
+<rect x="1255" y="460" width="310" height="170" rx="18" fill="#e5f0fb" stroke="#245f9f" stroke-width="2"/>
+<text x="1279" y="503" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">ToolSandbox Run</text>
+<text x="1279" y="541" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Agent acts in stateful</text>
+<text x="1279" y="564" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">benchmark with original</text>
+<text x="1279" y="587" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">tools plus routed</text>
+<text x="1279" y="610" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">helpers.</text>
+<rect x="465" y="780" width="310" height="170" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
+<text x="489" y="823" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Lifecycle Reflection</text>
+<text x="489" y="861" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Retain, route-repair,</text>
+<text x="489" y="884" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">adoption-repair, schema-</text>
+<text x="489" y="907" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">repair, park, or scale.</text>
+<rect x="860" y="780" width="310" height="170" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
+<text x="884" y="823" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Evidence Export</text>
+<text x="884" y="861" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Dashboards, contribution</text>
+<text x="884" y="884" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">summary, residual gaps,</text>
+<text x="884" y="907" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">run ledger, methodology</text>
+<text x="884" y="930" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">reports.</text>
+<line x1="380" y1="235" x2="465" y2="235" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="775" y1="235" x2="860" y2="235" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="1170" y1="235" x2="1255" y2="235" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="1410" y1="320" x2="1410" y2="460" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="1255" y1="545" x2="1170" y2="545" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="860" y1="545" x2="775" y2="545" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="465" y1="545" x2="380" y2="545" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="225" y1="460" x2="225" y2="320" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="1410" y1="630" x2="775" y2="780" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="775" y1="865" x2="860" y2="865" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="620" y1="780" x2="620" y2="630" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<line x1="620" y1="780" x2="1015" y2="320" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
+<rect x="1610" y="150" width="230" height="260" rx="18" fill="#fdeaea" stroke="#a13a3a" stroke-width="2"/>
+<text x="1634" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#a13a3a">Safety</text>
+<text x="1634" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Side-effect-free</text>
+<text x="1634" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">helpers. Explicit</text>
+<text x="1634" y="277" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">original action</text>
+<text x="1634" y="300" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">follow-up.</text>
+<text x="1634" y="323" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Runtime and</text>
+<text x="1634" y="346" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">helper incidents</text>
+<text x="1634" y="369" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">must remain zero.</text>
+<rect x="1610" y="480" width="230" height="230" rx="18" fill="#eef2f7" stroke="#9aa8bd" stroke-width="2"/>
+<text x="1634" y="523" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Cache Policy</text>
+<text x="1634" y="561" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Controls can be</text>
+<text x="1634" y="584" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">cached task-by-</text>
+<text x="1634" y="607" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">task.</text>
+<text x="1634" y="630" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">SAGE/candidate</text>
+<text x="1634" y="653" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">task evidence is</text>
+<text x="1634" y="676" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">fresh.</text>
+<rect x="1610" y="770" width="230" height="210" rx="18" fill="#eef2f7" stroke="#9aa8bd" stroke-width="2"/>
+<text x="1634" y="813" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Metrics</text>
+<text x="1634" y="851" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Outcome primary.</text>
+<text x="1634" y="874" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Canonical</text>
+<text x="1634" y="897" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">secondary. Exact</text>
+<text x="1634" y="920" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">success and</text>
+<text x="1634" y="943" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">contribution are</text>
+<text x="1634" y="966" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">explanatory.</text>
+</svg>
