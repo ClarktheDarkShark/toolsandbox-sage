@@ -1,99 +1,217 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1160" viewBox="0 0 1900 1160">
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1500" viewBox="0 0 2200 1500">
 <defs>
-<marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 14 7 L 0 14 z" fill="#536178"/></marker>
+<marker id="arrow" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 16 8 L 0 16 z" fill="#526278"/></marker>
+<marker id="dark_arrow" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 16 8 L 0 16 z" fill="#263246"/></marker>
 </defs>
-<rect x="0" y="0" width="1900" height="1160" rx="0" fill="#f7f9fc" stroke="none" stroke-width="2"/>
-<text x="60" y="82" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#172033">2. SAGE Internal Components</text>
-<rect x="70" y="150" width="310" height="170" rx="18" fill="#e5f0fb" stroke="#245f9f" stroke-width="2"/>
-<text x="94" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Task + Trace Input</text>
-<text x="94" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Current task text,</text>
-<text x="94" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">visible state, prior tool</text>
-<text x="94" y="277" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">calls, errors, and run</text>
-<text x="94" y="300" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">feedback.</text>
-<rect x="465" y="150" width="310" height="170" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="489" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Gap Observer</text>
-<text x="489" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Classifies missing</text>
-<text x="489" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">deterministic step</text>
-<text x="489" y="277" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">without truth labels.</text>
-<rect x="860" y="150" width="310" height="170" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
-<text x="884" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Tool Generator</text>
-<text x="884" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Creates typed scalar/list</text>
-<text x="884" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">helper specs and code.</text>
-<rect x="1255" y="150" width="310" height="170" rx="18" fill="#fff3d8" stroke="#9a6a05" stroke-width="2"/>
-<text x="1279" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Validation Gates</text>
-<text x="1279" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">AST safety, schema,</text>
-<text x="1279" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">callability, minefields,</text>
-<text x="1279" y="277" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">side-effect preservation.</text>
-<rect x="70" y="460" width="310" height="170" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
-<text x="94" y="503" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Accepted Registry</text>
-<text x="94" y="541" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Persistent helper code,</text>
-<text x="94" y="564" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">metadata, validation</text>
-<text x="94" y="587" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">evidence, known risks,</text>
-<text x="94" y="610" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">reuse counts, hashes.</text>
-<rect x="465" y="460" width="310" height="170" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="489" y="503" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Router / Composer</text>
-<text x="489" y="541" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Small relevant helper</text>
-<text x="489" y="564" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">bundle selected by task</text>
-<text x="489" y="587" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">features and lifecycle</text>
-<text x="489" y="610" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">evidence.</text>
-<rect x="860" y="460" width="310" height="170" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="884" y="503" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Actor Bridge Policy</text>
-<text x="884" y="541" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Natural helper adoption</text>
-<text x="884" y="564" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">while preserving original</text>
-<text x="884" y="587" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">ToolSandbox side-effect</text>
-<text x="884" y="610" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">calls.</text>
-<rect x="1255" y="460" width="310" height="170" rx="18" fill="#e5f0fb" stroke="#245f9f" stroke-width="2"/>
-<text x="1279" y="503" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">ToolSandbox Run</text>
-<text x="1279" y="541" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Agent acts in stateful</text>
-<text x="1279" y="564" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">benchmark with original</text>
-<text x="1279" y="587" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">tools plus routed</text>
-<text x="1279" y="610" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">helpers.</text>
-<rect x="465" y="780" width="310" height="170" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
-<text x="489" y="823" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Lifecycle Reflection</text>
-<text x="489" y="861" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Retain, route-repair,</text>
-<text x="489" y="884" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">adoption-repair, schema-</text>
-<text x="489" y="907" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">repair, park, or scale.</text>
-<rect x="860" y="780" width="310" height="170" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="884" y="823" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Evidence Export</text>
-<text x="884" y="861" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Dashboards, contribution</text>
-<text x="884" y="884" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">summary, residual gaps,</text>
-<text x="884" y="907" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">run ledger, methodology</text>
-<text x="884" y="930" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">reports.</text>
-<line x1="380" y1="235" x2="465" y2="235" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="775" y1="235" x2="860" y2="235" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1170" y1="235" x2="1255" y2="235" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1410" y1="320" x2="1410" y2="460" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1255" y1="545" x2="1170" y2="545" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="860" y1="545" x2="775" y2="545" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="465" y1="545" x2="380" y2="545" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="225" y1="460" x2="225" y2="320" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1410" y1="630" x2="775" y2="780" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="775" y1="865" x2="860" y2="865" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="620" y1="780" x2="620" y2="630" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="620" y1="780" x2="1015" y2="320" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<rect x="1610" y="150" width="230" height="260" rx="18" fill="#fdeaea" stroke="#a13a3a" stroke-width="2"/>
-<text x="1634" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#a13a3a">Safety</text>
-<text x="1634" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Side-effect-free</text>
-<text x="1634" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">helpers. Explicit</text>
-<text x="1634" y="277" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">original action</text>
-<text x="1634" y="300" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">follow-up.</text>
-<text x="1634" y="323" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Runtime and</text>
-<text x="1634" y="346" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">helper incidents</text>
-<text x="1634" y="369" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">must remain zero.</text>
-<rect x="1610" y="480" width="230" height="230" rx="18" fill="#eef2f7" stroke="#9aa8bd" stroke-width="2"/>
-<text x="1634" y="523" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Cache Policy</text>
-<text x="1634" y="561" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Controls can be</text>
-<text x="1634" y="584" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">cached task-by-</text>
-<text x="1634" y="607" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">task.</text>
-<text x="1634" y="630" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">SAGE/candidate</text>
-<text x="1634" y="653" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">task evidence is</text>
-<text x="1634" y="676" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">fresh.</text>
-<rect x="1610" y="770" width="230" height="210" rx="18" fill="#eef2f7" stroke="#9aa8bd" stroke-width="2"/>
-<text x="1634" y="813" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Metrics</text>
-<text x="1634" y="851" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Outcome primary.</text>
-<text x="1634" y="874" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Canonical</text>
-<text x="1634" y="897" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">secondary. Exact</text>
-<text x="1634" y="920" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">success and</text>
-<text x="1634" y="943" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">contribution are</text>
-<text x="1634" y="966" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">explanatory.</text>
+<rect x="0" y="0" width="2200" height="1500" rx="0" fill="#f5f7fb" stroke="none" stroke-width="2"/>
+<text x="70" y="84" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" fill="#142033">2. SAGE Runtime Component Architecture</text>
+<text x="70" y="115" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="400" fill="#526278">Zoom-in on SAGE as a self-evolving subsystem: event ingestion, gap reasoning, generation, validation, registry lifecycle, runtime routing, and feedback control.</text>
+<rect x="55" y="155" width="2088" height="1180" rx="24" fill="none" stroke="#0b7a70" stroke-width="2" stroke-dasharray="12 10"/>
+<rect x="79" y="137" width="273" height="40" rx="20" fill="#f5f7fb" stroke="#0b7a70" stroke-width="1"/>
+<text x="99" y="163" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#0b7a70">SAGE runtime boundary</text>
+<rect x="100" y="235" width="330" height="215" rx="18" fill="#e3f0fb" stroke="#1f5d99" stroke-width="2"/>
+<rect x="100" y="235" width="12" height="215" rx="18" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="130" y="278" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Event ingress</text>
+<circle cx="138" cy="309" r="5" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="154" y="314" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Task text and visible state</text>
+<circle cx="138" cy="336" r="5" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="154" y="341" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Tool-call trace and final</text>
+<text x="154" y="359" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">response</text>
+<circle cx="138" cy="381" r="5" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="154" y="386" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Scores, failures, VNC, route</text>
+<text x="154" y="404" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">mismatch</text>
+<rect x="505" y="235" width="330" height="215" rx="18" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<rect x="505" y="235" width="12" height="215" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="535" y="278" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Gap observer</text>
+<circle cx="543" cy="309" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="559" y="314" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Classifies missing deterministic</text>
+<text x="559" y="332" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">step</text>
+<circle cx="543" cy="354" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="559" y="359" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Separates insufficient</text>
+<text x="559" y="377" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">information</text>
+<circle cx="543" cy="399" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="559" y="404" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Builds oracle-free gap packet</text>
+<rect x="910" y="235" width="330" height="215" rx="18" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<rect x="910" y="235" width="12" height="215" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="940" y="278" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Opportunity ranker</text>
+<circle cx="948" cy="309" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="964" y="314" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Buckets repeated unsupported</text>
+<text x="964" y="332" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">work</text>
+<circle cx="948" cy="354" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="964" y="359" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Scores lift potential and risk</text>
+<circle cx="948" cy="381" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="964" y="386" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Selects next generation target</text>
+<rect x="1315" y="235" width="330" height="215" rx="18" fill="#dff4f1" stroke="#0b7a70" stroke-width="2"/>
+<rect x="1315" y="235" width="12" height="215" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1345" y="278" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Tool generator</text>
+<circle cx="1353" cy="309" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1369" y="314" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Creates scalar/list helper specs</text>
+<circle cx="1353" cy="336" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1369" y="341" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Emits code, metadata, triggers</text>
+<circle cx="1353" cy="363" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1369" y="368" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Includes abstain and negative</text>
+<text x="1369" y="386" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">cases</text>
+<rect x="1720" y="235" width="330" height="215" rx="18" fill="#dff4f1" stroke="#0b7a70" stroke-width="2"/>
+<rect x="1720" y="235" width="12" height="215" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1750" y="278" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Candidate builder</text>
+<circle cx="1758" cy="309" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1774" y="314" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Normalizes type annotations</text>
+<circle cx="1758" cy="336" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1774" y="341" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Packages tool metadata</text>
+<circle cx="1758" cy="363" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1774" y="368" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Assigns lifecycle identifiers</text>
+<rect x="1720" y="530" width="330" height="215" rx="18" fill="#fff1d0" stroke="#8a5b05" stroke-width="2"/>
+<rect x="1720" y="530" width="12" height="215" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1750" y="573" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Validation gates</text>
+<circle cx="1758" cy="604" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1774" y="610" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">AST and import safety</text>
+<circle cx="1758" cy="632" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1774" y="638" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Schema/callability checks</text>
+<circle cx="1758" cy="660" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1774" y="666" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Synthetic minefields</text>
+<circle cx="1758" cy="688" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1774" y="694" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Live smoke and side-effect</text>
+<text x="1774" y="713" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">preservation</text>
+<rect x="1315" y="576" width="330" height="138" fill="#f8fafc" stroke="#0b7a70" stroke-width="2"/>
+<ellipse cx="1480.0" cy="576.0" rx="165.0" ry="16.0" fill="#f8fafc" stroke="#0b7a70" stroke-width="2"/>
+<ellipse cx="1480.0" cy="714.0" rx="165.0" ry="16.0" fill="#f8fafc" stroke="#0b7a70" stroke-width="2"/>
+<text x="1337" y="609" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#142033">Accepted registry</text>
+<text x="1337" y="646" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Helper code, metadata, validation</text>
+<text x="1337" y="666" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">evidence, lifecycle state, hash.</text>
+<rect x="910" y="540" width="330" height="205" rx="18" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<rect x="910" y="540" width="12" height="205" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="940" y="583" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Router / composer</text>
+<circle cx="948" cy="614" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="964" y="620" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">System selects bounded helper</text>
+<text x="964" y="639" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">bundle</text>
+<circle cx="948" cy="661" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="964" y="667" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Uses triggers and lifecycle</text>
+<text x="964" y="686" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">evidence</text>
+<circle cx="948" cy="708" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="964" y="714" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Can compose helper chains</text>
+<rect x="505" y="540" width="330" height="205" rx="18" fill="#dff4f1" stroke="#0b7a70" stroke-width="2"/>
+<rect x="505" y="540" width="12" height="205" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="535" y="583" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Actor bridge policy</text>
+<circle cx="543" cy="614" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="559" y="620" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Natural adoption guidance</text>
+<circle cx="543" cy="642" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="559" y="648" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Final-answer retention</text>
+<circle cx="543" cy="670" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="559" y="676" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Original side-effect calls</text>
+<text x="559" y="695" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">preserved</text>
+<rect x="100" y="540" width="330" height="205" rx="18" fill="#eee8fb" stroke="#6545a4" stroke-width="2"/>
+<rect x="100" y="540" width="12" height="205" rx="18" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="130" y="583" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">ToolSandbox adapter</text>
+<circle cx="138" cy="614" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="154" y="620" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Injects routed helpers</text>
+<circle cx="138" cy="642" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="154" y="648" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Preserves original tools</text>
+<circle cx="138" cy="670" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="154" y="676" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Records traces and tool</text>
+<text x="154" y="695" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">attempts</text>
+<rect x="100" y="870" width="330" height="190" rx="18" fill="#fff1d0" stroke="#8a5b05" stroke-width="2"/>
+<rect x="100" y="870" width="12" height="190" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="130" y="913" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Contribution export</text>
+<circle cx="138" cy="944" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="154" y="950" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Visible/called/VNC</text>
+<circle cx="138" cy="972" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="154" y="978" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Called-subset outcome</text>
+<circle cx="138" cy="1000" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="154" y="1006" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Helper incidents and route</text>
+<text x="154" y="1025" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">mismatch</text>
+<rect x="505" y="901" width="330" height="133" fill="#f8fafc" stroke="#8a5b05" stroke-width="2"/>
+<ellipse cx="670.0" cy="901.0" rx="165.0" ry="16.0" fill="#f8fafc" stroke="#8a5b05" stroke-width="2"/>
+<ellipse cx="670.0" cy="1034.0" rx="165.0" ry="16.0" fill="#f8fafc" stroke="#8a5b05" stroke-width="2"/>
+<text x="527" y="934" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#142033">Feedback packets</text>
+<text x="527" y="971" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Per-task machine-readable gap,</text>
+<text x="527" y="991" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">trace, metric, safety, and routing</text>
+<text x="527" y="1011" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">evidence.</text>
+<rect x="910" y="870" width="330" height="190" rx="18" fill="#dff4f1" stroke="#0b7a70" stroke-width="2"/>
+<rect x="910" y="870" width="12" height="190" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="940" y="913" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Lifecycle reflection</text>
+<circle cx="948" cy="944" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="964" y="950" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Retain, refine, recombine,</text>
+<text x="964" y="969" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">scale</text>
+<circle cx="948" cy="991" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="964" y="997" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Park unsafe or negative tools</text>
+<circle cx="948" cy="1019" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="964" y="1025" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Schedule next gap bucket</text>
+<rect x="1315" y="901" width="330" height="133" fill="#f8fafc" stroke="#0b7a70" stroke-width="2"/>
+<ellipse cx="1480.0" cy="901.0" rx="165.0" ry="16.0" fill="#f8fafc" stroke="#0b7a70" stroke-width="2"/>
+<ellipse cx="1480.0" cy="1034.0" rx="165.0" ry="16.0" fill="#f8fafc" stroke="#0b7a70" stroke-width="2"/>
+<text x="1337" y="934" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#142033">Lifecycle ledger</text>
+<text x="1337" y="971" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Use counts, failure classes,</text>
+<text x="1337" y="991" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">repair history, adoption evidence,</text>
+<text x="1337" y="1011" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">hashes.</text>
+<rect x="1720" y="870" width="330" height="190" rx="18" fill="#fde8e8" stroke="#a13737" stroke-width="2"/>
+<rect x="1720" y="870" width="12" height="190" rx="18" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1750" y="913" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Repair planner</text>
+<circle cx="1758" cy="944" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1774" y="950" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Schema/input bridge repair</text>
+<circle cx="1758" cy="972" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1774" y="978" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Output-shape and final-action</text>
+<text x="1774" y="997" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">repair</text>
+<circle cx="1758" cy="1019" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1774" y="1025" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Routing and affordance repair</text>
+<rect x="100" y="1150" width="390" height="160" rx="18" fill="#ffffff" stroke="#74829a" stroke-width="2"/>
+<rect x="100" y="1150" width="12" height="160" rx="18" fill="#263246" stroke="none" stroke-width="2"/>
+<text x="130" y="1193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Execution flags</text>
+<circle cx="138" cy="1224" r="5" fill="#263246" stroke="none" stroke-width="2"/>
+<text x="154" y="1229" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Discovery: generation on</text>
+<circle cx="138" cy="1251" r="5" fill="#263246" stroke="none" stroke-width="2"/>
+<text x="154" y="1256" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Frozen validation: generation off</text>
+<circle cx="138" cy="1278" r="5" fill="#263246" stroke="none" stroke-width="2"/>
+<text x="154" y="1283" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Candidate task cache off</text>
+<rect x="560" y="1150" width="390" height="160" rx="18" fill="#fde8e8" stroke="#a13737" stroke-width="2"/>
+<rect x="560" y="1150" width="12" height="160" rx="18" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="590" y="1193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Research contracts</text>
+<circle cx="598" cy="1224" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="614" y="1229" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">No labels for unseen design</text>
+<circle cx="598" cy="1251" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="614" y="1256" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">No force-call promotion</text>
+<circle cx="598" cy="1278" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="614" y="1283" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">No task-specific facts in tools</text>
+<rect x="1020" y="1150" width="390" height="160" rx="18" fill="#fff1d0" stroke="#8a5b05" stroke-width="2"/>
+<rect x="1020" y="1150" width="12" height="160" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1050" y="1193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Promotion contracts</text>
+<circle cx="1058" cy="1224" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1074" y="1229" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Natural calls and positive called</text>
+<text x="1074" y="1247" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">subset</text>
+<circle cx="1058" cy="1269" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1074" y="1274" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Runtime/helper incidents zero</text>
+<circle cx="1058" cy="1296" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1074" y="1301" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Scale only after gates pass</text>
+<rect x="1480" y="1150" width="570" height="160" rx="18" fill="#dff4f1" stroke="#0b7a70" stroke-width="2"/>
+<rect x="1480" y="1150" width="12" height="160" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1510" y="1193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">System-owned routing</text>
+<circle cx="1518" cy="1224" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1534" y="1229" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">SAGE selects bundles from policy, registry metadata, and</text>
+<text x="1534" y="1247" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">lifecycle evidence.</text>
+<circle cx="1518" cy="1269" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="1534" y="1274" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">The user does not pick helpers to expose.</text>
+<polyline points="430,330 505,330" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="835,330 910,330" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1240,330 1315,330" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1645,330 1720,330" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1885,425 1885,530" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1720,640 1645,640" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="1599" y="620" width="92" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1615" y="644" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">accept</text>
+<polyline points="1315,640 1240,640" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="910,640 835,640" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="505,640 430,640" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="265,745 265,870" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="430,965 505,965" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="835,965 910,965" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1240,965 1315,965" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1645,965 1720,965" fill="none" stroke="#a13737" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1885,870 2075,870 2075,425 1885,425" fill="none" stroke="#a13737" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<rect x="2029" y="620" width="92" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="2045" y="644" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">repair</text>
+<polyline points="1080,870 1080,745" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="994" y="725" width="172" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1010" y="749" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">route evidence</text>
+<polyline points="670,885 670,790 1460,790 1460,730" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<rect x="1404" y="770" width="112" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1420" y="794" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">feedback</text>
 </svg>

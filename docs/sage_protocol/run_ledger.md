@@ -1007,7 +1007,7 @@
 
 ## 2026-05-13 - Chapter 3 SAGE Praxis Figure Package
 
-- Objective: prepare Chapter 3 and peer-review visual methodology assets for the current SAGE Praxis self-evolving system.
+- Objective: prepare Chapter 3 and peer-review visual methodology assets for the current SAGE Praxis self-evolving system; first sketch-level figures were replaced with architecture-grade system-design diagrams.
 - Branch: `codex/self-evolving-sage-mini60`.
 - Status comment: SAGE Praxis with true self-evolution working is the current main SAGE system going forward for methodology drafting and future validation campaigns; protected final claims remain separate until locked matched review.
 - Figure renderer: `scripts/render_sage_methodology_diagrams.py`.

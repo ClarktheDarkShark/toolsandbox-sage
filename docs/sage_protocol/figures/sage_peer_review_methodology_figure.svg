@@ -1,74 +1,150 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1220" viewBox="0 0 1900 1220">
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1500" viewBox="0 0 2200 1500">
 <defs>
-<marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 14 7 L 0 14 z" fill="#536178"/></marker>
+<marker id="arrow" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 16 8 L 0 16 z" fill="#526278"/></marker>
+<marker id="dark_arrow" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 16 8 L 0 16 z" fill="#263246"/></marker>
 </defs>
-<rect x="0" y="0" width="1900" height="1220" rx="0" fill="#ffffff" stroke="none" stroke-width="2"/>
-<text x="60" y="82" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#172033">4. SAGE Methodology For Matched ToolSandbox Validation</text>
-<rect x="70" y="150" width="330" height="190" rx="18" fill="#ffffff" stroke="#172033" stroke-width="2"/>
-<text x="94" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Sealed Manifest</text>
-<text x="94" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Frozen scenario order</text>
-<text x="94" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">No label peeking</text>
-<text x="94" y="277" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Diversity/gap profile</text>
-<text x="94" y="300" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">recorded</text>
-<rect x="520" y="115" width="330" height="160" rx="18" fill="#ffffff" stroke="#172033" stroke-width="2"/>
-<text x="544" y="158" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Baseline Arm</text>
-<text x="544" y="196" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Base tools</text>
-<text x="544" y="219" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Task-level cached controls</text>
-<text x="544" y="242" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">allowed</text>
-<text x="544" y="265" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Fresh/cached counts hashed</text>
-<rect x="520" y="330" width="330" height="160" rx="18" fill="#ffffff" stroke="#172033" stroke-width="2"/>
-<text x="544" y="373" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">SAGE Arm</text>
-<text x="544" y="411" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Fresh candidate execution</text>
-<text x="544" y="434" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Generated helpers or frozen</text>
-<text x="544" y="457" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">registry</text>
-<text x="544" y="480" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Candidate task cache off</text>
-<rect x="970" y="115" width="330" height="160" rx="18" fill="#ffffff" stroke="#172033" stroke-width="2"/>
-<text x="994" y="158" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">ToolSandbox</text>
-<text x="994" y="196" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Stateful environment</text>
-<text x="994" y="219" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">User simulator</text>
-<text x="994" y="242" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Original tools</text>
-<text x="994" y="265" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Execution traces</text>
-<rect x="970" y="330" width="330" height="160" rx="18" fill="#ffffff" stroke="#172033" stroke-width="2"/>
-<text x="994" y="373" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">SAGE Runtime</text>
-<text x="994" y="411" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Gap observer -&gt; generator</text>
-<text x="994" y="434" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">-&gt; validator -&gt; registry -&gt;</text>
-<text x="994" y="457" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">router -&gt; reflection</text>
-<rect x="1420" y="150" width="330" height="190" rx="18" fill="#ffffff" stroke="#172033" stroke-width="2"/>
-<text x="1444" y="193" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Paired Analysis</text>
-<text x="1444" y="231" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Outcome primary</text>
-<text x="1444" y="254" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Canonical secondary</text>
-<text x="1444" y="277" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Bootstrap CI</text>
-<text x="1444" y="300" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Permutation test</text>
-<rect x="270" y="660" width="340" height="190" rx="18" fill="#ffffff" stroke="#172033" stroke-width="2"/>
-<text x="294" y="703" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Safety Gate</text>
-<text x="294" y="741" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Zero runtime exceptions</text>
-<text x="294" y="764" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Zero helper side-effect</text>
-<text x="294" y="787" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">incidents</text>
-<text x="294" y="810" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">No force-call promotion</text>
-<text x="294" y="833" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">evidence</text>
-<rect x="780" y="660" width="340" height="190" rx="18" fill="#ffffff" stroke="#172033" stroke-width="2"/>
-<text x="804" y="703" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Leakage Controls</text>
-<text x="804" y="741" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">No hidden labels</text>
-<text x="804" y="764" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">No expected-answer strings</text>
-<text x="804" y="787" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">No scenario-specific hard-</text>
-<text x="804" y="810" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">coding</text>
-<text x="804" y="833" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">No prior SAGE trace reuse</text>
-<rect x="1290" y="660" width="340" height="190" rx="18" fill="#ffffff" stroke="#172033" stroke-width="2"/>
-<text x="1314" y="703" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Reproducibility</text>
-<text x="1314" y="741" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Registry hashes</text>
-<text x="1314" y="764" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Cache manifests</text>
-<text x="1314" y="787" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Run ledger</text>
-<text x="1314" y="810" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Dashboard/report exports</text>
-<line x1="400" y1="245" x2="520" y2="195" stroke="#172033" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="400" y1="245" x2="520" y2="410" stroke="#172033" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="850" y1="195" x2="970" y2="195" stroke="#172033" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="850" y1="410" x2="970" y2="410" stroke="#172033" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1300" y1="195" x2="1420" y2="245" stroke="#172033" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1300" y1="410" x2="1420" y2="245" stroke="#172033" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1135" y1="330" x2="1135" y2="275" stroke="#172033" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="160" y1="590" x2="1740" y2="590" stroke="#172033" stroke-width="3"/>
-<text x="80" y="954" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#172033">Figure caption draft:</text>
-<text x="80" y="991" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#172033">SAGE is evaluated as a matched ToolSandbox treatment. Baseline and SAGE arms share a sealed manifest and model policy. Controls may use transparent</text>
-<text x="80" y="1017" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#172033">task-level cache; SAGE/candidate evidence is fresh. Tool generation, validation, routing, and reflection are bounded by safety and leakage controls</text>
-<text x="80" y="1043" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#172033">before paired outcome and canonical analyses.</text>
+<rect x="0" y="0" width="2200" height="1500" rx="0" fill="#ffffff" stroke="none" stroke-width="2"/>
+<text x="70" y="84" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" fill="#142033">4. Paper Figure: Matched Validation And Self-Evolving Tool Lifecycle</text>
+<text x="70" y="115" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="400" fill="#526278">Single-figure methodology view for peer review: experimental contract, self-evolution mechanism, safety/leakage controls, and statistical endpoint hierarchy.</text>
+<rect x="70" y="165" width="990" height="570" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<text x="95" y="214" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">A. Matched ToolSandbox</text>
+<text x="95" y="244" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">validation contract</text>
+<rect x="120" y="286" width="250" height="113" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<ellipse cx="245.0" cy="286.0" rx="125.0" ry="16.0" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<ellipse cx="245.0" cy="399.0" rx="125.0" ry="16.0" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<text x="142" y="319" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#142033">Sealed manifest</text>
+<text x="142" y="356" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Scenario order, task</text>
+<text x="142" y="376" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">splits, hash.</text>
+<rect x="460" y="230" width="250" height="180" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="460" y="230" width="12" height="180" rx="18" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="490" y="273" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Baseline</text>
+<circle cx="498" cy="304" r="5" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="514" y="307" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Base tools</text>
+<circle cx="498" cy="328" r="5" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="514" y="331" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Eligible cached controls</text>
+<circle cx="498" cy="352" r="5" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="514" y="355" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Same model policy</text>
+<rect x="460" y="500" width="250" height="180" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="460" y="500" width="12" height="180" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="490" y="543" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">SAGE</text>
+<circle cx="498" cy="574" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="514" y="577" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Fresh candidate arm</text>
+<circle cx="498" cy="598" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="514" y="601" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Registry or live</text>
+<text x="514" y="616" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">generation</text>
+<circle cx="498" cy="637" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="514" y="640" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Candidate cache off</text>
+<rect x="810" y="360" width="210" height="190" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="810" y="360" width="12" height="190" rx="18" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="840" y="403" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">ToolSandbox</text>
+<text x="840" y="431" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">+ scorer</text>
+<circle cx="848" cy="434" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="864" y="437" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Stateful tools</text>
+<circle cx="848" cy="458" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="864" y="461" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">User simulator</text>
+<circle cx="848" cy="482" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="864" y="485" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Outcome and</text>
+<text x="864" y="500" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">canonical scoring</text>
+<polyline points="370,327 460,305" fill="none" stroke="#263246" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#dark_arrow)"/>
+<polyline points="370,327 430,327 430,575 460,575" fill="none" stroke="#263246" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#dark_arrow)"/>
+<polyline points="710,305 810,425" fill="none" stroke="#263246" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#dark_arrow)"/>
+<polyline points="710,575 810,455" fill="none" stroke="#263246" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#dark_arrow)"/>
+<polyline points="1020,440 1090,440" fill="none" stroke="#263246" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#dark_arrow)"/>
+<rect x="1090" y="165" width="1040" height="570" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<text x="1115" y="214" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">B. Statistical and</text>
+<text x="1115" y="244" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">reproducibility outputs</text>
+<rect x="1130" y="270" width="420" height="100" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1130" y="270" width="12" height="100" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1160" y="313" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Primary endpoint</text>
+<circle cx="1168" cy="344" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1184" y="347" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Outcome/task completion delta, paired by scenario.</text>
+<rect x="1610" y="270" width="420" height="100" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1610" y="270" width="12" height="100" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1640" y="313" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Secondary endpoint</text>
+<circle cx="1648" cy="344" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1664" y="347" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Canonical/reference similarity and exact success.</text>
+<rect x="1130" y="400" width="420" height="100" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1130" y="400" width="12" height="100" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1160" y="443" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Uncertainty</text>
+<circle cx="1168" cy="474" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1184" y="477" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Paired bootstrap CI and paired randomization test.</text>
+<rect x="1610" y="400" width="420" height="100" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1610" y="400" width="12" height="100" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1640" y="443" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Trace evidence</text>
+<circle cx="1648" cy="474" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1664" y="477" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Visible/called/VNC, route mismatch, called-subset</text>
+<text x="1664" y="492" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">contribution.</text>
+<rect x="1130" y="530" width="420" height="100" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1130" y="530" width="12" height="100" rx="18" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1160" y="573" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Safety</text>
+<circle cx="1168" cy="604" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1184" y="607" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Runtime exceptions, helper failures, side-effect</text>
+<text x="1184" y="622" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">incidents.</text>
+<rect x="1610" y="530" width="420" height="100" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1610" y="530" width="12" height="100" rx="18" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="1640" y="573" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Reproducibility</text>
+<circle cx="1648" cy="604" r="5" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="1664" y="607" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">Registry hashes, cache manifests, run ledger,</text>
+<text x="1664" y="622" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" fill="#526278">dashboards.</text>
+<rect x="70" y="805" width="1250" height="530" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<text x="95" y="854" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">C. Self-evolving SAGE</text>
+<text x="95" y="884" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">mechanism</text>
+<circle cx="190" cy="1070" r="78" fill="#ffffff" stroke="#0b7a70" stroke-width="3"/>
+<text x="132" y="1047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#142033">Observe</text>
+<text x="128" y="1072" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">Gap packets from</text>
+<text x="128" y="1087" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">traces</text>
+<circle cx="395" cy="1070" r="78" fill="#ffffff" stroke="#0b7a70" stroke-width="3"/>
+<text x="337" y="1047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#142033">Generate</text>
+<text x="333" y="1072" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">Typed helper</text>
+<text x="333" y="1087" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">candidates</text>
+<circle cx="600" cy="1070" r="78" fill="#ffffff" stroke="#0b7a70" stroke-width="3"/>
+<text x="542" y="1047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#142033">Validate</text>
+<text x="538" y="1072" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">Static, schema,</text>
+<text x="538" y="1087" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">minefield, live</text>
+<text x="538" y="1102" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">smoke</text>
+<circle cx="805" cy="1070" r="78" fill="#ffffff" stroke="#0b7a70" stroke-width="3"/>
+<text x="747" y="1047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#142033">Retain</text>
+<text x="743" y="1072" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">Registry with</text>
+<text x="743" y="1087" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">lifecycle state</text>
+<circle cx="1010" cy="1070" r="78" fill="#ffffff" stroke="#0b7a70" stroke-width="3"/>
+<text x="952" y="1047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#142033">Route</text>
+<text x="948" y="1072" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">System-selected</text>
+<text x="948" y="1087" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">bounded bundle</text>
+<circle cx="1215" cy="1070" r="78" fill="#ffffff" stroke="#0b7a70" stroke-width="3"/>
+<text x="1157" y="1047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#142033">Reflect</text>
+<text x="1153" y="1072" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">Scale, repair,</text>
+<text x="1153" y="1087" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">recombine, park</text>
+<polyline points="268,1070 317,1070" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="473,1070 522,1070" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="678,1070 727,1070" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="883,1070 932,1070" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1088,1070 1137,1070" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1215,1148 1215,1238 190,1238 190,1148" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<rect x="1380" y="805" width="750" height="530" rx="18" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<text x="1405" y="854" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">D. Research integrity</text>
+<text x="1405" y="884" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">guardrails</text>
+<rect x="1420" y="890" width="660" height="76" rx="14" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1420" y="890" width="12" height="76" rx="14" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1450" y="920" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#142033">Leakage</text>
+<text x="1475" y="944" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">No hidden labels, expected answers, scenario-specific tool logic, or prior SAGE trace</text>
+<text x="1475" y="959" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">reuse.</text>
+<rect x="1420" y="976" width="660" height="76" rx="14" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1420" y="976" width="12" height="76" rx="14" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1450" y="1006" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#142033">Cache</text>
+<text x="1475" y="1030" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">Controls may use transparent task cache; SAGE/candidate task evidence remains fresh.</text>
+<rect x="1420" y="1062" width="660" height="76" rx="14" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1420" y="1062" width="12" height="76" rx="14" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1450" y="1092" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#142033">Side effects</text>
+<text x="1475" y="1116" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">Helpers prepare values or action specs; original ToolSandbox side-effect tools still</text>
+<text x="1475" y="1131" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">execute.</text>
+<rect x="1420" y="1148" width="660" height="76" rx="14" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1420" y="1148" width="12" height="76" rx="14" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1450" y="1178" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#142033">Promotion</text>
+<text x="1475" y="1202" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">Force-call diagnostics repair the system but never count as evidence.</text>
+<rect x="1420" y="1234" width="660" height="76" rx="14" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<rect x="1420" y="1234" width="12" height="76" rx="14" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1450" y="1264" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#142033">Claim boundary</text>
+<text x="1475" y="1288" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#526278">Experimental candidates become protected claims only after locked matched review.</text>
+<text x="80" y="1408" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#142033">Caption draft: SAGE is evaluated as a matched ToolSandbox treatment with a sealed manifest, transparent control caching, fresh SAGE/candidate arms, bounded generated-tool routing, safety/leakage gates, and paired</text>
+<text x="80" y="1430" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#142033">statistical analysis. Outcome/task completion is primary; canonical/reference similarity is secondary.</text>
 </svg>

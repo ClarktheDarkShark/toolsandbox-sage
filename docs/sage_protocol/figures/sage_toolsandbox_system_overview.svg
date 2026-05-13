@@ -1,85 +1,197 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1160" viewBox="0 0 1900 1160">
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1450" viewBox="0 0 2200 1450">
 <defs>
-<marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 14 7 L 0 14 z" fill="#536178"/></marker>
+<marker id="arrow" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 16 8 L 0 16 z" fill="#526278"/></marker>
+<marker id="dark_arrow" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 16 8 L 0 16 z" fill="#263246"/></marker>
 </defs>
-<rect x="0" y="0" width="1900" height="1160" rx="0" fill="#f7f9fc" stroke="none" stroke-width="2"/>
-<text x="60" y="82" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#172033">1. SAGE + ToolSandbox End-to-End System</text>
-<rect x="60" y="130" width="390" height="230" rx="18" fill="#e5f0fb" stroke="#245f9f" stroke-width="2"/>
-<text x="84" y="173" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Sealed Task Cohort</text>
-<text x="84" y="211" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Manifest-defined scenario order,</text>
-<text x="84" y="234" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">split protocol, family diversity</text>
-<text x="84" y="257" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">checks, and no label peeking</text>
-<text x="84" y="280" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">before unseen runs.</text>
-<rect x="60" y="410" width="390" height="210" rx="18" fill="#eef2f7" stroke="#9aa8bd" stroke-width="2"/>
-<text x="84" y="453" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Control Baseline</text>
-<text x="84" y="491" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Base ToolSandbox tools. Eligible</text>
-<text x="84" y="514" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">controls may use task-level</text>
-<text x="84" y="537" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">baseline cache with fresh/cached</text>
-<text x="84" y="560" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">counts and hash recorded.</text>
-<rect x="60" y="680" width="390" height="230" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
-<text x="84" y="723" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">SAGE Candidate</text>
-<text x="84" y="761" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Fresh candidate arm. Generation</text>
-<text x="84" y="784" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">on for discovery, off for frozen</text>
-<text x="84" y="807" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">validation. Candidate task cache</text>
-<text x="84" y="830" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">remains off.</text>
-<rect x="560" y="210" width="360" height="230" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="584" y="253" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">ToolSandbox Environment</text>
-<text x="584" y="291" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Stateful tools, user</text>
-<text x="584" y="314" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">simulator, execution context, </text>
-<text x="584" y="337" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">phone/contact/reminder/message</text>
-<text x="584" y="360" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">/device state, and scenario</text>
-<text x="584" y="383" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">scorer.</text>
-<rect x="560" y="560" width="360" height="230" rx="18" fill="#fff3d8" stroke="#9a6a05" stroke-width="2"/>
-<text x="584" y="603" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Original Tool Calls</text>
-<text x="584" y="641" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">SAGE helpers never replace</text>
-<text x="584" y="664" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">required side-effect tools.</text>
-<text x="584" y="687" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">They prepare deterministic</text>
-<text x="584" y="710" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">values, selections, or next-</text>
-<text x="584" y="733" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">call arguments.</text>
-<rect x="1030" y="120" width="390" height="210" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
-<text x="1054" y="163" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">SAGE Runtime</text>
-<text x="1054" y="201" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Gap observer, live tool</text>
-<text x="1054" y="224" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">generation, validation, registry,</text>
-<text x="1054" y="247" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">bounded router, actor bridge</text>
-<text x="1054" y="270" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">policy, and lifecycle reflection.</text>
-<rect x="1030" y="410" width="390" height="220" rx="18" fill="#e5f0fb" stroke="#245f9f" stroke-width="2"/>
-<text x="1054" y="453" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Matched Scoring</text>
-<text x="1054" y="491" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Paired scenario-level</text>
-<text x="1054" y="514" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">canonical/reference score,</text>
-<text x="1054" y="537" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">primary outcome score, exact</text>
-<text x="1054" y="560" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">success, gains, regressions, and</text>
-<text x="1054" y="583" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">preserved counts.</text>
-<rect x="1030" y="710" width="390" height="220" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="1054" y="753" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Contribution Evidence</text>
-<text x="1054" y="791" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Visible/called/VNC, called-subset</text>
-<text x="1054" y="814" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">deltas, generated-tool births,</text>
-<text x="1054" y="837" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">helper failures, side-effect</text>
-<text x="1054" y="860" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">preservation, and route mismatch.</text>
-<rect x="1510" y="260" width="320" height="220" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="1534" y="303" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Dashboards</text>
-<text x="1534" y="341" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Task Compare, Task Focus,</text>
-<text x="1534" y="364" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">run progress, task</text>
-<text x="1534" y="387" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">details, full transaction</text>
-<text x="1534" y="410" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">traces, generated tool</text>
-<text x="1534" y="433" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">events, and outcome lift.</text>
-<rect x="1510" y="590" width="320" height="220" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="1534" y="633" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Reports + Artifacts</text>
-<text x="1534" y="671" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">Run ledger, current state,</text>
-<text x="1534" y="694" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">registry manifests,</text>
-<text x="1534" y="717" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">hashes, summaries,</text>
-<text x="1534" y="740" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">statistics, and</text>
-<text x="1534" y="763" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536178">methodology assets.</text>
-<line x1="450" y1="245" x2="560" y2="245" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="450" y1="515" x2="560" y2="515" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="450" y1="795" x2="560" y2="795" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="920" y1="325" x2="1030" y2="225" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="920" y1="675" x2="1030" y2="520" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1420" y1="520" x2="1510" y2="370" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1420" y1="820" x2="1510" y2="700" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1225" y1="710" x2="1225" y2="630" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1225" y1="330" x2="1225" y2="410" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<rect x="60" y="980" width="1770" height="110" rx="18" fill="#fdeaea" stroke="#a13a3a" stroke-width="2"/>
-<text x="90" y="1028" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#a13a3a">Research Guardrails</text>
-<text x="90" y="1062" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="400" fill="#172033">No hidden labels, no expected-answer leakage, no scenario-specific hard-coding, no force-call promotion evidence, no candidate task cache, and zero helper</text>
-<text x="90" y="1087" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="400" fill="#172033">side-effect incidents for claim candidates.</text>
+<rect x="0" y="0" width="2200" height="1450" rx="0" fill="#f5f7fb" stroke="none" stroke-width="2"/>
+<text x="70" y="84" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" fill="#142033">1. SAGE + ToolSandbox System Architecture</text>
+<text x="70" y="115" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="400" fill="#526278">End-to-end execution architecture showing trust boundaries, data stores, runtime arms, ToolSandbox integration, scoring, and research guardrails.</text>
+<rect x="40" y="140" width="2120" height="1190" rx="24" fill="none" stroke="#263246" stroke-width="2" stroke-dasharray="12 10"/>
+<rect x="64" y="122" width="338" height="40" rx="20" fill="#f5f7fb" stroke="#263246" stroke-width="1"/>
+<text x="84" y="148" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#263246">Research protocol boundary</text>
+<rect x="80" y="190" width="430" height="1010" rx="22" fill="#eef3f8" stroke="#74829a" stroke-width="2"/>
+<rect x="80" y="190" width="430" height="48" rx="22" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="102" y="219" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#ffffff">Protocol inputs and preflight</text>
+<rect x="560" y="190" width="430" height="1010" rx="22" fill="#eef7f6" stroke="#0b7a70" stroke-width="2"/>
+<rect x="560" y="190" width="430" height="48" rx="22" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="582" y="219" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#ffffff">Matched execution arms</text>
+<rect x="1040" y="190" width="460" height="1010" rx="22" fill="#f3eefb" stroke="#6545a4" stroke-width="2"/>
+<rect x="1040" y="190" width="460" height="48" rx="22" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1062" y="219" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#ffffff">ToolSandbox benchmark system</text>
+<rect x="1550" y="190" width="560" height="1010" rx="22" fill="#fff7e5" stroke="#8a5b05" stroke-width="2"/>
+<rect x="1550" y="190" width="560" height="48" rx="22" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1572" y="219" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#ffffff">Evidence, review, and claim boundary</text>
+<rect x="120" y="286" width="340" height="113" fill="#f8fafc" stroke="#263246" stroke-width="2"/>
+<ellipse cx="290.0" cy="286.0" rx="170.0" ry="16.0" fill="#f8fafc" stroke="#263246" stroke-width="2"/>
+<ellipse cx="290.0" cy="399.0" rx="170.0" ry="16.0" fill="#f8fafc" stroke="#263246" stroke-width="2"/>
+<text x="142" y="319" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#142033">Sealed manifest store</text>
+<text x="142" y="356" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Scenario order, split labels,</text>
+<text x="142" y="376" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">family diversity, manifest hash.</text>
+<rect x="120" y="460" width="340" height="160" rx="18" fill="#ffffff" stroke="#74829a" stroke-width="2"/>
+<rect x="120" y="460" width="12" height="160" rx="18" fill="#263246" stroke="none" stroke-width="2"/>
+<text x="150" y="503" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Final-run preflight</text>
+<circle cx="158" cy="534" r="5" fill="#263246" stroke="none" stroke-width="2"/>
+<text x="174" y="540" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Clean git and registry hashes</text>
+<circle cx="158" cy="562" r="5" fill="#263246" stroke="none" stroke-width="2"/>
+<text x="174" y="568" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Generation/cache/routing policy</text>
+<text x="174" y="587" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">checked</text>
+<circle cx="158" cy="609" r="5" fill="#263246" stroke="none" stroke-width="2"/>
+<text x="174" y="615" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Diagnostic force paths absent</text>
+<rect x="120" y="670" width="340" height="190" rx="18" fill="#fde8e8" stroke="#a13737" stroke-width="2"/>
+<rect x="120" y="670" width="12" height="190" rx="18" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="150" y="713" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Leakage controls</text>
+<circle cx="158" cy="744" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="174" y="750" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">No hidden labels or expected</text>
+<text x="174" y="769" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">answers</text>
+<circle cx="158" cy="791" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="174" y="797" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">No scenario-specific hard-</text>
+<text x="174" y="816" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">coding</text>
+<circle cx="158" cy="838" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="174" y="844" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">No prior SAGE trace reuse</text>
+<rect x="120" y="931" width="340" height="118" fill="#f8fafc" stroke="#1f5d99" stroke-width="2"/>
+<ellipse cx="290.0" cy="931.0" rx="170.0" ry="16.0" fill="#f8fafc" stroke="#1f5d99" stroke-width="2"/>
+<ellipse cx="290.0" cy="1049.0" rx="170.0" ry="16.0" fill="#f8fafc" stroke="#1f5d99" stroke-width="2"/>
+<text x="142" y="964" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#142033">Control cache policy</text>
+<text x="142" y="1001" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Task-level baseline cache allowed</text>
+<text x="142" y="1021" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">only with eligibility counts and</text>
+<text x="142" y="1041" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">hash.</text>
+<rect x="600" y="265" width="350" height="170" rx="18" fill="#e3f0fb" stroke="#1f5d99" stroke-width="2"/>
+<rect x="600" y="265" width="12" height="170" rx="18" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="630" y="308" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Baseline control arm</text>
+<circle cx="638" cy="339" r="5" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="654" y="345" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Base ToolSandbox tools only</text>
+<circle cx="638" cy="367" r="5" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="654" y="373" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Task-level cached controls when</text>
+<text x="654" y="392" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">eligible</text>
+<circle cx="638" cy="414" r="5" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="654" y="420" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Same model policy and manifest</text>
+<text x="654" y="439" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">order</text>
+<rect x="600" y="500" width="350" height="210" rx="18" fill="#dff4f1" stroke="#0b7a70" stroke-width="2"/>
+<rect x="600" y="500" width="12" height="210" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="630" y="543" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">SAGE candidate arm</text>
+<circle cx="638" cy="574" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="654" y="580" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Fresh candidate execution</text>
+<circle cx="638" cy="602" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="654" y="608" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Generation on for discovery</text>
+<circle cx="638" cy="630" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="654" y="636" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Generation off for frozen</text>
+<text x="654" y="655" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">validation</text>
+<circle cx="638" cy="677" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="654" y="683" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Candidate task cache off</text>
+<rect x="600" y="786" width="350" height="123" fill="#f8fafc" stroke="#0b7a70" stroke-width="2"/>
+<ellipse cx="775.0" cy="786.0" rx="175.0" ry="16.0" fill="#f8fafc" stroke="#0b7a70" stroke-width="2"/>
+<ellipse cx="775.0" cy="909.0" rx="175.0" ry="16.0" fill="#f8fafc" stroke="#0b7a70" stroke-width="2"/>
+<text x="622" y="819" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#142033">Generated registry</text>
+<text x="622" y="856" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Helper code, metadata, validation</text>
+<text x="622" y="876" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">evidence, lifecycle state, digest.</text>
+<rect x="600" y="980" width="350" height="150" rx="18" fill="#dff4f1" stroke="#0b7a70" stroke-width="2"/>
+<rect x="600" y="980" width="12" height="150" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="630" y="1023" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Router and bridge policy</text>
+<circle cx="638" cy="1054" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="654" y="1060" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Small bounded helper bundle</text>
+<circle cx="638" cy="1082" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="654" y="1088" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Original side-effect tools</text>
+<text x="654" y="1107" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">preserved</text>
+<rect x="1090" y="270" width="360" height="190" rx="18" fill="#eee8fb" stroke="#6545a4" stroke-width="2"/>
+<rect x="1090" y="270" width="12" height="190" rx="18" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1120" y="313" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">ToolSandbox execution</text>
+<text x="1120" y="341" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">core</text>
+<circle cx="1128" cy="344" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1144" y="350" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Stateful</text>
+<text x="1144" y="369" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">phone/contact/reminder/message</text>
+<text x="1144" y="388" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">state</text>
+<circle cx="1128" cy="410" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1144" y="416" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Original benchmark tools</text>
+<circle cx="1128" cy="438" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1144" y="444" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Conversation and tool-call traces</text>
+<rect x="1090" y="530" width="360" height="180" rx="18" fill="#eee8fb" stroke="#6545a4" stroke-width="2"/>
+<rect x="1090" y="530" width="12" height="180" rx="18" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1120" y="573" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">User simulator and agent</text>
+<text x="1120" y="601" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">loop</text>
+<circle cx="1128" cy="604" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1144" y="610" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">On-policy turns</text>
+<circle cx="1128" cy="632" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1144" y="638" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Tool results returned to actor</text>
+<circle cx="1128" cy="660" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1144" y="666" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Final response recorded</text>
+<rect x="1090" y="790" width="360" height="190" rx="18" fill="#eee8fb" stroke="#6545a4" stroke-width="2"/>
+<rect x="1090" y="790" width="12" height="190" rx="18" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1120" y="833" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Scenario scorer</text>
+<circle cx="1128" cy="864" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1144" y="870" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Canonical/reference milestones</text>
+<circle cx="1128" cy="892" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1144" y="898" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Primary outcome checks</text>
+<circle cx="1128" cy="920" r="5" fill="#6545a4" stroke="none" stroke-width="2"/>
+<text x="1144" y="926" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Exact success and state deltas</text>
+<rect x="1600" y="270" width="450" height="165" rx="18" fill="#fff1d0" stroke="#8a5b05" stroke-width="2"/>
+<rect x="1600" y="270" width="12" height="165" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1630" y="313" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Paired score table</text>
+<circle cx="1638" cy="344" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1654" y="350" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Baseline vs SAGE per scenario</text>
+<circle cx="1638" cy="372" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1654" y="378" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Outcome primary, canonical secondary</text>
+<circle cx="1638" cy="400" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1654" y="406" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Gains, regressions, preserved counts</text>
+<rect x="1600" y="495" width="450" height="175" rx="18" fill="#fff1d0" stroke="#8a5b05" stroke-width="2"/>
+<rect x="1600" y="495" width="12" height="175" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1630" y="538" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Contribution export</text>
+<circle cx="1638" cy="569" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1654" y="575" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Visible/called/VNC</text>
+<circle cx="1638" cy="597" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1654" y="603" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Called-subset deltas</text>
+<circle cx="1638" cy="625" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1654" y="631" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Route mismatch and no-helper-fit metrics</text>
+<rect x="1600" y="735" width="450" height="170" rx="18" fill="#fff1d0" stroke="#8a5b05" stroke-width="2"/>
+<rect x="1600" y="735" width="12" height="170" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1630" y="778" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Safety and cache audit</text>
+<circle cx="1638" cy="809" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1654" y="815" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Runtime exceptions and helper incidents</text>
+<circle cx="1638" cy="837" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1654" y="843" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Control cache counts and hashes</text>
+<circle cx="1638" cy="865" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1654" y="871" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">External-service fixture policy</text>
+<rect x="1600" y="981" width="450" height="128" fill="#f8fafc" stroke="#8a5b05" stroke-width="2"/>
+<ellipse cx="1825.0" cy="981.0" rx="225.0" ry="16.0" fill="#f8fafc" stroke="#8a5b05" stroke-width="2"/>
+<ellipse cx="1825.0" cy="1109.0" rx="225.0" ry="16.0" fill="#f8fafc" stroke="#8a5b05" stroke-width="2"/>
+<text x="1622" y="1014" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#142033">Run artifact store</text>
+<text x="1622" y="1051" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">Dashboards, feedback packets, registries,</text>
+<text x="1622" y="1071" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#526278">summaries, statistics, reports.</text>
+<polyline points="460,342 600,342" fill="none" stroke="#74829a" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="449" y="290" width="162" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="465" y="314" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">same manifest</text>
+<polyline points="460,342 530,342 530,605 600,605" fill="none" stroke="#74829a" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="449" y="445" width="162" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="465" y="469" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">same manifest</text>
+<polyline points="460,990 600,350" fill="none" stroke="#1f5d99" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="509" y="330" width="182" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="525" y="354" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">cached controls</text>
+<polyline points="775,435 775,500" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="704" y="480" width="142" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="720" y="504" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">matched arm</text>
+<polyline points="950,350 1090,350" fill="none" stroke="#1f5d99" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="1024" y="330" width="132" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1040" y="354" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">base tools</text>
+<polyline points="950,605 1040,605 1040,625 1090,625" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="904" y="605" width="272" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="920" y="629" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">helpers + original tools</text>
+<polyline points="950,1050 1010,1050 1010,625 1090,625" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1270,460 1270,530" fill="none" stroke="#6545a4" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1270,710 1270,790" fill="none" stroke="#6545a4" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1450,885 1600,350" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="1514" y="330" width="172" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1530" y="354" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">paired metrics</text>
+<polyline points="1450,625 1600,582" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="1514" y="562" width="172" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1530" y="586" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">trace evidence</text>
+<polyline points="1450,885 1600,820" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="1554" y="800" width="92" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1570" y="824" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">safety</text>
+<polyline points="1825,965 1825,670" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1825,495 1825,435" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<polyline points="1600,1045 1440,1045 1440,1190 775,1190 775,1130" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<rect x="1014" y="1170" width="212" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1030" y="1194" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">discovery feedback</text>
+<rect x="80" y="1240" width="2030" height="82" rx="18" fill="#fde8e8" stroke="#a13737" stroke-width="2"/>
+<text x="110" y="1280" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#a13737">Claim-run invariants</text>
+<text x="350" y="1279" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#142033">No force-call promotion evidence; no candidate task cache; no label or expected-answer leakage; zero helper side-effect incidents for protected candidates.</text>
 </svg>

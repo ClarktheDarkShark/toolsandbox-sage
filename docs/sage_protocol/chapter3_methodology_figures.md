@@ -2,7 +2,7 @@
 
 Status comment: SAGE Praxis with true self-evolution working is the current main SAGE system going forward for methodology writing and future validation campaigns. This status does not modify protected final-claim evidence; protected claims still require locked matched validation and review.
 
-These figures are prepared for Chapter 3 drafting, methodology review, and paper figures. SVG files are preferred for editing and submission workflows; PNG files are included for quick draft insertion and dashboard-style review.
+These figures are prepared for Chapter 3 drafting, methodology review, and paper figures. This package uses architecture-grade system diagrams with explicit runtime boundaries, data stores, control/data flows, safety gates, lifecycle states, and claim boundaries rather than sketch-level boxes. SVG files are preferred for editing and submission workflows; PNG files are included for quick draft insertion and dashboard-style review.
 
 Regenerate all figures with:
 
@@ -14,10 +14,10 @@ python3 scripts/render_sage_methodology_diagrams.py
 
 | Figure | Purpose | Files |
 |---|---|---|
-| 1. SAGE + ToolSandbox End-to-End System | Overview of the full experimental system: sealed task cohorts, cached controls, fresh SAGE arms, ToolSandbox, scoring, contribution exports, dashboards, and guardrails. | `docs/sage_protocol/figures/sage_toolsandbox_system_overview.svg`, `docs/sage_protocol/figures/sage_toolsandbox_system_overview.png` |
-| 2. SAGE Internal Components | Zoom-in on SAGE: gap observer, generator, validation gates, registry, router/composer, actor bridge policy, lifecycle reflection, and evidence export. | `docs/sage_protocol/figures/sage_internal_components_zoom.svg`, `docs/sage_protocol/figures/sage_internal_components_zoom.png` |
-| 3. Tool Generation, Validation, And Repair Loop | Tool birth and repair loop: gap packet, candidate design, static/schema gates, minefields, live smoke, natural adoption, retention/repair/park decisions, and scale gate. | `docs/sage_protocol/figures/sage_tool_generation_validation_repair_loop.svg`, `docs/sage_protocol/figures/sage_tool_generation_validation_repair_loop.png` |
-| 4. SAGE Methodology For Matched ToolSandbox Validation | Paper-ready matched-validation diagram: sealed manifest, baseline and SAGE arms, ToolSandbox, SAGE runtime, paired analysis, safety, leakage, and reproducibility controls. | `docs/sage_protocol/figures/sage_peer_review_methodology_figure.svg`, `docs/sage_protocol/figures/sage_peer_review_methodology_figure.png` |
+| 1. SAGE + ToolSandbox System Architecture | Full execution architecture with protocol trust boundary, manifest/control-cache stores, matched baseline and SAGE arms, ToolSandbox runtime, scoring, contribution export, artifact storage, feedback, and claim-run invariants. | `docs/sage_protocol/figures/sage_toolsandbox_system_overview.svg`, `docs/sage_protocol/figures/sage_toolsandbox_system_overview.png` |
+| 2. SAGE Runtime Component Architecture | Internal SAGE subsystem design: event ingress, gap observer, opportunity ranker, generator, candidate builder, validator, registry, router/composer, actor bridge, ToolSandbox adapter, feedback packets, lifecycle ledger, and repair planner. | `docs/sage_protocol/figures/sage_internal_components_zoom.svg`, `docs/sage_protocol/figures/sage_internal_components_zoom.png` |
+| 3. Tool Generation, Validation, And Repair State Machine | Tool birth state machine with explicit validation gates, failure classification, self-healing repair paths, promotion evidence boundary, scale gate, and hard stop conditions. | `docs/sage_protocol/figures/sage_tool_generation_validation_repair_loop.svg`, `docs/sage_protocol/figures/sage_tool_generation_validation_repair_loop.png` |
+| 4. Paper Figure: Matched Validation And Self-Evolving Tool Lifecycle | Peer-review-ready panel figure covering matched validation, statistical outputs, self-evolving lifecycle, and research integrity guardrails. | `docs/sage_protocol/figures/sage_peer_review_methodology_figure.svg`, `docs/sage_protocol/figures/sage_peer_review_methodology_figure.png` |
 
 ## Suggested Captions
 

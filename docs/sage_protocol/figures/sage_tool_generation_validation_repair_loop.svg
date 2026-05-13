@@ -1,79 +1,175 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1250" viewBox="0 0 1900 1250">
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1500" viewBox="0 0 2200 1500">
 <defs>
-<marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 14 7 L 0 14 z" fill="#536178"/></marker>
+<marker id="arrow" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 16 8 L 0 16 z" fill="#526278"/></marker>
+<marker id="dark_arrow" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 16 8 L 0 16 z" fill="#263246"/></marker>
 </defs>
-<rect x="0" y="0" width="1900" height="1250" rx="0" fill="#f7f9fc" stroke="none" stroke-width="2"/>
-<text x="60" y="82" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#172033">3. Tool Generation, Validation, And Repair Loop</text>
-<rect x="80" y="160" width="310" height="205" rx="18" fill="#e5f0fb" stroke="#245f9f" stroke-width="2"/>
-<text x="104" y="203" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Gap Packet</text>
-<text x="104" y="239" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Missing deterministic step,</text>
-<text x="104" y="260" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">no helper fit, VNC, bad</text>
-<text x="104" y="281" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">args, or called-negative</text>
-<text x="104" y="302" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">evidence.</text>
-<rect x="475" y="160" width="310" height="205" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
-<text x="499" y="203" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Candidate Designs</text>
-<text x="499" y="239" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Typed helper specs with</text>
-<text x="499" y="260" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">final-ready outputs, abstain</text>
-<text x="499" y="281" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">behavior, and negative</text>
-<text x="499" y="302" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">triggers.</text>
-<rect x="870" y="160" width="310" height="205" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="894" y="203" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Static + Schema Gate</text>
-<text x="894" y="239" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">No unsafe imports or side</text>
-<text x="894" y="260" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">effects. Scalar/list</text>
-<text x="894" y="281" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">contracts and valid</text>
-<text x="894" y="302" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">metadata.</text>
-<rect x="1265" y="160" width="310" height="205" rx="18" fill="#fff3d8" stroke="#9a6a05" stroke-width="2"/>
-<text x="1289" y="203" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Minefield Tests</text>
-<text x="1289" y="239" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Ambiguity, duplicates,</text>
-<text x="1289" y="260" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">missing fields, wrong units,</text>
-<text x="1289" y="281" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">empty results, and</text>
-<text x="1289" y="302" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">irrelevant families.</text>
-<rect x="1265" y="520" width="310" height="205" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="1289" y="563" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Live Smoke</text>
-<text x="1289" y="599" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Small safe examples confirm</text>
-<text x="1289" y="620" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">callability and side-effect</text>
-<text x="1289" y="641" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">preservation mechanics.</text>
-<rect x="870" y="520" width="310" height="205" rx="18" fill="#e5f0fb" stroke="#245f9f" stroke-width="2"/>
-<text x="894" y="563" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Natural Adoption Gate</text>
-<text x="894" y="599" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Visibility, calls, VNC,</text>
-<text x="894" y="620" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">called-subset outcome,</text>
-<text x="894" y="641" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">failures, and route</text>
-<text x="894" y="662" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">mismatch.</text>
-<rect x="475" y="520" width="310" height="205" rx="18" fill="#dff3ef" stroke="#1f7a6d" stroke-width="2"/>
-<text x="499" y="563" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Decision</text>
-<text x="499" y="599" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Retain, refine, route</text>
-<text x="499" y="620" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">repair, adoption repair,</text>
-<text x="499" y="641" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">schema repair, final-output</text>
-<text x="499" y="662" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">repair, or park.</text>
-<rect x="80" y="520" width="310" height="205" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="104" y="563" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Registry Update</text>
-<text x="104" y="599" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Accepted helpers are</text>
-<text x="104" y="620" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">versioned, hashed, bounded</text>
-<text x="104" y="641" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">by routing, and tracked over</text>
-<text x="104" y="662" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">time.</text>
-<rect x="475" y="875" width="310" height="205" rx="18" fill="#fdeaea" stroke="#a13a3a" stroke-width="2"/>
-<text x="499" y="918" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#a13a3a">Repair Prompt</text>
-<text x="499" y="954" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Failed-call evidence and</text>
-<text x="499" y="975" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">lifecycle stats drive the</text>
-<text x="499" y="996" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">smallest contract or routing</text>
-<text x="499" y="1017" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">repair.</text>
-<rect x="870" y="875" width="310" height="205" rx="18" fill="#ffffff" stroke="#9aa8bd" stroke-width="2"/>
-<text x="894" y="918" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#172033">Scale If Promising</text>
-<text x="894" y="954" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">Move from 20/60 to</text>
-<text x="894" y="975" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">100/250/500 only when</text>
-<text x="894" y="996" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">outcome, calls, safety, and</text>
-<text x="894" y="1017" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536178">cache policy pass.</text>
-<line x1="390" y1="245" x2="475" y2="245" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="785" y1="245" x2="870" y2="245" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1180" y1="245" x2="1265" y2="245" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1420" y1="365" x2="1420" y2="520" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1265" y1="622" x2="1180" y2="622" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="870" y1="622" x2="785" y2="622" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="475" y1="622" x2="390" y2="622" stroke="#536178" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="800" y1="625" x2="800" y2="875" stroke="#a13a3a" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="800" y1="875" x2="800" y2="365" stroke="#a13a3a" stroke-width="4" marker-end="url(#arrow)"/>
-<line x1="1025" y1="725" x2="1025" y2="875" stroke="#1f7a6d" stroke-width="4" marker-end="url(#arrow)"/>
-<rect x="80" y="1140" width="1495" height="70" rx="18" fill="#eef2f7" stroke="#9aa8bd" stroke-width="2"/>
-<text x="110" y="1178" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#172033">Diagnostic force-call can expose latent value or schema defects, but it is never counted as promotion evidence. Final comparisons must walk</text>
-<text x="110" y="1201" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#172033">back to natural routing and natural calls.</text>
+<rect x="0" y="0" width="2200" height="1500" rx="0" fill="#f5f7fb" stroke="none" stroke-width="2"/>
+<text x="70" y="84" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" fill="#142033">3. Tool Generation, Validation, And Repair State Machine</text>
+<text x="70" y="115" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="400" fill="#526278">Detailed tool birth contract: only system-generated, validated, naturally adopted, safety-clean helpers can move toward scale. Diagnostics repair the system; they do not count as</text>
+<text x="70" y="140" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="400" fill="#526278">promotion evidence.</text>
+<rect x="95" y="235" width="235" height="185" rx="22" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<circle cx="129" cy="273" r="25" fill="#0b7a70" stroke="#0b7a70" stroke-width="2"/>
+<text x="120" y="279" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">1</text>
+<text x="167" y="279" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">Gap packet</text>
+<text x="119" y="328" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Oracle-free shortfall</text>
+<text x="119" y="347" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">from task text, visible</text>
+<text x="119" y="366" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">state, trace, VNC, or</text>
+<text x="119" y="385" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">failed-call evidence.</text>
+<rect x="362" y="235" width="235" height="185" rx="22" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<circle cx="396" cy="273" r="25" fill="#0b7a70" stroke="#0b7a70" stroke-width="2"/>
+<text x="387" y="279" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">2</text>
+<text x="434" y="279" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">Design</text>
+<text x="434" y="304" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">candidates</text>
+<text x="386" y="328" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Multiple scalar/list</text>
+<text x="386" y="347" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">helper specs with</text>
+<text x="386" y="366" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">final-ready output and</text>
+<text x="386" y="385" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">explicit abstain</text>
+<text x="386" y="404" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">behavior.</text>
+<polyline points="330,327 362,327" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="629" y="235" width="235" height="185" rx="22" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<circle cx="663" cy="273" r="25" fill="#0b7a70" stroke="#0b7a70" stroke-width="2"/>
+<text x="654" y="279" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">3</text>
+<text x="701" y="279" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">Contract gate</text>
+<text x="653" y="328" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Typed inputs, no opaque</text>
+<text x="653" y="347" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">records unless</text>
+<text x="653" y="366" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">justified, metadata</text>
+<text x="653" y="385" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">triggers, negative</text>
+<text x="653" y="404" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">triggers.</text>
+<polyline points="597,327 629,327" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="896" y="235" width="235" height="185" rx="22" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<circle cx="930" cy="273" r="25" fill="#0b7a70" stroke="#0b7a70" stroke-width="2"/>
+<text x="921" y="279" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">4</text>
+<text x="968" y="279" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">Static gate</text>
+<text x="920" y="328" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">AST/import safety, no</text>
+<text x="920" y="347" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">writes, no network, no</text>
+<text x="920" y="366" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">hidden benchmark</text>
+<text x="920" y="385" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">strings.</text>
+<polyline points="864,327 896,327" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="1163" y="235" width="235" height="185" rx="22" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<circle cx="1197" cy="273" r="25" fill="#0b7a70" stroke="#0b7a70" stroke-width="2"/>
+<text x="1188" y="279" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">5</text>
+<text x="1235" y="279" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">Minefield</text>
+<text x="1235" y="304" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">gate</text>
+<text x="1187" y="328" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Ambiguity, duplicates,</text>
+<text x="1187" y="347" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">missing fields, wrong</text>
+<text x="1187" y="366" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">units, empty results,</text>
+<text x="1187" y="385" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">irrelevant tasks.</text>
+<polyline points="1131,327 1163,327" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="1430" y="235" width="235" height="185" rx="22" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<circle cx="1464" cy="273" r="25" fill="#0b7a70" stroke="#0b7a70" stroke-width="2"/>
+<text x="1455" y="279" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">6</text>
+<text x="1502" y="279" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">Live smoke</text>
+<text x="1454" y="328" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Callability and side-</text>
+<text x="1454" y="347" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">effect preservation</text>
+<text x="1454" y="366" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">mechanics on small safe</text>
+<text x="1454" y="385" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">diagnostics.</text>
+<polyline points="1398,327 1430,327" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="1697" y="235" width="235" height="185" rx="22" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<circle cx="1731" cy="273" r="25" fill="#0b7a70" stroke="#0b7a70" stroke-width="2"/>
+<text x="1722" y="279" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">7</text>
+<text x="1769" y="279" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">Natural</text>
+<text x="1769" y="304" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">adoption</text>
+<text x="1721" y="328" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">System-routed bundle,</text>
+<text x="1721" y="347" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">visible/called/VNC</text>
+<text x="1721" y="366" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">measured without forced</text>
+<text x="1721" y="385" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">promotion.</text>
+<polyline points="1665,327 1697,327" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="1964" y="235" width="235" height="185" rx="22" fill="#ffffff" stroke="#0b7a70" stroke-width="2"/>
+<circle cx="1998" cy="273" r="25" fill="#0b7a70" stroke="#0b7a70" stroke-width="2"/>
+<text x="1989" y="279" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">8</text>
+<text x="2036" y="279" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#142033">Scale gate</text>
+<text x="1988" y="328" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Outcome, called subset,</text>
+<text x="1988" y="347" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">safety, cache, leakage,</text>
+<text x="1988" y="366" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">and route metrics</text>
+<text x="1988" y="385" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">decide scale.</text>
+<polyline points="1932,327 1964,327" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="90" y="520" width="2020" height="410" rx="26" fill="#e7ecf4" stroke="#74829a" stroke-width="2"/>
+<text x="120" y="569" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">Failure classification</text>
+<text x="120" y="599" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">and self-healing routes</text>
+<rect x="125" y="610" width="560" height="110" rx="18" fill="#ffffff" stroke="#74829a" stroke-width="2"/>
+<rect x="125" y="610" width="12" height="110" rx="18" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="155" y="653" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Schema repair</text>
+<circle cx="163" cy="684" r="5" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="179" y="689" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Bad types, optional annotations, missing defaults, opaque</text>
+<text x="179" y="707" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">payloads.</text>
+<rect x="775" y="610" width="560" height="110" rx="18" fill="#ffffff" stroke="#74829a" stroke-width="2"/>
+<rect x="775" y="610" width="12" height="110" rx="18" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="805" y="653" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Input bridge repair</text>
+<circle cx="813" cy="684" r="5" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="829" y="689" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Actor lacks scalar values; add extraction or preparatory</text>
+<text x="829" y="707" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">helper.</text>
+<rect x="1425" y="610" width="560" height="110" rx="18" fill="#ffffff" stroke="#74829a" stroke-width="2"/>
+<rect x="1425" y="610" width="12" height="110" rx="18" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="1455" y="653" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Output-shape repair</text>
+<circle cx="1463" cy="684" r="5" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="1479" y="689" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Intermediate value not final-answer-ready or final-action-</text>
+<text x="1479" y="707" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">ready.</text>
+<rect x="125" y="760" width="560" height="110" rx="18" fill="#ffffff" stroke="#74829a" stroke-width="2"/>
+<rect x="125" y="760" width="12" height="110" rx="18" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="155" y="803" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Routing repair</text>
+<circle cx="163" cy="834" r="5" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="179" y="839" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Hidden helper, weak triggers, overbroad negative trigger,</text>
+<text x="179" y="857" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">context budget issue.</text>
+<rect x="775" y="760" width="560" height="110" rx="18" fill="#ffffff" stroke="#74829a" stroke-width="2"/>
+<rect x="775" y="760" width="12" height="110" rx="18" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="805" y="803" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Adoption repair</text>
+<circle cx="813" cy="834" r="5" fill="#74829a" stroke="none" stroke-width="2"/>
+<text x="829" y="839" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Visible but not called; metadata, examples, ordering, or</text>
+<text x="829" y="857" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">bridge wording issue.</text>
+<rect x="1425" y="760" width="560" height="110" rx="18" fill="#ffffff" stroke="#a13737" stroke-width="2"/>
+<rect x="1425" y="760" width="12" height="110" rx="18" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1455" y="803" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Safety redesign</text>
+<circle cx="1463" cy="834" r="5" fill="#a13737" stroke="none" stroke-width="2"/>
+<text x="1479" y="839" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Side-effect risk, over-answering, ambiguity handling,</text>
+<text x="1479" y="857" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">insufficient-info failure.</text>
+<rect x="90" y="1000" width="2020" height="255" rx="26" fill="#ffffff" stroke="#263246" stroke-width="2"/>
+<text x="120" y="1049" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">Promotion evidence</text>
+<text x="120" y="1079" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#142033">boundary</text>
+<rect x="125" y="1090" width="560" height="120" rx="18" fill="#e3f0fb" stroke="#1f5d99" stroke-width="2"/>
+<rect x="125" y="1090" width="12" height="120" rx="18" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="155" y="1133" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Diagnostics only</text>
+<circle cx="163" cy="1164" r="5" fill="#1f5d99" stroke="none" stroke-width="2"/>
+<text x="179" y="1169" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Force exposure and force calls can test latent value, schema</text>
+<text x="179" y="1187" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">defects, and preservation mechanics. They cannot promote a</text>
+<text x="179" y="1205" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">helper.</text>
+<rect x="775" y="1090" width="560" height="120" rx="18" fill="#dff4f1" stroke="#0b7a70" stroke-width="2"/>
+<rect x="775" y="1090" width="12" height="120" rx="18" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="805" y="1133" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Natural comparison</text>
+<circle cx="813" cy="1164" r="5" fill="#0b7a70" stroke="none" stroke-width="2"/>
+<text x="829" y="1169" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Actual evidence requires natural routing and natural calls on</text>
+<text x="829" y="1187" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">unseen tasks with no code or registry changes between matched</text>
+<text x="829" y="1205" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">arms.</text>
+<rect x="1425" y="1090" width="560" height="120" rx="18" fill="#fff1d0" stroke="#8a5b05" stroke-width="2"/>
+<rect x="1425" y="1090" width="12" height="120" rx="18" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1455" y="1133" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#142033">Scale decision</text>
+<circle cx="1463" cy="1164" r="5" fill="#8a5b05" stroke="none" stroke-width="2"/>
+<text x="1479" y="1169" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">Move to 100/250/500 only when outcome lift, called-subset</text>
+<text x="1479" y="1187" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#526278">contribution, safety, leakage, and cache policy all pass.</text>
+<polyline points="746,420 746,520" fill="none" stroke="#a13737" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<rect x="660" y="450" width="172" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="676" y="474" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">fail -&gt; repair</text>
+<polyline points="1013,420 1013,520" fill="none" stroke="#a13737" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<rect x="927" y="450" width="172" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="943" y="474" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">fail -&gt; repair</text>
+<polyline points="1280,420 1280,520" fill="none" stroke="#a13737" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<rect x="1194" y="450" width="172" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1210" y="474" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">fail -&gt; repair</text>
+<polyline points="1547,420 1547,520" fill="none" stroke="#a13737" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<rect x="1461" y="450" width="172" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1477" y="474" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">fail -&gt; repair</text>
+<polyline points="1814,420 1814,520" fill="none" stroke="#a13737" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<rect x="1728" y="450" width="172" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1744" y="474" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">fail -&gt; repair</text>
+<polyline points="395,930 395,1000" fill="none" stroke="#1f5d99" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="339" y="980" width="112" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="355" y="1004" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">diagnose</text>
+<polyline points="1045,930 1045,1000" fill="none" stroke="#0b7a70" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="984" y="980" width="122" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1000" y="1004" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">walk back</text>
+<polyline points="1695,930 1695,1000" fill="none" stroke="#8a5b05" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="1614" y="980" width="162" height="40" rx="20" fill="#f5f7fb" stroke="#74829a" stroke-width="1"/>
+<text x="1630" y="1004" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#142033">scale if safe</text>
+<rect x="90" y="1305" width="2020" height="95" rx="20" fill="#fde8e8" stroke="#a13737" stroke-width="2"/>
+<text x="120" y="1350" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#a13737">Hard stop conditions</text>
+<text x="390" y="1347" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#142033">Label leakage, expected-answer hard-coding, scenario-specific strings, unresolved side-effect incidents, or candidate task-cache reuse block promotion immediately.</text>
 </svg>
