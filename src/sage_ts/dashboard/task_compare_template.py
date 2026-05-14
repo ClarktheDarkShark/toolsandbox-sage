@@ -417,6 +417,82 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       line-height: 1.35;
       overflow-wrap: anywhere;
     }
+    .evidence-readable {
+      border: 1px solid rgba(43, 58, 77, .65);
+      background: rgba(17, 26, 36, .72);
+      border-radius: 7px;
+      padding: 7px;
+      margin-bottom: 6px;
+    }
+    .evidence-main {
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 750;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .evidence-kind {
+      display: inline-block;
+      border: 1px solid rgba(119, 189, 255, .32);
+      background: rgba(16, 35, 55, .85);
+      color: var(--blue);
+      border-radius: 999px;
+      padding: 1px 6px;
+      margin-right: 5px;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      vertical-align: 1px;
+    }
+    .evidence-kind.result {
+      border-color: rgba(65, 217, 150, .35);
+      background: rgba(13, 45, 32, .78);
+      color: var(--green);
+    }
+    .evidence-kind.state {
+      border-color: rgba(255, 200, 87, .35);
+      background: rgba(49, 37, 13, .78);
+      color: var(--amber);
+    }
+    .kv-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 5px;
+    }
+    .kv-chip {
+      border: 1px solid #345371;
+      background: #102337;
+      color: #c9dbed;
+      border-radius: 999px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 750;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+    .raw-evidence {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+    .raw-evidence summary {
+      cursor: pointer;
+      width: max-content;
+      color: var(--muted);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .raw-evidence pre {
+      margin-top: 4px;
+      max-height: 96px;
+      overflow: auto;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.35;
+    }
     .more-lines {
       color: var(--muted);
       font-size: 11px;
@@ -728,9 +804,131 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     function evidenceList(lines, emptyLabel) {
       const values = Array.isArray(lines) ? lines.filter((line) => line !== null && line !== undefined && String(line).trim() !== "") : [];
       if (!values.length) return `<div class="evidence-line small">${esc(emptyLabel)}</div>`;
-      const shown = values.slice(0, 2).map((line) => `<div class="evidence-line">${esc(line)}</div>`).join("");
+      const shown = values.slice(0, 2).map(evidenceLineHtml).join("");
       const more = values.length > 2 ? `<div class="more-lines">+${values.length - 2} more line${values.length - 2 === 1 ? "" : "s"}</div>` : "";
       return shown + more;
+    }
+
+    function cleanToolName(name) {
+      return String(name || "").replace(/^.*:/, "");
+    }
+
+    function humanKey(key) {
+      const labels = {
+        person_id: "person ID",
+        reminder_id: "reminder ID",
+        phone_number: "phone",
+        creation_timestamp: "created",
+        reminder_timestamp: "reminder time",
+        location_service: "location",
+        low_battery_mode: "low battery",
+        is_self: "self",
+      };
+      return labels[key] || String(key || "").replace(/_/g, " ");
+    }
+
+    function humanValue(value) {
+      if (value === null || value === undefined || value === "" || value === "None" || value === "null") return "missing";
+      const text = String(value);
+      if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(text)) return `${text.slice(0, 8)}...`;
+      if (/^-?\d+(?:\.\d+)?$/.test(text) && text.length >= 10) return Number(text).toLocaleString(undefined, {maximumFractionDigits: 0});
+      return text.length > 64 ? `${text.slice(0, 61)}...` : text;
+    }
+
+    function extractFields(text) {
+      const fields = {};
+      const pattern = /['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?\s*[:=]\s*(?:'([^']*)'|"([^"]*)"|([^,}\]\)\s]+))/g;
+      let match;
+      while ((match = pattern.exec(String(text || ""))) !== null) {
+        const key = match[1];
+        if (!key || key in fields) continue;
+        fields[key] = (match[2] ?? match[3] ?? match[4] ?? "").replace(/[}\]\)]*$/, "");
+      }
+      return fields;
+    }
+
+    function fieldSummary(fields, keys) {
+      return keys
+        .filter((key) => Object.prototype.hasOwnProperty.call(fields, key))
+        .filter((key) => !(key === "is_self" && String(fields[key]).toLowerCase() === "false"))
+        .slice(0, 6)
+        .map((key) => `<span class="kv-chip">${esc(humanKey(key))}: ${esc(humanValue(fields[key]))}</span>`)
+        .join("");
+    }
+
+    function preferredKeysForTool(tool) {
+      const name = String(tool || "").toLowerCase();
+      if (name.includes("contact")) return ["name", "phone_number", "relationship", "person_id", "is_self"];
+      if (name.includes("reminder")) return ["content", "reminder_timestamp", "creation_timestamp", "reminder_id", "latitude", "longitude"];
+      if (name.includes("message")) return ["sender", "recipient", "content", "phone_number", "timestamp"];
+      if (name.includes("setting") || name.includes("wifi") || name.includes("cellular")) return ["wifi", "cellular", "location_service", "low_battery_mode"];
+      return ["name", "content", "phone_number", "relationship", "person_id", "reminder_timestamp", "sender", "recipient"];
+    }
+
+    function entityForTool(tool) {
+      const name = String(tool || "").toLowerCase();
+      if (name.includes("contact")) return "contact";
+      if (name.includes("reminder")) return "reminder";
+      if (name.includes("message")) return "message";
+      if (name.includes("setting") || name.includes("wifi") || name.includes("cellular")) return "setting";
+      if (name.includes("stock")) return "stock result";
+      return "record";
+    }
+
+    function evidenceCard(kind, main, raw, fieldsHtml = "") {
+      const rawText = String(raw || "");
+      const needsRaw = rawText && rawText !== main;
+      return `<div class="evidence-readable">
+        <div class="evidence-main"><span class="evidence-kind ${esc(kind)}">${esc(kind)}</span> ${esc(main)}</div>
+        ${fieldsHtml ? `<div class="kv-row">${fieldsHtml}</div>` : ""}
+        ${needsRaw ? `<details class="raw-evidence"><summary>Raw</summary><pre>${esc(rawText)}</pre></details>` : ""}
+      </div>`;
+    }
+
+    function summarizeToolCall(line) {
+      const call = String(line || "").match(/^([A-Za-z_][A-Za-z0-9_]*)\((.*)\)$/s);
+      if (!call) return null;
+      const tool = cleanToolName(call[1]);
+      const args = extractFields(call[2]);
+      const fields = fieldSummary(args, Object.keys(args));
+      const main = Object.keys(args).length ? `${tool} called with: ${Object.keys(args).map(humanKey).join(", ")}` : `${tool} called`;
+      return evidenceCard("call", main, line, fields);
+    }
+
+    function summarizeStateLine(line) {
+      const state = String(line || "").match(/^([A-Z][A-Z_]+):\s*(.+)$/s);
+      if (!state) return null;
+      const namespace = state[1].replace(/_/g, " ").toLowerCase();
+      const fields = extractFields(state[2]);
+      const keys = Object.keys(fields);
+      const fieldsHtml = fieldSummary(fields, keys);
+      const main = keys.length ? `${namespace} state matched: ${keys.map(humanKey).join(", ")}` : `${namespace} state evidence`;
+      return evidenceCard("state", main, line, fieldsHtml);
+    }
+
+    function summarizeToolResult(line) {
+      const result = String(line || "").match(/^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/s);
+      if (!result) return null;
+      const tool = cleanToolName(result[1]);
+      const payloadText = result[2] || "";
+      if (payloadText.trim() === "[]") return evidenceCard("result", `${tool} returned no results`, line);
+      const recordCount = (payloadText.match(/\{[^{}]*\}/g) || []).length;
+      const fields = extractFields(payloadText);
+      const keys = preferredKeysForTool(tool);
+      const fieldsHtml = fieldSummary(fields, keys.length ? keys : Object.keys(fields));
+      const entity = entityForTool(tool);
+      const countText = recordCount ? `${recordCount} ${entity}${recordCount === 1 ? "" : "s"}` : entity;
+      const main = `${tool} returned: ${countText}`;
+      return evidenceCard("result", main, line, fieldsHtml);
+    }
+
+    function evidenceLineHtml(line) {
+      const raw = String(line ?? "").trim();
+      if (!raw) return "";
+      const summarized = summarizeStateLine(raw) || summarizeToolResult(raw) || summarizeToolCall(raw);
+      if (summarized) return summarized;
+      const clipped = raw.length > 220 ? `${raw.slice(0, 217)}...` : raw;
+      return evidenceCard("text", clipped, raw);
     }
 
     function checkTotals(row, checks) {
