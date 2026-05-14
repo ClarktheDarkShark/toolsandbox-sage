@@ -693,6 +693,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     let selected = 0;
     let transactionArm = "candidate";
     let handlersBound = false;
+    let refreshTimer = null;
 
     function metric(label, value, hint, className = "", clickable = false) {
       return `<div class="metric ${clickable ? "clickable" : ""}" ${clickable ? 'id="toolsMetric" role="button" tabindex="0"' : ""}>
@@ -1219,7 +1220,54 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       document.getElementById("toolDrawer").setAttribute("aria-hidden", "true");
     }
 
-    async function refresh() {
+    function captureScrollState() {
+      return {
+        windowX: window.scrollX,
+        windowY: window.scrollY,
+        asideY: document.querySelector("aside")?.scrollTop || 0,
+        transcriptY: document.querySelector(".transcript")?.scrollTop || 0,
+      };
+    }
+
+    function restoreScrollState(state) {
+      if (!state) return;
+      window.requestAnimationFrame(() => {
+        const aside = document.querySelector("aside");
+        const transcript = document.querySelector(".transcript");
+        if (aside) aside.scrollTop = state.asideY;
+        if (transcript) transcript.scrollTop = state.transcriptY;
+        window.scrollTo(state.windowX, state.windowY);
+      });
+    }
+
+    function runIsComplete() {
+      if (!payload) return false;
+      const status = String(payload.status || "").toLowerCase();
+      if (["complete", "completed", "done", "failed", "error"].includes(status)) return true;
+      const s = payload.summary || {};
+      const totalTasks = plannedTaskCount(s);
+      const baselineDone = Number(s.control_completed ?? 0);
+      const sageDone = Number(s.candidate_completed ?? s.current_completed ?? 0);
+      return totalTasks > 0 && Math.min(baselineDone, sageDone) >= totalTasks;
+    }
+
+    function updateRefreshTimer() {
+      if (runIsComplete()) {
+        if (refreshTimer !== null) {
+          window.clearInterval(refreshTimer);
+          refreshTimer = null;
+        }
+        return;
+      }
+      if (refreshTimer === null) {
+        refreshTimer = window.setInterval(() => {
+          refresh({preserveScroll: true}).catch((error) => console.error(error));
+        }, 5000);
+      }
+    }
+
+    async function refresh(options = {}) {
+      const scrollState = options.preserveScroll ? captureScrollState() : null;
       const response = await fetch(`task_compare_data.json?ts=${Date.now()}`, {cache: "no-store"});
       payload = await response.json();
       pairs = payload.pairs || [];
@@ -1235,6 +1283,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       renderMetrics();
       renderList();
       renderDetail();
+      restoreScrollState(scrollState);
+      updateRefreshTimer();
     }
 
     async function load() {
@@ -1250,9 +1300,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         window.addEventListener("keydown", (event) => {
           if (event.key === "Escape") closeTools();
         });
-        window.setInterval(() => {
-          refresh().catch((error) => console.error(error));
-        }, 5000);
+        updateRefreshTimer();
       }
     }
 
