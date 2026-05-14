@@ -522,6 +522,14 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     .msg-lbl { color: var(--muted); font-size: 10px; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .08em; }
     .tbadge { display: inline-block; margin: 0 5px 6px 0; border: 1px solid rgba(65,217,150,.45); border-radius: 999px; padding: 2px 7px; color: var(--green); font-size: 11px; font-weight: 800; }
     .empty-transcript { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .message-text {
+      margin: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--ink);
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -827,10 +835,16 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       return labels[key] || String(key || "").replace(/_/g, " ");
     }
 
-    function humanValue(value) {
+    function humanValue(value, key = "") {
       if (value === null || value === undefined || value === "" || value === "None" || value === "null") return "missing";
       const text = String(value);
       if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(text)) return `${text.slice(0, 8)}...`;
+      if (String(key).includes("timestamp") && finite(text)) {
+        const seconds = Number(text);
+        if (seconds > 1000000000 && seconds < 4102444800) {
+          return new Date(seconds * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
+        }
+      }
       if (/^-?\d+(?:\.\d+)?$/.test(text) && text.length >= 10) return Number(text).toLocaleString(undefined, {maximumFractionDigits: 0});
       return text.length > 64 ? `${text.slice(0, 61)}...` : text;
     }
@@ -852,14 +866,14 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         .filter((key) => Object.prototype.hasOwnProperty.call(fields, key))
         .filter((key) => !(key === "is_self" && String(fields[key]).toLowerCase() === "false"))
         .slice(0, 6)
-        .map((key) => `<span class="kv-chip">${esc(humanKey(key))}: ${esc(humanValue(fields[key]))}</span>`)
+        .map((key) => `<span class="kv-chip">${esc(humanKey(key))}: ${esc(humanValue(fields[key], key))}</span>`)
         .join("");
     }
 
     function preferredKeysForTool(tool) {
       const name = String(tool || "").toLowerCase();
       if (name.includes("contact")) return ["name", "phone_number", "relationship", "person_id", "is_self"];
-      if (name.includes("reminder")) return ["content", "reminder_timestamp", "creation_timestamp", "reminder_id", "latitude", "longitude"];
+      if (name.includes("reminder")) return ["content", "reminder_timestamp", "resolved_reminder_timestamp", "day_offset", "hour", "minute", "should_call_add_reminder", "location_status", "creation_timestamp", "reminder_id", "latitude", "longitude"];
       if (name.includes("message")) return ["sender", "recipient", "content", "phone_number", "timestamp"];
       if (name.includes("setting") || name.includes("wifi") || name.includes("cellular")) return ["wifi", "cellular", "location_service", "low_battery_mode"];
       return ["name", "content", "phone_number", "relationship", "person_id", "reminder_timestamp", "sender", "recipient"];
@@ -890,8 +904,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       if (!call) return null;
       const tool = cleanToolName(call[1]);
       const args = extractFields(call[2]);
-      const fields = fieldSummary(args, Object.keys(args));
-      const main = Object.keys(args).length ? `${tool} called with: ${Object.keys(args).map(humanKey).join(", ")}` : `${tool} called`;
+      const keys = Object.keys(args);
+      const fields = fieldSummary(args, keys);
+      const main = keys.length ? `${tool} called with ${keys.length} input${keys.length === 1 ? "" : "s"}` : `${tool} called without arguments`;
       return evidenceCard("call", main, line, fields);
     }
 
@@ -914,6 +929,21 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       if (payloadText.trim() === "[]") return evidenceCard("result", `${tool} returned no results`, line);
       const recordCount = (payloadText.match(/\{[^{}]*\}/g) || []).length;
       const fields = extractFields(payloadText);
+      if (!recordCount && !Object.keys(fields).length) {
+        const scalar = payloadText.trim().replace(/^['"]|['"]$/g, "");
+        if (scalar && scalar !== "{}") {
+          const lowerTool = tool.toLowerCase();
+          const key = lowerTool.includes("timestamp")
+            ? "timestamp"
+            : lowerTool.includes("reminder")
+              ? "reminder_id"
+              : lowerTool.includes("contact")
+                ? "person_id"
+                : "value";
+          const label = key === "timestamp" ? "time" : humanKey(key);
+          return evidenceCard("result", `${tool} returned: ${label}`, line, `<span class="kv-chip">${esc(label)}: ${esc(humanValue(scalar, key))}</span>`);
+        }
+      }
       const keys = preferredKeysForTool(tool);
       const fieldsHtml = fieldSummary(fields, keys.length ? keys : Object.keys(fields));
       const entity = entityForTool(tool);
@@ -1011,16 +1041,46 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       return tools;
     }
 
+    function messageToolName(message, tools) {
+      const label = String(message.label || "");
+      const content = String(message.content || message.message || "");
+      const labelMatch = label.match(/(?:tool call|tool):\s*([A-Za-z0-9_]+)/i);
+      const contentMatch = content.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(/);
+      return cleanToolName(message.name || tools[0] || labelMatch?.[1] || contentMatch?.[1] || "");
+    }
+
+    function toolResultHtml(tool, content) {
+      const raw = String(content ?? "").trim();
+      if (!raw) return evidenceCard("result", `${tool || "tool"} returned no visible content`, raw);
+      const result = tool ? summarizeToolResult(`${tool}: ${raw}`) : null;
+      if (result) return result;
+      const clipped = raw.length > 180 ? `${raw.slice(0, 177)}...` : raw;
+      return evidenceCard("result", `${tool || "tool"} returned: ${clipped}`, raw);
+    }
+
+    function messageBodyHtml(message, role, tools) {
+      const content = String(message.content || message.message || "[empty]");
+      const label = String(message.label || "");
+      const tool = messageToolName(message, tools);
+      const isToolCall = /tool call/i.test(label) || /^\s*[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(content);
+      if (isToolCall) {
+        return summarizeToolCall(content) || evidenceCard("call", `${tool || "tool"} called`, content);
+      }
+      if (role === "tool") {
+        return toolResultHtml(tool, content);
+      }
+      return `<div class="message-text">${esc(content)}</div>`;
+    }
+
     function messageHtml(message) {
       const role = messageRole(message);
       const tools = messageTools(message);
       const label = message.label || message.sender || message.role || role;
-      const content = message.content || message.message || "[empty]";
       return `<div class="msg ${role}${tools.length ? " generated-tool" : ""}">
         <div class="bubble">
           <div class="msg-lbl">${esc(`#${Number(message.index ?? 0) + 1} · ${label}`)}</div>
           ${tools.map((tool) => `<span class="tbadge">⚡ ${esc(tool)}</span>`).join("")}
-          <pre>${esc(content)}</pre>
+          ${messageBodyHtml(message, role, tools)}
         </div>
       </div>`;
     }
