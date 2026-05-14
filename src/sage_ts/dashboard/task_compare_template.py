@@ -38,8 +38,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       border-bottom: 1px solid var(--line);
       background: var(--panel);
       padding: 18px 22px 14px;
-      position: sticky;
-      top: 0;
+      position: relative;
       z-index: 5;
     }
     h1 {
@@ -136,7 +135,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     .warn { color: var(--amber); }
     main {
       display: grid;
-      grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+      grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
       min-height: calc(100vh - 150px);
     }
     aside {
@@ -144,8 +143,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       background: #0d151f;
       padding: 14px;
       position: sticky;
-      top: 139px;
-      height: calc(100vh - 139px);
+      top: 12px;
+      align-self: start;
+      height: calc(100vh - 24px);
       overflow: auto;
     }
     .search {
@@ -181,16 +181,33 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       font-weight: 750;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      line-height: 1.25;
     }
     .task-meta {
       display: flex;
-      justify-content: space-between;
+      flex-wrap: wrap;
       gap: 8px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
       margin-top: 3px;
       font-variant-numeric: tabular-nums;
+    }
+    .meta-pill {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 4px;
+      min-width: 0;
+    }
+    .meta-label {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
     }
     .tool-badges {
       display: flex;
@@ -230,7 +247,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
     .detail {
       padding: 18px 22px 28px;
-      overflow: hidden;
+      overflow: visible;
     }
     .section {
       background: var(--panel);
@@ -269,7 +286,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
     .compare-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
       gap: 10px;
       margin-top: 14px;
     }
@@ -286,6 +303,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
+    .check-split {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    }
     .transaction-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
     .transaction-head h3 { margin: 0; }
     .transaction-select { border: 1px solid var(--line); border-radius: 999px; background: var(--panel2); color: var(--blue); padding: 7px 10px; font-size: 12px; font-weight: 800; min-width: 150px; }
@@ -299,6 +319,108 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     .box h3 {
       margin: 0 0 9px;
       font-size: 14px;
+    }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .section-head h3 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: 0;
+    }
+    .check-explainer {
+      max-width: 720px;
+    }
+    .check-summary {
+      display: grid;
+      gap: 10px;
+    }
+    .check-totals {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .check-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(15, 23, 34, .72);
+      padding: 10px;
+    }
+    .check-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .check-title {
+      flex: 1 1 100%;
+      min-width: 0;
+      font-weight: 800;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+    .status-pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      white-space: nowrap;
+      align-self: flex-start;
+    }
+    .status-matched,
+    .status-clear {
+      border-color: rgba(65, 217, 150, .45);
+      background: rgba(13, 45, 32, .8);
+      color: var(--green);
+    }
+    .status-partial {
+      border-color: rgba(255, 200, 87, .45);
+      background: rgba(49, 37, 13, .8);
+      color: var(--amber);
+    }
+    .status-missed,
+    .status-triggered {
+      border-color: rgba(255, 107, 115, .45);
+      background: rgba(55, 18, 24, .8);
+      color: var(--red);
+    }
+    .check-evidence {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 9px;
+    }
+    .evidence-block {
+      min-width: 0;
+      border-top: 1px solid rgba(43, 58, 77, .75);
+      padding-top: 7px;
+    }
+    .evidence-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .evidence-line {
+      color: var(--ink);
+      font-size: 11px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .more-lines {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 3px;
     }
     .small {
       color: var(--muted);
@@ -380,6 +502,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
     @media (max-width: 1100px) {
       .metrics { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
+    }
+    @media (max-width: 760px) {
+      .metrics, .compare-grid, .split, .transaction-grid, .check-evidence { grid-template-columns: 1fr; }
       main { grid-template-columns: 1fr; }
       aside {
         position: relative;
@@ -389,11 +514,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         border-bottom: 1px solid var(--line);
       }
       .task-list {
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       }
-    }
-    @media (max-width: 760px) {
-      .metrics, .compare-grid, .split, .transaction-grid { grid-template-columns: 1fr; }
       .detail { padding: 14px; }
       header { position: relative; }
       .header-row { flex-direction: column; }
@@ -575,7 +697,10 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         const overflow = events.length > 3 ? `<span class="tool-chip" title="${esc(events.slice(3).map(toolEventLabel).join("\\n"))}">+${events.length - 3}</span>` : "";
         return `<button class="task-btn ${index === selected ? "active" : ""}" data-index="${index}">
           <div class="task-name">${esc(pair.display_index || index + 1)}. ${esc(pair.short_name || pair.scenario)}</div>
-          <div class="task-meta"><span class="${cls(d.scoreDelta)}">${signedNum(d.scoreDelta)}</span><span class="${cls(d.outcomeDelta)}">${signedNum(d.outcomeDelta)}</span></div>
+          <div class="task-meta">
+            <span class="meta-pill"><span class="meta-label">score</span><span class="${cls(d.scoreDelta)}">${signedNum(d.scoreDelta)}</span></span>
+            <span class="meta-pill"><span class="meta-label">outcome</span><span class="${cls(d.outcomeDelta)}">${signedNum(d.outcomeDelta)}</span></span>
+          </div>
           ${events.length ? `<div class="tool-badges">${chips}${overflow}</div>` : ""}
         </button>`;
       }).join("");
@@ -586,11 +711,73 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       }));
     }
 
+    function checkKindLabel(check) {
+      return check?.kind === "forbidden" ? "Guardrail" : "Milestone";
+    }
+
+    function inferCheckStatus(check) {
+      if (check?.status) return String(check.status);
+      if (check?.kind === "forbidden") return check?.included ? "triggered" : "clear";
+      if (!finite(check?.score)) return check?.included ? "included" : "unknown";
+      const score = Number(check.score);
+      if (score >= 0.999) return "matched";
+      if (score > 0) return "partial";
+      return "missed";
+    }
+
+    function evidenceList(lines, emptyLabel) {
+      const values = Array.isArray(lines) ? lines.filter((line) => line !== null && line !== undefined && String(line).trim() !== "") : [];
+      if (!values.length) return `<div class="evidence-line small">${esc(emptyLabel)}</div>`;
+      const shown = values.slice(0, 2).map((line) => `<div class="evidence-line">${esc(line)}</div>`).join("");
+      const more = values.length > 2 ? `<div class="more-lines">+${values.length - 2} more line${values.length - 2 === 1 ? "" : "s"}</div>` : "";
+      return shown + more;
+    }
+
+    function checkTotals(row, checks) {
+      const evaluation = row?.evaluation || {};
+      const requiredTotal = finite(evaluation.required_total) ? Number(evaluation.required_total) : checks.filter((check) => check.kind !== "forbidden").length;
+      const requiredPassed = finite(evaluation.required_passed) ? Number(evaluation.required_passed) : checks.filter((check) => check.kind !== "forbidden" && inferCheckStatus(check) === "matched").length;
+      const forbiddenTotal = finite(evaluation.forbidden_total) ? Number(evaluation.forbidden_total) : checks.filter((check) => check.kind === "forbidden").length;
+      const forbiddenTriggered = finite(evaluation.forbidden_triggered) ? Number(evaluation.forbidden_triggered) : checks.filter((check) => check.kind === "forbidden" && inferCheckStatus(check) === "triggered").length;
+      const finalScore = finite(evaluation.final_score) ? Number(evaluation.final_score) : row?.similarity;
+      return {requiredTotal, requiredPassed, forbiddenTotal, forbiddenTriggered, finalScore};
+    }
+
     function summarizeChecks(row) {
       const checks = row?.evaluation?.checks || row?.outcome_checks || [];
       if (!checks.length) return "<div class='small'>No outcome checks exported for this arm.</div>";
-      return `<table><thead><tr><th>Check</th><th>Kind</th><th>Included</th><th>Score</th></tr></thead><tbody>${checks.map((check, idx) => `
-        <tr><td>${idx + 1}</td><td>${esc(check.kind || "-")}</td><td>${esc(check.included)}</td><td>${num(check.score)}</td></tr>`).join("")}</tbody></table>`;
+      const totals = checkTotals(row, checks);
+      const guardrailText = totals.forbiddenTotal
+        ? `Guardrails clear ${Math.max(0, totals.forbiddenTotal - totals.forbiddenTriggered)}/${totals.forbiddenTotal}`
+        : "No guardrails";
+      return `<div class="check-summary">
+        <div class="check-totals">
+          <span class="pill">Milestones ${totals.requiredPassed}/${totals.requiredTotal}</span>
+          <span class="pill">${esc(guardrailText)}</span>
+          <span class="pill">Final ${num(totals.finalScore)}</span>
+        </div>
+        ${checks.map((check, idx) => {
+          const status = inferCheckStatus(check);
+          const kind = checkKindLabel(check);
+          const title = check.label || `${kind} ${check.index || idx + 1}`;
+          return `<div class="check-card">
+            <div class="check-head">
+              <div class="check-title">${esc(kind)} ${esc(check.index || idx + 1)}: ${esc(title)}</div>
+              <span class="status-pill status-${esc(status)}">${esc(status)} · ${num(check.score)}</span>
+            </div>
+            <div class="check-evidence">
+              <div class="evidence-block">
+                <div class="evidence-label">Expected</div>
+                ${evidenceList(check.expected || check.target_lines, "No expected evidence exported.")}
+              </div>
+              <div class="evidence-block">
+                <div class="evidence-label">Observed</div>
+                ${evidenceList(check.observed || check.observed_messages || check.observed_lines, "No observed evidence exported.")}
+              </div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>`;
     }
 
     function transcriptFallback(row) {
@@ -710,11 +897,11 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           <div class="compare-grid">
             <div class="mini"><div class="label">Baseline Score</div><div class="value">${pct(control.similarity)}</div></div>
             <div class="mini"><div class="label">SAGE Score</div><div class="value">${pct(candidate.similarity)}</div></div>
-            <div class="mini"><div class="label">Score Delta</div><div class="value ${cls(d.scoreDelta)}">${signedNum(d.scoreDelta)}</div><div class="hint">${signedPct(relLift(d.scoreDelta, control.similarity))} lift</div></div>
             <div class="mini"><div class="label">Score Lift</div><div class="value ${cls(d.scoreDelta)}">${signedPct(relLift(d.scoreDelta, control.similarity))}</div><div class="hint">${signedNum(d.scoreDelta)} score delta</div></div>
+            <div class="mini"><div class="label">Baseline Outcome</div><div class="value">${pct(outcome(control))}</div></div>
+            <div class="mini"><div class="label">SAGE Outcome</div><div class="value">${pct(outcome(candidate))}</div></div>
             <div class="mini"><div class="label">Outcome Lift</div><div class="value ${cls(d.outcomeDelta)}">${signedPct(relLift(d.outcomeDelta, outcome(control)))}</div><div class="hint">${num(outcome(control))} -> ${num(outcome(candidate))}; delta ${signedNum(d.outcomeDelta)}</div></div>
-            <div class="mini"><div class="label">Baseline Turns</div><div class="value">${esc(control.turn_count ?? "-")}</div></div>
-            <div class="mini"><div class="label">SAGE Turns</div><div class="value">${esc(candidate.turn_count ?? "-")}</div></div>
+            <div class="mini"><div class="label">Turns B / S</div><div class="value">${esc(control.turn_count ?? "-")} / ${esc(candidate.turn_count ?? "-")}</div></div>
             <div class="mini"><div class="label">Control Cache</div><div class="value">${esc(control.control_cache_source || "-")}</div></div>
             <div class="mini"><div class="label">SAGE Tool Events</div><div class="value">${esc(toolEvents(pair).length)}</div></div>
           </div>
@@ -723,14 +910,22 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           <h3 style="margin-top:0">Generated Tool Events On This Task</h3>
           <div class="pill-row">${toolEventHtml(pair)}</div>
         </div>
-        <div class="section split">
-          <div class="box">
-            <h3>Baseline Outcome Checks</h3>
-            ${summarizeChecks(control)}
+        <div class="section">
+          <div class="section-head">
+            <div>
+              <h3>Scored Milestones And Guardrails</h3>
+              <div class="small check-explainer">Milestones are required task facts, tool calls, or state changes. Guardrails are forbidden actions or unsafe states. The score is the benchmark's per-check match score using the expected and observed evidence below.</div>
+            </div>
           </div>
-          <div class="box">
-            <h3>SAGE Outcome Checks</h3>
-            ${summarizeChecks(candidate)}
+          <div class="split check-split">
+            <div class="box">
+              <h3>Baseline</h3>
+              ${summarizeChecks(control)}
+            </div>
+            <div class="box">
+              <h3>SAGE</h3>
+              ${summarizeChecks(candidate)}
+            </div>
           </div>
         </div>
         ${transactionPanelHtml(control, candidate)}
