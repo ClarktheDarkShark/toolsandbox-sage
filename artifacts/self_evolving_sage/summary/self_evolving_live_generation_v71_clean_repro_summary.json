@@ -1,0 +1,95 @@
+{
+  "run_name": "self_evolving_live_generation_v71_clean_repro",
+  "status": "metrics_reproduced_with_one_helper_contract_caveat",
+  "branch": "codex/self-evolving-sage-mini60",
+  "start_git_sha": "53c1b4c21c60c85a96b11da1832341b42e8f8ad5",
+  "run_root": "outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356",
+  "dashboard_task_compare_url": "http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356/dashboard/task_compare.html",
+  "manifest_path": "artifacts/self_evolving_sage/current_formal500_live_generation_v54_outcome_bridge_repair/self_evolving_formal500_online_build_manifest.json",
+  "manifest_sha256": "93f5597b09b7073fe718abd1aa8b416d3e8b440054c275031f8727809e39f08b",
+  "mode": "online_build_500",
+  "scenario_count": 500,
+  "models": {
+    "agent": "gpt-4o-mini",
+    "user": "gpt-4o-mini",
+    "generation": "gpt-4o-mini"
+  },
+  "runtime_policy": {
+    "generation": "on",
+    "candidate_task_cache": "off",
+    "openai_response_cache": "disabled",
+    "control_cache": "strict",
+    "control_cache_match_policy": "experimental_task_name_base_tool_policy_min3_model_user_bypassed",
+    "routing_evidence": "disabled",
+    "diagnostic_force_env": [],
+    "toolsandbox_clock": "frozen",
+    "praxis_bridge_policy": "combined",
+    "same_task_jit_birth": true,
+    "transient_retry_attempts": 4
+  },
+  "cache": {
+    "cached_control_tasks": 500,
+    "fresh_control_tasks": 0,
+    "control_cache_manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2"
+  },
+  "registry": {
+    "starting_generated_registry": "absent",
+    "final_registry_path": "artifacts/self_evolving_sage/current_formal500_live_generation_v71_clean_repro/formal500_registry/registry_manifest.json",
+    "final_registry_sha256": "6d48dd788b9d3d788710f0e7c17755aa481618fc76ac281c5feddea22d747f23",
+    "accepted_tools": 16,
+    "accepted_but_uncalled_tools": [
+      "constraint_to_action_planner",
+      "prepare_side_effect_args_from_selected_record"
+    ],
+    "naturally_called_tools": 14
+  },
+  "metrics": {
+    "baseline_score": 0.6567992510564296,
+    "sage_score": 0.8541884123518187,
+    "score_delta": 0.1973891612953893,
+    "score_lift_percent": 30.05319524617278,
+    "baseline_outcome": 0.4947458601435448,
+    "sage_outcome": 0.8808451957981286,
+    "outcome_delta": 0.3860993356545837,
+    "outcome_lift_percent": 78.03993257115106,
+    "baseline_exact_successes": 20,
+    "sage_exact_successes": 288,
+    "exact_success_delta": 268,
+    "canonical_gains": 395,
+    "canonical_regressions": 48,
+    "canonical_preserved": 57,
+    "outcome_gains": 325,
+    "outcome_regressions": 27,
+    "outcome_preserved": 32
+  },
+  "generated_tool_adoption": {
+    "reuse_count": 419,
+    "generated_tool_visible_scenarios": 453,
+    "generated_tool_called_scenarios": 297,
+    "generated_tool_failed_scenarios": 0,
+    "generated_tool_visible_not_called_scenarios": 156
+  },
+  "safety": {
+    "runtime_exceptions": 0,
+    "generated_tool_failures": 0,
+    "protocol_gate_passed": true,
+    "route_mismatch_qualified": false,
+    "helper_side_effect_preservation_failures": 1,
+    "actual_helper_side_effect_mutation_incidents": 0,
+    "side_effect_failure_scenario": "search_reminder_with_recency_yesterday_all_tools",
+    "side_effect_failure_helper": "select_action_target_by_recency",
+    "side_effect_failure_classification": "helper_contract_preservation_near_miss_on_read_only_task",
+    "side_effect_failure_summary": "The read-only reminder search task called select_action_target_by_recency with action_type=remove_reminder. The helper returned downstream_tool_name=remove_reminder and should_call_tool=true, but the actor did not execute remove_reminder and answered the user. This is not an actual state mutation incident, but it is a strict side-effect preservation failure and should be repaired before protected final-claim use."
+  },
+  "comparison_to_v70": {
+    "v70_score_delta": 0.170706,
+    "v71_score_delta": 0.1973891612953893,
+    "v70_outcome_delta": 0.378036,
+    "v71_outcome_delta": 0.3860993356545837,
+    "v70_exact_successes": 287,
+    "v71_exact_successes": 288,
+    "v70_helper_side_effect_preservation_failures": 0,
+    "v71_helper_side_effect_preservation_failures": 1
+  },
+  "decision": "Clean committed-tree run reproduced and exceeded v70 lift, but strict protected-claim readiness remains blocked until the one helper-contract side-effect preservation failure is repaired or formally adjudicated."
+}

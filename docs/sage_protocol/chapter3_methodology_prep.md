@@ -132,7 +132,16 @@ A clean result with this policy enabled supports a combined-treatment claim only
 
 The self-evolving treatment is distinct from frozen final validation. It starts with no generated helpers, keeps generation enabled, observes task-local inadequacy signals, generates deterministic helper candidates, validates them, stores accepted helpers in a run-local registry, and routes a bounded subset naturally. It is appropriate for discovery and methodology evidence; a protected final claim still requires a later frozen-registry validation with generation off.
 
-The current best experimental self-evolving broad500 result is:
+The current clean committed-tree experimental self-evolving broad500 reproduction is:
+
+- Run: `outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356`.
+- Canonical/reference: `0.656799 -> 0.854188`, delta `+0.197389`, lift `+30.05%`.
+- Outcome/task completion: `0.494746 -> 0.880845`, delta `+0.386099`, lift `+78.04%`.
+- Starting generated registry: absent/empty; generation on; `16` live-born helpers accepted; generated-tool visible/called/failed scenarios `453 / 297 / 0`.
+- Controls: `500 cached / 0 fresh`; candidate/SAGE task cache off; OpenAI response cache disabled; routing evidence disabled; models all `gpt-4o-mini`.
+- Clean-run caveat: runtime exceptions `0` and generated-tool failures `0`, but one helper-contract side-effect preservation failure was reported on a read-only reminder-search task. The actor did not execute the returned side-effect tool, so this is not an actual state mutation incident. It remains a strict preservation near miss and should be repaired before treating the result as protected final-claim evidence.
+
+The prior high-lift v70 broad500 result remains useful because it had zero helper side-effect preservation reports, but it began before the relevant runtime edits were committed:
 
 - Run: `outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839`.
 - Canonical/reference: `0.656799 -> 0.827506`, delta `+0.170706`, lift `+25.99%`.

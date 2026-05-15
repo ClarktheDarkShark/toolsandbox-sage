@@ -88,6 +88,85 @@ Only 24 scenarios matched the selected contact gap under the current capped mani
 
 No labels, expected answers, hidden benchmark facts, or cache availability were used to generate tool code or select scenarios. Scenario IDs appear in the split manifest because the harness requires executable scenario names, but they are not encoded into generated tools, routing rules, or repair logic.
 
+## Full Broad500 Clean Committed-Tree Reproduction Result
+
+Run:
+
+`outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356`
+
+Dashboard:
+
+`http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356/dashboard/task_compare.html`
+
+This run was launched from clean branch head `53c1b4c21c60c85a96b11da1832341b42e8f8ad5` to answer the v70 reproducibility caveat. The generated registry did not exist at launch, generation remained on, the candidate task cache was off, OpenAI response cache was disabled, routing evidence was disabled, and no diagnostic force-call environment variables were active.
+
+Controls:
+
+- control cache mode: `strict`
+- cached controls: `500`
+- fresh controls: `0`
+- cache match policy: `experimental_task_name_base_tool_policy_min3_model_user_bypassed`
+- cache manifest hash: `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
+- cohort selection influenced by cache: `false`
+
+Candidate/SAGE:
+
+- starting generated registry: absent/empty
+- final generated registry SHA-256: `6d48dd788b9d3d788710f0e7c17755aa481618fc76ac281c5feddea22d747f23`
+- generation: on
+- candidate task cache: off
+- OpenAI response cache: disabled
+- routing evidence: disabled
+- active diagnostic force env vars: none
+- agent/user/generation model: `gpt-4o-mini`
+- runtime exceptions: `0`
+- generated-tool failures: `0`
+- protocol gate: `PASS`
+
+Metrics:
+
+| Metric | Baseline | SAGE | Delta |
+|---|---:|---:|---:|
+| Canonical/reference score | `0.656799` | `0.854188` | `+0.197389` |
+| Canonical/reference lift | n/a | n/a | `+30.05%` |
+| Outcome/task completion | `0.494746` | `0.880845` | `+0.386099` |
+| Outcome/task-completion lift | n/a | n/a | `+78.04%` |
+| Exact successes | `20` | `288` | `+268` |
+| Canonical gains / regressions / preserved | n/a | n/a | `395 / 48 / 57` |
+| Outcome gains / regressions / preserved | n/a | n/a | `325 / 27 / 32` |
+
+Generated-tool adoption:
+
+| Metric | Value |
+|---|---:|
+| Accepted live-born tools | `16` |
+| Newly generated helpers naturally called | `14` |
+| Generated-tool visible scenarios | `453` |
+| Generated-tool called scenarios | `297` |
+| Generated-tool failed scenarios | `0` |
+| Accepted-but-uncalled tools | `constraint_to_action_planner`, `prepare_side_effect_args_from_selected_record` |
+
+Safety caveat:
+
+The run had one helper side-effect preservation failure in `side_effect_preservation_report.jsonl`: `select_action_target_by_recency` on `search_reminder_with_recency_yesterday_all_tools`. This was a read-only reminder-search task. The actor called the helper with `action_type=remove_reminder`, and the helper returned `downstream_tool_name=remove_reminder` with `should_call_tool=true`; the actor did not execute `remove_reminder` and only answered the user. Therefore the failure is not an actual ToolSandbox state mutation incident, but it is a helper-contract preservation near miss. Strict protected-claim readiness remains blocked until read-only recency selection and side-effect action-target routing are separated or formally adjudicated.
+
+Machine-readable summary:
+
+`artifacts/self_evolving_sage/summary/self_evolving_live_generation_v71_clean_repro_summary.json`
+
+Summary SHA-256:
+
+`1b5bd2d162e9202bf63491935a1eae5d8f207b73aec2b4dcf498deb0f8b935db`
+
+Status: this is strong clean committed-tree experimental self-evolving evidence. It reproduces and exceeds the v70 lift, but it is not protected final-claim evidence because of the single helper-contract preservation caveat.
+
+Recommended repair before protected review:
+
+- Route read-only `search_*` recency tasks to `select_record_by_timestamp_extreme` or an explicit answer-only mode, not to action-target side-effect planners.
+- Add generator validation/minefield cases where read-only selection helpers must not return a side-effect `downstream_tool_name` or `should_call_tool=true`.
+- Add a routing negative trigger that hides `select_action_target_by_recency` from read-only search tasks unless the user explicitly requests a remove/update/create action.
+- Run a targeted safety diagnostic on reminder/message recency search tasks before spending another clean broad500.
+
 ## Full Broad500 JIT Same-Task Birth Result
 
 Run:

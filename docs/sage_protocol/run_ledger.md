@@ -1,5 +1,29 @@
 # Run Ledger
 
+## 2026-05-15
+
+- `Self-evolving broad500 clean committed-tree reproduction v71` completed.
+  - Branch: `codex/self-evolving-sage-mini60`.
+  - Objective: reproduce the high-lift v70 self-evolving broad500 result from a clean committed runtime tree while starting from no generated helpers, keeping generation on, using cached controls, and letting SAGE choose births, retention, routing, and natural calls.
+  - Launch git SHA: `53c1b4c21c60c85a96b11da1832341b42e8f8ad5`; working tree was clean at launch except for run-generated artifacts that were absent before execution.
+  - Run: `outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356`.
+  - Dashboard: `http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356/dashboard/task_compare.html`.
+  - Summary: `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v71_clean_repro_summary.json`, SHA-256 `1b5bd2d162e9202bf63491935a1eae5d8f207b73aec2b4dcf498deb0f8b935db`.
+  - Manifest: `artifacts/self_evolving_sage/current_formal500_live_generation_v54_outcome_bridge_repair/self_evolving_formal500_online_build_manifest.json`, SHA-256 `93f5597b09b7073fe718abd1aa8b416d3e8b440054c275031f8727809e39f08b`.
+  - Registry: `artifacts/self_evolving_sage/current_formal500_live_generation_v71_clean_repro/formal500_registry/registry_manifest.json`, SHA-256 `6d48dd788b9d3d788710f0e7c17755aa481618fc76ac281c5feddea22d747f23`.
+  - Starting registry: absent/empty generated registry; `manifest_existed_before_run=false`.
+  - Controls: `500 cached / 0 fresh`; cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`; control cache match policy `experimental_task_name_base_tool_policy_min3_model_user_bypassed`; SAGE/candidate task cache off; OpenAI response cache disabled; routing evidence disabled.
+  - Models: agent/user/generation all `gpt-4o-mini`.
+  - Runtime policy: `SAGE_PRAXIS_BRIDGE_POLICY=combined`; `SAGE_SELF_EVOLVING_PROACTIVE_SCOPE=just_in_time`; `SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE=1`; frozen ToolSandbox clock; bounded transient scenario retry enabled with `SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS=4`; no diagnostic force-call env vars.
+  - Metrics: canonical/reference `0.656799 -> 0.854188`, delta `+0.197389`, relative lift `+30.05%`; outcome `0.494746 -> 0.880845`, delta `+0.386099`, relative lift `+78.04%`; exact successes `20 -> 288`, delta `+268`.
+  - Gains/regressions/preserved: canonical `395 / 48 / 57`; outcome `325 / 27 / 32`.
+  - Generated helpers: `16` accepted from an empty starting registry; `14` naturally called; generated-tool visible/called/failed scenarios `453 / 297 / 0`; accepted-but-uncalled `constraint_to_action_planner`, `prepare_side_effect_args_from_selected_record`.
+  - Safety: runtime exceptions `0`; generated-tool failures `0`; protocol gate `PASS`; route mismatch qualified `false`; helper side-effect preservation failures `1`.
+  - Side-effect caveat: the single preservation failure was `select_action_target_by_recency` on the read-only `search_reminder_with_recency_yesterday_all_tools` task. The helper returned a hypothetical `remove_reminder` next action, but the actor did not call `remove_reminder`; no ToolSandbox state mutation occurred. This is classified as a helper-contract preservation near miss, not an actual side-effect incident.
+  - Validation: registry check passed for all 16 active entries; dashboard HTML/JSON returned HTTP 200; protocol/cache assertions passed; `git diff --check` passed.
+  - Decision label: `SELF_EVOLVING_BROAD500_METRICS_REPRODUCED_WITH_ONE_HELPER_CONTRACT_CAVEAT`.
+  - Next action: repair read-only recency selection so action-target helpers either expose an answer-only mode or are hidden from read-only search tasks, then run targeted safety diagnostics before another clean broad500 if strict zero preservation failures are required.
+
 ## 2026-05-13
 
 - `Self-evolving broad500 JIT same-task birth and retry repair` completed.

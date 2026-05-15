@@ -215,6 +215,16 @@ Latest scale evidence:
 
 - report:
   `docs/sage_protocol/self_evolving_sage_mini60_report.md`
+- clean committed-tree broad500 reproduction summary:
+  `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v71_clean_repro_summary.json`
+- clean committed-tree broad500 reproduction run:
+  `outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356`
+- clean committed-tree broad500 reproduction dashboard:
+  `http://127.0.0.1:62624/outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356/dashboard/task_compare.html`
+- clean committed-tree broad500 reproduction result:
+  score `0.656799 -> 0.854188`, lift `+30.05%`; outcome `0.494746 -> 0.880845`, lift `+78.04%`; controls `500 cached / 0 fresh`; generation on from an empty generated registry; accepted generated helpers `16`; naturally called generated-tool scenarios `297`; generated-tool failures `0`; runtime exceptions `0`
+- clean-run caveat:
+  one helper-contract side-effect preservation failure was reported on a read-only reminder-search task. No state mutation occurred, but protected final-claim readiness requires repairing or adjudicating that preservation near miss.
 - broad500 JIT same-task birth summary:
   `artifacts/self_evolving_sage/summary/self_evolving_live_generation_v70_jit_birth_retry_repair_summary.json`
 - broad500 JIT same-task birth run:
