@@ -100,7 +100,7 @@ ignore = ["F841"]
 
 [tool.setuptools.packages.find]
 where = [".", "src"]
-include = ["tool_sandbox*", "sage_ts*"]
+include = ["tool_sandbox*", "sage_ts*", "sage_agent*"]
 exclude = ["data/"]
 
 # Configure pytest to parallelize test execution. This configuration is used e.g.

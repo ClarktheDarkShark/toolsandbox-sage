@@ -62,6 +62,59 @@ make freeze_registry REGISTRY=<path> OUT=<lockfile>
 
 Local secrets should be kept out of Git. Use `.secrets/` or environment variables for keys such as `OPENAI_API_KEY` and `RAPID_API_KEY`; `.secrets/` is ignored by Git.
 
+## Importable Standalone SAGE Package
+
+SAGE now has a development-stage standalone package boundary:
+
+```python
+from pathlib import Path
+
+from sage_agent import SAGEAgent, SAGEConfig
+from sage_agent.generators import TemplateHelperGenerator
+
+agent = SAGEAgent(
+    adapter=my_environment_adapter,
+    generator=TemplateHelperGenerator(),
+    config=SAGEConfig(model="gpt-4o-mini", registry_dir=Path("my_sage_registry")),
+)
+summary = agent.run(limit=20)
+```
+
+The standalone package lives in `src/sage_agent/`. It is intentionally
+environment-neutral: the core SAGE controller does not know about ToolSandbox,
+CyberGym, contacts, reminders, PoC submission, Docker, or benchmark-specific
+labels. Environments provide adapters that expose tasks, normalized run
+results, gap signals, validation cases, helper routing, and safety rules.
+
+Current adapter proof points:
+
+- `sage_agent.adapters.ToolSandboxMiniAdapter`: low-cost ToolSandbox-shaped
+  smoke proof for helper birth, validation, registry storage, and reuse.
+- `sage_agent.adapters.CyberGymAdapter`: low-cost CyberGym-shaped smoke proof
+  against the locally cloned `external/cybergym` repository. It validates the
+  adapter boundary without downloading the large CyberGym datasets or running a
+  Docker PoC server.
+
+Run the standalone smoke checks with no model-token spend:
+
+```bash
+PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
+  --env toolsandbox \
+  --model gpt-4o-mini \
+  --reset-registry \
+  --registry-dir artifacts/sage_standalone/toolsandbox_smoke_registry
+
+PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
+  --env cybergym \
+  --model gpt-4o-mini \
+  --reset-registry \
+  --registry-dir artifacts/sage_standalone/cybergym_smoke_registry \
+  --cybergym-repo external/cybergym
+```
+
+Architecture notes are in
+`docs/sage_protocol/standalone/sage_standalone_architecture.md`.
+
 ## Current Evidence Snapshot
 
 The protected broad validated portfolio is frozen best3:

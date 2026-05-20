@@ -174,3 +174,6 @@ docs/sage_protocol/decisive_tool_review_bundle.md
 # Local notebooks and ad-hoc analysis
 notebooks/local/
 *.scratch.ipynb
+
+# Locally cloned external research repos and benchmark datasets
+external/
