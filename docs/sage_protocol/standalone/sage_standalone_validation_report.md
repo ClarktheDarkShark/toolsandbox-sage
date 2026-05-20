@@ -246,3 +246,68 @@ the standalone adapter interface and add a real CyberGym subset executor:
 
 The current result is a working standalone architecture slice, not yet a full
 CyberGym benchmark campaign.
+
+## CyberGym Live Submit Smoke
+
+Date: 2026-05-20
+
+Setup:
+
+- downloaded the official 10-task Level 1 task assets from
+  `sunblaze-ucb/cybergym` using selective Hugging Face patterns;
+- generated task directories with `python3 -m cybergym.task.gen_task`;
+- used `external/cybergym/mask_map.json` so generated `submit.sh` scripts
+  expose masked task IDs;
+- installed CyberGym server extras and launched the local `/submit-vul` server;
+- pulled vulnerable runner Docker images task-by-task to avoid filling disk;
+- stopped the largest pull once when disk reached unsafe levels, removed
+  already-used runner images, then pulled the final runner and reran from the
+  server-side deterministic submission cache plus the live final task.
+
+Command:
+
+```bash
+PYTHONPATH=src:. python scripts/run_cybergym_live_sage.py \
+  --ignore-missing-images \
+  --reset-registry \
+  --registry-dir artifacts/cybergym_live_sage/official10_level1_registry_10of10 \
+  --output-root outputs/cybergym_live_sage \
+  --run-id official10_level1_live_submit_vul_10of10 \
+  --max-candidates 6
+```
+
+Dashboard:
+
+`outputs/cybergym_live_sage/official10_level1_live_submit_vul_10of10/dashboard/index.html`
+
+Result:
+
+- environment: `cybergym-live`
+- execution mode: `cybergym_live_level1_submit_vul`
+- tasks seen: `10`
+- baseline policy: fixed four-byte PoC
+- baseline success: `2/10`
+- SAGE success: `2/10`
+- absolute lift: `+0.0 pp`
+- relative lift: `+0.0%`
+- gaps observed: `1`
+- tools born: `1`
+- tools accepted: `1`
+- tools reused: `10`
+- runtime/integrity issues: `0`
+- skipped tasks: `0`
+- lifecycle decision: `refine`
+
+Interpretation: this is the first real CyberGym submit-path run for standalone
+SAGE, not a synthetic probe. The baseline was stronger than expected because a
+fixed four-byte PoC triggered vulnerable execution failures on two official
+Level 1 subset tasks. The generated SAGE helper was mechanically valid and
+naturally reused, but it did not improve over baseline. The result shows that
+the portable SAGE loop can connect to CyberGym's real task generation and
+submission machinery, but the cyber helper itself is not yet strong enough.
+The next work should target source unpacking, harness discovery, format-aware
+input synthesis, crash-log interpretation, and adaptive mutation/minimization.
+
+Limitation: this run used `/submit-vul` only. It did not run fix-side
+re-verification, so it remains a live smoke and must not be treated as final
+CyberGym benchmark evidence.

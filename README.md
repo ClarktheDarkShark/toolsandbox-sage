@@ -154,6 +154,24 @@ Use `--generator openai` to exercise the live LLM-backed generator through the
 same interface. Keep `--model gpt-4o-mini` unless a run protocol explicitly
 authorizes a stronger model.
 
+For a real CyberGym submit-path smoke, first download official task files,
+generate task directories with CyberGym's own `gen_task`, and run the local
+CyberGym server. Then use:
+
+```bash
+PYTHONPATH=src:. python scripts/run_cybergym_live_sage.py \
+  --reset-registry \
+  --registry-dir artifacts/cybergym_live_sage/official10_level1_registry_10of10 \
+  --output-root outputs/cybergym_live_sage \
+  --run-id official10_level1_live_submit_vul_10of10 \
+  --max-candidates 6
+```
+
+This live script runs baseline and SAGE through `submit.sh` and the local
+`/submit-vul` verifier. It is still a smoke rather than a final CyberGym claim:
+it does not run fix-side re-verification and its baseline is a deliberately
+simple fixed four-byte PoC.
+
 Architecture notes are in
 `docs/sage_protocol/standalone/sage_standalone_architecture.md`.
 Validation notes are in

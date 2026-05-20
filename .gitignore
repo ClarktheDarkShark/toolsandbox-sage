@@ -177,3 +177,6 @@ notebooks/local/
 
 # Locally cloned external research repos and benchmark datasets
 external/
+cybergym_data/
+server_poc/
+cybergym_tmp/

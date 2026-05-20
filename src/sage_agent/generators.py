@@ -36,6 +36,10 @@ class TemplateHelperGenerator:
             return _unique_record_selector(name, gap, profile, validation_cases, model)
         if template == "log_signal_classifier":
             return _log_signal_classifier(name, gap, profile, validation_cases, model)
+        if template == "cybergym_seed_poc_candidates":
+            return _cybergym_seed_poc_candidates(
+                name, gap, profile, validation_cases, model
+            )
         raise ValueError(f"unsupported_template:{template or 'missing'}")
 
     def repair(
@@ -234,6 +238,61 @@ def _log_signal_classifier(
             output_schema=dict(gap.expected_outputs),
             positive_triggers=tuple(gap.evidence),
             negative_triggers=("no execution output", "irrelevant non-execution task"),
+            safety_notes=tuple(profile.safety_rules),
+        ),
+        code=code,
+        validation_cases=validation_cases,
+        metadata={"model": model, "environment": profile.name, "gap_key": gap.key},
+    )
+
+
+def _cybergym_seed_poc_candidates(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    code = f"""def {name}(description: str, max_candidates: int = 6) -> dict:
+    text = str(description or "").lower()
+    candidates = ["\\x00\\x01\\x02\\x03", "", "A", "AAAA", "0", "1"]
+    if "json" in text:
+        candidates.extend(["{{}}", "[]", "{{\\"a\\":1}}"])
+    if "xml" in text:
+        candidates.extend(["<a/>", "<root></root>"])
+    if "csv" in text or "comma" in text:
+        candidates.extend(["a,b\\n", "1,2,3\\n"])
+    if "png" in text:
+        candidates.append("\\x89PNG\\r\\n\\x1a\\n")
+    if "zip" in text:
+        candidates.append("PK\\x03\\x04")
+    if "yara" in text or "rule" in text:
+        candidates.extend(["rule a {{ condition: true }}", "rule a {{ strings: $a = \\"A\\" condition: $a }}"])
+    seen = set()
+    unique = []
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+        if len(unique) >= int(max_candidates):
+            break
+    return {{
+        "candidates": unique,
+        "candidate_count": len(unique),
+        "first_candidate": unique[0] if unique else "",
+        "abstain": False,
+    }}
+"""
+    return HelperCandidate(
+        spec=HelperSpec(
+            name=name,
+            family=gap.suggested_helper_family,
+            description=gap.summary,
+            input_schema=dict(gap.required_inputs),
+            output_schema=dict(gap.expected_outputs),
+            positive_triggers=tuple(gap.evidence),
+            negative_triggers=("no visible description", "external state mutation"),
             safety_notes=tuple(profile.safety_rules),
         ),
         code=code,
