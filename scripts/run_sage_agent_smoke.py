@@ -92,6 +92,7 @@ def main() -> None:
         generator: HelperGenerator = TemplateHelperGenerator()
     else:
         generator = OpenAIHelperGenerator()
+    run_metadata = _run_metadata(args, adapter)
     baseline = _run_no_helper_baseline(adapter, limit=args.limit)
     agent = SAGEAgent(
         adapter=adapter,
@@ -106,9 +107,11 @@ def main() -> None:
         run_dir,
         registry_path=args.registry_dir / "sage_registry.json",
         baseline=baseline,
+        run_metadata=run_metadata,
     )
     payload = asdict(summary)
     payload["baseline"] = baseline
+    payload["run_metadata"] = run_metadata
     payload["run_dir"] = str(run_dir)
     payload["dashboard_path"] = str(dashboard_path)
     print(json.dumps(payload, indent=2))
@@ -118,6 +121,92 @@ def _default_run_id(environment: str) -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     safe_env = "".join(ch if ch.isalnum() else "_" for ch in environment)
     return f"{safe_env}_{stamp}"
+
+
+def _run_metadata(
+    args: argparse.Namespace, adapter: EnvironmentAdapter
+) -> dict[str, object]:
+    """Describe whether this run is benchmark evidence or an adapter probe."""
+
+    adapter.prepare()
+    available_tasks = len(adapter.tasks(limit=None))
+    base: dict[str, object] = {
+        "requested_limit": args.limit,
+        "available_tasks": available_tasks,
+        "limit_satisfied": args.limit <= available_tasks,
+    }
+    if args.env != "cybergym":
+        base.update(
+            {
+                "execution_mode": "standalone_adapter_smoke",
+                "benchmark_ready": False,
+                "real_task_generator_used": False,
+                "real_submission_server_used": False,
+                "real_poc_verifier_used": False,
+                "interpretation": (
+                    "This run validates standalone SAGE adapter lifecycle. "
+                    "It is not protected benchmark evidence."
+                ),
+                "setup_notes": (
+                    "The adapter exposes visible task inputs through the generic "
+                    "SAGE interface.",
+                ),
+            }
+        )
+        return base
+
+    repo_root = _resolve_path(args.cybergym_repo)
+    data_candidates = (
+        repo_root / "cybergym_data/data",
+        ROOT / "cybergym_data/data",
+    )
+    server_data_candidates = (
+        repo_root / "cybergym-server-data",
+        ROOT / "cybergym-server-data",
+    )
+    data_dir_exists = any(path.exists() for path in data_candidates)
+    server_data_dir_exists = any(path.exists() for path in server_data_candidates)
+    notes = [
+        "CyberGym Python source is present in the cloned external repository.",
+        "This adapter currently uses CyberGym-shaped synthetic verifier outputs, not generated task directories.",
+        "No CyberGym PoC submission server is launched by this smoke runner.",
+        "No real PoC is generated, submitted, or verified.",
+        "The public README lists 10 subset task IDs; a real 40-task run requires downloaded benchmark data and a real task selection source.",
+    ]
+    if not data_dir_exists:
+        notes.append(
+            "Missing cybergym_data/data; real CyberGym task generation is not available."
+        )
+    if not server_data_dir_exists:
+        notes.append(
+            "Missing cybergym-server-data; binary verifier/server data is not available."
+        )
+    if args.limit > available_tasks:
+        notes.append(
+            f"Requested {args.limit} tasks, but this probe adapter exposes only {available_tasks} tasks."
+        )
+    base.update(
+        {
+            "execution_mode": "cybergym_synthetic_probe",
+            "benchmark_ready": False,
+            "real_task_generator_used": False,
+            "real_submission_server_used": False,
+            "real_poc_verifier_used": False,
+            "cybergym_data_dir_exists": data_dir_exists,
+            "cybergym_server_data_dir_exists": server_data_dir_exists,
+            "interpretation": (
+                "This is a CyberGym-shaped SAGE integration smoke. It validates "
+                "helper generation, routing, reuse, dashboards, and integrity "
+                "checks, but it is not real CyberGym benchmark evidence."
+            ),
+            "setup_notes": tuple(notes),
+        }
+    )
+    return base
+
+
+def _resolve_path(path: Path) -> Path:
+    return path if path.is_absolute() else ROOT / path
 
 
 def _run_no_helper_baseline(

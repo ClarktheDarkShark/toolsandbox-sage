@@ -140,6 +140,17 @@ def test_standalone_dashboard_exports_env_neutral_run(tmp_path: Path) -> None:
             "success_rate": 0.0,
             "results": [],
         },
+        run_metadata={
+            "execution_mode": "cybergym_synthetic_probe",
+            "benchmark_ready": False,
+            "available_tasks": 2,
+            "requested_limit": 2,
+            "real_task_generator_used": False,
+            "real_submission_server_used": False,
+            "real_poc_verifier_used": False,
+            "interpretation": "Probe only.",
+            "setup_notes": ("No real verifier used.",),
+        },
     )
 
     html = dashboard_path.read_text(encoding="utf-8")
@@ -147,6 +158,8 @@ def test_standalone_dashboard_exports_env_neutral_run(tmp_path: Path) -> None:
     assert "cybergym" in html
     assert "Baseline success" in html
     assert "Relative lift" in html
+    assert "Run Mode" in html
+    assert "cybergym_synthetic_probe" in html
     assert (tmp_path / "run" / "summary.json").exists()
     assert (tmp_path / "run" / "dashboard_data.json").exists()
 

@@ -18,6 +18,7 @@ def write_standalone_dashboard(
     *,
     registry_path: Path | None = None,
     baseline: dict[str, Any] | None = None,
+    run_metadata: dict[str, Any] | None = None,
 ) -> Path:
     """Write a self-contained dashboard for any standalone SAGE adapter."""
 
@@ -30,6 +31,7 @@ def write_standalone_dashboard(
         "summary": summary_payload,
         "registry": registry_payload,
         "baseline": baseline or {},
+        "run_metadata": run_metadata or {},
     }
     (output_dir / "summary.json").write_text(
         json.dumps(summary_payload, indent=2) + "\n",
@@ -161,6 +163,10 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       margin-bottom: 18px;
       box-shadow: 0 18px 52px rgba(0, 0, 0, .26);
     }}
+    .panel.warning {{
+      border-color: rgba(255, 212, 92, .56);
+      background: linear-gradient(135deg, rgba(255, 212, 92, .13), rgba(16, 28, 43, .9) 46%);
+    }}
     .task-list {{ display: grid; gap: 10px; }}
     .task-btn {{
       width: 100%;
@@ -281,6 +287,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     </aside>
     <main>
       <section class="metrics" id="metrics"></section>
+      <section class="panel warning" id="runMode"></section>
       <section class="panel" id="taskDetail"></section>
       <section class="split">
         <div class="panel">
@@ -303,6 +310,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     const summary = payload.summary || {{}};
     const registry = payload.registry || {{}};
     const baseline = payload.baseline || {{}};
+    const runMetadata = payload.run_metadata || {{}};
     const events = summary.events || [];
     const tasks = events.filter((event) => event.event === "task");
     let selectedTaskId = tasks[0]?.task_id || "";
@@ -369,6 +377,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
         `${{summary.gaps_observed || 0}} gaps observed`,
         `${{summary.tools_accepted || 0}} helpers accepted`,
         `baseline ${{baseline.policy || "not recorded"}}`,
+        `mode ${{runMetadata.execution_mode || "not recorded"}}`,
       ];
       document.getElementById("badges").innerHTML = badges
         .map((badge) => `<span class="badge">${{esc(badge)}}</span>`)
@@ -399,6 +408,29 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
         metric("Integrity", summary.integrity_passed ? "PASS" : "BLOCK", `${{summary.integrity_issues || 0}} issues`, summary.integrity_passed ? "good" : "bad"),
         metric("Registry", Object.keys(registry.tools || {{}}).length, "stored generated helpers", "warn"),
       ].join("");
+    }}
+    function renderRunMode() {{
+      const ready = Boolean(runMetadata.benchmark_ready);
+      const notes = runMetadata.setup_notes || [];
+      const available = runMetadata.available_tasks ?? "unknown";
+      document.getElementById("runMode").innerHTML = `
+        <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap">
+          <div>
+            <h2>Run Mode</h2>
+            <div class="subtitle">${{esc(runMetadata.execution_mode || "not recorded")}}</div>
+          </div>
+          <span class="pill ${{ready ? "green" : "yellow"}}">${{ready ? "benchmark-ready" : "probe / not benchmark evidence"}}</span>
+        </div>
+        <div class="badge-row">
+          <span class="pill">available tasks: ${{esc(available)}}</span>
+          <span class="pill">requested: ${{esc(runMetadata.requested_limit ?? "unknown")}}</span>
+          <span class="pill">task generator: ${{esc(runMetadata.real_task_generator_used ?? false)}}</span>
+          <span class="pill">verifier: ${{esc(runMetadata.real_poc_verifier_used ?? false)}}</span>
+          <span class="pill">server: ${{esc(runMetadata.real_submission_server_used ?? false)}}</span>
+        </div>
+        <p class="subtitle">${{esc(runMetadata.interpretation || "No interpretation recorded.")}}</p>
+        ${{notes.length ? `<ul>${{notes.map((note) => `<li>${{esc(note)}}</li>`).join("")}}</ul>` : ""}}
+      `;
     }}
     function renderTaskList() {{
       document.getElementById("taskList").innerHTML = tasks.map((task, index) => {{
@@ -507,6 +539,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     }}
     renderHeader();
     renderMetrics();
+    renderRunMode();
     renderTaskList();
     renderTaskDetail();
     renderLifecycle();

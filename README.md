@@ -143,7 +143,12 @@ so it can render ToolSandbox, CyberGym, or a future adapter without
 environment-specific dashboard code. The smoke runner also records a matched
 no-generated-helper baseline over the same adapter task stream so the dashboard
 can report baseline success, SAGE success, absolute lift, and relative lift
-when the baseline is nonzero.
+when the baseline is nonzero. The dashboard also records run-mode metadata:
+whether the adapter is benchmark-ready, how many tasks the adapter exposes, and
+whether real task generation, verifier/server execution, and result ingestion
+were used. The current CyberGym adapter is explicitly a synthetic probe, not a
+CyberGym benchmark run, until CyberGym data, task generation, PoC server, and
+real verifier-backed scoring are connected.
 
 Use `--generator openai` to exercise the live LLM-backed generator through the
 same interface. Keep `--model gpt-4o-mini` unless a run protocol explicitly

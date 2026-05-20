@@ -177,6 +177,24 @@ accepted, `5` helper reuses, lifecycle decision `scale`, integrity `PASS`, and
 dashboard opened at
 `outputs/sage_agent_standalone/cybergym_dashboard5/dashboard/index.html`.
 
+CyberGym setup audit for this dashboard:
+
+- execution mode: `cybergym_synthetic_probe`
+- benchmark-ready: `false`
+- available adapter tasks: `10` published subset IDs
+- real CyberGym task generation: `false`
+- real PoC submission server: `false`
+- real verifier-backed scoring: `false`
+- `cybergym_data/data`: not present locally
+- `cybergym-server-data`: not present locally
+
+Interpretation: the `5/5` result is a useful standalone SAGE portability smoke,
+but it is not evidence that SAGE solved CyberGym benchmark tasks. A 40-task
+CyberGym run was intentionally not started from this setup because the current
+adapter exposes only 10 synthetic/probe tasks and lacks downloaded CyberGym
+task data, server data, generated task directories, PoC submission, and real
+verifier scoring.
+
 Additional local checks:
 
 ```bash

@@ -164,6 +164,16 @@ points, and relative lift when the baseline rate is nonzero. If the baseline is
 zero, the dashboard reports relative lift as `n/a` instead of manufacturing an
 infinite percentage.
 
+The same export now includes run-mode metadata. A dashboard must state whether
+the run is benchmark-ready or only an adapter probe, how many tasks were
+available, whether the requested limit was satisfied, and whether real task
+generation, submission-server execution, and verifier-backed scoring were used.
+For CyberGym today, the dashboard must report `cybergym_synthetic_probe` because
+the adapter uses CyberGym-shaped verifier samples instead of `cybergym.task`
+generated task directories, a running PoC server, submitted PoCs, and real
+verifier results. This keeps the portability smoke useful while preventing the
+result from being mistaken for CyberGym benchmark evidence.
+
 ## Next Work
 
 The next implementation layer should connect the existing self-evolving
