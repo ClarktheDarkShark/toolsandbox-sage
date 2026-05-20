@@ -86,14 +86,28 @@ CyberGym, contacts, reminders, PoC submission, Docker, or benchmark-specific
 labels. Environments provide adapters that expose tasks, normalized run
 results, gap signals, validation cases, helper routing, and safety rules.
 
+Research-integrity checks are enforced at the standalone boundary. Adapters may
+privately score tasks, but SAGE-facing task specs, gap signals, and helper
+candidates must not expose hidden labels, expected answers, oracle fields,
+answer keys, protected solutions, prior SAGE traces, or cache shortcuts. If an
+adapter exposes leak-prone metadata such as `expected_answer`, `ground_truth`,
+`oracle`, or `solution`, `SAGEAgent.run()` fails before generation begins.
+Visible environment information remains allowed: prompts, visible files,
+allowed tools, public task metadata, tool traces, and synthetic validation cases
+needed to test helper robustness.
+
 Current adapter proof points:
 
 - `sage_agent.adapters.ToolSandboxMiniAdapter`: low-cost ToolSandbox-shaped
   smoke proof for helper birth, validation, registry storage, and reuse.
+- `sage_agent.adapters.ToolSandboxScenarioProbeAdapter`: reads the real
+  ToolSandbox scenario registry and validates standalone SAGE against real
+  scenario names, categories, and allowed-tool surfaces without running a full
+  paired benchmark.
 - `sage_agent.adapters.CyberGymAdapter`: low-cost CyberGym-shaped smoke proof
-  against the locally cloned `external/cybergym` repository. It validates the
-  adapter boundary without downloading the large CyberGym datasets or running a
-  Docker PoC server.
+  against the locally cloned `external/cybergym` repository and the published
+  10-task subset IDs. It validates the adapter boundary without downloading the
+  large CyberGym datasets or running a Docker PoC server.
 
 Run the standalone smoke checks with no model-token spend:
 
@@ -105,15 +119,30 @@ PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
   --registry-dir artifacts/sage_standalone/toolsandbox_smoke_registry
 
 PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
+  --env toolsandbox-probe \
+  --model gpt-4o-mini \
+  --reset-registry \
+  --registry-dir artifacts/sage_standalone/toolsandbox_probe_registry \
+  --toolsandbox-scenario search_phone_number_with_name \
+  --toolsandbox-scenario update_contact_with_id_and_phone_number
+
+PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
   --env cybergym \
   --model gpt-4o-mini \
   --reset-registry \
   --registry-dir artifacts/sage_standalone/cybergym_smoke_registry \
-  --cybergym-repo external/cybergym
+  --cybergym-repo external/cybergym \
+  --limit 3
 ```
+
+Use `--generator openai` to exercise the live LLM-backed generator through the
+same interface. Keep `--model gpt-4o-mini` unless a run protocol explicitly
+authorizes a stronger model.
 
 Architecture notes are in
 `docs/sage_protocol/standalone/sage_standalone_architecture.md`.
+Validation notes are in
+`docs/sage_protocol/standalone/sage_standalone_validation_report.md`.
 
 ## Current Evidence Snapshot
 

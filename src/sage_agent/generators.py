@@ -1,12 +1,14 @@
-"""Low-cost helper generators for standalone SAGE smoke tests.
+"""Helper generators for standalone SAGE.
 
-Production environments can pass an LLM-backed generator that uses the same
-``HelperGenerator`` protocol. These templates are intentionally generic and
-consume environment-supplied gap directives rather than hard-coded benchmark
-answers.
+Template generation is used for deterministic smoke tests. ``OpenAIHelperGenerator``
+provides the same protocol for low-cost live generation with ``gpt-4o-mini``.
 """
 
 from __future__ import annotations
+
+import json
+from importlib import import_module
+from typing import Any, cast
 
 from sage_agent.interfaces import (
     EnvironmentProfile,
@@ -35,6 +37,106 @@ class TemplateHelperGenerator:
         if template == "log_signal_classifier":
             return _log_signal_classifier(name, gap, profile, validation_cases, model)
         raise ValueError(f"unsupported_template:{template or 'missing'}")
+
+    def repair(
+        self,
+        gap: GapSignal,
+        profile: EnvironmentProfile,
+        rejected: HelperCandidate,
+        errors: tuple[str, ...],
+        validation_cases: tuple[ValidationCase, ...],
+        *,
+        model: str,
+    ) -> HelperCandidate:
+        """Repair by regenerating from the environment directives."""
+
+        del rejected, errors
+        return self.generate(gap, profile, validation_cases, model=model)
+
+
+class OpenAIHelperGenerator:
+    """LLM-backed helper generator using the OpenAI Python SDK.
+
+    The generator is intentionally environment-neutral. It receives an adapter
+    profile, a gap signal, and validation cases; it does not know benchmark
+    labels or hidden answers. The default model is expected to be ``gpt-4o-mini``
+    unless a run protocol deliberately overrides it.
+    """
+
+    def __init__(self, *, api_key: str | None = None) -> None:
+        try:
+            openai_module = import_module("openai")
+        except Exception as exc:  # pragma: no cover - depends on local install
+            raise RuntimeError(
+                "openai package is required for live generation"
+            ) from exc
+        OpenAI = getattr(openai_module, "OpenAI")
+        self._client = OpenAI(api_key=api_key) if api_key else OpenAI()
+
+    def generate(
+        self,
+        gap: GapSignal,
+        profile: EnvironmentProfile,
+        validation_cases: tuple[ValidationCase, ...],
+        *,
+        model: str,
+    ) -> HelperCandidate:
+        payload = self._complete_json(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": _system_prompt(),
+                },
+                {
+                    "role": "user",
+                    "content": _generation_prompt(gap, profile, validation_cases),
+                },
+            ],
+        )
+        return _candidate_from_payload(payload, gap, profile, validation_cases, model)
+
+    def repair(
+        self,
+        gap: GapSignal,
+        profile: EnvironmentProfile,
+        rejected: HelperCandidate,
+        errors: tuple[str, ...],
+        validation_cases: tuple[ValidationCase, ...],
+        *,
+        model: str,
+    ) -> HelperCandidate:
+        payload = self._complete_json(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": _system_prompt(),
+                },
+                {
+                    "role": "user",
+                    "content": _repair_prompt(
+                        gap, profile, rejected, errors, validation_cases
+                    ),
+                },
+            ],
+        )
+        return _candidate_from_payload(payload, gap, profile, validation_cases, model)
+
+    def _complete_json(
+        self, *, model: str, messages: list[dict[str, str]]
+    ) -> dict[str, Any]:
+        response = self._client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+        content = response.choices[0].message.content or "{}"
+        parsed = json.loads(content)
+        if not isinstance(parsed, dict):
+            raise ValueError("generator_returned_non_object_json")
+        return cast(dict[str, Any], parsed)
 
 
 def _unique_record_selector(
@@ -144,3 +246,162 @@ def _safe_name(value: str) -> str:
     kept = [ch.lower() if ch.isalnum() else "_" for ch in value]
     name = "".join(kept).strip("_")
     return name or "generated_helper"
+
+
+def _system_prompt() -> str:
+    return (
+        "You generate deterministic, side-effect-free Python helper functions for "
+        "SAGE. Return JSON only. Do not hard-code task IDs, expected answers, "
+        "labels, hidden facts, scenario-specific strings, credentials, file paths, "
+        "or prior traces. The helper must use only explicit inputs. It must define "
+        "exactly one Python function with the requested name. It may not import, "
+        "open files, call network APIs, execute shell commands, mutate external "
+        "state, or submit actions. Return keys: spec and code. spec must include "
+        "name, family, description, input_schema, output_schema, positive_triggers, "
+        "negative_triggers, and safety_notes."
+    )
+
+
+def _generation_prompt(
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+) -> str:
+    payload = {
+        "environment_profile": {
+            "name": profile.name,
+            "description": profile.description,
+            "base_tools": list(profile.base_tools),
+            "action_tools": list(profile.action_tools),
+            "observation_fields": list(profile.observation_fields),
+            "helper_families": list(profile.helper_families),
+            "safety_rules": list(profile.safety_rules),
+        },
+        "gap": _gap_json(gap),
+        "validation_cases": [_case_json(case) for case in validation_cases],
+    }
+    return (
+        "Generate one reusable helper for this environment-neutral gap. The helper "
+        "must pass the validation cases and must abstain safely on ambiguity. "
+        f"Input JSON: {json.dumps(payload, sort_keys=True)}"
+    )
+
+
+def _repair_prompt(
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    rejected: HelperCandidate,
+    errors: tuple[str, ...],
+    validation_cases: tuple[ValidationCase, ...],
+) -> str:
+    payload = {
+        "environment_profile": {
+            "name": profile.name,
+            "description": profile.description,
+            "safety_rules": list(profile.safety_rules),
+        },
+        "gap": _gap_json(gap),
+        "rejected_spec": _spec_json(rejected.spec),
+        "rejected_code": rejected.code,
+        "validation_errors": list(errors),
+        "validation_cases": [_case_json(case) for case in validation_cases],
+    }
+    return (
+        "Repair the rejected helper. Preserve the same helper name unless the name "
+        "itself is invalid. Return the full corrected JSON object with spec and "
+        f"code only. Input JSON: {json.dumps(payload, sort_keys=True)}"
+    )
+
+
+def _candidate_from_payload(
+    payload: dict[str, Any],
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    spec_payload = payload.get("spec", {})
+    if not isinstance(spec_payload, dict):
+        raise ValueError("missing_spec_object")
+    code = payload.get("code")
+    if not isinstance(code, str) or not code.strip():
+        raise ValueError("missing_code")
+    name = str(
+        spec_payload.get("name") or gap.suggested_tool_name or _safe_name(gap.key)
+    )
+    return HelperCandidate(
+        spec=HelperSpec(
+            name=name,
+            family=str(
+                spec_payload.get("family")
+                or gap.suggested_helper_family
+                or "deterministic_helper"
+            ),
+            description=str(spec_payload.get("description") or gap.summary),
+            input_schema=_str_map(
+                spec_payload.get("input_schema") or gap.required_inputs
+            ),
+            output_schema=_str_map(
+                spec_payload.get("output_schema") or gap.expected_outputs
+            ),
+            positive_triggers=tuple(
+                str(item)
+                for item in spec_payload.get("positive_triggers", gap.evidence)
+            ),
+            negative_triggers=tuple(
+                str(item) for item in spec_payload.get("negative_triggers", ())
+            ),
+            safety_notes=tuple(
+                str(item)
+                for item in spec_payload.get("safety_notes", profile.safety_rules)
+            ),
+        ),
+        code=code,
+        validation_cases=validation_cases,
+        metadata={"model": model, "environment": profile.name, "gap_key": gap.key},
+    )
+
+
+def _gap_json(gap: GapSignal) -> dict[str, Any]:
+    return {
+        "key": gap.key,
+        "summary": gap.summary,
+        "source_environment": gap.source_environment,
+        "severity": gap.severity,
+        "suggested_tool_name": gap.suggested_tool_name,
+        "suggested_helper_family": gap.suggested_helper_family,
+        "evidence": list(gap.evidence),
+        "required_inputs": dict(gap.required_inputs),
+        "expected_outputs": dict(gap.expected_outputs),
+        "validation_hints": list(gap.validation_hints),
+        "generation_directives": dict(gap.generation_directives),
+    }
+
+
+def _case_json(case: ValidationCase) -> dict[str, Any]:
+    return {
+        "name": case.name,
+        "inputs": dict(case.inputs),
+        "expected": dict(case.expected),
+        "should_abstain": case.should_abstain,
+        "description": case.description,
+    }
+
+
+def _spec_json(spec: HelperSpec) -> dict[str, Any]:
+    return {
+        "name": spec.name,
+        "family": spec.family,
+        "description": spec.description,
+        "input_schema": dict(spec.input_schema),
+        "output_schema": dict(spec.output_schema),
+        "positive_triggers": list(spec.positive_triggers),
+        "negative_triggers": list(spec.negative_triggers),
+        "safety_notes": list(spec.safety_notes),
+    }
+
+
+def _str_map(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): str(item) for key, item in value.items()}

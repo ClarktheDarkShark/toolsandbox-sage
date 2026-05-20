@@ -158,6 +158,22 @@ class HelperGenerator(Protocol):
         """Generate a helper candidate for a reusable gap."""
 
 
+class HelperRepairGenerator(HelperGenerator, Protocol):
+    """Optional protocol for generators that can repair rejected helpers."""
+
+    def repair(
+        self,
+        gap: GapSignal,
+        profile: EnvironmentProfile,
+        rejected: HelperCandidate,
+        errors: tuple[str, ...],
+        validation_cases: tuple[ValidationCase, ...],
+        *,
+        model: str,
+    ) -> HelperCandidate:
+        """Repair a generated helper that failed validation."""
+
+
 class EnvironmentAdapter(Protocol):
     """Contract an environment must implement for standalone SAGE."""
 

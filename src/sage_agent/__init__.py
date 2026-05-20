@@ -6,12 +6,21 @@ provide adapters; SAGE provides the gap-to-helper lifecycle.
 """
 
 from sage_agent.controller import SAGEAgent, SAGEConfig, SAGERunSummary
+from sage_agent.generators import OpenAIHelperGenerator, TemplateHelperGenerator
+from sage_agent.integrity import (
+    IntegrityError,
+    IntegrityIssue,
+    IntegrityReport,
+    ResearchIntegrityPolicy,
+)
 from sage_agent.interfaces import (
     EnvironmentAdapter,
     EnvironmentProfile,
     GapSignal,
     HelperCandidate,
+    HelperGenerator,
     HelperRecord,
+    HelperRepairGenerator,
     HelperSpec,
     HelperValidationReport,
     TaskRunResult,
@@ -19,6 +28,7 @@ from sage_agent.interfaces import (
     ToolUseRecord,
     ValidationCase,
 )
+from sage_agent.lifecycle import HelperLifecycleAssessment, assess_helper_lifecycle
 from sage_agent.registry import LocalSAGERegistry
 
 __all__ = [
@@ -26,15 +36,25 @@ __all__ = [
     "EnvironmentProfile",
     "GapSignal",
     "HelperCandidate",
+    "HelperGenerator",
+    "HelperLifecycleAssessment",
     "HelperRecord",
+    "HelperRepairGenerator",
     "HelperSpec",
     "HelperValidationReport",
+    "IntegrityError",
+    "IntegrityIssue",
+    "IntegrityReport",
     "LocalSAGERegistry",
+    "OpenAIHelperGenerator",
+    "ResearchIntegrityPolicy",
     "SAGEAgent",
     "SAGEConfig",
     "SAGERunSummary",
+    "TemplateHelperGenerator",
     "TaskRunResult",
     "TaskSpec",
     "ToolUseRecord",
     "ValidationCase",
+    "assess_helper_lifecycle",
 ]
