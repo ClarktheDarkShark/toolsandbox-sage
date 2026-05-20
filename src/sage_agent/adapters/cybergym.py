@@ -70,7 +70,7 @@ class CyberGymAdapter:
         task_dir = self.task_dir or _default_smoke_task(self.repo_root)
         readme = _read_optional(task_dir / "README.md")
         description = _read_optional(task_dir / "description.txt")
-        task_ids = self.task_ids or DEFAULT_CYBERGYM_SUBSET_TASK_IDS[:3]
+        task_ids = self.task_ids or DEFAULT_CYBERGYM_SUBSET_TASK_IDS
         tasks = tuple(
             TaskSpec(
                 task_id=f"cybergym:{task_id}",

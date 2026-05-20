@@ -6,6 +6,7 @@ from sage_agent.adapters import (
     ToolSandboxMiniAdapter,
     ToolSandboxScenarioProbeAdapter,
 )
+from sage_agent.dashboard import write_standalone_dashboard
 from sage_agent.generators import TemplateHelperGenerator
 from sage_agent.integrity import (
     IntegrityError,
@@ -118,6 +119,36 @@ def test_standalone_sage_blocks_label_peeking_metadata(tmp_path: Path) -> None:
         assert "expected_answer" in str(exc)
     else:  # pragma: no cover - defensive clarity
         raise AssertionError("SAGE accepted leak-prone task metadata")
+
+
+def test_standalone_dashboard_exports_env_neutral_run(tmp_path: Path) -> None:
+    agent = SAGEAgent(
+        adapter=CyberGymAdapter(repo_root=Path("external/cybergym")),
+        generator=TemplateHelperGenerator(),
+        config=SAGEConfig(registry_dir=tmp_path / "registry"),
+    )
+
+    summary = agent.run(limit=2)
+    dashboard_path = write_standalone_dashboard(
+        summary,
+        tmp_path / "run",
+        registry_path=tmp_path / "registry" / "sage_registry.json",
+        baseline={
+            "policy": "no_generated_helpers",
+            "tasks_seen": 2,
+            "tasks_succeeded": 0,
+            "success_rate": 0.0,
+            "results": [],
+        },
+    )
+
+    html = dashboard_path.read_text(encoding="utf-8")
+    assert "SAGE Standalone Dashboard" in html
+    assert "cybergym" in html
+    assert "Baseline success" in html
+    assert "Relative lift" in html
+    assert (tmp_path / "run" / "summary.json").exists()
+    assert (tmp_path / "run" / "dashboard_data.json").exists()
 
 
 class BrokenThenRepairGenerator(TemplateHelperGenerator):

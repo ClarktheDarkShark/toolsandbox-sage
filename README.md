@@ -135,6 +135,16 @@ PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
   --limit 3
 ```
 
+Each smoke run writes an environment-neutral dashboard under
+`outputs/sage_agent_standalone/<run_id>/dashboard/index.html`, plus
+`summary.json`, `dashboard_data.json`, and a copy of the standalone registry.
+The dashboard reads only generic SAGE run summary events and registry metadata,
+so it can render ToolSandbox, CyberGym, or a future adapter without
+environment-specific dashboard code. The smoke runner also records a matched
+no-generated-helper baseline over the same adapter task stream so the dashboard
+can report baseline success, SAGE success, absolute lift, and relative lift
+when the baseline is nonzero.
+
 Use `--generator openai` to exercise the live LLM-backed generator through the
 same interface. Keep `--model gpt-4o-mini` unless a run protocol explicitly
 authorizes a stronger model.

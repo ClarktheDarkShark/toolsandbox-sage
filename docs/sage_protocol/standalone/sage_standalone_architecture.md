@@ -34,6 +34,8 @@ SAGE now supports the following generic lifecycle mechanics at this boundary:
 - enforce a research-integrity boundary that blocks label peeking, oracle
   metadata, answer keys, hidden solutions, prior SAGE traces, and cache
   shortcuts before generation begins.
+- export an environment-neutral dashboard from generic run summary events and
+  registry metadata.
 
 ## Core Boundary
 
@@ -139,6 +141,28 @@ An LLM-backed generator is available as `sage_agent.OpenAIHelperGenerator` and
 can be selected in the smoke runner with `--generator openai`. It is not used by
 default because the current portability validation is testing package mechanics
 and adapter boundaries, not model quality.
+
+## Environment-Neutral Dashboard
+
+Standalone SAGE runs export a dashboard through `src/sage_agent/dashboard.py`.
+The exporter writes:
+
+- `summary.json`: the generic `SAGERunSummary`;
+- `dashboard_data.json`: summary plus registry payload;
+- `registry.json`: a run-local copy of accepted helper metadata;
+- `dashboard/index.html`: a self-contained dark-mode dashboard.
+
+The dashboard deliberately avoids ToolSandbox-specific assumptions. It renders
+generic task events, gap events, helper birth/repair/retry events, integrity
+status, lifecycle decisions, and registry tools. Any future environment adapter
+that returns the same `SAGERunSummary` shape can use the same dashboard.
+
+For smoke runs, `scripts/run_sage_agent_smoke.py` also records a matched
+no-generated-helper baseline over the same adapter task stream. This lets the
+dashboard show baseline success, SAGE success, absolute lift in percentage
+points, and relative lift when the baseline rate is nonzero. If the baseline is
+zero, the dashboard reports relative lift as `n/a` instead of manufacturing an
+infinite percentage.
 
 ## Next Work
 

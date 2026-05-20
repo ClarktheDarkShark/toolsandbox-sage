@@ -154,6 +154,28 @@ Additional integrity-specific coverage:
   generation;
 - accepted helper candidates are scanned before validation and registry
   insertion.
+- the environment-neutral dashboard exporter writes generic SAGE summary,
+  registry, and dashboard artifacts for CyberGym and ToolSandbox-shaped runs.
+
+Dashboard smoke:
+
+```bash
+PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
+  --env cybergym \
+  --model gpt-4o-mini \
+  --reset-registry \
+  --registry-dir artifacts/sage_standalone/cybergym_dashboard5_registry \
+  --cybergym-repo external/cybergym \
+  --limit 5 \
+  --output-root outputs/sage_agent_standalone \
+  --run-id cybergym_dashboard5
+```
+
+Result: no-helper baseline `0/5`, SAGE `5/5`, absolute lift `+100.0 pp`,
+relative lift `n/a` because the baseline was zero, `1` helper born and
+accepted, `5` helper reuses, lifecycle decision `scale`, integrity `PASS`, and
+dashboard opened at
+`outputs/sage_agent_standalone/cybergym_dashboard5/dashboard/index.html`.
 
 Additional local checks:
 

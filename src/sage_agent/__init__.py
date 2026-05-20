@@ -6,6 +6,7 @@ provide adapters; SAGE provides the gap-to-helper lifecycle.
 """
 
 from sage_agent.controller import SAGEAgent, SAGEConfig, SAGERunSummary
+from sage_agent.dashboard import write_standalone_dashboard
 from sage_agent.generators import OpenAIHelperGenerator, TemplateHelperGenerator
 from sage_agent.integrity import (
     IntegrityError,
@@ -57,4 +58,5 @@ __all__ = [
     "ToolUseRecord",
     "ValidationCase",
     "assess_helper_lifecycle",
+    "write_standalone_dashboard",
 ]
