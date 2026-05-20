@@ -1,4 +1,9 @@
-"""Render architecture-grade SAGE methodology diagrams as SVG and PNG assets."""
+"""Render architecture-grade SAGE methodology diagrams as synchronized assets.
+
+Run this script directly whenever any methodology figure changes. The full render
+keeps SVG, PNG, and HTML companions in sync so one figure artifact does not drift
+from another.
+"""
 
 from __future__ import annotations
 
@@ -1424,11 +1429,967 @@ def render_paper_diagram() -> None:
     d.finish()
 
 
+def write_sage_one_page_infographic_html() -> None:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    example_registry = Path(
+        "artifacts/self_evolving_sage/current_formal500_live_generation_v71_clean_repro/formal500_registry/registry_manifest.json"
+    )
+    example_specs = [
+        (
+            "prepare_side_effect_args_from_selected_record",
+            "Action-spec helper",
+            "Turns a selected contact or reminder record into safe downstream ToolSandbox arguments without mutating state.",
+        ),
+        (
+            "prepare_reminder_creation_args",
+            "Reminder helper",
+            "Builds add_reminder arguments from resolved time and optional location fields while preserving abstain cases.",
+        ),
+        (
+            "next_weekday_time_to_timestamp",
+            "Time normalizer",
+            "Converts a visible current timestamp plus weekday/time fields into a deterministic reminder timestamp.",
+        ),
+    ]
+    tool_example_cards: list[str] = []
+    if example_registry.exists():
+        import json
+
+        registry_data = json.loads(example_registry.read_text(encoding="utf-8"))
+        generated_tools = registry_data.get("tools", {})
+        for tool_name, label, description in example_specs:
+            entry = generated_tools.get(tool_name, {})
+            code = (entry.get("tool") or {}).get("code") or ""
+            snippet = "\n".join(code.strip().splitlines()[:42])
+            if not snippet:
+                continue
+            tool_example_cards.append(
+                f"""
+              <article class="example-card" data-section="example-{escape(tool_name)}">
+                <h3>{escape(tool_name)}</h3>
+                <p><strong>{escape(label)}.</strong> {escape(description)}</p>
+                <pre><code>{escape(snippet)}</code></pre>
+              </article>"""
+            )
+    tool_examples_html = "\n".join(tool_example_cards)
+    html = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SAGE One-Page Infographic</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --panel: #0f1c2d;
+      --ink: #eef6ff;
+      --muted: #9fb2c7;
+      --cyan: #37c5ff;
+      --green: #43e08f;
+      --yellow: #ffd45a;
+      --purple: #a78bfa;
+      --red: #ff6b7a;
+      --line: #28405d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(55, 197, 255, 0.14), transparent 30%),
+        radial-gradient(circle at 86% 12%, rgba(167, 139, 250, 0.16), transparent 28%),
+        var(--bg);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    main {
+      width: min(100%, 1180px);
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 52px);
+      letter-spacing: 0;
+    }
+    p {
+      margin: 8px 0 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.45;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    a {
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .button {
+      border: 1px solid var(--cyan);
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: rgba(55, 197, 255, 0.1);
+      color: var(--ink);
+      font-weight: 700;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    .figure-shell {
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: rgba(15, 28, 45, 0.72);
+      box-shadow: 0 26px 80px rgba(0, 0, 0, 0.34);
+      padding: 18px;
+      overflow-x: auto;
+    }
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 18px;
+      background: #07111f;
+    }
+    .infographic {
+      min-width: 1040px;
+      display: grid;
+      gap: 28px;
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at 18% 6%, rgba(55, 197, 255, 0.11), transparent 30%),
+        radial-gradient(circle at 85% 8%, rgba(167, 139, 250, 0.12), transparent 28%),
+        #07111f;
+      padding: 26px;
+    }
+    section,
+    article,
+    .endpoint-card,
+    .tool-row,
+    .metric-row,
+    .ladder-step {
+      scroll-margin: 24px;
+    }
+    .top-band {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 26px;
+      align-items: stretch;
+    }
+    .intro-card,
+    .endpoint-card,
+    .flywheel-panel,
+    .panel,
+    .evidence-ladder {
+      border: 1px solid var(--line);
+      background: #0f1c2d;
+      border-radius: 26px;
+    }
+    .intro-card {
+      padding: 28px;
+    }
+    .intro-card h2 {
+      margin: 0;
+      font-size: 72px;
+      line-height: 0.95;
+    }
+    .intro-card h3 {
+      margin: 16px 0 0;
+      font-size: 30px;
+      line-height: 1.15;
+    }
+    .endpoint-stack {
+      display: grid;
+      gap: 16px;
+    }
+    .endpoint-card {
+      padding: 22px 24px;
+      border-color: var(--cyan);
+      background: #102b3f;
+    }
+    .endpoint-card.secondary {
+      border-color: var(--purple);
+      background: #2c2035;
+    }
+    .eyebrow {
+      display: block;
+      color: var(--muted);
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .endpoint-value {
+      display: block;
+      color: var(--green);
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1.05;
+    }
+    .secondary .endpoint-value {
+      color: var(--purple);
+    }
+    .flywheel-panel {
+      background: #0a1728;
+      padding: 30px;
+    }
+    .flywheel-panel h2,
+    .panel h2,
+    .evidence-ladder h2 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.1;
+    }
+    .flywheel-panel > p {
+      max-width: 660px;
+      font-size: 19px;
+      line-height: 1.4;
+      margin-bottom: 24px;
+    }
+    .flywheel-grid {
+      position: relative;
+      height: 800px;
+      margin-top: 16px;
+    }
+    .flywheel-grid::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 570px;
+      height: 570px;
+      transform: translate(-50%, -56%);
+      border: 4px solid rgba(55, 197, 255, 0.22);
+      border-radius: 50%;
+      box-shadow:
+        0 0 0 22px rgba(55, 197, 255, 0.035),
+        inset 0 0 0 1px rgba(55, 197, 255, 0.2);
+    }
+    .flywheel-grid::after {
+      content: "continuous evidence loop";
+      position: absolute;
+      left: 50%;
+      bottom: 132px;
+      transform: translateX(-50%);
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 15px;
+      font-weight: 700;
+      background: #0a1728;
+    }
+    .step-card,
+    .registry-core,
+    .loop-note {
+      position: absolute;
+      min-height: 166px;
+      border-radius: 22px;
+      background: var(--panel);
+      border: 2px solid var(--accent);
+      padding: 20px 22px;
+    }
+    .step-card {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      column-gap: 14px;
+      align-content: start;
+      width: 270px;
+      z-index: 2;
+    }
+    .step-number {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #07111f;
+      background: var(--accent);
+      font-size: 24px;
+      font-weight: 800;
+    }
+    .step-card h3 {
+      margin: 4px 0 0;
+      font-size: 21px;
+      line-height: 1.12;
+    }
+    .step-card p {
+      grid-column: 1 / -1;
+      margin-top: 12px;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+    .cyan { --accent: var(--cyan); }
+    .green { --accent: var(--green); }
+    .yellow { --accent: var(--yellow); }
+    .purple { --accent: var(--purple); }
+    .red { --accent: var(--red); }
+    .registry-core {
+      --accent: var(--cyan);
+      left: 50%;
+      top: 50%;
+      width: 276px;
+      height: 276px;
+      transform: translate(-50%, -50%);
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      text-align: center;
+      background: #102235;
+      border-radius: 50%;
+      box-shadow:
+        inset 0 0 0 8px rgba(55, 197, 255, 0.08),
+        0 0 38px rgba(55, 197, 255, 0.18);
+      z-index: 1;
+    }
+    .registry-core h3 {
+      margin: 0 0 8px;
+      color: var(--yellow);
+      font-size: 30px;
+      line-height: 1;
+    }
+    .registry-core strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.15;
+    }
+    .registry-core p,
+    .loop-note p {
+      font-size: 16px;
+      line-height: 1.35;
+    }
+    .loop-note {
+      --accent: var(--line);
+      left: 50%;
+      bottom: 0;
+      width: min(680px, calc(100% - 120px));
+      min-height: 86px;
+      transform: translateX(-50%);
+      border-style: dashed;
+      color: var(--muted);
+      text-align: center;
+      z-index: 2;
+    }
+    .loop-note strong {
+      display: block;
+      color: var(--ink);
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+    .step-card[data-section="step-run-sealed-task"] { left: calc(50% - 135px); top: 0; }
+    .step-card[data-section="step-detect-gap"] { right: 48px; top: 86px; }
+    .step-card[data-section="step-generate-helper"] { right: 48px; top: 336px; }
+    .step-card[data-section="step-validate-repair"] { right: 176px; top: 560px; }
+    .step-card[data-section="step-store-registry"] { left: 176px; top: 560px; }
+    .step-card[data-section="step-route-bundle"] { left: 48px; top: 336px; }
+    .step-card[data-section="step-measure-reflect"] { left: 48px; top: 86px; }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+    }
+    .panel {
+      padding: 28px;
+      min-height: 350px;
+      border-color: var(--accent);
+    }
+    .tools { --accent: var(--green); }
+    .guardrails { --accent: var(--yellow); }
+    .metrics { --accent: var(--purple); }
+    .tool-list,
+    .metric-list,
+    .guardrails ul {
+      display: grid;
+      gap: 16px;
+      margin-top: 26px;
+    }
+    .tool-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 18px;
+      align-items: center;
+    }
+    .tool-pill {
+      border: 1px solid var(--green);
+      border-radius: 999px;
+      color: var(--green);
+      padding: 8px 12px;
+      font-size: 15px;
+      font-weight: 800;
+      text-align: center;
+      background: #102b3f;
+      cursor: pointer;
+      font-family: inherit;
+      display: inline-block;
+    }
+    button.tool-pill {
+      width: 100%;
+    }
+    .tool-pill:hover,
+    .tool-pill:focus {
+      outline: none;
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px rgba(55, 197, 255, 0.22);
+    }
+    .tool-row span:last-child,
+    .metric-row span:last-child,
+    .guardrails li {
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.3;
+    }
+    .guardrails ul {
+      padding: 0;
+      list-style: none;
+    }
+    .guardrails li {
+      position: relative;
+      padding-left: 28px;
+    }
+    .guardrails li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--yellow);
+    }
+    .metric-row {
+      display: grid;
+      grid-template-columns: 104px 1fr;
+      gap: 18px;
+    }
+    .metric-row strong {
+      color: var(--purple);
+      font-size: 18px;
+    }
+    .evidence-ladder {
+      padding: 28px;
+      background: #101f32;
+    }
+    .tool-example-drawer {
+      display: none;
+      border: 1px solid var(--green);
+      border-radius: 28px;
+      background: #0f1c2d;
+      padding: 28px;
+    }
+    .tool-example-drawer.open {
+      display: block;
+    }
+    .tool-example-drawer h2 {
+      margin: 0;
+      font-size: 30px;
+    }
+    .tool-example-drawer > p {
+      font-size: 18px;
+      max-width: 860px;
+    }
+    .example-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-top: 22px;
+    }
+    .example-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #0a1728;
+      padding: 18px;
+    }
+    .example-card h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      color: var(--green);
+    }
+    .example-card p {
+      font-size: 15px;
+      line-height: 1.35;
+    }
+    pre {
+      margin: 14px 0 0;
+      max-height: 360px;
+      overflow: auto;
+      border-radius: 14px;
+      padding: 14px;
+      background: #06101d;
+      border: 1px solid #203854;
+      color: #d7e7f7;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre;
+    }
+    .ladder-track {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 18px;
+      margin-top: 28px;
+    }
+    .ladder-step {
+      position: relative;
+      min-height: 164px;
+      padding: 88px 12px 12px;
+      text-align: center;
+      border-radius: 20px;
+      background: rgba(15, 28, 45, 0.76);
+      border: 1px solid var(--line);
+    }
+    .ladder-step::before {
+      content: attr(data-step);
+      position: absolute;
+      left: 50%;
+      top: 16px;
+      width: 60px;
+      height: 60px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #07111f;
+      background: var(--accent);
+      font-size: 26px;
+      font-weight: 800;
+    }
+    .ladder-step strong {
+      display: block;
+      font-size: 20px;
+      margin-bottom: 6px;
+    }
+    .ladder-step span {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.25;
+    }
+    .note {
+      border-left: 4px solid var(--green);
+      margin-top: 18px;
+      padding: 10px 14px;
+      color: var(--muted);
+      background: rgba(67, 224, 143, 0.08);
+      border-radius: 10px;
+      font-size: 15px;
+      line-height: 1.45;
+    }
+    @media (max-width: 760px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .actions {
+        justify-content: flex-start;
+      }
+      main {
+        padding-inline: 12px;
+      }
+      .figure-shell {
+        padding: 10px;
+        border-radius: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>SAGE One-Page Infographic</h1>
+        <p>Shareable visual summary of the self-evolving SAGE loop: observe gaps, generate helpers, validate and repair, store safe tools, route a bounded helper bundle, and measure matched ToolSandbox lift.</p>
+      </div>
+      <nav class="actions" aria-label="Asset links">
+        <a class="button" href="sage_one_page_infographic.svg">Open SVG</a>
+        <a class="button" href="sage_one_page_infographic.png">Open PNG</a>
+      </nav>
+    </header>
+    <section class="figure-shell" aria-label="SAGE infographic with selectable sections">
+      <div class="infographic">
+        <section class="top-band" data-section="infographic-summary" aria-label="SAGE summary">
+          <article class="intro-card" data-section="hero">
+            <h2>SAGE</h2>
+            <h3>A self-evolving tool system for ToolSandbox tasks</h3>
+            <p>Observe capability gaps, generate safe helper tools, validate them, remember what works, and reuse them on future tasks.</p>
+          </article>
+          <aside class="endpoint-stack" data-section="endpoint-summary" aria-label="Endpoint summary">
+            <div class="endpoint-card" data-section="primary-endpoint">
+              <span class="eyebrow">Primary endpoint</span>
+              <span class="endpoint-value">task outcome</span>
+            </div>
+            <div class="endpoint-card secondary" data-section="secondary-endpoint">
+              <span class="eyebrow">Secondary endpoint</span>
+              <span class="endpoint-value">route match</span>
+            </div>
+          </aside>
+        </section>
+
+        <section class="flywheel-panel" data-section="sage-flywheel" aria-label="SAGE flywheel">
+          <h2>The SAGE flywheel</h2>
+          <p>Each task either uses the current registry or teaches SAGE what reusable deterministic help is missing.</p>
+          <div class="flywheel-grid">
+            <article class="step-card yellow" data-section="step-measure-reflect">
+              <span class="step-number">7</span>
+              <h3>Measure and reflect</h3>
+              <p>SAGE records gains, regressions, visible-not-called cases, safety, and lifecycle decisions.</p>
+            </article>
+            <article class="step-card cyan" data-section="step-run-sealed-task">
+              <span class="step-number">1</span>
+              <h3>Run a sealed task</h3>
+              <p>The task comes from a fixed manifest. Baseline and SAGE see the same task order.</p>
+            </article>
+            <article class="step-card yellow" data-section="step-detect-gap">
+              <span class="step-number">2</span>
+              <h3>Detect a gap</h3>
+              <p>Finds missing deterministic steps: selection, time, preconditions, action args, or abstention.</p>
+            </article>
+            <article class="step-card green" data-section="step-route-bundle">
+              <span class="step-number">6</span>
+              <h3>Route a small bundle</h3>
+              <p>The system selects relevant helpers. The actor naturally decides whether to call them.</p>
+            </article>
+            <article class="registry-core" data-section="registry-core">
+              <h3>registry</h3>
+              <strong>validated helper memory</strong>
+              <p>Accepted tools become reusable memory after safety and usefulness checks.</p>
+            </article>
+            <article class="step-card green" data-section="step-generate-helper">
+              <span class="step-number">3</span>
+              <h3>Generate a helper</h3>
+              <p>A small typed Python tool is proposed. It should solve a reusable subproblem, not memorize an answer.</p>
+            </article>
+            <article class="step-card cyan" data-section="step-store-registry">
+              <span class="step-number">5</span>
+              <h3>Store what passes</h3>
+              <p>Accepted helpers enter the registry with metadata, hashes, evidence, risks, and lifecycle status.</p>
+            </article>
+            <article class="step-card purple" data-section="step-validate-repair">
+              <span class="step-number">4</span>
+              <h3>Validate and repair</h3>
+              <p>Static, schema, minefield, smoke, and side-effect checks run before acceptance.</p>
+            </article>
+            <article class="loop-note" data-section="flywheel-loop-note">
+              <strong>Closed loop</strong>
+              <p>New evidence updates routing, repair, retention, and scale decisions for later tasks.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="info-grid" data-section="infographic-detail-panels" aria-label="Infographic detail panels">
+          <article class="panel tools" data-section="what-sage-generates">
+            <h2>What SAGE generates</h2>
+            <div class="tool-list">
+              <div class="tool-row" data-section="generated-helper-tools"><button class="tool-pill" type="button" data-open-examples>helper tools</button><span>small Python functions</span></div>
+              <div class="tool-row" data-section="generated-action-specs"><button class="tool-pill" type="button" data-open-examples>action specs</button><span>safe next-tool arguments</span></div>
+              <div class="tool-row" data-section="generated-selectors"><button class="tool-pill" type="button" data-open-examples>selectors</button><span>choose the right record</span></div>
+              <div class="tool-row" data-section="generated-normalizers"><button class="tool-pill" type="button" data-open-examples>normalizers</button><span>dates, units, formats</span></div>
+              <div class="tool-row" data-section="generated-abstainers"><button class="tool-pill" type="button" data-open-examples>abstainers</button><span>say when info is missing</span></div>
+            </div>
+          </article>
+          <article class="panel guardrails" data-section="scientific-guardrails">
+            <h2>Scientific guardrails</h2>
+            <ul>
+              <li data-section="guardrail-no-labels">No hidden labels or expected answers.</li>
+              <li data-section="guardrail-no-hardcoding">No scenario-specific hard-coding.</li>
+              <li data-section="guardrail-no-helper-side-effects">Helpers do not mutate ToolSandbox state.</li>
+              <li data-section="guardrail-force-call-boundary">Force-calls diagnose; they are not evidence.</li>
+              <li data-section="guardrail-fresh-sage-arms">SAGE arms stay fresh in claim runs.</li>
+            </ul>
+          </article>
+          <article class="panel metrics" data-section="what-gets-measured">
+            <h2>What gets measured</h2>
+            <div class="metric-list">
+              <div class="metric-row" data-section="metric-outcome"><strong>Outcome</strong><span>Did the task get completed?</span></div>
+              <div class="metric-row" data-section="metric-canonical"><strong>Canonical</strong><span>Did the route match the benchmark?</span></div>
+              <div class="metric-row" data-section="metric-adoption"><strong>Adoption</strong><span>Was the helper visible and called?</span></div>
+              <div class="metric-row" data-section="metric-safety"><strong>Safety</strong><span>Any exceptions or side-effect incidents?</span></div>
+              <div class="metric-row" data-section="metric-lift"><strong>Lift</strong><span>Did SAGE beat the matched baseline?</span></div>
+            </div>
+          </article>
+        </section>
+
+        <section class="tool-example-drawer" id="generated-tool-examples" data-section="generated-tool-examples" aria-label="Generated Python tool examples">
+          <h2>Generated Python tool examples</h2>
+          <p>These snippets come from the self-evolving v71 generated-tool registry and show the kind of side-effect-free helper code SAGE can create, validate, retain, and reuse.</p>
+          <div class="example-grid">
+__TOOL_EXAMPLES__
+          </div>
+        </section>
+
+        <section class="evidence-ladder" data-section="evidence-ladder" aria-label="Evidence ladder">
+          <h2>Evidence ladder</h2>
+          <div class="ladder-track">
+            <article class="ladder-step cyan" data-step="1" data-section="evidence-discovery"><strong>Discovery</strong><span>generation on</span></article>
+            <article class="ladder-step green" data-step="2" data-section="evidence-candidate"><strong>Candidate</strong><span>retain and recombine</span></article>
+            <article class="ladder-step yellow" data-step="3" data-section="evidence-freeze"><strong>Freeze</strong><span>generation off</span></article>
+            <article class="ladder-step purple" data-step="4" data-section="evidence-validation"><strong>Validation</strong><span>matched statistical review</span></article>
+            <article class="ladder-step red" data-step="5" data-section="evidence-claim"><strong>Claim</strong><span>only if safe and reproducible</span></article>
+          </div>
+        </section>
+
+        <section class="note" data-section="plain-language-summary">
+          Plain-language summary: SAGE learns reusable, side-effect-free helpers from observed gaps, validates them before use, stores the safe ones, and tests whether natural reuse improves matched ToolSandbox outcomes.
+        </section>
+      </div>
+    </section>
+    <div class="note">
+      Generated by <code>scripts/render_sage_methodology_diagrams.py</code>. Regenerate the full figure set with <code>python3 scripts/render_sage_methodology_diagrams.py</code> whenever any figure is changed, so SVG, PNG, and HTML companions remain synchronized.
+    </div>
+  </main>
+  <script>
+    const exampleDrawer = document.getElementById("generated-tool-examples");
+    document.querySelectorAll("[data-open-examples]").forEach((button) => {
+      button.addEventListener("click", () => {
+        exampleDrawer.classList.add("open");
+        exampleDrawer.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  </script>
+</body>
+</html>
+"""
+    html = html.replace("__TOOL_EXAMPLES__", tool_examples_html)
+    (OUT_DIR / "sage_one_page_infographic.html").write_text(html, encoding="utf-8")
+
+
+def render_sage_one_page_infographic() -> None:
+    d = Diagram(
+        "sage_one_page_infographic",
+        "",
+        1600,
+        2250,
+    )
+    bg = "#07111f"
+    panel = "#0f1c2d"
+    ink = "#eef6ff"
+    muted = "#9fb2c7"
+    cyan = "#37c5ff"
+    green = "#43e08f"
+    yellow = "#ffd45a"
+    purple = "#a78bfa"
+    red = "#ff6b7a"
+    line = "#28405d"
+
+    d.rect(0, 0, 1600, 2250, bg, stroke="none", radius=0)
+    for x in range(80, 1520, 160):
+        for y in range(110, 2220, 160):
+            d.circle(x, y, 3, "#13243a", stroke="none")
+
+    d.text(90, 78, "SAGE", 92, ink, bold=True, max_width=360, line_height=96)
+    d.text(
+        92,
+        190,
+        "A self-evolving tool system for ToolSandbox tasks",
+        34,
+        "#c8dbef",
+        bold=True,
+        max_width=1040,
+    )
+    d.text(
+        95,
+        246,
+        "Observe capability gaps, generate safe helper tools, validate them, remember what works, and reuse them on future tasks.",
+        24,
+        muted,
+        max_width=1100,
+        line_height=32,
+    )
+    d.rect(1190, 88, 300, 96, "#102b3f", stroke=cyan, radius=28, width=2)
+    d.text(1230, 108, "Primary endpoint", 19, muted, bold=True, max_width=230)
+    d.text(1230, 144, "task outcome", 30, green, bold=True, max_width=230)
+    d.rect(1190, 205, 300, 96, "#2c2035", stroke=purple, radius=28, width=2)
+    d.text(1230, 225, "Secondary endpoint", 19, muted, bold=True, max_width=230)
+    d.text(1230, 261, "route match", 30, purple, bold=True, max_width=230)
+
+    d.rect(70, 360, 1460, 1015, "#0a1728", stroke=line, radius=36, width=2)
+    d.text(110, 398, "The SAGE flywheel", 34, ink, bold=True, max_width=520)
+    d.text(
+        110,
+        448,
+        "Each task either uses the current registry or teaches SAGE what reusable deterministic help is missing.",
+        22,
+        muted,
+        max_width=900,
+        line_height=30,
+    )
+
+    nodes = [
+        (
+            656,
+            525,
+            "1",
+            "Run a sealed task",
+            "The task comes from a fixed manifest. Baseline and SAGE see the same task order.",
+            cyan,
+        ),
+        (
+            1080,
+            625,
+            "2",
+            "Detect a gap",
+            "Finds missing deterministic steps: selection, time, preconditions, action args, or abstention.",
+            yellow,
+        ),
+        (
+            1080,
+            910,
+            "3",
+            "Generate a helper",
+            "A small typed Python tool is proposed. It should solve a reusable subproblem, not memorize an answer.",
+            green,
+        ),
+        (
+            832,
+            1140,
+            "4",
+            "Validate and repair",
+            "Static, schema, minefield, smoke, and side-effect checks run before acceptance.",
+            purple,
+        ),
+        (
+            480,
+            1140,
+            "5",
+            "Store what passes",
+            "Accepted helpers enter the registry with metadata, hashes, evidence, risks, and lifecycle status.",
+            cyan,
+        ),
+        (
+            232,
+            910,
+            "6",
+            "Route a small bundle",
+            "The system selects relevant helpers. The actor naturally decides whether to call them.",
+            green,
+        ),
+        (
+            232,
+            625,
+            "7",
+            "Measure and reflect",
+            "SAGE records gains, regressions, visible-not-called cases, safety, and lifecycle decisions.",
+            yellow,
+        ),
+    ]
+    node_w = 310
+    node_h = 176
+    centers = [(x + node_w // 2, y + node_h // 2) for x, y, *_ in nodes]
+    for a, b in zip(centers, centers[1:] + centers[:1]):
+        d.polyline([a, b], color="#2c6f91", width=5)
+
+    d.circle(800, 875, 178, "#12283c", stroke="#295170", width=4)
+    d.circle(800, 875, 126, "#102235", stroke=cyan, width=2)
+    d.text(700, 795, "registry", 32, yellow, bold=True, max_width=220)
+    d.text(660, 850, "validated helper memory", 24, ink, bold=True, max_width=292)
+    d.text(
+        668,
+        920,
+        "Accepted tools become reusable memory after safety and usefulness checks.",
+        18,
+        muted,
+        max_width=265,
+        line_height=23,
+    )
+
+    for x, y, num, title, body, accent in nodes:
+        d.rect(x, y, node_w, node_h, panel, stroke=accent, radius=24, width=2)
+        d.circle(x + 40, y + 40, 28, accent, stroke=accent, width=2)
+        d.text(x + 31, y + 21, num, 27, bg, bold=True, max_width=42)
+        d.text(x + 82, y + 25, title, 22, ink, bold=True, max_width=200)
+        d.text(x + 30, y + 84, body, 16, muted, max_width=250, line_height=20)
+
+    d.rect(100, 1430, 440, 405, panel, stroke=green, radius=28, width=2)
+    d.text(135, 1460, "What SAGE generates", 30, ink, bold=True, max_width=360)
+    generated = [
+        ("helper tools", "small Python functions"),
+        ("action specs", "safe next-tool arguments"),
+        ("selectors", "choose the right record"),
+        ("normalizers", "dates, units, formats"),
+        ("abstainers", "say when info is missing"),
+    ]
+    yy = 1532
+    for label, body in generated:
+        d.rect(135, yy, 170, 38, "#102b3f", stroke=green, radius=19, width=1)
+        d.text(154, yy + 6, label, 16, green, bold=True, max_width=142)
+        d.text(326, yy + 1, body, 19, muted, max_width=170, line_height=24)
+        yy += 56
+
+    d.rect(580, 1430, 440, 405, panel, stroke=yellow, radius=28, width=2)
+    d.text(615, 1460, "Scientific guardrails", 30, ink, bold=True, max_width=360)
+    guardrails = [
+        "No hidden labels or expected answers.",
+        "No scenario-specific hard-coding.",
+        "Helpers do not mutate ToolSandbox state.",
+        "Force-calls diagnose; they are not evidence.",
+        "SAGE arms stay fresh in claim runs.",
+    ]
+    yy = 1532
+    for item in guardrails:
+        d.circle(628, yy + 13, 8, yellow, stroke="none")
+        d.text(653, yy, item, 19, muted, max_width=320, line_height=24)
+        yy += 58
+
+    d.rect(1060, 1430, 440, 405, panel, stroke=purple, radius=28, width=2)
+    d.text(1095, 1460, "What gets measured", 30, ink, bold=True, max_width=360)
+    measures = [
+        ("Outcome", "Did the task get completed?"),
+        ("Canonical", "Did the route match the benchmark?"),
+        ("Adoption", "Was the helper visible and called?"),
+        ("Safety", "Any exceptions or side-effect incidents?"),
+        ("Lift", "Did SAGE beat the matched baseline?"),
+    ]
+    yy = 1532
+    for label, body in measures:
+        d.text(1095, yy, label, 19, purple, bold=True, max_width=118)
+        d.text(1220, yy, body, 19, muted, max_width=245, line_height=24)
+        yy += 58
+
+    d.rect(100, 1890, 1400, 225, "#101f32", stroke=line, radius=30, width=2)
+    d.text(140, 1920, "Evidence ladder", 30, ink, bold=True, max_width=280)
+    ladder = [
+        ("Discovery", "generation on", cyan),
+        ("Candidate", "retain and recombine", green),
+        ("Freeze", "generation off", yellow),
+        ("Validation", "matched statistical review", purple),
+        ("Claim", "only if safe and reproducible", red),
+    ]
+    start_x = 380
+    for i, (title, sub, color) in enumerate(ladder):
+        x = start_x + i * 215
+        d.circle(x, 1978, 48, color, stroke=color, width=2)
+        d.text(x - 20, 1957, str(i + 1), 32, bg, bold=True, max_width=40)
+        d.text(x - 82, 2038, title, 20, ink, bold=True, max_width=164)
+        d.text(x - 84, 2072, sub, 16, muted, max_width=168, line_height=20)
+        if i < len(ladder) - 1:
+            d.polyline([(x + 52, 1978), (x + 162, 1978)], color=line, width=4)
+
+    d.text(
+        105,
+        2165,
+        "Plain-language summary: SAGE learns reusable, side-effect-free helpers from observed gaps, validates them before use, stores the safe ones, and tests whether natural reuse improves matched ToolSandbox outcomes.",
+        20,
+        "#b8cce0",
+        max_width=1390,
+        line_height=26,
+    )
+    d.finish()
+    write_sage_one_page_infographic_html()
+
+
 def main() -> None:
     render_overview()
     render_sage_zoom()
     render_tool_loop()
     render_paper_diagram()
+    render_sage_one_page_infographic()
 
 
 if __name__ == "__main__":
