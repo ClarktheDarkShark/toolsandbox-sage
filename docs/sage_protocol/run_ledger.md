@@ -1182,3 +1182,67 @@
   --check` passed.
 - Decision label:
   `CYBERGYM_REPAIR_PRESERVES_MINIGRID_AND_TOOLSANDBOX_STANDALONE_SMOKES`.
+
+## 2026-05-21 - Standalone SAGE Four-Environment Live40 Validation
+
+- Objective: add one more benchmark and verify that the importable standalone
+  SAGE agent can run against four different environments with real baseline and
+  SAGE arms where available: ToolSandbox, CyberGym, MiniGrid, and BIG-Bench
+  Hard.
+- Branch: `codex/sage-standalone-agent`.
+- New benchmark: BIG-Bench Hard from the public repository
+  `https://github.com/suzgunmirac/BIG-Bench-Hard`, cloned locally under
+  `external/BIG-Bench-Hard` at commit
+  `9ee07bd481feebf959a6b59d61ea57bdcf30964d`.
+- Code changes: added `BBHAdapter`, exported it from `sage_agent.adapters`,
+  added a BBH exact-answer LLM baseline path to `scripts/run_sage_agent_smoke.py`,
+  and added a fixture-based BBH unit test proving private targets are not
+  exposed through SAGE-facing task specs.
+- Machine-readable summary:
+  `artifacts/sage_agent_standalone/final_four_env_live40_summary_20260521.json`,
+  SHA-256
+  `5987f4c09d845ac34c9c89e9acb8139cc5e116a0d2774ab0b978fc526065a2b2`.
+- ToolSandbox run:
+  `outputs/sage_agent_standalone/toolsandbox_verify40_self_evolving_policy_20260521/mechanism_40_20260521_175250`;
+  dashboard
+  `outputs/sage_agent_standalone/toolsandbox_verify40_self_evolving_policy_20260521/mechanism_40_20260521_175250/dashboard/task_compare.html`.
+- ToolSandbox result: `40 cached / 0 fresh` controls; fresh SAGE; score
+  `0.647929 -> 0.874999`, delta `+0.227070`; outcome
+  `0.473734 -> 0.907297`, delta `+0.433562`; exact successes `3 -> 24`;
+  generated registry size `14`; runtime exceptions `0`.
+- CyberGym run:
+  `outputs/cybergym_live_sage/final_agent_cybergym_live40_20260521`;
+  dashboard
+  `outputs/cybergym_live_sage/final_agent_cybergym_live40_20260521/dashboard/task_compare.html`.
+- CyberGym result: ten four-task live `/submit-vul` batches; cached LLM
+  baseline `1/40` with `40 cached / 0 fresh` controls; fresh SAGE `4/40`;
+  tools born/accepted/reused `12 / 12 / 237`; repair attempts/refined tools
+  `9 / 9`; integrity issues `0`. This remains portability evidence rather
+  than final CyberGym benchmark evidence because fix-side verification is not
+  run.
+- MiniGrid run:
+  `outputs/sage_agent_standalone/minigrid_live40_20260521`; dashboard
+  `outputs/sage_agent_standalone/minigrid_live40_20260521/dashboard/task_compare.html`.
+- MiniGrid result: LLM baseline `21/40`; SAGE `40/40`; tools
+  born/accepted/reused `1 / 1 / 40`; integrity issues `0`.
+- BIG-Bench Hard run:
+  `outputs/sage_agent_standalone/bbh_live40_20260521`; dashboard
+  `outputs/sage_agent_standalone/bbh_live40_20260521/dashboard/task_compare.html`.
+- BIG-Bench Hard result: LLM exact-answer baseline `16/40`; SAGE `40/40`;
+  tools born/accepted/reused `1 / 1 / 40`; integrity issues `0`. The 40-task
+  mix included `10` each from `boolean_expressions`,
+  `multistep_arithmetic_two`, `dyck_languages`, and `word_sorting`. One helper
+  was expected because the generated symbolic exact-answer helper generalized
+  across those visible public formats; target answers remained private inside
+  the adapter scorer.
+- Default run conditions: standalone smoke and live scripts keep
+  `gpt-4o-mini` as the enforced default model and open Task Compare at run
+  start unless `--no-dashboard-open` is explicitly supplied. ToolSandbox
+  generation-enabled runs use `--sage-policy self-evolving-praxis` or `auto`,
+  which records the high-lift self-evolving defaults.
+- Leakage controls: SAGE-facing task specs, gap signals, helper code, and
+  registry metadata did not include hidden labels, expected answers, reference
+  PoCs, or prior SAGE traces. BBH targets are private to the adapter scorer;
+  CyberGym helpers receive only visible task assets and live submit feedback.
+- Decision label:
+  `STANDALONE_SAGE_FOUR_ENVIRONMENT_AGENT_BASE_READY_FOR_METHOD_CHAPTER_WITH_CYBERGYM_LIMITATION`.

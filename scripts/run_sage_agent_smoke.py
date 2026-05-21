@@ -22,6 +22,7 @@ if str(SRC) not in sys.path:
 
 from sage_agent import SAGEAgent, SAGEConfig, SAGERunSummary  # noqa: E402
 from sage_agent.adapters import (  # noqa: E402
+    BBHAdapter,
     CyberGymAdapter,
     MiniGridAdapter,
     ToolSandboxMiniAdapter,
@@ -47,7 +48,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--env",
-        choices=("toolsandbox", "toolsandbox-probe", "cybergym", "minigrid"),
+        choices=("toolsandbox", "toolsandbox-probe", "cybergym", "minigrid", "bbh"),
         required=True,
     )
     parser.add_argument("--limit", type=int, default=2)
@@ -61,6 +62,17 @@ def main() -> None:
         "--cybergym-repo",
         type=Path,
         default=Path("external/cybergym"),
+    )
+    parser.add_argument(
+        "--bbh-repo",
+        type=Path,
+        default=Path("external/BIG-Bench-Hard"),
+    )
+    parser.add_argument(
+        "--bbh-task",
+        action="append",
+        default=[],
+        help="BBH task JSON stem to include. Repeat to include multiple families.",
     )
     parser.add_argument("--reset-registry", action="store_true")
     parser.add_argument("--toolsandbox-scenario", action="append", default=[])
@@ -112,6 +124,11 @@ def main() -> None:
         adapter = CyberGymAdapter(
             repo_root=args.cybergym_repo,
             task_ids=tuple(args.cybergym_task_id),
+        )
+    elif args.env == "bbh":
+        adapter = BBHAdapter(
+            repo_root=args.bbh_repo,
+            task_names=tuple(args.bbh_task) or BBHAdapter.task_names,
         )
     else:
         adapter = MiniGridAdapter(
@@ -206,6 +223,31 @@ def _run_metadata(
                 or MiniGridAdapter.env_ids,
                 "minigrid_seeds": tuple(_parse_int_ranges(args.minigrid_seeds)),
                 "minigrid_max_steps": args.minigrid_max_steps,
+                "llm_timeout_seconds": args.llm_timeout,
+            }
+        )
+        return base
+
+    if args.env == "bbh":
+        base.update(
+            {
+                "execution_mode": "big_bench_hard_exact_answer_standalone",
+                "benchmark_ready": False,
+                "real_task_generator_used": True,
+                "real_submission_server_used": False,
+                "real_poc_verifier_used": False,
+                "official_success_verification": True,
+                "interpretation": (
+                    "This run validates standalone SAGE on public BIG-Bench Hard "
+                    "JSON tasks using exact-answer scoring. It is an integration "
+                    "check, not a protected BBH leaderboard claim."
+                ),
+                "setup_notes": (
+                    "The adapter exposes only prompt text, task family, and answer "
+                    "format to SAGE. Targets remain private inside the scorer.",
+                ),
+                "bbh_repo": str(_resolve_path(args.bbh_repo)),
+                "bbh_tasks": tuple(args.bbh_task) or BBHAdapter.task_names,
                 "llm_timeout_seconds": args.llm_timeout,
             }
         )
@@ -326,6 +368,13 @@ def _run_baseline(
                 model=str(args.model),
                 timeout=float(args.llm_timeout),
             )
+        if isinstance(adapter, BBHAdapter):
+            return _run_bbh_llm_baseline(
+                adapter,
+                limit=limit,
+                model=str(args.model),
+                timeout=float(args.llm_timeout),
+            )
         raise SystemExit(f"--baseline llm is not implemented for env={args.env}")
     return _run_no_helper_baseline(adapter, limit=limit)
 
@@ -364,6 +413,48 @@ def _run_minigrid_llm_baseline(
             "Basic LLM baseline over visible MiniGrid task artifacts. It receives "
             "the grid rows, start pose, goal, and allowed actions, then the adapter "
             "executes its action sequence in MiniGrid."
+        ),
+        "tasks_seen": len(results),
+        "tasks_succeeded": successes,
+        "success_rate": successes / len(results) if results else 0.0,
+        "results": results,
+    }
+
+
+def _run_bbh_llm_baseline(
+    adapter: BBHAdapter, *, limit: int | None, model: str, timeout: float
+) -> dict[str, object]:
+    planner = OpenAIEnvironmentBaseline(model=model, timeout=timeout)
+    adapter.prepare()
+    results: list[dict[str, object]] = []
+    for task in adapter.tasks(limit=limit):
+        try:
+            answer = planner.answer_text_task(
+                task,
+                answer_format=str(task.artifacts.get("answer_format", "exact string")),
+            )
+            result = adapter.score_answer(
+                task,
+                answer,
+                transcript_prefix=f"LLM baseline answered {answer!r}",
+            )
+        except Exception as exc:  # pragma: no cover - live API/environment failure
+            result = TaskRunResult(
+                task=task,
+                success=False,
+                score=0.0,
+                outcome_score=0.0,
+                transcript=(f"LLM baseline failed: {type(exc).__name__}: {exc}",),
+                error=str(exc),
+            )
+        results.append(_baseline_result_json(result))
+    successes = sum(1 for result in results if result["success"])
+    return {
+        "policy": f"llm_visible_prompt_baseline:{model}",
+        "comparison_valid": True,
+        "comparison_note": (
+            "Basic LLM baseline over visible BIG-Bench Hard prompt text and "
+            "answer format. It does not receive targets or prior SAGE traces."
         ),
         "tasks_seen": len(results),
         "tasks_succeeded": successes,

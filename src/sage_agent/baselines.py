@@ -116,6 +116,32 @@ class OpenAIEnvironmentBaseline:
                 break
         return normalized
 
+    def answer_text_task(self, task: TaskSpec, *, answer_format: str) -> str:
+        """Return one exact-answer prediction for a visible text benchmark task."""
+
+        payload = self._complete_json(
+            system=(
+                "You are a baseline agent for an exact-answer text benchmark. "
+                "Use only the visible task prompt, task name, and answer format. "
+                "Do not assume hidden labels, target answers, or prior SAGE traces. "
+                "Return JSON only."
+            ),
+            user=(
+                "Answer the task exactly. Return only the final answer string in "
+                'JSON as {"answer":"..."}. Do not include explanations unless the '
+                "answer format itself requires them.\n\n"
+                f"Task name: {task.name}\n"
+                f"Task family: {task.metadata.get('task_family', '')}\n"
+                f"Answer format: {answer_format}\n\n"
+                f"Prompt:\n{task.prompt}"
+            ),
+            max_tokens=1200,
+        )
+        answer = payload.get("answer", "")
+        if isinstance(answer, str):
+            return answer.strip()
+        return str(answer).strip()
+
     def _complete_json(
         self, *, system: str, user: str, max_tokens: int = 3500
     ) -> dict[str, Any]:

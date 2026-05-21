@@ -1,5 +1,6 @@
 """Environment adapters for standalone SAGE."""
 
+from sage_agent.adapters.bbh import BBHAdapter
 from sage_agent.adapters.cybergym import CyberGymAdapter
 from sage_agent.adapters.cybergym_live import (
     CyberGymLiveSubmitAdapter,
@@ -12,6 +13,7 @@ from sage_agent.adapters.toolsandbox import (
 )
 
 __all__ = [
+    "BBHAdapter",
     "CyberGymAdapter",
     "CyberGymLiveSubmitAdapter",
     "CyberGymLiveTask",

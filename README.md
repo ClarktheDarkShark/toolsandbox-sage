@@ -124,6 +124,10 @@ Current adapter proof points:
   It exposes visible grid state and validates that SAGE can generate a reusable
   side-effect-free grid action planner in a third environment that is neither
   ToolSandbox nor CyberGym.
+- `sage_agent.adapters.BBHAdapter`: BIG-Bench Hard exact-answer adapter. It
+  loads public BBH JSON task files from `external/BIG-Bench-Hard`, exposes only
+  prompt text, public task family, and answer format, and keeps target answers
+  private inside the adapter scorer.
 
 Run the standalone smoke checks with no model-token spend:
 
@@ -156,6 +160,15 @@ PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
   --reset-registry \
   --registry-dir artifacts/sage_standalone/minigrid_smoke_registry \
   --limit 9
+
+PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
+  --env bbh \
+  --model gpt-4o-mini \
+  --baseline llm \
+  --reset-registry \
+  --registry-dir artifacts/sage_standalone/bbh_smoke_registry \
+  --bbh-repo external/BIG-Bench-Hard \
+  --limit 40
 ```
 
 Each smoke run writes an environment-neutral Task Compare dashboard under
@@ -315,29 +328,36 @@ loaded.
 
 Recent standalone generalization checks:
 
-- ToolSandbox no-token lifecycle smoke:
-  `outputs/sage_agent_standalone/toolsandbox_lift_maintenance_3_20260521_smoke`
-  produced `2/2` SAGE successes from an empty registry with `1` accepted helper,
-  `1` same-task retry success, and `0` integrity issues. This smoke runner does
-  not yet implement a real ToolSandbox LLM baseline; protected ToolSandbox
-  comparisons use the protocol runner.
-- ToolSandbox matched 20-task self-evolving Praxis verification:
-  `outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy/mechanism_40_20260520_210531`
-  restored the working ToolSandbox pattern with score `0.728002 -> 0.908119`
-  and outcome `0.454649 -> 0.920139` using `20 cached / 0 fresh` controls.
-- CyberGym live batched 20-task smoke:
-  `outputs/cybergym_live_sage/cybergym_lift_candidate_feedback_v3_20_20260521`
-  improved cached LLM-visible-artifact baseline success from `1/20` to `4/20`,
-  birthed `7` accepted helpers, reused helpers `116` times, repaired/refined `4`
-  helpers, and had `0` integrity issues. The useful signal emerged late, so
-  8-task CyberGym checks are now considered too short to judge registry
-  evolution. This is live `/submit-vul` evidence, not final CyberGym benchmark
-  evidence because fix-side verification is not yet run.
-- MiniGrid official smoke:
-  `outputs/sage_agent_standalone/minigrid_lift_maintenance_12_20260521`
-  improved the LLM baseline from `4/12` to `12/12` by birthing and reusing
-  `plan_grid_shortest_path_actions`. This is a third-environment integration
-  proof, not a protected MiniGrid benchmark claim.
+- ToolSandbox matched 40-task self-evolving Praxis verification:
+  `outputs/sage_agent_standalone/toolsandbox_verify40_self_evolving_policy_20260521/mechanism_40_20260521_175250`
+  used `40 cached / 0 fresh` controls and fresh SAGE execution. Score improved
+  `0.647929 -> 0.874999` (`+0.227070`), outcome improved
+  `0.473734 -> 0.907297` (`+0.433562`), exact successes moved `3 -> 24`,
+  runtime exceptions were `0`, and the generated registry contained `14`
+  accepted helpers.
+- CyberGym live batched 40-task smoke:
+  `outputs/cybergym_live_sage/final_agent_cybergym_live40_20260521`
+  used ten four-task batches, fully cached controls (`40 cached / 0 fresh`),
+  and fresh SAGE execution. Cached LLM-visible-artifact baseline success was
+  `1/40`; SAGE success was `4/40`; tools born/accepted/reused were
+  `12 / 12 / 237`; repair attempts/refined tools were `9 / 9`; integrity issues
+  were `0`. This is live `/submit-vul` portability evidence, not final CyberGym
+  benchmark evidence because fix-side verification is not yet run.
+- MiniGrid official 40-task check:
+  `outputs/sage_agent_standalone/minigrid_live40_20260521`
+  improved the LLM baseline from `21/40` to `40/40` by birthing and reusing
+  `plan_grid_shortest_path_actions`; integrity issues were `0`.
+- BIG-Bench Hard 40-task check:
+  `outputs/sage_agent_standalone/bbh_live40_20260521`
+  improved the LLM exact-answer baseline from `16/40` to `40/40`. The task mix
+  was intentionally broad within the adapter: `10` examples each from
+  `boolean_expressions`, `multistep_arithmetic_two`, `dyck_languages`, and
+  `word_sorting`. SAGE produced one accepted helper because a single reusable
+  symbolic exact-answer helper generalized across those public task families;
+  target answers stayed private inside the adapter scorer.
+
+Machine-readable four-environment summary:
+`artifacts/sage_agent_standalone/final_four_env_live40_summary_20260521.json`.
 
 ## Current Evidence Snapshot
 

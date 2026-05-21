@@ -42,6 +42,10 @@ scenario IDs, labels, hidden answers, or benchmark-specific facts.
 | `cybergym_lift_candidate_feedback_v3_20_20260521` | CyberGym live | 20 | 1/20 cached LLM baseline | 4/20 | larger signal: seven helpers born, four repairs, late-batch lift emerged |
 | `minigrid_lift_maintenance_12_20260521` | MiniGrid | 12 | 4/12 LLM baseline | 12/12 | maintenance check: generic lifecycle changes preserved MiniGrid lift |
 | `toolsandbox_lift_maintenance_3_20260521_smoke` | ToolSandbox adapter smoke | 3 requested, 2 available | 0/2 smoke | 2/2 | maintenance check: same-task birth and reuse still work |
+| `toolsandbox_verify40_self_evolving_policy_20260521` | ToolSandbox protocol | 40 | score 0.647929; outcome 0.473734 | score 0.874999; outcome 0.907297 | high-lift self-evolving Praxis stack preserved on real ToolSandbox |
+| `final_agent_cybergym_live40_20260521` | CyberGym live | 40 | 1/40 cached LLM baseline | 4/40 | live portability lift; low absolute success remains future-work target |
+| `minigrid_live40_20260521` | MiniGrid | 40 | 21/40 LLM baseline | 40/40 | maintained strong third-environment performance |
+| `bbh_live40_20260521` | BIG-Bench Hard | 40 | 16/40 LLM exact-answer baseline | 40/40 | fourth benchmark; reusable symbolic exact-answer helper generalized across four public task families |
 
 The completed CyberGym 40 run is the live stress case that exposed the lifecycle
 issue. The 4-task post-patch run is the bounded verification that the generic
@@ -77,6 +81,8 @@ Additional hashes:
   `5a5c0af188ee31773e251963fbb3888fcbb7ec84d6a5fad2d043ef43c5979b95`.
 - ToolSandbox maintenance summary SHA-256:
   `fea45a95f1cb6c211ef2d01afbd57a969fb925393be79045e73aa60895a45841`.
+- Four-environment live40 summary SHA-256:
+  `5987f4c09d845ac34c9c89e9acb8139cc5e116a0d2774ab0b978fc526065a2b2`.
 
 ## Dashboard Paths
 
@@ -87,6 +93,10 @@ Additional hashes:
 - CyberGym 20 candidate-feedback check: `outputs/cybergym_live_sage/cybergym_lift_candidate_feedback_v3_20_20260521/dashboard/task_compare.html`
 - MiniGrid maintenance: `outputs/sage_agent_standalone/minigrid_lift_maintenance_12_20260521/dashboard/task_compare.html`
 - ToolSandbox maintenance: `outputs/sage_agent_standalone/toolsandbox_lift_maintenance_3_20260521_smoke/dashboard/task_compare.html`
+- ToolSandbox live40: `outputs/sage_agent_standalone/toolsandbox_verify40_self_evolving_policy_20260521/mechanism_40_20260521_175250/dashboard/task_compare.html`
+- CyberGym live40: `outputs/cybergym_live_sage/final_agent_cybergym_live40_20260521/dashboard/task_compare.html`
+- MiniGrid live40: `outputs/sage_agent_standalone/minigrid_live40_20260521/dashboard/task_compare.html`
+- BIG-Bench Hard live40: `outputs/sage_agent_standalone/bbh_live40_20260521/dashboard/task_compare.html`
 
 ## Caveats
 
@@ -97,12 +107,21 @@ candidate-feedback run used a cached LLM baseline for all 20 controls and fresh
 SAGE execution. ToolSandbox smoke is an adapter lifecycle check, not the
 protected ToolSandbox benchmark protocol.
 
+The BIG-Bench Hard 40-task run intentionally produced only one generated helper.
+That is not evidence of weak adaptation in this case: the sampled BBH split was
+balanced across four public task families, and one symbolic exact-answer helper
+passed validation and solved all four deterministic visible formats. If future
+BBH work targets broader language, commonsense, or multi-choice tasks, the
+adapter should expose those public families as separate gap types so SAGE can
+birth additional helper families where a single deterministic parser is no
+longer sufficient.
+
 ## Validation
 
 Validation run after the change:
 
 - Python compile checks for standalone SAGE modules and live-run scripts.
 - Ruff check and format check.
-- Unit tests: `27 passed`.
+- Unit tests: `28 passed`.
 - `git diff --check`.
 - Standalone run audit passed for MiniGrid and CyberGym live checks.

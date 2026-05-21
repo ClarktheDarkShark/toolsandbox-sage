@@ -63,6 +63,8 @@ class TemplateHelperGenerator:
             return _grid_shortest_path_action_planner(
                 name, gap, profile, validation_cases, model
             )
+        if template == "symbolic_text_answerer":
+            return _symbolic_text_answerer(name, gap, profile, validation_cases, model)
         raise ValueError(f"unsupported_template:{template or 'missing'}")
 
     def repair(
@@ -879,6 +881,218 @@ def _grid_shortest_path_action_planner(
             output_schema=dict(gap.expected_outputs),
             positive_triggers=tuple(gap.evidence),
             negative_triggers=("blocked start or goal", "no visible path"),
+            safety_notes=tuple(profile.safety_rules),
+        ),
+        code=code,
+        validation_cases=validation_cases,
+        metadata={"model": model, "environment": profile.name, "gap_key": gap.key},
+    )
+
+
+def _symbolic_text_answerer(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    code = f"""def {name}(prompt: str, task_family: str = "") -> dict:
+    text = str(prompt or "")
+    family = str(task_family or "").strip().lower()
+
+    if family == "word_sorting" or "sort the following words alphabetically" in text.lower():
+        marker = "List:"
+        if marker not in text:
+            return {{"answer": "", "abstain": True, "abstain_reason": "missing_word_list"}}
+        words = text.split(marker, 1)[1].strip().split()
+        return {{"answer": " ".join(sorted(words)), "abstain": False, "abstain_reason": ""}}
+
+    if family == "dyck_languages" or "parentheses are closed properly" in text.lower():
+        segment = text.split("Input:", 1)[1] if "Input:" in text else text
+        opens = "([{{<"
+        closes = ")]}}>"
+        stack = []
+        for ch in segment:
+            if ch in opens:
+                stack.append(ch)
+            elif ch in closes:
+                if stack and opens.index(stack[-1]) == closes.index(ch):
+                    stack.pop()
+                else:
+                    return {{"answer": "", "abstain": True, "abstain_reason": "unbalanced_prefix"}}
+        answer_parts = []
+        index = len(stack) - 1
+        while index >= 0:
+            answer_parts.append(closes[opens.index(stack[index])])
+            index -= 1
+        return {{"answer": " ".join(answer_parts), "abstain": False, "abstain_reason": ""}}
+
+    if family == "multistep_arithmetic_two" or text.strip().endswith("="):
+        expr = text.split("=", 1)[0]
+        tokens = []
+        index = 0
+        previous = "start"
+        while index < len(expr):
+            ch = expr[index]
+            if ch.isspace():
+                index += 1
+                continue
+            if ch.isdigit() or (ch == "-" and previous in ("start", "op", "lparen") and index + 1 < len(expr) and expr[index + 1].isdigit()):
+                sign = 1
+                if ch == "-":
+                    sign = -1
+                    index += 1
+                value = 0
+                while index < len(expr) and expr[index].isdigit():
+                    value = value * 10 + int(expr[index])
+                    index += 1
+                tokens.append(sign * value)
+                previous = "number"
+                continue
+            if ch in "+-*":
+                tokens.append(ch)
+                previous = "op"
+                index += 1
+                continue
+            if ch == "(":
+                tokens.append(ch)
+                previous = "lparen"
+                index += 1
+                continue
+            if ch == ")":
+                tokens.append(ch)
+                previous = "rparen"
+                index += 1
+                continue
+            index += 1
+        values = []
+        ops = []
+        for token in tokens:
+            if isinstance(token, int):
+                values.append(token)
+                continue
+            if token == "(":
+                ops.append(token)
+                continue
+            if token == ")":
+                while ops and ops[-1] != "(" and len(values) >= 2:
+                    op = ops.pop()
+                    right = values.pop()
+                    left = values.pop()
+                    if op == "+":
+                        values.append(left + right)
+                    elif op == "-":
+                        values.append(left - right)
+                    elif op == "*":
+                        values.append(left * right)
+                if ops and ops[-1] == "(":
+                    ops.pop()
+                continue
+            prec = 2 if token == "*" else 1
+            while ops and ops[-1] != "(" and len(values) >= 2:
+                top_prec = 2 if ops[-1] == "*" else 1
+                if top_prec < prec:
+                    break
+                op = ops.pop()
+                right = values.pop()
+                left = values.pop()
+                if op == "+":
+                    values.append(left + right)
+                elif op == "-":
+                    values.append(left - right)
+                elif op == "*":
+                    values.append(left * right)
+            ops.append(token)
+        while ops and len(values) >= 2:
+            op = ops.pop()
+            if op == "(":
+                continue
+            right = values.pop()
+            left = values.pop()
+            if op == "+":
+                values.append(left + right)
+            elif op == "-":
+                values.append(left - right)
+            elif op == "*":
+                values.append(left * right)
+        if len(values) != 1:
+            return {{"answer": "", "abstain": True, "abstain_reason": "parse_failed"}}
+        return {{"answer": str(values[0]), "abstain": False, "abstain_reason": ""}}
+
+    if family == "boolean_expressions" or text.strip().endswith(" is"):
+        expr = text.strip()
+        if expr.endswith(" is"):
+            expr = expr[:-3]
+        spaced = expr.replace("(", " ( ").replace(")", " ) ")
+        raw_tokens = spaced.split()
+        values = []
+        ops = []
+        for token in raw_tokens:
+            lower = token.lower()
+            if lower == "true":
+                values.append(True)
+                continue
+            if lower == "false":
+                values.append(False)
+                continue
+            if token == "(":
+                ops.append(token)
+                continue
+            if token == ")":
+                while ops and ops[-1] != "(":
+                    op = ops.pop()
+                    if op == "not" and values:
+                        values.append(not values.pop())
+                    elif len(values) >= 2:
+                        right = values.pop()
+                        left = values.pop()
+                        values.append((left and right) if op == "and" else (left or right))
+                if ops and ops[-1] == "(":
+                    ops.pop()
+                if ops and ops[-1] == "not" and values:
+                    ops.pop()
+                    values.append(not values.pop())
+                continue
+            if lower in ("not", "and", "or"):
+                prec = 3 if lower == "not" else 2 if lower == "and" else 1
+                while ops and ops[-1] != "(":
+                    top = ops[-1]
+                    top_prec = 3 if top == "not" else 2 if top == "and" else 1
+                    if top_prec < prec or lower == "not":
+                        break
+                    op = ops.pop()
+                    if op == "not" and values:
+                        values.append(not values.pop())
+                    elif len(values) >= 2:
+                        right = values.pop()
+                        left = values.pop()
+                        values.append((left and right) if op == "and" else (left or right))
+                ops.append(lower)
+        while ops:
+            op = ops.pop()
+            if op == "(":
+                continue
+            if op == "not" and values:
+                values.append(not values.pop())
+            elif len(values) >= 2:
+                right = values.pop()
+                left = values.pop()
+                values.append((left and right) if op == "and" else (left or right))
+        if len(values) != 1:
+            return {{"answer": "", "abstain": True, "abstain_reason": "parse_failed"}}
+        return {{"answer": "True" if values[0] else "False", "abstain": False, "abstain_reason": ""}}
+
+    return {{"answer": "", "abstain": True, "abstain_reason": "unsupported_task_family"}}
+"""
+    return HelperCandidate(
+        spec=HelperSpec(
+            name=name,
+            family=gap.suggested_helper_family,
+            description=gap.summary,
+            input_schema=dict(gap.required_inputs),
+            output_schema=dict(gap.expected_outputs),
+            positive_triggers=tuple(gap.evidence),
+            negative_triggers=("unsupported task family", "ambiguous prompt format"),
             safety_notes=tuple(profile.safety_rules),
         ),
         code=code,

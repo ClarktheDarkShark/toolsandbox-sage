@@ -1,0 +1,132 @@
+{
+  "manifest_type": "standalone_toolsandbox_real_verify40_from_formal500_first40",
+  "strategy": "Proper paired ToolSandbox 40-task verification for the standalone branch; first 40 tasks from v2_1_formal_500, baseline eligible for task cache, SAGE fresh with generation on.",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_500.json",
+  "splits": {
+    "mechanism_40": [
+      {
+        "name": "remove_contact_by_phone"
+      },
+      {
+        "name": "add_reminder_content_and_date_and_time"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location"
+      },
+      {
+        "name": "add_reminder_content_and_weekday_delta_and_time"
+      },
+      {
+        "name": "modify_contact_with_message_recency"
+      },
+      {
+        "name": "search_message_with_recency_latest"
+      },
+      {
+        "name": "search_message_with_recency_oldest"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off"
+      },
+      {
+        "name": "find_days_till_holiday"
+      },
+      {
+        "name": "find_days_till_holiday_wifi_off"
+      },
+      {
+        "name": "update_contact_relationship_with_relationship"
+      },
+      {
+        "name": "find_days_till_holiday_insufficient_information"
+      },
+      {
+        "name": "modify_contact_with_message_recency_insufficient_information"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest"
+      },
+      {
+        "name": "remove_contact_by_phone_no_remove_contact_insufficient_information"
+      },
+      {
+        "name": "remove_contact_by_phone_no_search_contacts_insufficient_information"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest"
+      },
+      {
+        "name": "send_message_with_contact_content_cellular_off_insufficient_information"
+      },
+      {
+        "name": "add_contact_with_name_and_phone_number"
+      },
+      {
+        "name": "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt"
+      },
+      {
+        "name": "cellular_off"
+      },
+      {
+        "name": "find_thanksgiving_timestamp"
+      },
+      {
+        "name": "get_cellular"
+      },
+      {
+        "name": "get_wifi"
+      },
+      {
+        "name": "modify_reminder_with_recency_latest_insufficient_information"
+      },
+      {
+        "name": "remove_contact_with_id"
+      },
+      {
+        "name": "remove_reminder_with_recency_latest_insufficient_information"
+      },
+      {
+        "name": "search_name_with_relationship"
+      },
+      {
+        "name": "search_phone_number_with_name"
+      },
+      {
+        "name": "search_relationship_with_phone_number"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday"
+      }
+    ]
+  },
+  "split_sizes": {
+    "mechanism_40": 40
+  }
+}

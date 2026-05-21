@@ -1,8 +1,10 @@
+import json
 from collections.abc import Mapping
 from pathlib import Path
 
 from sage_agent import SAGEAgent, SAGEConfig
 from sage_agent.adapters import (
+    BBHAdapter,
     CyberGymAdapter,
     ToolSandboxMiniAdapter,
     ToolSandboxScenarioProbeAdapter,
@@ -86,6 +88,60 @@ def test_standalone_sage_toolsandbox_probe_uses_real_scenario_registry(
     assert summary.environment == "toolsandbox"
     assert summary.tools_accepted == 1
     assert summary.birth_task_retry_successes >= 1
+
+
+def test_standalone_sage_bbh_adapter_uses_private_targets_and_reuses_symbolic_helper(
+    tmp_path: Path,
+) -> None:
+    bbh_dir = tmp_path / "bbh_repo" / "bbh"
+    bbh_dir.mkdir(parents=True)
+    examples = {
+        "boolean_expressions": {
+            "input": "not ( True ) and ( True ) is",
+            "target": "False",
+        },
+        "multistep_arithmetic_two": {
+            "input": "((-1 + 2 + 9 * 5) - (-2 + -4 + -4 * -7)) =",
+            "target": "24",
+        },
+        "dyck_languages": {
+            "input": (
+                "Complete the rest of the sequence, making sure that the "
+                "parentheses are closed properly. Input: < [ ["
+            ),
+            "target": "] ] >",
+        },
+        "word_sorting": {
+            "input": "Sort the following words alphabetically: List: zebra apple middle",
+            "target": "apple middle zebra",
+        },
+    }
+    for family, example in examples.items():
+        (bbh_dir / f"{family}.json").write_text(
+            json.dumps({"examples": [example]}, indent=2),
+            encoding="utf-8",
+        )
+
+    adapter = BBHAdapter(repo_root=tmp_path / "bbh_repo")
+    tasks = adapter.tasks(limit=4)
+
+    assert {task.metadata["task_family"] for task in tasks} == set(examples)
+    assert all("target" not in task.metadata for task in tasks)
+    assert all("target" not in task.artifacts for task in tasks)
+    assert check_task_specs(tasks, ResearchIntegrityPolicy()).passed
+
+    agent = SAGEAgent(
+        adapter=adapter,
+        generator=TemplateHelperGenerator(),
+        config=SAGEConfig(registry_dir=tmp_path / "registry"),
+    )
+
+    summary = agent.run(limit=4)
+
+    assert summary.environment == "bbh"
+    assert summary.tools_born == 1
+    assert summary.tools_accepted == 1
+    assert summary.tasks_succeeded == 4
 
 
 def test_standalone_sage_repairs_rejected_helper(tmp_path: Path) -> None:

@@ -750,6 +750,37 @@ generate and validate a helper, retain it, and reuse it in an environment that
 does not share ToolSandbox or CyberGym mechanics. This is an integration smoke,
 not a protected MiniGrid benchmark claim.
 
+## Four-Environment Live40 Checkpoint
+
+Date: 2026-05-21.
+
+Purpose: confirm the standalone SAGE agent works across four environments with
+only minor adapter additions and without exposing hidden labels, expected
+answers, reference PoCs, or prior SAGE traces.
+
+New fourth benchmark: BIG-Bench Hard, cloned to `external/BIG-Bench-Hard` at
+commit `9ee07bd481feebf959a6b59d61ea57bdcf30964d`. The adapter loads public
+BBH JSON files and privately scores exact answers. SAGE sees only prompt text,
+public task family, and answer format.
+
+Machine-readable summary:
+`artifacts/sage_agent_standalone/final_four_env_live40_summary_20260521.json`,
+SHA-256 `5987f4c09d845ac34c9c89e9acb8139cc5e116a0d2774ab0b978fc526065a2b2`.
+
+| Environment | Run | Baseline | SAGE | Notes |
+| --- | --- | ---: | ---: | --- |
+| ToolSandbox | `outputs/sage_agent_standalone/toolsandbox_verify40_self_evolving_policy_20260521/mechanism_40_20260521_175250` | score `0.647929`, outcome `0.473734` | score `0.874999`, outcome `0.907297` | real protocol run; `40 cached / 0 fresh` controls; fresh SAGE; exact successes `3 -> 24`; runtime exceptions `0` |
+| CyberGym live | `outputs/cybergym_live_sage/final_agent_cybergym_live40_20260521` | `1/40` cached LLM baseline | `4/40` | real `/submit-vul` batches of four; tools born/accepted/reused `12 / 12 / 237`; integrity issues `0`; not official final CyberGym evidence because fix-side verification is not run |
+| MiniGrid | `outputs/sage_agent_standalone/minigrid_live40_20260521` | `21/40` LLM baseline | `40/40` | official MiniGrid environments; one accepted/reused shortest-path planner |
+| BIG-Bench Hard | `outputs/sage_agent_standalone/bbh_live40_20260521` | `16/40` LLM baseline | `40/40` | 10 each from boolean expressions, arithmetic, Dyck completion, and word sorting; one accepted symbolic exact-answer helper reused across all four public families |
+
+The BBH one-helper result is expected for this selected task mix. The sampled
+families are different, but they share a deterministic visible-text exact-answer
+structure. The relevant generalization signal is not a high tool count; it is
+that a helper born from one failure validated against multiple synthetic cases,
+then naturally reused across four public BBH task families while targets stayed
+private inside the scorer.
+
 ## Current Generalization Assessment
 
 SAGE is now no longer just a ToolSandbox-specific harness. The current
@@ -766,10 +797,9 @@ standalone boundary supports:
 - lifecycle decisions for keep/refine/park/scale;
 - environment-neutral dashboards.
 
-Maintained ToolSandbox success is verified by the cached-control matched
-20-task self-evolving Praxis run above. A current rerun attempt without sourcing
-the local secret file failed before meaningful SAGE behavior because the shell
-did not contain a valid `OPENAI_API_KEY`; this is an execution-environment
-credential issue, not a SAGE policy result. Source `.secrets/env.sh` or set
-`OPENAI_API_KEY` in the process environment before repeating OpenAI-backed
-ToolSandbox validation.
+Maintained ToolSandbox success is now verified by the cached-control matched
+40-task self-evolving Praxis run above. CyberGym remains the lowest-success
+environment; it demonstrates live portability and positive lift, but future
+work should focus on stronger environment-general source/harness inventory,
+input-format inference, feedback classification, mutation/minimization, and
+repair policy before treating CyberGym as more than portability evidence.
