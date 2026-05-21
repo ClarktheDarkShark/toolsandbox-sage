@@ -442,7 +442,7 @@ PYTHONPATH=src:. python scripts/run_cybergym_live_batched_sage.py \
 
 Dashboard:
 
-`outputs/cybergym_live_sage/batched20_generic_visible_v2_20260521_102125/dashboard/index.html`
+`outputs/cybergym_live_sage/batched20_generic_visible_v2_20260521_102125/dashboard/task_compare.html`
 
 Result:
 

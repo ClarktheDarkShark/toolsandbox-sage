@@ -41,11 +41,18 @@ def write_standalone_dashboard(
         json.dumps(data_payload, indent=2) + "\n",
         encoding="utf-8",
     )
+    (dashboard_dir / "task_compare_data.json").write_text(
+        json.dumps(data_payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
     if registry_path and registry_path.exists():
         shutil.copyfile(registry_path, output_dir / "registry.json")
     index_path = dashboard_dir / "index.html"
-    index_path.write_text(_dashboard_html(data_payload), encoding="utf-8")
-    return index_path
+    task_compare_path = dashboard_dir / "task_compare.html"
+    rendered = _dashboard_html(data_payload)
+    index_path.write_text(rendered, encoding="utf-8")
+    task_compare_path.write_text(rendered, encoding="utf-8")
+    return task_compare_path
 
 
 def _read_registry_payload(registry_path: Path | None) -> dict[str, Any]:
@@ -56,6 +63,712 @@ def _read_registry_payload(registry_path: Path | None) -> dict[str, Any]:
 
 
 def _dashboard_html(payload: dict[str, Any]) -> str:
+    embedded = html.escape(json.dumps(payload), quote=False)
+    template = r"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Task Compare - SAGE Standalone</title>
+  <style>
+    :root {
+      --bg: #0b1118;
+      --panel: #111a24;
+      --panel2: #172332;
+      --panel3: #0f1722;
+      --line: #2b3a4d;
+      --text: #e7edf5;
+      --muted: #93a4b8;
+      --green: #41d996;
+      --red: #ff6b73;
+      --amber: #ffc857;
+      --blue: #77bdff;
+      --shadow: rgba(0, 0, 0, .35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input { font: inherit; }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      padding: 18px 22px 14px;
+      position: relative;
+      z-index: 5;
+    }
+    h1 { margin: 0; font-size: 22px; letter-spacing: 0; }
+    h2 { margin: 0; font-size: 19px; letter-spacing: 0; }
+    h3 { margin: 0 0 10px; font-size: 15px; }
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .dashboard-switch {
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel2);
+      color: var(--blue);
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      min-width: 140px;
+      text-align: center;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 5px;
+      overflow-wrap: anywhere;
+    }
+    .run-progress {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel2);
+      border-radius: 999px;
+      padding: 7px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+      box-shadow: 0 8px 22px var(--shadow);
+    }
+    .run-progress .label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .run-progress strong {
+      color: var(--text);
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+      max-width: 960px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      background: var(--panel2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      min-height: 78px;
+      box-shadow: 0 8px 22px var(--shadow);
+    }
+    .metric.clickable {
+      cursor: pointer;
+      border-color: #3f80bd;
+      background: #162a3d;
+    }
+    .label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .value {
+      font-size: 24px;
+      font-weight: 800;
+      margin-top: 8px;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+      line-height: 1.3;
+    }
+    .good { color: var(--green); }
+    .bad { color: var(--red); }
+    .warn { color: var(--amber); }
+    main {
+      display: grid;
+      grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+      min-height: calc(100vh - 150px);
+    }
+    aside {
+      border-right: 1px solid var(--line);
+      background: #0d151f;
+      padding: 14px;
+      position: sticky;
+      top: 12px;
+      align-self: start;
+      height: calc(100vh - 24px);
+      overflow: auto;
+    }
+    .detail-wrap {
+      padding: 18px 20px 32px;
+      min-width: 0;
+    }
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: var(--panel);
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    .task-list {
+      display: grid;
+      gap: 6px;
+    }
+    .task-btn {
+      width: 100%;
+      text-align: left;
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 7px;
+      padding: 8px;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .task-btn:hover,
+    .task-btn.active {
+      background: #162a3d;
+      border-color: #3f80bd;
+    }
+    .task-name {
+      font-size: 13px;
+      font-weight: 750;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      line-height: 1.25;
+    }
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+    .meta-label {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .tool-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+      min-height: 18px;
+    }
+    .tool-chip {
+      border: 1px solid #345371;
+      background: #102033;
+      color: #b7c9de;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 11px;
+      font-weight: 750;
+      line-height: 1.25;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+    .tool-chip.born { color: var(--amber); border-color: #927525; background: #2a2310; }
+    .tool-chip.called { color: var(--green); border-color: #227a50; background: #0d271d; }
+    .tool-chip.failed { color: var(--red); border-color: #8e3c45; background: #2b1418; }
+    .task-hero {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 16px;
+      margin: 18px 0 12px;
+      box-shadow: 0 8px 22px var(--shadow);
+    }
+    .task-title-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .task-title {
+      font-size: 24px;
+      line-height: 1.1;
+      font-weight: 850;
+      overflow-wrap: anywhere;
+    }
+    .task-id {
+      color: var(--muted);
+      margin-top: 4px;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: var(--muted);
+      background: var(--panel2);
+      font-size: 11px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+      max-width: 100%;
+    }
+    .tag.good { color: var(--green); border-color: #227a50; }
+    .tag.bad { color: var(--red); border-color: #8e3c45; }
+    .tag.warn { color: var(--amber); border-color: #927525; }
+    .task-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 10px;
+      margin: 10px 0 12px;
+    }
+    .section {
+      border: 1px solid var(--line);
+      background: var(--panel3);
+      border-radius: 8px;
+      padding: 14px;
+      margin-top: 14px;
+    }
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .transaction {
+      border: 1px solid var(--line);
+      background: #0b131d;
+      border-radius: 8px;
+      padding: 12px;
+      min-width: 0;
+    }
+    .transcript {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .msg {
+      border: 1px solid #28435c;
+      background: #0e1a27;
+      border-radius: 7px;
+      padding: 9px;
+      color: #dbe8f6;
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    .msg.tool {
+      border-color: #3a6c8d;
+      background: #102437;
+    }
+    details {
+      border: 1px solid var(--line);
+      background: #0b131d;
+      border-radius: 8px;
+      padding: 9px 10px;
+      margin-top: 8px;
+    }
+    summary {
+      cursor: pointer;
+      color: var(--blue);
+      font-weight: 750;
+      font-size: 12px;
+    }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      margin: 10px 0 0;
+      color: #dce7f3;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+    th {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    @media (max-width: 1100px) {
+      header { position: relative; }
+      .metrics, .task-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      main { grid-template-columns: 1fr; }
+      aside { position: relative; height: auto; top: 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .split { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .metrics, .task-metrics { grid-template-columns: 1fr; }
+      .header-row, .task-title-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <script id="sage-data" type="application/json">__SAGE_DATA__</script>
+  <header>
+    <div class="header-row">
+      <div>
+        <h1>Task Compare</h1>
+        <div class="subtitle" id="subtitle"></div>
+        <div class="run-progress" id="runProgress"></div>
+      </div>
+      <div class="dashboard-switch">Universal SAGE</div>
+    </div>
+    <section class="metrics" id="metrics"></section>
+  </header>
+  <main>
+    <aside>
+      <input class="search" id="search" placeholder="Filter tasks" />
+      <div class="task-list" id="taskList"></div>
+    </aside>
+    <section class="detail-wrap" id="detail"></section>
+  </main>
+  <script>
+    const payload = JSON.parse(document.getElementById("sage-data").textContent);
+    const summary = payload.summary || {};
+    const registry = payload.registry || {};
+    const baseline = payload.baseline || {};
+    const runMetadata = payload.run_metadata || {};
+    const events = summary.events || [];
+    const registryTools = registry.tools || {};
+    const baselineResults = baseline.results || [];
+    const baselineByTask = new Map(baselineResults.map((item) => [item.task_id, item]));
+    const taskEvents = events.filter((event) => event.event === "task");
+    const tasks = taskEvents.map((event, index) => ({
+      ...event,
+      display_index: index + 1,
+      baseline: baselineByTask.get(event.task_id) || null,
+      related: events.filter((candidate) => candidate.task_id === event.task_id),
+    }));
+    let selectedTaskId = tasks[0]?.task_id || "";
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[ch]));
+    }
+    function num(value, fallback = 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    function mean(values) {
+      const valid = values.map((value) => num(value, NaN)).filter((value) => Number.isFinite(value));
+      return valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
+    }
+    function fmt(value, digits = 3) {
+      return num(value).toFixed(digits);
+    }
+    function pct(value, digits = 1) {
+      const sign = value > 0 ? "+" : "";
+      return `${sign}${(num(value) * 100).toFixed(digits)}%`;
+    }
+    function deltaText(value, digits = 3) {
+      const sign = value >= 0 ? "+" : "";
+      return `${sign}${num(value).toFixed(digits)}`;
+    }
+    function scoreOf(record) {
+      if (!record) return 0;
+      if (record.score !== undefined) return num(record.score);
+      return record.success ? 1 : 0;
+    }
+    function outcomeOf(record) {
+      if (!record) return 0;
+      if (record.outcome_score !== undefined && record.outcome_score !== null) {
+        return num(record.outcome_score);
+      }
+      return scoreOf(record);
+    }
+    function taskName(task) {
+      return task.name || task.baseline?.name || task.task_id || "task";
+    }
+    function getRunStats() {
+      const baselineScore = mean(baselineResults.map(scoreOf));
+      const sageScore = mean(tasks.map(scoreOf));
+      const baselineOutcome = mean(baselineResults.map(outcomeOf));
+      const sageOutcome = mean(tasks.map(outcomeOf));
+      const total = Math.max(summary.tasks_seen || 0, baseline.tasks_seen || 0, tasks.length, baselineResults.length);
+      const paired = Math.min(summary.tasks_seen || tasks.length, baseline.tasks_seen || baselineResults.length || tasks.length);
+      return {
+        baselineScore,
+        sageScore,
+        scoreDelta: sageScore - baselineScore,
+        scoreLift: baselineScore ? (sageScore - baselineScore) / baselineScore : 0,
+        baselineOutcome,
+        sageOutcome,
+        outcomeDelta: sageOutcome - baselineOutcome,
+        outcomeLift: baselineOutcome ? (sageOutcome - baselineOutcome) / baselineOutcome : 0,
+        total,
+        paired,
+      };
+    }
+    function metric(label, value, hint, cls = "", clickable = false) {
+      return `<article class="metric ${clickable ? "clickable" : ""}" ${clickable ? 'id="toolsMetric"' : ""}>
+        <div class="label">${esc(label)}</div>
+        <div class="value ${cls}">${esc(value)}</div>
+        <div class="hint">${esc(hint)}</div>
+      </article>`;
+    }
+    function toolEventsForTask(task) {
+      const names = new Map();
+      for (const event of task.related || []) {
+        for (const helper of event.visible_helpers || []) names.set(helper, "visible");
+        if (event.tool_name) {
+          const kind = event.event === "tool_birth"
+            ? "born"
+            : event.event === "tool_refinement"
+              ? "repair"
+              : event.event.includes("retry")
+                ? "called"
+                : event.accepted === false
+                  ? "failed"
+                  : "visible";
+          names.set(event.tool_name, kind);
+        }
+      }
+      for (const use of task.tool_uses || []) {
+        if (use.generated_helper && use.tool_name) {
+          names.set(use.tool_name, use.success === false ? "failed" : "called");
+        }
+      }
+      return [...names.entries()].map(([tool, kind]) => ({ tool, kind }));
+    }
+    function renderHeader() {
+      const stats = getRunStats();
+      const status = runMetadata.benchmark_ready === false ? "probe" : "complete";
+      document.getElementById("subtitle").textContent =
+        `${summary.environment || "environment"} · ${status} · ${summary.model || "model"} · ` +
+        `${stats.paired}/${stats.total} matched tasks`;
+      document.getElementById("runProgress").innerHTML =
+        `<span class="label">Run Progress</span><strong>${stats.paired}/${stats.total}</strong>` +
+        `<span>baseline ${baseline.tasks_seen || baselineResults.length}/${stats.total} · ` +
+        `SAGE ${summary.tasks_seen || tasks.length}/${stats.total}</span>`;
+      document.getElementById("metrics").innerHTML = [
+        metric("Baseline Score", fmt(stats.baselineScore), `${baselineResults.length} paired score tasks`),
+        metric("SAGE Score", fmt(stats.sageScore), `${tasks.length} paired score tasks`),
+        metric("Score Lift", pct(stats.scoreLift), `${deltaText(stats.scoreDelta)} score delta`, stats.scoreDelta >= 0 ? "good" : "bad"),
+        metric("Baseline Outcome", fmt(stats.baselineOutcome), `${baselineResults.length} paired outcome tasks`),
+        metric("SAGE Outcome", fmt(stats.sageOutcome), `${tasks.length} paired outcome tasks`),
+        metric("Outcome Lift", pct(stats.outcomeLift), `${deltaText(stats.outcomeDelta)} outcome delta`, stats.outcomeDelta >= 0 ? "good" : "bad"),
+        metric(
+          "Tools Born / Used",
+          `${summary.tools_born || 0} / ${Object.values(registryTools).filter((record) => (record.uses || 0) > 0).length}`,
+          `${Object.keys(registryTools).length} registry tools; click for contribution`,
+          "warn",
+          true,
+        ),
+      ].join("");
+      document.getElementById("toolsMetric")?.addEventListener("click", () => {
+        document.getElementById("registrySection")?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+    function renderTaskList() {
+      const query = document.getElementById("search").value.toLowerCase();
+      const filtered = tasks.filter((task) => `${task.task_id} ${taskName(task)}`.toLowerCase().includes(query));
+      document.getElementById("taskList").innerHTML = filtered.map((task) => {
+        const base = task.baseline;
+        const scoreDelta = scoreOf(task) - scoreOf(base);
+        const outcomeDelta = outcomeOf(task) - outcomeOf(base);
+        const toolBadges = toolEventsForTask(task).slice(0, 3).map((item) =>
+          `<span class="tool-chip ${esc(item.kind)}">${esc(item.kind)} · ${esc(item.tool.replaceAll("_", " "))}</span>`
+        ).join("");
+        const more = toolEventsForTask(task).length > 3
+          ? `<span class="tool-chip">+${toolEventsForTask(task).length - 3}</span>`
+          : "";
+        return `<button class="task-btn ${task.task_id === selectedTaskId ? "active" : ""}" data-task-id="${esc(task.task_id)}">
+          <div class="task-name">${task.display_index}. ${esc(taskName(task))}</div>
+          <div class="task-meta">
+            <span><span class="meta-label">Score</span> <span class="${scoreDelta >= 0 ? "good" : "bad"}">${deltaText(scoreDelta)}</span></span>
+            <span><span class="meta-label">Outcome</span> <span class="${outcomeDelta >= 0 ? "good" : "bad"}">${deltaText(outcomeDelta)}</span></span>
+          </div>
+          <div class="tool-badges">${toolBadges}${more}</div>
+        </button>`;
+      }).join("") || "<div class='subtitle'>No matching tasks.</div>";
+      for (const button of document.querySelectorAll(".task-btn")) {
+        button.addEventListener("click", () => {
+          selectedTaskId = button.dataset.taskId;
+          renderTaskList();
+          renderDetail();
+        });
+      }
+    }
+    function renderDetail() {
+      const task = tasks.find((item) => item.task_id === selectedTaskId) || tasks[0];
+      if (!task) {
+        document.getElementById("detail").innerHTML = "<section class='task-hero'><h2>No task data recorded</h2></section>";
+        return;
+      }
+      const base = task.baseline;
+      const scoreDelta = scoreOf(task) - scoreOf(base);
+      const outcomeDelta = outcomeOf(task) - outcomeOf(base);
+      const toolEvents = toolEventsForTask(task);
+      const statusClass = task.success ? "good" : "bad";
+      document.getElementById("detail").innerHTML = `
+        <section class="task-hero">
+          <div class="task-title-row">
+            <div>
+              <div class="task-title">${esc(taskName(task))}</div>
+              <div class="task-id">${esc(task.task_id)}</div>
+            </div>
+            <span class="tag ${statusClass}">${task.success ? "SAGE success" : "SAGE incomplete"}</span>
+          </div>
+          <div class="tag-row">
+            <span class="tag">environment: ${esc(summary.environment || "unknown")}</span>
+            <span class="tag">mode: ${esc(runMetadata.execution_mode || "unknown")}</span>
+            <span class="tag ${summary.integrity_passed ? "good" : "bad"}">integrity ${summary.integrity_passed ? "passed" : "blocked"}</span>
+          </div>
+        </section>
+        <section class="task-metrics">
+          ${metric("Baseline Score", fmt(scoreOf(base)), base ? "baseline task" : "missing baseline")}
+          ${metric("SAGE Score", fmt(scoreOf(task)), "SAGE task")}
+          ${metric("Score Lift", deltaText(scoreDelta), "task score delta", scoreDelta >= 0 ? "good" : "bad")}
+          ${metric("Outcome Lift", deltaText(outcomeDelta), "task outcome delta", outcomeDelta >= 0 ? "good" : "bad")}
+        </section>
+        <section class="section">
+          <div class="section-title"><h2>Generated Tool Events On This Task</h2></div>
+          <div class="tool-badges">
+            ${toolEvents.length ? toolEvents.map((item) => `<span class="tool-chip ${esc(item.kind)}">${esc(item.kind)} · ${esc(item.tool.replaceAll("_", " "))}</span>`).join("") : "<span class='tool-chip'>no generated helper recorded</span>"}
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title"><h2>Task Evidence And Scores</h2></div>
+          <div class="split">
+            ${scoreCard("Baseline", base)}
+            ${scoreCard("SAGE", task)}
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title"><h2>Full Transaction</h2></div>
+          <div class="split">
+            ${transactionCard("Baseline", base)}
+            ${transactionCard("SAGE", task)}
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title"><h2>Task Event Timeline</h2></div>
+          ${task.related.map(renderEvent).join("")}
+        </section>
+        <section class="section" id="registrySection">
+          <div class="section-title"><h2>Generated Tool Registry</h2></div>
+          ${registryTable()}
+        </section>
+      `;
+    }
+    function scoreCard(label, record) {
+      if (!record) {
+        return `<div class="transaction"><h3>${esc(label)}</h3><p class="subtitle">No record exported.</p></div>`;
+      }
+      return `<div class="transaction">
+        <h3>${esc(label)}</h3>
+        <table>
+          <tr><th>Success</th><td>${esc(Boolean(record.success))}</td></tr>
+          <tr><th>Score</th><td>${fmt(scoreOf(record))}</td></tr>
+          <tr><th>Outcome</th><td>${fmt(outcomeOf(record))}</td></tr>
+          ${record.error ? `<tr><th>Error</th><td>${esc(record.error)}</td></tr>` : ""}
+        </table>
+      </div>`;
+    }
+    function transactionCard(label, record) {
+      if (!record) {
+        return `<div class="transaction"><h3>${esc(label)}</h3><p class="subtitle">No transaction exported.</p></div>`;
+      }
+      const transcript = record.transcript || [];
+      const toolUses = record.tool_uses || [];
+      const attempts = record.artifacts?.attempts || [];
+      return `<div class="transaction">
+        <h3>${esc(label)}</h3>
+        <div class="transcript">
+          ${transcript.length ? transcript.map((line, index) => `<div class="msg">${index + 1}. ${esc(line)}</div>`).join("") : "<div class='msg'>No transcript messages exported.</div>"}
+          ${toolUses.map((use, index) => `<div class="msg tool">${index + 1}. TOOL ${esc(use.tool_name)} · success ${esc(use.success)}<br>${esc(compactJson(use.arguments))}<br>${esc(compactJson(use.result))}</div>`).join("")}
+          ${attempts.map((attempt, index) => `<div class="msg tool">${index + 1}. ATTEMPT ${esc(attempt.candidate_index ?? index)} · exit ${esc(attempt.exit_code ?? "n/a")} · len ${esc(attempt.poc_length ?? "n/a")}<br>${esc(attempt.output_excerpt || attempt.error || "")}</div>`).join("")}
+        </div>
+        <details><summary>Raw ${esc(label)} record</summary><pre>${esc(JSON.stringify(record, null, 2))}</pre></details>
+      </div>`;
+    }
+    function compactJson(value) {
+      if (value === undefined || value === null || value === "") return "";
+      const rendered = JSON.stringify(value);
+      return rendered && rendered.length > 260 ? `${rendered.slice(0, 260)}...` : rendered;
+    }
+    function renderEvent(event) {
+      const title = (event.event || "event").replaceAll("_", " ");
+      const cls = event.success === true || event.accepted === true ? "good" : event.success === false || event.accepted === false ? "bad" : "warn";
+      return `<details>
+        <summary><span class="${cls}">${esc(title)}</span> ${esc(event.tool_name || event.gap_key || "")}</summary>
+        <pre>${esc(JSON.stringify(event, null, 2))}</pre>
+      </details>`;
+    }
+    function registryTable() {
+      const rows = Object.entries(registryTools);
+      if (!rows.length) return "<p class='subtitle'>No generated tools retained.</p>";
+      return `<table><thead><tr><th>Tool</th><th>Family</th><th>Uses</th><th>Successes</th><th>Decision</th></tr></thead><tbody>
+        ${rows.map(([name, record]) => {
+          const spec = record.candidate?.spec || {};
+          const lifecycle = (summary.lifecycle_decisions || []).find((row) => row.tool_name === name) || {};
+          return `<tr>
+            <td>${esc(name)}</td>
+            <td>${esc(spec.family || "")}</td>
+            <td>${esc(record.uses || 0)}</td>
+            <td>${esc(record.successes || 0)}</td>
+            <td>${esc(lifecycle.decision || "watch")}</td>
+          </tr>`;
+        }).join("")}
+      </tbody></table>`;
+    }
+    document.getElementById("search").addEventListener("input", renderTaskList);
+    renderHeader();
+    renderTaskList();
+    renderDetail();
+  </script>
+</body>
+</html>
+"""
+    return template.replace("__SAGE_DATA__", embedded)
+
+
+def _legacy_dashboard_html(payload: dict[str, Any]) -> str:
     embedded = html.escape(json.dumps(payload), quote=False)
     return f"""<!doctype html>
 <html lang="en">

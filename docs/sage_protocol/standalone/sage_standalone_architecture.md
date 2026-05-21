@@ -149,13 +149,22 @@ The exporter writes:
 
 - `summary.json`: the generic `SAGERunSummary`;
 - `dashboard_data.json`: summary plus registry payload;
+- `dashboard/task_compare_data.json`: dashboard-local copy of the same generic
+  payload;
 - `registry.json`: a run-local copy of accepted helper metadata;
-- `dashboard/index.html`: a self-contained dark-mode dashboard.
+- `dashboard/task_compare.html`: the default self-contained dark-mode Task
+  Compare dashboard;
+- `dashboard/index.html`: compatibility copy of the same dashboard.
 
 The dashboard deliberately avoids ToolSandbox-specific assumptions. It renders
-generic task events, gap events, helper birth/repair/retry events, integrity
-status, lifecycle decisions, and registry tools. Any future environment adapter
-that returns the same `SAGERunSummary` shape can use the same dashboard.
+generic task events, baseline records, SAGE task scores, transcripts/artifacts
+when the adapter exports them, gap events, helper birth/repair/retry events,
+integrity status, lifecycle decisions, and registry tools. Its visual structure
+matches the main Task Compare dashboard: run-level metric tiles, a compact task
+sidebar, task-level score/outcome lift, generated-tool events near the top, full
+baseline/SAGE transactions, and registry/lifecycle details. Any future
+environment adapter that returns the same `SAGERunSummary` and optional
+baseline-result shape can use the same dashboard.
 
 For smoke runs, `scripts/run_sage_agent_smoke.py` also records a matched
 no-generated-helper baseline over the same adapter task stream. This lets the

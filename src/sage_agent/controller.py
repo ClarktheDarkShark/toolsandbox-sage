@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+import json
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
@@ -126,12 +127,11 @@ class SAGEAgent:
             tasks_succeeded += int(result.success)
             tools_reused += _record_reuse_events(self.registry, helper_bundle, result)
             events.append(
-                {
-                    "event": "task",
-                    "task_id": task.task_id,
-                    "success": result.success,
-                    "visible_helpers": list(visible),
-                }
+                _task_result_event(
+                    task_id=task.task_id,
+                    result=result,
+                    visible_helpers=visible,
+                )
             )
             gap = self.adapter.observe_gap(task, result, records)
             if gap is None:
@@ -401,6 +401,33 @@ def _record_reuse_events(
         registry.record_use(use.tool_name, success=use.success and result.success)
         count += 1
     return count
+
+
+def _task_result_event(
+    *,
+    task_id: str,
+    result: TaskRunResult,
+    visible_helpers: tuple[str, ...],
+) -> dict[str, Any]:
+    return {
+        "event": "task",
+        "task_id": task_id,
+        "name": result.task.name,
+        "success": result.success,
+        "score": result.score,
+        "outcome_score": (
+            result.outcome_score if result.outcome_score is not None else result.score
+        ),
+        "error": result.error,
+        "visible_helpers": list(visible_helpers),
+        "transcript": list(result.transcript),
+        "tool_uses": _json_safe([asdict(use) for use in result.tool_uses]),
+        "artifacts": _json_safe(result.artifacts),
+    }
+
+
+def _json_safe(value: Any) -> Any:
+    return json.loads(json.dumps(value, default=str))
 
 
 def _gap_event(gap: GapSignal) -> dict[str, Any]:

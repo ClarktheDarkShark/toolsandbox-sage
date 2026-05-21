@@ -192,14 +192,17 @@ def test_standalone_dashboard_exports_env_neutral_run(tmp_path: Path) -> None:
     )
 
     html = dashboard_path.read_text(encoding="utf-8")
-    assert "SAGE Standalone Dashboard" in html
+    assert dashboard_path.name == "task_compare.html"
+    assert "Task Compare" in html
     assert "cybergym" in html
-    assert "Baseline success" in html
-    assert "Relative lift" in html
-    assert "Run Mode" in html
+    assert "Baseline Score" in html
+    assert "Outcome Lift" in html
+    assert "Universal SAGE" in html
     assert "cybergym_synthetic_probe" in html
     assert (tmp_path / "run" / "summary.json").exists()
     assert (tmp_path / "run" / "dashboard_data.json").exists()
+    assert (tmp_path / "run" / "dashboard" / "task_compare_data.json").exists()
+    assert (tmp_path / "run" / "dashboard" / "index.html").exists()
 
 
 class BrokenThenRepairGenerator(TemplateHelperGenerator):

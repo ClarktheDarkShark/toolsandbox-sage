@@ -135,18 +135,20 @@ PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
   --limit 3
 ```
 
-Each smoke run writes an environment-neutral dashboard under
-`outputs/sage_agent_standalone/<run_id>/dashboard/index.html`, plus
-`summary.json`, `dashboard_data.json`, and a copy of the standalone registry.
-The dashboard reads only generic SAGE run summary events and registry metadata,
-so it can render ToolSandbox, CyberGym, or a future adapter without
-environment-specific dashboard code. The smoke runner also records a matched
-no-generated-helper baseline over the same adapter task stream so the dashboard
-can report baseline success, SAGE success, absolute lift, and relative lift
-when the runner marks that baseline as a valid comparison. Adapter smoke
-baselines are lifecycle checks, not benchmark controls; those are marked as
-`comparison_valid: false`, shown as `Probe baseline`, and excluded from lift
-calculations. The dashboard also records run-mode metadata:
+Each smoke run writes an environment-neutral Task Compare dashboard under
+`outputs/sage_agent_standalone/<run_id>/dashboard/task_compare.html`; `index.html`
+is kept as the same page for compatibility. The run also writes `summary.json`,
+`dashboard_data.json`, `dashboard/task_compare_data.json`, and a copy of the
+standalone registry. The dashboard reads only generic SAGE run summary events,
+baseline records, task transcripts/artifacts when the adapter exports them, and
+registry metadata, so it can render ToolSandbox, CyberGym, or a future adapter
+without environment-specific dashboard code. The smoke runner also records a
+matched no-generated-helper baseline over the same adapter task stream so the
+dashboard can report baseline score, SAGE score, score lift, baseline outcome,
+SAGE outcome, and outcome lift when the runner marks that baseline as a valid
+comparison. Adapter smoke baselines are lifecycle checks, not benchmark
+controls; those are marked as `comparison_valid: false` and described as probe
+baselines. The dashboard also records run-mode metadata:
 whether the adapter is benchmark-ready, how many tasks the adapter exposes, and
 whether real task generation, verifier/server execution, and result ingestion
 were used. The current CyberGym adapter is explicitly a synthetic probe, not a

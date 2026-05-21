@@ -1107,7 +1107,7 @@
 - Objective: verify that standalone SAGE can operate on a new benchmark environment using bounded four-task batches, without CyberGym-specific generated-helper hard-coding or hidden-label/reference-PoC access.
 - Branch: `codex/sage-standalone-agent`.
 - Run root: `outputs/cybergym_live_sage/batched20_generic_visible_v2_20260521_102125`.
-- Dashboard: `outputs/cybergym_live_sage/batched20_generic_visible_v2_20260521_102125/dashboard/index.html`.
+- Dashboard: `outputs/cybergym_live_sage/batched20_generic_visible_v2_20260521_102125/dashboard/task_compare.html`.
 - Registry: `artifacts/cybergym_live_sage/batched20_registry_generic_visible_v2/sage_registry.json`, SHA-256 `93a6444a7a1225d4f4aab79a8237d5add07ed082176618ec4fa4823b440437e7`.
 - Machine-readable summary: `artifacts/sage_standalone/cybergym_batched20_generic_visible_v2_summary.json`, SHA-256 `20bab3b048ccda1a21600f775dbd411d855ef7878a697af2dd68b1c5333edbb6`.
 - Run summary SHA-256: `84bc00e440ea620a401340bf69d880bdfe67003e88cc9d4345673489368d7759`; batched summary SHA-256 `fb491016ee5b26b5081e15fdfa8be6986d148439ca22a825a06406e6bc36143d`; dashboard data SHA-256 `03b9af70d54966bf82ea4c75d188057c97dc6938559e0aae97e9a8a9a5777233`.
