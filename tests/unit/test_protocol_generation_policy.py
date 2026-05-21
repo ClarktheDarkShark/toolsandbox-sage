@@ -1,5 +1,8 @@
 # mypy: ignore-errors
 from scripts.run_sage_protocol import (
+    SAGE_POLICY_SELF_EVOLVING_PRAXIS,
+    SELF_EVOLVING_PRAXIS_ENV_DEFAULTS,
+    _apply_sage_policy_preset,
     _generation_enabled_by_default,
     _protocol_gate_decision,
     _restore_registry_after_failed_gate,
@@ -21,6 +24,32 @@ def test_transfer_mode_stays_frozen_for_non_discovery_manifest() -> None:
 
 def test_mechanism_mode_enables_generation_by_default() -> None:
     assert _generation_enabled_by_default("mechanism_40", "anything") is True
+
+
+def test_self_evolving_praxis_policy_sets_high_lift_runtime_defaults(
+    monkeypatch,
+) -> None:
+    for key in SELF_EVOLVING_PRAXIS_ENV_DEFAULTS:
+        monkeypatch.delenv(key, raising=False)
+
+    applied = _apply_sage_policy_preset(SAGE_POLICY_SELF_EVOLVING_PRAXIS)
+
+    assert applied
+    for key, expected in SELF_EVOLVING_PRAXIS_ENV_DEFAULTS.items():
+        assert applied[key] == {"value": expected, "source": "preset_default"}
+
+
+def test_self_evolving_praxis_policy_preserves_explicit_environment(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "disabled")
+
+    applied = _apply_sage_policy_preset(SAGE_POLICY_SELF_EVOLVING_PRAXIS)
+
+    assert applied["SAGE_PRAXIS_BRIDGE_POLICY"] == {
+        "value": "disabled",
+        "source": "preexisting_environment",
+    }
 
 
 def test_protocol_gate_rejects_non_negative_mean_without_helper_value() -> None:

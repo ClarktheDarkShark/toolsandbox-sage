@@ -176,9 +176,13 @@ result from being mistaken for CyberGym benchmark evidence.
 
 ## Next Work
 
-The next implementation layer should connect the existing self-evolving
-ToolSandbox online-birth machinery to the standalone adapter interface. After
-that, CyberGym can add real execution support:
+The ToolSandbox protocol runner now exposes the existing self-evolving
+online-birth machinery as `--sage-policy self-evolving-praxis`, which is the
+bridge from the historical ToolSandbox-specific system into the broader SAGE
+agent work. The remaining architecture work is to make this policy shape
+native to the environment-neutral adapter interface instead of expressing it
+through ToolSandbox environment variables. After that, CyberGym can add fuller
+execution support:
 
 1. subset data bootstrap,
 2. PoC server lifecycle,

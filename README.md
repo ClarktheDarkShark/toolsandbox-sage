@@ -317,34 +317,37 @@ PYTHONPATH=src:. python scripts/prepare_self_evolving_sage_mini60.py \
 ```
 
 Then run the prepared manifest with cached controls and fresh candidate/SAGE
-tasks. Generation must stay on for this live self-evolving proof:
+tasks. Generation must stay on for this live self-evolving proof. Prefer the
+first-class policy preset so the run records the complete self-evolving Praxis
+runtime stack in `protocol_manifest.json`:
 
 ```bash
-env \
-  SAGE_PRAXIS_BRIDGE_POLICY=combined \
-  SAGE_SELF_EVOLVING_PROACTIVE_BIRTH=1 \
-  SAGE_SELF_EVOLVING_PROACTIVE_SCOPE=just_in_time \
-  SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE=1 \
-  SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS=4 \
-  SAGE_TS_MODEL=gpt-4o-mini \
-  PYTHONPATH=src:. \
-  python scripts/run_sage_protocol.py \
-    --mode mechanism_60 \
-    --manifest artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_manifest.json \
-    --registry-dir artifacts/self_evolving_sage/current_mini60_live_generation_v2/registry \
-    --agent gpt-4o-mini \
-    --user gpt-4o-mini \
-    --generation-model gpt-4o-mini \
-    --generation on \
-    --disable-openai-response-cache \
-    --cache-mode off \
-    --parallel-arms \
-    --control-cache use-if-eligible \
-    --routing-evidence-mode disabled \
-    --allow-low-quality-cohort \
-    --output-root outputs/self_evolving_sage/live_generation_v_next_diag24 \
-    --artifact-root artifacts/self_evolving_sage/campaign_artifacts_live_generation_v_next_diag24
+PYTHONPATH=src:. python scripts/run_sage_protocol.py \
+  --mode mechanism_60 \
+  --manifest artifacts/self_evolving_sage/current_mini60_live_generation_v2/self_evolving_mini60_manifest.json \
+  --registry-dir artifacts/self_evolving_sage/current_mini60_live_generation_v2/registry \
+  --sage-policy self-evolving-praxis \
+  --agent gpt-4o-mini \
+  --user gpt-4o-mini \
+  --generation-model gpt-4o-mini \
+  --generation on \
+  --disable-openai-response-cache \
+  --cache-mode off \
+  --parallel-arms \
+  --control-cache use-if-eligible \
+  --routing-evidence-mode disabled \
+  --allow-low-quality-cohort \
+  --output-root outputs/self_evolving_sage/live_generation_v_next_diag24 \
+  --artifact-root artifacts/self_evolving_sage/campaign_artifacts_live_generation_v_next_diag24
 ```
+
+`--sage-policy self-evolving-praxis` expands to the high-lift audited defaults:
+just-in-time proactive helper birth, same-task fair chance for newly accepted
+helpers, safe-abstain birth, the combined Praxis actor bridge policy, transient
+scenario retries, V2 contract synthesis/repair/dependency/medium-grain
+generation features, and task-level control-cache matching. Explicit
+environment variables are preserved and recorded if a run intentionally
+overrides any default.
 
 By default, each protocol run opens the new Task Compare dashboard
 (`dashboard/task_compare.html`) in the external browser. The runner also writes

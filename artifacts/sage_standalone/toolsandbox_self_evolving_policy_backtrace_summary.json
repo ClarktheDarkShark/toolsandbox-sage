@@ -1,0 +1,133 @@
+{
+  "date": "2026-05-20",
+  "decision": "ROOT_CAUSE_CONFIRMED_POLICY_PRESET_RESTORES_TOOLSANDBOX_LIFT_ON_CACHED_VERIFY20",
+  "root_cause": "failed standalone verify20 enabled generic generation but not the high-lift self-evolving Praxis policy stack used by v70/v71 broad500 runs",
+  "failed_run": {
+    "run_root": "outputs/sage_agent_standalone/toolsandbox_real_verify20/mechanism_40_20260520_204549",
+    "score_delta": 0.029974930609670648,
+    "outcome_delta": -0.03762994067338511,
+    "exact_success_delta": 2,
+    "control_cache_mode": "use-if-eligible",
+    "cached_control_tasks": 12,
+    "fresh_control_tasks": 8,
+    "accepted_tools": 11,
+    "called_tools": 2,
+    "gate_passed": false
+  },
+  "recovered_run": {
+    "run_root": "outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy/mechanism_40_20260520_210531",
+    "dashboard_url": "http://127.0.0.1:62630/outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy/mechanism_40_20260520_210531/dashboard/task_compare.html",
+    "sage_policy": "self-evolving-praxis",
+    "sage_policy_env": {
+      "SAGE_SELF_EVOLVING_PROACTIVE_BIRTH": {
+        "value": "1",
+        "source": "preset_default"
+      },
+      "SAGE_SELF_EVOLVING_PROACTIVE_SCOPE": {
+        "value": "just_in_time",
+        "source": "preset_default"
+      },
+      "SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE": {
+        "value": "1",
+        "source": "preset_default"
+      },
+      "SAGE_ENABLE_SAFE_ABSTAIN_BIRTH": {
+        "value": "1",
+        "source": "preset_default"
+      },
+      "SAGE_PRAXIS_BRIDGE_POLICY": {
+        "value": "combined",
+        "source": "preset_default"
+      },
+      "SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS": {
+        "value": "4",
+        "source": "preset_default"
+      },
+      "SAGE_V2_EXPERIMENT_FEATURES": {
+        "value": "contract_synthesis,candidate_repair,dependency_logic,medium_grain_skills",
+        "source": "preset_default"
+      },
+      "SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS": {
+        "value": "120",
+        "source": "preset_default"
+      },
+      "SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY": {
+        "value": "1",
+        "source": "preset_default"
+      }
+    },
+    "score": {
+      "control": 0.7280016760404069,
+      "candidate": 0.9081188985049202,
+      "delta": 0.18011722246451334
+    },
+    "outcome": {
+      "control": 0.45464922278512293,
+      "candidate": 0.9201388888888888,
+      "delta": 0.46548966610376596
+    },
+    "exact_successes": {
+      "control": 3,
+      "candidate": 16,
+      "delta": 13
+    },
+    "gains_regressions": {
+      "score_gains": 14,
+      "score_regressions": 2,
+      "outcome_gains": 14,
+      "outcome_regressions": 1
+    },
+    "control_cache": {
+      "mode": "strict",
+      "source": "cached",
+      "cached": 20,
+      "fresh": 0,
+      "manifest_hash": "00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2"
+    },
+    "models": {
+      "agent": "gpt-4o-mini",
+      "user": "gpt-4o-mini",
+      "generation_model": "gpt-4o-mini"
+    },
+    "generated_helpers": {
+      "registry_size": 12,
+      "accepted_tools": [
+        "days_between_timestamps",
+        "next_weekday_time_to_timestamp",
+        "plan_contact_relationship_batch_update",
+        "plan_device_state_action_sequence_v3",
+        "prepare_reminder_creation_args",
+        "prepare_safe_action_or_abstain",
+        "prepare_side_effect_args_from_selected_record",
+        "relative_day_time_to_timestamp",
+        "resolve_search_window_or_bounds",
+        "select_action_target_by_recency",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update"
+      ],
+      "called_tools": [
+        "next_weekday_time_to_timestamp",
+        "plan_contact_relationship_batch_update",
+        "plan_device_state_action_sequence_v3",
+        "prepare_reminder_creation_args",
+        "prepare_safe_action_or_abstain",
+        "resolve_search_window_or_bounds",
+        "select_message_content_by_recency",
+        "select_message_counterparty_for_contact_update"
+      ],
+      "accepted_but_uncalled": [
+        "days_between_timestamps",
+        "prepare_side_effect_args_from_selected_record",
+        "relative_day_time_to_timestamp",
+        "select_action_target_by_recency"
+      ]
+    },
+    "runtime_exception_count": 0,
+    "protocol_gate_passed": true,
+    "protocol_gate_reasons": []
+  },
+  "reference_runs": {
+    "v71_clean_repro": "outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356",
+    "v70_zero_side_effect_jit": "outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839"
+  }
+}

@@ -86,6 +86,47 @@ MODES = (
     "full_benchmark",
 )
 
+SAGE_POLICY_NONE = "none"
+SAGE_POLICY_SELF_EVOLVING_PRAXIS = "self-evolving-praxis"
+SAGE_POLICIES = (SAGE_POLICY_NONE, SAGE_POLICY_SELF_EVOLVING_PRAXIS)
+SELF_EVOLVING_PRAXIS_ENV_DEFAULTS = {
+    "SAGE_SELF_EVOLVING_PROACTIVE_BIRTH": "1",
+    "SAGE_SELF_EVOLVING_PROACTIVE_SCOPE": "just_in_time",
+    "SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE": "1",
+    "SAGE_ENABLE_SAFE_ABSTAIN_BIRTH": "1",
+    "SAGE_PRAXIS_BRIDGE_POLICY": "combined",
+    "SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS": "4",
+    "SAGE_V2_EXPERIMENT_FEATURES": (
+        "contract_synthesis,candidate_repair,dependency_logic,medium_grain_skills"
+    ),
+    "SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS": "120",
+    "SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY": "1",
+}
+
+
+def _apply_sage_policy_preset(policy: str) -> dict[str, dict[str, str]]:
+    """Apply a named SAGE runtime policy without overriding explicit env values."""
+
+    if policy == SAGE_POLICY_NONE:
+        return {}
+    if policy != SAGE_POLICY_SELF_EVOLVING_PRAXIS:
+        raise ValueError(f"Unknown SAGE policy preset: {policy}")
+    applied: dict[str, dict[str, str]] = {}
+    for key, desired_value in SELF_EVOLVING_PRAXIS_ENV_DEFAULTS.items():
+        existing = os.environ.get(key)
+        if existing is None:
+            os.environ[key] = desired_value
+            applied[key] = {
+                "value": desired_value,
+                "source": "preset_default",
+            }
+        else:
+            applied[key] = {
+                "value": existing,
+                "source": "preexisting_environment",
+            }
+    return applied
+
 
 def _manifest_type(manifest: Path) -> str:
     try:
@@ -845,6 +886,16 @@ def main() -> None:
         choices=KNOWN_POLICIES,
         default=UPSTREAM_POLICY,
     )
+    parser.add_argument(
+        "--sage-policy",
+        choices=SAGE_POLICIES,
+        default=os.environ.get("SAGE_POLICY_PRESET", SAGE_POLICY_NONE),
+        help=(
+            "Optional SAGE runtime policy preset. 'self-evolving-praxis' "
+            "enables the audited high-lift online birth, repair, bridge, "
+            "and fair-chance controls used by the self-evolving Praxis runs."
+        ),
+    )
     parser.add_argument("--registry-dir", type=Path)
     parser.add_argument(
         "--prompt-cache-dir",
@@ -970,6 +1021,7 @@ def main() -> None:
         generation_model=args.generation_model,
         user_model=args.user,
     )
+    os.environ["SAGE_TS_MODEL"] = args.agent
     run_root = args.output_root / f"{args.mode}_{_timestamp()}"
     control_root = run_root / "control"
     candidate_root = run_root / "candidate"
@@ -988,6 +1040,15 @@ def main() -> None:
     elif _is_frozen_transfer_mode(args.mode):
         generation_enabled = False
     frozen_final_run = _is_frozen_transfer_mode(args.mode) and not generation_enabled
+    sage_policy_env: dict[str, dict[str, str]] = {}
+    if args.sage_policy != SAGE_POLICY_NONE:
+        if not generation_enabled:
+            raise SystemExit(
+                "--sage-policy self-evolving-praxis requires generation-enabled "
+                "mechanism/online-build execution. Do not use it for frozen "
+                "registry validation arms."
+            )
+        sage_policy_env = _apply_sage_policy_preset(args.sage_policy)
     _preflight_openai_api_key(
         agent_model=args.agent,
         user_model=args.user,
@@ -1093,6 +1154,8 @@ def main() -> None:
             "routing_evidence_path": str(args.routing_evidence_path)
             if args.routing_evidence_path
             else None,
+            "sage_policy": args.sage_policy,
+            "sage_policy_env": sage_policy_env,
             "toolsandbox_clock_policy": "frozen"
             if args.freeze_toolsandbox_clock
             else "wall_clock",
@@ -1190,6 +1253,7 @@ def main() -> None:
             "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
             "cohort_quality_gate_status": cohort_preflight.get("quality_gate_status"),
             "routing_evidence_mode": routing_evidence_mode,
+            "sage_policy": args.sage_policy,
         },
         root=args.artifact_root,
     )
@@ -1676,6 +1740,8 @@ def main() -> None:
         "comparison_model_key": model_metadata["comparison_key"],
         "generation_enabled": generation_enabled,
         "base_tool_policy": args.base_tool_policy,
+        "sage_policy": args.sage_policy,
+        "sage_policy_env": sage_policy_env,
         "scenario_count": len(scenario_names),
         "control_dir": str(control_dir),
         "candidate_dir": str(candidate_dir),

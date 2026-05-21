@@ -1,5 +1,23 @@
 # Run Ledger
 
+## 2026-05-20
+
+- `Standalone ToolSandbox self-evolving policy backtrace verify20` completed.
+  - Branch: `codex/sage-standalone-agent`.
+  - Objective: find why the standalone ToolSandbox verify20 run regressed while prior self-evolving broad500 runs had high lift, then recover the working mechanics without manually exposing tools.
+  - Root cause: failed run `outputs/sage_agent_standalone/toolsandbox_real_verify20/mechanism_40_20260520_204549` used generic generation only. It did not enable the self-evolving Praxis runtime stack from v70/v71: just-in-time proactive birth, same-task fair chance, safe-abstain birth, combined Praxis actor bridge policy, transient retries, V2 contract/repair/dependency/medium-grain generation features, and task-level control-cache matching.
+  - Code repair: `scripts/run_sage_protocol.py` now exposes `--sage-policy self-evolving-praxis`. The preset applies the high-lift defaults and records each value/source in `protocol_manifest.json`; explicit environment overrides are preserved.
+  - Validation run: `outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy/mechanism_40_20260520_210531`.
+  - Dashboard: `http://127.0.0.1:62630/outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy/mechanism_40_20260520_210531/dashboard/task_compare.html`.
+  - Controls: `20 cached / 0 fresh`; cache manifest hash `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`; SAGE/candidate task cache off; OpenAI response cache disabled; routing evidence disabled.
+  - Models: agent/user/generation all `gpt-4o-mini`.
+  - Metrics: canonical/reference `0.728002 -> 0.908119`, delta `+0.180117`; outcome `0.454649 -> 0.920139`, delta `+0.465490`; exact successes `3 -> 16`.
+  - Gains/regressions: canonical `14 / 2`; outcome `14 / 1`.
+  - Generated helpers: `12` accepted from an empty generated-tool registry; `8` naturally called.
+  - Safety: runtime exceptions `0`; helper side-effect preservation reports `0`; protocol gate `PASS`.
+  - Machine summary: `artifacts/sage_standalone/toolsandbox_self_evolving_policy_backtrace_summary.json`, SHA-256 `3bc290fa823fb832ee024466147633e7b5b4f771143a081bbb275042db6fd112`.
+  - Decision label: `ROOT_CAUSE_CONFIRMED_POLICY_PRESET_RESTORES_TOOLSANDBOX_LIFT_ON_CACHED_VERIFY20`.
+
 ## 2026-05-15
 
 - `Self-evolving broad500 clean committed-tree reproduction v71` completed.

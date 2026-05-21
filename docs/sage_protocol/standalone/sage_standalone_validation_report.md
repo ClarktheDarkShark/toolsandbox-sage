@@ -474,3 +474,129 @@ target, not as task-ID or label-specific logic.
 Resource cleanup check: after the run, no `n132/arvo:*` or
 `cybergym/oss-fuzz:*` runner images remained listed by Docker. Batch work
 directories were cleared unless explicitly retained.
+
+## ToolSandbox Root-Cause Backtrace to the Working Self-Evolving System
+
+Date: 2026-05-20
+
+Question: why did the standalone ToolSandbox verify20 run regress on outcome
+when the previous self-evolving SAGE runs produced very large lift?
+
+Root cause: the failed verify20 run enabled generic generation, but did not
+enable the full self-evolving Praxis runtime stack that produced the broad500
+success. The prior high-lift runs were not just "generation on." They combined
+just-in-time proactive helper birth, same-task fair chance for newly accepted
+helpers, Praxis actor bridge policy, V2 contract/repair/dependency generation
+features, safe-abstain birth, transient scenario retries, routing evidence
+disabled, fresh SAGE/candidate execution, and strict cached controls.
+
+Correct prior reference runs:
+
+- highest clean committed-tree reproduction:
+  `outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356`
+- strongest zero-side-effect JIT same-task proof:
+  `outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839`
+
+Reference v71 result:
+
+- score: `0.656799 -> 0.854188`, delta `+0.197389`
+- outcome: `0.494746 -> 0.880845`, delta `+0.386099`
+- exact successes: `20 -> 288`
+- controls: `500 cached / 0 fresh`
+- generated registry: `16` accepted helpers, `14` naturally called
+- gate: pass
+
+Reference v70 result:
+
+- score: `0.656799 -> 0.827506`, delta `+0.170706`
+- outcome: `0.494746 -> 0.872782`, delta `+0.378036`
+- exact successes: `20 -> 287`
+- controls: `500 cached / 0 fresh`
+- generated registry: `16` accepted helpers, `14` naturally called
+- helper side-effect incidents: `0`
+- gate: pass
+
+Failed standalone verify20 result:
+
+- run: `outputs/sage_agent_standalone/toolsandbox_real_verify20/mechanism_40_20260520_204549`
+- score: `0.723418 -> 0.753393`, delta `+0.029975`
+- outcome: `0.510265 -> 0.472635`, delta `-0.037630`
+- exact successes: `6 -> 8`
+- controls: `12 cached / 8 fresh`
+- generated registry: `11` accepted helpers, only `2` naturally called
+- gate: fail
+
+The behavioral failure was adoption and routing, not tool absence. The failed
+run generated many familiar helpers, but most of the important helpers were
+hidden or visible-not-called. The high-lift runs routed and adopted the same
+types of helpers broadly: device-state action planning, search-window
+resolution, contact lookup/update planning, reminder argument preparation,
+message recency selectors, weekday timestamp conversion, and safe abstention.
+
+Code repair: `scripts/run_sage_protocol.py` now has a first-class
+`--sage-policy self-evolving-praxis` preset. The preset applies and records the
+same policy defaults used by the successful broad500 runs:
+
+- `SAGE_SELF_EVOLVING_PROACTIVE_BIRTH=1`
+- `SAGE_SELF_EVOLVING_PROACTIVE_SCOPE=just_in_time`
+- `SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE=1`
+- `SAGE_ENABLE_SAFE_ABSTAIN_BIRTH=1`
+- `SAGE_PRAXIS_BRIDGE_POLICY=combined`
+- `SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS=4`
+- `SAGE_V2_EXPERIMENT_FEATURES=contract_synthesis,candidate_repair,dependency_logic,medium_grain_skills`
+- `SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS=120`
+- `SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY=1`
+
+The preset does not overwrite explicit environment values. If a value is
+already set, the protocol manifest records that it came from the preexisting
+environment.
+
+Small validation after repair:
+
+```bash
+PYTHONPATH=src:. python scripts/run_sage_protocol.py \
+  --mode mechanism_40 \
+  --manifest artifacts/sage_standalone/toolsandbox_verify20_manifest.json \
+  --generation on \
+  --sage-policy self-evolving-praxis \
+  --agent gpt-4o-mini \
+  --user gpt-4o-mini \
+  --generation-model gpt-4o-mini \
+  --disable-openai-response-cache \
+  --cache-mode off \
+  --control-cache strict \
+  --routing-evidence-mode disabled \
+  --allow-low-quality-cohort \
+  --output-root outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy \
+  --artifact-root artifacts/sage_standalone/toolsandbox_verify20_self_evolving_policy_artifacts \
+  --dashboard-port 62630
+```
+
+Run:
+`outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy/mechanism_40_20260520_210531`
+
+Machine-readable summary:
+`artifacts/sage_standalone/toolsandbox_self_evolving_policy_backtrace_summary.json`,
+SHA-256 `3bc290fa823fb832ee024466147633e7b5b4f771143a081bbb275042db6fd112`
+
+Result:
+
+- matched tasks: `20`
+- controls: `20 cached / 0 fresh`
+- score: `0.728002 -> 0.908119`, delta `+0.180117`
+- outcome: `0.454649 -> 0.920139`, delta `+0.465490`
+- exact successes: `3 -> 16`
+- gains/regressions: `14 / 2`
+- outcome gains/regressions: `14 / 1`
+- generated registry: `12` accepted helpers, `8` naturally called
+- runtime exceptions: `0`
+- helper side-effect preservation reports: none emitted
+- gate: pass
+
+Interpretation: the previous failure was a harness/policy integration error in
+the broad standalone ToolSandbox validation path. Once the high-lift
+self-evolving stack is applied as a named preset, the same 20-task slice moves
+from outcome regression to large positive outcome lift while starting from an
+empty generated-tool registry and using only cached controls for the baseline.
+This does not by itself replace the prior broad500 evidence, but it verifies
+that the broader runner can activate the working SAGE mechanics.
