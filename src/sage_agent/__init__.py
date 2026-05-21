@@ -5,8 +5,9 @@ It intentionally contains no ToolSandbox-specific assumptions. Environments
 provide adapters; SAGE provides the gap-to-helper lifecycle.
 """
 
+from sage_agent.baselines import OpenAIEnvironmentBaseline
 from sage_agent.controller import SAGEAgent, SAGEConfig, SAGERunSummary
-from sage_agent.dashboard import write_standalone_dashboard
+from sage_agent.dashboard import open_standalone_dashboard, write_standalone_dashboard
 from sage_agent.gap_mining import mine_gap_signals
 from sage_agent.generators import OpenAIHelperGenerator, TemplateHelperGenerator
 from sage_agent.integrity import (
@@ -48,6 +49,7 @@ __all__ = [
     "IntegrityIssue",
     "IntegrityReport",
     "LocalSAGERegistry",
+    "OpenAIEnvironmentBaseline",
     "OpenAIHelperGenerator",
     "ResearchIntegrityPolicy",
     "SAGEAgent",
@@ -60,5 +62,6 @@ __all__ = [
     "ValidationCase",
     "assess_helper_lifecycle",
     "mine_gap_signals",
+    "open_standalone_dashboard",
     "write_standalone_dashboard",
 ]

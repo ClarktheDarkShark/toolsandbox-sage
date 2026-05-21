@@ -5,9 +5,13 @@ from __future__ import annotations
 import html
 import json
 import shutil
+import socket
+import subprocess
+import sys
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from sage_agent.controller import SAGERunSummary
 
@@ -45,6 +49,10 @@ def write_standalone_dashboard(
         json.dumps(data_payload, indent=2) + "\n",
         encoding="utf-8",
     )
+    (dashboard_dir / "dashboard_data.json").write_text(
+        json.dumps(data_payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
     if registry_path and registry_path.exists():
         shutil.copyfile(registry_path, output_dir / "registry.json")
     index_path = dashboard_dir / "index.html"
@@ -53,6 +61,43 @@ def write_standalone_dashboard(
     index_path.write_text(rendered, encoding="utf-8")
     task_compare_path.write_text(rendered, encoding="utf-8")
     return task_compare_path
+
+
+def open_standalone_dashboard(index_path: Path, *, port: int = 62630) -> str:
+    """Open a standalone dashboard through a repo-root static server."""
+
+    ensure_standalone_dashboard_server(port=port)
+    repo_root = _repo_root()
+    try:
+        relative = index_path.resolve().relative_to(repo_root)
+    except ValueError:
+        relative = index_path.resolve()
+    url = f"http://127.0.0.1:{port}/{quote(str(relative), safe='/')}"
+    subprocess.Popen(
+        ["open", url],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return url
+
+
+def ensure_standalone_dashboard_server(*, port: int = 62630) -> None:
+    """Start a repo-root static server if the requested port is unused."""
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.2)
+        if sock.connect_ex(("127.0.0.1", port)) == 0:
+            return
+    subprocess.Popen(
+        [sys.executable, "-m", "http.server", str(port)],
+        cwd=_repo_root(),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
 
 
 def _read_registry_payload(registry_path: Path | None) -> dict[str, Any]:
@@ -483,23 +528,71 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     <section class="detail-wrap" id="detail"></section>
   </main>
   <script>
-    const payload = JSON.parse(document.getElementById("sage-data").textContent);
-    const summary = payload.summary || {};
-    const registry = payload.registry || {};
-    const baseline = payload.baseline || {};
-    const runMetadata = payload.run_metadata || {};
-    const events = summary.events || [];
-    const registryTools = registry.tools || {};
-    const baselineResults = baseline.results || [];
-    const baselineByTask = new Map(baselineResults.map((item) => [item.task_id, item]));
-    const taskEvents = events.filter((event) => event.event === "task");
-    const tasks = taskEvents.map((event, index) => ({
-      ...event,
-      display_index: index + 1,
-      baseline: baselineByTask.get(event.task_id) || null,
-      related: events.filter((candidate) => candidate.task_id === event.task_id),
-    }));
-    let selectedTaskId = tasks[0]?.task_id || "";
+    let payload = JSON.parse(document.getElementById("sage-data").textContent);
+    let summary = {};
+    let registry = {};
+    let baseline = {};
+    let runMetadata = {};
+    let events = [];
+    let registryTools = {};
+    let baselineResults = [];
+    let baselineByTask = new Map();
+    let tasks = [];
+    let selectedTaskId = "";
+    let lastPayloadText = JSON.stringify(payload);
+
+    function applyPayload(nextPayload) {
+      payload = nextPayload || {};
+      summary = payload.summary || {};
+      registry = payload.registry || {};
+      baseline = payload.baseline || {};
+      runMetadata = payload.run_metadata || {};
+      events = summary.events || [];
+      registryTools = registry.tools || {};
+      baselineResults = baseline.results || [];
+      baselineByTask = new Map(baselineResults.map((item) => [item.task_id, item]));
+      const taskEvents = events.filter((event) => event.event === "task");
+      const retryEvents = events.filter((event) =>
+        event.event === "birth_task_retry" || event.event === "refined_tool_task_retry"
+      );
+      const taskIds = [];
+      for (const item of [...baselineResults, ...taskEvents, ...retryEvents]) {
+        if (item.task_id && !taskIds.includes(item.task_id)) taskIds.push(item.task_id);
+      }
+      tasks = taskIds.map((taskId, index) => {
+        const related = events.filter((candidate) => candidate.task_id === taskId);
+        const initial = [...related].reverse().find((event) => event.event === "task");
+        const retries = related.filter((event) =>
+          event.event === "birth_task_retry" || event.event === "refined_tool_task_retry"
+        );
+        const successfulRetry = [...retries].reverse().find((event) => event.success === true);
+        const retry = successfulRetry || [...retries].reverse()[0] || null;
+        const base = baselineByTask.get(taskId) || null;
+        const final = retry || initial || {
+          event: "task",
+          task_id: taskId,
+          name: base?.name || taskId,
+          success: false,
+          score: 0,
+          outcome_score: 0,
+          visible_helpers: [],
+          transcript: [],
+          tool_uses: [],
+          artifacts: {},
+        };
+        return {
+          ...final,
+          display_index: index + 1,
+          baseline: base,
+          related,
+          initial_attempt: initial || null,
+          retry_result: retry || null,
+        };
+      });
+      if (!selectedTaskId || !tasks.some((task) => task.task_id === selectedTaskId)) {
+        selectedTaskId = tasks[0]?.task_id || "";
+      }
+    }
 
     function esc(value) {
       return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
@@ -557,7 +650,14 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       const sageScore = mean(tasks.map(scoreOf));
       const baselineOutcome = mean(baselineResults.map(outcomeOf));
       const sageOutcome = mean(tasks.map(outcomeOf));
-      const total = Math.max(summary.tasks_seen || 0, baseline.tasks_seen || 0, tasks.length, baselineResults.length);
+      const requested = num(runMetadata.requested_limit, 0);
+      const total = Math.max(
+        summary.tasks_seen || 0,
+        baseline.tasks_seen || 0,
+        tasks.length,
+        baselineResults.length,
+        requested,
+      );
       const paired = Math.min(summary.tasks_seen || tasks.length, baseline.tasks_seen || baselineResults.length || tasks.length);
       return {
         baselineScore,
@@ -605,7 +705,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     }
     function renderHeader() {
       const stats = getRunStats();
-      const status = runMetadata.benchmark_ready === false ? "probe" : "complete";
+      const status = runMetadata.status || (runMetadata.benchmark_ready === false ? "probe" : "complete");
       const environmentName = envDisplayName(summary.environment);
       document.title = `Task Compare - ${environmentName} - SAGE`;
       document.getElementById("envBadge").textContent = environmentName;
@@ -797,10 +897,46 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
         }).join("")}
       </tbody></table>`;
     }
+    function renderAll() {
+      renderHeader();
+      renderTaskList();
+      renderDetail();
+    }
+    function captureScrollState() {
+      return {
+        windowX: window.scrollX,
+        windowY: window.scrollY,
+        asideY: document.querySelector("aside")?.scrollTop || 0,
+      };
+    }
+    function restoreScrollState(state) {
+      requestAnimationFrame(() => {
+        const aside = document.querySelector("aside");
+        if (aside) aside.scrollTop = state.asideY;
+        window.scrollTo(state.windowX, state.windowY);
+      });
+    }
+    async function refreshDashboardData() {
+      try {
+        const response = await fetch(`task_compare_data.json?ts=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const nextPayload = await response.json();
+        const nextText = JSON.stringify(nextPayload);
+        if (nextText === lastPayloadText) return;
+        const scrollState = captureScrollState();
+        lastPayloadText = nextText;
+        applyPayload(nextPayload);
+        renderAll();
+        restoreScrollState(scrollState);
+      } catch (error) {
+        // File URLs and stale static servers can reject fetches. The embedded
+        // snapshot still renders, so refresh failure is non-fatal.
+      }
+    }
     document.getElementById("search").addEventListener("input", renderTaskList);
-    renderHeader();
-    renderTaskList();
-    renderDetail();
+    applyPayload(payload);
+    renderAll();
+    setInterval(refreshDashboardData, 2500);
   </script>
 </body>
 </html>

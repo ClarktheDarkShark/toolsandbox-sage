@@ -124,16 +124,10 @@ class MiniGridAdapter:
             for item in planner_result.get("actions", [])
             if str(item) in {"left", "right", "forward"}
         ]
-        executed = self._execute_actions(task, action_names)
-        return TaskRunResult(
-            task=task,
-            success=executed["success"],
-            score=executed["score"],
-            outcome_score=executed["score"],
-            transcript=(
-                f"{name} planned {len(action_names)} actions: {action_names[:20]}",
-                f"MiniGrid execution success={executed['success']} reward={executed['reward']}",
-            ),
+        return self.run_action_sequence(
+            task,
+            action_names,
+            transcript_prefix=f"{name} planned {len(action_names)} actions: {action_names[:20]}",
             tool_uses=(
                 ToolUseRecord(
                     tool_name=name,
@@ -146,12 +140,50 @@ class MiniGridAdapter:
                         "goal_col": task.metadata["goal_col"],
                     },
                     result=planner_result,
-                    success=executed["success"],
+                    success=True,
                     generated_helper=True,
                 ),
             ),
+        )
+
+    def run_action_sequence(
+        self,
+        task: TaskSpec,
+        action_names: list[str],
+        *,
+        transcript_prefix: str,
+        tool_uses: tuple[ToolUseRecord, ...] = (),
+    ) -> TaskRunResult:
+        """Execute a provided action sequence through MiniGrid and score it."""
+
+        valid_actions = [
+            str(item)
+            for item in action_names
+            if str(item) in {"left", "right", "forward"}
+        ]
+        executed = self._execute_actions(task, valid_actions)
+        normalized_tool_uses = tuple(
+            ToolUseRecord(
+                tool_name=use.tool_name,
+                arguments=use.arguments,
+                result=use.result,
+                success=executed["success"] if use.success else False,
+                generated_helper=use.generated_helper,
+            )
+            for use in tool_uses
+        )
+        return TaskRunResult(
+            task=task,
+            success=executed["success"],
+            score=executed["score"],
+            outcome_score=executed["score"],
+            transcript=(
+                transcript_prefix,
+                f"MiniGrid execution success={executed['success']} reward={executed['reward']}",
+            ),
+            tool_uses=normalized_tool_uses,
             artifacts={
-                "planned_actions": action_names,
+                "planned_actions": valid_actions,
                 "steps": executed["steps"],
                 "reward": executed["reward"],
             },
@@ -278,20 +310,12 @@ class MiniGridAdapter:
 
     def _run_baseline(self, task: TaskSpec) -> TaskRunResult:
         actions = ["forward"] * min(self.max_steps, 12)
-        executed = self._execute_actions(task, actions)
-        return TaskRunResult(
-            task=task,
-            success=executed["success"],
-            score=executed["score"],
-            outcome_score=executed["score"],
-            transcript=(
-                f"Baseline executed fixed forward policy for {executed['steps']} steps.",
+        return self.run_action_sequence(
+            task,
+            actions,
+            transcript_prefix=(
+                f"Baseline executed fixed forward policy for {len(actions)} planned steps."
             ),
-            artifacts={
-                "planned_actions": actions,
-                "steps": executed["steps"],
-                "reward": executed["reward"],
-            },
         )
 
     def _execute_actions(

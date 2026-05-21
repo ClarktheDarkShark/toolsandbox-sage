@@ -18,6 +18,13 @@ from sage_agent.interfaces import (
     ValidationCase,
 )
 
+CANDIDATE_PLANNER_FAMILIES = {
+    "visible_text_candidate_planner",
+    "artifact_literal_candidate_planner",
+    "execution_feedback_candidate_mutation_planner",
+    "structured_input_candidate_planner",
+}
+
 
 class TemplateHelperGenerator:
     """Generate deterministic helpers from environment-provided directives."""
@@ -68,9 +75,13 @@ class TemplateHelperGenerator:
         *,
         model: str,
     ) -> HelperCandidate:
-        """Repair by regenerating from the environment directives."""
+        """Repair by regenerating or widening a generic helper design."""
 
-        del rejected, errors
+        del errors
+        if rejected.spec.family in CANDIDATE_PLANNER_FAMILIES:
+            return _adaptive_candidate_portfolio_planner(
+                rejected.spec.name, gap, profile, validation_cases, model
+            )
         return self.generate(gap, profile, validation_cases, model=model)
 
 
@@ -530,6 +541,160 @@ def _structured_input_candidate_planner(
     if "size" in text or "length" in text or "chunk" in text:
         candidates.extend(["0", "1", "-1", "4294967295", "A" * 32])
     candidates.extend(["A", "AAAA", "\\x00\\x01\\x02\\x03"])
+    unique = []
+    seen = set()
+    limit = int(max_candidates)
+    if limit < 1:
+        limit = 1
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+        if len(unique) >= limit:
+            break
+    return {{
+        "candidates": unique,
+        "candidate_count": len(unique),
+        "first_candidate": unique[0] if unique else "",
+        "abstain": False,
+    }}
+"""
+    return _candidate_planner_candidate(
+        name, gap, profile, validation_cases, model, code
+    )
+
+
+def _adaptive_candidate_portfolio_planner(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    code = f"""def {name}(description: str, readme: str = "", feedback: str = "", artifact_summary: str = "", max_candidates: int = 12) -> dict:
+    text = str(description or "") + "\\n" + str(readme or "") + "\\n" + str(artifact_summary or "") + "\\n" + str(feedback or "")
+    lower = text.lower()
+    candidates = []
+
+    explicit_prefixes = (
+        "literal:",
+        "source_line:",
+        "dict:",
+        "token:",
+        "example:",
+        "input:",
+        "example input:",
+        "trigger:",
+        "poc:",
+        "candidate:",
+    )
+    for raw_line in text.splitlines():
+        line = raw_line.strip(" \\t\\r\\n-*")
+        if not line:
+            continue
+        line_lower = line.lower()
+        for prefix in explicit_prefixes:
+            pos = line_lower.find(prefix)
+            if pos >= 0 and "provided as input to the vulnerable program" not in line_lower:
+                value = line[pos + len(prefix):].strip(" :-,;\\t")
+                if value:
+                    candidates.append(str(value))
+        if "==" in line or "strcmp" in line_lower or "memcmp" in line_lower:
+            for quote in ("\\"", "'"):
+                start = 0
+                while True:
+                    left = line.find(quote, start)
+                    if left < 0:
+                        break
+                    right = line.find(quote, left + 1)
+                    if right < 0:
+                        break
+                    value = line[left + 1:right].strip()
+                    if value:
+                        candidates.append(str(value))
+                    start = right + 1
+
+    if "xml" in lower or "html" in lower or "<" in text:
+        for value in ("<a/>", "<root></root>", "<root>A</root>", "<!DOCTYPE a><a/>"):
+            candidates.append(str(value))
+    if "json" in lower or "javascript" in lower:
+        for value in ("{{}}", "[]", "{{\\"a\\":1}}", "[1,2,3]"):
+            candidates.append(str(value))
+    if "csv" in lower or "comma" in lower:
+        for value in ("a,b\\n", "1,2,3\\n", "name,value\\na,1\\n"):
+            candidates.append(str(value))
+    if "regex" in lower or "pcre" in lower:
+        for value in ("(", "(a", ".*", "[a-", "(?P<a>a)"):
+            candidates.append(str(value))
+    if "path" in lower or "file" in lower:
+        for value in ("/tmp/a", "../a", "A/B", "file.txt"):
+            candidates.append(str(value))
+    if "size" in lower or "length" in lower or "chunk" in lower:
+        for value in ("0", "1", "-1", "4294967295", "A" * 32, "A" * 128):
+            candidates.append(str(value))
+
+    lengths = []
+    for token in text.replace("=", " ").replace(":", " ").replace(",", " ").split():
+        if token.isdigit():
+            value = int(token)
+            if 0 <= value <= 4096:
+                lengths.append(value)
+    seed_pool = [
+        "",
+        "\\x00",
+        "\\xff",
+        "A",
+        "AAAA",
+        "0",
+        "1",
+        "-1",
+        "0\\n",
+        "(",
+        "(a",
+        "()",
+        "{{}}",
+        "[]",
+        "<a/>",
+        "<root></root>",
+        "a,b\\n",
+        "\\x00\\x01\\x02\\x03",
+        "A" * 8,
+        "A" * 32,
+        "A" * 128,
+    ]
+    for value in seed_pool:
+        candidates.append(str(value))
+    for length in lengths[:16]:
+        if length <= 0:
+            continue
+        capped = min(max(length, 1), 512)
+        candidates.append(str("A" * capped))
+        candidates.append(str("\\x00" * min(capped, 64)))
+        if capped > 1:
+            candidates.append(str("A" * (capped - 1)))
+            candidates.append(str("A" * (capped + 1)))
+
+    for quote in ("`", "\\"", "'"):
+        start = 0
+        while True:
+            left = text.find(quote, start)
+            if left < 0:
+                break
+            right = text.find(quote, left + 1)
+            if right < 0:
+                break
+            value = text[left + 1:right].strip()
+            if value:
+                candidates.append(str(value))
+            start = right + 1
+
+    base_values = list(candidates[:24])
+    for value in base_values:
+        if isinstance(value, str) and 0 < len(value) <= 80:
+            candidates.append(str(value + "\\n"))
+            candidates.append(str(value + value))
+
     unique = []
     seen = set()
     limit = int(max_candidates)

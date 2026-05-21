@@ -25,7 +25,11 @@ from sage_agent.adapters import (  # noqa: E402
     CyberGymLiveSubmitAdapter,
     CyberGymLiveTask,
 )
-from sage_agent.dashboard import write_standalone_dashboard  # noqa: E402
+from sage_agent.baselines import OpenAIEnvironmentBaseline  # noqa: E402
+from sage_agent.dashboard import (  # noqa: E402
+    open_standalone_dashboard,
+    write_standalone_dashboard,
+)
 from sage_agent.generators import (  # noqa: E402
     OpenAIHelperGenerator,
     TemplateHelperGenerator,
@@ -47,7 +51,16 @@ def main() -> None:
     parser.add_argument("--start-server", action="store_true", default=True)
     parser.add_argument("--no-start-server", action="store_false", dest="start_server")
     parser.add_argument("--max-candidates", type=int, default=12)
+    parser.add_argument("--baseline-max-candidates", type=int, default=12)
     parser.add_argument("--model", default="gpt-4o-mini")
+    parser.add_argument("--llm-timeout", type=float, default=180.0)
+    parser.add_argument("--submit-timeout", type=float, default=300.0)
+    parser.add_argument(
+        "--baseline",
+        choices=("llm", "fixed"),
+        default="llm",
+        help="Baseline policy. llm uses gpt-4o-mini over visible task artifacts.",
+    )
     parser.add_argument(
         "--generator",
         choices=("template", "openai"),
@@ -68,6 +81,8 @@ def main() -> None:
         default=Path("outputs/cybergym_live_sage/batched_work"),
     )
     parser.add_argument("--run-id", default="")
+    parser.add_argument("--dashboard-port", type=int, default=62630)
+    parser.add_argument("--no-dashboard-open", action="store_true")
     parser.add_argument("--reset-registry", action="store_true")
     parser.add_argument("--clear-images", action="store_true", default=True)
     parser.add_argument("--no-clear-images", action="store_false", dest="clear_images")
@@ -83,9 +98,26 @@ def main() -> None:
     run_id = args.run_id or _default_run_id(args.limit)
     run_dir = args.output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
+    initial_metadata = _run_metadata(args, tasks, batch_reports=())
+    initial_dashboard = write_standalone_dashboard(
+        _empty_summary("cybergym-live", args.model, args.registry_dir),
+        run_dir,
+        registry_path=args.registry_dir / "sage_registry.json",
+        baseline={
+            "policy": f"{args.baseline}_baseline_pending",
+            "tasks_seen": 0,
+            "tasks_succeeded": 0,
+            "success_rate": 0.0,
+            "results": [],
+        },
+        run_metadata={**initial_metadata, "status": "running"},
+    )
+    if not args.no_dashboard_open:
+        url = open_standalone_dashboard(initial_dashboard, port=args.dashboard_port)
+        print(f"Dashboard opened at run start: {url}", flush=True)
     server_proc = _ensure_server(args.server, run_dir) if args.start_server else None
     try:
-        summary, baseline, batch_reports = _run_batches(args, tasks)
+        summary, baseline, batch_reports = _run_batches(args, tasks, run_dir=run_dir)
     finally:
         if server_proc is not None:
             server_proc.terminate()
@@ -94,31 +126,7 @@ def main() -> None:
             except subprocess.TimeoutExpired:
                 server_proc.kill()
 
-    run_metadata = {
-        "execution_mode": "cybergym_live_level1_submit_vul_batched",
-        "benchmark_ready": False,
-        "requested_limit": args.limit,
-        "available_tasks": len(tasks),
-        "limit_satisfied": len(tasks) == args.limit,
-        "batch_size": args.batch_size,
-        "real_task_generator_used": True,
-        "real_submission_server_used": True,
-        "real_poc_verifier_used": True,
-        "official_success_verification": False,
-        "interpretation": (
-            "Real CyberGym submit.sh smoke using generated Level 1 task dirs in "
-            "bounded batches. This confirms environment wiring and SAGE lifecycle "
-            "on live CyberGym submission, but it is not final CyberGym benchmark "
-            "evidence because fix-side verification is not run."
-        ),
-        "setup_notes": (
-            "Only level1 visible assets are downloaded: repo-vul.tar.gz and description.txt.",
-            "Batch work directories and Docker images are cleared after each batch unless requested otherwise.",
-            "SAGE starts from the supplied registry; use --reset-registry for an empty generated-tool registry.",
-            "Submissions remain environment-side effects; generated helpers only prepare candidate strings.",
-        ),
-        "batch_reports": batch_reports,
-    }
+    run_metadata = _run_metadata(args, tasks, batch_reports=batch_reports)
     dashboard_path = write_standalone_dashboard(
         summary,
         run_dir,
@@ -134,6 +142,41 @@ def main() -> None:
         json.dumps(payload, indent=2) + "\n", encoding="utf-8"
     )
     print(json.dumps(payload, indent=2))
+
+
+def _run_metadata(
+    args: argparse.Namespace,
+    tasks: list[dict[str, Any]],
+    *,
+    batch_reports: Any,
+) -> dict[str, Any]:
+    return {
+        "execution_mode": "cybergym_live_level1_submit_vul_batched",
+        "benchmark_ready": False,
+        "requested_limit": args.limit,
+        "available_tasks": len(tasks),
+        "limit_satisfied": len(tasks) == args.limit,
+        "batch_size": args.batch_size,
+        "real_task_generator_used": True,
+        "real_submission_server_used": True,
+        "real_poc_verifier_used": True,
+        "official_success_verification": False,
+        "llm_timeout_seconds": args.llm_timeout,
+        "submit_timeout_seconds": args.submit_timeout,
+        "interpretation": (
+            "Real CyberGym submit.sh smoke using generated Level 1 task dirs in "
+            "bounded batches. This confirms environment wiring and SAGE lifecycle "
+            "on live CyberGym submission, but it is not final CyberGym benchmark "
+            "evidence because fix-side verification is not run."
+        ),
+        "setup_notes": (
+            "Only level1 visible assets are downloaded: repo-vul.tar.gz and description.txt.",
+            "Batch work directories and Docker images are cleared after each batch unless requested otherwise.",
+            "SAGE starts from the supplied registry; use --reset-registry for an empty generated-tool registry.",
+            "Submissions remain environment-side effects; generated helpers only prepare candidate strings.",
+        ),
+        "batch_reports": batch_reports,
+    }
 
 
 def _select_tasks(
@@ -194,10 +237,15 @@ def _ensure_server(server: str, run_dir: Path) -> subprocess.Popen[str] | None:
 
 
 def _run_batches(
-    args: argparse.Namespace, tasks: list[dict[str, Any]]
+    args: argparse.Namespace, tasks: list[dict[str, Any]], *, run_dir: Path
 ) -> tuple[SAGERunSummary, dict[str, Any], list[dict[str, Any]]]:
     events: list[dict[str, Any]] = []
     baseline_results: list[dict[str, Any]] = []
+    baseline_planner = (
+        OpenAIEnvironmentBaseline(model=args.model, timeout=args.llm_timeout)
+        if args.baseline == "llm"
+        else None
+    )
     totals = {
         "tasks_seen": 0,
         "tasks_succeeded": 0,
@@ -244,8 +292,9 @@ def _run_batches(
                 tasks_root=task_root,
                 tasks_to_run=tuple(live_tasks),
                 max_candidates=args.max_candidates,
+                submit_timeout_seconds=args.submit_timeout,
             )
-            baseline = _run_no_helper_baseline(adapter)
+            baseline = _run_baseline(adapter, args=args, planner=baseline_planner)
             baseline_results.extend(baseline["results"])
             agent = SAGEAgent(
                 adapter=adapter,
@@ -279,6 +328,14 @@ def _run_batches(
                     "tools_reused": batch_summary.tools_reused,
                 }
             )
+            _write_partial_dashboard(
+                args=args,
+                run_dir=run_dir,
+                totals=totals,
+                events=events,
+                baseline_results=baseline_results,
+                batch_reports=batch_reports,
+            )
         finally:
             if args.clear_images:
                 for image in images:
@@ -290,6 +347,44 @@ def _run_batches(
                     )
             if not args.keep_work:
                 shutil.rmtree(batch_root, ignore_errors=True)
+    summary = _summary_from_totals(args=args, totals=totals, events=events)
+    baseline = _baseline_from_results(args, baseline_results)
+    return summary, baseline, batch_reports
+
+
+def _write_partial_dashboard(
+    *,
+    args: argparse.Namespace,
+    run_dir: Path,
+    totals: dict[str, int],
+    events: list[dict[str, Any]],
+    baseline_results: list[dict[str, Any]],
+    batch_reports: list[dict[str, Any]],
+) -> None:
+    write_standalone_dashboard(
+        _summary_from_totals(args=args, totals=totals, events=events),
+        run_dir,
+        registry_path=args.registry_dir / "sage_registry.json",
+        baseline=_baseline_from_results(args, baseline_results),
+        run_metadata={
+            **_run_metadata(
+                args,
+                _select_tasks(
+                    args.tasks_json, limit=args.limit, difficulty=args.difficulty
+                ),
+                batch_reports=batch_reports,
+            ),
+            "status": "running",
+        },
+    )
+
+
+def _summary_from_totals(
+    *,
+    args: argparse.Namespace,
+    totals: dict[str, int],
+    events: list[dict[str, Any]],
+) -> SAGERunSummary:
     registry_path = args.registry_dir / "sage_registry.json"
     lifecycle: tuple[dict[str, Any], ...] = ()
     if registry_path.exists():
@@ -302,7 +397,7 @@ def _run_batches(
                 LocalSAGERegistry(args.registry_dir).load()
             )
         )
-    summary = SAGERunSummary(
+    return SAGERunSummary(
         environment="cybergym-live",
         tasks_seen=totals["tasks_seen"],
         tasks_succeeded=totals["tasks_succeeded"],
@@ -322,15 +417,17 @@ def _run_batches(
         lifecycle_decisions=lifecycle,
         events=tuple(events),
     )
+
+
+def _baseline_from_results(
+    args: argparse.Namespace, baseline_results: list[dict[str, Any]]
+) -> dict[str, Any]:
     baseline_successes = sum(1 for result in baseline_results if result["success"])
-    baseline = {
-        "policy": "fixed_four_byte_poc_batched",
+    baseline_policy, baseline_note = _baseline_metadata(args)
+    return {
+        "policy": baseline_policy,
         "comparison_valid": True,
-        "comparison_note": (
-            "Fixed four-byte PoC smoke baseline for this CyberGym live wiring "
-            "check. It is a valid within-run smoke comparison, but not an "
-            "official CyberGym benchmark baseline."
-        ),
+        "comparison_note": baseline_note,
         "tasks_seen": len(baseline_results),
         "tasks_succeeded": baseline_successes,
         "success_rate": baseline_successes / len(baseline_results)
@@ -338,13 +435,94 @@ def _run_batches(
         else 0.0,
         "results": baseline_results,
     }
-    return summary, baseline, batch_reports
+
+
+def _baseline_metadata(args: argparse.Namespace) -> tuple[str, str]:
+    if args.baseline == "llm":
+        return (
+            f"llm_visible_artifact_baseline:{args.model}",
+            (
+                "Basic LLM baseline over visible CyberGym task files. It sees "
+                "README.md, description.txt, and a bounded visible source summary, "
+                "then submits candidate strings through the same submit.sh path. "
+                "This is a real live comparison for this adapter, not official "
+                "CyberGym final evidence because fix-side verification is not run."
+            ),
+        )
+    return (
+        "fixed_four_byte_poc_batched",
+        (
+            "Fixed four-byte PoC smoke baseline for CyberGym wiring checks. It is "
+            "not a fully functional LLM baseline."
+        ),
+    )
 
 
 def _helper_generator(name: str) -> TemplateHelperGenerator | OpenAIHelperGenerator:
     if name == "openai":
         return OpenAIHelperGenerator()
     return TemplateHelperGenerator()
+
+
+def _run_baseline(
+    adapter: CyberGymLiveSubmitAdapter,
+    *,
+    args: argparse.Namespace,
+    planner: OpenAIEnvironmentBaseline | None,
+) -> dict[str, Any]:
+    if args.baseline == "llm":
+        if planner is None:
+            raise RuntimeError("LLM baseline planner was not initialized")
+        return _run_llm_baseline(
+            adapter,
+            planner=planner,
+            max_candidates=args.baseline_max_candidates,
+        )
+    return _run_no_helper_baseline(adapter)
+
+
+def _run_llm_baseline(
+    adapter: CyberGymLiveSubmitAdapter,
+    *,
+    planner: OpenAIEnvironmentBaseline,
+    max_candidates: int,
+) -> dict[str, Any]:
+    adapter.prepare()
+    results: list[dict[str, Any]] = []
+    for task in adapter.tasks():
+        try:
+            candidates = planner.plan_candidate_inputs(
+                task,
+                max_candidates=max_candidates,
+            )
+            if not candidates:
+                candidates = ["\x00\x01\x02\x03"]
+            result = adapter.run_candidate_strings(
+                task,
+                candidates,
+                transcript_prefix=(
+                    f"LLM baseline planned {len(candidates)} candidate inputs."
+                ),
+                remember_feedback=False,
+            )
+        except Exception as exc:  # pragma: no cover - live API/environment failure
+            result = TaskRunResult(
+                task=task,
+                success=False,
+                score=0.0,
+                outcome_score=0.0,
+                transcript=(f"LLM baseline failed: {type(exc).__name__}: {exc}",),
+                error=str(exc),
+            )
+        results.append(_baseline_result_json(result))
+    successes = sum(1 for result in results if result["success"])
+    return {
+        "policy": f"llm_visible_artifact_baseline:{planner.model}",
+        "tasks_seen": len(results),
+        "tasks_succeeded": successes,
+        "success_rate": successes / len(results) if results else 0.0,
+        "results": results,
+    }
 
 
 def _download_visible_assets(
@@ -423,6 +601,27 @@ def _baseline_result_json(result: TaskRunResult) -> dict[str, Any]:
         "transcript": list(result.transcript),
         "artifacts": dict(result.artifacts),
     }
+
+
+def _empty_summary(environment: str, model: str, registry_dir: Path) -> SAGERunSummary:
+    return SAGERunSummary(
+        environment=environment,
+        tasks_seen=0,
+        tasks_succeeded=0,
+        gaps_observed=0,
+        tools_born=0,
+        tools_accepted=0,
+        tools_rejected=0,
+        tools_reused=0,
+        repair_attempts=0,
+        tools_refined=0,
+        birth_task_retries=0,
+        birth_task_retry_successes=0,
+        model=model,
+        registry_path=str(registry_dir / "sage_registry.json"),
+        integrity_passed=True,
+        integrity_issues=0,
+    )
 
 
 def _live_tasks_for_batch(

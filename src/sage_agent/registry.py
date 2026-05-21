@@ -86,6 +86,17 @@ class LocalSAGERegistry:
         )
         self.save(records)
 
+    def retire(self, tool_name: str) -> bool:
+        """Park a helper so routers no longer expose it naturally."""
+
+        records = self.load()
+        record = records.get(tool_name)
+        if record is None or record.retired:
+            return False
+        records[tool_name] = replace(record, retired=True)
+        self.save(records)
+        return True
+
 
 def _spec_to_json(spec: HelperSpec) -> dict[str, Any]:
     return {

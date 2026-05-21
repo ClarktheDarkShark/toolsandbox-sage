@@ -136,6 +136,41 @@ def test_standalone_sage_refines_underperforming_retained_helper(
     assert summary.tasks_succeeded == 1
 
 
+def test_standalone_sage_parks_weak_helper_after_failed_redesign(
+    tmp_path: Path,
+) -> None:
+    registry = LocalSAGERegistry(tmp_path / "registry")
+    registry.add(
+        NoOpRepairGenerator.weak_candidate(),
+        HelperValidationReport(
+            accepted=True,
+            cases_run=1,
+            cases_passed=1,
+            runtime_smoke_passed=True,
+            side_effect_free=True,
+        ),
+        birth_gap_key="weak_gap",
+        birth_environment="weak-helper-test",
+    )
+    agent = SAGEAgent(
+        adapter=WeakHelperAdapter(),
+        generator=NoOpRepairGenerator(),
+        config=SAGEConfig(
+            registry_dir=tmp_path / "registry",
+            max_new_tools=0,
+            max_refinements=4,
+            min_uses_before_lifecycle_action=1,
+            failed_repair_limit_before_parking=2,
+        ),
+    )
+
+    summary = agent.run(limit=2)
+    records = registry.load()
+
+    assert records["weak_helper"].retired is True
+    assert any(event["event"] == "tool_parked" for event in summary.events)
+
+
 def test_standalone_adapters_do_not_expose_label_or_oracle_metadata() -> None:
     policy = ResearchIntegrityPolicy()
     toolsandbox_tasks = ToolSandboxMiniAdapter().tasks()
@@ -587,6 +622,114 @@ class RefinementAdapter:
                 name="good_case",
                 inputs={},
                 expected={"value": "good", "abstain": False},
+            ),
+        )
+
+
+class NoOpRepairGenerator(TemplateHelperGenerator):
+    @staticmethod
+    def weak_candidate() -> HelperCandidate:
+        return HelperCandidate(
+            spec=HelperSpec(
+                name="weak_helper",
+                family="weak",
+                description="A retained helper that does not solve the task.",
+            ),
+            code=(
+                "def weak_helper() -> dict:\n"
+                "    return {'value': 'still_bad', 'abstain': False}\n"
+            ),
+            validation_cases=(
+                ValidationCase(
+                    name="weak_case",
+                    inputs={},
+                    expected={"value": "still_bad", "abstain": False},
+                ),
+            ),
+        )
+
+    def repair(
+        self,
+        gap: GapSignal,
+        profile: EnvironmentProfile,
+        rejected: HelperCandidate,
+        errors: tuple[str, ...],
+        validation_cases: tuple[ValidationCase, ...],
+        *,
+        model: str,
+    ) -> HelperCandidate:
+        del gap, profile, errors, validation_cases, model
+        return rejected
+
+
+class WeakHelperAdapter:
+    def profile(self) -> EnvironmentProfile:
+        return EnvironmentProfile(
+            name="weak-helper-test",
+            description="Synthetic environment for parking weak helpers.",
+            helper_families=("weak",),
+        )
+
+    def prepare(self) -> None:
+        return None
+
+    def tasks(self, *, limit: int | None = None) -> tuple[TaskSpec, ...]:
+        tasks = (
+            TaskSpec(task_id="weak-1", name="weak retained helper 1", prompt="Solve."),
+            TaskSpec(task_id="weak-2", name="weak retained helper 2", prompt="Solve."),
+        )
+        return tasks[:limit] if limit is not None else tasks
+
+    def route_helpers(
+        self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
+    ) -> tuple[str, ...]:
+        del task
+        return tuple(name for name, record in helpers.items() if not record.retired)
+
+    def run_task(
+        self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
+    ) -> TaskRunResult:
+        return TaskRunResult(
+            task=task,
+            success=False,
+            score=0.0,
+            tool_uses=tuple(
+                ToolUseRecord(
+                    tool_name=name,
+                    success=True,
+                    generated_helper=True,
+                )
+                for name in helpers
+            ),
+        )
+
+    def observe_gap(
+        self,
+        task: TaskSpec,
+        result: TaskRunResult,
+        helpers: Mapping[str, HelperRecord],
+    ) -> GapSignal | None:
+        del helpers
+        if result.success:
+            return None
+        return GapSignal(
+            key="weak_gap",
+            summary="Redesign a retained helper after weak natural reuse evidence.",
+            source_task_id=task.task_id,
+            source_environment="weak-helper-test",
+            suggested_tool_name="weak_helper",
+            suggested_helper_family="weak",
+            required_inputs={},
+            expected_outputs={"value": "str", "abstain": "bool"},
+        )
+
+    def validation_cases_for_gap(self, gap: GapSignal) -> tuple[ValidationCase, ...]:
+        del gap
+        return (
+            ValidationCase(
+                name="weak_case",
+                inputs={},
+                expected={"value": "still_bad", "abstain": False},
             ),
         )
 

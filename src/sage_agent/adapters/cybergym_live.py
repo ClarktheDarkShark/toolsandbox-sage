@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import tarfile
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +22,8 @@ from sage_agent.interfaces import (
     ValidationCase,
 )
 from sage_agent.validation import validate_helper_candidate
+
+_SUBMIT_TIMESTAMPS: list[float] = []
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,7 @@ class CyberGymLiveSubmitAdapter:
     tasks_root: Path
     tasks_to_run: tuple[CyberGymLiveTask, ...]
     max_candidates: int = 12
+    submit_timeout_seconds: float = 300.0
     _feedback_memory: list[str] | None = None
 
     def profile(self) -> EnvironmentProfile:
@@ -99,7 +103,6 @@ class CyberGymLiveSubmitAdapter:
     def run_task(
         self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
     ) -> TaskRunResult:
-        live_task = self._live_task(task.task_id)
         description = task.artifacts.get("description", "")
         readme = task.artifacts.get("readme", "")
         artifact_summary = task.artifacts.get("artifact_summary", "")
@@ -151,12 +154,37 @@ class CyberGymLiveSubmitAdapter:
             )
             if not candidates:
                 candidates = ["\x00\x01\x02\x03"]
+        return self.run_candidate_strings(
+            task,
+            candidates,
+            transcript_prefix="SAGE generated-helper candidate submission",
+            tool_uses=tuple(tool_uses),
+            remember_feedback=True,
+        )
+
+    def run_candidate_strings(
+        self,
+        task: TaskSpec,
+        candidates: list[str],
+        *,
+        transcript_prefix: str,
+        tool_uses: tuple[ToolUseRecord, ...] = (),
+        remember_feedback: bool = False,
+    ) -> TaskRunResult:
+        """Submit provided candidate strings through the live CyberGym task."""
+
+        live_task = self._live_task(task.task_id)
         attempts = []
         success = False
         best_score = 0.0
         error = ""
-        for index, candidate in enumerate(candidates):
-            result = _submit_candidate(live_task.task_dir, index, candidate)
+        for index, candidate in enumerate(candidates[: self.max_candidates]):
+            result = _submit_candidate(
+                live_task.task_dir,
+                index,
+                candidate,
+                timeout_seconds=self.submit_timeout_seconds,
+            )
             attempts.append(result)
             exit_code = int(result.get("exit_code", 0)) if result.get("ok") else 0
             if result.get("ok") and exit_code not in (0, 300):
@@ -165,19 +193,31 @@ class CyberGymLiveSubmitAdapter:
                 break
             if not result.get("ok"):
                 error = str(result.get("error", ""))
-        transcript = tuple(_attempt_summary(item) for item in attempts)
-        if self._feedback_memory is None:
+        transcript = (transcript_prefix,) + tuple(
+            _attempt_summary(item) for item in attempts
+        )
+        if remember_feedback and self._feedback_memory is None:
             self._feedback_memory = []
-        if attempts:
+        if remember_feedback and attempts and self._feedback_memory is not None:
             self._feedback_memory.extend(_attempt_summary(item) for item in attempts)
             self._feedback_memory = self._feedback_memory[-40:]
+        normalized_tool_uses = tuple(
+            ToolUseRecord(
+                tool_name=use.tool_name,
+                arguments=use.arguments,
+                result=use.result,
+                success=success if use.success else False,
+                generated_helper=use.generated_helper,
+            )
+            for use in tool_uses
+        )
         return TaskRunResult(
             task=task,
             success=success,
             score=best_score,
             outcome_score=best_score,
             transcript=transcript,
-            tool_uses=tuple(tool_uses),
+            tool_uses=normalized_tool_uses,
             artifacts={"attempts": attempts},
             error=error,
         )
@@ -536,7 +576,14 @@ def _source_line_has_signal(line: str) -> bool:
     )
 
 
-def _submit_candidate(task_dir: Path, index: int, candidate: str) -> dict[str, Any]:
+def _submit_candidate(
+    task_dir: Path,
+    index: int,
+    candidate: str,
+    *,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    _respect_submit_rate_limit()
     poc_path = task_dir / f"sage_candidate_{index}.poc"
     poc_path.write_bytes(candidate.encode("latin1", errors="ignore"))
     completed = subprocess.run(
@@ -544,7 +591,7 @@ def _submit_candidate(task_dir: Path, index: int, candidate: str) -> dict[str, A
         check=False,
         capture_output=True,
         text=True,
-        timeout=90,
+        timeout=timeout_seconds,
     )
     raw = completed.stdout.strip()
     payload: dict[str, Any] = {}
@@ -569,6 +616,24 @@ def _submit_candidate(task_dir: Path, index: int, candidate: str) -> dict[str, A
     payload["output_excerpt"] = output[:600]
     payload.pop("output", None)
     return payload
+
+
+def _respect_submit_rate_limit(
+    *, max_requests: int = 18, window_seconds: float = 60.0
+) -> None:
+    """Stay below the CyberGym server's request limit during live comparisons."""
+
+    now = time.monotonic()
+    cutoff = now - window_seconds
+    _SUBMIT_TIMESTAMPS[:] = [ts for ts in _SUBMIT_TIMESTAMPS if ts >= cutoff]
+    if len(_SUBMIT_TIMESTAMPS) >= max_requests:
+        sleep_for = window_seconds - (now - _SUBMIT_TIMESTAMPS[0]) + 0.5
+        if sleep_for > 0:
+            time.sleep(sleep_for)
+        now = time.monotonic()
+        cutoff = now - window_seconds
+        _SUBMIT_TIMESTAMPS[:] = [ts for ts in _SUBMIT_TIMESTAMPS if ts >= cutoff]
+    _SUBMIT_TIMESTAMPS.append(time.monotonic())
 
 
 def _attempt_summary(attempt: Mapping[str, Any]) -> str:
