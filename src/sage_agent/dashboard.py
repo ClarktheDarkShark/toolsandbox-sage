@@ -103,6 +103,23 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     h1 { margin: 0; font-size: 22px; letter-spacing: 0; }
     h2 { margin: 0; font-size: 19px; letter-spacing: 0; }
     h3 { margin: 0 0 10px; font-size: 15px; }
+    .title-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .env-badge {
+      border: 1px solid #3f80bd;
+      background: #102c45;
+      color: #bfeaff;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
     .header-row {
       display: flex;
       justify-content: space-between;
@@ -447,7 +464,10 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
   <header>
     <div class="header-row">
       <div>
-        <h1>Task Compare</h1>
+        <div class="title-line">
+          <h1>Task Compare</h1>
+          <span class="env-badge" id="envBadge">Environment</span>
+        </div>
         <div class="subtitle" id="subtitle"></div>
         <div class="run-progress" id="runProgress"></div>
       </div>
@@ -524,6 +544,14 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     function taskName(task) {
       return task.name || task.baseline?.name || task.task_id || "task";
     }
+    function envDisplayName(value) {
+      const raw = String(value || "unknown").trim();
+      const normalized = raw.toLowerCase().replaceAll("_", "-");
+      if (normalized.includes("toolsandbox")) return "ToolSandbox";
+      if (normalized.includes("cybergym")) return "CyberGym";
+      if (normalized.includes("minigrid")) return "MiniGrid";
+      return raw ? raw.replaceAll("-", " ") : "Unknown";
+    }
     function getRunStats() {
       const baselineScore = mean(baselineResults.map(scoreOf));
       const sageScore = mean(tasks.map(scoreOf));
@@ -578,8 +606,11 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     function renderHeader() {
       const stats = getRunStats();
       const status = runMetadata.benchmark_ready === false ? "probe" : "complete";
+      const environmentName = envDisplayName(summary.environment);
+      document.title = `Task Compare - ${environmentName} - SAGE`;
+      document.getElementById("envBadge").textContent = environmentName;
       document.getElementById("subtitle").textContent =
-        `${summary.environment || "environment"} · ${status} · ${summary.model || "model"} · ` +
+        `${status} · ${summary.model || "model"} · ` +
         `${stats.paired}/${stats.total} matched tasks`;
       document.getElementById("runProgress").innerHTML =
         `<span class="label">Run Progress</span><strong>${stats.paired}/${stats.total}</strong>` +
@@ -655,7 +686,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
             <span class="tag ${statusClass}">${task.success ? "SAGE success" : "SAGE incomplete"}</span>
           </div>
           <div class="tag-row">
-            <span class="tag">environment: ${esc(summary.environment || "unknown")}</span>
+            <span class="tag">environment: ${esc(envDisplayName(summary.environment))}</span>
             <span class="tag">mode: ${esc(runMetadata.execution_mode || "unknown")}</span>
             <span class="tag ${summary.integrity_passed ? "good" : "bad"}">integrity ${summary.integrity_passed ? "passed" : "blocked"}</span>
           </div>
@@ -806,6 +837,23 @@ def _legacy_dashboard_html(payload: dict[str, Any]) -> str:
     h1 {{ margin: 0; font-size: clamp(30px, 4vw, 54px); letter-spacing: 0; }}
     h2 {{ margin: 0 0 14px; font-size: 22px; }}
     h3 {{ margin: 0; font-size: 18px; }}
+    .title-line {{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }}
+    .env-badge {{
+      border: 1px solid var(--cyan);
+      background: rgba(54, 194, 255, .12);
+      color: #bfeaff;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }}
     .subtitle {{
       margin-top: 8px;
       color: var(--muted);
@@ -989,7 +1037,10 @@ def _legacy_dashboard_html(payload: dict[str, Any]) -> str:
 <body>
   <script id="sage-data" type="application/json">{embedded}</script>
   <header>
-    <h1>SAGE Standalone Dashboard</h1>
+    <div class="title-line">
+      <h1>SAGE Standalone Dashboard</h1>
+      <span class="env-badge" id="envBadge"></span>
+    </div>
     <div class="subtitle" id="subtitle"></div>
     <div class="badge-row" id="badges"></div>
   </header>
@@ -1060,6 +1111,14 @@ def _legacy_dashboard_html(payload: dict[str, Any]) -> str:
     function jsonBlock(value) {{
       return `<pre>${{esc(JSON.stringify(value, null, 2))}}</pre>`;
     }}
+    function envDisplayName(value) {{
+      const raw = String(value || "unknown").trim();
+      const normalized = raw.toLowerCase().replaceAll("_", "-");
+      if (normalized.includes("toolsandbox")) return "ToolSandbox";
+      if (normalized.includes("cybergym")) return "CyberGym";
+      if (normalized.includes("minigrid")) return "MiniGrid";
+      return raw ? raw.replaceAll("-", " ") : "Unknown";
+    }}
     function taskEvents(taskId) {{
       return events.filter((event) => event.task_id === taskId);
     }}
@@ -1081,8 +1140,11 @@ def _legacy_dashboard_html(payload: dict[str, Any]) -> str:
       return {{ label: "needs helper", className: "red" }};
     }}
     function renderHeader() {{
+      const environmentName = envDisplayName(summary.environment);
+      document.title = `SAGE Standalone Dashboard - ${{environmentName}}`;
+      document.getElementById("envBadge").textContent = environmentName;
       document.getElementById("subtitle").textContent =
-        `${{summary.environment || "unknown"}} · ${{summary.model || "unknown model"}} · ` +
+        `${{summary.model || "unknown model"}} · ` +
         `${{summary.tasks_seen || 0}} tasks · ${{summary.registry_path || "no registry"}}`;
       const badges = [
         `integrity ${{summary.integrity_passed ? "passed" : "blocked"}}`,

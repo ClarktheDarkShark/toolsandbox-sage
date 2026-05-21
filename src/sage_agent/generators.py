@@ -40,6 +40,22 @@ class TemplateHelperGenerator:
             return _visible_text_candidate_planner(
                 name, gap, profile, validation_cases, model
             )
+        if template == "artifact_literal_candidate_planner":
+            return _artifact_literal_candidate_planner(
+                name, gap, profile, validation_cases, model
+            )
+        if template == "execution_feedback_candidate_mutation_planner":
+            return _execution_feedback_candidate_mutation_planner(
+                name, gap, profile, validation_cases, model
+            )
+        if template == "structured_input_candidate_planner":
+            return _structured_input_candidate_planner(
+                name, gap, profile, validation_cases, model
+            )
+        if template == "grid_shortest_path_action_planner":
+            return _grid_shortest_path_action_planner(
+                name, gap, profile, validation_cases, model
+            )
         raise ValueError(f"unsupported_template:{template or 'missing'}")
 
     def repair(
@@ -362,6 +378,316 @@ def _visible_text_candidate_planner(
             output_schema=dict(gap.expected_outputs),
             positive_triggers=tuple(gap.evidence),
             negative_triggers=("no visible description", "external state mutation"),
+            safety_notes=tuple(profile.safety_rules),
+        ),
+        code=code,
+        validation_cases=validation_cases,
+        metadata={"model": model, "environment": profile.name, "gap_key": gap.key},
+    )
+
+
+def _artifact_literal_candidate_planner(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    code = f"""def {name}(description: str, readme: str = "", feedback: str = "", artifact_summary: str = "", max_candidates: int = 12) -> dict:
+    text = str(artifact_summary or "") + "\\n" + str(description or "") + "\\n" + str(readme or "")
+    candidates = []
+    prefixes = ("literal:", "source_line:", "dict:", "token:", "example:", "input:")
+    for raw_line in text.splitlines():
+        line = raw_line.strip(" \\t\\r\\n-*")
+        if not line:
+            continue
+        lower = line.lower()
+        for prefix in prefixes:
+            if lower.startswith(prefix):
+                value = line[len(prefix):].strip(" :-,;\\t")
+                if 0 < len(value) <= 240:
+                    candidates.append(value)
+        if "==" in line or "strcmp" in lower or "memcmp" in lower:
+            for quote in ("\\"", "'"):
+                start = 0
+                while True:
+                    left = line.find(quote, start)
+                    if left < 0:
+                        break
+                    right = line.find(quote, left + 1)
+                    if right < 0:
+                        break
+                    value = line[left + 1:right].strip()
+                    if 0 < len(value) <= 240:
+                        candidates.append(value)
+                    start = right + 1
+        if len(line) <= 160 and any(ch in line for ch in "()[]{{}}<>/\\\\_=:+-.0123456789"):
+            candidates.append(line)
+    candidates.extend(["MAGIC", "magic", "AAAA", "\\x00\\x01\\x02\\x03", "A" * 32])
+    unique = []
+    seen = set()
+    limit = int(max_candidates)
+    if limit < 1:
+        limit = 1
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+        if len(unique) >= limit:
+            break
+    return {{
+        "candidates": unique,
+        "candidate_count": len(unique),
+        "first_candidate": unique[0] if unique else "",
+        "abstain": False,
+    }}
+"""
+    return _candidate_planner_candidate(
+        name, gap, profile, validation_cases, model, code
+    )
+
+
+def _execution_feedback_candidate_mutation_planner(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    code = f"""def {name}(description: str, readme: str = "", feedback: str = "", artifact_summary: str = "", max_candidates: int = 12) -> dict:
+    text = str(feedback or "") + "\\n" + str(description or "") + "\\n" + str(artifact_summary or "")
+    candidates = []
+    lengths = []
+    for token in text.replace("=", " ").replace(":", " ").split():
+        if token.isdigit():
+            value = int(token)
+            if 0 <= value <= 4096:
+                lengths.append(value)
+    seeds = ["", "\\x00", "\\xff", "A", "AAAA", "0", "1", "-1", "0\\n", "A" * 8, "A" * 32, "A" * 128]
+    for seed in seeds:
+        candidates.append(seed)
+        if seed:
+            candidates.append(seed + "\\n")
+            candidates.append(seed + seed)
+    for length in lengths[:12]:
+        if length <= 0:
+            continue
+        capped = min(max(length, 1), 512)
+        candidates.append("A" * capped)
+        candidates.append("\\x00" * min(capped, 64))
+        if capped > 1:
+            candidates.append("A" * (capped - 1))
+            candidates.append("A" * (capped + 1))
+    if "xml" in text.lower() or "<" in text:
+        candidates.extend(["<a/>", "<root></root>", "<root>A</root>"])
+    if "json" in text.lower() or "{{" in text:
+        candidates.extend(["{{}}", "[]", "{{\\"a\\":1}}"])
+    unique = []
+    seen = set()
+    limit = int(max_candidates)
+    if limit < 1:
+        limit = 1
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+        if len(unique) >= limit:
+            break
+    return {{
+        "candidates": unique,
+        "candidate_count": len(unique),
+        "first_candidate": unique[0] if unique else "",
+        "abstain": False,
+    }}
+"""
+    return _candidate_planner_candidate(
+        name, gap, profile, validation_cases, model, code
+    )
+
+
+def _structured_input_candidate_planner(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    code = f"""def {name}(description: str, readme: str = "", feedback: str = "", artifact_summary: str = "", max_candidates: int = 12) -> dict:
+    text = (str(description or "") + "\\n" + str(readme or "") + "\\n" + str(artifact_summary or "")).lower()
+    candidates = []
+    if "xml" in text or "html" in text or "<" in text:
+        candidates.extend(["<a/>", "<root></root>", "<root>A</root>", "<!DOCTYPE a><a/>"])
+    if "json" in text or "javascript" in text:
+        candidates.extend(["{{}}", "[]", "{{\\"a\\":1}}", "[1,2,3]"])
+    if "csv" in text or "comma" in text:
+        candidates.extend(["a,b\\n", "1,2,3\\n", "name,value\\na,1\\n"])
+    if "regex" in text or "pcre" in text:
+        candidates.extend(["(", "(a", ".*", "[a-", "(?P<a>a)"])
+    if "path" in text or "file" in text:
+        candidates.extend(["/tmp/a", "../a", "A/B", "file.txt"])
+    if "size" in text or "length" in text or "chunk" in text:
+        candidates.extend(["0", "1", "-1", "4294967295", "A" * 32])
+    candidates.extend(["A", "AAAA", "\\x00\\x01\\x02\\x03"])
+    unique = []
+    seen = set()
+    limit = int(max_candidates)
+    if limit < 1:
+        limit = 1
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+        if len(unique) >= limit:
+            break
+    return {{
+        "candidates": unique,
+        "candidate_count": len(unique),
+        "first_candidate": unique[0] if unique else "",
+        "abstain": False,
+    }}
+"""
+    return _candidate_planner_candidate(
+        name, gap, profile, validation_cases, model, code
+    )
+
+
+def _candidate_planner_candidate(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+    code: str,
+) -> HelperCandidate:
+    return HelperCandidate(
+        spec=HelperSpec(
+            name=name,
+            family=gap.suggested_helper_family,
+            description=gap.summary,
+            input_schema=dict(gap.required_inputs),
+            output_schema=dict(gap.expected_outputs),
+            positive_triggers=tuple(gap.evidence),
+            negative_triggers=("no visible context", "external state mutation"),
+            safety_notes=tuple(profile.safety_rules),
+        ),
+        code=code,
+        validation_cases=validation_cases,
+        metadata={"model": model, "environment": profile.name, "gap_key": gap.key},
+    )
+
+
+def _grid_shortest_path_action_planner(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    code = f"""def {name}(grid_rows: list, start_row: int, start_col: int, start_dir: int, goal_row: int, goal_col: int, blocked_symbols: list = None) -> dict:
+    rows = [str(row) for row in (grid_rows or [])]
+    if not rows:
+        return {{"actions": [], "action_count": 0, "path_found": False, "abstain": True, "abstain_reason": "missing_grid"}}
+    height = len(rows)
+    width = max(len(row) for row in rows)
+    blocked = set(blocked_symbols or ["#"])
+    start = (int(start_row), int(start_col))
+    goal = (int(goal_row), int(goal_col))
+    if start[0] < 0 or start[1] < 0 or goal[0] < 0 or goal[1] < 0:
+        return {{"actions": [], "action_count": 0, "path_found": False, "abstain": True, "abstain_reason": "negative_coordinate"}}
+    if start[0] >= height or goal[0] >= height or start[1] >= width or goal[1] >= width:
+        return {{"actions": [], "action_count": 0, "path_found": False, "abstain": True, "abstain_reason": "coordinate_out_of_bounds"}}
+
+    start_passable = (
+        start[0] >= 0
+        and start[0] < height
+        and start[1] >= 0
+        and start[1] < len(rows[start[0]])
+        and rows[start[0]][start[1]] not in blocked
+    )
+    goal_passable = (
+        goal[0] >= 0
+        and goal[0] < height
+        and goal[1] >= 0
+        and goal[1] < len(rows[goal[0]])
+        and rows[goal[0]][goal[1]] not in blocked
+    )
+    if not start_passable or not goal_passable:
+        return {{"actions": [], "action_count": 0, "path_found": False, "abstain": True, "abstain_reason": "blocked_start_or_goal"}}
+
+    directions = [(-1, 0), (0, 1), (1, 0), (0, -1)]
+    queue = [start]
+    parents = {{start: None}}
+    head = 0
+    while head < len(queue):
+        current = queue[head]
+        head += 1
+        if current == goal:
+            break
+        for delta in directions:
+            nxt = (current[0] + delta[0], current[1] + delta[1])
+            nxt_passable = (
+                nxt[0] >= 0
+                and nxt[0] < height
+                and nxt[1] >= 0
+                and nxt[1] < len(rows[nxt[0]])
+                and rows[nxt[0]][nxt[1]] not in blocked
+            )
+            if nxt in parents or not nxt_passable:
+                continue
+            parents[nxt] = current
+            queue.append(nxt)
+    if goal not in parents:
+        return {{"actions": [], "action_count": 0, "path_found": False, "abstain": True, "abstain_reason": "no_path"}}
+
+    reverse_path = []
+    current = goal
+    while current is not None:
+        reverse_path.append(current)
+        current = parents[current]
+    path = []
+    for index in range(len(reverse_path) - 1, -1, -1):
+        path.append(reverse_path[index])
+    facing = int(start_dir) % 4
+    actions = []
+    for index in range(1, len(path)):
+        prev = path[index - 1]
+        nxt = path[index]
+        delta = (nxt[0] - prev[0], nxt[1] - prev[1])
+        target_dir = 0
+        if delta == (0, 1):
+            target_dir = 0
+        elif delta == (1, 0):
+            target_dir = 1
+        elif delta == (0, -1):
+            target_dir = 2
+        elif delta == (-1, 0):
+            target_dir = 3
+        else:
+            return {{"actions": [], "action_count": 0, "path_found": False, "abstain": True, "abstain_reason": "non_adjacent_path"}}
+        turn = (target_dir - facing) % 4
+        if turn == 1:
+            actions.append("right")
+        elif turn == 2:
+            actions.append("right")
+            actions.append("right")
+        elif turn == 3:
+            actions.append("left")
+        actions.append("forward")
+        facing = target_dir
+    return {{"actions": actions, "action_count": len(actions), "path_found": True, "abstain": False, "abstain_reason": ""}}
+"""
+    return HelperCandidate(
+        spec=HelperSpec(
+            name=name,
+            family=gap.suggested_helper_family,
+            description=gap.summary,
+            input_schema=dict(gap.required_inputs),
+            output_schema=dict(gap.expected_outputs),
+            positive_triggers=tuple(gap.evidence),
+            negative_triggers=("blocked start or goal", "no visible path"),
             safety_notes=tuple(profile.safety_rules),
         ),
         code=code,

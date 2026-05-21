@@ -253,7 +253,7 @@ def _run_batches(
                 config=SAGEConfig(
                     model=args.model,
                     registry_dir=args.registry_dir,
-                    max_new_tools=2,
+                    max_new_tools=6,
                     max_refinements=2,
                 ),
             )

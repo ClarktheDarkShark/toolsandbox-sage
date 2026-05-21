@@ -546,8 +546,12 @@ resolution, contact lookup/update planning, reminder argument preparation,
 message recency selectors, weekday timestamp conversion, and safe abstention.
 
 Code repair: `scripts/run_sage_protocol.py` now has a first-class
-`--sage-policy self-evolving-praxis` preset. The preset applies and records the
-same policy defaults used by the successful broad500 runs:
+`--sage-policy self-evolving-praxis` preset. The default `--sage-policy auto`
+resolves to this preset for generation-enabled mechanism and online-build
+runs, and resolves to `none` for frozen validation arms. This prevents future
+ToolSandbox build runs from silently exercising the weaker generic path while
+leaving protected registry validation uncontaminated. The preset applies and
+records the same policy defaults used by the successful broad500 runs:
 
 - `SAGE_SELF_EVOLVING_PROACTIVE_BIRTH=1`
 - `SAGE_SELF_EVOLVING_PROACTIVE_SCOPE=just_in_time`
@@ -612,3 +616,160 @@ from outcome regression to large positive outcome lift while starting from an
 empty generated-tool registry and using only cached controls for the baseline.
 This does not by itself replace the prior broad500 evidence, but it verifies
 that the broader runner can activate the working SAGE mechanics.
+
+## General Gap Mining V2: CyberGym Live 20
+
+Date: 2026-05-21
+
+Purpose: move from one CyberGym-shaped helper to a generic self-evolving
+portfolio that can birth several reusable helper families from the same failed
+task without hand-selecting tools or hard-coding CyberGym IDs.
+
+Implementation:
+
+- `src/sage_agent/gap_mining.py` mines additional reusable gap hypotheses from
+  visible task text, visible artifacts, execution attempts, and tool traces.
+- `SAGEConfig.enable_generic_gap_mining` is on by default.
+- `SAGEAgent` can process several sibling gaps per failed task, validate each
+  helper, and retry the same task with a composed helper bundle.
+- `CyberGymLiveSubmitAdapter` now routes up to four generic candidate-planning
+  helper families:
+  `visible_text_candidate_planner`,
+  `artifact_literal_candidate_planner`,
+  `execution_feedback_candidate_mutation_planner`, and
+  `structured_input_candidate_planner`.
+
+Command:
+
+```bash
+PYTHONPATH=src:. python scripts/run_cybergym_live_batched_sage.py \
+  --limit 20 \
+  --batch-size 4 \
+  --model gpt-4o-mini \
+  --generator template \
+  --reset-registry \
+  --registry-dir artifacts/cybergym_live_sage/general_gap_v2_registry \
+  --output-root outputs/cybergym_live_sage \
+  --run-id general_gap_v2_20_20260521_143053 \
+  --max-candidates 32
+```
+
+Run:
+`outputs/cybergym_live_sage/general_gap_v2_20_20260521_143053`
+
+Dashboard:
+`outputs/cybergym_live_sage/general_gap_v2_20_20260521_143053/dashboard/task_compare.html`
+
+Result:
+
+- environment: `cybergym-live`
+- execution mode: `cybergym_live_level1_submit_vul_batched`
+- tasks requested/run: `20/20`
+- batch size: `4`
+- baseline policy: fixed four-byte PoC per task
+- baseline success: `1/20`
+- SAGE success: `5/20`
+- absolute lift: `+20.0 pp`
+- relative lift: `+400.0%`
+- gaps observed: `19`
+- tools born/accepted: `4 / 4`
+- tools reused: `86`
+- birth-task retries: `4`
+- birth-task retry successes: `1`
+- lifecycle decisions: all `refine`, because natural value is positive but
+  mixed
+- integrity issues: `0`
+- skipped tasks: `0`
+
+Interpretation: this is stronger portability evidence than the previous
+CyberGym live smoke because SAGE starts with no generated helpers, identifies
+multiple generic gap hypotheses from visible evidence, births a small portfolio
+without manual tool exposure, and naturally reuses all accepted helpers across
+batches. It remains a smoke rather than final CyberGym benchmark evidence
+because it uses `/submit-vul` only and does not run fix-side verification from
+the official CyberGym scoring workflow.
+
+## Third-Environment Smoke: MiniGrid
+
+Date: 2026-05-21
+
+Environment selected: Farama MiniGrid, from the published MiniGrid/MiniWorld
+line of goal-oriented reinforcement-learning environments. The local repo was
+cloned to `external/minigrid` at commit
+`90928729376741a41222a257911343b97103b548`. The directory is ignored by Git
+under the existing `external/` rule; reproduce with:
+
+```bash
+git clone https://github.com/Farama-Foundation/Minigrid.git external/minigrid
+python3 -m pip install -e external/minigrid
+```
+
+Implementation:
+
+- `src/sage_agent/adapters/minigrid.py` exposes official MiniGrid tasks through
+  the generic adapter interface.
+- SAGE sees visible grid rows, start pose, goal position, and allowed action
+  names.
+- SAGE does not see rewards, expert trajectories, hidden policies, labels, or
+  reference action sequences.
+- The generated helper plans action names only; the adapter executes and scores
+  those actions privately.
+
+Command:
+
+```bash
+PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
+  --env minigrid \
+  --model gpt-4o-mini \
+  --generator template \
+  --reset-registry \
+  --limit 9 \
+  --registry-dir artifacts/sage_agent_standalone/minigrid_smoke_registry \
+  --output-root outputs/sage_agent_standalone \
+  --run-id minigrid_generalization_smoke_20260521_142949
+```
+
+Run:
+`outputs/sage_agent_standalone/minigrid_generalization_smoke_20260521_142949`
+
+Result:
+
+- environment: `minigrid`
+- tasks seen: `9`
+- no-helper smoke baseline: `0/9`
+- SAGE success: `9/9`
+- tools born/accepted: `1 / 1`
+- tool reused: `9`
+- accepted helper: `plan_grid_shortest_path_actions`
+- lifecycle decision: `scale`
+- integrity issues: `0`
+
+Interpretation: MiniGrid is the third environment proof. It shows that the
+same standalone SAGE lifecycle can identify a missing deterministic capability,
+generate and validate a helper, retain it, and reuse it in an environment that
+does not share ToolSandbox or CyberGym mechanics. This is an integration smoke,
+not a protected MiniGrid benchmark claim.
+
+## Current Generalization Assessment
+
+SAGE is now no longer just a ToolSandbox-specific harness. The current
+standalone boundary supports:
+
+- environment adapters with private scoring and public SAGE-visible task
+  observations;
+- no-label/no-oracle integrity checks before generation;
+- adapter-provided and generic mined gap signals;
+- multiple sibling helper births from one failed task;
+- static, callability, semantic, and abstain validation;
+- same-task retry after accepted helper birth;
+- persistent registry retention and natural reuse;
+- lifecycle decisions for keep/refine/park/scale;
+- environment-neutral dashboards.
+
+Maintained ToolSandbox success is verified by the cached-control matched
+20-task self-evolving Praxis run above. A current rerun attempt without sourcing
+the local secret file failed before meaningful SAGE behavior because the shell
+did not contain a valid `OPENAI_API_KEY`; this is an execution-environment
+credential issue, not a SAGE policy result. Source `.secrets/env.sh` or set
+`OPENAI_API_KEY` in the process environment before repeating OpenAI-backed
+ToolSandbox validation.

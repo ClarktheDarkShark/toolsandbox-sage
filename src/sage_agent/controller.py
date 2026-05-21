@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
+from sage_agent.gap_mining import mine_gap_signals
 from sage_agent.integrity import (
     IntegrityReport,
     ResearchIntegrityPolicy,
@@ -44,6 +45,8 @@ class SAGEConfig:
     repair_attempts: int = 1
     max_refinements: int = 2
     retry_birth_task_with_new_tool: bool = True
+    enable_generic_gap_mining: bool = True
+    max_gap_signals_per_task: int = 4
     integrity_policy: ResearchIntegrityPolicy = field(
         default_factory=ResearchIntegrityPolicy
     )
@@ -125,6 +128,7 @@ class SAGEAgent:
             result = self.adapter.run_task(task, helper_bundle)
             tasks_seen += 1
             tasks_succeeded += int(result.success)
+            task_counted_success = result.success
             tools_reused += _record_reuse_events(self.registry, helper_bundle, result)
             events.append(
                 _task_result_event(
@@ -133,152 +137,175 @@ class SAGEAgent:
                     visible_helpers=visible,
                 )
             )
-            gap = self.adapter.observe_gap(task, result, records)
-            if gap is None:
-                continue
-            gap_integrity = check_gap_signal(gap, self.config.integrity_policy)
-            integrity_report = merge_reports(integrity_report, gap_integrity)
-            gap_integrity.raise_for_issues()
-            gaps_observed += 1
-            events.append(_gap_event(gap))
-            if gap.severity < self.config.min_gap_severity:
-                continue
-            if gap.key in generated_gap_keys or (
-                gap.suggested_tool_name
-                and gap.suggested_tool_name in generated_tool_names
-            ):
-                if tools_refined < self.config.max_refinements:
-                    refinement = _refine_existing_helper(
-                        generator=self.generator,
-                        registry=self.registry,
-                        records=records,
-                        gap=gap,
-                        profile=profile,
-                        validation_cases=self.adapter.validation_cases_for_gap(gap),
-                        model=self.config.model,
-                        result=result,
-                        policy=self.config.integrity_policy,
-                        integrity_report=integrity_report,
+            adapter_gap = self.adapter.observe_gap(task, result, records)
+            gap_candidates = _gap_candidates(
+                adapter_gap=adapter_gap,
+                config=self.config,
+                profile=profile,
+                task=task,
+                result=result,
+                helper_bundle=helper_bundle,
+            )
+            stop_after_this_task = False
+            for gap in gap_candidates:
+                gap_integrity = check_gap_signal(gap, self.config.integrity_policy)
+                integrity_report = merge_reports(integrity_report, gap_integrity)
+                gap_integrity.raise_for_issues()
+                gaps_observed += 1
+                events.append(_gap_event(gap))
+                if gap.severity < self.config.min_gap_severity:
+                    continue
+                if gap.key in generated_gap_keys or (
+                    gap.suggested_tool_name
+                    and gap.suggested_tool_name in generated_tool_names
+                ):
+                    if tools_refined < self.config.max_refinements:
+                        refinement = _refine_existing_helper(
+                            generator=self.generator,
+                            registry=self.registry,
+                            records=records,
+                            gap=gap,
+                            profile=profile,
+                            validation_cases=self.adapter.validation_cases_for_gap(gap),
+                            model=self.config.model,
+                            result=result,
+                            policy=self.config.integrity_policy,
+                            integrity_report=integrity_report,
+                        )
+                        integrity_report = refinement.integrity_report
+                        events.extend(refinement.events)
+                        if refinement.accepted_tool_name:
+                            tools_refined += 1
+                            repair_attempts += 1
+                            records = self.registry.load()
+                            if self.config.retry_birth_task_with_new_tool:
+                                retry_bundle = _retry_bundle(
+                                    records=records,
+                                    helper_bundle=helper_bundle,
+                                    new_tool_name=refinement.accepted_tool_name,
+                                )
+                                retry_result = self.adapter.run_task(task, retry_bundle)
+                                helper_bundle = retry_bundle
+                                birth_task_retries += 1
+                                birth_task_retry_successes += int(retry_result.success)
+                                tools_reused += _record_reuse_events(
+                                    self.registry, retry_bundle, retry_result
+                                )
+                                if retry_result.success and not task_counted_success:
+                                    tasks_succeeded += 1
+                                    task_counted_success = True
+                                events.append(
+                                    {
+                                        "event": "refined_tool_task_retry",
+                                        "task_id": task.task_id,
+                                        "tool_name": refinement.accepted_tool_name,
+                                        "success": retry_result.success,
+                                    }
+                                )
+                    events.append(
+                        {
+                            "event": "tool_generation_skipped_existing",
+                            "gap_key": gap.key,
+                            "task_id": task.task_id,
+                            "tool_name": gap.suggested_tool_name or "",
+                        }
                     )
-                    integrity_report = refinement.integrity_report
-                    events.extend(refinement.events)
-                    if refinement.accepted_tool_name:
-                        tools_refined += 1
-                        repair_attempts += 1
-                        records = self.registry.load()
-                        if self.config.retry_birth_task_with_new_tool:
-                            retry_bundle = {
-                                refinement.accepted_tool_name: records[
-                                    refinement.accepted_tool_name
-                                ]
-                            }
-                            retry_result = self.adapter.run_task(task, retry_bundle)
-                            birth_task_retries += 1
-                            birth_task_retry_successes += int(retry_result.success)
-                            tools_reused += _record_reuse_events(
-                                self.registry, retry_bundle, retry_result
-                            )
-                            if retry_result.success and not result.success:
-                                tasks_succeeded += 1
-                            events.append(
-                                {
-                                    "event": "refined_tool_task_retry",
-                                    "task_id": task.task_id,
-                                    "tool_name": refinement.accepted_tool_name,
-                                    "success": retry_result.success,
-                                }
-                            )
-                events.append(
-                    {
-                        "event": "tool_generation_skipped_existing",
-                        "gap_key": gap.key,
-                        "task_id": task.task_id,
-                        "tool_name": gap.suggested_tool_name or "",
-                    }
-                )
-                continue
-            if tools_born >= self.config.max_new_tools:
-                continue
-            candidate = self.generator.generate(
-                gap,
-                profile,
-                self.adapter.validation_cases_for_gap(gap),
-                model=self.config.model,
-            )
-            tools_born += 1
-            candidate_integrity = check_helper_candidate(
-                candidate, gap, self.config.integrity_policy
-            )
-            integrity_report = merge_reports(integrity_report, candidate_integrity)
-            validation = _integrity_or_validation(candidate_integrity, candidate)
-            for attempt in range(self.config.repair_attempts):
-                if validation.accepted or not _supports_repair(self.generator):
-                    break
-                repair_attempts += 1
-                candidate = cast(HelperRepairGenerator, self.generator).repair(
+                    continue
+                if tools_born >= self.config.max_new_tools:
+                    continue
+                candidate = self.generator.generate(
                     gap,
                     profile,
-                    candidate,
-                    validation.errors,
                     self.adapter.validation_cases_for_gap(gap),
                     model=self.config.model,
                 )
+                tools_born += 1
                 candidate_integrity = check_helper_candidate(
                     candidate, gap, self.config.integrity_policy
                 )
                 integrity_report = merge_reports(integrity_report, candidate_integrity)
                 validation = _integrity_or_validation(candidate_integrity, candidate)
-                events.append(
-                    {
-                        "event": "tool_repair",
-                        "tool_name": candidate.spec.name,
-                        "attempt": attempt + 1,
-                        "accepted": validation.accepted,
-                        "errors": list(validation.errors),
-                    }
-                )
-            events.append(
-                {
-                    "event": "tool_birth",
-                    "tool_name": candidate.spec.name,
-                    "accepted": validation.accepted,
-                    "errors": list(validation.errors),
-                    "cases": validation.cases_run,
-                }
-            )
-            if validation.accepted:
-                self.registry.add(
-                    candidate,
-                    validation,
-                    birth_gap_key=gap.key,
-                    birth_environment=profile.name,
-                )
-                records = self.registry.load()
-                generated_gap_keys.add(gap.key)
-                generated_tool_names.add(candidate.spec.name)
-                tools_accepted += 1
-                if self.config.retry_birth_task_with_new_tool:
-                    retry_bundle = {candidate.spec.name: records[candidate.spec.name]}
-                    retry_result = self.adapter.run_task(task, retry_bundle)
-                    birth_task_retries += 1
-                    birth_task_retry_successes += int(retry_result.success)
-                    tools_reused += _record_reuse_events(
-                        self.registry, retry_bundle, retry_result
+                for attempt in range(self.config.repair_attempts):
+                    if validation.accepted or not _supports_repair(self.generator):
+                        break
+                    repair_attempts += 1
+                    candidate = cast(HelperRepairGenerator, self.generator).repair(
+                        gap,
+                        profile,
+                        candidate,
+                        validation.errors,
+                        self.adapter.validation_cases_for_gap(gap),
+                        model=self.config.model,
                     )
-                    if retry_result.success and not result.success:
-                        tasks_succeeded += 1
+                    candidate_integrity = check_helper_candidate(
+                        candidate, gap, self.config.integrity_policy
+                    )
+                    integrity_report = merge_reports(
+                        integrity_report, candidate_integrity
+                    )
+                    validation = _integrity_or_validation(
+                        candidate_integrity, candidate
+                    )
                     events.append(
                         {
-                            "event": "birth_task_retry",
-                            "task_id": task.task_id,
+                            "event": "tool_repair",
                             "tool_name": candidate.spec.name,
-                            "success": retry_result.success,
+                            "attempt": attempt + 1,
+                            "accepted": validation.accepted,
+                            "errors": list(validation.errors),
                         }
                     )
-                if self.config.stop_after_first_birth:
-                    break
-            else:
-                tools_rejected += 1
+                events.append(
+                    {
+                        "event": "tool_birth",
+                        "tool_name": candidate.spec.name,
+                        "accepted": validation.accepted,
+                        "errors": list(validation.errors),
+                        "cases": validation.cases_run,
+                    }
+                )
+                if validation.accepted:
+                    self.registry.add(
+                        candidate,
+                        validation,
+                        birth_gap_key=gap.key,
+                        birth_environment=profile.name,
+                    )
+                    records = self.registry.load()
+                    generated_gap_keys.add(gap.key)
+                    generated_tool_names.add(candidate.spec.name)
+                    tools_accepted += 1
+                    if self.config.retry_birth_task_with_new_tool:
+                        retry_bundle = _retry_bundle(
+                            records=records,
+                            helper_bundle=helper_bundle,
+                            new_tool_name=candidate.spec.name,
+                        )
+                        retry_result = self.adapter.run_task(task, retry_bundle)
+                        helper_bundle = retry_bundle
+                        birth_task_retries += 1
+                        birth_task_retry_successes += int(retry_result.success)
+                        tools_reused += _record_reuse_events(
+                            self.registry, retry_bundle, retry_result
+                        )
+                        if retry_result.success and not task_counted_success:
+                            tasks_succeeded += 1
+                            task_counted_success = True
+                        events.append(
+                            {
+                                "event": "birth_task_retry",
+                                "task_id": task.task_id,
+                                "tool_name": candidate.spec.name,
+                                "success": retry_result.success,
+                            }
+                        )
+                    if self.config.stop_after_first_birth:
+                        stop_after_this_task = True
+                        break
+                else:
+                    tools_rejected += 1
+            if stop_after_this_task:
+                break
 
         final_records = self.registry.load()
         return SAGERunSummary(
@@ -310,6 +337,53 @@ class _RefinementResult:
     accepted_tool_name: str
     integrity_report: IntegrityReport
     events: tuple[dict[str, Any], ...]
+
+
+def _gap_candidates(
+    *,
+    adapter_gap: GapSignal | None,
+    config: SAGEConfig,
+    profile: EnvironmentProfile,
+    task: Any,
+    result: TaskRunResult,
+    helper_bundle: dict[str, HelperRecord],
+) -> tuple[GapSignal, ...]:
+    gaps: list[GapSignal] = []
+    if adapter_gap is not None:
+        gaps.append(adapter_gap)
+    if config.enable_generic_gap_mining:
+        gaps.extend(
+            mine_gap_signals(
+                profile=profile,
+                task=task,
+                result=result,
+                helpers=helper_bundle,
+                base_gap=adapter_gap,
+            )
+        )
+    unique: list[GapSignal] = []
+    seen: set[tuple[str, str]] = set()
+    for gap in gaps:
+        identity = (gap.key, gap.suggested_tool_name or "")
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique.append(gap)
+        if len(unique) >= config.max_gap_signals_per_task:
+            break
+    return tuple(unique)
+
+
+def _retry_bundle(
+    *,
+    records: dict[str, HelperRecord],
+    helper_bundle: dict[str, HelperRecord],
+    new_tool_name: str,
+) -> dict[str, HelperRecord]:
+    retry = dict(helper_bundle)
+    if new_tool_name in records and not records[new_tool_name].retired:
+        retry[new_tool_name] = records[new_tool_name]
+    return retry
 
 
 def _refine_existing_helper(

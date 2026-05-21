@@ -23,6 +23,7 @@ if str(SRC) not in sys.path:
 from sage_agent import SAGEAgent, SAGEConfig  # noqa: E402
 from sage_agent.adapters import (  # noqa: E402
     CyberGymAdapter,
+    MiniGridAdapter,
     ToolSandboxMiniAdapter,
     ToolSandboxScenarioProbeAdapter,
 )
@@ -42,7 +43,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--env",
-        choices=("toolsandbox", "toolsandbox-probe", "cybergym"),
+        choices=("toolsandbox", "toolsandbox-probe", "cybergym", "minigrid"),
         required=True,
     )
     parser.add_argument("--limit", type=int, default=2)
@@ -82,11 +83,13 @@ def main() -> None:
         adapter = ToolSandboxScenarioProbeAdapter(
             scenario_names=tuple(args.toolsandbox_scenario)
         )
-    else:
+    elif args.env == "cybergym":
         adapter = CyberGymAdapter(
             repo_root=args.cybergym_repo,
             task_ids=tuple(args.cybergym_task_id),
         )
+    else:
+        adapter = MiniGridAdapter()
 
     if args.generator == "template":
         generator: HelperGenerator = TemplateHelperGenerator()
@@ -135,6 +138,27 @@ def _run_metadata(
         "available_tasks": available_tasks,
         "limit_satisfied": args.limit <= available_tasks,
     }
+    if args.env == "minigrid":
+        base.update(
+            {
+                "execution_mode": "official_minigrid_standalone_smoke",
+                "benchmark_ready": False,
+                "real_task_generator_used": True,
+                "real_submission_server_used": False,
+                "real_poc_verifier_used": False,
+                "interpretation": (
+                    "This run validates SAGE on official MiniGrid environments "
+                    "using visible grid observations. It is a small integration "
+                    "smoke, not a protected MiniGrid benchmark claim."
+                ),
+                "setup_notes": (
+                    "The adapter exposes visible grid rows and pose fields, then "
+                    "scores only by executing action names through MiniGrid.",
+                ),
+            }
+        )
+        return base
+
     if args.env != "cybergym":
         base.update(
             {

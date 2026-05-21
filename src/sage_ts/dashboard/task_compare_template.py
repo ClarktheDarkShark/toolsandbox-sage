@@ -46,6 +46,23 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       font-size: 22px;
       letter-spacing: 0;
     }
+    .title-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .env-badge {
+      border: 1px solid #3f80bd;
+      background: #102c45;
+      color: #bfeaff;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
     .header-row {
       display: flex;
       justify-content: space-between;
@@ -610,7 +627,10 @@ TASK_COMPARE_HTML = r"""<!doctype html>
   <header>
     <div class="header-row">
       <div>
-        <h1>Task Compare</h1>
+        <div class="title-line">
+          <h1>Task Compare</h1>
+          <span class="env-badge" id="envBadge">ToolSandbox</span>
+        </div>
         <div class="subtitle" id="subtitle">Loading run data...</div>
       </div>
       <select id="dashboardSwitch" class="dashboard-switch" aria-label="Switch dashboard">
@@ -644,6 +664,14 @@ TASK_COMPARE_HTML = r"""<!doctype html>
   </div>
   <script>
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    function envDisplayName(value) {
+      const raw = String(value || "ToolSandbox").trim();
+      const normalized = raw.toLowerCase().replaceAll("_", "-");
+      if (normalized.includes("toolsandbox")) return "ToolSandbox";
+      if (normalized.includes("cybergym")) return "CyberGym";
+      if (normalized.includes("minigrid")) return "MiniGrid";
+      return raw ? raw.replaceAll("-", " ") : "ToolSandbox";
+    }
     const finite = (v) => v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v));
     const pct = (v) => finite(v) ? (Number(v) * 100).toFixed(1) + "%" : "-";
     const signedPct = (v) => finite(v) ? (Number(v) >= 0 ? "+" : "") + (Number(v) * 100).toFixed(1) + "%" : "-";
@@ -1278,6 +1306,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const totalTasks = plannedTaskCount(s);
       const selectedTasks = Math.max(Number(s.scenario_count || 0), Number(pairs.length || 0));
       const matchedText = selectedTasks && selectedTasks !== totalTasks ? `${matched || 0}/${totalTasks || 0} cap · ${selectedTasks} matched tasks` : `${matched || 0}/${totalTasks || 0} matched tasks`;
+      const environmentName = envDisplayName(payload.environment || payload.benchmark || s.environment || "ToolSandbox");
+      document.title = `Task Compare - ${environmentName} - SAGE`;
+      document.getElementById("envBadge").textContent = environmentName;
       document.getElementById("subtitle").textContent = `${payload.mode || "run"} · ${payload.status || "unknown"} · ${payload.agent || ""} · ${matchedText} · refreshed ${new Date().toLocaleTimeString()}`;
       if (selected >= pairs.length) selected = Math.max(0, pairs.length - 1);
       renderMetrics();

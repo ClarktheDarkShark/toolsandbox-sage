@@ -51,7 +51,12 @@ class CyberGymLiveSubmitAdapter:
             base_tools=("file_read", "shell", "submit_poc"),
             action_tools=("submit_poc",),
             observation_fields=("README.md", "description.txt", "submit_result"),
-            helper_families=("visible_text_candidate_planner",),
+            helper_families=(
+                "visible_text_candidate_planner",
+                "artifact_literal_candidate_planner",
+                "execution_feedback_candidate_mutation_planner",
+                "structured_input_candidate_planner",
+            ),
             safety_rules=(
                 "helpers must not submit PoCs",
                 "helpers must not read reference PoCs or hidden labels",
@@ -79,12 +84,17 @@ class CyberGymLiveSubmitAdapter:
         self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
     ) -> tuple[str, ...]:
         del task
+        candidate_families = {
+            "visible_text_candidate_planner",
+            "artifact_literal_candidate_planner",
+            "execution_feedback_candidate_mutation_planner",
+            "structured_input_candidate_planner",
+        }
         return tuple(
             name
             for name, record in helpers.items()
-            if record.candidate.spec.family == "visible_text_candidate_planner"
-            and not record.retired
-        )[:1]
+            if record.candidate.spec.family in candidate_families and not record.retired
+        )[:4]
 
     def run_task(
         self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
@@ -97,44 +107,50 @@ class CyberGymLiveSubmitAdapter:
         candidates = ["\x00\x01\x02\x03"]
         tool_uses: list[ToolUseRecord] = []
         if helpers:
-            name, record = next(iter(helpers.items()))
-            validation = validate_helper_candidate(record.candidate)
-            if validation.accepted:
-                planner = _load_helper(record)
-                planned = _call_planner(
-                    planner,
-                    description=str(description),
-                    readme=str(readme),
-                    feedback=feedback,
-                    artifact_summary=str(artifact_summary),
-                    max_candidates=self.max_candidates,
-                )
-                candidates = [
-                    str(item)
-                    for item in planned.get("candidates", [])
-                    if isinstance(item, str)
-                ][: self.max_candidates]
-                if not candidates:
-                    candidates = ["\x00\x01\x02\x03"]
-                tool_uses.append(
-                    ToolUseRecord(
-                        tool_name=name,
-                        arguments={"description_chars": len(str(description))},
-                        result={
-                            "candidate_count": len(candidates),
-                            "artifact_summary_chars": len(str(artifact_summary)),
-                            "first_candidate_len": len(candidates[0])
-                            if candidates
-                            else 0,
-                        },
-                        success=True,
-                        generated_helper=True,
+            candidate_batches: list[list[str]] = []
+            per_helper_limit = max(3, self.max_candidates // max(len(helpers), 1))
+            for name, record in helpers.items():
+                validation = validate_helper_candidate(record.candidate)
+                if validation.accepted:
+                    planner = _load_helper(record)
+                    planned = _call_planner(
+                        planner,
+                        description=str(description),
+                        readme=str(readme),
+                        feedback=feedback,
+                        artifact_summary=str(artifact_summary),
+                        max_candidates=per_helper_limit,
                     )
-                )
-            else:
-                tool_uses.append(
-                    ToolUseRecord(name, generated_helper=True, success=False)
-                )
+                    planned_candidates = [
+                        str(item)
+                        for item in planned.get("candidates", [])
+                        if isinstance(item, str)
+                    ][:per_helper_limit]
+                    candidate_batches.append(planned_candidates)
+                    tool_uses.append(
+                        ToolUseRecord(
+                            tool_name=name,
+                            arguments={"description_chars": len(str(description))},
+                            result={
+                                "candidate_count": len(planned_candidates),
+                                "artifact_summary_chars": len(str(artifact_summary)),
+                                "first_candidate_len": len(planned_candidates[0])
+                                if planned_candidates
+                                else 0,
+                            },
+                            success=True,
+                            generated_helper=True,
+                        )
+                    )
+                else:
+                    tool_uses.append(
+                        ToolUseRecord(name, generated_helper=True, success=False)
+                    )
+            candidates = _merge_candidate_batches(
+                candidate_batches, limit=self.max_candidates
+            )
+            if not candidates:
+                candidates = ["\x00\x01\x02\x03"]
         attempts = []
         success = False
         best_score = 0.0
@@ -209,7 +225,61 @@ class CyberGymLiveSubmitAdapter:
         )
 
     def validation_cases_for_gap(self, gap: GapSignal) -> tuple[ValidationCase, ...]:
-        del gap
+        template = str(gap.generation_directives.get("template", ""))
+        if template == "artifact_literal_candidate_planner":
+            return (
+                ValidationCase(
+                    name="artifact_literal_first",
+                    inputs={
+                        "description": "",
+                        "readme": "",
+                        "feedback": "",
+                        "artifact_summary": "literal: MAGIC_HEADER\nsource_line: size=4294967295",
+                        "max_candidates": 4,
+                    },
+                    expected={
+                        "candidate_count": 4,
+                        "first_candidate": "MAGIC_HEADER",
+                        "abstain": False,
+                    },
+                ),
+            )
+        if template == "execution_feedback_candidate_mutation_planner":
+            return (
+                ValidationCase(
+                    name="feedback_mutations",
+                    inputs={
+                        "description": "Input length matters.",
+                        "readme": "",
+                        "feedback": "candidate 0: exit_code=0 len=4",
+                        "artifact_summary": "",
+                        "max_candidates": 4,
+                    },
+                    expected={
+                        "candidate_count": 4,
+                        "first_candidate": "",
+                        "abstain": False,
+                    },
+                ),
+            )
+        if template == "structured_input_candidate_planner":
+            return (
+                ValidationCase(
+                    name="xml_structured_candidate",
+                    inputs={
+                        "description": "The parser reads XML input.",
+                        "readme": "",
+                        "feedback": "",
+                        "artifact_summary": "",
+                        "max_candidates": 4,
+                    },
+                    expected={
+                        "candidate_count": 4,
+                        "first_candidate": "<a/>",
+                        "abstain": False,
+                    },
+                ),
+            )
         return (
             ValidationCase(
                 name="visible_example_input",
@@ -325,6 +395,26 @@ def _call_planner(
         except TypeError:
             planned = planner(description=description, max_candidates=max_candidates)
     return planned if isinstance(planned, dict) else {}
+
+
+def _merge_candidate_batches(
+    candidate_batches: list[list[str]], *, limit: int
+) -> list[str]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    width = max((len(batch) for batch in candidate_batches), default=0)
+    for index in range(width):
+        for batch in candidate_batches:
+            if index >= len(batch):
+                continue
+            candidate = batch[index]
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            unique.append(candidate)
+            if len(unique) >= limit:
+                return unique
+    return unique
 
 
 def _visible_artifact_summary(task_dir: Path) -> str:

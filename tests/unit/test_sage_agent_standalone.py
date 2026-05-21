@@ -8,6 +8,7 @@ from sage_agent.adapters import (
     ToolSandboxScenarioProbeAdapter,
 )
 from sage_agent.dashboard import write_standalone_dashboard
+from sage_agent.gap_mining import mine_gap_signals
 from sage_agent.generators import TemplateHelperGenerator
 from sage_agent.integrity import (
     IntegrityError,
@@ -84,7 +85,7 @@ def test_standalone_sage_toolsandbox_probe_uses_real_scenario_registry(
     summary = agent.run(limit=1)
     assert summary.environment == "toolsandbox"
     assert summary.tools_accepted == 1
-    assert summary.birth_task_retry_successes == 1
+    assert summary.birth_task_retry_successes >= 1
 
 
 def test_standalone_sage_repairs_rejected_helper(tmp_path: Path) -> None:
@@ -131,7 +132,7 @@ def test_standalone_sage_refines_underperforming_retained_helper(
 
     assert summary.tools_born == 0
     assert summary.tools_refined == 1
-    assert summary.birth_task_retry_successes == 1
+    assert summary.birth_task_retry_successes >= 1
     assert summary.tasks_succeeded == 1
 
 
@@ -205,6 +206,57 @@ def test_standalone_dashboard_exports_env_neutral_run(tmp_path: Path) -> None:
     assert (tmp_path / "run" / "dashboard" / "index.html").exists()
 
 
+def test_generic_gap_mining_splits_candidate_failures_into_multiple_hypotheses() -> (
+    None
+):
+    profile = EnvironmentProfile(
+        name="portable-candidate-env",
+        description="Generic candidate submission environment.",
+        base_tools=("submit_candidate",),
+        action_tools=("submit_candidate",),
+        observation_fields=("description", "artifact_summary", "attempts"),
+    )
+    task = TaskSpec(
+        task_id="portable-1",
+        name="parse structured input",
+        prompt="Submit an input for an XML parser.",
+        artifacts={
+            "description": "Parser reads XML.",
+            "artifact_summary": "literal: MAGIC_HEADER\nsource_line: size=4294967295",
+        },
+    )
+    result = TaskRunResult(
+        task=task,
+        success=False,
+        transcript=("candidate 0: exit_code=0 len=4",),
+        artifacts={"attempts": [{"exit_code": 0, "poc_length": 4}]},
+    )
+
+    gaps = mine_gap_signals(profile=profile, task=task, result=result, helpers={})
+    keys = {gap.key for gap in gaps}
+
+    assert "visible_artifact_literal_candidate_extraction" in keys
+    assert "execution_feedback_candidate_mutation" in keys
+    assert "structured_input_format_candidate_planning" in keys
+
+
+def test_standalone_sage_can_birth_sibling_helpers_from_generic_gap_mining(
+    tmp_path: Path,
+) -> None:
+    agent = SAGEAgent(
+        adapter=GenericCandidateAdapter(),
+        generator=TemplateHelperGenerator(),
+        config=SAGEConfig(registry_dir=tmp_path / "registry", max_new_tools=4),
+    )
+
+    summary = agent.run(limit=1)
+
+    assert summary.tools_born >= 3
+    assert summary.tools_accepted >= 3
+    assert summary.birth_task_retry_successes >= 1
+    assert summary.tasks_succeeded == 1
+
+
 class BrokenThenRepairGenerator(TemplateHelperGenerator):
     def generate(
         self,
@@ -237,6 +289,174 @@ class BrokenThenRepairGenerator(TemplateHelperGenerator):
         del rejected, errors
         return TemplateHelperGenerator.generate(
             self, gap, profile, validation_cases, model=model
+        )
+
+
+class GenericCandidateAdapter:
+    def profile(self) -> EnvironmentProfile:
+        return EnvironmentProfile(
+            name="portable-candidate-env",
+            description="Generic candidate submission environment.",
+            base_tools=("submit_candidate",),
+            action_tools=("submit_candidate",),
+            observation_fields=("description", "artifact_summary", "attempts"),
+            helper_families=(
+                "visible_text_candidate_planner",
+                "artifact_literal_candidate_planner",
+                "execution_feedback_candidate_mutation_planner",
+                "structured_input_candidate_planner",
+            ),
+            safety_rules=("helpers prepare candidates but do not submit them",),
+        )
+
+    def prepare(self) -> None:
+        return None
+
+    def tasks(self, *, limit: int | None = None) -> tuple[TaskSpec, ...]:
+        tasks = (
+            TaskSpec(
+                task_id="portable-1",
+                name="parse structured input",
+                prompt="Submit an input for an XML parser.",
+                artifacts={
+                    "description": "Parser reads XML.",
+                    "artifact_summary": (
+                        "literal: MAGIC_HEADER\nsource_line: size=4294967295"
+                    ),
+                },
+            ),
+        )
+        return tasks[:limit] if limit is not None else tasks
+
+    def route_helpers(
+        self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
+    ) -> tuple[str, ...]:
+        del task
+        return tuple(name for name, record in helpers.items() if not record.retired)[:4]
+
+    def run_task(
+        self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
+    ) -> TaskRunResult:
+        success = len(helpers) >= 3
+        return TaskRunResult(
+            task=task,
+            success=success,
+            score=1.0 if success else 0.0,
+            outcome_score=1.0 if success else 0.0,
+            transcript=("candidate 0: exit_code=0 len=4",),
+            tool_uses=tuple(
+                ToolUseRecord(name, generated_helper=True, success=True)
+                for name in helpers
+            ),
+            artifacts={"attempts": [{"exit_code": 0, "poc_length": 4}]},
+        )
+
+    def observe_gap(
+        self,
+        task: TaskSpec,
+        result: TaskRunResult,
+        helpers: Mapping[str, HelperRecord],
+    ) -> GapSignal | None:
+        del helpers
+        if result.success:
+            return None
+        return GapSignal(
+            key="visible_text_candidate_planning_from_context",
+            summary="Create side-effect-free candidate strings from visible context.",
+            source_task_id=task.task_id,
+            source_environment="portable-candidate-env",
+            severity=0.8,
+            suggested_tool_name="plan_visible_text_input_candidates",
+            suggested_helper_family="visible_text_candidate_planner",
+            evidence=("visible description",),
+            required_inputs={
+                "description": "str",
+                "readme": "str",
+                "feedback": "str",
+                "artifact_summary": "str",
+                "max_candidates": "int",
+            },
+            expected_outputs={
+                "candidates": "list[str]",
+                "candidate_count": "int",
+                "first_candidate": "str",
+                "abstain": "bool",
+            },
+            generation_directives={"template": "visible_text_candidate_planner"},
+        )
+
+    def validation_cases_for_gap(self, gap: GapSignal) -> tuple[ValidationCase, ...]:
+        template = str(gap.generation_directives.get("template", ""))
+        if template == "artifact_literal_candidate_planner":
+            return (
+                ValidationCase(
+                    name="literal",
+                    inputs={
+                        "description": "",
+                        "readme": "",
+                        "feedback": "",
+                        "artifact_summary": "literal: MAGIC_HEADER",
+                        "max_candidates": 2,
+                    },
+                    expected={
+                        "candidate_count": 2,
+                        "first_candidate": "MAGIC_HEADER",
+                        "abstain": False,
+                    },
+                ),
+            )
+        if template == "execution_feedback_candidate_mutation_planner":
+            return (
+                ValidationCase(
+                    name="feedback",
+                    inputs={
+                        "description": "",
+                        "readme": "",
+                        "feedback": "candidate 0: exit_code=0 len=4",
+                        "artifact_summary": "",
+                        "max_candidates": 2,
+                    },
+                    expected={
+                        "candidate_count": 2,
+                        "first_candidate": "",
+                        "abstain": False,
+                    },
+                ),
+            )
+        if template == "structured_input_candidate_planner":
+            return (
+                ValidationCase(
+                    name="xml",
+                    inputs={
+                        "description": "XML parser",
+                        "readme": "",
+                        "feedback": "",
+                        "artifact_summary": "",
+                        "max_candidates": 2,
+                    },
+                    expected={
+                        "candidate_count": 2,
+                        "first_candidate": "<a/>",
+                        "abstain": False,
+                    },
+                ),
+            )
+        return (
+            ValidationCase(
+                name="visible",
+                inputs={
+                    "description": "Example input: MAGIC_HEADER",
+                    "readme": "",
+                    "feedback": "",
+                    "artifact_summary": "",
+                    "max_candidates": 2,
+                },
+                expected={
+                    "candidate_count": 2,
+                    "first_candidate": "MAGIC_HEADER",
+                    "abstain": False,
+                },
+            ),
         )
 
 

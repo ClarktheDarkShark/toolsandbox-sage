@@ -1,10 +1,13 @@
 # mypy: ignore-errors
 from scripts.run_sage_protocol import (
+    SAGE_POLICY_AUTO,
+    SAGE_POLICY_NONE,
     SAGE_POLICY_SELF_EVOLVING_PRAXIS,
     SELF_EVOLVING_PRAXIS_ENV_DEFAULTS,
     _apply_sage_policy_preset,
     _generation_enabled_by_default,
     _protocol_gate_decision,
+    _resolve_sage_policy_preset,
     _restore_registry_after_failed_gate,
     _route_mismatch_qualified,
     _snapshot_registry_for_gate,
@@ -24,6 +27,27 @@ def test_transfer_mode_stays_frozen_for_non_discovery_manifest() -> None:
 
 def test_mechanism_mode_enables_generation_by_default() -> None:
     assert _generation_enabled_by_default("mechanism_40", "anything") is True
+
+
+def test_auto_sage_policy_uses_praxis_for_generation_enabled_runs() -> None:
+    assert (
+        _resolve_sage_policy_preset(SAGE_POLICY_AUTO, generation_enabled=True)
+        == SAGE_POLICY_SELF_EVOLVING_PRAXIS
+    )
+
+
+def test_auto_sage_policy_stays_none_for_frozen_runs() -> None:
+    assert (
+        _resolve_sage_policy_preset(SAGE_POLICY_AUTO, generation_enabled=False)
+        == SAGE_POLICY_NONE
+    )
+
+
+def test_explicit_sage_policy_override_is_preserved() -> None:
+    assert (
+        _resolve_sage_policy_preset(SAGE_POLICY_NONE, generation_enabled=True)
+        == SAGE_POLICY_NONE
+    )
 
 
 def test_self_evolving_praxis_policy_sets_high_lift_runtime_defaults(

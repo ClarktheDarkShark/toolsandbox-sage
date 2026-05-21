@@ -1,6 +1,6 @@
 # SAGE: Self-Adaptive Generative Evolution
 
-SAGE is a ToolSandbox-based self-evolving agent research system. It starts from an intentionally incomplete but fair base toolset, detects missing deterministic capabilities during ToolSandbox tasks, generates small typed Python helper tools, validates those helpers, stores accepted helpers in a persistent registry, and later routes retained helpers back into unseen ToolSandbox scenarios.
+SAGE is a self-evolving agent research system. It starts from an intentionally incomplete but fair base toolset, detects missing deterministic capabilities during tasks, generates small typed Python helper tools, validates those helpers, stores accepted helpers in a persistent registry, and later routes retained helpers back into new tasks. ToolSandbox remains the primary benchmark used for the mature evidence base, and the standalone `sage_agent` package is the current path for making the same process portable across environments.
 
 The research claim is not simply “better tool calling.” The claim is tool evolution:
 
@@ -12,11 +12,13 @@ The research claim is not simply “better tool calling.” The claim is tool ev
 6. later tasks load and call that retained helper,
 7. matched control/SAGE runs show task-outcome improvement or preservation from reuse.
 
-This repository is built on Apple’s ToolSandbox benchmark. The upstream ToolSandbox code, license, and benchmark README are retained below for attribution and reproducibility.
+This repository is built from Apple’s ToolSandbox benchmark and now also contains a development-stage environment-neutral SAGE package. The upstream ToolSandbox code, license, and benchmark README are retained below for attribution and reproducibility.
 
 ## Current Main System: SAGE Praxis With True Self-Evolution
 
 SAGE Praxis with true self-evolution working is the current main SAGE system going forward for methodology writing and future validation campaigns. In this mode, SAGE can start from an empty generated-tool registry, keep generation on during candidate runs, identify unsupported task buckets from online gap evidence, generate and validate new helpers, retain useful tools, park harmful tools, and reuse retained helpers through system-driven routing.
+
+For ToolSandbox protocol runs, `scripts/run_sage_protocol.py` now resolves `--sage-policy auto` to the audited high-lift `self-evolving-praxis` preset whenever generation is enabled, and to `none` for frozen validation arms. This prevents generation-enabled mechanism/build runs from accidentally exercising the weaker generic path. Use `--sage-policy none` only for explicit ablations.
 
 This is a current-system and methodology marker, not an automatic protected final-claim update. Protected claims still require locked matched validation, zero helper side-effect incidents, documented cache policy, and protected-claim review.
 
@@ -82,9 +84,14 @@ summary = agent.run(limit=20)
 
 The standalone package lives in `src/sage_agent/`. It is intentionally
 environment-neutral: the core SAGE controller does not know about ToolSandbox,
-CyberGym, contacts, reminders, PoC submission, Docker, or benchmark-specific
-labels. Environments provide adapters that expose tasks, normalized run
-results, gap signals, validation cases, helper routing, and safety rules.
+CyberGym, MiniGrid, contacts, reminders, PoC submission, Docker, grid worlds,
+or benchmark-specific labels. Environments provide adapters that expose tasks,
+normalized run results, gap signals, validation cases, helper routing, and
+safety rules. Generic gap mining is enabled by default in `SAGEConfig`; it can
+split one failed task into multiple reusable hypotheses when visible evidence
+supports them, such as candidate-input planning from visible artifacts,
+execution-feedback mutation, structured-format input planning, or grid
+navigation planning.
 
 Research-integrity checks are enforced at the standalone boundary. Adapters may
 privately score tasks, but SAGE-facing task specs, gap signals, and helper
@@ -108,6 +115,15 @@ Current adapter proof points:
   against the locally cloned `external/cybergym` repository and the published
   10-task subset IDs. It validates the adapter boundary without downloading the
   large CyberGym datasets or running a Docker PoC server.
+- `sage_agent.adapters.CyberGymLiveSubmitAdapter`: real CyberGym Level 1
+  submit-path adapter. It downloads visible task assets in bounded batches,
+  generates task directories with CyberGym's own generator, submits candidate
+  PoCs through the task `submit.sh` scripts, and records verifier-backed
+  success from `/submit-vul`.
+- `sage_agent.adapters.MiniGridAdapter`: official Farama MiniGrid smoke adapter.
+  It exposes visible grid state and validates that SAGE can generate a reusable
+  side-effect-free grid action planner in a third environment that is neither
+  ToolSandbox nor CyberGym.
 
 Run the standalone smoke checks with no model-token spend:
 
@@ -133,6 +149,13 @@ PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
   --registry-dir artifacts/sage_standalone/cybergym_smoke_registry \
   --cybergym-repo external/cybergym \
   --limit 3
+
+PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
+  --env minigrid \
+  --model gpt-4o-mini \
+  --reset-registry \
+  --registry-dir artifacts/sage_standalone/minigrid_smoke_registry \
+  --limit 9
 ```
 
 Each smoke run writes an environment-neutral Task Compare dashboard under
@@ -185,32 +208,132 @@ PYTHONPATH=src:. python scripts/run_cybergym_live_batched_sage.py \
   --limit 20 \
   --batch-size 4 \
   --reset-registry \
-  --registry-dir artifacts/cybergym_live_sage/batched20_registry_generic_visible_v2 \
+  --registry-dir artifacts/cybergym_live_sage/general_gap_v2_registry \
   --output-root outputs/cybergym_live_sage \
-  --run-id batched20_generic_visible_v2 \
-  --max-candidates 24
+  --run-id general_gap_v2_20 \
+  --max-candidates 32
 ```
 
 This starts SAGE from an empty generated-helper registry, preserves the registry
 across batches, uses only visible task assets and live submit feedback, and
 clears batch task directories and runner Docker images by default.
-The current batched runner uses the generic `visible_text_candidate_planner`
-helper family, which extracts visible examples, visible source-artifact
-summaries, execution feedback, and a small universal edge-case candidate set.
-It does not encode CyberGym task IDs, hidden labels, reference PoCs, expected
-answers, or benchmark-specific facts into the generated helper. Use
-`--no-clear-images` only for short local diagnostics when repeated pulls would
-dominate runtime; the default remains image cleanup for space-constrained runs.
+The current batched runner starts with no generated helpers and can birth
+several generic candidate-planning families from the same failed task:
+visible-text planning, visible-artifact literal extraction, execution-feedback
+mutation, and structured-format input planning. It does not encode CyberGym
+task IDs, hidden labels, reference PoCs, expected answers, or benchmark-specific
+facts into generated helpers. Use `--no-clear-images` only for short local
+diagnostics when repeated pulls would dominate runtime; the default remains
+image cleanup for space-constrained runs.
 
 For real ToolSandbox verification, use `scripts/run_sage_protocol.py` with a
-fixed manifest and `OPENAI_API_KEY` available in the process environment. Do
-not interpret `toolsandbox-probe` smoke baselines as ToolSandbox benchmark
-baselines.
+fixed manifest and `OPENAI_API_KEY` available in the process environment. For
+generation-enabled mechanism or online-build runs, the default `--sage-policy
+auto` activates the self-evolving Praxis policy. For frozen validation arms,
+generation remains off and `auto` resolves to no policy preset. Do not interpret
+`toolsandbox-probe` smoke baselines as ToolSandbox benchmark baselines.
+
+Example ToolSandbox self-evolving verification command:
+
+```bash
+PYTHONPATH=src:. python scripts/run_sage_protocol.py \
+  --mode mechanism_40 \
+  --manifest artifacts/sage_standalone/toolsandbox_verify20_manifest.json \
+  --generation on \
+  --agent gpt-4o-mini \
+  --user gpt-4o-mini \
+  --generation-model gpt-4o-mini \
+  --disable-openai-response-cache \
+  --cache-mode off \
+  --control-cache strict \
+  --routing-evidence-mode disabled \
+  --allow-low-quality-cohort \
+  --output-root outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy \
+  --artifact-root artifacts/sage_standalone/toolsandbox_verify20_self_evolving_policy_artifacts
+```
 
 Architecture notes are in
 `docs/sage_protocol/standalone/sage_standalone_architecture.md`.
 Validation notes are in
 `docs/sage_protocol/standalone/sage_standalone_validation_report.md`.
+
+### Using SAGE on a New Benchmark Dataset
+
+To run SAGE on a new environment, implement the `EnvironmentAdapter` protocol
+from `src/sage_agent/interfaces.py`. Keep the environment-specific work inside
+the adapter and keep SAGE-facing data clean:
+
+1. `profile()` describes public capabilities: base tools, action tools,
+   observable fields, helper families, and safety rules.
+2. `prepare()` downloads or starts local environment resources.
+3. `tasks(limit=...)` returns a sealed task stream. Do not select tasks based
+   on labels, cache hits, or prior SAGE performance.
+4. `run_task(task, helpers)` executes the task with a bounded helper bundle and
+   returns normalized score, outcome, transcript, helper uses, and visible
+   artifacts.
+5. `observe_gap(task, result, helpers)` converts failure or friction into a
+   reusable capability gap. It should describe the missing deterministic step,
+   not the hidden answer.
+6. `validation_cases_for_gap(gap)` provides synthetic or visible-data validation
+   cases, including abstain/minefield cases.
+7. `route_helpers(task, registry)` selects a small relevant helper bundle from
+   the accepted registry. The actor or environment still decides whether to
+   use a visible helper naturally.
+
+Adapters may privately score tasks, submit files, step simulators, or call
+benchmark servers. Generated helpers must remain side-effect-free unless a
+future run protocol explicitly permits a different class. Do not expose
+`expected_answer`, `ground_truth`, `oracle`, `solution`, `answer_key`, prior
+SAGE traces, reference PoCs, or hidden labels through task metadata, artifacts,
+gap signals, generation directives, helper code, or registry metadata. The
+standalone integrity policy fails fast if those leak-prone fields appear.
+
+Minimal runner pattern:
+
+```python
+from pathlib import Path
+
+from sage_agent import SAGEAgent, SAGEConfig, TemplateHelperGenerator
+from my_env_adapter import MyBenchmarkAdapter
+
+agent = SAGEAgent(
+    adapter=MyBenchmarkAdapter(data_root=Path("external/my-benchmark")),
+    generator=TemplateHelperGenerator(),  # or OpenAIHelperGenerator()
+    config=SAGEConfig(
+        model="gpt-4o-mini",
+        registry_dir=Path("artifacts/my_benchmark/sage_registry"),
+    ),
+)
+summary = agent.run(limit=20)
+```
+
+For large or disk-heavy benchmarks, use the CyberGym pattern: download a small
+batch, generate task directories, run baseline and SAGE, preserve only the SAGE
+registry and summaries, clear batch resources, and continue with the next batch.
+The registry is the evolving memory; the task data does not need to remain
+loaded.
+
+Recent standalone generalization checks:
+
+- ToolSandbox no-token lifecycle smoke:
+  `outputs/sage_agent_standalone/generic_gap_toolsandbox_smoke_20260521_141611`
+  produced `2/2` SAGE successes from an empty registry with `1` accepted helper
+  and `0` integrity issues.
+- ToolSandbox matched 20-task self-evolving Praxis verification:
+  `outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy/mechanism_40_20260520_210531`
+  restored the working ToolSandbox pattern with score `0.728002 -> 0.908119`
+  and outcome `0.454649 -> 0.920139` using `20 cached / 0 fresh` controls.
+- CyberGym live batched 20-task smoke:
+  `outputs/cybergym_live_sage/general_gap_v2_20_20260521_143053` improved
+  fixed-PoC success from `1/20` to `5/20`, birthed `4` accepted helpers, reused
+  helpers `86` times, and had `0` integrity issues. This is live `/submit-vul`
+  evidence, not final CyberGym benchmark evidence because fix-side
+  verification is not yet run.
+- MiniGrid official smoke:
+  `outputs/sage_agent_standalone/minigrid_generalization_smoke_20260521_142949`
+  improved the fixed-forward smoke baseline from `0/9` to `9/9` by birthing and
+  reusing `plan_grid_shortest_path_actions`. This is a third-environment
+  integration proof, not a protected MiniGrid benchmark claim.
 
 ## Current Evidence Snapshot
 
