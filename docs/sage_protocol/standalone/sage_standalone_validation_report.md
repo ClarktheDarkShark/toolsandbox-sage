@@ -803,3 +803,47 @@ environment; it demonstrates live portability and positive lift, but future
 work should focus on stronger environment-general source/harness inventory,
 input-format inference, feedback classification, mutation/minimization, and
 repair policy before treating CyberGym as more than portability evidence.
+
+## Source-Artifact Candidate Planning And CyberGym Fixed-Side Check
+
+Date: 2026-05-21.
+
+Purpose: take a targeted but environment-general improvement pass on the
+lowest-success environment, CyberGym, without adding CyberGym-specific hidden
+answers or manual tool exposure. The improvement adds a generic
+`source_boundary_value_candidate_planning` gap and
+`source_boundary_candidate_planner` helper family. This family mines only
+visible source/artifact summaries for literals, parser tokens, numeric
+boundaries, magic strings, and comparison constants.
+
+The CyberGym live batched runner also now supports `--fixed-side-check`. With
+that flag, a candidate counts as successful only if it crashes the vulnerable
+target and preserves behavior on the fixed target. Fixed-side cache entries are
+separated from legacy vulnerable-only cache entries by including
+`fixed_side_check` in the LLM baseline cache key.
+
+Runs:
+
+| Environment | Run | Baseline | SAGE | Notes |
+| --- | --- | ---: | ---: | --- |
+| CyberGym fixed-side smoke | `outputs/cybergym_live_sage/openai_key_fixed_side_smoke2_20260521` | `0/2` | `1/2` | `gpt-4o-mini` OpenAI-backed LLM baseline, baseline cache off, fixed-side verification on, tools born/accepted/reused `5 / 5 / 23`, one birth-task retry success, integrity issues `0` |
+| CyberGym fixed-side cached-control smoke | `outputs/cybergym_live_sage/source_boundary_fixed_side_direct_v1_4_20260521` | `0/4` | `1/4` | fixed-side verification on, baseline cache use-if-eligible with fixed-side cache separation, tools born/accepted/reused `5 / 5 / 31`, integrity issues `0` |
+| ToolSandbox maintenance smoke | `outputs/sage_agent_standalone/toolsandbox_source_boundary_maintenance_2_20260521` | `0/2` smoke | `2/2` | lifecycle preservation only, not protected ToolSandbox benchmark evidence |
+| MiniGrid maintenance | `outputs/sage_agent_standalone/minigrid_source_boundary_maintenance_12_20260521` | `7/12` | `12/12` | one accepted/reused grid planner, integrity issues `0` |
+| BIG-Bench Hard maintenance | `outputs/sage_agent_standalone/bbh_source_boundary_maintenance_12_20260521` | `5/12` | `12/12` | one accepted/reused symbolic helper, integrity issues `0` |
+
+Machine-readable summary:
+`artifacts/sage_agent_standalone/source_boundary_fixed_side_maintenance_summary_20260521.json`.
+SHA-256 `6ffda4082984fe19c52d9d818e040a086a4739732d3986cb55cd34b7b42c66ce`.
+
+Dashboard note: zero-baseline relative lift is now displayed as an approximate
+percentage using a documented `0.100` denominator floor. For example,
+`0.000 -> 0.500` displays as approximately `+500.0%`, and the card note states
+that the true baseline was zero and gives the absolute lift. This avoids both
+false `0.0%` lift and infinite percentages.
+
+Interpretation: this is a successful small improvement to SAGE's general
+source-artifact generation lifecycle and a stronger CyberGym correctness check
+than vulnerable-only scoring. It is still not final CyberGym benchmark
+readiness; the sample is intentionally small and should be scaled only after
+the same fixed-side protocol remains stable over a larger task set.

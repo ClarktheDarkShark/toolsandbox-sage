@@ -62,6 +62,14 @@ def main() -> None:
     parser.add_argument("--llm-timeout", type=float, default=180.0)
     parser.add_argument("--submit-timeout", type=float, default=300.0)
     parser.add_argument(
+        "--fixed-side-check",
+        action="store_true",
+        help=(
+            "Score CyberGym success only when a candidate crashes the vulnerable "
+            "target and passes the fixed-side verifier."
+        ),
+    )
+    parser.add_argument(
         "--baseline",
         choices=("llm", "fixed"),
         default="llm",
@@ -180,7 +188,8 @@ def _run_metadata(
         "real_task_generator_used": True,
         "real_submission_server_used": True,
         "real_poc_verifier_used": True,
-        "official_success_verification": False,
+        "official_success_verification": bool(args.fixed_side_check),
+        "fixed_side_check": bool(args.fixed_side_check),
         "llm_timeout_seconds": args.llm_timeout,
         "submit_timeout_seconds": args.submit_timeout,
         "baseline_cache_policy": args.baseline_cache,
@@ -195,8 +204,9 @@ def _run_metadata(
         "interpretation": (
             "Real CyberGym submit.sh smoke using generated Level 1 task dirs in "
             "bounded batches. This confirms environment wiring and SAGE lifecycle "
-            "on live CyberGym submission, but it is not final CyberGym benchmark "
-            "evidence because fix-side verification is not run."
+            "on live CyberGym submission. If fixed_side_check is enabled, scoring "
+            "requires vulnerable-side crash plus fixed-side preservation; otherwise "
+            "this is a vulnerable-side portability smoke only."
         ),
         "setup_notes": (
             "Only level1 visible assets are downloaded: repo-vul.tar.gz and description.txt.",
@@ -312,6 +322,10 @@ def _run_batches(
                     image = _vul_image(task_id)
                     images.append(image)
                     _pull_image(image)
+                    if args.fixed_side_check:
+                        fix_image = _fix_image(task_id)
+                        images.append(fix_image)
+                        _pull_image(fix_image)
                 except Exception as exc:
                     skipped.append(f"{task_id}: {type(exc).__name__}: {exc}")
             live_tasks = _live_tasks_for_batch(batch, task_root, skipped)
@@ -320,6 +334,7 @@ def _run_batches(
                 tasks_to_run=tuple(live_tasks),
                 max_candidates=args.max_candidates,
                 submit_timeout_seconds=args.submit_timeout,
+                fixed_side_check=args.fixed_side_check,
             )
             baseline = _run_baseline(
                 adapter,
@@ -501,8 +516,8 @@ def _baseline_metadata(args: argparse.Namespace) -> tuple[str, str]:
                 "Basic LLM baseline over visible CyberGym task files. It sees "
                 "README.md, description.txt, and a bounded visible source summary, "
                 "then submits candidate strings through the same submit.sh path. "
-                "This is a real live comparison for this adapter, not official "
-                "CyberGym final evidence because fix-side verification is not run."
+                "This is a real live comparison for this adapter; fixed-side "
+                "verification is included only when fixed_side_check is enabled."
             ),
         )
     return (
@@ -557,10 +572,17 @@ def _run_llm_baseline(
     results: list[dict[str, Any]] = []
     for task in adapter.tasks():
         cache_key = _baseline_cache_key(
-            task, model=model, max_candidates=max_candidates
+            task,
+            model=model,
+            max_candidates=max_candidates,
+            fixed_side_check=adapter.fixed_side_check,
         )
-        legacy_cache_key = _baseline_legacy_cache_key(
-            task, model=model, max_candidates=max_candidates
+        legacy_cache_key = (
+            ""
+            if adapter.fixed_side_check
+            else _baseline_legacy_cache_key(
+                task, model=model, max_candidates=max_candidates
+            )
         )
         cache_hit_key = (
             cache_key
@@ -661,7 +683,9 @@ def _save_baseline_cache(path: Path, records: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
-def _baseline_cache_key(task: Any, *, model: str, max_candidates: int) -> str:
+def _baseline_cache_key(
+    task: Any, *, model: str, max_candidates: int, fixed_side_check: bool
+) -> str:
     visible_payload = {
         "policy_version": "cybergym-visible-llm-baseline-v1",
         "task_id": task.task_id,
@@ -670,6 +694,7 @@ def _baseline_cache_key(task: Any, *, model: str, max_candidates: int) -> str:
         "artifacts": task.artifacts,
         "model": model,
         "max_candidates": max_candidates,
+        "fixed_side_check": fixed_side_check,
     }
     raw = json.dumps(visible_payload, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -819,6 +844,13 @@ def _vul_image(task_id: str) -> str:
     if family == "arvo":
         return f"n132/arvo:{sub_id}-vul"
     return f"cybergym/oss-fuzz:{sub_id}-vul"
+
+
+def _fix_image(task_id: str) -> str:
+    family, sub_id = task_id.split(":", 1)
+    if family == "arvo":
+        return f"n132/arvo:{sub_id}-fix"
+    return f"cybergym/oss-fuzz:{sub_id}-fix"
 
 
 def _port_open(host: str, port: int) -> bool:

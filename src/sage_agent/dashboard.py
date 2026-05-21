@@ -614,9 +614,16 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     function fmt(value, digits = 3) {
       return num(value).toFixed(digits);
     }
+    const ZERO_BASELINE_LIFT_FLOOR = 0.1;
     function pct(value, digits = 1) {
-      const sign = value > 0 ? "+" : "";
-      return `${sign}${(num(value) * 100).toFixed(digits)}%`;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return "n/a";
+      const sign = parsed > 0 ? "+" : "";
+      return `${sign}${(parsed * 100).toFixed(digits)}%`;
+    }
+    function liftPct(value, approximate = false, digits = 1) {
+      const rendered = pct(value, digits);
+      return approximate && rendered !== "n/a" ? `~${rendered}` : rendered;
     }
     function deltaText(value, digits = 3) {
       const sign = value >= 0 ? "+" : "";
@@ -633,6 +640,21 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
         return num(record.outcome_score);
       }
       return scoreOf(record);
+    }
+    function relativeLift(delta, baseline) {
+      if (!Number.isFinite(delta) || !Number.isFinite(baseline)) return null;
+      if (Math.abs(baseline) > 1e-12) return delta / baseline;
+      if (Math.abs(delta) <= 1e-12) return 0;
+      return delta / ZERO_BASELINE_LIFT_FLOOR;
+    }
+    function approximateZeroBaselineLift(delta, baseline) {
+      return Number.isFinite(delta) && Number.isFinite(baseline) && Math.abs(baseline) <= 1e-12 && Math.abs(delta) > 1e-12;
+    }
+    function liftHint(delta, baseline, unit) {
+      if (approximateZeroBaselineLift(delta, baseline)) {
+        return `approx using 0.100 floor; true baseline is 0; ${deltaText(delta)} ${unit} absolute lift`;
+      }
+      return `${deltaText(delta)} ${unit} delta`;
     }
     function taskName(task) {
       return task.name || task.baseline?.name || task.task_id || "task";
@@ -663,11 +685,11 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
         baselineScore,
         sageScore,
         scoreDelta: sageScore - baselineScore,
-        scoreLift: baselineScore ? (sageScore - baselineScore) / baselineScore : 0,
+        scoreLift: relativeLift(sageScore - baselineScore, baselineScore),
         baselineOutcome,
         sageOutcome,
         outcomeDelta: sageOutcome - baselineOutcome,
-        outcomeLift: baselineOutcome ? (sageOutcome - baselineOutcome) / baselineOutcome : 0,
+        outcomeLift: relativeLift(sageOutcome - baselineOutcome, baselineOutcome),
         total,
         paired,
       };
@@ -719,10 +741,10 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       document.getElementById("metrics").innerHTML = [
         metric("Baseline Score", fmt(stats.baselineScore), `${baselineResults.length} paired score tasks`),
         metric("SAGE Score", fmt(stats.sageScore), `${tasks.length} paired score tasks`),
-        metric("Score Lift", pct(stats.scoreLift), `${deltaText(stats.scoreDelta)} score delta`, stats.scoreDelta >= 0 ? "good" : "bad"),
+        metric("Score Lift", liftPct(stats.scoreLift, approximateZeroBaselineLift(stats.scoreDelta, stats.baselineScore)), liftHint(stats.scoreDelta, stats.baselineScore, "score"), stats.scoreDelta >= 0 ? "good" : "bad"),
         metric("Baseline Outcome", fmt(stats.baselineOutcome), `${baselineResults.length} paired outcome tasks`),
         metric("SAGE Outcome", fmt(stats.sageOutcome), `${tasks.length} paired outcome tasks`),
-        metric("Outcome Lift", pct(stats.outcomeLift), `${deltaText(stats.outcomeDelta)} outcome delta`, stats.outcomeDelta >= 0 ? "good" : "bad"),
+        metric("Outcome Lift", liftPct(stats.outcomeLift, approximateZeroBaselineLift(stats.outcomeDelta, stats.baselineOutcome)), liftHint(stats.outcomeDelta, stats.baselineOutcome, "outcome"), stats.outcomeDelta >= 0 ? "good" : "bad"),
         metric(
           "Tools Born / Used",
           `${summary.tools_born || 0} / ${Object.values(registryTools).filter((record) => (record.uses || 0) > 0).length}`,
@@ -1239,7 +1261,8 @@ def _legacy_dashboard_html(payload: dict[str, Any]) -> str:
       return `${{sign}}${{(value * 100).toFixed(1)}} pp`;
     }}
     function liftPercent(base, candidate) {{
-      if (!base) return "n/a";
+      if (!base && candidate) return `~${{((candidate / 0.1) * 100).toFixed(1)}}%`;
+      if (!base) return "0.0%";
       const value = (candidate - base) / base;
       const sign = value >= 0 ? "+" : "";
       return `${{sign}}${{(value * 100).toFixed(1)}}%`;
@@ -1334,9 +1357,9 @@ def _legacy_dashboard_html(payload: dict[str, Any]) -> str:
           "Relative lift",
           comparisonValid ? liftPercent(baseRate, sageRate) : "n/a",
           comparisonValid
-            ? (baseRate ? "versus no-helper baseline" : "baseline was zero")
+            ? (baseRate ? "versus no-helper baseline" : `approx using 0.100 floor; true baseline is 0; ${{pp(delta)}} absolute lift`)
             : "use a matched benchmark run for lift",
-          comparisonValid ? (baseRate ? "good" : "warn") : "warn",
+          comparisonValid ? (delta > 0 ? "good" : baseRate ? "" : "warn") : "warn",
         ),
         metric("Gaps observed", summary.gaps_observed || 0, "adapter-normalized gap signals", "warn"),
         metric("Tools born", summary.tools_born || 0, `${{summary.tools_accepted || 0}} accepted · ${{summary.tools_rejected || 0}} rejected`, "warn"),

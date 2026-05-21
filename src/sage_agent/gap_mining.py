@@ -41,6 +41,31 @@ def mine_gap_signals(
     gaps: list[GapSignal] = []
 
     if _looks_like_candidate_submission_context(profile, task, result):
+        if (
+            "source_boundary_candidate_planner" not in existing_families
+            and _has_source_boundary_cue(lowered)
+        ):
+            gaps.append(
+                _candidate_gap(
+                    key="source_boundary_value_candidate_planning",
+                    summary=(
+                        "Generate candidate inputs from visible source-artifact "
+                        "boundary values, magic literals, parser constants, and "
+                        "size/length/check comparisons."
+                    ),
+                    source_task_id=task.task_id,
+                    source_environment=profile.name,
+                    tool_name="plan_source_boundary_input_candidates",
+                    family="source_boundary_candidate_planner",
+                    evidence=(
+                        "visible source-like lines",
+                        "boundary or size constants",
+                        "magic strings or parser comparisons",
+                    ),
+                    template="source_boundary_candidate_planner",
+                )
+            )
+
         if "artifact_literal_candidate_planner" not in existing_families and (
             "literal:" in lowered or "source_line:" in lowered
         ):
@@ -292,6 +317,28 @@ def _has_structured_format_cue(text: str) -> bool:
         "length",
     )
     return any(cue in text for cue in cues)
+
+
+def _has_source_boundary_cue(text: str) -> bool:
+    if "source_line:" not in text:
+        return False
+    cues = (
+        "size",
+        "length",
+        "chunk",
+        "version",
+        "magic",
+        "header",
+        "token",
+        "strcmp",
+        "memcmp",
+        "==",
+        ">=",
+        "<=",
+        "boundary",
+        "overflow",
+    )
+    return any(cue in text for cue in cues) and any(ch.isdigit() for ch in text)
 
 
 def _dedupe_gaps(gaps: list[GapSignal]) -> tuple[GapSignal, ...]:

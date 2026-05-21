@@ -23,6 +23,7 @@ CANDIDATE_PLANNER_FAMILIES = {
     "artifact_literal_candidate_planner",
     "execution_feedback_candidate_mutation_planner",
     "structured_input_candidate_planner",
+    "source_boundary_candidate_planner",
 }
 
 
@@ -49,6 +50,10 @@ class TemplateHelperGenerator:
             )
         if template == "artifact_literal_candidate_planner":
             return _artifact_literal_candidate_planner(
+                name, gap, profile, validation_cases, model
+            )
+        if template == "source_boundary_candidate_planner":
+            return _source_boundary_candidate_planner(
                 name, gap, profile, validation_cases, model
             )
         if template == "execution_feedback_candidate_mutation_planner":
@@ -455,6 +460,127 @@ def _artifact_literal_candidate_planner(
         candidates.append(value + "\\x00")
         candidates.append(value + value)
     candidates.extend(["MAGIC", "magic", "AAAA", "\\x00\\x01\\x02\\x03", "A" * 32])
+    unique = []
+    seen = set()
+    limit = int(max_candidates)
+    if limit < 1:
+        limit = 1
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+        if len(unique) >= limit:
+            break
+    return {{
+        "candidates": unique,
+        "candidate_count": len(unique),
+        "first_candidate": unique[0] if unique else "",
+        "abstain": False,
+    }}
+"""
+    return _candidate_planner_candidate(
+        name, gap, profile, validation_cases, model, code
+    )
+
+
+def _source_boundary_candidate_planner(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    code = f"""def {name}(description: str, readme: str = "", feedback: str = "", artifact_summary: str = "", max_candidates: int = 12) -> dict:
+    text = str(artifact_summary or "") + "\\n" + str(description or "") + "\\n" + str(readme or "") + "\\n" + str(feedback or "")
+    lower = text.lower()
+    candidates = []
+    literals = []
+    numbers = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip(" \\t\\r\\n-*")
+        if not line:
+            continue
+        line_lower = line.lower()
+        if line_lower.startswith("file:"):
+            continue
+        source_like_line = False
+        if line_lower.startswith("source_line:"):
+            line = line.split(":", 1)[1].strip()
+            line_lower = line.lower()
+            source_like_line = True
+        for prefix in ("literal:", "dict:", "token:", "magic:", "example:", "input:"):
+            if line_lower.startswith(prefix):
+                value = line[len(prefix):].strip(" :-,;\\t")
+                if 0 < len(value) <= 240:
+                    literals.append(value)
+                    candidates.append(value)
+        if "strcmp" in line_lower or "memcmp" in line_lower or "==" in line:
+            for quote in ("\\"", "'"):
+                start = 0
+                while True:
+                    left = line.find(quote, start)
+                    if left < 0:
+                        break
+                    right = line.find(quote, left + 1)
+                    if right < 0:
+                        break
+                    value = line[left + 1:right].strip()
+                    if 0 < len(value) <= 240:
+                        literals.append(value)
+                        candidates.append(value)
+                    start = right + 1
+        if source_like_line and 0 < len(line) <= 180 and any(ch in line for ch in "()[]{{}}<>/\\\\_=:+-.0123456789"):
+            candidates.append(line)
+        token = ""
+        for ch in line:
+            if ch.isdigit():
+                token += ch
+            else:
+                if token:
+                    numbers.append(token)
+                token = ""
+        if token:
+            numbers.append(token)
+
+    for value in ("0", "1", "-1", "2", "3", "4", "7", "8", "15", "16", "31", "32", "63", "64", "127", "128", "255", "256", "257", "511", "512", "1023", "1024", "4095", "4096", "65535", "65536", "2147483647", "2147483648", "4294967295"):
+        candidates.append(value)
+    for value in ("\\x00", "\\xff", "\\xff\\xff", "\\xff\\xff\\xff\\xff", "\\x00\\x00\\x00\\x00", "\\x01\\x00\\x00\\x00", "A" * 8, "A" * 32, "A" * 128, "A" * 256):
+        candidates.append(value)
+
+    for number_text in numbers[:40]:
+        if number_text.isdigit():
+            value = int(number_text)
+            if 0 <= value <= 4294967296:
+                for delta in (-1, 0, 1):
+                    candidate_number = value + delta
+                    if candidate_number >= 0:
+                        candidates.append(str(candidate_number))
+                if 1 <= value <= 512:
+                    candidates.append("A" * value)
+                    candidates.append("\\x00" * min(value, 64))
+
+    if "xml" in lower or "<" in text:
+        for value in ("<a/>", "<root></root>", "<root>0</root>", "<root>4294967295</root>"):
+            candidates.append(value)
+    if "json" in lower or "javascript" in lower:
+        for value in ("{{}}", "[]", "{{\\"size\\":0}}", "{{\\"size\\":4294967295}}"):
+            candidates.append(value)
+    if "csv" in lower or "comma" in lower:
+        for value in ("0,0\\n", "1,4294967295\\n", "size,value\\n4294967295,A\\n"):
+            candidates.append(value)
+
+    base_literals = [str(item) for item in literals[:12] if 0 < len(str(item)) <= 96]
+    boundary_values = ("0", "1", "-1", "255", "256", "1024", "4096", "65535", "4294967295")
+    for literal in base_literals:
+        candidates.append(literal + "\\n")
+        candidates.append(literal + "\\x00")
+        candidates.append(literal + literal)
+        for number in boundary_values[:5]:
+            candidates.append(literal + number)
+            candidates.append(literal + "\\n" + number)
+
     unique = []
     seen = set()
     limit = int(max_candidates)

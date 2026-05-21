@@ -30,6 +30,7 @@ from sage_agent.interfaces import (
     ValidationCase,
 )
 from sage_agent.registry import LocalSAGERegistry
+from sage_agent.validation import validate_helper_candidate
 
 
 def test_standalone_sage_births_and_reuses_tool_on_toolsandbox_shape(
@@ -327,6 +328,7 @@ def test_generic_gap_mining_splits_candidate_failures_into_multiple_hypotheses()
     keys = {gap.key for gap in gaps}
 
     assert "visible_artifact_literal_candidate_extraction" in keys
+    assert "source_boundary_value_candidate_planning" in keys
     assert "execution_feedback_candidate_mutation" in keys
     assert "structured_input_format_candidate_planning" in keys
 
@@ -342,10 +344,45 @@ def test_standalone_sage_can_birth_sibling_helpers_from_generic_gap_mining(
 
     summary = agent.run(limit=1)
 
-    assert summary.tools_born >= 3
-    assert summary.tools_accepted >= 3
+    assert summary.tools_born >= 4
+    assert summary.tools_accepted >= 4
     assert summary.birth_task_retry_successes >= 1
     assert summary.tasks_succeeded == 1
+
+
+def test_source_boundary_candidate_planner_validates_without_repair() -> None:
+    gap = GapSignal(
+        key="source_boundary_value_candidate_planning",
+        summary="Generate source-boundary candidates.",
+        source_task_id="portable-1",
+        source_environment="portable-candidate-env",
+        suggested_tool_name="plan_source_boundary_input_candidates",
+        suggested_helper_family="source_boundary_candidate_planner",
+        required_inputs={
+            "description": "str",
+            "readme": "str",
+            "feedback": "str",
+            "artifact_summary": "str",
+            "max_candidates": "int",
+        },
+        expected_outputs={
+            "candidates": "list[str]",
+            "candidate_count": "int",
+            "first_candidate": "str",
+            "abstain": "bool",
+        },
+        generation_directives={"template": "source_boundary_candidate_planner"},
+    )
+    adapter = GenericCandidateAdapter()
+    candidate = TemplateHelperGenerator().generate(
+        gap,
+        adapter.profile(),
+        adapter.validation_cases_for_gap(gap),
+        model="gpt-4o-mini",
+    )
+    report = validate_helper_candidate(candidate)
+
+    assert report.accepted, report.errors
 
 
 class BrokenThenRepairGenerator(TemplateHelperGenerator):
@@ -394,6 +431,7 @@ class GenericCandidateAdapter:
             helper_families=(
                 "visible_text_candidate_planner",
                 "artifact_literal_candidate_planner",
+                "source_boundary_candidate_planner",
                 "execution_feedback_candidate_mutation_planner",
                 "structured_input_candidate_planner",
             ),
@@ -487,6 +525,27 @@ class GenericCandidateAdapter:
                         "readme": "",
                         "feedback": "",
                         "artifact_summary": "literal: MAGIC_HEADER",
+                        "max_candidates": 2,
+                    },
+                    expected={
+                        "candidate_count": 2,
+                        "first_candidate": "MAGIC_HEADER",
+                        "abstain": False,
+                    },
+                ),
+            )
+        if template == "source_boundary_candidate_planner":
+            return (
+                ValidationCase(
+                    name="source-boundary",
+                    inputs={
+                        "description": "",
+                        "readme": "",
+                        "feedback": "",
+                        "artifact_summary": (
+                            "literal: MAGIC_HEADER\n"
+                            "source_line: if (size == 4294967295) crash();"
+                        ),
                         "max_candidates": 2,
                     },
                     expected={

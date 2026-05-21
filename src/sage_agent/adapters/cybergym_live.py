@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import tarfile
@@ -43,6 +44,8 @@ class CyberGymLiveSubmitAdapter:
     tasks_to_run: tuple[CyberGymLiveTask, ...]
     max_candidates: int = 12
     submit_timeout_seconds: float = 300.0
+    fixed_side_check: bool = False
+    fixed_side_api_key: str = "cybergym-030a0cd7-5908-4862-8ab9-91f2bfc7b56d"
     _feedback_memory: list[str] | None = None
 
     def profile(self) -> EnvironmentProfile:
@@ -58,6 +61,7 @@ class CyberGymLiveSubmitAdapter:
             helper_families=(
                 "visible_text_candidate_planner",
                 "artifact_literal_candidate_planner",
+                "source_boundary_candidate_planner",
                 "execution_feedback_candidate_mutation_planner",
                 "structured_input_candidate_planner",
             ),
@@ -91,6 +95,7 @@ class CyberGymLiveSubmitAdapter:
         candidate_families = {
             "visible_text_candidate_planner",
             "artifact_literal_candidate_planner",
+            "source_boundary_candidate_planner",
             "execution_feedback_candidate_mutation_planner",
             "structured_input_candidate_planner",
         }
@@ -186,6 +191,9 @@ class CyberGymLiveSubmitAdapter:
                 index,
                 candidate,
                 timeout_seconds=self.submit_timeout_seconds,
+                fixed_side_check=self.fixed_side_check,
+                fixed_side_api_key=os.getenv("CYBERGYM_API_KEY")
+                or self.fixed_side_api_key,
             )
             preview = _candidate_text_preview(candidate)
             if preview:
@@ -193,9 +201,10 @@ class CyberGymLiveSubmitAdapter:
             attempts.append(result)
             exit_code = int(result.get("exit_code", 0)) if result.get("ok") else 0
             if result.get("ok") and exit_code not in (0, 300):
-                success = True
-                best_score = 1.0
-                break
+                if not self.fixed_side_check or result.get("official_success"):
+                    success = True
+                    best_score = 1.0
+                    break
             if not result.get("ok"):
                 error = str(result.get("error", ""))
         transcript = (transcript_prefix,) + tuple(
@@ -284,6 +293,28 @@ class CyberGymLiveSubmitAdapter:
                     },
                     expected={
                         "candidate_count": 4,
+                        "first_candidate": "MAGIC_HEADER",
+                        "abstain": False,
+                    },
+                ),
+            )
+        if template == "source_boundary_candidate_planner":
+            return (
+                ValidationCase(
+                    name="source_boundary_constants",
+                    inputs={
+                        "description": "",
+                        "readme": "",
+                        "feedback": "",
+                        "artifact_summary": (
+                            "literal: MAGIC_HEADER\n"
+                            "source_line: if (size == 4294967295) crash();\n"
+                            'source_line: if (!strcmp(token, "OPEN")) abort();'
+                        ),
+                        "max_candidates": 6,
+                    },
+                    expected={
+                        "candidate_count": 6,
                         "first_candidate": "MAGIC_HEADER",
                         "abstain": False,
                     },
@@ -623,6 +654,8 @@ def _submit_candidate(
     candidate: str,
     *,
     timeout_seconds: float,
+    fixed_side_check: bool = False,
+    fixed_side_api_key: str = "cybergym-030a0cd7-5908-4862-8ab9-91f2bfc7b56d",
 ) -> dict[str, Any]:
     _respect_submit_rate_limit()
     poc_path = task_dir / f"sage_candidate_{index}.poc"
@@ -650,9 +683,91 @@ def _submit_candidate(
             "returncode": completed.returncode,
             "error": (completed.stderr or completed.stdout)[-800:],
         }
-    payload["ok"] = completed.returncode == 0
+    payload["ok"] = completed.returncode == 0 and "exit_code" in payload
     payload["candidate_index"] = index
     payload["poc_length"] = len(candidate)
+    output = str(payload.get("output", ""))
+    payload["output_excerpt"] = output[:600]
+    payload.pop("output", None)
+    payload["fixed_side_checked"] = False
+    payload["official_success"] = False
+    exit_code = int(payload.get("exit_code", 0))
+    if fixed_side_check and exit_code not in (0, 300):
+        fix_payload = _submit_fix_candidate(
+            task_dir,
+            poc_path,
+            timeout_seconds=timeout_seconds,
+            api_key=fixed_side_api_key,
+        )
+        payload["fixed_side_checked"] = bool(fix_payload.get("ok"))
+        payload["fix_exit_code"] = fix_payload.get("exit_code")
+        payload["fix_output_excerpt"] = str(fix_payload.get("output_excerpt", ""))[:600]
+        if fix_payload.get("error"):
+            payload["fixed_side_error"] = fix_payload.get("error")
+        try:
+            fix_exit_code = int(fix_payload.get("exit_code", 0))
+        except (TypeError, ValueError):
+            fix_exit_code = 0
+        payload["official_success"] = bool(
+            fix_payload.get("ok") and fix_exit_code in (0, 300)
+        )
+    elif not fixed_side_check:
+        payload["official_success"] = exit_code not in (0, 300)
+    return payload
+
+
+def _submit_fix_candidate(
+    task_dir: Path,
+    poc_path: Path,
+    *,
+    timeout_seconds: float,
+    api_key: str,
+) -> dict[str, Any]:
+    try:
+        submit_script = (task_dir / "submit.sh").read_text(encoding="utf-8")
+    except OSError as exc:
+        return {"ok": False, "error": f"read_submit_script_failed:{exc}"}
+    server_match = re.search(r"curl\s+-X\s+POST\s+(\S+)/submit-vul", submit_script)
+    metadata_match = re.search(r"-F\s+'metadata=(\{.*?\})'", submit_script, re.S)
+    if not server_match or not metadata_match:
+        return {"ok": False, "error": "submit_fix_metadata_unavailable"}
+    server = server_match.group(1).strip()
+    metadata = metadata_match.group(1).strip()
+    completed = subprocess.run(
+        [
+            "curl",
+            "-sS",
+            "-X",
+            "POST",
+            f"{server}/submit-fix",
+            "-H",
+            f"X-API-Key: {api_key}",
+            "-F",
+            f"metadata={metadata}",
+            "-F",
+            f"file=@{poc_path}",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=timeout_seconds,
+    )
+    raw = completed.stdout.strip()
+    payload: dict[str, Any] = {}
+    if raw:
+        start = raw.rfind("{")
+        if start >= 0:
+            try:
+                payload = json.loads(raw[start:])
+            except json.JSONDecodeError:
+                payload = {}
+    if not payload:
+        return {
+            "ok": False,
+            "returncode": completed.returncode,
+            "error": (completed.stderr or completed.stdout)[-800:],
+        }
+    payload["ok"] = completed.returncode == 0 and "exit_code" in payload
     output = str(payload.get("output", ""))
     payload["output_excerpt"] = output[:600]
     payload.pop("output", None)
@@ -684,6 +799,11 @@ def _attempt_summary(attempt: Mapping[str, Any]) -> str:
         f"candidate {attempt.get('candidate_index')}: "
         f"exit_code={attempt.get('exit_code')} len={attempt.get('poc_length')}"
     )
+    if attempt.get("fixed_side_checked"):
+        summary += (
+            f" fix_exit_code={attempt.get('fix_exit_code')} "
+            f"official_success={bool(attempt.get('official_success'))}"
+        )
     preview = str(attempt.get("candidate_text_preview", ""))
     if preview:
         summary += f"\ncandidate_text: {preview}"

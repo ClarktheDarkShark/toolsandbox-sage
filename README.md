@@ -91,7 +91,10 @@ safety rules. Generic gap mining is enabled by default in `SAGEConfig`; it can
 split one failed task into multiple reusable hypotheses when visible evidence
 supports them, such as candidate-input planning from visible artifacts,
 execution-feedback mutation, structured-format input planning, or grid
-navigation planning.
+navigation planning. For source-artifact environments, SAGE can also generate
+source-boundary candidate planners that mine visible source summaries for
+magic literals, parser tokens, numeric boundaries, and comparison constants
+without seeing hidden solutions or reference inputs.
 
 Research-integrity checks are enforced at the standalone boundary. Adapters may
 privately score tasks, but SAGE-facing task specs, gap signals, and helper
@@ -119,7 +122,9 @@ Current adapter proof points:
   submit-path adapter. It downloads visible task assets in bounded batches,
   generates task directories with CyberGym's own generator, submits candidate
   PoCs through the task `submit.sh` scripts, and records verifier-backed
-  success from `/submit-vul`.
+  success from `/submit-vul`. With `--fixed-side-check`, a candidate is scored
+  as successful only when it both crashes the vulnerable target and passes the
+  fixed-side verifier.
 - `sage_agent.adapters.MiniGridAdapter`: official Farama MiniGrid smoke adapter.
   It exposes visible grid state and validates that SAGE can generate a reusable
   side-effect-free grid action planner in a third environment that is neither
@@ -220,6 +225,8 @@ use:
 PYTHONPATH=src:. python scripts/run_cybergym_live_batched_sage.py \
   --limit 20 \
   --batch-size 4 \
+  --baseline llm \
+  --fixed-side-check \
   --reset-registry \
   --registry-dir artifacts/cybergym_live_sage/general_gap_v2_registry \
   --output-root outputs/cybergym_live_sage \
@@ -238,6 +245,16 @@ task IDs, hidden labels, reference PoCs, expected answers, or benchmark-specific
 facts into generated helpers. Use `--no-clear-images` only for short local
 diagnostics when repeated pulls would dominate runtime; the default remains
 image cleanup for space-constrained runs.
+
+When `--fixed-side-check` is enabled, the runner also pulls the matching fixed
+image and requires fixed-side preservation before counting a CyberGym success.
+The LLM baseline cache key includes the fixed-side setting, so older
+vulnerable-only baseline cache entries are not reused as fixed-side evidence.
+If the matched baseline starts at zero and SAGE improves, the dashboard reports
+an approximate relative lift using a documented `0.100` denominator floor and
+shows the true absolute lift in the card note. For example, `0.000 -> 0.500`
+renders as approximately `+500.0%`, with the note making clear that the true
+baseline was zero.
 
 For real ToolSandbox verification, use `scripts/run_sage_protocol.py` with a
 fixed manifest and `OPENAI_API_KEY` available in the process environment. For

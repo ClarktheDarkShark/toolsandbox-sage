@@ -1246,3 +1246,47 @@
   CyberGym helpers receive only visible task assets and live submit feedback.
 - Decision label:
   `STANDALONE_SAGE_FOUR_ENVIRONMENT_AGENT_BASE_READY_FOR_METHOD_CHAPTER_WITH_CYBERGYM_LIMITATION`.
+
+## 2026-05-21 - Source-Artifact CyberGym Repair And Fixed-Side Verification Smoke
+
+- Objective: improve CyberGym performance through an environment-general
+  source-artifact candidate-planning capability, while maintaining ToolSandbox,
+  MiniGrid, and BBH behavior and adding fixed-side verification for CyberGym
+  scoring.
+- Branch: `codex/sage-standalone-agent`.
+- OpenAI API status: `OPENAI_API_KEY` was available from a local env file and
+  was used for the fresh LLM baseline in the fixed-side two-task CyberGym smoke.
+  The secret was not printed.
+- Code changes: added generic gap key
+  `source_boundary_value_candidate_planning`; added helper family
+  `source_boundary_candidate_planner`; added fixed-side CyberGym scoring via
+  `--fixed-side-check`; separated fixed-side baseline cache keys from legacy
+  vulnerable-only cache entries; fixed dashboard zero-baseline lift display to
+  show an approximate relative lift using a documented `0.100` denominator
+  floor.
+- Machine-readable summary:
+  `artifacts/sage_agent_standalone/source_boundary_fixed_side_maintenance_summary_20260521.json`.
+  SHA-256 `6ffda4082984fe19c52d9d818e040a086a4739732d3986cb55cd34b7b42c66ce`.
+- CyberGym fixed-side OpenAI-key smoke:
+  `outputs/cybergym_live_sage/openai_key_fixed_side_smoke2_20260521`;
+  dashboard
+  `outputs/cybergym_live_sage/openai_key_fixed_side_smoke2_20260521/dashboard/task_compare.html`.
+- CyberGym fixed-side OpenAI-key result: LLM baseline `0/2`, SAGE `1/2`;
+  baseline cache `off`; fixed-side verification `true`; tools
+  born/accepted/reused `5 / 5 / 23`; repair attempts/refined tools `1 / 1`;
+  birth-task retry successes `1`; integrity issues `0`.
+- CyberGym fixed-side cached-control smoke:
+  `outputs/cybergym_live_sage/source_boundary_fixed_side_direct_v1_4_20260521`;
+  result baseline `0/4`, SAGE `1/4`; fixed-side verification `true`;
+  integrity issues `0`.
+- Maintenance checks: ToolSandbox smoke
+  `outputs/sage_agent_standalone/toolsandbox_source_boundary_maintenance_2_20260521`
+  SAGE `2/2`; MiniGrid
+  `outputs/sage_agent_standalone/minigrid_source_boundary_maintenance_12_20260521`
+  baseline `7/12`, SAGE `12/12`; BBH
+  `outputs/sage_agent_standalone/bbh_source_boundary_maintenance_12_20260521`
+  baseline `5/12`, SAGE `12/12`.
+- Validation: standalone unit tests `13 passed`; Python compile passed for the
+  touched SAGE files and CyberGym runner; `git diff --check` passed.
+- Decision label:
+  `SOURCE_ARTIFACT_PLANNER_IMPROVES_CYBERGYM_FIXED_SIDE_SMOKE_WITH_GENERALIZATION_MAINTAINED`.

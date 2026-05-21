@@ -1,0 +1,78 @@
+{
+  "date": "2026-05-21",
+  "branch": "codex/sage-standalone-agent",
+  "objective": "Improve the environment-general SAGE generation method on CyberGym without hard-coding CyberGym-specific answers, while preserving ToolSandbox, MiniGrid, and BBH maintenance behavior.",
+  "openai_api_key": {
+    "available": true,
+    "used_for_llm_baselines": true,
+    "secret_printed": false
+  },
+  "core_change": {
+    "gap_key": "source_boundary_value_candidate_planning",
+    "helper_family": "source_boundary_candidate_planner",
+    "tool_name": "plan_source_boundary_input_candidates",
+    "description": "A generic candidate-input planner that mines visible source/artifact summaries for literals, parser tokens, numeric boundary values, magic strings, and comparison constants. It is intended for source-artifact benchmark environments generally, not for CyberGym task IDs or hidden PoCs.",
+    "fixed_side_scoring": "CyberGym live scoring can now require vulnerable-side crash plus fixed-side preservation via --fixed-side-check."
+  },
+  "cybergym_fixed_side_smoke_openai_key": {
+    "run": "outputs/cybergym_live_sage/openai_key_fixed_side_smoke2_20260521",
+    "dashboard": "outputs/cybergym_live_sage/openai_key_fixed_side_smoke2_20260521/dashboard/task_compare.html",
+    "baseline": "0/2",
+    "sage": "1/2",
+    "baseline_cache_policy": "off",
+    "fixed_side_check": true,
+    "official_success_verification": true,
+    "tools_born_accepted_reused": "5 / 5 / 23",
+    "repair_attempts": 1,
+    "birth_task_retry_successes": 1,
+    "integrity_issues": 0
+  },
+  "cybergym_fixed_side_smoke_cached_baseline": {
+    "run": "outputs/cybergym_live_sage/source_boundary_fixed_side_direct_v1_4_20260521",
+    "dashboard": "outputs/cybergym_live_sage/source_boundary_fixed_side_direct_v1_4_20260521/dashboard/task_compare.html",
+    "baseline": "0/4",
+    "sage": "1/4",
+    "baseline_cache_policy": "use-if-eligible",
+    "fixed_side_check": true,
+    "official_success_verification": true,
+    "tools_born_accepted_reused": "5 / 5 / 31",
+    "repair_attempts": 1,
+    "birth_task_retry_successes": 1,
+    "integrity_issues": 0
+  },
+  "maintenance_checks": {
+    "toolsandbox": {
+      "run": "outputs/sage_agent_standalone/toolsandbox_source_boundary_maintenance_2_20260521",
+      "baseline": "0/2 smoke",
+      "sage": "2/2",
+      "interpretation": "Lifecycle preservation only; not protected ToolSandbox benchmark evidence."
+    },
+    "minigrid": {
+      "run": "outputs/sage_agent_standalone/minigrid_source_boundary_maintenance_12_20260521",
+      "baseline": "7/12",
+      "sage": "12/12"
+    },
+    "bbh": {
+      "run": "outputs/sage_agent_standalone/bbh_source_boundary_maintenance_12_20260521",
+      "baseline": "5/12",
+      "sage": "12/12"
+    }
+  },
+  "dashboard_fix": {
+    "description": "Task Compare and standalone dashboards now render zero-baseline nonzero improvements as an approximate relative lift using a documented 0.100 denominator floor, with an explicit absolute-lift note. For example, 0.000 -> 0.500 renders as approximately +500.0%.",
+    "refreshed_dashboards": [
+      "outputs/cybergym_live_sage/openai_key_fixed_side_smoke2_20260521/dashboard/task_compare.html",
+      "outputs/cybergym_live_sage/source_boundary_fixed_side_direct_v1_4_20260521/dashboard/task_compare.html",
+      "outputs/cybergym_live_sage/batched20_generic_visible_v2_20260521_102125/dashboard/task_compare.html",
+      "outputs/sage_agent_standalone/minigrid_source_boundary_maintenance_12_20260521/dashboard/task_compare.html",
+      "outputs/sage_agent_standalone/bbh_source_boundary_maintenance_12_20260521/dashboard/task_compare.html"
+    ]
+  },
+  "research_integrity": {
+    "label_peeking": "not used",
+    "reference_poc_peeking": "not used",
+    "task_id_hardcoding": "not used",
+    "candidate_cache": "off for SAGE arms",
+    "fixed_side_cache_separation": "fixed-side baseline cache keys include fixed_side_check and do not reuse legacy vulnerable-side cache evidence"
+  }
+}

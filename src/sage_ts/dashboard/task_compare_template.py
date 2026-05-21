@@ -674,10 +674,29 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
     const finite = (v) => v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v));
     const pct = (v) => finite(v) ? (Number(v) * 100).toFixed(1) + "%" : "-";
+    const ZERO_BASELINE_LIFT_FLOOR = 0.1;
     const signedPct = (v) => finite(v) ? (Number(v) >= 0 ? "+" : "") + (Number(v) * 100).toFixed(1) + "%" : "-";
+    const liftPct = (v, approximate = false) => {
+      const rendered = signedPct(v);
+      return approximate && rendered !== "-" ? `~${rendered}` : rendered;
+    };
     const num = (v, d = 3) => finite(v) ? Number(v).toFixed(d) : "-";
     const signedNum = (v, d = 3) => finite(v) ? (Number(v) >= 0 ? "+" : "") + Number(v).toFixed(d) : "-";
-    const relLift = (delta, baseline) => finite(delta) && finite(baseline) && Number(baseline) !== 0 ? Number(delta) / Number(baseline) : null;
+    const relLift = (delta, baseline) => {
+      if (!finite(delta) || !finite(baseline)) return null;
+      const d = Number(delta);
+      const b = Number(baseline);
+      if (Math.abs(b) > 1e-12) return d / b;
+      if (Math.abs(d) <= 1e-12) return 0;
+      return d / ZERO_BASELINE_LIFT_FLOOR;
+    };
+    const approxZeroBaselineLift = (delta, baseline) => finite(delta) && finite(baseline) && Math.abs(Number(baseline)) <= 1e-12 && Math.abs(Number(delta)) > 1e-12;
+    const liftHint = (delta, baseline, unit) => {
+      if (approxZeroBaselineLift(delta, baseline)) {
+        return `approx using 0.100 floor; true baseline is 0; ${signedNum(delta)} ${unit} absolute lift`;
+      }
+      return `${signedNum(delta)} ${unit} delta`;
+    };
     const cls = (v) => Number(v || 0) > 0 ? "good" : Number(v || 0) < 0 ? "bad" : "";
     const outcome = (row) => row?.outcome_similarity ?? row?.outcome_milestone_similarity ?? null;
     function initDashboardSwitch() {
@@ -777,10 +796,10 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       document.getElementById("metrics").innerHTML = [
         metric("Baseline Score", num(baselineScore), `${paired.scoreCount || matched || 0} paired score tasks`),
         metric("SAGE Score", num(sageScore), `${paired.scoreCount || matched || 0} paired score tasks`),
-        metric("Score Lift", signedPct(scoreLift), `${signedNum(scoreDelta)} score delta`, cls(scoreDelta)),
+        metric("Score Lift", liftPct(scoreLift, approxZeroBaselineLift(scoreDelta, baselineScore)), liftHint(scoreDelta, baselineScore, "score"), cls(scoreDelta)),
         metric("Baseline Outcome", num(baselineOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("SAGE Outcome", num(sageOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
-        metric("Outcome Lift", signedPct(outcomeLift), `${signedNum(outcomeDelta)} outcome delta`, cls(outcomeDelta)),
+        metric("Outcome Lift", liftPct(outcomeLift, approxZeroBaselineLift(outcomeDelta, baselineOutcome)), liftHint(outcomeDelta, baselineOutcome, "outcome"), cls(outcomeDelta)),
       ].join("");
       document.getElementById("toolMetrics").innerHTML = metric("Tools Born / Used", `${tools.generated_tool_birth_count || 0} / ${used}`, `${total} registry tools; click for contribution`, "warn", true);
       const cell = document.getElementById("toolsMetric");
@@ -1184,10 +1203,10 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           <div class="compare-grid">
             <div class="mini"><div class="label">Baseline Score</div><div class="value">${pct(control.similarity)}</div></div>
             <div class="mini"><div class="label">SAGE Score</div><div class="value">${pct(candidate.similarity)}</div></div>
-            <div class="mini"><div class="label">Score Lift</div><div class="value ${cls(d.scoreDelta)}">${signedPct(relLift(d.scoreDelta, control.similarity))}</div><div class="hint">${signedNum(d.scoreDelta)} score delta</div></div>
+            <div class="mini"><div class="label">Score Lift</div><div class="value ${cls(d.scoreDelta)}">${liftPct(relLift(d.scoreDelta, control.similarity), approxZeroBaselineLift(d.scoreDelta, control.similarity))}</div><div class="hint">${liftHint(d.scoreDelta, control.similarity, "score")}</div></div>
             <div class="mini"><div class="label">Baseline Outcome</div><div class="value">${pct(outcome(control))}</div></div>
             <div class="mini"><div class="label">SAGE Outcome</div><div class="value">${pct(outcome(candidate))}</div></div>
-            <div class="mini"><div class="label">Outcome Lift</div><div class="value ${cls(d.outcomeDelta)}">${signedPct(relLift(d.outcomeDelta, outcome(control)))}</div><div class="hint">${num(outcome(control))} -> ${num(outcome(candidate))}; delta ${signedNum(d.outcomeDelta)}</div></div>
+            <div class="mini"><div class="label">Outcome Lift</div><div class="value ${cls(d.outcomeDelta)}">${liftPct(relLift(d.outcomeDelta, outcome(control)), approxZeroBaselineLift(d.outcomeDelta, outcome(control)))}</div><div class="hint">${approxZeroBaselineLift(d.outcomeDelta, outcome(control)) ? liftHint(d.outcomeDelta, outcome(control), "outcome") : `${num(outcome(control))} -> ${num(outcome(candidate))}; delta ${signedNum(d.outcomeDelta)}`}</div></div>
             <div class="mini"><div class="label">Turns B / S</div><div class="value">${esc(control.turn_count ?? "-")} / ${esc(candidate.turn_count ?? "-")}</div></div>
             <div class="mini"><div class="label">Control Cache</div><div class="value">${esc(control.control_cache_source || "-")}</div></div>
             <div class="mini"><div class="label">SAGE Tool Events</div><div class="value">${esc(toolEvents(pair).length)}</div></div>
