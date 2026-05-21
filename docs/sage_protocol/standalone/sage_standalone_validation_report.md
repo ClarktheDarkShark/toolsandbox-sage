@@ -101,14 +101,83 @@ A real ToolSandbox 20-task verification manifest was prepared from the first
 - manifest SHA-256:
   `f1e299f46490c92d8492ab9d3f9214d837488b04bd12031c7cc3a2cc5be51170`
 
-The matched ToolSandbox verification command was attempted with
+The matched ToolSandbox verification command was first attempted with
 `scripts/run_sage_protocol.py`, generation enabled, `gpt-4o-mini`, candidate
 cache off, OpenAI response cache disabled, routing evidence disabled, and
 control cache eligible. It stopped before task execution because
-`OPENAI_API_KEY` was missing or blank in the shell environment. Therefore this
-standalone slice does not yet contain a real 20-task ToolSandbox benchmark
-verification. That run should be retried only after the API key is visible to
-the process environment.
+`OPENAI_API_KEY` was missing or blank in the shell environment.
+
+The local project secret loader was then found at `.secrets/env.sh`. The key was
+confirmed present after sourcing that file without printing the secret value.
+The same ToolSandbox 20-task verification was rerun from the fixed manifest:
+
+```bash
+set -a
+source .secrets/env.sh
+set +a
+PYTHONPATH=src:. python scripts/run_sage_protocol.py \
+  --mode mechanism_40 \
+  --manifest artifacts/sage_standalone/toolsandbox_verify20_manifest.json \
+  --generation on \
+  --agent gpt-4o-mini \
+  --user gpt-4o-mini \
+  --generation-model gpt-4o-mini \
+  --disable-openai-response-cache \
+  --cache-mode off \
+  --parallel-arms \
+  --control-cache use-if-eligible \
+  --routing-evidence-mode disabled \
+  --allow-low-quality-cohort \
+  --output-root outputs/sage_agent_standalone/toolsandbox_real_verify20 \
+  --artifact-root artifacts/sage_standalone/toolsandbox_real_verify20_artifacts \
+  --dashboard-port 62630
+```
+
+Run root:
+
+`outputs/sage_agent_standalone/toolsandbox_real_verify20/mechanism_40_20260520_204549/`
+
+Dashboard:
+
+`outputs/sage_agent_standalone/toolsandbox_real_verify20/mechanism_40_20260520_204549/dashboard/task_compare.html`
+
+Result:
+
+- matched tasks: `20`
+- model: `gpt-4o-mini` for agent, user, and generation
+- generation: on
+- OpenAI response cache: disabled
+- candidate/SAGE task cache: off
+- routing evidence: disabled
+- control-cache mode: `use-if-eligible`
+- control source: mixed
+- cached control tasks: `12`
+- fresh control tasks: `8`
+- cache manifest hash:
+  `00546ff4d26e2ecd4ac595282c8a4d6d819f2e77eb7726268d835229d16243b2`
+- cache misses: the 8 fresh controls had fewer than 3 compatible completed
+  cached controls under the task-name/model/user/base-tool-policy rule
+- baseline score: `0.7234176544455837`
+- SAGE score: `0.7533925850552543`
+- score delta: `+0.029974930609670648`
+- baseline outcome: `0.5102649992954722`
+- SAGE outcome: `0.4726350586220871`
+- outcome delta: `-0.03762994067338511`
+- exact successes: control `6`, SAGE `8`
+- runtime exceptions: `0`
+- protocol gate: failed
+- gate reasons: `non_positive_outcome_delta`,
+  `outcome_gains_do_not_exceed_regressions`
+
+Interpretation: this is a real ToolSandbox matched 20-task verification run,
+not an adapter smoke. It used the baseline cache to the maximum extent allowed
+by the current eligibility policy: 12 cached controls and 8 fresh controls. The
+run does not validate the standalone SAGE slice as ToolSandbox-ready because
+the primary outcome metric regressed despite a positive canonical/score delta
+and two more exact successes. The next ToolSandbox validation should either use
+a manifest whose baseline tasks are fully cache-eligible or first populate
+eligible control-cache records for the missing reminder/holiday tasks, then
+rerun only the SAGE arm comparison against cached controls.
 
 ## CyberGym Probe
 
