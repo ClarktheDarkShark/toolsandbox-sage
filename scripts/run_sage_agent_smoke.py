@@ -212,7 +212,11 @@ def _resolve_path(path: Path) -> Path:
 def _run_no_helper_baseline(
     adapter: EnvironmentAdapter, *, limit: int | None
 ) -> dict[str, object]:
-    """Run the same adapter task stream without generated helpers."""
+    """Run the same adapter task stream without generated helpers.
+
+    This is a lifecycle baseline for standalone adapter smoke tests. It is not a
+    ToolSandbox control baseline unless a concrete adapter marks it as such.
+    """
 
     adapter.prepare()
     tasks = adapter.tasks(limit=limit)
@@ -223,6 +227,11 @@ def _run_no_helper_baseline(
     successes = sum(1 for result in results if result["success"])
     return {
         "policy": "no_generated_helpers",
+        "comparison_valid": False,
+        "comparison_note": (
+            "Standalone adapter smoke baseline only. This is not a benchmark "
+            "control arm and must not be reported as ToolSandbox score lift."
+        ),
         "tasks_seen": len(results),
         "tasks_succeeded": successes,
         "success_rate": successes / len(results) if results else 0.0,

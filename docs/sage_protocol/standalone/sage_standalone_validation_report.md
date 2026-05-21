@@ -74,6 +74,42 @@ scenario-registry task. This is not a full ToolSandbox benchmark run.
 The probe exposes scenario names, categories, and allowed tools only; expected
 record IDs remain private adapter scoring state.
 
+### ToolSandbox 20-Task Baseline Correction
+
+Date: 2026-05-20
+
+A later 20-task `toolsandbox-probe` smoke exposed an easy-to-misread dashboard
+result: the adapter smoke baseline showed `0/20`, while SAGE showed `20/20`.
+That baseline was not a ToolSandbox control arm. It was only the standalone
+adapter's no-helper lifecycle baseline, so it cannot be used as benchmark lift
+or as evidence that the real ToolSandbox baseline solved zero tasks.
+
+The smoke runner and standalone dashboard were updated so adapter smoke
+baselines are marked with:
+
+- `comparison_valid: false`
+- `comparison_note: Standalone adapter smoke baseline only...`
+
+The dashboard now labels these as `Probe baseline` and suppresses absolute and
+relative lift. This prevents a lifecycle probe from being mistaken for a
+matched ToolSandbox comparison.
+
+A real ToolSandbox 20-task verification manifest was prepared from the first
+20 tasks of the formal500 manifest:
+
+- manifest: `artifacts/sage_standalone/toolsandbox_verify20_manifest.json`
+- manifest SHA-256:
+  `f1e299f46490c92d8492ab9d3f9214d837488b04bd12031c7cc3a2cc5be51170`
+
+The matched ToolSandbox verification command was attempted with
+`scripts/run_sage_protocol.py`, generation enabled, `gpt-4o-mini`, candidate
+cache off, OpenAI response cache disabled, routing evidence disabled, and
+control cache eligible. It stopped before task execution because
+`OPENAI_API_KEY` was missing or blank in the shell environment. Therefore this
+standalone slice does not yet contain a real 20-task ToolSandbox benchmark
+verification. That run should be retried only after the API key is visible to
+the process environment.
+
 ## CyberGym Probe
 
 Command:
@@ -311,3 +347,61 @@ input synthesis, crash-log interpretation, and adaptive mutation/minimization.
 Limitation: this run used `/submit-vul` only. It did not run fix-side
 re-verification, so it remains a live smoke and must not be treated as final
 CyberGym benchmark evidence.
+
+## CyberGym Batched Live Submit Smoke
+
+Date: 2026-05-20
+
+Purpose: verify that the standalone SAGE adapter can operate in a new
+environment in bounded batches without keeping all downloaded task data and
+Docker images on disk at once.
+
+Command:
+
+```bash
+PYTHONPATH=src:. python scripts/run_cybergym_live_batched_sage.py \
+  --limit 20 \
+  --batch-size 4 \
+  --reset-registry \
+  --registry-dir artifacts/cybergym_live_sage/batched20_registry_framework_probe \
+  --output-root outputs/cybergym_live_sage \
+  --run-id batched20_framework_probe_20260521_000814
+```
+
+Dashboard:
+
+`outputs/cybergym_live_sage/batched20_framework_probe_20260521_000814/dashboard/index.html`
+
+Result:
+
+- environment: `cybergym-live`
+- execution mode: `cybergym_live_level1_submit_vul_batched`
+- tasks requested/run: `20/20`
+- batch size: `4`
+- baseline policy: fixed four-byte PoC per task
+- baseline success: `1/20`
+- SAGE success: `4/20`
+- absolute lift: `+15.0 pp`
+- relative lift: `+300.0%`
+- gaps observed: `16`
+- tools born: `1`
+- tools accepted: `1`
+- tools reused: `20`
+- lifecycle decision: `refine`
+- integrity issues: `0`
+- skipped tasks: `0`
+
+Interpretation: this run confirms the batched live CyberGym wiring and shows a
+small real submit-path lift over the fixed-PoC control. It is still not final
+CyberGym benchmark evidence because it uses `/submit-vul` only and does not run
+fix-side verification. The single generic visible-text candidate planner was
+accepted and reused naturally, but the success rate remains weak. The next
+framework work should give SAGE richer environment-observation and repair
+loops, especially source/harness inventory, input-format inference, feedback
+classification, targeted mutation, and candidate minimization. Those should be
+implemented as environment-general capabilities with CyberGym as one validation
+target, not as task-ID or label-specific logic.
+
+Resource cleanup check: after the run, no `n132/arvo:*` or
+`cybergym/oss-fuzz:*` runner images remained listed by Docker. Batch work
+directories were cleared unless explicitly retained.

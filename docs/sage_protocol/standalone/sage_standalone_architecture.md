@@ -214,3 +214,64 @@ evidence. It currently omits fix-side re-verification and uses a deliberately
 small candidate planner. The next cyber-specific SAGE layer needs actual
 analysis actions: source unpacking, harness discovery, crash-log interpretation,
 targeted mutation, candidate minimization, and repair from failed submissions.
+
+`scripts/run_cybergym_live_batched_sage.py` extends this into a bounded
+environment-runner pattern:
+
+- select a fixed visible task list from CyberGym metadata;
+- download only visible assets needed for the current batch;
+- generate task directories with CyberGym's own task generator;
+- run the same baseline and SAGE lifecycle through each task's `submit.sh`;
+- preserve the SAGE registry across batches;
+- clear batch work directories and pulled runner images after each batch.
+
+This is the preferred pattern for new heavy environments: the adapter owns
+environment setup and side effects, while SAGE sees only normalized task text,
+visible artifacts, execution feedback, gap signals, helper validation cases,
+and registry metadata.
+
+## Baseline Semantics
+
+Standalone adapter smoke runs are not automatically benchmark comparisons. The
+`scripts/run_sage_agent_smoke.py` no-helper path is a lifecycle baseline used
+to verify that helper birth, validation, registry storage, routing, and reuse
+work through an adapter. Unless a runner explicitly marks
+`baseline.comparison_valid: true`, dashboards must not report lift from that
+baseline.
+
+The generic dashboard therefore supports two modes:
+
+- `comparison_valid: true`: show baseline success, absolute lift, and relative
+  lift for a real matched control.
+- `comparison_valid: false`: label the value as `Probe baseline` and suppress
+  lift.
+
+This distinction matters most for ToolSandbox. A `toolsandbox-probe` adapter can
+exercise real scenario metadata without running the protected benchmark actor
+and scorer. Its no-helper baseline may be useful for lifecycle debugging, but
+it is not a real ToolSandbox control arm.
+
+## Generic Gap Handling
+
+The first CyberGym live adapter originally generated a CyberGym-named seed
+candidate helper. That has been replaced by a generic
+`visible_text_candidate_planner` helper family. The helper reads only visible
+task descriptions, visible instructions, and prior execution feedback, then
+returns side-effect-free candidate input strings for the adapter to submit.
+
+This is still a shallow capability. Its purpose is to prove the env-general
+loop:
+
+1. observe visible task context and execution feedback;
+2. emit a normalized gap signal;
+3. generate a side-effect-free helper;
+4. validate it with static, schema, and minefield cases;
+5. retain it in the registry;
+6. route it naturally on later tasks;
+7. classify lifecycle status from observed use and success.
+
+The next architecture step is to make the same pattern richer without hard
+coding CyberGym facts: environment inventory tools, artifact summarizers,
+format-inference helpers, feedback classifiers, mutation planners, and repair
+policies that operate on adapter-normalized observations rather than hidden
+labels or task IDs.

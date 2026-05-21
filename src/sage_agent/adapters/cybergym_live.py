@@ -36,7 +36,8 @@ class CyberGymLiveSubmitAdapter:
 
     tasks_root: Path
     tasks_to_run: tuple[CyberGymLiveTask, ...]
-    max_candidates: int = 6
+    max_candidates: int = 12
+    _feedback_memory: list[str] | None = None
 
     def profile(self) -> EnvironmentProfile:
         return EnvironmentProfile(
@@ -48,7 +49,7 @@ class CyberGymLiveSubmitAdapter:
             base_tools=("file_read", "shell", "submit_poc"),
             action_tools=("submit_poc",),
             observation_fields=("README.md", "description.txt", "submit_result"),
-            helper_families=("poc_seed_candidate_planner",),
+            helper_families=("visible_text_candidate_planner",),
             safety_rules=(
                 "helpers must not submit PoCs",
                 "helpers must not read reference PoCs or hidden labels",
@@ -79,7 +80,8 @@ class CyberGymLiveSubmitAdapter:
         return tuple(
             name
             for name, record in helpers.items()
-            if record.candidate.spec.family == "poc_seed_candidate_planner"
+            if record.candidate.spec.family
+            in {"visible_text_candidate_planner", "poc_seed_candidate_planner"}
             and not record.retired
         )[:1]
 
@@ -88,6 +90,8 @@ class CyberGymLiveSubmitAdapter:
     ) -> TaskRunResult:
         live_task = self._live_task(task.task_id)
         description = task.artifacts.get("description", "")
+        readme = task.artifacts.get("readme", "")
+        feedback = "\n".join((self._feedback_memory or [])[-12:])
         candidates = ["\x00\x01\x02\x03"]
         tool_uses: list[ToolUseRecord] = []
         if helpers:
@@ -95,8 +99,11 @@ class CyberGymLiveSubmitAdapter:
             validation = validate_helper_candidate(record.candidate)
             if validation.accepted:
                 planner = _load_helper(record)
-                planned = planner(
+                planned = _call_planner(
+                    planner,
                     description=str(description),
+                    readme=str(readme),
+                    feedback=feedback,
                     max_candidates=self.max_candidates,
                 )
                 candidates = [
@@ -139,6 +146,11 @@ class CyberGymLiveSubmitAdapter:
             if not result.get("ok"):
                 error = str(result.get("error", ""))
         transcript = tuple(_attempt_summary(item) for item in attempts)
+        if self._feedback_memory is None:
+            self._feedback_memory = []
+        if attempts:
+            self._feedback_memory.extend(_attempt_summary(item) for item in attempts)
+            self._feedback_memory = self._feedback_memory[-40:]
         return TaskRunResult(
             task=task,
             success=success,
@@ -156,28 +168,38 @@ class CyberGymLiveSubmitAdapter:
         result: TaskRunResult,
         helpers: Mapping[str, HelperRecord],
     ) -> GapSignal | None:
-        if result.success or helpers:
+        if result.success:
             return None
         return GapSignal(
-            key="cybergym_visible_seed_poc_candidate_planning",
+            key="visible_text_candidate_planning_from_context",
             summary=(
-                "Create side-effect-free seed PoC candidate strings from visible "
-                "CyberGym task descriptions for later submission by the environment."
+                "Create side-effect-free candidate input strings from visible task "
+                "context and prior execution feedback for later submission by the "
+                "environment."
             ),
             source_task_id=task.task_id,
             source_environment="cybergym-live",
             severity=0.8,
-            suggested_tool_name="plan_visible_seed_poc_candidates",
-            suggested_helper_family="poc_seed_candidate_planner",
-            evidence=("description.txt", "README.md", "baseline submit result"),
-            required_inputs={"description": "str", "max_candidates": "int"},
+            suggested_tool_name="plan_visible_text_input_candidates",
+            suggested_helper_family="visible_text_candidate_planner",
+            evidence=(
+                "visible description",
+                "visible instructions",
+                "execution feedback",
+            ),
+            required_inputs={
+                "description": "str",
+                "readme": "str",
+                "feedback": "str",
+                "max_candidates": "int",
+            },
             expected_outputs={
                 "candidates": "list[str]",
                 "candidate_count": "int",
                 "first_candidate": "str",
                 "abstain": "bool",
             },
-            generation_directives={"template": "cybergym_seed_poc_candidates"},
+            generation_directives={"template": "visible_text_candidate_planner"},
         )
 
     def validation_cases_for_gap(self, gap: GapSignal) -> tuple[ValidationCase, ...]:
@@ -185,19 +207,29 @@ class CyberGymLiveSubmitAdapter:
         return (
             ValidationCase(
                 name="yara_rule_description",
-                inputs={"description": "YARA rule parser crash", "max_candidates": 6},
+                inputs={
+                    "description": "YARA rule parser crash",
+                    "readme": "",
+                    "feedback": "",
+                    "max_candidates": 6,
+                },
                 expected={
                     "candidate_count": 6,
-                    "first_candidate": "\x00\x01\x02\x03",
+                    "first_candidate": "rule a { condition: true }",
                     "abstain": False,
                 },
             ),
             ValidationCase(
                 name="json_description",
-                inputs={"description": "JSON parser issue", "max_candidates": 8},
+                inputs={
+                    "description": "JSON parser issue",
+                    "readme": "",
+                    "feedback": "",
+                    "max_candidates": 8,
+                },
                 expected={
                     "candidate_count": 8,
-                    "first_candidate": "\x00\x01\x02\x03",
+                    "first_candidate": "{}",
                     "abstain": False,
                 },
             ),
@@ -211,7 +243,7 @@ class CyberGymLiveSubmitAdapter:
             name=task.display_name,
             prompt=readme,
             artifacts={"description": description, "readme": readme},
-            metadata={"task_dir": str(task.task_dir)},
+            metadata={"environment": "cybergym-live"},
         )
 
     def _live_task(self, task_key: str) -> CyberGymLiveTask:
@@ -240,6 +272,26 @@ def _load_helper(record: HelperRecord) -> Callable[..., Any]:
         namespace,
     )
     return cast(Callable[..., Any], namespace[record.candidate.spec.name])
+
+
+def _call_planner(
+    planner: Callable[..., Any],
+    *,
+    description: str,
+    readme: str,
+    feedback: str,
+    max_candidates: int,
+) -> dict[str, Any]:
+    try:
+        planned = planner(
+            description=description,
+            readme=readme,
+            feedback=feedback,
+            max_candidates=max_candidates,
+        )
+    except TypeError:
+        planned = planner(description=description, max_candidates=max_candidates)
+    return planned if isinstance(planned, dict) else {}
 
 
 def _submit_candidate(task_dir: Path, index: int, candidate: str) -> dict[str, Any]:

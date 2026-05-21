@@ -91,6 +91,12 @@ class SAGEAgent:
         )
         integrity_report.raise_for_issues()
         records = self.registry.load()
+        generated_gap_keys = {
+            record.birth_gap_key for record in records.values() if not record.retired
+        }
+        generated_tool_names = {
+            name for name, record in records.items() if not record.retired
+        }
         events: list[dict[str, Any]] = []
         tasks_seen = 0
         tasks_succeeded = 0
@@ -134,6 +140,19 @@ class SAGEAgent:
                 gap.severity < self.config.min_gap_severity
                 or tools_born >= self.config.max_new_tools
             ):
+                continue
+            if gap.key in generated_gap_keys or (
+                gap.suggested_tool_name
+                and gap.suggested_tool_name in generated_tool_names
+            ):
+                events.append(
+                    {
+                        "event": "tool_generation_skipped_existing",
+                        "gap_key": gap.key,
+                        "task_id": task.task_id,
+                        "tool_name": gap.suggested_tool_name or "",
+                    }
+                )
                 continue
             candidate = self.generator.generate(
                 gap,
@@ -190,6 +209,8 @@ class SAGEAgent:
                     birth_environment=profile.name,
                 )
                 records = self.registry.load()
+                generated_gap_keys.add(gap.key)
+                generated_tool_names.add(candidate.spec.name)
                 tools_accepted += 1
                 if self.config.retry_birth_task_with_new_tool:
                     retry_bundle = {candidate.spec.name: records[candidate.spec.name]}

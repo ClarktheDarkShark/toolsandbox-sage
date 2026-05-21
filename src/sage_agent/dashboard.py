@@ -395,11 +395,29 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       const baseRate = rate(baseline.tasks_succeeded || 0, baseline.tasks_seen || 0);
       const sageRate = rate(summary.tasks_succeeded || 0, summary.tasks_seen || 0);
       const delta = sageRate - baseRate;
+      const comparisonValid = baseline.comparison_valid !== false;
       document.getElementById("metrics").innerHTML = [
-        metric("Baseline success", `${{baseline.tasks_succeeded || 0}}/${{baseline.tasks_seen || 0}}`, pct(baseline.tasks_succeeded || 0, baseline.tasks_seen || 0)),
+        metric(
+          comparisonValid ? "Baseline success" : "Probe baseline",
+          `${{baseline.tasks_succeeded || 0}}/${{baseline.tasks_seen || 0}}`,
+          comparisonValid ? pct(baseline.tasks_succeeded || 0, baseline.tasks_seen || 0) : "not a benchmark control",
+          comparisonValid ? "" : "warn",
+        ),
         metric("Tasks succeeded", `${{summary.tasks_succeeded || 0}}/${{summary.tasks_seen || 0}}`, successRate, "good"),
-        metric("Absolute lift", pp(delta), "SAGE success rate minus baseline", delta >= 0 ? "good" : "bad"),
-        metric("Relative lift", liftPercent(baseRate, sageRate), baseRate ? "versus no-helper baseline" : "baseline was zero", baseRate ? "good" : "warn"),
+        metric(
+          "Absolute lift",
+          comparisonValid ? pp(delta) : "n/a",
+          comparisonValid ? "SAGE success rate minus baseline" : "probe baseline is not comparable evidence",
+          comparisonValid ? (delta >= 0 ? "good" : "bad") : "warn",
+        ),
+        metric(
+          "Relative lift",
+          comparisonValid ? liftPercent(baseRate, sageRate) : "n/a",
+          comparisonValid
+            ? (baseRate ? "versus no-helper baseline" : "baseline was zero")
+            : "use a matched benchmark run for lift",
+          comparisonValid ? (baseRate ? "good" : "warn") : "warn",
+        ),
         metric("Gaps observed", summary.gaps_observed || 0, "adapter-normalized gap signals", "warn"),
         metric("Tools born", summary.tools_born || 0, `${{summary.tools_accepted || 0}} accepted · ${{summary.tools_rejected || 0}} rejected`, "warn"),
         metric("Tools reused", summary.tools_reused || 0, "natural calls plus birth-task retry use", "good"),
@@ -413,6 +431,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       const ready = Boolean(runMetadata.benchmark_ready);
       const notes = runMetadata.setup_notes || [];
       const available = runMetadata.available_tasks ?? "unknown";
+      const comparisonNote = baseline.comparison_note || "";
       document.getElementById("runMode").innerHTML = `
         <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap">
           <div>
@@ -429,6 +448,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
           <span class="pill">server: ${{esc(runMetadata.real_submission_server_used ?? false)}}</span>
         </div>
         <p class="subtitle">${{esc(runMetadata.interpretation || "No interpretation recorded.")}}</p>
+        ${{comparisonNote ? `<p class="subtitle"><strong>Baseline note:</strong> ${{esc(comparisonNote)}}</p>` : ""}}
         ${{notes.length ? `<ul>${{notes.map((note) => `<li>${{esc(note)}}</li>`).join("")}}</ul>` : ""}}
       `;
     }}

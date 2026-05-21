@@ -143,7 +143,10 @@ so it can render ToolSandbox, CyberGym, or a future adapter without
 environment-specific dashboard code. The smoke runner also records a matched
 no-generated-helper baseline over the same adapter task stream so the dashboard
 can report baseline success, SAGE success, absolute lift, and relative lift
-when the baseline is nonzero. The dashboard also records run-mode metadata:
+when the runner marks that baseline as a valid comparison. Adapter smoke
+baselines are lifecycle checks, not benchmark controls; those are marked as
+`comparison_valid: false`, shown as `Probe baseline`, and excluded from lift
+calculations. The dashboard also records run-mode metadata:
 whether the adapter is benchmark-ready, how many tasks the adapter exposes, and
 whether real task generation, verifier/server execution, and result ingestion
 were used. The current CyberGym adapter is explicitly a synthetic probe, not a
@@ -171,6 +174,28 @@ This live script runs baseline and SAGE through `submit.sh` and the local
 `/submit-vul` verifier. It is still a smoke rather than a final CyberGym claim:
 it does not run fix-side re-verification and its baseline is a deliberately
 simple fixed four-byte PoC.
+
+For a bounded CyberGym smoke that downloads and clears four tasks at a time,
+use:
+
+```bash
+PYTHONPATH=src:. python scripts/run_cybergym_live_batched_sage.py \
+  --limit 20 \
+  --batch-size 4 \
+  --reset-registry \
+  --registry-dir artifacts/cybergym_live_sage/batched20_registry_framework_probe \
+  --output-root outputs/cybergym_live_sage \
+  --run-id batched20_framework_probe
+```
+
+This starts SAGE from an empty generated-helper registry, preserves the registry
+across batches, uses only visible task assets and live submit feedback, and
+clears batch task directories and runner Docker images by default.
+
+For real ToolSandbox verification, use `scripts/run_sage_protocol.py` with a
+fixed manifest and `OPENAI_API_KEY` available in the process environment. Do
+not interpret `toolsandbox-probe` smoke baselines as ToolSandbox benchmark
+baselines.
 
 Architecture notes are in
 `docs/sage_protocol/standalone/sage_standalone_architecture.md`.
