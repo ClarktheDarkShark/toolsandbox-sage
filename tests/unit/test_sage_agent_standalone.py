@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from pathlib import Path
 
 from sage_agent import SAGEAgent, SAGEConfig
@@ -19,10 +20,13 @@ from sage_agent.interfaces import (
     HelperCandidate,
     HelperRecord,
     HelperSpec,
+    HelperValidationReport,
     TaskRunResult,
     TaskSpec,
+    ToolUseRecord,
     ValidationCase,
 )
+from sage_agent.registry import LocalSAGERegistry
 
 
 def test_standalone_sage_births_and_reuses_tool_on_toolsandbox_shape(
@@ -95,6 +99,40 @@ def test_standalone_sage_repairs_rejected_helper(tmp_path: Path) -> None:
     assert summary.repair_attempts == 1
     assert summary.tools_accepted == 1
     assert summary.tools_rejected == 0
+
+
+def test_standalone_sage_refines_underperforming_retained_helper(
+    tmp_path: Path,
+) -> None:
+    registry = LocalSAGERegistry(tmp_path / "registry")
+    registry.add(
+        RetainedRefinementGenerator.bad_candidate(),
+        HelperValidationReport(
+            accepted=True,
+            cases_run=1,
+            cases_passed=1,
+            runtime_smoke_passed=True,
+            side_effect_free=True,
+        ),
+        birth_gap_key="constant_gap",
+        birth_environment="refinement-test",
+    )
+    agent = SAGEAgent(
+        adapter=RefinementAdapter(),
+        generator=RetainedRefinementGenerator(),
+        config=SAGEConfig(
+            registry_dir=tmp_path / "registry",
+            max_new_tools=0,
+            max_refinements=1,
+        ),
+    )
+
+    summary = agent.run(limit=1)
+
+    assert summary.tools_born == 0
+    assert summary.tools_refined == 1
+    assert summary.birth_task_retry_successes == 1
+    assert summary.tasks_succeeded == 1
 
 
 def test_standalone_adapters_do_not_expose_label_or_oracle_metadata() -> None:
@@ -199,6 +237,137 @@ class BrokenThenRepairGenerator(TemplateHelperGenerator):
         )
 
 
+class RetainedRefinementGenerator(TemplateHelperGenerator):
+    @staticmethod
+    def bad_candidate() -> HelperCandidate:
+        return HelperCandidate(
+            spec=HelperSpec(
+                name="constant_helper",
+                family="constant",
+                description="Return the retained value.",
+            ),
+            code=(
+                "def constant_helper() -> dict:\n"
+                "    return {'value': 'bad', 'abstain': False}\n"
+            ),
+            validation_cases=(
+                ValidationCase(
+                    name="bad_case",
+                    inputs={},
+                    expected={"value": "bad", "abstain": False},
+                ),
+            ),
+        )
+
+    def repair(
+        self,
+        gap: GapSignal,
+        profile: EnvironmentProfile,
+        rejected: HelperCandidate,
+        errors: tuple[str, ...],
+        validation_cases: tuple[ValidationCase, ...],
+        *,
+        model: str,
+    ) -> HelperCandidate:
+        del gap, profile, rejected, errors, validation_cases, model
+        return HelperCandidate(
+            spec=HelperSpec(
+                name="constant_helper",
+                family="constant",
+                description="Return the repaired retained value.",
+            ),
+            code=(
+                "def constant_helper() -> dict:\n"
+                "    return {'value': 'good', 'abstain': False}\n"
+            ),
+            validation_cases=(
+                ValidationCase(
+                    name="good_case",
+                    inputs={},
+                    expected={"value": "good", "abstain": False},
+                ),
+            ),
+        )
+
+
+class RefinementAdapter:
+    def profile(self) -> EnvironmentProfile:
+        return EnvironmentProfile(
+            name="refinement-test",
+            description="Synthetic environment for retained helper refinement.",
+            helper_families=("constant",),
+        )
+
+    def prepare(self) -> None:
+        return None
+
+    def tasks(self, *, limit: int | None = None) -> tuple[TaskSpec, ...]:
+        tasks = (
+            TaskSpec(
+                task_id="refine-1",
+                name="refine retained helper",
+                prompt="Return good.",
+            ),
+        )
+        return tasks[:limit] if limit is not None else tasks
+
+    def route_helpers(
+        self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
+    ) -> tuple[str, ...]:
+        del task
+        return tuple(helpers)
+
+    def run_task(
+        self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
+    ) -> TaskRunResult:
+        if not helpers:
+            return TaskRunResult(task=task, success=False)
+        name, record = next(iter(helpers.items()))
+        success = "'good'" in record.candidate.code
+        return TaskRunResult(
+            task=task,
+            success=success,
+            score=1.0 if success else 0.0,
+            tool_uses=(
+                ToolUseRecord(
+                    tool_name=name,
+                    success=True,
+                    generated_helper=True,
+                ),
+            ),
+        )
+
+    def observe_gap(
+        self,
+        task: TaskSpec,
+        result: TaskRunResult,
+        helpers: Mapping[str, HelperRecord],
+    ) -> GapSignal | None:
+        del helpers
+        if result.success:
+            return None
+        return GapSignal(
+            key="constant_gap",
+            summary="Repair the retained helper when natural use underperforms.",
+            source_task_id=task.task_id,
+            source_environment="refinement-test",
+            suggested_tool_name="constant_helper",
+            suggested_helper_family="constant",
+            required_inputs={},
+            expected_outputs={"value": "str", "abstain": "bool"},
+        )
+
+    def validation_cases_for_gap(self, gap: GapSignal) -> tuple[ValidationCase, ...]:
+        del gap
+        return (
+            ValidationCase(
+                name="good_case",
+                inputs={},
+                expected={"value": "good", "abstain": False},
+            ),
+        )
+
+
 class LeakyAdapter:
     def profile(self) -> EnvironmentProfile:
         return EnvironmentProfile(name="leaky", description="Leaky test adapter.")
@@ -218,13 +387,13 @@ class LeakyAdapter:
         return tasks[:limit] if limit is not None else tasks
 
     def route_helpers(
-        self, task: TaskSpec, helpers: dict[str, HelperRecord]
+        self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
     ) -> tuple[str, ...]:
         del task, helpers
         return ()
 
     def run_task(
-        self, task: TaskSpec, helpers: dict[str, HelperRecord]
+        self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
     ) -> TaskRunResult:
         del helpers
         return TaskRunResult(task=task, success=False)
@@ -233,7 +402,7 @@ class LeakyAdapter:
         self,
         task: TaskSpec,
         result: TaskRunResult,
-        helpers: dict[str, HelperRecord],
+        helpers: Mapping[str, HelperRecord],
     ) -> GapSignal | None:
         del result, helpers
         return GapSignal(

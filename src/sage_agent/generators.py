@@ -36,10 +36,7 @@ class TemplateHelperGenerator:
             return _unique_record_selector(name, gap, profile, validation_cases, model)
         if template == "log_signal_classifier":
             return _log_signal_classifier(name, gap, profile, validation_cases, model)
-        if template in {
-            "visible_text_candidate_planner",
-            "cybergym_seed_poc_candidates",
-        }:
+        if template == "visible_text_candidate_planner":
             return _visible_text_candidate_planner(
                 name, gap, profile, validation_cases, model
             )
@@ -256,38 +253,87 @@ def _visible_text_candidate_planner(
     validation_cases: tuple[ValidationCase, ...],
     model: str,
 ) -> HelperCandidate:
-    code = f"""def {name}(description: str, readme: str = "", feedback: str = "", max_candidates: int = 12) -> dict:
-    text = (str(description or "") + "\\n" + str(readme or "") + "\\n" + str(feedback or "")).lower()
+    code = f"""def {name}(description: str, readme: str = "", feedback: str = "", artifact_summary: str = "", max_candidates: int = 12) -> dict:
+    text = str(description or "") + "\\n" + str(readme or "") + "\\n" + str(artifact_summary or "") + "\\n" + str(feedback or "")
     candidates = []
-
-    if "json" in text or "jq" in text:
-        candidates.extend(["{{}}", "[]", "{{\\"a\\":1}}", "{{\\"a\\":[1,2,3]}}", "-10E-1000010001"])
-    if "xml" in text or "libxml" in text or "namespace" in text or "entity" in text:
-        candidates.extend(["<a/>", "<root></root>", "<!DOCTYPE a [<!ENTITY x 'x'>]><a>&x;</a>", "<a xmlns:x='urn:x' x:id='x'/>"])
-    if "regex" in text or "pcre" in text or "regexp" in text:
-        candidates.extend(["(", "(a", "(?C)", "(?<a>a)", "\\\\C", "a{{100000}}"])
-    if "yara" in text or "rule" in text:
-        candidates.extend(["rule a {{ condition: true }}", "rule a {{ strings: $a = \\"A\\" condition: $a }}", "import \\"pe\\"\\nrule a {{ condition: pe.number_of_sections > 0 }}"])
-    if "csv" in text or "comma" in text:
-        candidates.extend(["a,b\\n", "1,2,3\\n", "\\"a\\",\\"b\\"\\n"])
-    if "png" in text:
-        candidates.extend(["\\x89PNG\\r\\n\\x1a\\n", "\\x89PNG\\r\\n\\x1a\\n\\x00\\x00\\x00\\rIHDR"])
-    if "jpeg" in text or "jpg" in text:
-        candidates.extend(["\\xff\\xd8\\xff\\xd9", "\\xff\\xd8\\xff\\xe0JFIF\\x00\\xff\\xd9"])
-    if "zip" in text:
-        candidates.extend(["PK\\x03\\x04", "PK\\x05\\x06"])
-    if "font" in text or "freetype" in text or "cff" in text or "ttf" in text:
-        candidates.extend(["OTTO\\x00\\x01\\x00\\x00", "\\x00\\x01\\x00\\x00\\x00\\x01\\x00\\x00", "ttcf\\x00\\x01\\x00\\x00"])
-    if "bam" in text or "sam" in text or "cram" in text or "htslib" in text:
-        candidates.extend(["@HD\\tVN:1.6\\n", "BAM\\x01", "CRAM\\x03\\x00"])
-    if "aac" in text or "faad" in text or "xaac" in text:
-        candidates.extend(["\\xff\\xf1\\x50\\x80\\x00\\x1f\\xfc", "\\x00\\x00\\x00\\x00\\xff\\xf1"])
-    if "empty" in text or "null" in text:
-        candidates.extend(["", "\\x00"])
-    if "timeout" in text:
-        candidates.extend(["A" * 64, "0" * 64])
-
-    candidates.extend(["\\x00\\x01\\x02\\x03", "", "A", "AAAA", "0", "1", "A" * 32])
+    lower = text.lower()
+    cue_markers = (
+        "example input:",
+        "input:",
+        "such as",
+        "for example",
+        "e.g.",
+        "trigger:",
+        "poc:",
+        "candidate:",
+    )
+    deferred = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip(" \\t\\r\\n-*")
+        if not line:
+            continue
+        line_lower = line.lower()
+        for marker in cue_markers:
+            pos = line_lower.find(marker)
+            if pos >= 0 and "provided as input to the vulnerable program" not in line_lower:
+                value = line[pos + len(marker):].strip(" :-,;\\t")
+                if 0 < len(value) <= 240:
+                    candidates.append(value)
+        if ":" in line and line_lower.split(":", 1)[0] in ("literal", "symbol", "source_line", "example", "input"):
+            value = line.split(":", 1)[1].strip(" :-,;\\t")
+            if 0 < len(value) <= 240:
+                deferred.append(value)
+        if len(line) <= 180 and any(ch in line for ch in "()[]{{}}<>/\\\\_=:+-.0123456789") and "provided as input to the vulnerable program" not in line_lower:
+            deferred.append(line)
+    seed_pool = [
+        "",
+        "\\x00",
+        "\\xff",
+        "A",
+        "AAAA",
+        "0",
+        "1",
+        "-1",
+        "0\\n",
+        "(",
+        "(a",
+        "()",
+        "{{}}",
+        "[]",
+        "<a/>",
+        "<root></root>",
+        "a,b\\n",
+        "\\x00\\x01\\x02\\x03",
+        "A" * 32,
+        "A" * 128,
+    ]
+    if "short" in lower or "empty" in lower or "null" in lower:
+        seed_pool = ["", "\\x00"] + seed_pool
+    candidates.extend(seed_pool)
+    for quote in ("`", "\\"", "'"):
+        start = 0
+        while True:
+            left = text.find(quote, start)
+            if left < 0:
+                break
+            right = text.find(quote, left + 1)
+            if right < 0:
+                break
+            value = text[left + 1:right].strip()
+            if 0 < len(value) <= 240:
+                candidates.append(value)
+            start = right + 1
+    candidates.extend(deferred)
+    for token in text.replace("\\n", " ").split():
+        value = token.strip(" ,;")
+        value = value.strip()
+        if 1 < len(value) <= 160 and any(ch in value for ch in "()[]{{}}<>/\\\\_=:+-.0123456789"):
+            candidates.append(value.strip(".,;"))
+    base_values = list(candidates[:24])
+    for value in base_values:
+        if isinstance(value, str) and 0 < len(value) <= 80:
+            candidates.append(value + "\\n")
+            candidates.append(value + value)
     seen = set()
     unique = []
     limit = int(max_candidates)

@@ -26,7 +26,10 @@ from sage_agent.adapters import (  # noqa: E402
     CyberGymLiveTask,
 )
 from sage_agent.dashboard import write_standalone_dashboard  # noqa: E402
-from sage_agent.generators import TemplateHelperGenerator  # noqa: E402
+from sage_agent.generators import (  # noqa: E402
+    OpenAIHelperGenerator,
+    TemplateHelperGenerator,
+)
 from sage_agent.interfaces import EnvironmentAdapter, TaskRunResult  # noqa: E402
 
 DATASET_REPO = "sunblaze-ucb/cybergym"
@@ -46,6 +49,12 @@ def main() -> None:
     parser.add_argument("--max-candidates", type=int, default=12)
     parser.add_argument("--model", default="gpt-4o-mini")
     parser.add_argument(
+        "--generator",
+        choices=("template", "openai"),
+        default="template",
+        help="Helper generator. Template is deterministic and token-free; openai uses the configured API key.",
+    )
+    parser.add_argument(
         "--registry-dir",
         type=Path,
         default=Path("artifacts/cybergym_live_sage/batched20_registry"),
@@ -61,6 +70,7 @@ def main() -> None:
     parser.add_argument("--run-id", default="")
     parser.add_argument("--reset-registry", action="store_true")
     parser.add_argument("--clear-images", action="store_true", default=True)
+    parser.add_argument("--no-clear-images", action="store_false", dest="clear_images")
     parser.add_argument("--keep-work", action="store_true")
     args = parser.parse_args()
 
@@ -197,6 +207,7 @@ def _run_batches(
         "tools_rejected": 0,
         "tools_reused": 0,
         "repair_attempts": 0,
+        "tools_refined": 0,
         "birth_task_retries": 0,
         "birth_task_retry_successes": 0,
         "integrity_issues": 0,
@@ -238,11 +249,12 @@ def _run_batches(
             baseline_results.extend(baseline["results"])
             agent = SAGEAgent(
                 adapter=adapter,
-                generator=TemplateHelperGenerator(),
+                generator=_helper_generator(args.generator),
                 config=SAGEConfig(
                     model=args.model,
                     registry_dir=args.registry_dir,
                     max_new_tools=2,
+                    max_refinements=2,
                 ),
             )
             batch_summary = agent.run()
@@ -300,6 +312,7 @@ def _run_batches(
         tools_rejected=totals["tools_rejected"],
         tools_reused=totals["tools_reused"],
         repair_attempts=totals["repair_attempts"],
+        tools_refined=totals["tools_refined"],
         birth_task_retries=totals["birth_task_retries"],
         birth_task_retry_successes=totals["birth_task_retry_successes"],
         model=args.model,
@@ -321,6 +334,12 @@ def _run_batches(
         "results": baseline_results,
     }
     return summary, baseline, batch_reports
+
+
+def _helper_generator(name: str) -> TemplateHelperGenerator | OpenAIHelperGenerator:
+    if name == "openai":
+        return OpenAIHelperGenerator()
+    return TemplateHelperGenerator()
 
 
 def _download_visible_assets(
@@ -416,9 +435,9 @@ def _live_tasks_for_batch(
             continue
         live_tasks.append(
             CyberGymLiveTask(
-                task_key=f"cybergym-live-{local_index:02d}",
+                task_key=task_id,
                 task_dir=task_root / _task_dir_name(local_index, task_id),
-                display_name=f"CyberGym live Level 1 batch task {local_index:02d}",
+                display_name=f"CyberGym live Level 1 {task_id}",
             )
         )
     return live_tasks

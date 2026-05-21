@@ -234,6 +234,35 @@ environment setup and side effects, while SAGE sees only normalized task text,
 visible artifacts, execution feedback, gap signals, helper validation cases,
 and registry metadata.
 
+The first batched CyberGym helper used a CyberGym-shaped seed-planner template.
+That was useful for wiring, but it was too environment-specific for the
+standalone SAGE claim. The current live adapter now routes a generic
+`visible_text_candidate_planner` family instead. The helper receives only
+adapter-normalized visible fields:
+
+- task description;
+- task README/instructions;
+- a bounded summary of visible source artifacts from `repo-vul.tar.gz`;
+- prior live submission feedback;
+- a candidate limit.
+
+The adapter-owned artifact summarizer extracts file names, short source lines,
+and string literals from visible source files, while skipping reference PoCs,
+solutions, hidden labels, and scorer fields. The generated helper remains
+side-effect-free: it returns candidate input strings only. The adapter performs
+all `submit.sh` calls and scoring privately. This pattern is the intended
+generalization boundary for new benchmark datasets: environment adapters may
+summarize visible resources and own side effects, but SAGE helper generation,
+validation, retention, routing, and lifecycle decisions remain environment
+neutral.
+
+The standalone controller now also supports bounded retained-helper
+refinement. If a helper was accepted and naturally routed but later
+underperforms, SAGE can ask a repair-capable generator for an updated helper
+under the same static, semantic, and integrity checks. Repaired helpers are
+only retained when their code changes and validation passes; force-calls remain
+diagnostic-only and are not part of the live CyberGym runner.
+
 ## Baseline Semantics
 
 Standalone adapter smoke runs are not automatically benchmark comparisons. The
@@ -260,8 +289,9 @@ it is not a real ToolSandbox control arm.
 The first CyberGym live adapter originally generated a CyberGym-named seed
 candidate helper. That has been replaced by a generic
 `visible_text_candidate_planner` helper family. The helper reads only visible
-task descriptions, visible instructions, and prior execution feedback, then
-returns side-effect-free candidate input strings for the adapter to submit.
+task descriptions, visible instructions, visible source-artifact summaries, and
+prior execution feedback, then returns side-effect-free candidate input strings
+for the adapter to submit.
 
 This is still a shallow capability. Its purpose is to prove the env-general
 loop:
@@ -275,7 +305,7 @@ loop:
 7. classify lifecycle status from observed use and success.
 
 The next architecture step is to make the same pattern richer without hard
-coding CyberGym facts: environment inventory tools, artifact summarizers,
-format-inference helpers, feedback classifiers, mutation planners, and repair
-policies that operate on adapter-normalized observations rather than hidden
-labels or task IDs.
+coding CyberGym facts: stronger environment inventory tools, artifact
+summarizers, format-inference helpers, feedback classifiers, mutation planners,
+and repair policies that operate on adapter-normalized observations rather than
+hidden labels or task IDs.

@@ -419,11 +419,13 @@ CyberGym benchmark evidence.
 
 ## CyberGym Batched Live Submit Smoke
 
-Date: 2026-05-20
+Date: 2026-05-21
 
 Purpose: verify that the standalone SAGE adapter can operate in a new
 environment in bounded batches without keeping all downloaded task data and
-Docker images on disk at once.
+Docker images on disk at once. This rerun used the generic
+`visible_text_candidate_planner` helper family rather than the earlier
+CyberGym-shaped seed planner.
 
 Command:
 
@@ -432,14 +434,15 @@ PYTHONPATH=src:. python scripts/run_cybergym_live_batched_sage.py \
   --limit 20 \
   --batch-size 4 \
   --reset-registry \
-  --registry-dir artifacts/cybergym_live_sage/batched20_registry_framework_probe \
+  --registry-dir artifacts/cybergym_live_sage/batched20_registry_generic_visible_v2 \
   --output-root outputs/cybergym_live_sage \
-  --run-id batched20_framework_probe_20260521_000814
+  --run-id batched20_generic_visible_v2_20260521_102125 \
+  --max-candidates 24
 ```
 
 Dashboard:
 
-`outputs/cybergym_live_sage/batched20_framework_probe_20260521_000814/dashboard/index.html`
+`outputs/cybergym_live_sage/batched20_generic_visible_v2_20260521_102125/dashboard/index.html`
 
 Result:
 
@@ -452,10 +455,11 @@ Result:
 - SAGE success: `4/20`
 - absolute lift: `+15.0 pp`
 - relative lift: `+300.0%`
-- gaps observed: `16`
+- gaps observed: `17`
 - tools born: `1`
 - tools accepted: `1`
 - tools reused: `20`
+- retained-helper refinements accepted: `0`
 - lifecycle decision: `refine`
 - integrity issues: `0`
 - skipped tasks: `0`
@@ -464,7 +468,15 @@ Interpretation: this run confirms the batched live CyberGym wiring and shows a
 small real submit-path lift over the fixed-PoC control. It is still not final
 CyberGym benchmark evidence because it uses `/submit-vul` only and does not run
 fix-side verification. The single generic visible-text candidate planner was
-accepted and reused naturally, but the success rate remains weak. The next
+accepted and reused naturally. It improved live task completion from `5%` to
+`20%` on this 20-task ordered sample without hard-coding CyberGym task IDs,
+expected answers, labels, task-specific strings, or reference PoCs into the
+helper. The helper uses visible descriptions, visible instructions, bounded
+visible source-artifact summaries, prior submit feedback, and a small universal
+edge-case candidate set.
+
+This is a meaningful portability result, but the lifecycle decision remains
+`refine`: the helper helped on four tasks and failed on sixteen. The next
 framework work should give SAGE richer environment-observation and repair
 loops, especially source/harness inventory, input-format inference, feedback
 classification, targeted mutation, and candidate minimization. Those should be

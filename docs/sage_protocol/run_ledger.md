@@ -1101,3 +1101,23 @@
   - `docs/sage_protocol/figures/sage_peer_review_methodology_figure.svg` and `.png`
 - Documentation updated: `README.md`, `docs/sage_protocol/chapter3_methodology_prep.md`, and `docs/sage_protocol/current_state.md`.
 - Decision label: `METHODOLOGY_FIGURE_PACKAGE_READY_FOR_CHAPTER_3_DRAFTING`.
+
+## 2026-05-21 - Standalone SAGE CyberGym Batched Live Portability Smoke
+
+- Objective: verify that standalone SAGE can operate on a new benchmark environment using bounded four-task batches, without CyberGym-specific generated-helper hard-coding or hidden-label/reference-PoC access.
+- Branch: `codex/sage-standalone-agent`.
+- Run root: `outputs/cybergym_live_sage/batched20_generic_visible_v2_20260521_102125`.
+- Dashboard: `outputs/cybergym_live_sage/batched20_generic_visible_v2_20260521_102125/dashboard/index.html`.
+- Registry: `artifacts/cybergym_live_sage/batched20_registry_generic_visible_v2/sage_registry.json`, SHA-256 `93a6444a7a1225d4f4aab79a8237d5add07ed082176618ec4fa4823b440437e7`.
+- Machine-readable summary: `artifacts/sage_standalone/cybergym_batched20_generic_visible_v2_summary.json`, SHA-256 `20bab3b048ccda1a21600f775dbd411d855ef7878a697af2dd68b1c5333edbb6`.
+- Run summary SHA-256: `84bc00e440ea620a401340bf69d880bdfe67003e88cc9d4345673489368d7759`; batched summary SHA-256 `fb491016ee5b26b5081e15fdfa8be6986d148439ca22a825a06406e6bc36143d`; dashboard data SHA-256 `03b9af70d54966bf82ea4c75d188057c97dc6938559e0aae97e9a8a9a5777233`.
+- Execution mode: `cybergym_live_level1_submit_vul_batched`; official task assets generated with CyberGym's own task generator; live local `/submit-vul` verifier used; fix-side verification not run.
+- Batch method: `20` tasks in five batches of `4`; batch work directories and runner Docker images cleared by default after each batch.
+- Baseline policy: fixed four-byte PoC, `1/20` success.
+- SAGE policy: empty generated-helper registry at start; deterministic generic `visible_text_candidate_planner`; no OpenAI generation calls; configured model metadata `gpt-4o-mini`; SAGE `4/20` success.
+- Lift: absolute task-completion lift `+15.0 pp`; relative lift `+300.0%` over the fixed-PoC baseline.
+- Lifecycle: gaps observed `17`; tools born/accepted/reused `1 / 1 / 20`; birth-task retries/successes `1 / 1`; retained helper decision `refine`.
+- Leakage controls: helper received only visible descriptions, visible README/instructions, bounded summaries from visible `repo-vul.tar.gz` source artifacts, and prior live submit feedback. It did not receive hidden labels, reference PoCs, expected answers, task-specific helper constants, or hard-coded CyberGym task IDs.
+- Integrity: integrity passed; issues `0`; helper side effects `0`; generated helper only prepared candidate strings, while the adapter retained responsibility for environment submissions.
+- Interpretation: meaningful portability proof for the standalone SAGE loop, not final CyberGym benchmark evidence. The next generalization work should add environment-general source/harness inventory, input-format inference, feedback classification, mutation/minimization, and repair policy rather than CyberGym-specific branches.
+- Decision label: `PORTABILITY_SMOKE_POSITIVE_REFINE_FOR_BROADER_CYBERGYM_VALIDATION`.

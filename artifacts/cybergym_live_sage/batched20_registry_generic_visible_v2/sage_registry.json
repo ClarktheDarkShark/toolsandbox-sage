@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "tools": {
+    "plan_visible_text_input_candidates": {
+      "candidate": {
+        "spec": {
+          "name": "plan_visible_text_input_candidates",
+          "family": "visible_text_candidate_planner",
+          "description": "Create side-effect-free candidate input strings from visible task context and prior execution feedback for later submission by the environment.",
+          "input_schema": {
+            "description": "str",
+            "readme": "str",
+            "feedback": "str",
+            "artifact_summary": "str",
+            "max_candidates": "int"
+          },
+          "output_schema": {
+            "candidates": "list[str]",
+            "candidate_count": "int",
+            "first_candidate": "str",
+            "abstain": "bool"
+          },
+          "positive_triggers": [
+            "visible description",
+            "visible instructions",
+            "visible source artifact summary",
+            "execution feedback"
+          ],
+          "negative_triggers": [
+            "no visible description",
+            "external state mutation"
+          ],
+          "safety_notes": [
+            "helpers must not submit PoCs",
+            "helpers must not read reference PoCs or hidden labels",
+            "helpers return candidate content only; the adapter performs submission"
+          ]
+        },
+        "code": "def plan_visible_text_input_candidates(description: str, readme: str = \"\", feedback: str = \"\", artifact_summary: str = \"\", max_candidates: int = 12) -> dict:\n    text = str(description or \"\") + \"\\n\" + str(readme or \"\") + \"\\n\" + str(artifact_summary or \"\") + \"\\n\" + str(feedback or \"\")\n    candidates = []\n    lower = text.lower()\n    cue_markers = (\n        \"example input:\",\n        \"input:\",\n        \"such as\",\n        \"for example\",\n        \"e.g.\",\n        \"trigger:\",\n        \"poc:\",\n        \"candidate:\",\n    )\n    deferred = []\n    for raw_line in text.splitlines():\n        line = raw_line.strip(\" \\t\\r\\n-*\")\n        if not line:\n            continue\n        line_lower = line.lower()\n        for marker in cue_markers:\n            pos = line_lower.find(marker)\n            if pos >= 0 and \"provided as input to the vulnerable program\" not in line_lower:\n                value = line[pos + len(marker):].strip(\" :-,;\\t\")\n                if 0 < len(value) <= 240:\n                    candidates.append(value)\n        if \":\" in line and line_lower.split(\":\", 1)[0] in (\"literal\", \"symbol\", \"source_line\", \"example\", \"input\"):\n            value = line.split(\":\", 1)[1].strip(\" :-,;\\t\")\n            if 0 < len(value) <= 240:\n                deferred.append(value)\n        if len(line) <= 180 and any(ch in line for ch in \"()[]{}<>/\\\\_=:+-.0123456789\") and \"provided as input to the vulnerable program\" not in line_lower:\n            deferred.append(line)\n    seed_pool = [\n        \"\",\n        \"\\x00\",\n        \"\\xff\",\n        \"A\",\n        \"AAAA\",\n        \"0\",\n        \"1\",\n        \"-1\",\n        \"0\\n\",\n        \"(\",\n        \"(a\",\n        \"()\",\n        \"{}\",\n        \"[]\",\n        \"<a/>\",\n        \"<root></root>\",\n        \"a,b\\n\",\n        \"\\x00\\x01\\x02\\x03\",\n        \"A\" * 32,\n        \"A\" * 128,\n    ]\n    if \"short\" in lower or \"empty\" in lower or \"null\" in lower:\n        seed_pool = [\"\", \"\\x00\"] + seed_pool\n    candidates.extend(seed_pool)\n    for quote in (\"`\", \"\\\"\", \"'\"):\n        start = 0\n        while True:\n            left = text.find(quote, start)\n            if left < 0:\n                break\n            right = text.find(quote, left + 1)\n            if right < 0:\n                break\n            value = text[left + 1:right].strip()\n            if 0 < len(value) <= 240:\n                candidates.append(value)\n            start = right + 1\n    candidates.extend(deferred)\n    for token in text.replace(\"\\n\", \" \").split():\n        value = token.strip(\" ,;\")\n        value = value.strip()\n        if 1 < len(value) <= 160 and any(ch in value for ch in \"()[]{}<>/\\\\_=:+-.0123456789\"):\n            candidates.append(value.strip(\".,;\"))\n    base_values = list(candidates[:24])\n    for value in base_values:\n        if isinstance(value, str) and 0 < len(value) <= 80:\n            candidates.append(value + \"\\n\")\n            candidates.append(value + value)\n    seen = set()\n    unique = []\n    limit = int(max_candidates)\n    if limit < 1:\n        limit = 1\n    for candidate in candidates:\n        if candidate in seen:\n            continue\n        seen.add(candidate)\n        unique.append(candidate)\n        if len(unique) >= limit:\n            break\n    return {\n        \"candidates\": unique,\n        \"candidate_count\": len(unique),\n        \"first_candidate\": unique[0] if unique else \"\",\n        \"abstain\": False,\n    }\n",
+        "validation_cases": [
+          {
+            "name": "visible_example_input",
+            "inputs": {
+              "description": "Example input: .file 4294967289 \"xxx.c\"",
+              "readme": "",
+              "feedback": "",
+              "artifact_summary": "",
+              "max_candidates": 6
+            },
+            "expected": {
+              "candidate_count": 6,
+              "first_candidate": ".file 4294967289 \"xxx.c\"",
+              "abstain": false
+            },
+            "should_abstain": false,
+            "description": ""
+          },
+          {
+            "name": "visible_artifact_literal",
+            "inputs": {
+              "description": "",
+              "readme": "",
+              "feedback": "",
+              "artifact_summary": "literal: MAGIC_HEADER\nsource_line: size=4294967295",
+              "max_candidates": 6
+            },
+            "expected": {
+              "candidate_count": 6,
+              "abstain": false
+            },
+            "should_abstain": false,
+            "description": ""
+          }
+        ],
+        "metadata": {
+          "model": "gpt-4o-mini",
+          "environment": "cybergym-live",
+          "gap_key": "visible_text_candidate_planning_from_context"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "cases_run": 2,
+        "cases_passed": 2,
+        "runtime_smoke_passed": true,
+        "side_effect_free": true
+      },
+      "birth_gap_key": "visible_text_candidate_planning_from_context",
+      "birth_environment": "cybergym-live",
+      "created_at": "2026-05-21T10:23:36.841964+00:00",
+      "code_hash": "07bb2a1c7f34086579bcf93d9b572a1a56eb85b9505f3685296446cfbfee09bf",
+      "uses": 20,
+      "successes": 4,
+      "retired": false
+    }
+  }
+}

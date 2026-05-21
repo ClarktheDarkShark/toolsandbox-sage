@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
+import tarfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -80,8 +82,7 @@ class CyberGymLiveSubmitAdapter:
         return tuple(
             name
             for name, record in helpers.items()
-            if record.candidate.spec.family
-            in {"visible_text_candidate_planner", "poc_seed_candidate_planner"}
+            if record.candidate.spec.family == "visible_text_candidate_planner"
             and not record.retired
         )[:1]
 
@@ -91,6 +92,7 @@ class CyberGymLiveSubmitAdapter:
         live_task = self._live_task(task.task_id)
         description = task.artifacts.get("description", "")
         readme = task.artifacts.get("readme", "")
+        artifact_summary = task.artifacts.get("artifact_summary", "")
         feedback = "\n".join((self._feedback_memory or [])[-12:])
         candidates = ["\x00\x01\x02\x03"]
         tool_uses: list[ToolUseRecord] = []
@@ -104,6 +106,7 @@ class CyberGymLiveSubmitAdapter:
                     description=str(description),
                     readme=str(readme),
                     feedback=feedback,
+                    artifact_summary=str(artifact_summary),
                     max_candidates=self.max_candidates,
                 )
                 candidates = [
@@ -119,6 +122,7 @@ class CyberGymLiveSubmitAdapter:
                         arguments={"description_chars": len(str(description))},
                         result={
                             "candidate_count": len(candidates),
+                            "artifact_summary_chars": len(str(artifact_summary)),
                             "first_candidate_len": len(candidates[0])
                             if candidates
                             else 0,
@@ -185,12 +189,14 @@ class CyberGymLiveSubmitAdapter:
             evidence=(
                 "visible description",
                 "visible instructions",
+                "visible source artifact summary",
                 "execution feedback",
             ),
             required_inputs={
                 "description": "str",
                 "readme": "str",
                 "feedback": "str",
+                "artifact_summary": "str",
                 "max_candidates": "int",
             },
             expected_outputs={
@@ -206,30 +212,31 @@ class CyberGymLiveSubmitAdapter:
         del gap
         return (
             ValidationCase(
-                name="yara_rule_description",
+                name="visible_example_input",
                 inputs={
-                    "description": "YARA rule parser crash",
+                    "description": 'Example input: .file 4294967289 "xxx.c"',
                     "readme": "",
                     "feedback": "",
+                    "artifact_summary": "",
                     "max_candidates": 6,
                 },
                 expected={
                     "candidate_count": 6,
-                    "first_candidate": "rule a { condition: true }",
+                    "first_candidate": '.file 4294967289 "xxx.c"',
                     "abstain": False,
                 },
             ),
             ValidationCase(
-                name="json_description",
+                name="visible_artifact_literal",
                 inputs={
-                    "description": "JSON parser issue",
+                    "description": "",
                     "readme": "",
                     "feedback": "",
-                    "max_candidates": 8,
+                    "artifact_summary": "literal: MAGIC_HEADER\nsource_line: size=4294967295",
+                    "max_candidates": 6,
                 },
                 expected={
-                    "candidate_count": 8,
-                    "first_candidate": "{}",
+                    "candidate_count": 6,
                     "abstain": False,
                 },
             ),
@@ -238,11 +245,16 @@ class CyberGymLiveSubmitAdapter:
     def _task_spec(self, task: CyberGymLiveTask) -> TaskSpec:
         readme = (task.task_dir / "README.md").read_text(encoding="utf-8")
         description = (task.task_dir / "description.txt").read_text(encoding="utf-8")
+        artifact_summary = _visible_artifact_summary(task.task_dir)
         return TaskSpec(
             task_id=task.task_key,
             name=task.display_name,
             prompt=readme,
-            artifacts={"description": description, "readme": readme},
+            artifacts={
+                "description": description,
+                "readme": readme,
+                "artifact_summary": artifact_summary,
+            },
             metadata={"environment": "cybergym-live"},
         )
 
@@ -259,14 +271,25 @@ def _load_helper(record: HelperRecord) -> Callable[..., Any]:
         record.candidate.code,
         {
             "__builtins__": {
+                "all": all,
+                "any": any,
                 "bool": bool,
                 "dict": dict,
+                "enumerate": enumerate,
+                "float": float,
                 "int": int,
                 "isinstance": isinstance,
                 "len": len,
                 "list": list,
+                "max": max,
+                "min": min,
+                "range": range,
+                "round": round,
                 "set": set,
+                "sorted": sorted,
                 "str": str,
+                "sum": sum,
+                "tuple": tuple,
             }
         },
         namespace,
@@ -280,6 +303,7 @@ def _call_planner(
     description: str,
     readme: str,
     feedback: str,
+    artifact_summary: str,
     max_candidates: int,
 ) -> dict[str, Any]:
     try:
@@ -287,11 +311,139 @@ def _call_planner(
             description=description,
             readme=readme,
             feedback=feedback,
+            artifact_summary=artifact_summary,
             max_candidates=max_candidates,
         )
     except TypeError:
-        planned = planner(description=description, max_candidates=max_candidates)
+        try:
+            planned = planner(
+                description=description,
+                readme=readme,
+                feedback=feedback,
+                max_candidates=max_candidates,
+            )
+        except TypeError:
+            planned = planner(description=description, max_candidates=max_candidates)
     return planned if isinstance(planned, dict) else {}
+
+
+def _visible_artifact_summary(task_dir: Path) -> str:
+    """Summarize visible task artifacts without opening labels or reference PoCs."""
+
+    archive = task_dir / "repo-vul.tar.gz"
+    if not archive.exists():
+        return ""
+    lines: list[str] = []
+    literal_count = 0
+    source_count = 0
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            members = sorted(
+                [
+                    member
+                    for member in tar.getmembers()
+                    if member.isfile()
+                    and member.size <= 350_000
+                    and _looks_text_source(member.name)
+                ],
+                key=_artifact_member_priority,
+            )[:80]
+            for member in members:
+                lines.append(f"file: {member.name}")
+                extracted = tar.extractfile(member)
+                if extracted is None:
+                    continue
+                text = extracted.read(160_000).decode("utf-8", errors="ignore")
+                for value in re.findall(r'"([^"\n\r]{1,96})"', text):
+                    cleaned = value.strip()
+                    if cleaned and any(
+                        ch in cleaned
+                        for ch in "()[]{}<>/\\_=:+-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                    ):
+                        lines.append(f"literal: {cleaned}")
+                        literal_count += 1
+                        if literal_count >= 80:
+                            break
+                for raw_line in text.splitlines()[:600]:
+                    if source_count >= 80:
+                        break
+                    stripped = raw_line.strip()
+                    if 8 <= len(stripped) <= 160 and _source_line_has_signal(stripped):
+                        lines.append(f"source_line: {stripped}")
+                        source_count += 1
+                if len("\n".join(lines)) >= 12_000:
+                    break
+    except (OSError, tarfile.TarError):
+        return ""
+    return "\n".join(lines)[:12_000]
+
+
+def _looks_text_source(name: str) -> bool:
+    lowered = name.lower()
+    suffixes = (
+        ".c",
+        ".cc",
+        ".cpp",
+        ".cxx",
+        ".h",
+        ".hpp",
+        ".py",
+        ".rs",
+        ".go",
+        ".java",
+        ".js",
+        ".ts",
+        ".txt",
+        ".md",
+        ".options",
+        ".dict",
+        ".diff",
+        ".patch",
+    )
+    return lowered.endswith(suffixes)
+
+
+def _artifact_member_priority(member: tarfile.TarInfo) -> tuple[int, int, int, str]:
+    lowered = member.name.lower()
+    basename = Path(lowered).name
+    preferred = (
+        "fuzz" in basename
+        or basename.endswith((".dict", ".options"))
+        or basename in {"readme", "readme.md"}
+    )
+    generated_patch = lowered.endswith((".diff", ".patch"))
+    return (
+        0 if preferred else 1,
+        1 if generated_patch else 0,
+        lowered.count("/"),
+        lowered,
+    )
+
+
+def _source_line_has_signal(line: str) -> bool:
+    lowered = line.lower()
+    tokens = (
+        "fuzz",
+        "parse",
+        "read",
+        "input",
+        "magic",
+        "header",
+        "version",
+        "size",
+        "length",
+        "chunk",
+        "token",
+        "format",
+        "assert",
+        "crash",
+        "memcpy",
+        "strcpy",
+        "strcmp",
+    )
+    return any(token in lowered for token in tokens) and any(
+        ch in line for ch in "()[]{}<>/\\_=:+-.0123456789"
+    )
 
 
 def _submit_candidate(task_dir: Path, index: int, candidate: str) -> dict[str, Any]:

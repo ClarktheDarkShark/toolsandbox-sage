@@ -183,14 +183,22 @@ PYTHONPATH=src:. python scripts/run_cybergym_live_batched_sage.py \
   --limit 20 \
   --batch-size 4 \
   --reset-registry \
-  --registry-dir artifacts/cybergym_live_sage/batched20_registry_framework_probe \
+  --registry-dir artifacts/cybergym_live_sage/batched20_registry_generic_visible_v2 \
   --output-root outputs/cybergym_live_sage \
-  --run-id batched20_framework_probe
+  --run-id batched20_generic_visible_v2 \
+  --max-candidates 24
 ```
 
 This starts SAGE from an empty generated-helper registry, preserves the registry
 across batches, uses only visible task assets and live submit feedback, and
 clears batch task directories and runner Docker images by default.
+The current batched runner uses the generic `visible_text_candidate_planner`
+helper family, which extracts visible examples, visible source-artifact
+summaries, execution feedback, and a small universal edge-case candidate set.
+It does not encode CyberGym task IDs, hidden labels, reference PoCs, expected
+answers, or benchmark-specific facts into the generated helper. Use
+`--no-clear-images` only for short local diagnostics when repeated pulls would
+dominate runtime; the default remains image cleanup for space-constrained runs.
 
 For real ToolSandbox verification, use `scripts/run_sage_protocol.py` with a
 fixed manifest and `OPENAI_API_KEY` available in the process environment. Do
