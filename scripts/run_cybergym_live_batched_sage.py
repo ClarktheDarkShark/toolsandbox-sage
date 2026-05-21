@@ -326,6 +326,11 @@ def _run_batches(
     baseline = {
         "policy": "fixed_four_byte_poc_batched",
         "comparison_valid": True,
+        "comparison_note": (
+            "Fixed four-byte PoC smoke baseline for this CyberGym live wiring "
+            "check. It is a valid within-run smoke comparison, but not an "
+            "official CyberGym benchmark baseline."
+        ),
         "tasks_seen": len(baseline_results),
         "tasks_succeeded": baseline_successes,
         "success_rate": baseline_successes / len(baseline_results)

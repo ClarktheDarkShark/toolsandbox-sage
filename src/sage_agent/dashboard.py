@@ -712,6 +712,10 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
         </section>
         <section class="section">
           <div class="section-title"><h2>Full Transaction</h2></div>
+          <p class="subtitle">
+            Baseline policy: ${esc(baseline.policy || "not recorded")}${baseline.comparison_valid === false ? " · probe baseline, not benchmark control" : ""}.
+            ${baseline.comparison_note ? esc(baseline.comparison_note) : ""}
+          </p>
           <div class="split">
             ${transactionCard("Baseline", base)}
             ${transactionCard("SAGE", task)}
@@ -748,10 +752,15 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       const transcript = record.transcript || [];
       const toolUses = record.tool_uses || [];
       const attempts = record.artifacts?.attempts || [];
+      const plannedActions = record.artifacts?.planned_actions || [];
+      const actionSummary = plannedActions.length
+        ? `<div class="msg tool">Actions executed: ${esc(plannedActions.join(" -> "))}<br>steps ${esc(record.artifacts?.steps ?? plannedActions.length)} · reward ${esc(record.artifacts?.reward ?? "not recorded")}</div>`
+        : "";
       return `<div class="transaction">
         <h3>${esc(label)}</h3>
         <div class="transcript">
           ${transcript.length ? transcript.map((line, index) => `<div class="msg">${index + 1}. ${esc(line)}</div>`).join("") : "<div class='msg'>No transcript messages exported.</div>"}
+          ${actionSummary}
           ${toolUses.map((use, index) => `<div class="msg tool">${index + 1}. TOOL ${esc(use.tool_name)} · success ${esc(use.success)}<br>${esc(compactJson(use.arguments))}<br>${esc(compactJson(use.result))}</div>`).join("")}
           ${attempts.map((attempt, index) => `<div class="msg tool">${index + 1}. ATTEMPT ${esc(attempt.candidate_index ?? index)} · exit ${esc(attempt.exit_code ?? "n/a")} · len ${esc(attempt.poc_length ?? "n/a")}<br>${esc(attempt.output_excerpt || attempt.error || "")}</div>`).join("")}
         </div>

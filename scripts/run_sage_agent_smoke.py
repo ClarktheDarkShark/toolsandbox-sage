@@ -272,6 +272,7 @@ def _baseline_result_json(result: TaskRunResult) -> dict[str, object]:
         "outcome_score": result.outcome_score,
         "error": result.error,
         "transcript": list(result.transcript),
+        "artifacts": dict(result.artifacts),
     }
 
 
