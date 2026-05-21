@@ -1121,3 +1121,64 @@
 - Integrity: integrity passed; issues `0`; helper side effects `0`; generated helper only prepared candidate strings, while the adapter retained responsibility for environment submissions.
 - Interpretation: meaningful portability proof for the standalone SAGE loop, not final CyberGym benchmark evidence. The next generalization work should add environment-general source/harness inventory, input-format inference, feedback classification, mutation/minimization, and repair policy rather than CyberGym-specific branches.
 - Decision label: `PORTABILITY_SMOKE_POSITIVE_REFINE_FOR_BROADER_CYBERGYM_VALIDATION`.
+
+## 2026-05-21 - Standalone SAGE Candidate-Feedback 20-Task CyberGym Check
+
+- Objective: respond to the observation that 8 samples are too few to observe
+  self-evolution, then test whether helper birth, repair, retention, and reuse
+  produce a stronger signal across 20 CyberGym live tasks.
+- Branch: `codex/sage-standalone-agent`.
+- Run root:
+  `outputs/cybergym_live_sage/cybergym_lift_candidate_feedback_v3_20_20260521`.
+- Dashboard:
+  `outputs/cybergym_live_sage/cybergym_lift_candidate_feedback_v3_20_20260521/dashboard/task_compare.html`.
+- Machine summary:
+  `outputs/cybergym_live_sage/cybergym_lift_candidate_feedback_v3_20_20260521/batched_live_summary.json`,
+  SHA-256 `01ea9a4ea84ac0086ea758ee6a96fe24a423aa6a6a44fef60a9a84187bf04d2d`.
+- Baseline cache: `artifacts/cybergym_live_sage/baseline_cache.json`,
+  SHA-256 `64f7a49421730d029783fcb66bb3e7f0cedd6ce74f60e86550586d37fe10945a`;
+  controls `20 cached / 0 fresh`; SAGE fresh.
+- Baseline policy: cached `gpt-4o-mini` visible-artifact LLM baseline,
+  same task IDs and candidate budget.
+- SAGE policy: empty generated-helper registry at start, deterministic generic
+  helper generation, no hidden labels, no reference PoCs, no expected answers,
+  no task-specific hard-coded constants.
+- Result: baseline `1/20`; SAGE `4/20`; absolute task-completion lift
+  `+15.0 pp`.
+- Lifecycle: tools born/accepted/reused `7 / 7 / 116`; repair
+  attempts/refined tools `4 / 4`; birth-task retries `11`; integrity issues
+  `0`.
+- Interpretation: the earlier 8-task checks were too short to judge evolution.
+  The 20-task run shows useful lift emerging late after multiple birth and repair
+  cycles. This remains experimental live `/submit-vul` evidence, not official
+  CyberGym final evidence because fix-side verification is not yet run.
+- Decision label:
+  `CYBERGYM_EVOLUTION_SIGNAL_REQUIRES_20_TASK_MINIMUM_CONTINUE_GENERAL_REPAIR`.
+
+## 2026-05-21 - Standalone SAGE Maintenance Checks After CyberGym Repair
+
+- Objective: verify that the CyberGym candidate-feedback and lifecycle changes
+  did not regress the other standalone environments.
+- MiniGrid run:
+  `outputs/sage_agent_standalone/minigrid_lift_maintenance_12_20260521`;
+  dashboard
+  `outputs/sage_agent_standalone/minigrid_lift_maintenance_12_20260521/dashboard/task_compare.html`;
+  summary SHA-256
+  `5a5c0af188ee31773e251963fbb3888fcbb7ec84d6a5fad2d043ef43c5979b95`.
+- MiniGrid result: LLM baseline `4/12`; SAGE `12/12`; tools
+  born/accepted/reused `1 / 1 / 12`; integrity passed.
+- ToolSandbox adapter smoke run:
+  `outputs/sage_agent_standalone/toolsandbox_lift_maintenance_3_20260521_smoke`;
+  dashboard
+  `outputs/sage_agent_standalone/toolsandbox_lift_maintenance_3_20260521_smoke/dashboard/task_compare.html`;
+  summary SHA-256
+  `fea45a95f1cb6c211ef2d01afbd57a969fb925393be79045e73aa60895a45841`.
+- ToolSandbox result: smoke baseline `0/2`; SAGE `2/2`; one helper born and
+  reused; birth-task retry success `1`; integrity passed. The standalone smoke
+  runner does not yet implement an LLM baseline for this mini adapter, so this is
+  lifecycle preservation evidence only.
+- Validation: Python compile passed; `pytest` standalone/protocol tests
+  `27 passed`; `ruff check` passed; `ruff format --check` passed; `git diff
+  --check` passed.
+- Decision label:
+  `CYBERGYM_REPAIR_PRESERVES_MINIGRID_AND_TOOLSANDBOX_STANDALONE_SMOKES`.

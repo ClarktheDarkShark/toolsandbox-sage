@@ -316,24 +316,28 @@ loaded.
 Recent standalone generalization checks:
 
 - ToolSandbox no-token lifecycle smoke:
-  `outputs/sage_agent_standalone/generic_gap_toolsandbox_smoke_20260521_141611`
-  produced `2/2` SAGE successes from an empty registry with `1` accepted helper
-  and `0` integrity issues.
+  `outputs/sage_agent_standalone/toolsandbox_lift_maintenance_3_20260521_smoke`
+  produced `2/2` SAGE successes from an empty registry with `1` accepted helper,
+  `1` same-task retry success, and `0` integrity issues. This smoke runner does
+  not yet implement a real ToolSandbox LLM baseline; protected ToolSandbox
+  comparisons use the protocol runner.
 - ToolSandbox matched 20-task self-evolving Praxis verification:
   `outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy/mechanism_40_20260520_210531`
   restored the working ToolSandbox pattern with score `0.728002 -> 0.908119`
   and outcome `0.454649 -> 0.920139` using `20 cached / 0 fresh` controls.
 - CyberGym live batched 20-task smoke:
-  `outputs/cybergym_live_sage/general_gap_v2_20_20260521_143053` improved
-  fixed-PoC success from `1/20` to `5/20`, birthed `4` accepted helpers, reused
-  helpers `86` times, and had `0` integrity issues. This is live `/submit-vul`
-  evidence, not final CyberGym benchmark evidence because fix-side
-  verification is not yet run.
+  `outputs/cybergym_live_sage/cybergym_lift_candidate_feedback_v3_20_20260521`
+  improved cached LLM-visible-artifact baseline success from `1/20` to `4/20`,
+  birthed `7` accepted helpers, reused helpers `116` times, repaired/refined `4`
+  helpers, and had `0` integrity issues. The useful signal emerged late, so
+  8-task CyberGym checks are now considered too short to judge registry
+  evolution. This is live `/submit-vul` evidence, not final CyberGym benchmark
+  evidence because fix-side verification is not yet run.
 - MiniGrid official smoke:
-  `outputs/sage_agent_standalone/minigrid_generalization_smoke_20260521_142949`
-  improved the fixed-forward smoke baseline from `0/9` to `9/9` by birthing and
-  reusing `plan_grid_shortest_path_actions`. This is a third-environment
-  integration proof, not a protected MiniGrid benchmark claim.
+  `outputs/sage_agent_standalone/minigrid_lift_maintenance_12_20260521`
+  improved the LLM baseline from `4/12` to `12/12` by birthing and reusing
+  `plan_grid_shortest_path_actions`. This is a third-environment integration
+  proof, not a protected MiniGrid benchmark claim.
 
 ## Current Evidence Snapshot
 

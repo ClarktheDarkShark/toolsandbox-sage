@@ -293,6 +293,9 @@ def _visible_text_candidate_planner(
         "trigger:",
         "poc:",
         "candidate:",
+        "candidate_text:",
+        "successful_candidate:",
+        "crashing_candidate:",
     )
     deferred = []
     for raw_line in text.splitlines():
@@ -300,16 +303,21 @@ def _visible_text_candidate_planner(
         if not line:
             continue
         line_lower = line.lower()
+        if line_lower.startswith("file:"):
+            continue
         for marker in cue_markers:
             pos = line_lower.find(marker)
             if pos >= 0 and "provided as input to the vulnerable program" not in line_lower:
                 value = line[pos + len(marker):].strip(" :-,;\\t")
                 if 0 < len(value) <= 240:
                     candidates.append(value)
-        if ":" in line and line_lower.split(":", 1)[0] in ("literal", "symbol", "source_line", "example", "input"):
+        if ":" in line and line_lower.split(":", 1)[0] in ("literal", "symbol", "source_line", "dict", "example", "input"):
             value = line.split(":", 1)[1].strip(" :-,;\\t")
             if 0 < len(value) <= 240:
                 deferred.append(value)
+        if line_lower.startswith("source_line:"):
+            line = line.split(":", 1)[1].strip()
+            line_lower = line.lower()
         if len(line) <= 180 and any(ch in line for ch in "()[]{{}}<>/\\\\_=:+-.0123456789") and "provided as input to the vulnerable program" not in line_lower:
             deferred.append(line)
     seed_pool = [
@@ -413,11 +421,16 @@ def _artifact_literal_candidate_planner(
         if not line:
             continue
         lower = line.lower()
+        if lower.startswith("file:"):
+            continue
         for prefix in prefixes:
             if lower.startswith(prefix):
                 value = line[len(prefix):].strip(" :-,;\\t")
                 if 0 < len(value) <= 240:
                     candidates.append(value)
+        if lower.startswith("source_line:"):
+            line = line.split(":", 1)[1].strip()
+            lower = line.lower()
         if "==" in line or "strcmp" in lower or "memcmp" in lower:
             for quote in ("\\"", "'"):
                 start = 0
@@ -434,6 +447,11 @@ def _artifact_literal_candidate_planner(
                     start = right + 1
         if len(line) <= 160 and any(ch in line for ch in "()[]{{}}<>/\\\\_=:+-.0123456789"):
             candidates.append(line)
+    literal_bases = [str(item) for item in candidates[:16] if 0 < len(str(item)) <= 80]
+    for value in literal_bases:
+        candidates.append(value + "\\n")
+        candidates.append(value + "\\x00")
+        candidates.append(value + value)
     candidates.extend(["MAGIC", "magic", "AAAA", "\\x00\\x01\\x02\\x03", "A" * 32])
     unique = []
     seen = set()
@@ -588,18 +606,26 @@ def _adaptive_candidate_portfolio_planner(
         "trigger:",
         "poc:",
         "candidate:",
+        "candidate_text:",
+        "successful_candidate:",
+        "crashing_candidate:",
     )
     for raw_line in text.splitlines():
         line = raw_line.strip(" \\t\\r\\n-*")
         if not line:
             continue
         line_lower = line.lower()
+        if line_lower.startswith("file:"):
+            continue
         for prefix in explicit_prefixes:
             pos = line_lower.find(prefix)
             if pos >= 0 and "provided as input to the vulnerable program" not in line_lower:
                 value = line[pos + len(prefix):].strip(" :-,;\\t")
                 if value:
                     candidates.append(str(value))
+        if line_lower.startswith("source_line:"):
+            line = line.split(":", 1)[1].strip()
+            line_lower = line.lower()
         if "==" in line or "strcmp" in line_lower or "memcmp" in line_lower:
             for quote in ("\\"", "'"):
                 start = 0

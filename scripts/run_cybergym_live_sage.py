@@ -16,12 +16,15 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from sage_agent import SAGEAgent, SAGEConfig  # noqa: E402
+from sage_agent import SAGEAgent, SAGEConfig, SAGERunSummary  # noqa: E402
 from sage_agent.adapters import (  # noqa: E402
     CyberGymLiveSubmitAdapter,
     CyberGymLiveTask,
 )
-from sage_agent.dashboard import write_standalone_dashboard  # noqa: E402
+from sage_agent.dashboard import (  # noqa: E402
+    open_standalone_dashboard,
+    write_standalone_dashboard,
+)
 from sage_agent.generators import TemplateHelperGenerator  # noqa: E402
 from sage_agent.interfaces import EnvironmentAdapter, TaskRunResult  # noqa: E402
 
@@ -60,6 +63,8 @@ def main() -> None:
     parser.add_argument("--model", default="gpt-4o-mini")
     parser.add_argument("--reset-registry", action="store_true")
     parser.add_argument("--max-candidates", type=int, default=6)
+    parser.add_argument("--dashboard-port", type=int, default=62630)
+    parser.add_argument("--no-dashboard-open", action="store_true")
     parser.add_argument(
         "--ignore-missing-images",
         action="store_true",
@@ -74,6 +79,45 @@ def main() -> None:
         raise SystemExit("Live smoke is capped to gpt-4o-mini.")
     if args.reset_registry and args.registry_dir.exists():
         shutil.rmtree(args.registry_dir)
+
+    run_id = args.run_id or _default_run_id()
+    run_dir = args.output_root / run_id
+    run_metadata = {
+        "execution_mode": "cybergym_live_level1_submit_vul",
+        "benchmark_ready": False,
+        "requested_limit": len(OFFICIAL_10),
+        "available_tasks": 0,
+        "limit_satisfied": False,
+        "real_task_generator_used": True,
+        "real_submission_server_used": True,
+        "real_poc_verifier_used": True,
+        "official_success_verification": False,
+        "status": "running",
+        "interpretation": (
+            "Real CyberGym submit.sh smoke using generated Level 1 task dirs and "
+            "the live local /submit-vul server. It is not a final CyberGym claim "
+            "because fix-side re-verification was not run."
+        ),
+        "setup_notes": (
+            "Dashboard is opened at run start; results populate as the run finishes.",
+        ),
+    }
+    initial_dashboard = write_standalone_dashboard(
+        _empty_summary("cybergym-live", args.model, args.registry_dir),
+        run_dir,
+        registry_path=args.registry_dir / "sage_registry.json",
+        baseline={
+            "policy": "fixed_four_byte_poc_pending",
+            "tasks_seen": 0,
+            "tasks_succeeded": 0,
+            "success_rate": 0.0,
+            "results": [],
+        },
+        run_metadata=run_metadata,
+    )
+    if not args.no_dashboard_open:
+        url = open_standalone_dashboard(initial_dashboard, port=args.dashboard_port)
+        print(f"Dashboard opened at run start: {url}", flush=True)
 
     runnable, skipped = _discover_runnable_tasks(
         args.tasks_root, ignore_missing_images=args.ignore_missing_images
@@ -90,8 +134,6 @@ def main() -> None:
         config=SAGEConfig(model=args.model, registry_dir=args.registry_dir),
     )
     summary = agent.run()
-    run_id = args.run_id or _default_run_id()
-    run_dir = args.output_root / run_id
     run_metadata = {
         "execution_mode": "cybergym_live_level1_submit_vul",
         "benchmark_ready": False,
@@ -102,6 +144,7 @@ def main() -> None:
         "real_submission_server_used": True,
         "real_poc_verifier_used": True,
         "official_success_verification": False,
+        "status": "complete",
         "interpretation": (
             "Real CyberGym submit.sh smoke using generated Level 1 task dirs and "
             "the live local /submit-vul server. It is not a final CyberGym claim "
@@ -212,6 +255,27 @@ def _baseline_result_json(result: TaskRunResult) -> dict[str, object]:
 def _default_run_id() -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     return f"official10_level1_live_{stamp}"
+
+
+def _empty_summary(environment: str, model: str, registry_dir: Path) -> SAGERunSummary:
+    return SAGERunSummary(
+        environment=environment,
+        tasks_seen=0,
+        tasks_succeeded=0,
+        gaps_observed=0,
+        tools_born=0,
+        tools_accepted=0,
+        tools_rejected=0,
+        tools_reused=0,
+        repair_attempts=0,
+        tools_refined=0,
+        birth_task_retries=0,
+        birth_task_retry_successes=0,
+        model=model,
+        registry_path=str(registry_dir / "sage_registry.json"),
+        integrity_passed=True,
+        integrity_issues=0,
+    )
 
 
 if __name__ == "__main__":

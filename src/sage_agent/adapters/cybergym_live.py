@@ -94,11 +94,13 @@ class CyberGymLiveSubmitAdapter:
             "execution_feedback_candidate_mutation_planner",
             "structured_input_candidate_planner",
         }
-        return tuple(
-            name
+        eligible = [
+            (name, record)
             for name, record in helpers.items()
             if record.candidate.spec.family in candidate_families and not record.retired
-        )[:4]
+        ]
+        eligible.sort(key=_candidate_helper_route_key)
+        return tuple(name for name, _ in eligible[:4])
 
     def run_task(
         self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
@@ -185,6 +187,9 @@ class CyberGymLiveSubmitAdapter:
                 candidate,
                 timeout_seconds=self.submit_timeout_seconds,
             )
+            preview = _candidate_text_preview(candidate)
+            if preview:
+                result["candidate_text_preview"] = preview
             attempts.append(result)
             exit_code = int(result.get("exit_code", 0)) if result.get("ok") else 0
             if result.get("ok") and exit_code not in (0, 300):
@@ -407,6 +412,17 @@ def _load_helper(record: HelperRecord) -> Callable[..., Any]:
     return cast(Callable[..., Any], namespace[record.candidate.spec.name])
 
 
+def _candidate_helper_route_key(
+    item: tuple[str, HelperRecord],
+) -> tuple[int, float, str]:
+    """Prefer untested helpers, then helpers with stronger natural evidence."""
+
+    name, record = item
+    success_rate = record.successes / record.uses if record.uses else 0.0
+    has_been_tested = 1 if record.uses else 0
+    return (has_been_tested, -success_rate, name)
+
+
 def _call_planner(
     planner: Callable[..., Any],
     *,
@@ -484,12 +500,15 @@ def _visible_artifact_summary(task_dir: Path) -> str:
                 if extracted is None:
                     continue
                 text = extracted.read(160_000).decode("utf-8", errors="ignore")
+                if member.name.lower().endswith(".dict"):
+                    for value in _dictionary_entries(text):
+                        lines.append(f"dict: {value}")
+                        literal_count += 1
+                        if literal_count >= 80:
+                            break
                 for value in re.findall(r'"([^"\n\r]{1,96})"', text):
                     cleaned = value.strip()
-                    if cleaned and any(
-                        ch in cleaned
-                        for ch in "()[]{}<>/\\_=:+-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                    ):
+                    if cleaned and _literal_has_signal(cleaned):
                         lines.append(f"literal: {cleaned}")
                         literal_count += 1
                         if literal_count >= 80:
@@ -531,6 +550,28 @@ def _looks_text_source(name: str) -> bool:
         ".patch",
     )
     return lowered.endswith(suffixes)
+
+
+def _dictionary_entries(text: str) -> list[str]:
+    """Return visible fuzz-dictionary entries from a source archive member."""
+
+    entries: list[str] = []
+    for raw_line in text.splitlines()[:500]:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" in line:
+            line = line.split("=", 1)[1].strip()
+        line = line.strip('"').strip("'")
+        if 0 < len(line) <= 160:
+            entries.append(line)
+    return entries
+
+
+def _literal_has_signal(value: str) -> bool:
+    if len(value) >= 4 and any(ch.isalpha() for ch in value):
+        return True
+    return any(ch in value for ch in "()[]{}<>/\\_=:+-.0123456789")
 
 
 def _artifact_member_priority(member: tarfile.TarInfo) -> tuple[int, int, int, str]:
@@ -639,7 +680,27 @@ def _respect_submit_rate_limit(
 def _attempt_summary(attempt: Mapping[str, Any]) -> str:
     if not attempt.get("ok"):
         return f"candidate {attempt.get('candidate_index')}: submit failed"
-    return (
+    summary = (
         f"candidate {attempt.get('candidate_index')}: "
         f"exit_code={attempt.get('exit_code')} len={attempt.get('poc_length')}"
     )
+    preview = str(attempt.get("candidate_text_preview", ""))
+    if preview:
+        summary += f"\ncandidate_text: {preview}"
+        try:
+            exit_code = int(attempt.get("exit_code", 0))
+        except (TypeError, ValueError):
+            exit_code = 0
+        if exit_code not in (0, 300):
+            summary += f"\ncrashing_candidate: {preview}"
+    return summary
+
+
+def _candidate_text_preview(candidate: str) -> str:
+    """Return printable generated candidate text for feedback memory."""
+
+    if not candidate or len(candidate) > 200:
+        return ""
+    if all(ch in "\n\r\t" or 32 <= ord(ch) <= 126 for ch in candidate):
+        return candidate.replace("\r", "\\r").replace("\n", "\\n")
+    return ""

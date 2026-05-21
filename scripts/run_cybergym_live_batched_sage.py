@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import socket
@@ -52,6 +53,11 @@ def main() -> None:
     parser.add_argument("--no-start-server", action="store_false", dest="start_server")
     parser.add_argument("--max-candidates", type=int, default=12)
     parser.add_argument("--baseline-max-candidates", type=int, default=12)
+    parser.add_argument("--max-new-tools", type=int, default=8)
+    parser.add_argument("--max-refinements", type=int, default=4)
+    parser.add_argument("--min-uses-before-lifecycle-action", type=int, default=4)
+    parser.add_argument("--weak-helper-success-rate", type=float, default=0.25)
+    parser.add_argument("--failed-repair-limit-before-parking", type=int, default=2)
     parser.add_argument("--model", default="gpt-4o-mini")
     parser.add_argument("--llm-timeout", type=float, default=180.0)
     parser.add_argument("--submit-timeout", type=float, default=300.0)
@@ -60,6 +66,20 @@ def main() -> None:
         choices=("llm", "fixed"),
         default="llm",
         help="Baseline policy. llm uses gpt-4o-mini over visible task artifacts.",
+    )
+    parser.add_argument(
+        "--baseline-cache",
+        choices=("off", "use-if-eligible"),
+        default="use-if-eligible",
+        help=(
+            "Reuse cached baseline task results when the task, visible artifacts, "
+            "model, and baseline candidate budget match."
+        ),
+    )
+    parser.add_argument(
+        "--baseline-cache-path",
+        type=Path,
+        default=Path("artifacts/cybergym_live_sage/baseline_cache.json"),
     )
     parser.add_argument(
         "--generator",
@@ -163,6 +183,15 @@ def _run_metadata(
         "official_success_verification": False,
         "llm_timeout_seconds": args.llm_timeout,
         "submit_timeout_seconds": args.submit_timeout,
+        "baseline_cache_policy": args.baseline_cache,
+        "baseline_cache_path": str(args.baseline_cache_path),
+        "sage_lifecycle_policy": {
+            "max_new_tools": args.max_new_tools,
+            "max_refinements": args.max_refinements,
+            "min_uses_before_lifecycle_action": args.min_uses_before_lifecycle_action,
+            "weak_helper_success_rate": args.weak_helper_success_rate,
+            "failed_repair_limit_before_parking": args.failed_repair_limit_before_parking,
+        },
         "interpretation": (
             "Real CyberGym submit.sh smoke using generated Level 1 task dirs in "
             "bounded batches. This confirms environment wiring and SAGE lifecycle "
@@ -241,11 +270,9 @@ def _run_batches(
 ) -> tuple[SAGERunSummary, dict[str, Any], list[dict[str, Any]]]:
     events: list[dict[str, Any]] = []
     baseline_results: list[dict[str, Any]] = []
-    baseline_planner = (
-        OpenAIEnvironmentBaseline(model=args.model, timeout=args.llm_timeout)
-        if args.baseline == "llm"
-        else None
-    )
+    baseline_cache = _load_baseline_cache(args.baseline_cache_path)
+    baseline_cache_stats = {"cached": 0, "fresh": 0}
+    baseline_planner: OpenAIEnvironmentBaseline | None = None
     totals = {
         "tasks_seen": 0,
         "tasks_succeeded": 0,
@@ -294,7 +321,15 @@ def _run_batches(
                 max_candidates=args.max_candidates,
                 submit_timeout_seconds=args.submit_timeout,
             )
-            baseline = _run_baseline(adapter, args=args, planner=baseline_planner)
+            baseline = _run_baseline(
+                adapter,
+                args=args,
+                planner=baseline_planner,
+                baseline_cache=baseline_cache,
+                baseline_cache_stats=baseline_cache_stats,
+            )
+            if args.baseline_cache != "off":
+                _save_baseline_cache(args.baseline_cache_path, baseline_cache)
             baseline_results.extend(baseline["results"])
             agent = SAGEAgent(
                 adapter=adapter,
@@ -302,8 +337,15 @@ def _run_batches(
                 config=SAGEConfig(
                     model=args.model,
                     registry_dir=args.registry_dir,
-                    max_new_tools=6,
-                    max_refinements=2,
+                    max_new_tools=args.max_new_tools,
+                    max_refinements=args.max_refinements,
+                    min_uses_before_lifecycle_action=(
+                        args.min_uses_before_lifecycle_action
+                    ),
+                    weak_helper_success_rate=args.weak_helper_success_rate,
+                    failed_repair_limit_before_parking=(
+                        args.failed_repair_limit_before_parking
+                    ),
                 ),
             )
             batch_summary = agent.run()
@@ -326,6 +368,8 @@ def _run_batches(
                     "sage_successes": batch_summary.tasks_succeeded,
                     "tools_born": batch_summary.tools_born,
                     "tools_reused": batch_summary.tools_reused,
+                    "baseline_cached": baseline_cache_stats["cached"],
+                    "baseline_fresh": baseline_cache_stats["fresh"],
                 }
             )
             _write_partial_dashboard(
@@ -433,6 +477,18 @@ def _baseline_from_results(
         "success_rate": baseline_successes / len(baseline_results)
         if baseline_results
         else 0.0,
+        "cache_policy": args.baseline_cache,
+        "cache_path": str(args.baseline_cache_path),
+        "cached_count": sum(
+            1
+            for result in baseline_results
+            if result.get("control_cache_source") == "cached"
+        ),
+        "fresh_count": sum(
+            1
+            for result in baseline_results
+            if result.get("control_cache_source") == "fresh"
+        ),
         "results": baseline_results,
     }
 
@@ -469,14 +525,19 @@ def _run_baseline(
     *,
     args: argparse.Namespace,
     planner: OpenAIEnvironmentBaseline | None,
+    baseline_cache: dict[str, Any],
+    baseline_cache_stats: dict[str, int],
 ) -> dict[str, Any]:
     if args.baseline == "llm":
-        if planner is None:
-            raise RuntimeError("LLM baseline planner was not initialized")
         return _run_llm_baseline(
             adapter,
             planner=planner,
+            model=args.model,
+            timeout=args.llm_timeout,
             max_candidates=args.baseline_max_candidates,
+            cache_policy=args.baseline_cache,
+            baseline_cache=baseline_cache,
+            baseline_cache_stats=baseline_cache_stats,
         )
     return _run_no_helper_baseline(adapter)
 
@@ -484,13 +545,47 @@ def _run_baseline(
 def _run_llm_baseline(
     adapter: CyberGymLiveSubmitAdapter,
     *,
-    planner: OpenAIEnvironmentBaseline,
+    planner: OpenAIEnvironmentBaseline | None,
+    model: str,
+    timeout: float,
     max_candidates: int,
+    cache_policy: str,
+    baseline_cache: dict[str, Any],
+    baseline_cache_stats: dict[str, int],
 ) -> dict[str, Any]:
     adapter.prepare()
     results: list[dict[str, Any]] = []
     for task in adapter.tasks():
+        cache_key = _baseline_cache_key(
+            task, model=model, max_candidates=max_candidates
+        )
+        legacy_cache_key = _baseline_legacy_cache_key(
+            task, model=model, max_candidates=max_candidates
+        )
+        cache_hit_key = (
+            cache_key
+            if cache_key in baseline_cache
+            else legacy_cache_key
+            if legacy_cache_key in baseline_cache
+            else ""
+        )
+        if cache_policy == "use-if-eligible" and cache_hit_key:
+            cached = dict(baseline_cache[cache_hit_key])
+            cached["control_cache_source"] = "cached"
+            cached["control_cache_key"] = cache_key
+            cached["control_cache_match"] = (
+                "visible_artifact_hash"
+                if cache_hit_key == cache_key
+                else "task_id_model_budget"
+            )
+            results.append(cached)
+            baseline_cache_stats["cached"] += 1
+            if cache_hit_key != cache_key:
+                baseline_cache[cache_key] = cached
+            continue
         try:
+            if planner is None:
+                planner = OpenAIEnvironmentBaseline(model=model, timeout=timeout)
             candidates = planner.plan_candidate_inputs(
                 task,
                 max_candidates=max_candidates,
@@ -514,15 +609,83 @@ def _run_llm_baseline(
                 transcript=(f"LLM baseline failed: {type(exc).__name__}: {exc}",),
                 error=str(exc),
             )
-        results.append(_baseline_result_json(result))
+        result_json = _baseline_result_json(result)
+        result_json["control_cache_source"] = "fresh"
+        result_json["control_cache_key"] = cache_key
+        results.append(result_json)
+        baseline_cache[cache_key] = result_json
+        baseline_cache_stats["fresh"] += 1
     successes = sum(1 for result in results if result["success"])
     return {
-        "policy": f"llm_visible_artifact_baseline:{planner.model}",
+        "policy": f"llm_visible_artifact_baseline:{model}",
         "tasks_seen": len(results),
         "tasks_succeeded": successes,
         "success_rate": successes / len(results) if results else 0.0,
+        "cache_policy": cache_policy,
+        "cached_count": sum(
+            1 for result in results if result.get("control_cache_source") == "cached"
+        ),
+        "fresh_count": sum(
+            1 for result in results if result.get("control_cache_source") == "fresh"
+        ),
         "results": results,
     }
+
+
+def _load_baseline_cache(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    records = payload.get("records", payload)
+    if not isinstance(records, dict):
+        return {}
+    return {
+        str(key): value for key, value in records.items() if isinstance(value, dict)
+    }
+
+
+def _save_baseline_cache(path: Path, records: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "policy": "cybergym_visible_llm_baseline_task_cache",
+        "records": records,
+    }
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def _baseline_cache_key(task: Any, *, model: str, max_candidates: int) -> str:
+    visible_payload = {
+        "policy_version": "cybergym-visible-llm-baseline-v1",
+        "task_id": task.task_id,
+        "task_name": task.name,
+        "prompt": task.prompt,
+        "artifacts": task.artifacts,
+        "model": model,
+        "max_candidates": max_candidates,
+    }
+    raw = json.dumps(visible_payload, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _baseline_legacy_cache_key(task: Any, *, model: str, max_candidates: int) -> str:
+    raw = json.dumps(
+        {
+            "policy_version": "cybergym-visible-llm-baseline-v1-legacy-task-key",
+            "task_id": task.task_id,
+            "model": model,
+            "max_candidates": max_candidates,
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _download_visible_assets(
