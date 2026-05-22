@@ -31,6 +31,30 @@ as a lifecycle signal:
 This policy is based on observed helper performance and repair outcomes, not on
 scenario IDs, labels, hidden answers, or benchmark-specific facts.
 
+## CyberGym-Driven Generalization Update
+
+CyberGym continues to be used as the hard test case because it combines visible
+source artifacts, expensive submit-side execution, sparse successes, and many
+failed candidate strings. The latest repair keeps that pressure but moves the
+implementation into environment-neutral SAGE mechanisms:
+
+- adaptive candidate-portfolio helpers synthesize visible literals,
+  source-boundary values, structured-format cues, execution feedback, and
+  generic parser/numeric/binary seeds;
+- gated format-edge helpers are born only after multiple generic candidate
+  planners already exist and a recurring visible format cue appears;
+- same-task gap processing stops after a born or refined helper succeeds on the
+  task that exposed the gap;
+- existing helpers are refined only after enough natural-use evidence shows weak
+  value;
+- each task has a small helper-birth budget so one expensive environment task
+  cannot consume the whole generation budget.
+
+These changes do not reference CyberGym task IDs, hidden PoCs, labels, expected
+answers, or CyberGym-only benchmark facts. They are controller, generator, and
+adapter-interface policies that future source-artifact or candidate-submission
+environments can reuse.
+
 ## Live Checks
 
 | Run | Environment | Requested | Baseline | SAGE | Result |
@@ -46,6 +70,9 @@ scenario IDs, labels, hidden answers, or benchmark-specific facts.
 | `final_agent_cybergym_live40_20260521` | CyberGym live | 40 | 1/40 cached LLM baseline | 4/40 | live portability lift; low absolute success remains future-work target |
 | `minigrid_live40_20260521` | MiniGrid | 40 | 21/40 LLM baseline | 40/40 | maintained strong third-environment performance |
 | `bbh_live40_20260521` | BIG-Bench Hard | 40 | 16/40 LLM exact-answer baseline | 40/40 | fourth benchmark; reusable symbolic exact-answer helper generalized across four public task families |
+| `budgeted_lifecycle_tty4_20260521` | CyberGym live fixed-side | 4 | 0/4 cached LLM baseline | 1/4 | latest general lifecycle repair preserved success while reducing helper churn |
+| `budgeted_lifecycle_minigrid12_20260521` | MiniGrid | 12 | 0/12 adapter smoke | 12/12 | latest lifecycle repair preserved grid helper success |
+| `budgeted_lifecycle_bbh12_20260521` | BIG-Bench Hard | 12 | 0/12 adapter smoke | 12/12 | latest lifecycle repair preserved symbolic helper success |
 
 The completed CyberGym 40 run is the live stress case that exposed the lifecycle
 issue. The 4-task post-patch run is the bounded verification that the generic
@@ -83,6 +110,10 @@ Additional hashes:
   `fea45a95f1cb6c211ef2d01afbd57a969fb925393be79045e73aa60895a45841`.
 - Four-environment live40 summary SHA-256:
   `5987f4c09d845ac34c9c89e9acb8139cc5e116a0d2774ab0b978fc526065a2b2`.
+- Budgeted lifecycle generalization audit SHA-256:
+  `2ee196755eb2747e36da232ed4a0ecf3c67acbf9c1651a1b2d64aab3f43fa086`.
+- Latest fixed-side CyberGym budgeted lifecycle summary SHA-256:
+  `f3916ebee4c640b3f682d4d74bae28055ca6cbf8adb0d7caf76ddaa303d8a3b6`.
 
 ## Dashboard Paths
 
@@ -97,6 +128,9 @@ Additional hashes:
 - CyberGym live40: `outputs/cybergym_live_sage/final_agent_cybergym_live40_20260521/dashboard/task_compare.html`
 - MiniGrid live40: `outputs/sage_agent_standalone/minigrid_live40_20260521/dashboard/task_compare.html`
 - BIG-Bench Hard live40: `outputs/sage_agent_standalone/bbh_live40_20260521/dashboard/task_compare.html`
+- Latest CyberGym lifecycle repair: `outputs/cybergym_live_sage/budgeted_lifecycle_tty4_20260521/dashboard/task_compare.html`
+- Latest MiniGrid maintenance: `outputs/sage_agent_standalone/budgeted_lifecycle_minigrid12_20260521/dashboard/task_compare.html`
+- Latest BIG-Bench Hard maintenance: `outputs/sage_agent_standalone/budgeted_lifecycle_bbh12_20260521/dashboard/task_compare.html`
 
 ## Caveats
 
@@ -118,10 +152,13 @@ longer sufficient.
 
 ## Validation
 
-Validation run after the change:
+Validation run after the lifecycle and candidate-portfolio changes:
 
 - Python compile checks for standalone SAGE modules and live-run scripts.
-- Ruff check and format check.
-- Unit tests: `28 passed`.
+- Ruff check.
+- Unit tests: `21 passed`.
 - `git diff --check`.
-- Standalone run audit passed for MiniGrid and CyberGym live checks.
+- Standalone run audit passed for CyberGym live, MiniGrid, and BIG-Bench Hard
+  checks. The audit remains strict for CyberGym live comparisons and now
+  classifies non-CyberGym adapter smoke baselines as non-claim lifecycle checks
+  instead of treating them as CyberGym-style LLM baselines.

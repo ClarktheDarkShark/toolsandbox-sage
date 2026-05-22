@@ -64,6 +64,8 @@ class CyberGymLiveSubmitAdapter:
                 "source_boundary_candidate_planner",
                 "execution_feedback_candidate_mutation_planner",
                 "structured_input_candidate_planner",
+                "adaptive_candidate_portfolio_planner",
+                "format_edge_candidate_planner",
             ),
             safety_rules=(
                 "helpers must not submit PoCs",
@@ -98,6 +100,8 @@ class CyberGymLiveSubmitAdapter:
             "source_boundary_candidate_planner",
             "execution_feedback_candidate_mutation_planner",
             "structured_input_candidate_planner",
+            "adaptive_candidate_portfolio_planner",
+            "format_edge_candidate_planner",
         }
         eligible = [
             (name, record)
@@ -105,7 +109,7 @@ class CyberGymLiveSubmitAdapter:
             if record.candidate.spec.family in candidate_families and not record.retired
         ]
         eligible.sort(key=_candidate_helper_route_key)
-        return tuple(name for name, _ in eligible[:4])
+        return tuple(name for name, _ in eligible[:5])
 
     def run_task(
         self, task: TaskSpec, helpers: Mapping[str, HelperRecord]
@@ -117,26 +121,51 @@ class CyberGymLiveSubmitAdapter:
         candidates = ["\x00\x01\x02\x03"]
         tool_uses: list[ToolUseRecord] = []
         if helpers:
-            candidate_batches: list[list[str]] = []
+            primary_batches: list[list[str]] = []
+            secondary_batches: list[list[str]] = []
             per_helper_limit = max(3, self.max_candidates // max(len(helpers), 1))
-            for name, record in helpers.items():
+            helper_items = sorted(
+                helpers.items(),
+                key=lambda item: (
+                    0
+                    if item[1].candidate.spec.family == "format_edge_candidate_planner"
+                    else 1
+                    if item[1].candidate.spec.family
+                    == "adaptive_candidate_portfolio_planner"
+                    else 2,
+                    item[0],
+                ),
+            )
+            for name, record in helper_items:
                 validation = validate_helper_candidate(record.candidate)
                 if validation.accepted:
                     planner = _load_helper(record)
+                    is_adaptive_portfolio = record.candidate.spec.family in {
+                        "adaptive_candidate_portfolio_planner",
+                        "format_edge_candidate_planner",
+                    }
+                    candidate_limit = (
+                        self.max_candidates
+                        if is_adaptive_portfolio
+                        else per_helper_limit
+                    )
                     planned = _call_planner(
                         planner,
                         description=str(description),
                         readme=str(readme),
                         feedback=feedback,
                         artifact_summary=str(artifact_summary),
-                        max_candidates=per_helper_limit,
+                        max_candidates=candidate_limit,
                     )
                     planned_candidates = [
                         str(item)
                         for item in planned.get("candidates", [])
                         if isinstance(item, str)
-                    ][:per_helper_limit]
-                    candidate_batches.append(planned_candidates)
+                    ][:candidate_limit]
+                    if is_adaptive_portfolio:
+                        primary_batches.append(planned_candidates)
+                    else:
+                        secondary_batches.append(planned_candidates)
                     tool_uses.append(
                         ToolUseRecord(
                             tool_name=name,
@@ -156,9 +185,23 @@ class CyberGymLiveSubmitAdapter:
                     tool_uses.append(
                         ToolUseRecord(name, generated_helper=True, success=False)
                     )
-            candidates = _merge_candidate_batches(
-                candidate_batches, limit=self.max_candidates
-            )
+            if primary_batches:
+                candidates = _merge_candidate_batches(
+                    primary_batches, limit=self.max_candidates
+                )
+                if len(candidates) < self.max_candidates:
+                    candidates = _append_unique_candidates(
+                        candidates,
+                        _merge_candidate_batches(
+                            secondary_batches,
+                            limit=self.max_candidates - len(candidates),
+                        ),
+                        limit=self.max_candidates,
+                    )
+            else:
+                candidates = _merge_candidate_batches(
+                    secondary_batches, limit=self.max_candidates
+                )
             if not candidates:
                 candidates = ["\x00\x01\x02\x03"]
         return self.run_candidate_strings(
@@ -356,6 +399,47 @@ class CyberGymLiveSubmitAdapter:
                     },
                 ),
             )
+        if template == "adaptive_candidate_portfolio_planner":
+            return (
+                ValidationCase(
+                    name="adaptive_candidate_portfolio",
+                    inputs={
+                        "description": "The parser reads XML input and has length checks.",
+                        "readme": "Submit candidate input strings only.",
+                        "feedback": "candidate 0: exit_code=0 len=4",
+                        "artifact_summary": (
+                            "literal: MAGIC_HEADER\n"
+                            "dict: \\\\A\n"
+                            "source_line: if (size == 4294967295) crash();\n"
+                            'source_line: if (!strcmp(token, "OPEN")) abort();'
+                        ),
+                        "max_candidates": 8,
+                    },
+                    expected={
+                        "candidate_count": 8,
+                        "first_candidate": "MAGIC_HEADER",
+                        "abstain": False,
+                    },
+                ),
+            )
+        if template == "format_edge_candidate_planner":
+            kind = str(gap.generation_directives.get("format_kind", "generic"))
+            return (
+                ValidationCase(
+                    name=f"{kind}_format_edges",
+                    inputs={
+                        "description": "The visible parser accepts regex input.",
+                        "readme": "Submit candidate input strings only.",
+                        "feedback": "candidate 0: exit_code=0 len=4",
+                        "artifact_summary": "dict: \\\\A\nliteral: MAGIC_HEADER",
+                        "max_candidates": 6,
+                    },
+                    expected={
+                        "candidate_count": 6,
+                        "abstain": False,
+                    },
+                ),
+            )
         return (
             ValidationCase(
                 name="visible_example_input",
@@ -445,13 +529,20 @@ def _load_helper(record: HelperRecord) -> Callable[..., Any]:
 
 def _candidate_helper_route_key(
     item: tuple[str, HelperRecord],
-) -> tuple[int, float, str]:
+) -> tuple[int, int, float, str]:
     """Prefer untested helpers, then helpers with stronger natural evidence."""
 
     name, record = item
     success_rate = record.successes / record.uses if record.uses else 0.0
     has_been_tested = 1 if record.uses else 0
-    return (has_been_tested, -success_rate, name)
+    portfolio_priority = (
+        0
+        if record.candidate.spec.family == "format_edge_candidate_planner"
+        else 1
+        if record.candidate.spec.family == "adaptive_candidate_portfolio_planner"
+        else 2
+    )
+    return (portfolio_priority, has_been_tested, -success_rate, name)
 
 
 def _call_planner(
@@ -501,6 +592,21 @@ def _merge_candidate_batches(
             unique.append(candidate)
             if len(unique) >= limit:
                 return unique
+    return unique
+
+
+def _append_unique_candidates(
+    primary: list[str], secondary: list[str], *, limit: int
+) -> list[str]:
+    unique = list(primary)
+    seen = set(unique)
+    for candidate in secondary:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+        if len(unique) >= limit:
+            break
     return unique
 
 
@@ -608,14 +714,12 @@ def _literal_has_signal(value: str) -> bool:
 def _artifact_member_priority(member: tarfile.TarInfo) -> tuple[int, int, int, str]:
     lowered = member.name.lower()
     basename = Path(lowered).name
-    preferred = (
-        "fuzz" in basename
-        or basename.endswith((".dict", ".options"))
-        or basename in {"readme", "readme.md"}
-    )
+    dictionary_or_options = basename.endswith((".dict", ".options"))
+    fuzz_driver = "fuzz" in basename
+    readme = basename in {"readme", "readme.md"}
     generated_patch = lowered.endswith((".diff", ".patch"))
     return (
-        0 if preferred else 1,
+        0 if dictionary_or_options else 1 if fuzz_driver else 2 if readme else 3,
         1 if generated_patch else 0,
         lowered.count("/"),
         lowered,

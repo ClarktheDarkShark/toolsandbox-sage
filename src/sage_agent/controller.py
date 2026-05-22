@@ -40,12 +40,14 @@ class SAGEConfig:
 
     model: str = "gpt-4o-mini"
     max_new_tools: int = 4
+    max_new_tools_per_task: int = 2
     min_gap_severity: float = 0.2
     registry_dir: Path = Path(".sage_agent_registry")
     stop_after_first_birth: bool = False
     repair_attempts: int = 1
     max_refinements: int = 2
     retry_birth_task_with_new_tool: bool = True
+    stop_task_gap_processing_after_successful_retry: bool = True
     min_uses_before_lifecycle_action: int = 6
     weak_helper_success_rate: float = 0.25
     failed_repair_limit_before_parking: int = 2
@@ -152,6 +154,8 @@ class SAGEAgent:
                 helper_bundle=helper_bundle,
             )
             stop_after_this_task = False
+            stop_gap_processing_for_task = False
+            tools_born_this_task = 0
             for gap in gap_candidates:
                 gap_integrity = check_gap_signal(gap, self.config.integrity_policy)
                 integrity_report = merge_reports(integrity_report, gap_integrity)
@@ -166,7 +170,17 @@ class SAGEAgent:
                 )
                 if active_gap_already_has_helper:
                     parked_existing_tool = False
-                    if tools_refined < self.config.max_refinements:
+                    existing_for_gap = _find_existing_helper_for_gap(records, gap)
+                    can_refine_existing = (
+                        existing_for_gap is not None
+                        and _should_refine_existing_helper(
+                            existing_for_gap[1], config=self.config
+                        )
+                    )
+                    if (
+                        tools_refined < self.config.max_refinements
+                        and can_refine_existing
+                    ):
                         refinement = _refine_existing_helper(
                             generator=self.generator,
                             registry=self.registry,
@@ -212,6 +226,11 @@ class SAGEAgent:
                                 if retry_result.success and not task_counted_success:
                                     tasks_succeeded += 1
                                     task_counted_success = True
+                                if (
+                                    retry_result.success
+                                    and self.config.stop_task_gap_processing_after_successful_retry
+                                ):
+                                    stop_gap_processing_for_task = True
                                 events.append(
                                     _task_retry_event(
                                         event_name="refined_tool_task_retry",
@@ -221,6 +240,8 @@ class SAGEAgent:
                                         visible_helpers=tuple(retry_bundle),
                                     )
                                 )
+                                if stop_gap_processing_for_task:
+                                    break
                         elif refinement.replaced_tool_name:
                             name = refinement.replaced_tool_name
                             failed_repairs[name] = failed_repairs.get(name, 0) + 1
@@ -274,6 +295,8 @@ class SAGEAgent:
                     gap = _redesign_gap(gap, failed_repairs=failed_repairs)
                 if tools_born >= self.config.max_new_tools:
                     continue
+                if tools_born_this_task >= self.config.max_new_tools_per_task:
+                    continue
                 candidate = self.generator.generate(
                     gap,
                     profile,
@@ -281,6 +304,7 @@ class SAGEAgent:
                     model=self.config.model,
                 )
                 tools_born += 1
+                tools_born_this_task += 1
                 candidate_integrity = check_helper_candidate(
                     candidate, gap, self.config.integrity_policy
                 )
@@ -352,6 +376,11 @@ class SAGEAgent:
                         if retry_result.success and not task_counted_success:
                             tasks_succeeded += 1
                             task_counted_success = True
+                        if (
+                            retry_result.success
+                            and self.config.stop_task_gap_processing_after_successful_retry
+                        ):
+                            stop_gap_processing_for_task = True
                         events.append(
                             _task_retry_event(
                                 event_name="birth_task_retry",
@@ -361,6 +390,8 @@ class SAGEAgent:
                                 visible_helpers=tuple(retry_bundle),
                             )
                         )
+                        if stop_gap_processing_for_task:
+                            break
                     if self.config.stop_after_first_birth:
                         stop_after_this_task = True
                         break
@@ -608,6 +639,14 @@ def _should_park_failed_helper(
     if record.uses < config.min_uses_before_lifecycle_action:
         return False
     if failed_repairs < config.failed_repair_limit_before_parking:
+        return False
+    return _success_rate(record) < config.weak_helper_success_rate
+
+
+def _should_refine_existing_helper(record: HelperRecord, *, config: SAGEConfig) -> bool:
+    """Return true when natural-use evidence is mature enough to redesign."""
+
+    if record.uses < config.min_uses_before_lifecycle_action:
         return False
     return _success_rate(record) < config.weak_helper_success_rate
 

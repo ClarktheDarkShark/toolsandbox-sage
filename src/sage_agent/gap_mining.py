@@ -38,9 +38,50 @@ def mine_gap_signals(
         for record in helpers.values()
         if not record.retired
     }
+    existing_tool_names = {
+        name for name, record in helpers.items() if not record.retired
+    }
     gaps: list[GapSignal] = []
 
     if _looks_like_candidate_submission_context(profile, task, result):
+        existing_candidate_planner_count = len(
+            existing_families.intersection(
+                {
+                    "visible_text_candidate_planner",
+                    "artifact_literal_candidate_planner",
+                    "source_boundary_candidate_planner",
+                    "execution_feedback_candidate_mutation_planner",
+                    "structured_input_candidate_planner",
+                }
+            )
+        )
+        if (
+            existing_candidate_planner_count >= 2
+            and "adaptive_candidate_portfolio_planner" not in existing_families
+            and (_attempt_count(result) >= 4 or "exit_code=0" in lowered)
+        ):
+            gaps.append(
+                _candidate_gap(
+                    key="adaptive_candidate_portfolio_planning",
+                    summary=(
+                        "Synthesize several weak candidate planners into one "
+                        "adaptive portfolio planner that combines visible "
+                        "artifact literals, source-boundary values, structured "
+                        "format cues, and execution feedback."
+                    ),
+                    source_task_id=task.task_id,
+                    source_environment=profile.name,
+                    tool_name="plan_adaptive_candidate_portfolio",
+                    family="adaptive_candidate_portfolio_planner",
+                    evidence=(
+                        "multiple candidate planners visible",
+                        "prior candidate attempts failed",
+                        "portfolio synthesis needed",
+                    ),
+                    template="adaptive_candidate_portfolio_planner",
+                )
+            )
+
         if (
             "source_boundary_candidate_planner" not in existing_families
             and _has_source_boundary_cue(lowered)
@@ -65,6 +106,31 @@ def mine_gap_signals(
                     template="source_boundary_candidate_planner",
                 )
             )
+
+        format_kind = _candidate_format_kind(lowered)
+        if format_kind and existing_candidate_planner_count >= 2:
+            tool_name = f"plan_{format_kind}_edge_input_candidates"
+            if tool_name not in existing_tool_names:
+                gaps.append(
+                    _candidate_gap(
+                        key=f"{format_kind}_format_edge_candidate_planning",
+                        summary=(
+                            "Generate candidate inputs for a recurring visible "
+                            f"{format_kind.replace('_', ' ')} format or parser edge case."
+                        ),
+                        source_task_id=task.task_id,
+                        source_environment=profile.name,
+                        tool_name=tool_name,
+                        family="format_edge_candidate_planner",
+                        evidence=(
+                            "visible format cue",
+                            "candidate attempts failed",
+                            "format-specific edge candidates needed",
+                        ),
+                        template="format_edge_candidate_planner",
+                        extra_directives={"format_kind": format_kind},
+                    )
+                )
 
         if "artifact_literal_candidate_planner" not in existing_families and (
             "literal:" in lowered or "source_line:" in lowered
@@ -214,7 +280,11 @@ def _candidate_gap(
     family: str,
     evidence: tuple[str, ...],
     template: str,
+    extra_directives: Mapping[str, object] | None = None,
 ) -> GapSignal:
+    directives: dict[str, object] = {"template": template}
+    if extra_directives:
+        directives.update(extra_directives)
     return GapSignal(
         key=key,
         summary=summary,
@@ -237,7 +307,7 @@ def _candidate_gap(
             "first_candidate": "str",
             "abstain": "bool",
         },
-        generation_directives={"template": template},
+        generation_directives=directives,
     )
 
 
@@ -317,6 +387,30 @@ def _has_structured_format_cue(text: str) -> bool:
         "length",
     )
     return any(cue in text for cue in cues)
+
+
+def _candidate_format_kind(text: str) -> str:
+    """Classify visible candidate-input format cues without labels or answers."""
+
+    if any(cue in text for cue in ("xml", "html", "doctype", "xmlns")):
+        return "xml"
+    if any(cue in text for cue in ("regex", "regexp", "pcre", "oniguruma")):
+        return "regex"
+    if any(
+        cue in text
+        for cue in (
+            "float",
+            "double",
+            "decimal",
+            "numeric",
+            "number",
+            "scientific notation",
+        )
+    ):
+        return "numeric"
+    if any(cue in text for cue in ("handshake", "protocol", "packet", "socket")):
+        return "binary_protocol"
+    return ""
 
 
 def _has_source_boundary_cue(text: str) -> bool:

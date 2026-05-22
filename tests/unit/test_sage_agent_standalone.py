@@ -1,6 +1,7 @@
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Any, cast
 
 from pytest import MonkeyPatch
 
@@ -184,6 +185,7 @@ def test_standalone_sage_refines_underperforming_retained_helper(
             registry_dir=tmp_path / "registry",
             max_new_tools=0,
             max_refinements=1,
+            min_uses_before_lifecycle_action=0,
         ),
     )
 
@@ -218,7 +220,7 @@ def test_standalone_sage_parks_weak_helper_after_failed_redesign(
             registry_dir=tmp_path / "registry",
             max_new_tools=0,
             max_refinements=4,
-            min_uses_before_lifecycle_action=1,
+            min_uses_before_lifecycle_action=0,
             failed_repair_limit_before_parking=2,
         ),
     )
@@ -335,21 +337,94 @@ def test_generic_gap_mining_splits_candidate_failures_into_multiple_hypotheses()
     assert "structured_input_format_candidate_planning" in keys
 
 
+def test_generic_gap_mining_synthesizes_adaptive_candidate_portfolio() -> None:
+    profile = EnvironmentProfile(
+        name="portable-candidate-env",
+        description="Generic candidate submission environment.",
+        base_tools=("submit_candidate",),
+        action_tools=("submit_candidate",),
+        observation_fields=("description", "artifact_summary", "attempts"),
+    )
+    task = TaskSpec(
+        task_id="portable-2",
+        name="source candidate task",
+        prompt="Submit an input for a visible parser.",
+        artifacts={
+            "description": "Parser reads structured input.",
+            "artifact_summary": (
+                "literal: MAGIC_HEADER\nsource_line: if (size == 4294967295) crash();"
+            ),
+        },
+    )
+    result = TaskRunResult(
+        task=task,
+        success=False,
+        transcript=(
+            "candidate 0: exit_code=0 len=4",
+            "candidate 1: exit_code=0 len=8",
+        ),
+        artifacts={
+            "attempts": [
+                {"exit_code": 0, "poc_length": 4},
+                {"exit_code": 0, "poc_length": 8},
+                {"exit_code": 0, "poc_length": 16},
+                {"exit_code": 0, "poc_length": 32},
+            ]
+        },
+    )
+    helpers = {
+        "a": _helper_record_for_family("source_boundary_candidate_planner"),
+        "b": _helper_record_for_family("artifact_literal_candidate_planner"),
+    }
+
+    gaps = mine_gap_signals(profile=profile, task=task, result=result, helpers=helpers)
+
+    assert "adaptive_candidate_portfolio_planning" in {gap.key for gap in gaps}
+
+
 def test_standalone_sage_can_birth_sibling_helpers_from_generic_gap_mining(
     tmp_path: Path,
 ) -> None:
     agent = SAGEAgent(
         adapter=GenericCandidateAdapter(),
         generator=TemplateHelperGenerator(),
-        config=SAGEConfig(registry_dir=tmp_path / "registry", max_new_tools=4),
+        config=SAGEConfig(
+            registry_dir=tmp_path / "registry",
+            max_new_tools=4,
+            max_new_tools_per_task=3,
+        ),
+    )
+
+    summary = agent.run(limit=1)
+
+    assert summary.tools_born == 3
+    assert summary.tools_accepted == 3
+    assert summary.birth_task_retry_successes >= 1
+    assert summary.tasks_succeeded == 1
+    assert not any(
+        event.get("tool_name") == "mutate_candidates_from_execution_feedback"
+        for event in summary.events
+    )
+
+
+def test_standalone_sage_can_continue_same_task_gap_mining_when_configured(
+    tmp_path: Path,
+) -> None:
+    agent = SAGEAgent(
+        adapter=GenericCandidateAdapter(),
+        generator=TemplateHelperGenerator(),
+        config=SAGEConfig(
+            registry_dir=tmp_path / "registry",
+            max_new_tools=4,
+            max_new_tools_per_task=4,
+            stop_task_gap_processing_after_successful_retry=False,
+        ),
     )
 
     summary = agent.run(limit=1)
 
     assert summary.tools_born >= 4
     assert summary.tools_accepted >= 4
-    assert summary.birth_task_retry_successes >= 1
-    assert summary.tasks_succeeded == 1
 
 
 def test_source_boundary_candidate_planner_validates_without_repair() -> None:
@@ -387,6 +462,226 @@ def test_source_boundary_candidate_planner_validates_without_repair() -> None:
     assert report.accepted, report.errors
 
 
+def test_adaptive_candidate_portfolio_planner_validates_without_repair() -> None:
+    gap = GapSignal(
+        key="adaptive_candidate_portfolio_planning",
+        summary="Synthesize candidate planners into an adaptive portfolio.",
+        source_task_id="portable-2",
+        source_environment="portable-candidate-env",
+        suggested_tool_name="plan_adaptive_candidate_portfolio",
+        suggested_helper_family="adaptive_candidate_portfolio_planner",
+        required_inputs={
+            "description": "str",
+            "readme": "str",
+            "feedback": "str",
+            "artifact_summary": "str",
+            "max_candidates": "int",
+        },
+        expected_outputs={
+            "candidates": "list[str]",
+            "candidate_count": "int",
+            "first_candidate": "str",
+            "abstain": "bool",
+        },
+        generation_directives={"template": "adaptive_candidate_portfolio_planner"},
+    )
+    candidate = TemplateHelperGenerator().generate(
+        gap,
+        GenericCandidateAdapter().profile(),
+        (
+            ValidationCase(
+                name="adaptive_visible_artifacts",
+                inputs={
+                    "description": "Input parser reads XML and size fields.",
+                    "readme": "",
+                    "feedback": "candidate 0: exit_code=0 len=4",
+                    "artifact_summary": (
+                        "literal: MAGIC_HEADER\n"
+                        "source_line: if (size == 4294967295) crash();"
+                    ),
+                    "max_candidates": 4,
+                },
+                expected={
+                    "candidate_count": 4,
+                    "first_candidate": "MAGIC_HEADER",
+                    "abstain": False,
+                },
+            ),
+        ),
+        model="gpt-4o-mini",
+    )
+    report = validate_helper_candidate(candidate)
+
+    assert report.accepted, report.errors
+
+
+def test_adaptive_candidate_portfolio_extracts_prose_examples() -> None:
+    gap = GapSignal(
+        key="adaptive_candidate_portfolio_planning",
+        summary="Synthesize candidate planners into an adaptive portfolio.",
+        source_task_id="portable-3",
+        source_environment="portable-candidate-env",
+        suggested_tool_name="plan_adaptive_candidate_portfolio",
+        suggested_helper_family="adaptive_candidate_portfolio_planner",
+        required_inputs={
+            "description": "str",
+            "readme": "str",
+            "feedback": "str",
+            "artifact_summary": "str",
+            "max_candidates": "int",
+        },
+        expected_outputs={
+            "candidates": "list[str]",
+            "candidate_count": "int",
+            "first_candidate": "str",
+            "abstain": "bool",
+        },
+        generation_directives={"template": "adaptive_candidate_portfolio_planner"},
+    )
+    candidate = TemplateHelperGenerator().generate(
+        gap,
+        GenericCandidateAdapter().profile(),
+        (),
+        model="gpt-4o-mini",
+    )
+    namespace: dict[str, object] = {}
+    exec(  # noqa: S102
+        candidate.code,
+        {
+            "__builtins__": {
+                "all": all,
+                "any": any,
+                "bool": bool,
+                "dict": dict,
+                "int": int,
+                "isinstance": isinstance,
+                "len": len,
+                "list": list,
+                "max": max,
+                "min": min,
+                "range": range,
+                "set": set,
+                "str": str,
+            }
+        },
+        namespace,
+    )
+    planner = cast(
+        Callable[..., Mapping[str, Any]],
+        namespace["plan_adaptive_candidate_portfolio"],
+    )
+    result = planner(
+        description=("A parser stringifies certain numbers such as -10E-1000010001."),
+        readme="Submit parser inputs only.",
+        feedback="candidate 0: exit_code=0 len=4",
+        artifact_summary="source_line: jv res = parse(input);",
+        max_candidates=8,
+    )
+
+    candidates = result["candidates"]
+    assert isinstance(candidates, list)
+    assert "-10E-1000010001" in candidates
+    assert "[-10E-1000010001]" in candidates
+
+
+def test_format_edge_candidate_planner_validates_and_prioritizes_regex() -> None:
+    gap = GapSignal(
+        key="regex_format_edge_candidate_planning",
+        summary="Generate regex edge candidates.",
+        source_task_id="portable-4",
+        source_environment="portable-candidate-env",
+        suggested_tool_name="plan_regex_edge_input_candidates",
+        suggested_helper_family="format_edge_candidate_planner",
+        required_inputs={
+            "description": "str",
+            "readme": "str",
+            "feedback": "str",
+            "artifact_summary": "str",
+            "max_candidates": "int",
+        },
+        expected_outputs={
+            "candidates": "list[str]",
+            "candidate_count": "int",
+            "first_candidate": "str",
+            "abstain": "bool",
+        },
+        generation_directives={
+            "template": "format_edge_candidate_planner",
+            "format_kind": "regex",
+        },
+    )
+    candidate = TemplateHelperGenerator().generate(
+        gap,
+        GenericCandidateAdapter().profile(),
+        (
+            ValidationCase(
+                name="regex_edges",
+                inputs={
+                    "description": "The parser accepts regex input.",
+                    "readme": "",
+                    "feedback": "",
+                    "artifact_summary": "dict: \\\\A",
+                    "max_candidates": 6,
+                },
+                expected={"candidate_count": 6, "abstain": False},
+            ),
+        ),
+        model="gpt-4o-mini",
+    )
+    report = validate_helper_candidate(candidate)
+
+    assert report.accepted, report.errors
+    namespace: dict[str, object] = {}
+    exec(  # noqa: S102
+        candidate.code,
+        {
+            "__builtins__": {
+                "all": all,
+                "any": any,
+                "bool": bool,
+                "dict": dict,
+                "int": int,
+                "len": len,
+                "list": list,
+                "max": max,
+                "min": min,
+                "range": range,
+                "set": set,
+                "str": str,
+            }
+        },
+        namespace,
+    )
+    planner = cast(
+        Callable[..., Mapping[str, Any]],
+        namespace["plan_regex_edge_input_candidates"],
+    )
+    result = planner(
+        description="The parser accepts PCRE regex input.",
+        artifact_summary="dict: \\\\A",
+        max_candidates=20,
+    )
+    candidates = result["candidates"]
+    assert isinstance(candidates, list)
+    assert any(item.endswith("A") and "\\" in item for item in candidates)
+    assert "(a)\\1" in candidates
+
+
+def test_cybergym_artifact_priority_keeps_dictionaries_first() -> None:
+    from sage_agent.adapters.cybergym_live import _artifact_member_priority
+
+    dict_member = type("Member", (), {"name": "src/project/fuzz.dict"})()
+    fuzz_member = type("Member", (), {"name": "src/project/fuzzer.cc"})()
+    readme_member = type("Member", (), {"name": "README.md"})()
+
+    assert _artifact_member_priority(dict_member) < _artifact_member_priority(
+        fuzz_member
+    )
+    assert _artifact_member_priority(fuzz_member) < _artifact_member_priority(
+        readme_member
+    )
+
+
 def test_cybergym_batched_runner_parallel_image_pull_reports_task_failures(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -410,6 +705,63 @@ def test_cybergym_batched_runner_parallel_image_pull_reports_task_failures(
     assert ("ok:vul", True) in calls
     assert ("ok:fix", True) in calls
     assert failures == ["bad:2: DockerImagePullError: pull failed"]
+
+
+def test_cybergym_baseline_cache_falls_back_to_task_record() -> None:
+    from scripts import run_cybergym_live_batched_sage as runner
+
+    task = TaskSpec(
+        task_id="arvo:demo",
+        name="demo",
+        prompt="new visible summary",
+        artifacts={"artifact_summary": "source_line: changed order"},
+    )
+    records = {
+        "old-visible-hash": {
+            "task_id": "arvo:demo",
+            "success": False,
+            "error": "",
+            "transcript": ["LLM baseline planned 1 candidate inputs."],
+            "artifacts": {"attempts": []},
+        },
+        "bad-current-hash": {
+            "task_id": "arvo:demo",
+            "success": False,
+            "error": "Missing credentials.",
+            "transcript": ["LLM baseline failed: Missing credentials."],
+            "artifacts": {},
+        },
+    }
+
+    assert (
+        runner._eligible_baseline_cache_key(
+            records,
+            task=task,
+            cache_key="bad-current-hash",
+            legacy_cache_key="missing-legacy",
+            fixed_side_check=True,
+        )
+        == "old-visible-hash"
+    )
+
+
+def _helper_record_for_family(family: str) -> HelperRecord:
+    candidate = HelperCandidate(
+        spec=HelperSpec(
+            name=f"helper_{family}",
+            family=family,
+            description="test helper",
+        ),
+        code="def helper():\n    return {}\n",
+    )
+    return HelperRecord(
+        candidate=candidate,
+        validation=HelperValidationReport(accepted=True),
+        birth_gap_key=family,
+        birth_environment="portable-candidate-env",
+        created_at="2026-05-21T00:00:00Z",
+        code_hash=family,
+    )
 
 
 class BrokenThenRepairGenerator(TemplateHelperGenerator):
@@ -461,6 +813,8 @@ class GenericCandidateAdapter:
                 "source_boundary_candidate_planner",
                 "execution_feedback_candidate_mutation_planner",
                 "structured_input_candidate_planner",
+                "adaptive_candidate_portfolio_planner",
+                "format_edge_candidate_planner",
             ),
             safety_rules=("helpers prepare candidates but do not submit them",),
         )

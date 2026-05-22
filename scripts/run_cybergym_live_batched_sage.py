@@ -619,12 +619,12 @@ def _run_llm_baseline(
                 task, model=model, max_candidates=max_candidates
             )
         )
-        cache_hit_key = (
-            cache_key
-            if cache_key in baseline_cache
-            else legacy_cache_key
-            if legacy_cache_key in baseline_cache
-            else ""
+        cache_hit_key = _eligible_baseline_cache_key(
+            baseline_cache,
+            task=task,
+            cache_key=cache_key,
+            legacy_cache_key=legacy_cache_key,
+            fixed_side_check=adapter.fixed_side_check,
         )
         if cache_policy == "use-if-eligible" and cache_hit_key:
             cached = dict(baseline_cache[cache_hit_key])
@@ -670,7 +670,8 @@ def _run_llm_baseline(
         result_json["control_cache_source"] = "fresh"
         result_json["control_cache_key"] = cache_key
         results.append(result_json)
-        baseline_cache[cache_key] = result_json
+        if not _baseline_result_is_credential_failure(result_json):
+            baseline_cache[cache_key] = result_json
         baseline_cache_stats["fresh"] += 1
     successes = sum(1 for result in results if result["success"])
     return {
@@ -716,6 +717,62 @@ def _save_baseline_cache(path: Path, records: dict[str, Any]) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     tmp.replace(path)
+
+
+def _eligible_baseline_cache_key(
+    records: dict[str, Any],
+    *,
+    task: Any,
+    cache_key: str,
+    legacy_cache_key: str,
+    fixed_side_check: bool,
+) -> str:
+    """Find an eligible cached control record even after visible summaries change."""
+
+    for key in (cache_key, legacy_cache_key):
+        record = records.get(key)
+        if isinstance(record, dict) and _usable_cached_baseline_record(
+            record, task=task, fixed_side_check=fixed_side_check
+        ):
+            return key
+    task_id = str(task.task_id)
+    for key, record in records.items():
+        if not isinstance(record, dict):
+            continue
+        if str(record.get("task_id", "")) != task_id:
+            continue
+        if _usable_cached_baseline_record(
+            record, task=task, fixed_side_check=fixed_side_check
+        ):
+            return str(key)
+    return ""
+
+
+def _usable_cached_baseline_record(
+    record: dict[str, Any], *, task: Any, fixed_side_check: bool
+) -> bool:
+    """Return true when a cached baseline record is safe to reuse for this task."""
+
+    if str(record.get("task_id", "")) != str(task.task_id):
+        return False
+    if _baseline_result_is_credential_failure(record):
+        return False
+    if not fixed_side_check or not bool(record.get("success")):
+        return True
+    attempts = record.get("artifacts", {}).get("attempts", [])
+    if not isinstance(attempts, list):
+        return False
+    return any(
+        isinstance(attempt, dict)
+        and bool(attempt.get("fixed_side_checked"))
+        and bool(attempt.get("official_success"))
+        for attempt in attempts
+    )
+
+
+def _baseline_result_is_credential_failure(record: dict[str, Any]) -> bool:
+    text = f"{record.get('error', '')} {' '.join(record.get('transcript', []))}"
+    return "missing credentials" in text.lower() or "missing api" in text.lower()
 
 
 def _baseline_cache_key(

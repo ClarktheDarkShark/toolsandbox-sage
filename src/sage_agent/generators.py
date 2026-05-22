@@ -24,6 +24,8 @@ CANDIDATE_PLANNER_FAMILIES = {
     "execution_feedback_candidate_mutation_planner",
     "structured_input_candidate_planner",
     "source_boundary_candidate_planner",
+    "adaptive_candidate_portfolio_planner",
+    "format_edge_candidate_planner",
 }
 
 
@@ -64,6 +66,14 @@ class TemplateHelperGenerator:
             return _structured_input_candidate_planner(
                 name, gap, profile, validation_cases, model
             )
+        if template == "adaptive_candidate_portfolio_planner":
+            return _adaptive_candidate_portfolio_planner(
+                name, gap, profile, validation_cases, model
+            )
+        if template == "format_edge_candidate_planner":
+            return _format_edge_candidate_planner(
+                name, gap, profile, validation_cases, model
+            )
         if template == "grid_shortest_path_action_planner":
             return _grid_shortest_path_action_planner(
                 name, gap, profile, validation_cases, model
@@ -86,6 +96,10 @@ class TemplateHelperGenerator:
 
         del errors
         if rejected.spec.family in CANDIDATE_PLANNER_FAMILIES:
+            if rejected.spec.family == "format_edge_candidate_planner":
+                return _format_edge_candidate_planner(
+                    rejected.spec.name, gap, profile, validation_cases, model
+                )
             return _adaptive_candidate_portfolio_planner(
                 rejected.spec.name, gap, profile, validation_cases, model
             )
@@ -315,11 +329,11 @@ def _visible_text_candidate_planner(
         for marker in cue_markers:
             pos = line_lower.find(marker)
             if pos >= 0 and "provided as input to the vulnerable program" not in line_lower:
-                value = line[pos + len(marker):].strip(" :-,;\\t")
+                value = line[pos + len(marker):].strip(" :,;\\t")
                 if 0 < len(value) <= 240:
                     candidates.append(value)
         if ":" in line and line_lower.split(":", 1)[0] in ("literal", "symbol", "source_line", "dict", "example", "input"):
-            value = line.split(":", 1)[1].strip(" :-,;\\t")
+            value = line.split(":", 1)[1].strip(" :,;\\t")
             if 0 < len(value) <= 240:
                 deferred.append(value)
         if line_lower.startswith("source_line:"):
@@ -432,7 +446,7 @@ def _artifact_literal_candidate_planner(
             continue
         for prefix in prefixes:
             if lower.startswith(prefix):
-                value = line[len(prefix):].strip(" :-,;\\t")
+                value = line[len(prefix):].strip(" :,;\\t")
                 if 0 < len(value) <= 240:
                     candidates.append(value)
         if lower.startswith("source_line:"):
@@ -512,7 +526,7 @@ def _source_boundary_candidate_planner(
             source_like_line = True
         for prefix in ("literal:", "dict:", "token:", "magic:", "example:", "input:"):
             if line_lower.startswith(prefix):
-                value = line[len(prefix):].strip(" :-,;\\t")
+                value = line[len(prefix):].strip(" :,;\\t")
                 if 0 < len(value) <= 240:
                     literals.append(value)
                     candidates.append(value)
@@ -721,7 +735,7 @@ def _adaptive_candidate_portfolio_planner(
     code = f"""def {name}(description: str, readme: str = "", feedback: str = "", artifact_summary: str = "", max_candidates: int = 12) -> dict:
     text = str(description or "") + "\\n" + str(readme or "") + "\\n" + str(artifact_summary or "") + "\\n" + str(feedback or "")
     lower = text.lower()
-    candidates = []
+    raw_candidates = []
 
     explicit_prefixes = (
         "literal:",
@@ -738,6 +752,14 @@ def _adaptive_candidate_portfolio_planner(
         "successful_candidate:",
         "crashing_candidate:",
     )
+    prose_markers = (
+        "example input:",
+        "example:",
+        "input:",
+        "such as",
+        "for example",
+        "e.g.",
+    )
     for raw_line in text.splitlines():
         line = raw_line.strip(" \\t\\r\\n-*")
         if not line:
@@ -745,12 +767,26 @@ def _adaptive_candidate_portfolio_planner(
         line_lower = line.lower()
         if line_lower.startswith("file:"):
             continue
+        prefix_matched = False
         for prefix in explicit_prefixes:
             pos = line_lower.find(prefix)
             if pos >= 0 and "provided as input to the vulnerable program" not in line_lower:
-                value = line[pos + len(prefix):].strip(" :-,;\\t")
+                value = line[pos + len(prefix):].strip(" :,;\\t")
                 if value:
-                    candidates.append(str(value))
+                    raw_candidates.append(value)
+                    prefix_matched = True
+        for marker in prose_markers:
+            pos = line_lower.find(marker)
+            if pos >= 0 and "provided as input to the vulnerable program" not in line_lower:
+                value = line[pos + len(marker):].strip(" :,;\\t")
+                if value:
+                    value = value.split(" when ", 1)[0]
+                    value = value.split(" which ", 1)[0]
+                    value = value.split(" that ", 1)[0]
+                    value = value.split(" but ", 1)[0]
+                    raw_candidates.append(value)
+        if prefix_matched and 0 < len(line) <= 220:
+            raw_candidates.append(line)
         if line_lower.startswith("source_line:"):
             line = line.split(":", 1)[1].strip()
             line_lower = line.lower()
@@ -766,27 +802,43 @@ def _adaptive_candidate_portfolio_planner(
                         break
                     value = line[left + 1:right].strip()
                     if value:
-                        candidates.append(str(value))
+                        raw_candidates.append(value)
                     start = right + 1
 
     if "xml" in lower or "html" in lower or "<" in text:
         for value in ("<a/>", "<root></root>", "<root>A</root>", "<!DOCTYPE a><a/>"):
-            candidates.append(str(value))
+            raw_candidates.append(str(value))
     if "json" in lower or "javascript" in lower:
         for value in ("{{}}", "[]", "{{\\"a\\":1}}", "[1,2,3]"):
-            candidates.append(str(value))
+            raw_candidates.append(str(value))
     if "csv" in lower or "comma" in lower:
         for value in ("a,b\\n", "1,2,3\\n", "name,value\\na,1\\n"):
-            candidates.append(str(value))
+            raw_candidates.append(str(value))
     if "regex" in lower or "pcre" in lower:
         for value in ("(", "(a", ".*", "[a-", "(?P<a>a)"):
-            candidates.append(str(value))
+            raw_candidates.append(str(value))
     if "path" in lower or "file" in lower:
         for value in ("/tmp/a", "../a", "A/B", "file.txt"):
-            candidates.append(str(value))
+            raw_candidates.append(str(value))
     if "size" in lower or "length" in lower or "chunk" in lower:
         for value in ("0", "1", "-1", "4294967295", "A" * 32, "A" * 128):
-            candidates.append(str(value))
+            raw_candidates.append(str(value))
+    if any(cue in lower for cue in ("float", "double", "decimal", "number", "numeric", "json", "parser", "parse")):
+        for value in (
+            "0.0",
+            "-0.0",
+            "0.1",
+            "-0.1",
+            "1e309",
+            "-1e309",
+            "1.0E-100",
+            "-1.0E-100",
+            "1.7976931348623157E+308",
+            "-1.7976931348623157E+308",
+            "9999999999999999",
+            "10000000000000000",
+        ):
+            raw_candidates.append(value)
 
     lengths = []
     for token in text.replace("=", " ").replace(":", " ").replace(",", " ").split():
@@ -813,21 +865,24 @@ def _adaptive_candidate_portfolio_planner(
         "<root></root>",
         "a,b\\n",
         "\\x00\\x01\\x02\\x03",
+        "\\x00A\\x00",
+        "A\\x00A",
+        "\\x00\\x00A",
         "A" * 8,
         "A" * 32,
         "A" * 128,
     ]
     for value in seed_pool:
-        candidates.append(str(value))
+        raw_candidates.append(value)
     for length in lengths[:16]:
         if length <= 0:
             continue
         capped = min(max(length, 1), 512)
-        candidates.append(str("A" * capped))
-        candidates.append(str("\\x00" * min(capped, 64)))
+        raw_candidates.append("A" * capped)
+        raw_candidates.append("\\x00" * min(capped, 64))
         if capped > 1:
-            candidates.append(str("A" * (capped - 1)))
-            candidates.append(str("A" * (capped + 1)))
+            raw_candidates.append("A" * (capped - 1))
+            raw_candidates.append("A" * (capped + 1))
 
     for quote in ("`", "\\"", "'"):
         start = 0
@@ -840,14 +895,186 @@ def _adaptive_candidate_portfolio_planner(
                 break
             value = text[left + 1:right].strip()
             if value:
-                candidates.append(str(value))
+                raw_candidates.append(value)
             start = right + 1
+
+    candidates = []
+    for raw_candidate in raw_candidates:
+        value = str(raw_candidate or "").strip(" :,;\\t\\r\\n")
+        value = value.rstrip(".,;")
+        if not value or "provided as input to the vulnerable program" in value.lower():
+            continue
+        candidates.append(value)
+        lower_value = value.lower()
+        numeric_like = any(ch.isdigit() for ch in value) and all(ch in "+-0123456789.eE" for ch in value)
+        if numeric_like:
+            candidates.append(value + "\\n")
+            if "json" in lower or "javascript" in lower or "parse" in lower or "number" in lower:
+                candidates.append("[" + value + "]")
+                candidates.append("{{\\"value\\":" + value + "}}")
+        if lower_value.startswith(("0x", "-0x")):
+            candidates.append(value + "\\n")
 
     base_values = list(candidates[:24])
     for value in base_values:
         if isinstance(value, str) and 0 < len(value) <= 80:
             candidates.append(str(value + "\\n"))
             candidates.append(str(value + value))
+
+    unique = []
+    seen = set()
+    limit = int(max_candidates)
+    if limit < 1:
+        limit = 1
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+        if len(unique) >= limit:
+            break
+    return {{
+        "candidates": unique,
+        "candidate_count": len(unique),
+        "first_candidate": unique[0] if unique else "",
+        "abstain": False,
+    }}
+"""
+    return _candidate_planner_candidate(
+        name, gap, profile, validation_cases, model, code
+    )
+
+
+def _format_edge_candidate_planner(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    kind = str(gap.generation_directives.get("format_kind", "generic")).lower()
+    code = f"""def {name}(description: str, readme: str = "", feedback: str = "", artifact_summary: str = "", max_candidates: int = 12) -> dict:
+    text = str(description or "") + "\\n" + str(readme or "") + "\\n" + str(artifact_summary or "") + "\\n" + str(feedback or "")
+    lower = text.lower()
+    kind = {kind!r}
+    visible_candidates = []
+    seed_candidates = []
+    prefixes = ("dict:", "literal:", "example input:", "example:", "input:", "candidate_text:", "crashing_candidate:")
+    prose_markers = ("such as", "for example", "e.g.")
+    for raw_line in text.splitlines():
+        line = raw_line.strip(" \\t\\r\\n-*")
+        if not line or line.lower().startswith("file:"):
+            continue
+        line_lower = line.lower()
+        for prefix in prefixes:
+            pos = line_lower.find(prefix)
+            if pos >= 0:
+                value = line[pos + len(prefix):].strip(" :,;\\t")
+                if value:
+                    visible_candidates.append(value)
+        for marker in prose_markers:
+            pos = line_lower.find(marker)
+            if pos >= 0:
+                value = line[pos + len(marker):].strip(" :,;\\t")
+                if value:
+                    value = value.split(" when ", 1)[0]
+                    value = value.split(" which ", 1)[0]
+                    value = value.split(" that ", 1)[0]
+                    value = value.split(" but ", 1)[0]
+                    visible_candidates.append(value)
+
+    if kind == "xml":
+        seed_candidates.extend([
+            "<a/>",
+            "<root></root>",
+            "<root>A</root>",
+            "<!DOCTYPE a><a/>",
+            "<!DOCTYPE a [<!ENTITY x 'x'>]><a>&x;</a>",
+            "<a xmlns:p='urn:x' p:id='x' id='x'/>",
+            "<a xml:id='x' xmlns='urn:x'/>",
+            "<a><b></a>",
+            "<?xml version='1.0'?><a/>",
+        ])
+    elif kind == "regex":
+        seed_candidates.extend([
+            "(",
+            "(a",
+            "()",
+            "(a)",
+            "(a)(b)",
+            "(a)(b)(c)",
+            "(a)\\\\1",
+            "(a){{100000}}",
+            "[a-",
+            "\\\\C",
+            "\\\\K",
+            "\\\\x00A\\\\x00",
+            "A\\\\x00A",
+            "(?<a>a)",
+            "(?<a>a)(?<a>b)",
+        ])
+    elif kind == "numeric":
+        seed_candidates.extend([
+            "0",
+            "-0",
+            "0.0",
+            "-0.0",
+            "0.1",
+            "-0.1",
+            "1e309",
+            "-1e309",
+            "1.0E-100",
+            "-1.0E-100",
+            "1.7976931348623157E+308",
+            "-1.7976931348623157E+308",
+            "9999999999999999",
+            "10000000000000000",
+            "4294967295",
+        ])
+    elif kind == "binary_protocol":
+        seed_candidates.extend([
+            "",
+            "\\x00",
+            "\\x00\\x00\\x00\\x00",
+            "\\xff\\xff\\xff\\xff",
+            "\\x01\\x00\\x00\\x00",
+            "\\x00A\\x00",
+            "A\\x00A",
+            "AAAA",
+            "A" * 32,
+            "A" * 128,
+            "0\\n",
+            "1\\n",
+        ])
+    else:
+        seed_candidates.extend(["", "\\x00", "A", "AAAA", "0", "1", "-1"])
+
+    raw_candidates = []
+    visible_head_limit = 10
+    width = max(len(visible_candidates), len(seed_candidates))
+    for index in range(width):
+        if index < len(visible_candidates) and index < visible_head_limit:
+            raw_candidates.append(visible_candidates[index])
+        if index < len(seed_candidates):
+            raw_candidates.append(seed_candidates[index])
+    raw_candidates.extend(visible_candidates[visible_head_limit:])
+
+    candidates = []
+    for raw_candidate in raw_candidates:
+        value = str(raw_candidate or "").strip(" :,;\\t\\r\\n")
+        value = value.rstrip(".,;")
+        if not value:
+            continue
+        candidates.append(value)
+        numeric_like = any(ch.isdigit() for ch in value) and all(ch in "+-0123456789.eE" for ch in value)
+        if numeric_like and ("json" in lower or "javascript" in lower or "parse" in lower or "number" in lower or kind == "numeric"):
+            candidates.append(value + "\\n")
+            candidates.append("[" + value + "]")
+            candidates.append("{{\\"value\\":" + value + "}}")
+        if kind == "xml" and value.startswith("<") and not value.endswith("\\n"):
+            candidates.append(value + "\\n")
+        if kind == "regex" and "\\\\x00" not in value and len(value) <= 80:
+            candidates.append(value + "\\x00")
 
     unique = []
     seen = set()

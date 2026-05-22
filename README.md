@@ -95,6 +95,14 @@ navigation planning. For source-artifact environments, SAGE can also generate
 source-boundary candidate planners that mine visible source summaries for
 magic literals, parser tokens, numeric boundaries, and comparison constants
 without seeing hidden solutions or reference inputs.
+CyberGym is currently used as the stress test for source-artifact,
+candidate-submission behavior, but the repairs are kept in the generic SAGE
+loop: adaptive candidate-portfolio planning, format-edge planning,
+evidence-gated repair, same-task retry after helper birth, stopping same-task
+gap mining after a successful retry, and a per-task helper-birth budget.
+Those controls are not CyberGym rules; they apply to any future adapter that
+surfaces visible artifacts, execution feedback, validation cases, and helper
+families through the standalone interface.
 
 Research-integrity checks are enforced at the standalone boundary. Adapters may
 privately score tasks, but SAGE-facing task specs, gap signals, and helper
@@ -250,6 +258,23 @@ task IDs, hidden labels, reference PoCs, expected answers, or benchmark-specific
 facts into generated helpers. Use `--clear-images` only when disk pressure
 matters more than runtime; it forces the next run to pay the Docker image setup
 cost again.
+
+The current CyberGym-driven generalization loop also supports two higher-level
+candidate families that are still environment-neutral:
+
+- **Adaptive candidate portfolio planning** combines visible literals, source
+  boundaries, structured-format cues, previous failed attempts, and generic
+  numeric/parser/binary seeds into one bounded candidate list.
+- **Format-edge candidate planning** is born only after SAGE already has
+  multiple generic candidate planners and sees a recurring visible format cue
+  such as XML, regex, numeric parsing, or packet/protocol input. This gating
+  prevents premature format-specific helpers from being born from vague text.
+
+The controller also limits helper churn by stopping further gap processing for
+a task once a newly born or refined helper succeeds on the same task, waiting
+for enough natural-use evidence before refining an existing helper, and capping
+new helper births per task. These are general lifecycle policies intended to
+make SAGE more portable to future benchmarks with expensive task execution.
 
 When `--fixed-side-check` is enabled, the runner also pulls the matching fixed
 image and requires fixed-side preservation before counting a CyberGym success.

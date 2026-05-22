@@ -67,10 +67,23 @@ def _audit_run(run_dir: Path) -> dict[str, Any]:
         issues.append("summary.environment missing")
     if not summary.get("model"):
         issues.append("summary.model missing")
-    if baseline.get("comparison_valid") is not True:
-        issues.append("baseline.comparison_valid is not true")
-    if not str(baseline.get("policy", "")).startswith("llm_visible_artifact_baseline"):
-        issues.append("baseline policy is not the live visible-artifact LLM baseline")
+    environment = str(summary.get("environment") or "")
+    baseline_policy = str(baseline.get("policy") or "")
+    comparison_valid = baseline.get("comparison_valid")
+    comparison_scope = _comparison_scope(
+        environment=environment,
+        baseline_policy=baseline_policy,
+        comparison_valid=comparison_valid,
+    )
+    if not baseline_policy:
+        issues.append("baseline.policy missing")
+    if environment == "cybergym-live":
+        if comparison_valid is not True:
+            issues.append("CyberGym baseline.comparison_valid is not true")
+        if not baseline_policy.startswith("llm_visible_artifact_baseline"):
+            issues.append(
+                "CyberGym baseline policy is not the live visible-artifact LLM baseline"
+            )
     requested = metadata.get("requested_limit")
     baseline_seen = int(baseline.get("tasks_seen") or 0)
     sage_seen = int(summary.get("tasks_seen") or 0)
@@ -121,10 +134,11 @@ def _audit_run(run_dir: Path) -> dict[str, Any]:
         "run_dir": str(run_dir),
         "passed": not issues,
         "issues": issues,
-        "environment": summary.get("environment"),
+        "environment": environment,
         "model": summary.get("model"),
         "requested_limit": requested,
-        "baseline_policy": baseline.get("policy"),
+        "baseline_policy": baseline_policy,
+        "comparison_scope": comparison_scope,
         "baseline_tasks_seen": baseline_seen,
         "baseline_tasks_succeeded": baseline.get("tasks_succeeded"),
         "sage_tasks_seen": sage_seen,
@@ -150,6 +164,23 @@ def _audit_run(run_dir: Path) -> dict[str, Any]:
 def _require_dict(name: str, value: Any, issues: list[str]) -> None:
     if not isinstance(value, dict):
         issues.append(f"{name} is not an object")
+
+
+def _comparison_scope(
+    *,
+    environment: str,
+    baseline_policy: str,
+    comparison_valid: object,
+) -> str:
+    """Classify the baseline without making the audit CyberGym-specific."""
+
+    if comparison_valid is True:
+        return "live_comparison"
+    if baseline_policy == "no_generated_helpers":
+        return "adapter_smoke_baseline"
+    if environment == "cybergym-live":
+        return "invalid_cybergym_comparison"
+    return "non_claim_smoke"
 
 
 def _require_transaction(label: str, item: dict[str, Any], issues: list[str]) -> None:
