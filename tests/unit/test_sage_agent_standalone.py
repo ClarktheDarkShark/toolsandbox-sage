@@ -2,6 +2,8 @@ import json
 from collections.abc import Mapping
 from pathlib import Path
 
+from pytest import MonkeyPatch
+
 from sage_agent import SAGEAgent, SAGEConfig
 from sage_agent.adapters import (
     BBHAdapter,
@@ -383,6 +385,31 @@ def test_source_boundary_candidate_planner_validates_without_repair() -> None:
     report = validate_helper_candidate(candidate)
 
     assert report.accepted, report.errors
+
+
+def test_cybergym_batched_runner_parallel_image_pull_reports_task_failures(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    from scripts import run_cybergym_live_batched_sage as runner
+
+    calls: list[tuple[str, bool]] = []
+
+    def fake_pull(image: str, *, skip_existing: bool) -> None:
+        calls.append((image, skip_existing))
+        if image == "bad:image":
+            raise RuntimeError("pull failed")
+
+    monkeypatch.setattr(runner, "_pull_image", fake_pull)
+
+    failures = runner._pull_images_for_tasks(
+        [("ok:1", ["ok:vul", "ok:fix"]), ("bad:2", ["bad:image"])],
+        workers=2,
+        skip_existing=True,
+    )
+
+    assert ("ok:vul", True) in calls
+    assert ("ok:fix", True) in calls
+    assert failures == ["bad:2: DockerImagePullError: pull failed"]
 
 
 class BrokenThenRepairGenerator(TemplateHelperGenerator):

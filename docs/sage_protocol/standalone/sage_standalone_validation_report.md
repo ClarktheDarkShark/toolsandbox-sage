@@ -828,6 +828,7 @@ Runs:
 | --- | --- | ---: | ---: | --- |
 | CyberGym fixed-side smoke | `outputs/cybergym_live_sage/openai_key_fixed_side_smoke2_20260521` | `0/2` | `1/2` | `gpt-4o-mini` OpenAI-backed LLM baseline, baseline cache off, fixed-side verification on, tools born/accepted/reused `5 / 5 / 23`, one birth-task retry success, integrity issues `0` |
 | CyberGym fixed-side cached-control smoke | `outputs/cybergym_live_sage/source_boundary_fixed_side_direct_v1_4_20260521` | `0/4` | `1/4` | fixed-side verification on, baseline cache use-if-eligible with fixed-side cache separation, tools born/accepted/reused `5 / 5 / 31`, integrity issues `0` |
+| CyberGym fixed-side validate20 | `outputs/cybergym_live_sage/source_boundary_fixed_side_validate20_20260521` | `2/20` | `5/20` | fixed-side verification on, baseline cache use-if-eligible with `4 cached / 16 fresh` controls, tools born/accepted/reused `5 / 5 / 95`, repair/refine `1 / 1`, birth-task retry successes `1`, integrity issues `0` |
 | ToolSandbox maintenance smoke | `outputs/sage_agent_standalone/toolsandbox_source_boundary_maintenance_2_20260521` | `0/2` smoke | `2/2` | lifecycle preservation only, not protected ToolSandbox benchmark evidence |
 | MiniGrid maintenance | `outputs/sage_agent_standalone/minigrid_source_boundary_maintenance_12_20260521` | `7/12` | `12/12` | one accepted/reused grid planner, integrity issues `0` |
 | BIG-Bench Hard maintenance | `outputs/sage_agent_standalone/bbh_source_boundary_maintenance_12_20260521` | `5/12` | `12/12` | one accepted/reused symbolic helper, integrity issues `0` |
@@ -835,6 +836,10 @@ Runs:
 Machine-readable summary:
 `artifacts/sage_agent_standalone/source_boundary_fixed_side_maintenance_summary_20260521.json`.
 SHA-256 `6ffda4082984fe19c52d9d818e040a086a4739732d3986cb55cd34b7b42c66ce`.
+
+Larger fixed-side validate20 and speed-repair summary:
+`artifacts/sage_agent_standalone/cybergym_fixed_side_validate20_speed_repair_summary_20260521.json`.
+SHA-256 `329996c1020f1f2cd0c76d6e1f13e78261f87970c84e30e55910540da08cfca7`.
 
 Dashboard note: zero-baseline relative lift is now displayed as an approximate
 percentage using a documented `0.100` denominator floor. For example,
@@ -844,6 +849,16 @@ false `0.0%` lift and infinite percentages.
 
 Interpretation: this is a successful small improvement to SAGE's general
 source-artifact generation lifecycle and a stronger CyberGym correctness check
-than vulnerable-only scoring. It is still not final CyberGym benchmark
-readiness; the sample is intentionally small and should be scaled only after
-the same fixed-side protocol remains stable over a larger task set.
+than vulnerable-only scoring. The 20-task fixed-side run is larger than the
+initial smoke and shows a real live lift (`2/20 -> 5/20`), but absolute
+CyberGym success remains low and the helper lifecycle still classifies the
+source-artifact helpers as `refine`, not `scale`.
+
+Operational speed repair: the live CyberGym batched runner now treats Docker
+images as reusable environment setup cache. By default it retains images,
+skips `docker pull` when an exact requested image is already local, and pulls
+the vulnerable/fixed images for a batch in parallel via `--image-pull-workers`.
+This does not change SAGE-visible evidence or scoring: SAGE still receives
+only visible task assets and live submit feedback, while hidden labels,
+reference PoCs, and expected answers remain unavailable. Use `--clear-images`
+only when disk pressure outweighs repeated validation speed.

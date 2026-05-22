@@ -218,7 +218,7 @@ This live script runs baseline and SAGE through `submit.sh` and the local
 it does not run fix-side re-verification and its baseline is a deliberately
 simple fixed four-byte PoC.
 
-For a bounded CyberGym smoke that downloads and clears four tasks at a time,
+For a bounded CyberGym validation run that downloads four tasks at a time,
 use:
 
 ```bash
@@ -227,6 +227,7 @@ PYTHONPATH=src:. python scripts/run_cybergym_live_batched_sage.py \
   --batch-size 4 \
   --baseline llm \
   --fixed-side-check \
+  --image-pull-workers 4 \
   --reset-registry \
   --registry-dir artifacts/cybergym_live_sage/general_gap_v2_registry \
   --output-root outputs/cybergym_live_sage \
@@ -236,15 +237,19 @@ PYTHONPATH=src:. python scripts/run_cybergym_live_batched_sage.py \
 
 This starts SAGE from an empty generated-helper registry, preserves the registry
 across batches, uses only visible task assets and live submit feedback, and
-clears batch task directories and runner Docker images by default.
+clears batch task directories by default. Docker images are retained and reused
+by default because they are environment setup artifacts, not answer labels or
+reference PoCs. The runner skips image pulls when the exact requested image is
+already present and can pull each batch's vulnerable/fixed images in parallel
+with `--image-pull-workers`.
 The current batched runner starts with no generated helpers and can birth
 several generic candidate-planning families from the same failed task:
 visible-text planning, visible-artifact literal extraction, execution-feedback
 mutation, and structured-format input planning. It does not encode CyberGym
 task IDs, hidden labels, reference PoCs, expected answers, or benchmark-specific
-facts into generated helpers. Use `--no-clear-images` only for short local
-diagnostics when repeated pulls would dominate runtime; the default remains
-image cleanup for space-constrained runs.
+facts into generated helpers. Use `--clear-images` only when disk pressure
+matters more than runtime; it forces the next run to pay the Docker image setup
+cost again.
 
 When `--fixed-side-check` is enabled, the runner also pulls the matching fixed
 image and requires fixed-side preservation before counting a CyberGym success.

@@ -10,6 +10,7 @@ import socket
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -112,7 +113,27 @@ def main() -> None:
     parser.add_argument("--dashboard-port", type=int, default=62630)
     parser.add_argument("--no-dashboard-open", action="store_true")
     parser.add_argument("--reset-registry", action="store_true")
-    parser.add_argument("--clear-images", action="store_true", default=True)
+    parser.add_argument(
+        "--image-pull-workers",
+        type=int,
+        default=4,
+        help=("Parallel Docker image pulls per batch. Set to 1 for serial pulls."),
+    )
+    parser.add_argument(
+        "--skip-existing-images",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Skip docker pull when the exact requested image already exists locally.",
+    )
+    parser.add_argument(
+        "--clear-images",
+        action="store_true",
+        default=False,
+        help=(
+            "Remove pulled Docker images after each batch. Disabled by default "
+            "so repeated validation does not re-download the same images."
+        ),
+    )
     parser.add_argument("--no-clear-images", action="store_false", dest="clear_images")
     parser.add_argument("--keep-work", action="store_true")
     args = parser.parse_args()
@@ -194,6 +215,11 @@ def _run_metadata(
         "submit_timeout_seconds": args.submit_timeout,
         "baseline_cache_policy": args.baseline_cache,
         "baseline_cache_path": str(args.baseline_cache_path),
+        "image_cache_policy": {
+            "clear_images_after_batch": bool(args.clear_images),
+            "skip_existing_images": bool(args.skip_existing_images),
+            "image_pull_workers": max(1, int(args.image_pull_workers)),
+        },
         "sage_lifecycle_policy": {
             "max_new_tools": args.max_new_tools,
             "max_refinements": args.max_refinements,
@@ -210,7 +236,8 @@ def _run_metadata(
         ),
         "setup_notes": (
             "Only level1 visible assets are downloaded: repo-vul.tar.gz and description.txt.",
-            "Batch work directories and Docker images are cleared after each batch unless requested otherwise.",
+            "Batch work directories are cleared after each batch unless requested otherwise.",
+            "Docker images are retained by default and reused as environment setup cache; use --clear-images to reclaim disk space.",
             "SAGE starts from the supplied registry; use --reset-registry for an empty generated-tool registry.",
             "Submissions remain environment-side effects; generated helpers only prepare candidate strings.",
         ),
@@ -306,6 +333,7 @@ def _run_batches(
         data_root.mkdir(parents=True, exist_ok=True)
         task_root.mkdir(parents=True, exist_ok=True)
         images: list[str] = []
+        task_images: list[tuple[str, list[str]]] = []
         skipped: list[str] = []
         try:
             for local_index, task in enumerate(batch, 1):
@@ -320,14 +348,21 @@ def _run_batches(
                         args.difficulty,
                     )
                     image = _vul_image(task_id)
-                    images.append(image)
-                    _pull_image(image)
+                    current_images = [image]
                     if args.fixed_side_check:
                         fix_image = _fix_image(task_id)
-                        images.append(fix_image)
-                        _pull_image(fix_image)
+                        current_images.append(fix_image)
+                    images.extend(current_images)
+                    task_images.append((task_id, current_images))
                 except Exception as exc:
                     skipped.append(f"{task_id}: {type(exc).__name__}: {exc}")
+            skipped.extend(
+                _pull_images_for_tasks(
+                    task_images,
+                    workers=max(1, int(args.image_pull_workers)),
+                    skip_existing=bool(args.skip_existing_images),
+                )
+            )
             live_tasks = _live_tasks_for_batch(batch, task_root, skipped)
             adapter = CyberGymLiveSubmitAdapter(
                 tasks_root=task_root,
@@ -759,8 +794,75 @@ def _generate_task_dir(
     )
 
 
-def _pull_image(image: str) -> None:
-    subprocess.run(["docker", "pull", image], check=True, timeout=1800)
+def _pull_images_for_tasks(
+    task_images: list[tuple[str, list[str]]], *, workers: int, skip_existing: bool
+) -> list[str]:
+    """Pull required Docker images, returning task-level skip reasons."""
+    if not task_images:
+        return []
+    workers = max(1, min(workers, len(task_images)))
+    if workers == 1:
+        serial_failures = []
+        for task_id, images in task_images:
+            try:
+                for image in images:
+                    _pull_image(image, skip_existing=skip_existing)
+            except Exception as exc:
+                serial_failures.append(f"{task_id}: DockerImagePullError: {exc}")
+        return serial_failures
+
+    failures: list[str] = []
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(
+                _pull_task_images, task_id, images, skip_existing=skip_existing
+            ): task_id
+            for task_id, images in task_images
+        }
+        for future in as_completed(futures):
+            task_id = futures[future]
+            try:
+                future.result()
+            except Exception as exc:
+                failures.append(f"{task_id}: DockerImagePullError: {exc}")
+    return failures
+
+
+def _pull_task_images(task_id: str, images: list[str], *, skip_existing: bool) -> None:
+    del task_id
+    for image in images:
+        _pull_image(image, skip_existing=skip_existing)
+
+
+def _pull_image(image: str, *, skip_existing: bool) -> None:
+    if skip_existing and _image_exists(image):
+        print(f"Docker image cached: {image}", flush=True)
+        return
+    print(f"Pulling Docker image: {image}", flush=True)
+    result = subprocess.run(
+        ["docker", "pull", image],
+        check=False,
+        timeout=1800,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if result.returncode != 0:
+        tail = (result.stdout or "").strip()[-2000:]
+        raise RuntimeError(f"docker pull failed for {image}: {tail}")
+    print(f"Docker image ready: {image}", flush=True)
+
+
+def _image_exists(image: str) -> bool:
+    return (
+        subprocess.run(
+            ["docker", "image", "inspect", image],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    )
 
 
 def _run_no_helper_baseline(adapter: EnvironmentAdapter) -> dict[str, Any]:

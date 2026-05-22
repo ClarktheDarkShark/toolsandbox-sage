@@ -1290,3 +1290,45 @@
   touched SAGE files and CyberGym runner; `git diff --check` passed.
 - Decision label:
   `SOURCE_ARTIFACT_PLANNER_IMPROVES_CYBERGYM_FIXED_SIDE_SMOKE_WITH_GENERALIZATION_MAINTAINED`.
+
+## 2026-05-21 - CyberGym Fixed-Side Validate20 And Image Cache Speed Repair
+
+- Objective: scale the fixed-side CyberGym check beyond the initial smoke while
+  keeping validation accurate and reducing repeated Docker setup cost.
+- Branch: `codex/sage-standalone-agent`.
+- Completed run:
+  `outputs/cybergym_live_sage/source_boundary_fixed_side_validate20_20260521`;
+  dashboard:
+  `outputs/cybergym_live_sage/source_boundary_fixed_side_validate20_20260521/dashboard/task_compare.html`.
+- Protocol: `gpt-4o-mini`; baseline `llm`; baseline cache
+  `use-if-eligible`; fixed-side verification `true`; generation starts from an
+  empty generated-helper registry via `--reset-registry`; SAGE candidate arm
+  fresh; visible CyberGym task assets only; live submit feedback only.
+- Result: baseline `2/20`, SAGE `5/20`; absolute lift `+15.0 pp`; relative
+  lift `+150.0%`; baseline cache `4 cached / 16 fresh`; tools
+  born/accepted/reused `5 / 5 / 95`; repair attempts/refined tools `1 / 1`;
+  birth-task retry successes `1`; integrity issues `0`.
+- Interpretation: larger fixed-side validation confirms real CyberGym lift, but
+  absolute success is still low and helper lifecycle marks the generated
+  CyberGym helpers as `refine`, not `scale`.
+- Speed repair: `scripts/run_cybergym_live_batched_sage.py` now retains Docker
+  images by default, skips exact existing images, and pulls the batch's
+  vulnerable/fixed images in parallel with `--image-pull-workers`. This is an
+  environment setup cache only; it does not expose labels, reference PoCs,
+  expected answers, or hidden task facts to SAGE.
+- Post-repair real-task verification:
+  `outputs/cybergym_live_sage/image_cache_speed_verify4_20260521` completed
+  on four official CyberGym Level 1 tasks with live task generation, live
+  submit server, fixed-side scoring, cached baseline controls, and a fresh
+  empty generated-helper registry. Result: baseline `0/4`, SAGE `1/4`; tools
+  born/accepted/reused `5 / 5 / 31`; birth-task retry successes `1`;
+  integrity issues `0`. A direct image-cache probe confirmed retained images
+  were detected as cached for `n132/arvo:1065-vul` and `n132/arvo:1065-fix`.
+- Machine-readable summary:
+  `artifacts/sage_agent_standalone/cybergym_fixed_side_validate20_speed_repair_summary_20260521.json`.
+  SHA-256 `329996c1020f1f2cd0c76d6e1f13e78261f87970c84e30e55910540da08cfca7`.
+- Validation: standalone unit tests `14 passed`; Python compile passed for the
+  touched runner/SAGE files; Ruff check and format check passed for the touched
+  Python files; `git diff --check` passed.
+- Decision label:
+  `CYBERGYM_FIXED_SIDE_VALIDATE20_CONFIRMS_LIFT_AND_IMAGE_CACHE_SPEED_REPAIR_READY_FOR_VALIDATION`.

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "date": "2026-05-21",
+  "branch": "codex/sage-standalone-agent",
+  "run": {
+    "run_id": "source_boundary_fixed_side_validate20_20260521",
+    "run_root": "outputs/cybergym_live_sage/source_boundary_fixed_side_validate20_20260521",
+    "dashboard": "outputs/cybergym_live_sage/source_boundary_fixed_side_validate20_20260521/dashboard/task_compare.html",
+    "environment": "cybergym-live",
+    "sample_size": 20,
+    "model": "gpt-4o-mini",
+    "baseline_policy": "llm",
+    "baseline_cache_policy": "use-if-eligible",
+    "baseline_cached": 4,
+    "baseline_fresh": 16,
+    "fixed_side_check": true,
+    "candidate_cache": "off",
+    "generation_start": "empty_generated_helper_registry",
+    "baseline_successes": 2,
+    "sage_successes": 5,
+    "absolute_lift_pp": 15.0,
+    "relative_lift_percent": 150.0,
+    "tools_born": 5,
+    "tools_accepted": 5,
+    "tools_reused": 95,
+    "repair_attempts": 1,
+    "tools_refined": 1,
+    "birth_task_retry_successes": 1,
+    "integrity_issues": 0
+  },
+  "speed_repair": {
+    "file": "scripts/run_cybergym_live_batched_sage.py",
+    "default_clear_images": false,
+    "skip_existing_images_default": true,
+    "image_pull_workers_default": 4,
+    "integrity_statement": "Docker image retention and parallel pulling are environment setup cache only. SAGE-visible evidence remains limited to visible task assets and live submit feedback; hidden labels, reference PoCs, expected answers, and task-specific facts are not exposed."
+  },
+  "decision": "CYBERGYM_FIXED_SIDE_VALIDATE20_CONFIRMS_LIFT_AND_IMAGE_CACHE_SPEED_REPAIR_READY_FOR_VALIDATION"
+}
