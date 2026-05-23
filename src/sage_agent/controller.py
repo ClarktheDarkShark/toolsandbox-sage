@@ -47,6 +47,7 @@ class SAGEConfig:
     repair_attempts: int = 1
     max_refinements: int = 2
     retry_birth_task_with_new_tool: bool = True
+    defer_birth_task_retries: bool = False
     stop_task_gap_processing_after_successful_retry: bool = True
     min_uses_before_lifecycle_action: int = 6
     weak_helper_success_rate: float = 0.25
@@ -156,6 +157,7 @@ class SAGEAgent:
             stop_after_this_task = False
             stop_gap_processing_for_task = False
             tools_born_this_task = 0
+            pending_retry_tools: list[str] = []
             for gap in gap_candidates:
                 gap_integrity = check_gap_signal(gap, self.config.integrity_policy)
                 integrity_report = merge_reports(integrity_report, gap_integrity)
@@ -210,7 +212,27 @@ class SAGEAgent:
                                 for name, record in records.items()
                                 if not record.retired
                             }
-                            if self.config.retry_birth_task_with_new_tool:
+                            if (
+                                self.config.retry_birth_task_with_new_tool
+                                and self.config.defer_birth_task_retries
+                            ):
+                                pending_retry_tools.append(
+                                    refinement.accepted_tool_name
+                                )
+                                helper_bundle = _retry_bundle(
+                                    records=records,
+                                    helper_bundle=helper_bundle,
+                                    new_tool_name=refinement.accepted_tool_name,
+                                )
+                                events.append(
+                                    _deferred_retry_event(
+                                        event_name="refined_tool_task_retry_deferred",
+                                        task_id=task.task_id,
+                                        tool_name=refinement.accepted_tool_name,
+                                        visible_helpers=tuple(helper_bundle),
+                                    )
+                                )
+                            elif self.config.retry_birth_task_with_new_tool:
                                 retry_bundle = _retry_bundle(
                                     records=records,
                                     helper_bundle=helper_bundle,
@@ -360,7 +382,25 @@ class SAGEAgent:
                     generated_gap_keys.add(gap.key)
                     generated_tool_names.add(candidate.spec.name)
                     tools_accepted += 1
-                    if self.config.retry_birth_task_with_new_tool:
+                    if (
+                        self.config.retry_birth_task_with_new_tool
+                        and self.config.defer_birth_task_retries
+                    ):
+                        pending_retry_tools.append(candidate.spec.name)
+                        helper_bundle = _retry_bundle(
+                            records=records,
+                            helper_bundle=helper_bundle,
+                            new_tool_name=candidate.spec.name,
+                        )
+                        events.append(
+                            _deferred_retry_event(
+                                event_name="birth_task_retry_deferred",
+                                task_id=task.task_id,
+                                tool_name=candidate.spec.name,
+                                visible_helpers=tuple(helper_bundle),
+                            )
+                        )
+                    elif self.config.retry_birth_task_with_new_tool:
                         retry_bundle = _retry_bundle(
                             records=records,
                             helper_bundle=helper_bundle,
@@ -397,6 +437,29 @@ class SAGEAgent:
                         break
                 else:
                     tools_rejected += 1
+            if (
+                pending_retry_tools
+                and self.config.retry_birth_task_with_new_tool
+                and self.config.defer_birth_task_retries
+            ):
+                retry_result = self.adapter.run_task(task, helper_bundle)
+                birth_task_retries += 1
+                birth_task_retry_successes += int(retry_result.success)
+                tools_reused += _record_reuse_events(
+                    self.registry, helper_bundle, retry_result
+                )
+                if retry_result.success and not task_counted_success:
+                    tasks_succeeded += 1
+                    task_counted_success = True
+                events.append(
+                    _task_retry_event(
+                        event_name="deferred_birth_task_retry",
+                        task_id=task.task_id,
+                        tool_name=",".join(pending_retry_tools),
+                        result=retry_result,
+                        visible_helpers=tuple(helper_bundle),
+                    )
+                )
             if stop_after_this_task:
                 break
 
@@ -610,6 +673,28 @@ def _task_retry_event(
     event["event"] = event_name
     event["tool_name"] = tool_name
     return event
+
+
+def _deferred_retry_event(
+    *,
+    event_name: str,
+    task_id: str,
+    tool_name: str,
+    visible_helpers: tuple[str, ...],
+) -> dict[str, Any]:
+    return {
+        "event": event_name,
+        "task_id": task_id,
+        "tool_name": tool_name,
+        "visible_helpers": list(visible_helpers),
+        "success": False,
+        "score": 0.0,
+        "outcome_score": 0.0,
+        "error": "",
+        "transcript": ["retry deferred until current task gap batch is complete"],
+        "tool_uses": [],
+        "artifacts": {},
+    }
 
 
 def _json_safe(value: Any) -> Any:

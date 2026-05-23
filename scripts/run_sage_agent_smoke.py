@@ -25,6 +25,9 @@ from sage_agent.adapters import (  # noqa: E402
     BBHAdapter,
     CyberGymAdapter,
     MiniGridAdapter,
+    ScienceAgentBenchProbeAdapter,
+    TauBenchProbeAdapter,
+    TerminalBenchProbeAdapter,
     ToolSandboxMiniAdapter,
     ToolSandboxScenarioProbeAdapter,
 )
@@ -46,12 +49,31 @@ from sage_agent.interfaces import (  # noqa: E402
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    environments = (
+        "toolsandbox",
+        "toolsandbox-probe",
+        "cybergym",
+        "minigrid",
+        "bbh",
+        "tau2-bench",
+        "tau3-bench",
+        "terminal-bench",
+        "scienceagentbench",
+        "science-agent-bench",
+    )
     parser.add_argument(
         "--env",
-        choices=("toolsandbox", "toolsandbox-probe", "cybergym", "minigrid", "bbh"),
-        required=True,
+        choices=environments,
+        default=None,
+        help="Standalone adapter to run. Kept for backwards compatibility.",
     )
-    parser.add_argument("--limit", type=int, default=2)
+    parser.add_argument(
+        "--dataset",
+        choices=environments,
+        default=None,
+        help="Alias for --env for CLI runs that choose a dataset/adapter.",
+    )
+    parser.add_argument("--limit", "--samples", dest="limit", type=int, default=2)
     parser.add_argument("--model", default="gpt-4o-mini")
     parser.add_argument(
         "--registry-dir",
@@ -67,6 +89,21 @@ def main() -> None:
         "--bbh-repo",
         type=Path,
         default=Path("external/BIG-Bench-Hard"),
+    )
+    parser.add_argument(
+        "--tau2-repo",
+        type=Path,
+        default=Path("external/tau2-bench"),
+    )
+    parser.add_argument(
+        "--terminal-bench-repo",
+        type=Path,
+        default=Path("external/terminal-bench"),
+    )
+    parser.add_argument(
+        "--scienceagentbench-repo",
+        type=Path,
+        default=Path("external/ScienceAgentBench"),
     )
     parser.add_argument(
         "--bbh-task",
@@ -109,6 +146,12 @@ def main() -> None:
     parser.add_argument("--no-dashboard-open", action="store_true")
     args = parser.parse_args()
 
+    if args.env and args.dataset and args.env != args.dataset:
+        parser.error("--env and --dataset must match when both are provided")
+    args.env = args.env or args.dataset
+    if not args.env:
+        parser.error("one of --env or --dataset is required")
+
     if args.model != "gpt-4o-mini":
         raise SystemExit("This smoke script is intentionally capped to gpt-4o-mini.")
     if args.reset_registry and args.registry_dir.exists():
@@ -130,6 +173,12 @@ def main() -> None:
             repo_root=args.bbh_repo,
             task_names=tuple(args.bbh_task) or BBHAdapter.task_names,
         )
+    elif args.env in {"tau2-bench", "tau3-bench"}:
+        adapter = TauBenchProbeAdapter(repo_root=args.tau2_repo)
+    elif args.env == "terminal-bench":
+        adapter = TerminalBenchProbeAdapter(repo_root=args.terminal_bench_repo)
+    elif args.env in {"scienceagentbench", "science-agent-bench"}:
+        adapter = ScienceAgentBenchProbeAdapter(repo_root=args.scienceagentbench_repo)
     else:
         adapter = MiniGridAdapter(
             env_ids=tuple(args.minigrid_env_id) or MiniGridAdapter.env_ids,
@@ -253,6 +302,45 @@ def _run_metadata(
         )
         return base
 
+    if isinstance(
+        adapter,
+        (
+            TauBenchProbeAdapter,
+            TerminalBenchProbeAdapter,
+            ScienceAgentBenchProbeAdapter,
+        ),
+    ):
+        base.update(
+            {
+                "execution_mode": "external_repository_metadata_probe",
+                "benchmark_ready": False,
+                "real_task_generator_used": False,
+                "real_submission_server_used": False,
+                "real_poc_verifier_used": False,
+                "official_success_verification": False,
+                "interpretation": (
+                    "This run validates SAGE helper birth and reuse over public "
+                    "task metadata from a cloned external benchmark repository. "
+                    "It is not a protected benchmark score."
+                ),
+                "setup_notes": (
+                    "A full benchmark claim still needs a dedicated execution "
+                    "adapter that runs the repository's official task harness and "
+                    "private scorer/verifier.",
+                ),
+                "external_repo": str(
+                    _resolve_path(
+                        args.tau2_repo
+                        if args.env in {"tau2-bench", "tau3-bench"}
+                        else args.terminal_bench_repo
+                        if args.env == "terminal-bench"
+                        else args.scienceagentbench_repo
+                    )
+                ),
+            }
+        )
+        return base
+
     if args.env != "cybergym":
         base.update(
             {
@@ -361,6 +449,20 @@ def _run_baseline(
     adapter: EnvironmentAdapter, *, args: argparse.Namespace, limit: int | None
 ) -> dict[str, object]:
     if args.baseline == "llm":
+        if isinstance(
+            adapter,
+            (
+                TauBenchProbeAdapter,
+                TerminalBenchProbeAdapter,
+                ScienceAgentBenchProbeAdapter,
+            ),
+        ):
+            return _run_repository_probe_llm_baseline(
+                adapter,
+                limit=limit,
+                model=str(args.model),
+                timeout=float(args.llm_timeout),
+            )
         if isinstance(adapter, MiniGridAdapter):
             return _run_minigrid_llm_baseline(
                 adapter,
@@ -377,6 +479,48 @@ def _run_baseline(
             )
         raise SystemExit(f"--baseline llm is not implemented for env={args.env}")
     return _run_no_helper_baseline(adapter, limit=limit)
+
+
+def _run_repository_probe_llm_baseline(
+    adapter: EnvironmentAdapter, *, limit: int | None, model: str, timeout: float
+) -> dict[str, object]:
+    planner = OpenAIEnvironmentBaseline(model=model, timeout=timeout)
+    adapter.prepare()
+    results: list[dict[str, object]] = []
+    for task in adapter.tasks(limit=limit):
+        try:
+            selected_value = planner.select_visible_record_value(task)
+            result = adapter.score_selected_value(  # type: ignore[attr-defined]
+                task,
+                selected_value,
+                transcript_prefix=(
+                    f"LLM baseline selected visible record value {selected_value!r}"
+                ),
+            )
+        except Exception as exc:  # pragma: no cover - live API/environment failure
+            result = TaskRunResult(
+                task=task,
+                success=False,
+                score=0.0,
+                outcome_score=0.0,
+                transcript=(f"LLM baseline failed: {type(exc).__name__}: {exc}",),
+                error=str(exc),
+            )
+        results.append(_baseline_result_json(result))
+    successes = sum(1 for result in results if result["success"])
+    return {
+        "policy": f"llm_visible_metadata_probe_baseline:{model}",
+        "comparison_valid": False,
+        "comparison_note": (
+            "Live LLM baseline over the same public metadata-probe task stream. "
+            "This is valid only as a plumbing check and must not be reported as "
+            "an official benchmark score or dataset performance result."
+        ),
+        "tasks_seen": len(results),
+        "tasks_succeeded": successes,
+        "success_rate": successes / len(results) if results else 0.0,
+        "results": results,
+    }
 
 
 def _run_minigrid_llm_baseline(

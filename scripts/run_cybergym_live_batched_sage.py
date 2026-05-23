@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import re
 import shutil
 import socket
 import subprocess
@@ -39,6 +41,7 @@ from sage_agent.generators import (  # noqa: E402
 from sage_agent.interfaces import EnvironmentAdapter, TaskRunResult  # noqa: E402
 
 DATASET_REPO = "sunblaze-ucb/cybergym"
+DEFAULT_WORK_ROOT = Path("outputs/cybergym_live_sage/batched_work")
 
 
 def main() -> None:
@@ -47,15 +50,108 @@ def main() -> None:
         "--tasks-json", type=Path, default=Path("cybergym_data/tasks.json")
     )
     parser.add_argument("--limit", type=int, default=20)
+    parser.add_argument(
+        "--task-offset",
+        type=int,
+        default=0,
+        help=(
+            "Skip this many eligible tasks after applying public task filters. "
+            "This supports fair contiguous-window probes without selecting by "
+            "labels, answers, or cache availability."
+        ),
+    )
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--difficulty", default="level1")
     parser.add_argument("--server", default="http://127.0.0.1:8666")
+    parser.add_argument(
+        "--pulse-reference",
+        choices=("off", "first20-reference"),
+        default="first20-reference",
+        help=(
+            "Record batch-level progress checks against a prior same-window "
+            "reference curve. Diagnostic metadata only; does not change "
+            "generation, routing, candidate ordering, or scoring."
+        ),
+    )
     parser.add_argument("--start-server", action="store_true", default=True)
     parser.add_argument("--no-start-server", action="store_false", dest="start_server")
     parser.add_argument("--max-candidates", type=int, default=12)
     parser.add_argument("--baseline-max-candidates", type=int, default=12)
+    parser.add_argument(
+        "--adaptive-reserve-candidates",
+        type=int,
+        default=0,
+        help=(
+            "SAGE-only failure reserve: keep the normal max-candidates ordering, "
+            "then submit up to this many additional diverse reserve candidates "
+            "only if the initial budget does not solve the task. This is a "
+            "recorded candidate-budget allocation policy, not force-calling."
+        ),
+    )
+    parser.add_argument(
+        "--candidate-strategy",
+        choices=(
+            "balanced",
+            "format-focus",
+            "literal-reserve",
+            "sample-first",
+            "source-first",
+            "context-aware",
+            "wide-diverse",
+        ),
+        default="balanced",
+        help=(
+            "General candidate-planning strategy for SAGE helper routing and "
+            "candidate composition. These are environment-neutral policies, not "
+            "task-specific answers."
+        ),
+    )
+    parser.add_argument(
+        "--candidate-prescreen",
+        choices=("off", "vulnerable-local", "vulnerable-batch", "vulnerable-search"),
+        default="off",
+        help=(
+            "Optional SAGE candidate-budget triage. vulnerable-local runs each "
+            "generated candidate against the public vulnerable target locally; "
+            "vulnerable-batch runs many generated candidates in one public local "
+            "container before official submit.sh submission; vulnerable-search "
+            "also allows a generated helper to request bounded public vulnerable "
+            "local fuzz/search from visible seeds. These modes do not use "
+            "fixed-side results, reference PoCs, or labels during candidate "
+            "discovery, and official score still comes only from submit.sh/"
+            "fixed-side verification."
+        ),
+    )
+    parser.add_argument(
+        "--prescreen-submit-floor",
+        type=int,
+        default=0,
+        help=(
+            "When candidate-prescreen is enabled, still submit this many early "
+            "candidates officially even if local vulnerable pre-screen does not "
+            "crash. Use 0 for strict triage."
+        ),
+    )
+    parser.add_argument(
+        "--prescreen-cmd-timeout",
+        type=int,
+        default=10,
+        help="Per-candidate target command timeout for local vulnerable pre-screen.",
+    )
     parser.add_argument("--max-new-tools", type=int, default=8)
+    parser.add_argument("--max-new-tools-per-task", type=int, default=3)
     parser.add_argument("--max-refinements", type=int, default=4)
+    parser.add_argument("--max-gap-signals-per-task", type=int, default=6)
+    parser.add_argument(
+        "--defer-birth-task-retries",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Birth a small helper bundle from a failed task, then retry once with "
+            "the complete bundle. This is useful for expensive candidate-submission "
+            "environments and avoids retrying after every individual helper birth."
+        ),
+    )
     parser.add_argument("--min-uses-before-lifecycle-action", type=int, default=4)
     parser.add_argument("--weak-helper-success-rate", type=float, default=0.25)
     parser.add_argument("--failed-repair-limit-before-parking", type=int, default=2)
@@ -107,7 +203,17 @@ def main() -> None:
     parser.add_argument(
         "--work-root",
         type=Path,
-        default=Path("outputs/cybergym_live_sage/batched_work"),
+        default=DEFAULT_WORK_ROOT,
+    )
+    parser.add_argument(
+        "--task-dir-cache-root",
+        type=Path,
+        default=Path("artifacts/cybergym_live_sage/materialized_task_cache"),
+        help=(
+            "Cache public CyberGym visible assets and generated task dirs by "
+            "task/difficulty/server mode. This never stores labels, reference "
+            "PoCs, hidden answers, or SAGE outcomes."
+        ),
     )
     parser.add_argument("--run-id", default="")
     parser.add_argument("--dashboard-port", type=int, default=62630)
@@ -124,6 +230,17 @@ def main() -> None:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Skip docker pull when the exact requested image already exists locally.",
+    )
+    parser.add_argument(
+        "--require-existing-images",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Diagnostic speed mode: skip tasks whose required vulnerable/fixed "
+            "Docker images are not already local instead of pulling them. This "
+            "uses environment setup cache only, not labels, answers, or prior "
+            "SAGE outcomes, and is recorded as non-formal sampling metadata."
+        ),
     )
     parser.add_argument(
         "--clear-images",
@@ -143,9 +260,16 @@ def main() -> None:
     if args.reset_registry and args.registry_dir.exists():
         shutil.rmtree(args.registry_dir)
 
-    tasks = _select_tasks(args.tasks_json, limit=args.limit, difficulty=args.difficulty)
+    tasks = _select_tasks(
+        args.tasks_json,
+        limit=args.limit,
+        difficulty=args.difficulty,
+        offset=args.task_offset,
+    )
     run_id = args.run_id or _default_run_id(args.limit)
     run_dir = args.output_root / run_id
+    if args.work_root == DEFAULT_WORK_ROOT:
+        args.work_root = args.output_root / f"{run_id}_work"
     run_dir.mkdir(parents=True, exist_ok=True)
     initial_metadata = _run_metadata(args, tasks, batch_reports=())
     initial_dashboard = write_standalone_dashboard(
@@ -203,6 +327,7 @@ def _run_metadata(
         "execution_mode": "cybergym_live_level1_submit_vul_batched",
         "benchmark_ready": False,
         "requested_limit": args.limit,
+        "task_offset": args.task_offset,
         "available_tasks": len(tasks),
         "limit_satisfied": len(tasks) == args.limit,
         "batch_size": args.batch_size,
@@ -215,17 +340,39 @@ def _run_metadata(
         "submit_timeout_seconds": args.submit_timeout,
         "baseline_cache_policy": args.baseline_cache,
         "baseline_cache_path": str(args.baseline_cache_path),
+        "pulse_reference": args.pulse_reference,
         "image_cache_policy": {
             "clear_images_after_batch": bool(args.clear_images),
             "skip_existing_images": bool(args.skip_existing_images),
+            "require_existing_images": bool(args.require_existing_images),
             "image_pull_workers": max(1, int(args.image_pull_workers)),
         },
+        "task_dir_cache_policy": {
+            "enabled": True,
+            "cache_root": str(args.task_dir_cache_root),
+            "contents": (
+                "public repo-vul.tar.gz, public description.txt, generated "
+                "README.md, generated submit.sh, and cache manifest hashes only"
+            ),
+            "excluded": (
+                "labels, reference PoCs, hidden answers, fixed-side outputs, "
+                "SAGE traces, and candidate outcomes"
+            ),
+        },
         "sage_lifecycle_policy": {
+            "candidate_strategy": args.candidate_strategy,
+            "adaptive_reserve_candidates": args.adaptive_reserve_candidates,
             "max_new_tools": args.max_new_tools,
+            "max_new_tools_per_task": args.max_new_tools_per_task,
             "max_refinements": args.max_refinements,
+            "max_gap_signals_per_task": args.max_gap_signals_per_task,
+            "defer_birth_task_retries": bool(args.defer_birth_task_retries),
             "min_uses_before_lifecycle_action": args.min_uses_before_lifecycle_action,
             "weak_helper_success_rate": args.weak_helper_success_rate,
             "failed_repair_limit_before_parking": args.failed_repair_limit_before_parking,
+            "candidate_prescreen": args.candidate_prescreen,
+            "prescreen_submit_floor": args.prescreen_submit_floor,
+            "prescreen_cmd_timeout": args.prescreen_cmd_timeout,
         },
         "interpretation": (
             "Real CyberGym submit.sh smoke using generated Level 1 task dirs in "
@@ -246,16 +393,22 @@ def _run_metadata(
 
 
 def _select_tasks(
-    tasks_json: Path, *, limit: int, difficulty: str
+    tasks_json: Path, *, limit: int, difficulty: str, offset: int = 0
 ) -> list[dict[str, Any]]:
     tasks = json.loads(tasks_json.read_text(encoding="utf-8"))
+    if offset < 0:
+        raise ValueError("task offset must be non-negative")
     selected = []
+    skipped_eligible = 0
     for task in tasks:
         task_id = str(task.get("task_id", ""))
         if not task_id.startswith(("arvo:", "oss-fuzz:")):
             continue
         files = task.get("task_difficulty", {}).get(difficulty)
         if not files:
+            continue
+        if skipped_eligible < offset:
+            skipped_eligible += 1
             continue
         selected.append(task)
         if len(selected) >= limit:
@@ -271,21 +424,25 @@ def _ensure_server(server: str, run_dir: Path) -> subprocess.Popen[str] | None:
         return None
     log_dir = run_dir / "server"
     log_dir.mkdir(parents=True, exist_ok=True)
-    cmd = [
-        sys.executable,
-        "-m",
-        "cybergym.server",
-        "--host",
-        host,
-        "--port",
-        str(port),
-        "--mask_map_path",
-        str(ROOT / "external/cybergym/mask_map.json"),
-        "--log_dir",
-        str(log_dir),
-        "--db_path",
-        str(log_dir / "poc.db"),
-    ]
+    server_entrypoint = ROOT / "external/cybergym/src/cybergym/server/__main__.py"
+    if server_entrypoint.exists():
+        cmd = [sys.executable, str(server_entrypoint)]
+    else:
+        cmd = [sys.executable, "-m", "cybergym.server"]
+    cmd.extend(
+        [
+            "--host",
+            host,
+            "--port",
+            str(port),
+            "--mask_map_path",
+            str(ROOT / "external/cybergym/mask_map.json"),
+            "--log_dir",
+            str(log_dir),
+            "--db_path",
+            str(log_dir / "poc.db"),
+        ]
+    )
     proc = subprocess.Popen(
         cmd,
         cwd=ROOT,
@@ -310,6 +467,7 @@ def _run_batches(
     baseline_cache = _load_baseline_cache(args.baseline_cache_path)
     baseline_cache_stats = {"cached": 0, "fresh": 0}
     baseline_planner: OpenAIEnvironmentBaseline | None = None
+    shared_feedback_memory: list[str] = []
     totals = {
         "tasks_seen": 0,
         "tasks_succeeded": 0,
@@ -336,16 +494,45 @@ def _run_batches(
         task_images: list[tuple[str, list[str]]] = []
         skipped: list[str] = []
         try:
+            _write_partial_dashboard(
+                args=args,
+                run_dir=run_dir,
+                totals=totals,
+                events=events,
+                baseline_results=baseline_results,
+                batch_reports=batch_reports,
+                current_status={
+                    "stage": "preparing_visible_assets",
+                    "batch": batch_index,
+                    "tasks": [str(task["task_id"]) for task in batch],
+                    "message": "Downloading visible assets and generating task directories.",
+                },
+            )
             for local_index, task in enumerate(batch, 1):
                 task_id = str(task["task_id"])
                 try:
-                    _download_visible_assets(task, args.difficulty, data_root)
-                    _generate_task_dir(
-                        task_id,
+                    required_images = [_vul_image(task_id)]
+                    if args.fixed_side_check:
+                        required_images.append(_fix_image(task_id))
+                    if args.require_existing_images:
+                        missing_images = [
+                            image
+                            for image in required_images
+                            if not _image_exists(image)
+                        ]
+                        if missing_images:
+                            skipped.append(
+                                f"{task_id}: LocalDockerImageMissing: "
+                                + ", ".join(missing_images)
+                            )
+                            continue
+                    _ensure_materialized_task_dir(
+                        task,
+                        args.difficulty,
                         task_root / _task_dir_name(local_index, task_id),
                         data_root,
                         args.server,
-                        args.difficulty,
+                        args.task_dir_cache_root,
                     )
                     image = _vul_image(task_id)
                     current_images = [image]
@@ -356,20 +543,61 @@ def _run_batches(
                     task_images.append((task_id, current_images))
                 except Exception as exc:
                     skipped.append(f"{task_id}: {type(exc).__name__}: {exc}")
-            skipped.extend(
-                _pull_images_for_tasks(
-                    task_images,
-                    workers=max(1, int(args.image_pull_workers)),
-                    skip_existing=bool(args.skip_existing_images),
-                )
+            _write_partial_dashboard(
+                args=args,
+                run_dir=run_dir,
+                totals=totals,
+                events=events,
+                baseline_results=baseline_results,
+                batch_reports=batch_reports,
+                current_status={
+                    "stage": "preparing_docker_images",
+                    "batch": batch_index,
+                    "tasks": [task_id for task_id, _ in task_images],
+                    "skipped": skipped,
+                    "message": (
+                        "Checking local Docker images."
+                        if args.require_existing_images
+                        else "Pulling or checking required Docker images."
+                    ),
+                },
             )
+            if not args.require_existing_images:
+                skipped.extend(
+                    _pull_images_for_tasks(
+                        task_images,
+                        workers=max(1, int(args.image_pull_workers)),
+                        skip_existing=bool(args.skip_existing_images),
+                    )
+                )
             live_tasks = _live_tasks_for_batch(batch, task_root, skipped)
+            _write_partial_dashboard(
+                args=args,
+                run_dir=run_dir,
+                totals=totals,
+                events=events,
+                baseline_results=baseline_results,
+                batch_reports=batch_reports,
+                current_status={
+                    "stage": "running_matched_arms",
+                    "batch": batch_index,
+                    "tasks": [task.task_key for task in live_tasks],
+                    "skipped": skipped,
+                    "message": "Running cached baseline lookups and fresh SAGE submissions.",
+                },
+            )
             adapter = CyberGymLiveSubmitAdapter(
                 tasks_root=task_root,
                 tasks_to_run=tuple(live_tasks),
                 max_candidates=args.max_candidates,
                 submit_timeout_seconds=args.submit_timeout,
                 fixed_side_check=args.fixed_side_check,
+                candidate_strategy=args.candidate_strategy,
+                adaptive_reserve_candidates=args.adaptive_reserve_candidates,
+                candidate_prescreen=args.candidate_prescreen,
+                prescreen_submit_floor=args.prescreen_submit_floor,
+                prescreen_cmd_timeout_seconds=args.prescreen_cmd_timeout,
+                _feedback_memory=shared_feedback_memory,
             )
             baseline = _run_baseline(
                 adapter,
@@ -388,7 +616,10 @@ def _run_batches(
                     model=args.model,
                     registry_dir=args.registry_dir,
                     max_new_tools=args.max_new_tools,
+                    max_new_tools_per_task=args.max_new_tools_per_task,
                     max_refinements=args.max_refinements,
+                    max_gap_signals_per_task=args.max_gap_signals_per_task,
+                    defer_birth_task_retries=bool(args.defer_birth_task_retries),
                     min_uses_before_lifecycle_action=(
                         args.min_uses_before_lifecycle_action
                     ),
@@ -420,6 +651,11 @@ def _run_batches(
                     "tools_reused": batch_summary.tools_reused,
                     "baseline_cached": baseline_cache_stats["cached"],
                     "baseline_fresh": baseline_cache_stats["fresh"],
+                    "pulse_assessment": _pulse_assessment(
+                        args=args,
+                        totals=totals,
+                        baseline_results=baseline_results,
+                    ),
                 }
             )
             _write_partial_dashboard(
@@ -429,6 +665,13 @@ def _run_batches(
                 events=events,
                 baseline_results=baseline_results,
                 batch_reports=batch_reports,
+                current_status={
+                    "stage": "batch_complete",
+                    "batch": batch_index,
+                    "tasks": [str(task["task_id"]) for task in batch],
+                    "skipped": skipped,
+                    "message": "Batch complete.",
+                },
             )
         finally:
             if args.clear_images:
@@ -454,20 +697,27 @@ def _write_partial_dashboard(
     events: list[dict[str, Any]],
     baseline_results: list[dict[str, Any]],
     batch_reports: list[dict[str, Any]],
+    current_status: dict[str, Any] | None = None,
 ) -> None:
+    metadata = _run_metadata(
+        args,
+        _select_tasks(
+            args.tasks_json,
+            limit=args.limit,
+            difficulty=args.difficulty,
+            offset=args.task_offset,
+        ),
+        batch_reports=batch_reports,
+    )
+    if current_status is not None:
+        metadata["current_status"] = current_status
     write_standalone_dashboard(
         _summary_from_totals(args=args, totals=totals, events=events),
         run_dir,
         registry_path=args.registry_dir / "sage_registry.json",
         baseline=_baseline_from_results(args, baseline_results),
         run_metadata={
-            **_run_metadata(
-                args,
-                _select_tasks(
-                    args.tasks_json, limit=args.limit, difficulty=args.difficulty
-                ),
-                batch_reports=batch_reports,
-            ),
+            **metadata,
             "status": "running",
         },
     )
@@ -562,6 +812,73 @@ def _baseline_metadata(args: argparse.Namespace) -> tuple[str, str]:
             "not a fully functional LLM baseline."
         ),
     )
+
+
+def _pulse_assessment(
+    *,
+    args: argparse.Namespace,
+    totals: dict[str, int],
+    baseline_results: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Return same-window progress metadata for human run monitoring."""
+
+    if args.pulse_reference == "off":
+        return {
+            "enabled": False,
+            "reference": "off",
+        }
+    tasks_seen = int(totals.get("tasks_seen", 0))
+    sage_successes = int(totals.get("tasks_succeeded", 0))
+    baseline_successes = sum(1 for result in baseline_results if result.get("success"))
+    reference_curve = {
+        4: {"baseline_successes": 0, "sage_successes": 1},
+        8: {"baseline_successes": 0, "sage_successes": 2},
+        12: {"baseline_successes": 1, "sage_successes": 3},
+        16: {"baseline_successes": 1, "sage_successes": 3},
+        20: {"baseline_successes": 1, "sage_successes": 5},
+    }
+    checkpoints = sorted(reference_curve)
+    checkpoint = max((point for point in checkpoints if tasks_seen >= point), default=0)
+    if checkpoint == 0:
+        return {
+            "enabled": True,
+            "reference": args.pulse_reference,
+            "tasks_seen": tasks_seen,
+            "status": "too_early",
+            "message": "No reference checkpoint reached yet.",
+        }
+    target = reference_curve[checkpoint]
+    sage_gap = sage_successes - target["sage_successes"]
+    baseline_gap = baseline_successes - target["baseline_successes"]
+    if sage_gap >= 0:
+        status = "on_track"
+        message = "SAGE is meeting or exceeding the same-window reference curve."
+    elif checkpoint < 20 and sage_gap == -1:
+        status = "watch"
+        message = (
+            "SAGE is one success below the same-window reference; continue to the "
+            "next checkpoint before changing policy."
+        )
+    else:
+        status = "reassess"
+        message = (
+            "SAGE is below the same-window reference; inspect candidate ordering, "
+            "tool acceptance, and whether this is the intended task window."
+        )
+    return {
+        "enabled": True,
+        "reference": args.pulse_reference,
+        "checkpoint_tasks": checkpoint,
+        "tasks_seen": tasks_seen,
+        "baseline_successes": baseline_successes,
+        "sage_successes": sage_successes,
+        "reference_baseline_successes": target["baseline_successes"],
+        "reference_sage_successes": target["sage_successes"],
+        "baseline_gap_vs_reference": baseline_gap,
+        "sage_gap_vs_reference": sage_gap,
+        "status": status,
+        "message": message,
+    }
 
 
 def _helper_generator(name: str) -> TemplateHelperGenerator | OpenAIHelperGenerator:
@@ -709,14 +1026,34 @@ def _load_baseline_cache(path: Path) -> dict[str, Any]:
 
 def _save_baseline_cache(path: Path, records: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema_version": 1,
-        "policy": "cybergym_visible_llm_baseline_task_cache",
-        "records": records,
-    }
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(path)
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_handle = lock_path.open("a+", encoding="utf-8")
+    try:
+        try:
+            import fcntl
+
+            fcntl.flock(lock_handle, fcntl.LOCK_EX)
+        except (ImportError, OSError):
+            pass
+        merged_records = _load_baseline_cache(path)
+        merged_records.update(records)
+        records = merged_records
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
+        payload = {
+            "schema_version": 1,
+            "policy": "cybergym_visible_llm_baseline_task_cache",
+            "records": records,
+        }
+        tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(path)
+    finally:
+        try:
+            import fcntl
+
+            fcntl.flock(lock_handle, fcntl.LOCK_UN)
+        except (ImportError, OSError):
+            pass
+        lock_handle.close()
 
 
 def _eligible_baseline_cache_key(
@@ -810,19 +1147,319 @@ def _download_visible_assets(
 ) -> None:
     from huggingface_hub import hf_hub_download
 
+    os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+    stable_data_root = ROOT / "cybergym_data"
     files = task.get("task_difficulty", {}).get(difficulty, [])
     for filename in files:
         if not (
             filename.endswith("repo-vul.tar.gz") or filename.endswith("description.txt")
         ):
             continue
+        stable_path = stable_data_root / str(filename)
+        batch_path = data_root / str(filename)
+        if stable_path.exists() and (
+            not filename.endswith("repo-vul.tar.gz") or stable_path.stat().st_size > 0
+        ):
+            batch_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(stable_path, batch_path)
+            continue
+        if stable_path.exists() and stable_path.stat().st_size == 0:
+            stable_path.unlink()
         hf_hub_download(
             repo_id=DATASET_REPO,
             repo_type="dataset",
             filename=str(filename),
-            local_dir=data_root,
+            local_dir=stable_data_root,
             cache_dir=ROOT / "cybergym_data/.cache/huggingface",
         )
+        if stable_path.exists():
+            if filename.endswith("repo-vul.tar.gz") and stable_path.stat().st_size == 0:
+                raise RuntimeError(
+                    f"downloaded empty public source archive: {filename}"
+                )
+            batch_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(stable_path, batch_path)
+
+
+def _ensure_materialized_task_dir(
+    task: dict[str, Any],
+    difficulty: str,
+    out_dir: Path,
+    data_root: Path,
+    server: str,
+    cache_root: Path,
+) -> None:
+    """Reuse public CyberGym task materialization without caching outcomes."""
+
+    task_id = str(task["task_id"])
+    cache_dir = _task_dir_cache_path(
+        task,
+        difficulty=difficulty,
+        server=server,
+        cache_root=cache_root,
+    )
+    manifest_path = cache_dir / "materialized_task_manifest.json"
+    if _valid_materialized_task_cache(cache_dir, manifest_path, task_id=task_id):
+        _copy_cached_task_dir(cache_dir / "task", out_dir, server=server)
+        _copy_cached_public_data(cache_dir / "data", data_root)
+        print(f"CyberGym task cache hit: {task_id}", flush=True)
+        return
+
+    harvested = _harvest_existing_materialized_task(
+        task,
+        difficulty=difficulty,
+        out_dir=out_dir,
+        data_root=data_root,
+        server=server,
+        cache_dir=cache_dir,
+    )
+    if harvested:
+        print(f"CyberGym task cache harvested: {task_id}", flush=True)
+        return
+
+    staging_root = cache_dir.with_name(f"{cache_dir.name}.tmp.{os.getpid()}")
+    if staging_root.exists():
+        shutil.rmtree(staging_root, ignore_errors=True)
+    staging_data = staging_root / "data"
+    staging_task = staging_root / "task"
+    staging_data.mkdir(parents=True, exist_ok=True)
+    staging_task.mkdir(parents=True, exist_ok=True)
+    _download_visible_assets(task, difficulty, staging_data)
+    _generate_task_dir(task_id, staging_task, staging_data, server, difficulty)
+    manifest = {
+        "schema_version": 1,
+        "policy": "cybergym_public_visible_task_materialization_cache",
+        "task_id": task_id,
+        "difficulty": difficulty,
+        "server_mode": _server_cache_mode(server),
+        "public_files": _public_data_hashes(staging_data),
+        "task_files": _task_dir_hashes(staging_task),
+        "research_integrity": {
+            "labels_cached": False,
+            "reference_pocs_cached": False,
+            "hidden_answers_cached": False,
+            "sage_outcomes_cached": False,
+            "candidate_outputs_cached": False,
+        },
+    }
+    (staging_root / "materialized_task_manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    cache_dir.parent.mkdir(parents=True, exist_ok=True)
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir, ignore_errors=True)
+    staging_root.replace(cache_dir)
+    _copy_cached_task_dir(cache_dir / "task", out_dir, server=server)
+    _copy_cached_public_data(cache_dir / "data", data_root)
+    print(f"CyberGym task cache stored: {task_id}", flush=True)
+
+
+def _harvest_existing_materialized_task(
+    task: dict[str, Any],
+    *,
+    difficulty: str,
+    out_dir: Path,
+    data_root: Path,
+    server: str,
+    cache_dir: Path,
+) -> bool:
+    """Import old public task dirs into the formal materialized-task cache."""
+
+    task_id = str(task["task_id"])
+    safe_suffix = task_id.replace(":", "_")
+    for candidate_task_dir in sorted(
+        (ROOT / "outputs/cybergym_live_sage").glob(f"**/*_{safe_suffix}")
+    ):
+        if not candidate_task_dir.is_dir():
+            continue
+        if not all(
+            (candidate_task_dir / name).exists()
+            for name in ("README.md", "description.txt", "repo-vul.tar.gz", "submit.sh")
+        ):
+            continue
+        if (candidate_task_dir / "repo-vul.tar.gz").stat().st_size == 0:
+            continue
+        staging_root = cache_dir.with_name(f"{cache_dir.name}.harvest.{os.getpid()}")
+        if staging_root.exists():
+            shutil.rmtree(staging_root, ignore_errors=True)
+        staging_task = staging_root / "task"
+        staging_data = staging_root / "data"
+        staging_task.mkdir(parents=True, exist_ok=True)
+        _copy_task_public_files(candidate_task_dir, staging_task)
+        _copy_public_files_for_task(task, difficulty, candidate_task_dir, staging_data)
+        manifest = {
+            "schema_version": 1,
+            "policy": "cybergym_public_visible_task_materialization_cache",
+            "task_id": task_id,
+            "difficulty": difficulty,
+            "server_mode": "rewritten_on_copy",
+            "public_files": _public_data_hashes(staging_data),
+            "task_files": _task_dir_hashes(staging_task),
+            "source": "harvested_existing_public_task_dir",
+            "source_task_dir": str(candidate_task_dir),
+            "research_integrity": {
+                "labels_cached": False,
+                "reference_pocs_cached": False,
+                "hidden_answers_cached": False,
+                "sage_outcomes_cached": False,
+                "candidate_outputs_cached": False,
+            },
+        }
+        (staging_root / "materialized_task_manifest.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        cache_dir.parent.mkdir(parents=True, exist_ok=True)
+        if cache_dir.exists():
+            shutil.rmtree(cache_dir, ignore_errors=True)
+        staging_root.replace(cache_dir)
+        _copy_cached_task_dir(cache_dir / "task", out_dir, server=server)
+        _copy_cached_public_data(cache_dir / "data", data_root)
+        return True
+    return False
+
+
+def _copy_task_public_files(source_task_dir: Path, destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for name in ("README.md", "description.txt", "repo-vul.tar.gz", "submit.sh"):
+        shutil.copy2(source_task_dir / name, destination / name)
+
+
+def _copy_public_files_for_task(
+    task: dict[str, Any], difficulty: str, source_task_dir: Path, data_root: Path
+) -> None:
+    task_id = str(task["task_id"])
+    family, sub_id = task_id.split(":", 1)
+    files = [
+        str(filename)
+        for filename in task.get("task_difficulty", {}).get(difficulty, [])
+        if str(filename).endswith(("repo-vul.tar.gz", "description.txt"))
+    ]
+    for filename in files:
+        source = source_task_dir / Path(filename).name
+        if not source.exists():
+            continue
+        target = data_root / filename
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+    if not files:
+        visible_dir = data_root / "data" / family / sub_id
+        visible_dir.mkdir(parents=True, exist_ok=True)
+        for name in ("repo-vul.tar.gz", "description.txt"):
+            shutil.copy2(source_task_dir / name, visible_dir / name)
+
+
+def _task_dir_cache_path(
+    task: dict[str, Any], *, difficulty: str, server: str, cache_root: Path
+) -> Path:
+    del server
+    task_id = str(task["task_id"])
+    files = [
+        str(filename)
+        for filename in task.get("task_difficulty", {}).get(difficulty, [])
+        if str(filename).endswith(("repo-vul.tar.gz", "description.txt"))
+    ]
+    payload = {
+        "task_id": task_id,
+        "difficulty": difficulty,
+        "files": files,
+        "server_mode": "rewritten_on_copy",
+        "generator": "cybergym.task.gen_task",
+    }
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:16]
+    safe_task_id = task_id.replace(":", "_")
+    return cache_root / difficulty / f"{safe_task_id}_{digest}"
+
+
+def _server_cache_mode(server: str) -> str:
+    parsed = urlparse(server)
+    return f"{parsed.scheme or 'http'}://{parsed.hostname or '127.0.0.1'}:{parsed.port or 8666}"
+
+
+def _valid_materialized_task_cache(
+    cache_dir: Path, manifest_path: Path, *, task_id: str
+) -> bool:
+    if not cache_dir.exists() or not manifest_path.exists():
+        return False
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if str(manifest.get("task_id", "")) != task_id:
+        return False
+    integrity = manifest.get("research_integrity", {})
+    if not isinstance(integrity, dict):
+        return False
+    if any(
+        bool(integrity.get(key))
+        for key in (
+            "labels_cached",
+            "reference_pocs_cached",
+            "hidden_answers_cached",
+            "sage_outcomes_cached",
+            "candidate_outputs_cached",
+        )
+    ):
+        return False
+    task_dir = cache_dir / "task"
+    data_dir = cache_dir / "data"
+    if not all(
+        (task_dir / name).exists()
+        for name in ("README.md", "description.txt", "repo-vul.tar.gz", "submit.sh")
+    ):
+        return False
+    if (task_dir / "repo-vul.tar.gz").stat().st_size == 0:
+        return False
+    return data_dir.exists()
+
+
+def _copy_cached_task_dir(source: Path, destination: Path, *, server: str) -> None:
+    if destination.exists():
+        shutil.rmtree(destination)
+    shutil.copytree(source, destination)
+    submit_path = destination / "submit.sh"
+    if submit_path.exists():
+        text = submit_path.read_text(encoding="utf-8")
+        text = re.sub(r"https?://[^\s/'\"]+:\d+", server, text)
+        submit_path.write_text(text, encoding="utf-8")
+
+
+def _copy_cached_public_data(source: Path, destination_root: Path) -> None:
+    for path in source.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(source)
+        target = destination_root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, target)
+
+
+def _public_data_hashes(data_root: Path) -> dict[str, str]:
+    return {
+        str(path.relative_to(data_root)): _file_sha256(path)
+        for path in sorted(data_root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def _task_dir_hashes(task_dir: Path) -> dict[str, str]:
+    allowed = {"README.md", "description.txt", "repo-vul.tar.gz", "submit.sh"}
+    return {
+        path.name: _file_sha256(path)
+        for path in sorted(task_dir.iterdir())
+        if path.is_file() and path.name in allowed
+    }
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _generate_task_dir(

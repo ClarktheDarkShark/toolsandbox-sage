@@ -191,6 +191,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     }
     .run-progress {
       display: inline-flex;
+      flex-wrap: wrap;
       align-items: baseline;
       gap: 10px;
       margin-top: 12px;
@@ -214,6 +215,15 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       color: var(--text);
       font-size: 15px;
       font-variant-numeric: tabular-nums;
+    }
+    .run-stage {
+      display: block;
+      margin-top: 7px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+      max-width: 980px;
+      overflow-wrap: anywhere;
     }
     .metrics {
       display: grid;
@@ -551,7 +561,9 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       registryTools = registry.tools || {};
       baselineResults = baseline.results || [];
       baselineByTask = new Map(baselineResults.map((item) => [item.task_id, item]));
-      const taskEvents = events.filter((event) => event.event === "task");
+      const taskEvents = events.filter((event) =>
+        event.event === "task" || event.event === "task_result"
+      );
       const retryEvents = events.filter((event) =>
         event.event === "birth_task_retry" || event.event === "refined_tool_task_retry"
       );
@@ -561,7 +573,9 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       }
       tasks = taskIds.map((taskId, index) => {
         const related = events.filter((candidate) => candidate.task_id === taskId);
-        const initial = [...related].reverse().find((event) => event.event === "task");
+        const initial = [...related].reverse().find((event) =>
+          event.event === "task" || event.event === "task_result"
+        );
         const retries = related.filter((event) =>
           event.event === "birth_task_retry" || event.event === "refined_tool_task_retry"
         );
@@ -728,16 +742,22 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     function renderHeader() {
       const stats = getRunStats();
       const status = runMetadata.status || (runMetadata.benchmark_ready === false ? "probe" : "complete");
+      const currentStatus = runMetadata.current_status || {};
+      const stageText = currentStatus.stage
+        ? `${String(currentStatus.stage).replaceAll("_", " ")}${currentStatus.batch ? ` · batch ${currentStatus.batch}` : ""}${currentStatus.message ? ` · ${currentStatus.message}` : ""}`
+        : "";
       const environmentName = envDisplayName(summary.environment);
       document.title = `Task Compare - ${environmentName} - SAGE`;
       document.getElementById("envBadge").textContent = environmentName;
       document.getElementById("subtitle").textContent =
         `${status} · ${summary.model || "model"} · ` +
-        `${stats.paired}/${stats.total} matched tasks`;
+        `${stats.paired}/${stats.total} matched tasks` +
+        (stageText ? ` · ${stageText}` : "");
       document.getElementById("runProgress").innerHTML =
         `<span class="label">Run Progress</span><strong>${stats.paired}/${stats.total}</strong>` +
         `<span>baseline ${baseline.tasks_seen || baselineResults.length}/${stats.total} · ` +
-        `SAGE ${summary.tasks_seen || tasks.length}/${stats.total}</span>`;
+        `SAGE ${summary.tasks_seen || tasks.length}/${stats.total}</span>` +
+        (stageText ? `<span class="run-stage">${esc(stageText)}</span>` : "");
       document.getElementById("metrics").innerHTML = [
         metric("Baseline Score", fmt(stats.baselineScore), `${baselineResults.length} paired score tasks`),
         metric("SAGE Score", fmt(stats.sageScore), `${tasks.length} paired score tasks`),
@@ -1243,7 +1263,7 @@ def _legacy_dashboard_html(payload: dict[str, Any]) -> str:
     const baseline = payload.baseline || {{}};
     const runMetadata = payload.run_metadata || {{}};
     const events = summary.events || [];
-    const tasks = events.filter((event) => event.event === "task");
+    const tasks = events.filter((event) => event.event === "task" || event.event === "task_result");
     let selectedTaskId = tasks[0]?.task_id || "";
 
     function pct(n, d) {{
@@ -1300,7 +1320,7 @@ def _legacy_dashboard_html(payload: dict[str, Any]) -> str:
     }}
     function taskStatus(taskId) {{
       const related = taskEvents(taskId);
-      const first = related.find((event) => event.event === "task") || {{}};
+      const first = related.find((event) => event.event === "task" || event.event === "task_result") || {{}};
       const retry = related.find((event) => event.event === "birth_task_retry");
       if (first.success) return {{ label: "success", className: "green" }};
       if (retry?.success) return {{ label: "retry success", className: "green" }};

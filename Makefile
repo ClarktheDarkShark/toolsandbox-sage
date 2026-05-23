@@ -15,6 +15,10 @@ OUT ?= artifacts/registries/frozen_registry.json
 RUN ?= outputs/sage_protocol_campaign/extended_reuse_100_20260428_125232
 MODE ?= evolve
 PORT ?= 5520
+SAGE_DATASET ?= toolsandbox
+SAGE_SAMPLES ?= 2
+SAGE_STANDALONE_REGISTRY ?= artifacts/sage_standalone/$(SAGE_DATASET)_cli_registry
+SAGE_STANDALONE_OUTPUT_ROOT ?= outputs/sage_agent_standalone
 CLAIM_PORTFOLIO_REGISTRY ?= outputs/claim_portfolio_registry
 DASHBOARD_OPEN ?= 1
 DASHBOARD_FLAGS := $(if $(filter 1,$(DASHBOARD_OPEN)),,--no-dashboard-open)
@@ -118,6 +122,7 @@ RELATIVE_TIME_TRANSFER_MANIFEST ?= outputs/splits/relative_datetime_transfer.jso
 .PHONY: \
 	test \
 	lint \
+	sage_agent \
 	dashboard \
 	campaign-init \
 	coverage_map \
@@ -178,6 +183,15 @@ test:
 
 lint:
 	$(RUFF) check scripts src/sage_ts tests/unit tests/integration
+
+sage_agent:
+	$(RUN_PYTHON) scripts/run_sage_agent_smoke.py \
+		--dataset $(SAGE_DATASET) \
+		--samples $(SAGE_SAMPLES) \
+		--registry-dir $(SAGE_STANDALONE_REGISTRY) \
+		--output-root $(SAGE_STANDALONE_OUTPUT_ROOT) \
+		--reset-registry \
+		$(DASHBOARD_FLAGS)
 
 campaign-init:
 	$(RUN_PYTHON) scripts/campaign_artifacts.py init

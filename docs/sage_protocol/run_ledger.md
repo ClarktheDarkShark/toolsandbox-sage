@@ -1332,3 +1332,103 @@
   Python files; `git diff --check` passed.
 - Decision label:
   `CYBERGYM_FIXED_SIDE_VALIDATE20_CONFIRMS_LIFT_AND_IMAGE_CACHE_SPEED_REPAIR_READY_FOR_VALIDATION`.
+
+## 2026-05-22 - CyberGym Evidence-Weighted Routing Phase
+
+- Objective: test whether SAGE can improve CyberGym generalization by using its
+  own natural-use contribution evidence for helper routing, without manually
+  exposing tools or adding CyberGym-specific hidden knowledge.
+- Branch: `codex/sage-standalone-agent`.
+- Code changes: candidate-helper routing now ranks by public task fit plus
+  SAGE's own winning-candidate helper evidence; validation also supports
+  fragment-based candidate-list assertions for helpers that preserve visible
+  source or artifact fragments inside longer candidates.
+- Negative gate: `outputs/cybergym_live_sage/next_phase_evidence_weighted_probe8_20260522`
+  tested task-relevance ranking as part of the balanced default and regressed
+  to SAGE `1/8`, so that ranking was not promoted.
+- Negative gate: `outputs/cybergym_live_sage/next_phase_context_aware_probe8_20260522`
+  tested task-relevance ranking as explicit `context-aware` and also scored
+  SAGE `1/8`, so it remains an experiment only.
+- Positive preservation gate:
+  `outputs/cybergym_live_sage/next_phase_route_only_validate20_20260522`;
+  dashboard:
+  `outputs/cybergym_live_sage/next_phase_route_only_validate20_20260522/dashboard/task_compare.html`.
+- Protocol: `gpt-4o-mini`; baseline `llm`; baseline cache
+  `use-if-eligible`; fixed-side verification `true`; generation starts from an
+  empty generated-helper registry via `--reset-registry`; SAGE candidate arm
+  fresh; visible CyberGym task assets and live submit feedback only.
+- Result: baseline `1/20`, SAGE `5/20`; absolute lift `+20.0 pp`; relative
+  lift `+400.0%`; baseline cache `20 cached / 0 fresh`; tools
+  born/accepted/reused `13 / 13 / 158`; rejected tools `0`; repair/refine
+  `3 / 1`; birth-task retry successes `1`; integrity issues `0`.
+- Maintenance checks: ToolSandbox standalone smoke
+  `outputs/sage_agent_standalone/next_phase_preserve_toolsandbox_20_20260522`
+  SAGE `2/2`; MiniGrid
+  `outputs/sage_agent_standalone/next_phase_preserve_minigrid_20_20260522`
+  SAGE `20/20`; BBH
+  `outputs/sage_agent_standalone/next_phase_preserve_bbh_20_20260522`
+  SAGE `15/20`; all had integrity issues `0`.
+- Machine-readable summary:
+  `artifacts/sage_agent_standalone/next_phase_evidence_weighted_routing_summary_20260522.json`.
+  SHA-256 `14fd07eda48120b85c4f53214aff1264f52c5d7bff3f19e4fb7ed8b6897f2ba5`.
+- Interpretation: evidence-weighted routing is safe and preserves the known
+  CyberGym first-20 fixed-side curve, but it does not exceed it. The remaining
+  bottleneck is candidate quality and candidate-budget allocation, not helper
+  visibility or initial gap detection.
+- Decision label:
+  `EVIDENCE_WEIGHTED_ROUTING_PRESERVES_CYBERGYM_REFERENCE_BUT_DOES_NOT_CLOSE_NEXT_GAP`.
+
+## 2026-05-23 - CyberGym Public Execution-Search Gap-Closure Phase
+
+- Objective: close the next CyberGym portability gap by improving candidate
+  quality through a general public execution-search helper class, while keeping
+  SAGE free of labels, reference PoCs, fixed-side discovery, scenario-ID
+  hard-coding, or prior-outcome leakage.
+- Branch: `codex/sage-standalone-agent`.
+- Code changes: `src/sage_agent/adapters/cybergym_live.py` now builds bounded
+  public vulnerable-side search corpora from generated candidates, direct
+  visible fixtures, nested public seed archives, and generic format probes; it
+  supports libFuzzer, Honggfuzz, and AFL handoff through public wrapper/runtime
+  inspection. `scripts/run_cybergym_live_batched_sage.py` now rejects
+  incomplete materialized task caches with zero-byte `repo-vul.tar.gz` and
+  redownloads visible public source archives.
+- Primary run:
+  `outputs/cybergym_live_sage/cybergym_public_search_validcache_first20_20260523`;
+  dashboard:
+  `outputs/cybergym_live_sage/cybergym_public_search_validcache_first20_20260523/dashboard/task_compare.html`.
+- Primary result: cached baseline `1/20`, SAGE `7/20`; absolute lift `+30.0`
+  percentage points; relative lift `+600.0%`; tools born/accepted/reused
+  `19 / 19 / 221`; rejected tools `0`; repair attempts `2`;
+  birth-task retry successes `1`; integrity issues `0`; zero-byte public source
+  archives in run output `0`.
+- Larger validation:
+  `outputs/cybergym_live_sage/cybergym_public_search_validcache_first40_20260523`;
+  dashboard:
+  `outputs/cybergym_live_sage/cybergym_public_search_validcache_first40_20260523/dashboard/task_compare.html`.
+- Larger result: cached baseline `1/40`, SAGE `10/40`; absolute lift `+22.5`
+  percentage points; relative lift `+900.0%`; controls `40 cached / 0 fresh`;
+  tools born/accepted/reused `21 / 21 / 399`; rejected tools `0`; repair
+  attempts `2`; birth-task retry successes `1`; integrity issues `0`;
+  zero-byte public source archives in run output `0`.
+- Prior same-window reference:
+  `outputs/cybergym_live_sage/next_phase_route_only_validate20_20260522`;
+  cached baseline `1/20`, SAGE `5/20`; integrity issues `0`.
+- Harder offset-window probe:
+  `outputs/cybergym_live_sage/cybergym_public_search_validcache_offset20_probe20_20260523`;
+  cached baseline `0/20`, SAGE `3/20`; tools born/accepted/reused
+  `18 / 18 / 212`; rejected tools `0`; repair attempts `2`; integrity
+  issues `0`; zero-byte public source archives in run output `0`.
+- Machine-readable summary:
+  `artifacts/sage_agent_standalone/cybergym_public_execution_search_gap_closure_20260523.json`.
+- Report:
+  `docs/sage_protocol/cybergym_public_execution_search_gap_closure_20260523.md`.
+- Validation: focused standalone unit tests passed
+  `12 passed, 57 deselected`; Python compile passed for the touched CyberGym
+  adapter and batched runner.
+- Interpretation: the public execution-search helper class is the first clear
+  CyberGym improvement beyond the `5/20` fixed-side first-window reference.
+  The offset-window result remains low, so the next bottleneck is deeper
+  source-guided candidate quality and candidate-budget allocation for harder
+  source families.
+- Decision label:
+  `PUBLIC_EXECUTION_SEARCH_IMPROVES_CYBERGYM_FIRST20_WITH_GENERAL_FRAMEWORK_REPAIR`.

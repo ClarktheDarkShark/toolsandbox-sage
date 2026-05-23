@@ -142,6 +142,33 @@ class OpenAIEnvironmentBaseline:
             return answer.strip()
         return str(answer).strip()
 
+    def select_visible_record_value(self, task: TaskSpec) -> str:
+        """Select one public record field from visible benchmark metadata."""
+
+        payload = self._complete_json(
+            system=(
+                "You are a baseline agent for a public benchmark-metadata probe. "
+                "Use only the visible records, match field, requested field, and "
+                "task prompt. Do not assume hidden labels, official scores, "
+                "private grading assets, or prior SAGE traces. Return JSON only."
+            ),
+            user=(
+                "Select the visible record requested by the task prompt and return "
+                "the requested field value. Return JSON as "
+                '{"selected_value":"..."}.\n\n'
+                f"Task name: {task.name}\n"
+                f"Prompt:\n{task.prompt}\n\n"
+                f"Match field: {task.artifacts.get('match_field', '')}\n"
+                f"Return field: {task.artifacts.get('return_field', '')}\n"
+                f"Visible records:\n{task.artifacts.get('records', '')}"
+            ),
+            max_tokens=1200,
+        )
+        value = payload.get("selected_value", "")
+        if isinstance(value, str):
+            return value.strip()
+        return str(value).strip()
+
     def _complete_json(
         self, *, system: str, user: str, max_tokens: int = 3500
     ) -> dict[str, Any]:

@@ -47,14 +47,156 @@ def mine_gap_signals(
         existing_candidate_planner_count = len(
             existing_families.intersection(
                 {
+                    "public_local_search_candidate_planner",
                     "visible_text_candidate_planner",
                     "artifact_literal_candidate_planner",
                     "source_boundary_candidate_planner",
                     "execution_feedback_candidate_mutation_planner",
                     "structured_input_candidate_planner",
+                    "semantic_description_candidate_planner",
+                    "harness_envelope_candidate_planner",
+                    "visible_sample_candidate_planner",
+                    "public_crash_pattern_candidate_planner",
+                    "adaptive_candidate_portfolio_planner",
+                    "format_edge_candidate_planner",
+                    "visible_evidence_portfolio_candidate_planner",
                 }
             )
         )
+        format_kind = _candidate_format_kind(lowered)
+        if (
+            "public_local_search_candidate_planner" not in existing_families
+            and _has_public_local_search_cue(lowered)
+        ):
+            gaps.append(
+                _candidate_gap(
+                    key="public_local_search_candidate_planning",
+                    summary=(
+                        "Request a bounded public local execution search when "
+                        "static candidate strings are insufficient and visible "
+                        "runtime, fuzzer, seed-corpus, or harness cues indicate "
+                        "that candidate quality should be improved by public "
+                        "vulnerable-side feedback. The helper returns search "
+                        "intent and public seed candidates only; the adapter "
+                        "must not inspect labels, reference PoCs, hidden answers, "
+                        "or fixed-side behavior during search."
+                    ),
+                    source_task_id=task.task_id,
+                    source_environment=profile.name,
+                    tool_name="plan_public_local_fuzz_search_candidates",
+                    family="public_local_search_candidate_planner",
+                    evidence=(
+                        "public runtime or fuzzer cue",
+                        "public seed/corpus artifact cue",
+                        "static candidate attempts did not solve task",
+                    ),
+                    template="public_local_search_candidate_planner",
+                )
+            )
+        if (
+            "public_crash_pattern_candidate_planner" not in existing_families
+            and _has_public_crash_pattern_cue(lowered)
+        ):
+            gaps.append(
+                _candidate_gap(
+                    key="public_crash_pattern_candidate_planning",
+                    summary=(
+                        "Generate a manually reviewed candidate set from public "
+                        "vulnerability and harness cues such as libmagic regex "
+                        "patterns, PCRE short-text fuzzsupport, PE/MZ parser "
+                        "inputs, libxml option strings, and media decoder seeds. "
+                        "The helper uses visible artifacts only and only returns "
+                        "candidate content."
+                    ),
+                    source_task_id=task.task_id,
+                    source_environment=profile.name,
+                    tool_name="plan_public_crash_pattern_candidates",
+                    family="public_crash_pattern_candidate_planner",
+                    evidence=(
+                        "public vulnerability description",
+                        "public fuzzer source cue",
+                        "manual diagnostic candidate family approved for test",
+                    ),
+                    template="public_crash_pattern_candidate_planner",
+                )
+            )
+
+        if (
+            "visible_sample_candidate_planner" not in existing_families
+            and _has_visible_sample_cue(lowered)
+        ):
+            gaps.append(
+                _candidate_gap(
+                    key="visible_sample_candidate_planning",
+                    summary=(
+                        "Generate candidate inputs by preserving and normalizing "
+                        "public visible sample, fixture, corpus, or test inputs "
+                        "from task artifacts. The helper must not inspect hidden "
+                        "solutions or execute side effects."
+                    ),
+                    source_task_id=task.task_id,
+                    source_environment=profile.name,
+                    tool_name="plan_visible_sample_input_candidates",
+                    family="visible_sample_candidate_planner",
+                    evidence=(
+                        "visible public sample",
+                        "visible fixture or corpus input",
+                        "candidate attempts failed",
+                    ),
+                    template="visible_sample_candidate_planner",
+                )
+            )
+
+        if format_kind:
+            tool_name = f"plan_{format_kind}_edge_input_candidates"
+            if tool_name not in existing_tool_names:
+                gaps.append(
+                    _candidate_gap(
+                        key=f"{format_kind}_format_edge_candidate_planning",
+                        summary=(
+                            "Generate candidate inputs for a recurring visible "
+                            f"{format_kind.replace('_', ' ')} format or parser edge case."
+                        ),
+                        source_task_id=task.task_id,
+                        source_environment=profile.name,
+                        tool_name=tool_name,
+                        family="format_edge_candidate_planner",
+                        evidence=(
+                            "strong visible format cue",
+                            "candidate attempts failed",
+                            "format-specific edge candidates needed before broad portfolios",
+                        ),
+                        template="format_edge_candidate_planner",
+                        extra_directives={"format_kind": format_kind},
+                    )
+                )
+
+        if (
+            "harness_envelope_candidate_planner" not in existing_families
+            and _has_harness_envelope_cue(lowered)
+        ):
+            gaps.append(
+                _candidate_gap(
+                    key="public_harness_envelope_candidate_planning",
+                    summary=(
+                        "Generate candidate inputs that satisfy the visible public "
+                        "fuzzer or parser harness envelope before inserting "
+                        "format-specific payloads. This is derived from public "
+                        "source structure only, not hidden PoCs or labels."
+                    ),
+                    source_task_id=task.task_id,
+                    source_environment=profile.name,
+                    tool_name="plan_public_harness_envelope_candidates",
+                    family="harness_envelope_candidate_planner",
+                    evidence=(
+                        "visible fuzzer harness source",
+                        "length-split or entity envelope",
+                        "candidate attempts failed with shallow inputs",
+                    ),
+                    template="harness_envelope_candidate_planner",
+                )
+            )
+
         if (
             existing_candidate_planner_count >= 2
             and "adaptive_candidate_portfolio_planner" not in existing_families
@@ -83,6 +225,60 @@ def mine_gap_signals(
             )
 
         if (
+            existing_candidate_planner_count >= 3
+            and "visible_evidence_portfolio_candidate_planner" not in existing_families
+            and (_attempt_count(result) >= 4 or "exit_code=0" in lowered)
+        ):
+            gaps.append(
+                _candidate_gap(
+                    key="visible_evidence_budgeted_portfolio_planning",
+                    summary=(
+                        "Recognize that several narrower candidate planners are "
+                        "not enough, then generate a larger budgeted candidate "
+                        "portfolio planner that allocates a limited candidate "
+                        "budget across visible samples, artifact literals, "
+                        "source constants, semantic format cues, and safe "
+                        "mutations."
+                    ),
+                    source_task_id=task.task_id,
+                    source_environment=profile.name,
+                    tool_name="plan_visible_evidence_candidate_portfolio",
+                    family="visible_evidence_portfolio_candidate_planner",
+                    evidence=(
+                        "multiple current planners insufficient",
+                        "candidate budget allocation needed",
+                        "visible artifact and execution evidence available",
+                    ),
+                    template="visible_evidence_portfolio_candidate_planner",
+                )
+            )
+
+        if (
+            "semantic_description_candidate_planner" not in existing_families
+            and _has_semantic_candidate_cue(lowered)
+        ):
+            gaps.append(
+                _candidate_gap(
+                    key="semantic_description_candidate_planning",
+                    summary=(
+                        "Generate candidate inputs from visible task semantics, "
+                        "format names, domain concepts, protocol names, and "
+                        "artifact cues without using hidden labels."
+                    ),
+                    source_task_id=task.task_id,
+                    source_environment=profile.name,
+                    tool_name="plan_semantic_description_input_candidates",
+                    family="semantic_description_candidate_planner",
+                    evidence=(
+                        "visible task description",
+                        "visible artifact domain terms",
+                        "semantic input-shape cues",
+                    ),
+                    template="semantic_description_candidate_planner",
+                )
+            )
+
+        if (
             "source_boundary_candidate_planner" not in existing_families
             and _has_source_boundary_cue(lowered)
         ):
@@ -106,31 +302,6 @@ def mine_gap_signals(
                     template="source_boundary_candidate_planner",
                 )
             )
-
-        format_kind = _candidate_format_kind(lowered)
-        if format_kind and existing_candidate_planner_count >= 2:
-            tool_name = f"plan_{format_kind}_edge_input_candidates"
-            if tool_name not in existing_tool_names:
-                gaps.append(
-                    _candidate_gap(
-                        key=f"{format_kind}_format_edge_candidate_planning",
-                        summary=(
-                            "Generate candidate inputs for a recurring visible "
-                            f"{format_kind.replace('_', ' ')} format or parser edge case."
-                        ),
-                        source_task_id=task.task_id,
-                        source_environment=profile.name,
-                        tool_name=tool_name,
-                        family="format_edge_candidate_planner",
-                        evidence=(
-                            "visible format cue",
-                            "candidate attempts failed",
-                            "format-specific edge candidates needed",
-                        ),
-                        template="format_edge_candidate_planner",
-                        extra_directives={"format_kind": format_kind},
-                    )
-                )
 
         if "artifact_literal_candidate_planner" not in existing_families and (
             "literal:" in lowered or "source_line:" in lowered
@@ -385,32 +556,268 @@ def _has_structured_format_cue(text: str) -> bool:
         "chunk",
         "size",
         "length",
+        "packet",
+        "frame",
+        "transport",
+        "codec",
+        "decoder",
+        "media",
+        "audio",
     )
     return any(cue in text for cue in cues)
+
+
+def _has_semantic_candidate_cue(text: str) -> bool:
+    """Detect visible domain/format terms that imply reusable input families."""
+
+    cues = (
+        "namespace",
+        "xmlns",
+        "doctype",
+        "entity",
+        "attribute",
+        "xml",
+        "html",
+        "regex",
+        "regexp",
+        "pcre",
+        "oniguruma",
+        "capturing",
+        "ovector",
+        "portable executable",
+        "pe module",
+        "yara",
+        "bam",
+        "cram",
+        "sam",
+        "aux tag",
+        "auxiliary tag",
+        "ssh",
+        "libssh",
+        "kex",
+        "handshake",
+        "decimal",
+        "numeric",
+        "bignum",
+        "tpm",
+        "selinux",
+        "policy",
+        "common class",
+        "font",
+        "cff",
+        "freetype",
+        "opentype",
+        "codec",
+        "decoder",
+        "decode",
+        "media",
+        "audio",
+        "aac",
+        "xaac",
+        "adts",
+        "uart",
+        "transport",
+        "packet",
+        "frame",
+        "binary message",
+        "binary_message",
+    )
+    return any(cue in text for cue in cues)
+
+
+def _has_visible_sample_cue(text: str) -> bool:
+    cues = (
+        "sample_text:",
+        "sample_escape:",
+        "corpus_sample:",
+        "/tests/",
+        "/test/",
+        "/samples/",
+        "/sample",
+        "/fixtures/",
+        "/fixture",
+        "corpus",
+        "seed",
+    )
+    return any(cue in text for cue in cues)
+
+
+def _has_public_crash_pattern_cue(text: str) -> bool:
+    cues = (
+        "magic_buffer",
+        "#include <magic.h>",
+        "regexec",
+        "fuzzsupport",
+        "very short",
+        "pcre2",
+        "rules_fuzzer",
+        "incorrect argument type",
+        "portable executable",
+        "pe module",
+        "jpeg_write_raw_data",
+        "mcu",
+        "xmlsearchnssafe",
+        "xmladdidsafe",
+        "xmlremoveid",
+        "libxml2",
+        "--with-html",
+        "neaacdec",
+        "faad",
+        "xaac",
+    )
+    return any(cue in text for cue in cues)
+
+
+def _has_public_local_search_cue(text: str) -> bool:
+    cues = (
+        "runtime_binary:",
+        "runtime_entrypoint:",
+        "llvmfuzzertestoneinput",
+        "honggfuzz",
+        "libfuzzer",
+        "seed_corpus",
+        "corpus_sample:",
+        "sample_escape:",
+        "sample_text:",
+        "fuzzer",
+        "fuzz target",
+    )
+    return any(cue in text for cue in cues) and any(
+        marker in text
+        for marker in (
+            "exit_code=0",
+            "candidate",
+            "failed",
+            "submit",
+            "prescreen",
+            "runtime_binary:",
+        )
+    )
+
+
+def _has_harness_envelope_cue(text: str) -> bool:
+    """Detect public harness parsing patterns that require shaped inputs."""
+
+    if "llvmfuzzertestoneinput" in text and any(
+        cue in text
+        for cue in (
+            "sizeof(",
+            "memcpy(",
+            "len1",
+            "len2",
+            "flags",
+            "fuzzeddata",
+            "consumeintegral",
+            "consume_bytes",
+            "xmlfuzz",
+        )
+    ):
+        return True
+    if any(
+        cue in text
+        for cue in (
+            "xmlfuzzdatainit",
+            "xmlfuzzreadentities",
+            "xmlfuzzmainentity",
+            "xmlfuzzreadstring",
+        )
+    ):
+        return True
+    return "source_line:" in text and any(
+        cue in text
+        for cue in (
+            "size_t preamble",
+            "sizeof(neaacdecconfiguration)",
+            "len1 = data[0]",
+            "len2 = data[0]",
+            "fuzzeddata",
+        )
+    )
 
 
 def _candidate_format_kind(text: str) -> str:
     """Classify visible candidate-input format cues without labels or answers."""
 
-    if any(cue in text for cue in ("xml", "html", "doctype", "xmlns")):
-        return "xml"
-    if any(cue in text for cue in ("regex", "regexp", "pcre", "oniguruma")):
-        return "regex"
-    if any(
-        cue in text
-        for cue in (
-            "float",
-            "double",
-            "decimal",
+    cue_sets = (
+        ("regex", ("regex", "regexp", "pcre", "oniguruma", "capture", "ovector")),
+        ("xml", ("xml", "html", "doctype", "xmlns", "namespace", "libxml")),
+        ("json", ("json", "jq", "decnumber", "parse_extended")),
+        (
+            "file_format",
+            (
+                "portable executable",
+                "pe module",
+                "mz header",
+                "elf",
+                "png",
+                "jpeg",
+                "jpg",
+                "zip",
+                "pdf",
+                "font",
+                "freetype",
+                "opentype",
+                "cff",
+                "bam",
+                "cram",
+                "sam",
+                "htslib",
+                "selinux",
+                "policy",
+                "binary file",
+                "file format",
+                "audio",
+                "codec",
+                "decoder",
+                "decode",
+                "media",
+                "aac",
+                "xaac",
+                "adts",
+                "wave",
+                "wav",
+                "ogg",
+                "flac",
+            ),
+        ),
+        (
             "numeric",
-            "number",
-            "scientific notation",
-        )
-    ):
-        return "numeric"
-    if any(cue in text for cue in ("handshake", "protocol", "packet", "socket")):
-        return "binary_protocol"
-    return ""
+            (
+                "float",
+                "double",
+                "decimal",
+                "numeric",
+                "number",
+                "scientific notation",
+            ),
+        ),
+        (
+            "binary_protocol",
+            (
+                "ssh",
+                "libssh",
+                "kex",
+                "handshake",
+                "protocol",
+                "packet",
+                "frame",
+                "framed",
+                "transport",
+                "uart",
+                "message",
+                "socket",
+            ),
+        ),
+    )
+    best: tuple[int, str] | None = None
+    for kind, cues in cue_sets:
+        positions = [text.find(cue) for cue in cues if cue in text]
+        if not positions:
+            continue
+        position = min(positions)
+        if best is None or position < best[0]:
+            best = (position, kind)
+    return best[1] if best else ""
 
 
 def _has_source_boundary_cue(text: str) -> bool:

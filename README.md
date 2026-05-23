@@ -184,6 +184,26 @@ PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
   --limit 40
 ```
 
+For day-to-day CLI use, `--dataset` is an alias for `--env` and `--samples`
+is an alias for `--limit`:
+
+```bash
+PYTHONPATH=src:. python scripts/run_sage_agent_smoke.py \
+  --dataset minigrid \
+  --samples 12 \
+  --reset-registry \
+  --registry-dir artifacts/sage_standalone/minigrid_cli_registry \
+  --no-dashboard-open
+
+make sage_agent SAGE_DATASET=minigrid SAGE_SAMPLES=12 DASHBOARD_OPEN=0
+```
+
+Selectable standalone datasets are `toolsandbox`, `toolsandbox-probe`,
+`cybergym`, `minigrid`, `bbh`, `tau2-bench`, `tau3-bench`, `terminal-bench`,
+`scienceagentbench`, and `science-agent-bench`. The tau, Terminal-Bench, and
+ScienceAgentBench integrations are public-metadata probes; they validate the
+portable SAGE lifecycle but are not official benchmark-score runs.
+
 Each smoke run writes an environment-neutral Task Compare dashboard under
 `outputs/sage_agent_standalone/<run_id>/dashboard/task_compare.html`; `index.html`
 is kept as the same page for compatibility. The run also writes `summary.json`,
