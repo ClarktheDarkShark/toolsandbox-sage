@@ -629,6 +629,49 @@ def test_generic_gap_mining_detects_public_crash_pattern_gap() -> None:
     assert "public_crash_pattern_candidate_planning" in {gap.key for gap in gaps}
 
 
+def test_generic_gap_mining_births_source_family_specialist_despite_generic_planners() -> (
+    None
+):
+    profile = EnvironmentProfile(
+        name="portable-candidate-env",
+        description="Generic candidate submission environment.",
+        base_tools=("submit_candidate",),
+        action_tools=("submit_candidate",),
+        observation_fields=("description", "artifact_summary", "attempts"),
+    )
+    task = TaskSpec(
+        task_id="portable-libssh",
+        name="visible libssh kex parser",
+        prompt="Submit input for a visible libssh key-exchange parser.",
+        artifacts={
+            "description": "The public target parses libssh KEX namelists.",
+            "artifact_summary": (
+                "source_line: kex_method = read_packet(input);\n"
+                "source_line: diffie-hellman-group14-sha256"
+            ),
+        },
+    )
+    result = TaskRunResult(
+        task=task,
+        success=False,
+        transcript=("candidate 0: exit_code=0 len=4",),
+        artifacts={"attempts": [{"exit_code": 0, "poc_length": 4}]},
+    )
+    helpers = {
+        "public": _helper_record_for_family("public_local_search_candidate_planner"),
+        "portfolio": _helper_record_for_family("adaptive_candidate_portfolio_planner"),
+    }
+
+    gaps = mine_gap_signals(profile=profile, task=task, result=result, helpers=helpers)
+
+    assert any(
+        gap.key == "libssh_kex_source_family_candidate_strategy"
+        and gap.suggested_tool_name == "plan_libssh_kex_source_family_candidates"
+        and gap.generation_directives["format_kind"] == "libssh_kex"
+        for gap in gaps
+    )
+
+
 def test_standalone_sage_can_birth_sibling_helpers_from_generic_gap_mining(
     tmp_path: Path,
 ) -> None:
@@ -1019,7 +1062,10 @@ def test_public_local_search_candidate_planner_validates_search_request() -> Non
                 },
                 expected={
                     "abstain": False,
-                    "candidates_contains": ("search_strategy: public_local_fuzz",),
+                    "candidates_contains": (
+                        "search_strategy: public_local_fuzz",
+                        "search_budget: source_guided_deep",
+                    ),
                     "candidates_contains_any_fragment": (
                         "runtime_binary",
                         "corpus_sample",
@@ -1033,6 +1079,94 @@ def test_public_local_search_candidate_planner_validates_search_request() -> Non
     report = validate_helper_candidate(candidate)
 
     assert report.accepted, report.errors
+
+
+def test_source_family_candidate_planner_emits_family_specific_candidates() -> None:
+    gap = GapSignal(
+        key="libssh_kex_source_family_candidate_strategy",
+        summary="Generate libssh KEX candidate inputs.",
+        source_task_id="portable-libssh",
+        source_environment="portable-candidate-env",
+        suggested_tool_name="plan_libssh_kex_source_family_candidates",
+        suggested_helper_family="source_family_candidate_strategy_planner",
+        required_inputs={
+            "description": "str",
+            "readme": "str",
+            "feedback": "str",
+            "artifact_summary": "str",
+            "max_candidates": "int",
+        },
+        expected_outputs={
+            "candidates": "list[str]",
+            "candidate_count": "int",
+            "first_candidate": "str",
+            "abstain": "bool",
+        },
+        generation_directives={
+            "template": "format_edge_candidate_planner",
+            "format_kind": "libssh_kex",
+            "source_family": "libssh_kex",
+        },
+    )
+
+    candidate = TemplateHelperGenerator().generate(
+        gap,
+        GenericCandidateAdapter().profile(),
+        (),
+        model="gpt-4o-mini",
+    )
+    namespace: dict[str, Any] = {}
+    exec(candidate.code, {}, namespace)  # noqa: S102
+    result = namespace["plan_libssh_kex_source_family_candidates"](
+        description="The public target parses libssh KEX namelists.",
+        readme="Submit candidate bytes.",
+        feedback="candidate 0: exit_code=0 len=4",
+        artifact_summary="source_line: diffie-hellman-group14-sha256",
+        max_candidates=6,
+    )
+
+    assert result["abstain"] is False
+    assert any("diffie-hellman" in item for item in result["candidates"])
+
+
+def test_cybergym_public_search_budget_deepens_only_from_visible_hard_cues(
+    tmp_path: Path,
+) -> None:
+    from sage_agent.adapters.cybergym_live import _public_search_budget
+
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    (task_dir / "description.txt").write_text(
+        "Visible libxml fuzzer task with namespace and entity handling.",
+        encoding="utf-8",
+    )
+
+    budget = _public_search_budget(
+        task_dir,
+        [
+            "search_strategy: public_local_fuzz",
+            "search_budget: source_guided_deep",
+            "source_line: LLVMFuzzerTestOneInput(data, size)",
+        ],
+        base_seconds=10,
+        base_artifacts=2,
+    )
+    generic_task_dir = tmp_path / "generic_task"
+    generic_task_dir.mkdir()
+    (generic_task_dir / "description.txt").write_text(
+        "Visible plain text parser task.",
+        encoding="utf-8",
+    )
+    generic_budget = _public_search_budget(
+        generic_task_dir,
+        ["search_strategy: public_local_fuzz"],
+        base_seconds=10,
+        base_artifacts=2,
+    )
+
+    assert budget["search_seconds"] >= 70
+    assert budget["max_artifacts"] >= 6
+    assert generic_budget == {"search_seconds": 10, "max_artifacts": 2}
 
 
 def test_candidate_validation_allows_visible_fragments_inside_candidates() -> None:
@@ -2057,6 +2191,41 @@ def test_cybergym_public_search_seed_corpus_uses_direct_visible_fixtures(
 
     assert written == 1
     assert [path.read_bytes() for path in seeds_dir.iterdir()] == [b"PUBLIC-SEED"]
+
+
+def test_cybergym_public_format_probes_cover_visible_hard_families(
+    tmp_path: Path,
+) -> None:
+    from sage_agent.adapters.cybergym_live import _write_public_format_probe_seeds
+
+    task_dir = tmp_path / "task"
+    seeds_dir = tmp_path / "seeds"
+    task_dir.mkdir()
+    seeds_dir.mkdir()
+    (task_dir / "description.txt").write_text(
+        "\n".join(
+            (
+                "libssh KEX namelist parser",
+                "HTSlib SAM BAM CRAM aux tag parser",
+                "FreeType CFF font parser",
+                "PE module loader",
+                "SELinux libsepol policy parser",
+                "PCRE regex ovector capture parser",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    written = _write_public_format_probe_seeds(task_dir, seeds_dir, ())
+    joined = b"\n".join(path.read_bytes() for path in seeds_dir.iterdir())
+
+    assert written >= 12
+    assert b"curve25519-sha256" in joined
+    assert b"@HD\tVN:1.6" in joined
+    assert b"OTTO" in joined
+    assert b"MZ" in joined
+    assert b"class file" in joined
+    assert b"(?P<name>a)" in joined
 
 
 def test_cybergym_public_search_seed_member_guardrails() -> None:

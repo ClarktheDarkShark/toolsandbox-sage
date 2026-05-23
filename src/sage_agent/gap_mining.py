@@ -64,6 +64,7 @@ def mine_gap_signals(
             )
         )
         format_kind = _candidate_format_kind(lowered)
+        source_family = _candidate_source_family(lowered)
         if (
             "public_local_search_candidate_planner" not in existing_families
             and _has_public_local_search_cue(lowered)
@@ -168,6 +169,37 @@ def mine_gap_signals(
                         ),
                         template="format_edge_candidate_planner",
                         extra_directives={"format_kind": format_kind},
+                    )
+                )
+
+        if source_family:
+            tool_name = f"plan_{source_family}_source_family_candidates"
+            if tool_name not in existing_tool_names:
+                gaps.append(
+                    _candidate_gap(
+                        key=f"{source_family}_source_family_candidate_strategy",
+                        summary=(
+                            "Generate candidate inputs for a visible hard source "
+                            f"family: {source_family.replace('_', ' ')}. This "
+                            "specialist should be born even when broader candidate "
+                            "planners already exist, because weak generic planners "
+                            "do not cover every parser or binary format family."
+                        ),
+                        source_task_id=task.task_id,
+                        source_environment=profile.name,
+                        tool_name=tool_name,
+                        family="source_family_candidate_strategy_planner",
+                        evidence=(
+                            "visible hard source-family cue",
+                            "existing candidate planners did not solve task",
+                            "family-specific input strategy needed",
+                        ),
+                        template="format_edge_candidate_planner",
+                        extra_directives={
+                            "format_kind": source_family,
+                            "source_family": source_family,
+                            "birth_even_if_generic_candidate_planners_exist": True,
+                        },
                     )
                 )
 
@@ -817,6 +849,87 @@ def _candidate_format_kind(text: str) -> str:
         position = min(positions)
         if best is None or position < best[0]:
             best = (position, kind)
+    return best[1] if best else ""
+
+
+def _candidate_source_family(text: str) -> str:
+    """Classify visible hard source families for specialist helper birth.
+
+    This uses only public task text, public artifact summaries, and execution
+    feedback visible to SAGE. It intentionally returns broad families rather
+    than benchmark IDs or expected answers.
+    """
+
+    cue_sets = (
+        (
+            "xml_namespace",
+            (
+                "xmlsearchnssafe",
+                "xmladdidsafe",
+                "xmlremoveid",
+                "xmlvalidateonenamespace",
+                "namespace",
+                "xmlns",
+                "doctype",
+                "entity",
+                "libxml",
+                "--with-html",
+            ),
+        ),
+        (
+            "aac_audio",
+            (
+                "aac",
+                "adts",
+                "adif",
+                "faad",
+                "neaac",
+                "xaac",
+                "usac",
+                "sbr",
+                "drc",
+                "audio",
+                "decoder",
+            ),
+        ),
+        (
+            "htslib_alignment",
+            ("htslib", "sam", "bam", "cram", "aux tag", "auxiliary tag", "@hd"),
+        ),
+        (
+            "libssh_kex",
+            ("libssh", " kex", "key exchange", "namelist", "diffie-hellman"),
+        ),
+        (
+            "pcre_ovector",
+            ("pcre", "pcre2", "ovector", "regexec", "regex", "regexp", "capture"),
+        ),
+        (
+            "pe_module",
+            ("portable executable", "pe module", "mz header", 'import "pe"', "is_pe"),
+        ),
+        (
+            "font_cff",
+            ("freetype", "cff", "opentype", "font", "glyph", "charstring"),
+        ),
+        (
+            "selinux_policy",
+            ("libsepol", "selinux", "policy", "common class", "allow ", "sid "),
+        ),
+        ("tpm_binary", ("tpm", "tpm2", "marshal", "unmarshal", "binary message")),
+        (
+            "afl_filter",
+            ("duplicate filter", "filter list", "afl", "deferred forkserver"),
+        ),
+    )
+    best: tuple[int, str] | None = None
+    for family, cues in cue_sets:
+        positions = [text.find(cue) for cue in cues if cue in text]
+        if not positions:
+            continue
+        position = min(positions)
+        if best is None or position < best[0]:
+            best = (position, family)
     return best[1] if best else ""
 
 

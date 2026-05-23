@@ -743,7 +743,37 @@ def _public_local_search_candidate_planner(
     )
     if any(cue in lower for cue in public_runtime_cues):
         candidates.append("search_strategy: public_local_fuzz")
-        candidates.append("search_budget: bounded_public_vulnerable_execution")
+        hard_source_cues = (
+            "aac",
+            "adts",
+            "audio",
+            "bam",
+            "cff",
+            "conditional section",
+            "cram",
+            "freetype",
+            "htslib",
+            "kex",
+            "libsepol",
+            "libssh",
+            "libxml",
+            "namespace",
+            "ovector",
+            "pcre",
+            "pe module",
+            "regex",
+            "sam",
+            "sbr",
+            "selinux",
+            "tpm",
+            "usac",
+            "xaac",
+            "xml",
+        )
+        if any(cue in lower for cue in hard_source_cues):
+            candidates.append("search_budget: source_guided_deep")
+        else:
+            candidates.append("search_budget: bounded_public_vulnerable_execution")
 
     for raw_line in text.splitlines():
         line = raw_line.strip(" \\t\\r\\n-*")
@@ -1981,6 +2011,18 @@ def _format_edge_candidate_planner(
             "<a><b></a>",
             "<?xml version='1.0'?><a/>",
         ])
+    elif kind == "xml_namespace":
+        seed_candidates.extend([
+            "<a/>",
+            "<root xmlns='urn:sage'></root>",
+            "<root xmlns:p='urn:sage'><p:item id='x'/></root>",
+            "<!DOCTYPE a [<!ENTITY x 'x'>]><a>&x;</a>",
+            "<a xml:id='x' xmlns='urn:sage'/>",
+            "<a xmlns:p='urn:sage' p:id='x' id='x'/>",
+            "<html><body><p id='x'>x</p></body></html>",
+            "<a><b></a>",
+            "<?xml version='1.0'?><a xmlns='urn:sage'/>",
+        ])
     elif kind == "regex":
         seed_candidates.extend([
             "(",
@@ -1998,6 +2040,21 @@ def _format_edge_candidate_planner(
             "A\\\\x00A",
             "(?<a>a)",
             "(?<a>a)(?<a>b)",
+        ])
+    elif kind == "pcre_ovector":
+        seed_candidates.extend([
+            "(",
+            "(a)",
+            "(a)(b)(c)(d)(e)(f)(g)(h)",
+            "(?<name>a)(?P=name)",
+            "(a)\\\\1",
+            "(?:a){{1024}}",
+            "[a-",
+            "\\\\C",
+            "\\\\K",
+            "A\\\\x00A",
+            "/([A-Z]+)([0-9]+)\\\\1/\\nABC123ABC",
+            "(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)(l)\\nabcdefghijkl",
         ])
     elif kind == "numeric":
         seed_candidates.extend([
@@ -2067,6 +2124,77 @@ def _format_edge_candidate_planner(
             "RIFF\\x24\\x00\\x00\\x00WAVEfmt ",
             "OggS\\x00\\x02",
             "fLaC\\x00\\x00\\x00\\x22",
+        ])
+    elif kind == "aac_audio":
+        seed_candidates.extend([
+            "\\xff\\xf1\\x50\\x80\\x00\\x1f\\xfc",
+            "\\xff\\xf9\\x50\\x80\\x00\\x1f\\xfc",
+            "ADIF",
+            "ID3\\x03\\x00\\x00\\x00\\x00\\x00\\x00",
+            "\\x00\\x00\\x00\\x18ftypM4A \\x00\\x00\\x00\\x00M4A isom",
+            "RIFF\\x24\\x00\\x00\\x00WAVEfmt ",
+            "OggS\\x00\\x02",
+            "fLaC\\x00\\x00\\x00\\x22",
+        ])
+    elif kind == "htslib_alignment":
+        seed_candidates.extend([
+            "@HD\\tVN:1.6\\tSO:unknown\\n@SQ\\tSN:chr1\\tLN:1\\n",
+            "@HD\\tVN:1.6\\n@SQ\\tSN:chr1\\tLN:1\\n"
+            "r1\\t0\\tchr1\\t1\\t60\\t1M\\t*\\t0\\t0\\tA\\t*\\tXX:B:i\\n",
+            "r2\\t0\\tchr1\\t1\\t0\\t1M\\t*\\t0\\t0\\tA\\t*\\tZZ:B:c,1,2,3\\n",
+            "r3\\t0\\tchr1\\t1\\t0\\t1M\\t*\\t0\\t0\\tA\\t*\\tNM:i:0\\tAS:i:1\\n",
+            "BAM\\x01\\x00\\x00\\x00",
+            "CRAM\\x03\\x00",
+        ])
+    elif kind == "libssh_kex":
+        seed_candidates.extend([
+            "curve25519-sha256,ecdh-sha2-nistp256,diffie-hellman-group14-sha256",
+            "diffie-hellman-group1-sha1," * 8,
+            "," * 64,
+            "kex_algorithms=" + ("A," * 128),
+            "\\x00\\x00\\x01\\x00" + ("curve25519-sha256," * 16),
+            "ssh-ed25519,rsa-sha2-512,rsa-sha2-256",
+        ])
+    elif kind == "pe_module":
+        seed_candidates.extend([
+            "MZ\\x90\\x00\\x03\\x00\\x00\\x00",
+            "MZ" + ("A" * 58) + "\\x80\\x00\\x00\\x00" + ("B" * 64) + "PE\\x00\\x00",
+            "MZ" + ("A" * 1024) + "PE\\x00\\x00L\\x01",
+            "import \\"pe\\"\\nrule pe_file {{ condition: pe.is_pe }}",
+            "PE\\x00\\x00L\\x01",
+        ])
+    elif kind == "font_cff":
+        seed_candidates.extend([
+            "OTTO\\x00\\x01\\x00\\x00CFF ",
+            "\\x00\\x01\\x00\\x00" + ("A" * 32) + "glyf",
+            "ttcf\\x00\\x01\\x00\\x00",
+            "%!PS-AdobeFont-1.0\\n/FontName /SAGE def\\nStartData\\n",
+            "\\x01\\x00\\x04\\x04" + ("\\xff" * 64),
+        ])
+    elif kind == "selinux_policy":
+        seed_candidates.extend([
+            "class file\\ncommon file\\nsid kernel\\n",
+            "common file {{ read write execute }}\\nclass dir inherits file\\n",
+            "allow source target:file {{ read write append getattr }};",
+            "policy_module(test, 1.0)",
+            "\\x0f\\x00\\x00\\x00policy",
+        ])
+    elif kind == "tpm_binary":
+        seed_candidates.extend([
+            "\\x80\\x01\\x00\\x00\\x00\\x0a",
+            "\\x80\\x02\\x00\\x00\\x00\\x0a",
+            "\\x00\\xc4\\x00\\x00\\x00\\x10",
+            "\\x00\\x00\\x00\\x00",
+            "\\xff\\xff\\xff\\xff",
+            "TPM2",
+        ])
+    elif kind == "afl_filter":
+        seed_candidates.extend([
+            "filter\\nfilter\\n",
+            "allow:block\\nallow:block\\nreject:block\\n",
+            "A\\n" * 128,
+            "\\x00\\x00\\x00\\x00",
+            "\\xff" * 64,
         ])
     elif kind == "binary_protocol":
         seed_candidates.extend([

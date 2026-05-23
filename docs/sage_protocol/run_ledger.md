@@ -1432,3 +1432,66 @@
   source families.
 - Decision label:
   `PUBLIC_EXECUTION_SEARCH_IMPROVES_CYBERGYM_FIRST20_WITH_GENERAL_FRAMEWORK_REPAIR`.
+
+## 2026-05-23 - Source-Guided Candidate-Quality Follow-Up
+
+- Objective: test the diagnosed next bottleneck, deeper source-guided candidate
+  quality and candidate-budget allocation on harder CyberGym source families,
+  while checking that the general SAGE agent still holds on MiniGrid, BBH, and
+  ToolSandbox.
+- Branch: `codex/sage-standalone-agent`.
+- Code changes: source-guided public vulnerable-side search budget now deepens
+  only from visible hard-source cues; public format-probe seeds now cover XML,
+  AAC/audio, HTSlib SAM/BAM/CRAM, libssh/KEX, PCRE/regex, PE modules,
+  FreeType/CFF, libsepol/SELinux, and AFL/filter-style parsers; wrapper-first
+  target selection permits visible hint-matched fuzz-target fallback.
+- CyberGym run:
+  `outputs/cybergym_live_sage/cybergym_source_guided_budget_first40_v2_20260523`;
+  dashboard:
+  `outputs/cybergym_live_sage/cybergym_source_guided_budget_first40_v2_20260523/dashboard/task_compare.html`.
+- CyberGym result: cached baseline `1/40`, SAGE `12/40`; absolute lift `+27.5`
+  percentage points; relative lift `+1100.0%`; same-window improvement over the
+  prior first40 public-search run `10/40 -> 12/40`; fixed-side verification
+  enabled; official success verifier used; integrity issues `0`; tools
+  born/accepted/reused `21 / 21 / 399`; birth-task retry successes `2 / 10`.
+- MiniGrid maintenance:
+  `outputs/sage_agent_standalone/minigrid_cross_validation40_satisfied_source_budget_20260523`;
+  baseline `18/40`, SAGE `40/40`, integrity issues `0`.
+- BBH maintenance:
+  `outputs/sage_agent_standalone/bbh_cross_validation40_source_budget_20260523`;
+  baseline `16/40`, SAGE `40/40`, integrity issues `0`.
+- ToolSandbox comparable formal first-40 maintenance:
+  `outputs/sage_agent_standalone/toolsandbox_verify40_post_source_family_20260523/mechanism_40_20260523_182940`;
+  score `0.648 -> 0.848`, delta `+0.200`, lift `+30.9%`; outcome
+  `0.474 -> 0.887`, delta `+0.414`; controls `40 cached / 0 fresh`; SAGE
+  cache off; OpenAI response cache disabled; runtime exceptions `0`;
+  generated tools accepted `14`; generated-tool called scenarios `23`;
+  generated-tool failed scenarios `0`. This corrects the earlier lower
+  ToolSandbox diagnostic interpretation: the `toolsandbox_protocol_mechanism40_source_budget_v2`
+  run used a different diagnostic split with `27 cached / 13 fresh` controls
+  and an external-service cohort warning, so it was not comparable to the
+  previous high-lift first-40 checks.
+- CyberGym later-window evolution follow-up:
+  `outputs/cybergym_live_sage/cybergym_source_family_offset20_20260523`;
+  cached baseline `0/20`, SAGE `5/20`, improving the prior offset20 probe
+  from `3/20`; fixed-side verification enabled; official success verifier
+  used; integrity issues `0`; tools born/accepted/reused `20 / 20 / 214`;
+  batch wins `2, 1, 1, 1, 0`; tools born by batch `12, 4, 3, 0, 1`.
+  Interpretation: evolution now continues past the first batch, but most
+  source-family specialists remain `refine`, so the next bottleneck is
+  specialist strategy quality and candidate-budget allocation.
+- Machine-readable summary updated:
+  `artifacts/sage_agent_standalone/cybergym_public_execution_search_gap_closure_20260523.json`.
+- Report updated:
+  `docs/sage_protocol/cybergym_public_execution_search_gap_closure_20260523.md`.
+- Validation: focused source-guided/source-family unit tests
+  `7 passed, 66 deselected`; full standalone unit suite `73 passed`; Ruff
+  check passed for touched Python files; JSON validation and `git diff --check`
+  passed.
+- Interpretation: source-guided budget allocation produced a real CyberGym
+  improvement without hidden labels or fixed-side discovery and did not regress
+  MiniGrid, BBH, or ToolSandbox maintenance behavior. The remaining CyberGym
+  bottleneck is richer source-family strategy generation and budget allocation,
+  not visibility or simple gap detection.
+- Decision label:
+  `SOURCE_FAMILY_EVOLUTION_REPAIR_IMPROVES_CYBERGYM_LATER_WINDOW_AND_RETAINS_TOOLSANDBOX_LIFT`.

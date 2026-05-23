@@ -245,6 +245,55 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       border-color: #3f80bd;
       background: #162a3d;
     }
+    .tool-modal {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 12px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .55);
+      width: min(920px, calc(100vw - 28px));
+      max-height: min(760px, calc(100vh - 28px));
+      padding: 0;
+      overflow: hidden;
+    }
+    .tool-modal::backdrop {
+      background: rgba(3, 8, 14, .72);
+      backdrop-filter: blur(2px);
+    }
+    .tool-modal-card {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      max-height: min(760px, calc(100vh - 28px));
+    }
+    .tool-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel2);
+    }
+    .tool-modal-header h2 {
+      font-size: 18px;
+    }
+    .tool-modal-close {
+      border: 1px solid var(--line);
+      background: #0b131d;
+      color: var(--text);
+      border-radius: 999px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-weight: 800;
+    }
+    .tool-modal-close:hover {
+      border-color: #3f80bd;
+      color: var(--blue);
+    }
+    .tool-modal-body {
+      overflow: auto;
+      padding: 16px 18px 18px;
+    }
     .label {
       color: var(--muted);
       font-size: 11px;
@@ -462,6 +511,57 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       border-color: #3a6c8d;
       background: #102437;
     }
+    .msg.generated-helper {
+      border-color: #1f9f94;
+      background: #0d4d58;
+      box-shadow: inset 0 0 0 2px rgba(65, 217, 150, .22);
+    }
+    .generated-helper-summary {
+      border: 1px solid #1f9f94;
+      background: #0d4d58;
+      border-radius: 10px;
+      padding: 8px;
+      box-shadow: inset 0 0 0 2px rgba(65, 217, 150, .18);
+      font-size: 11px;
+      line-height: 1.28;
+    }
+    .generated-helper-title {
+      color: var(--green);
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .helper-use-row {
+      border: 1px solid rgba(119, 189, 255, .28);
+      background: rgba(11, 19, 29, .55);
+      border-radius: 8px;
+      padding: 6px 7px;
+      margin-top: 5px;
+      font-size: 10px;
+      line-height: 1.24;
+    }
+    .helper-use-name {
+      color: var(--green);
+      font-weight: 900;
+      font-size: 11px;
+    }
+    .helper-use-status {
+      display: inline-block;
+      border: 1px solid #1f9f94;
+      color: var(--green);
+      border-radius: 999px;
+      padding: 1px 6px;
+      margin-right: 5px;
+      font-size: 8px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .helper-use-status.failed {
+      border-color: #8e3c45;
+      color: var(--red);
+    }
     details {
       border: 1px solid var(--line);
       background: #0b131d;
@@ -530,6 +630,18 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
     </div>
     <section class="metrics" id="metrics"></section>
   </header>
+  <dialog class="tool-modal" id="toolRegistryModal" aria-labelledby="toolRegistryTitle">
+    <div class="tool-modal-card">
+      <div class="tool-modal-header">
+        <div>
+          <h2 id="toolRegistryTitle">Generated Tool Registry</h2>
+          <div class="subtitle">Generated and retained tools for this run.</div>
+        </div>
+        <button class="tool-modal-close" id="toolRegistryClose" type="button">Close</button>
+      </div>
+      <div class="tool-modal-body" id="toolRegistryModalBody"></div>
+    </div>
+  </dialog>
   <main>
     <aside>
       <input class="search" id="search" placeholder="Filter tasks" />
@@ -565,7 +677,9 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
         event.event === "task" || event.event === "task_result"
       );
       const retryEvents = events.filter((event) =>
-        event.event === "birth_task_retry" || event.event === "refined_tool_task_retry"
+        event.event === "birth_task_retry" ||
+        event.event === "refined_tool_task_retry" ||
+        event.event === "deferred_birth_task_retry"
       );
       const taskIds = [];
       for (const item of [...baselineResults, ...taskEvents, ...retryEvents]) {
@@ -577,7 +691,9 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
           event.event === "task" || event.event === "task_result"
         );
         const retries = related.filter((event) =>
-          event.event === "birth_task_retry" || event.event === "refined_tool_task_retry"
+          event.event === "birth_task_retry" ||
+          event.event === "refined_tool_task_retry" ||
+          event.event === "deferred_birth_task_retry"
         );
         const successfulRetry = [...retries].reverse().find((event) => event.success === true);
         const retry = successfulRetry || [...retries].reverse()[0] || null;
@@ -739,6 +855,30 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       }
       return [...names.entries()].map(([tool, kind]) => ({ tool, kind }));
     }
+    function generatedHelperSummary(record) {
+      if (!record) return "";
+      const toolUses = record.tool_uses || [];
+      const generatedToolUses = toolUses.filter((use) => use.generated_helper && use.tool_name);
+      const visibleHelpers = record.visible_helpers || [];
+      if (generatedToolUses.length) {
+        return `<div class="generated-helper-summary">
+          <div class="generated-helper-title">SAGE generated helpers used in this transaction</div>
+          ${generatedToolUses.map((use) => `<div class="helper-use-row">
+            <span class="helper-use-status ${use.success === false ? "failed" : ""}">${use.success === false ? "miss" : "used"}</span>
+            <span class="helper-use-name">generated · ${esc(use.tool_name)}</span>
+            <br>${esc(compactJson(use.arguments))}
+            <br>${esc(compactJson(use.result))}
+          </div>`).join("")}
+        </div>`;
+      }
+      if (visibleHelpers.length) {
+        return `<div class="generated-helper-summary">
+          <div class="generated-helper-title">SAGE generated helpers visible to this transaction</div>
+          ${visibleHelpers.map((name) => `<span class="tool-chip called">visible · ${esc(String(name).replaceAll("_", " "))}</span>`).join(" ")}
+        </div>`;
+      }
+      return "";
+    }
     function renderHeader() {
       const stats = getRunStats();
       const status = runMetadata.status || (runMetadata.benchmark_ready === false ? "probe" : "complete");
@@ -774,8 +914,28 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
         ),
       ].join("");
       document.getElementById("toolsMetric")?.addEventListener("click", () => {
-        document.getElementById("registrySection")?.scrollIntoView({ behavior: "smooth" });
+        openToolRegistryModal();
       });
+    }
+    function openToolRegistryModal() {
+      const modal = document.getElementById("toolRegistryModal");
+      const body = document.getElementById("toolRegistryModalBody");
+      if (body) body.innerHTML = registryTable();
+      if (!modal) return;
+      if (typeof modal.showModal === "function") {
+        modal.showModal();
+      } else {
+        modal.setAttribute("open", "");
+      }
+    }
+    function closeToolRegistryModal() {
+      const modal = document.getElementById("toolRegistryModal");
+      if (!modal) return;
+      if (typeof modal.close === "function") {
+        modal.close();
+      } else {
+        modal.removeAttribute("open");
+      }
     }
     function renderTaskList() {
       const query = document.getElementById("search").value.toLowerCase();
@@ -844,6 +1004,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
           <div class="tool-badges">
             ${toolEvents.length ? toolEvents.map((item) => `<span class="tool-chip ${esc(item.kind)}">${esc(item.kind)} · ${esc(item.tool.replaceAll("_", " "))}</span>`).join("") : "<span class='tool-chip'>no generated helper recorded</span>"}
           </div>
+          ${generatedHelperSummary(task)}
         </section>
         <section class="section">
           <div class="section-title"><h2>Task Evidence And Scores</h2></div>
@@ -903,7 +1064,7 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
         <div class="transcript">
           ${transcript.length ? transcript.map((line, index) => `<div class="msg">${index + 1}. ${esc(line)}</div>`).join("") : "<div class='msg'>No transcript messages exported.</div>"}
           ${actionSummary}
-          ${toolUses.map((use, index) => `<div class="msg tool">${index + 1}. TOOL ${esc(use.tool_name)} · success ${esc(use.success)}<br>${esc(compactJson(use.arguments))}<br>${esc(compactJson(use.result))}</div>`).join("")}
+          ${toolUses.map((use, index) => `<div class="msg tool ${use.generated_helper ? "generated-helper" : ""}">${index + 1}. ${use.generated_helper ? "SAGE GENERATED HELPER" : "TOOL"} ${esc(use.tool_name)} · success ${esc(use.success)}<br>${esc(compactJson(use.arguments))}<br>${esc(compactJson(use.result))}</div>`).join("")}
           ${attempts.map((attempt, index) => `<div class="msg tool">${index + 1}. ATTEMPT ${esc(attempt.candidate_index ?? index)} · exit ${esc(attempt.exit_code ?? "n/a")} · len ${esc(attempt.poc_length ?? "n/a")}<br>${esc(attempt.output_excerpt || attempt.error || "")}</div>`).join("")}
         </div>
         <details><summary>Raw ${esc(label)} record</summary><pre>${esc(JSON.stringify(record, null, 2))}</pre></details>
@@ -976,6 +1137,10 @@ def _dashboard_html(payload: dict[str, Any]) -> str:
       }
     }
     document.getElementById("search").addEventListener("input", renderTaskList);
+    document.getElementById("toolRegistryClose")?.addEventListener("click", closeToolRegistryModal);
+    document.getElementById("toolRegistryModal")?.addEventListener("click", (event) => {
+      if (event.target === event.currentTarget) closeToolRegistryModal();
+    });
     applyPayload(payload);
     renderAll();
     setInterval(refreshDashboardData, 2500);
@@ -1321,7 +1486,9 @@ def _legacy_dashboard_html(payload: dict[str, Any]) -> str:
     function taskStatus(taskId) {{
       const related = taskEvents(taskId);
       const first = related.find((event) => event.event === "task" || event.event === "task_result") || {{}};
-      const retry = related.find((event) => event.event === "birth_task_retry");
+      const retry = related.find((event) =>
+        event.event === "birth_task_retry" || event.event === "deferred_birth_task_retry"
+      );
       if (first.success) return {{ label: "success", className: "green" }};
       if (retry?.success) return {{ label: "retry success", className: "green" }};
       if (retry && !retry.success) return {{ label: "retry failed", className: "red" }};

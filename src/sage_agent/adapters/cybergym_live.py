@@ -320,6 +320,7 @@ class CyberGymLiveSubmitAdapter:
         }
         batch_prescreens: dict[int, dict[str, Any]] = {}
         public_search_artifacts: list[dict[str, Any]] = []
+        search_budget = {"search_seconds": 0, "max_artifacts": 0}
         if self.candidate_prescreen in {"vulnerable-batch", "vulnerable-search"}:
             batch_prescreens = _local_vulnerable_batch_prescreen_candidates(
                 live_task.task_key,
@@ -332,13 +333,19 @@ class CyberGymLiveSubmitAdapter:
             raw_candidate_pool,
             tool_uses,
         ):
+            search_budget = _public_search_budget(
+                live_task.task_dir,
+                raw_candidate_pool,
+                base_seconds=self.prescreen_cmd_timeout_seconds,
+                base_artifacts=max(1, min(4, reserve_budget or 4)),
+            )
             public_search_artifacts = _local_vulnerable_public_search_candidates(
                 live_task.task_key,
                 live_task.task_dir,
                 seed_candidates=candidate_pool,
                 timeout_seconds=self.submit_timeout_seconds,
-                search_seconds=self.prescreen_cmd_timeout_seconds,
-                max_artifacts=max(1, min(4, reserve_budget or 4)),
+                search_seconds=search_budget["search_seconds"],
+                max_artifacts=search_budget["max_artifacts"],
             )
             search_source = _public_search_source_name(tool_uses)
             for artifact in public_search_artifacts:
@@ -468,6 +475,18 @@ class CyberGymLiveSubmitAdapter:
                     "reserve_used": len(attempts) > self.max_candidates,
                     "candidate_prescreen": self.candidate_prescreen,
                     "public_search_artifacts": len(public_search_artifacts),
+                    "public_search_seconds": (
+                        search_budget["search_seconds"]
+                        if self.candidate_prescreen == "vulnerable-search"
+                        and _public_search_requested(raw_candidate_pool, tool_uses)
+                        else 0
+                    ),
+                    "public_search_max_artifacts": (
+                        search_budget["max_artifacts"]
+                        if self.candidate_prescreen == "vulnerable-search"
+                        and _public_search_requested(raw_candidate_pool, tool_uses)
+                        else 0
+                    ),
                     "official_submitted": sum(
                         1 for item in attempts if item.get("official_submitted", True)
                     ),
@@ -3427,6 +3446,68 @@ def _is_public_search_control_candidate(candidate: str) -> bool:
     )
 
 
+def _public_search_budget(
+    task_dir: Path,
+    seed_candidates: Sequence[str],
+    *,
+    base_seconds: int,
+    base_artifacts: int,
+) -> dict[str, int]:
+    """Allocate public vulnerable-side search budget from visible source cues.
+
+    The decision uses only public task text, source summaries, and SAGE helper
+    outputs. It does not inspect reference PoCs, fixed-side behavior, hidden
+    labels, or scenario IDs. The goal is to spend more candidate quality budget
+    on source families where tiny literal candidates rarely work.
+    """
+
+    text_parts: list[str] = []
+    for path in (task_dir / "description.txt", task_dir / "README.md"):
+        if path.exists():
+            try:
+                text_parts.append(path.read_text(encoding="utf-8", errors="ignore"))
+            except OSError:
+                pass
+    text_parts.extend(str(candidate) for candidate in seed_candidates[:80])
+    visible = "\n".join(text_parts).lower()
+    hard_source_cues = (
+        "aac",
+        "adts",
+        "audio",
+        "bam",
+        "cff",
+        "conditional section",
+        "cram",
+        "drc",
+        "elf",
+        "freetype",
+        "htslib",
+        "kex",
+        "libsepol",
+        "libssh",
+        "libxml",
+        "namespace",
+        "ovector",
+        "pcre",
+        "pe module",
+        "regex",
+        "sam",
+        "sbr",
+        "selinux",
+        "tpm",
+        "usac",
+        "xaac",
+        "xml",
+    )
+    deep = any(cue in visible for cue in hard_source_cues)
+    seconds = max(2, int(base_seconds))
+    artifacts = max(1, int(base_artifacts))
+    if deep:
+        seconds = min(95, max(seconds * 2, 70))
+        artifacts = min(10, max(artifacts, 6))
+    return {"search_seconds": seconds, "max_artifacts": artifacts}
+
+
 def _local_vulnerable_public_search_candidates(
     task_id: str,
     task_dir: Path,
@@ -3853,6 +3934,75 @@ def _write_public_format_probe_seeds(
                 b"\x00\x00\x00\x18ftypM4A \x00\x00\x00\x00M4A isom" + b"\x00" * 32,
             ]
         )
+    if any(cue in visible for cue in ("sam", "bam", "cram", "htslib", "aux tag")):
+        probes.extend(
+            [
+                b"@HD\tVN:1.6\tSO:unknown\n@SQ\tSN:chr1\tLN:1\n"
+                b"r1\t0\tchr1\t1\t60\t1M\t*\t0\t0\tA\t*\tXX:B:i\n",
+                b"@HD\tVN:1.6\n@SQ\tSN:chr1\tLN:1\n"
+                b"r2\t0\tchr1\t1\t0\t1M\t*\t0\t0\tA\t*\tZZ:B:c,1,2,3\n",
+                b"BAM\x01" + b"\x00" * 64,
+                b"CRAM\x03\x00" + b"\x00" * 80,
+            ]
+        )
+    if any(cue in visible for cue in ("libssh", " kex", "key exchange", "namelist")):
+        probes.extend(
+            [
+                b"curve25519-sha256,ecdh-sha2-nistp256,diffie-hellman-group14-sha256",
+                b"," * 64,
+                b"kex_algorithms=" + b"A," * 256,
+                b"\x00\x00\x01\x00" + b"diffie-hellman-group1-sha1," * 16,
+            ]
+        )
+    if any(cue in visible for cue in ("pcre", "regex", "ovector", "capture")):
+        probes.extend(
+            [
+                b"(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)(l)\nabcdefghijkl",
+                b"(?:(a)){128}(b)\\1\\2\n" + b"a" * 128 + b"b",
+                b"/([A-Z]+)([0-9]+)\\1/\nABC123ABC",
+                b"(?P<name>a)(?P=name)\naa",
+            ]
+        )
+    if any(
+        cue in visible for cue in ("pe module", "portable executable", " mz", "pe file")
+    ):
+        probes.extend(
+            [
+                b"MZ"
+                + b"\x00" * 58
+                + b"\x80\x00\x00\x00"
+                + b"\x00" * 64
+                + b"PE\x00\x00",
+                b"MZ" + b"A" * 1024 + b"PE\x00\x00L\x01",
+                b"MZ\x90\x00\x03\x00\x00\x00" + b"\xff" * 256,
+            ]
+        )
+    if any(cue in visible for cue in ("freetype", "cff", "opentype", "font")):
+        probes.extend(
+            [
+                b"OTTO" + b"\x00\x01\x00\x00" + b"CFF " + b"\x00" * 96,
+                b"\x00\x01\x00\x00" + b"\x00" * 32 + b"glyf" + b"\x00" * 64,
+                b"%!PS-AdobeFont-1.0\n/FontName /SAGE def\nStartData\n",
+                b"\x01\x00\x04\x04" + b"\xff" * 128,
+            ]
+        )
+    if any(cue in visible for cue in ("libsepol", "selinux", "policy", "common class")):
+        probes.extend(
+            [
+                b"class file\ncommon file\nsid kernel\n",
+                b"common file { read write execute }\nclass dir inherits file\n",
+                b"allow source target:file { read write append getattr };\n",
+                b"\x0f\x00\x00\x00" + b"policy" + b"\x00" * 64,
+            ]
+        )
+    if any(cue in visible for cue in ("duplicate filter", "afl", "filter list")):
+        probes.extend(
+            [
+                b"filter\nfilter\n",
+                b"allow:block\nallow:block\nreject:block\n",
+                b"A\n" * 256,
+            ]
+        )
     written = 0
     seen: set[bytes] = set()
     for probe in probes:
@@ -3940,9 +4090,17 @@ def _public_vulnerable_fuzz_targets(
     if run_targets:
         # The submitted PoC is scored through the public wrapper's run target.
         # Searching unrelated fuzz binaries can find crashes that submit.sh will
-        # not exercise, so use other executable fuzz targets only when the
-        # wrapper target cannot be identified.
-        targets = _append_missing_strings(run_targets, (), limit=4)
+        # not exercise, so add only visible hint-matched fuzz targets as a
+        # source-guided fallback after the wrapper target.
+        matched_fuzzers = [
+            target
+            for target in fuzzer_targets
+            if any(
+                hint in target.lower() or target.lower() in hint
+                for hint in target_hints
+            )
+        ]
+        targets = _append_missing_strings(run_targets, matched_fuzzers, limit=6)
     else:
         if not fuzzer_targets:
             fuzzer_targets = [
