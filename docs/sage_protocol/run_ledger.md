@@ -1495,3 +1495,63 @@
   not visibility or simple gap detection.
 - Decision label:
   `SOURCE_FAMILY_EVOLUTION_REPAIR_IMPROVES_CYBERGYM_LATER_WINDOW_AND_RETAINS_TOOLSANDBOX_LIFT`.
+
+## 2026-05-23 - Import-Agent Portability Matrix And Tau2 Repair
+
+- Objective: make SAGE usable as an importable agent inside host-owned
+  benchmark harnesses without rewriting those harnesses around
+  `EnvironmentAdapter`, then validate the boundary on known-good and new
+  datasets.
+- Branch: `codex/sage-standalone-agent`.
+- Code changes: added `SAGEImportAgent`, `ImportTaskContext`,
+  `ImportTaskObservation`, `SAGEGuidance`, and `SAGEImportUpdate`; added
+  first-class helper types; added official harness runner support for tau2 and
+  Terminal-Bench; added baseline-control cache support for official harnesses;
+  added import-mode integrity checks and same-task retry policy controls.
+- Tau2 failure repair: the initial official tau2 run showed SAGE accepted a
+  reusable helper from a runner-side `JSONDecodeError`. Import mode now treats
+  runner/parser/subprocess/Docker/authentication/timeout failures as diagnostics
+  and emits `tool_birth_skipped` instead of birthing helpers.
+- ToolSandbox protocol40:
+  `outputs/sage_agent_standalone/import_agent_verify_toolsandbox40_20260523/mechanism_40_20260523_194131`;
+  score `0.648 -> 0.870`; outcome `0.474 -> 0.914`; exact successes
+  `3 -> 23`; controls `40 cached / 0 fresh`; runtime exceptions `0`.
+- CyberGym live fixed-side40:
+  `outputs/cybergym_live_sage/cybergym_source_guided_budget_first40_v2_20260523`;
+  cached baseline `1/40`, SAGE `12/40`; real task generator, real submit server,
+  real PoC verifier, fixed-side check enabled; integrity issues `0`.
+- MiniGrid live40:
+  `outputs/sage_agent_standalone/import_agent_openai_verify_minigrid40_20260523`;
+  cached baseline `18/40`, SAGE `40/40`; one reusable grid planner.
+- BBH live40:
+  `outputs/sage_agent_standalone/import_agent_openai_verify_bbh40_20260523`;
+  cached baseline `16/40`, SAGE `40/40`; hidden answer targets remained private
+  inside the adapter scorer.
+- Tau2 official40 pre-repair:
+  `outputs/sage_official_live/import_agent_tau2_airline_official_live40_gpt4omini_20260523`;
+  baseline `9/40`, SAGE `8/40`; controls `25 cached / 15 fresh`; paired gains
+  `5`, regressions `6`, both-win `3`, both-fail `26`.
+- Tau2 official40 post-repair:
+  `outputs/sage_official_live/import_agent_tau2_airline_skip_infra_helper_live40_20260523`;
+  baseline `9/40`, SAGE `10/40`; controls `40 cached / 0 fresh`; paired gains
+  `5`, regressions `4`, both-win `5`, both-fail `26`; no SAGE runner JSON error.
+- Terminal-Bench official40:
+  `outputs/sage_official_live/import_agent_terminal_bench_official_live40_20260523`;
+  stopped as runtime-feasibility blocker after about 24 minutes, with only
+  `3` paired tasks complete and no valid prior 40-task baseline cache. The run is
+  partial evidence only, not a completed validation.
+- tau3-bench: blocked because no tau3 official harness is installed locally;
+  using tau2 would be misleading.
+- ScienceAgentBench / science-agent-bench: blocked because the public clone
+  contains a benchmark placeholder and the password-protected official artifacts
+  are missing.
+- Reports/artifacts:
+  `docs/sage_protocol/sage_import_agent_validation_matrix_20260523.md`,
+  `docs/sage_protocol/sage_import_agent_tau2_failure_analysis.md`, and
+  `artifacts/sage_official_live/tau2_import_agent_repair_artifacts_20260523.json`.
+- Validation: targeted import-agent unit tests `4 passed`; Ruff passed for
+  `src/sage_agent/import_agent.py` and the import-agent tests. Full standalone
+  test file hung after several tests in the current local environment and was
+  stopped; rerun in a clean environment before protected review.
+- Decision label:
+  `IMPORT_AGENT_BOUNDARY_WORKS_WITH_TAU2_REPAIR_BUT_POLICY_HARNESS_HELPER_QUALITY_REMAINS_NEXT_GAP`.

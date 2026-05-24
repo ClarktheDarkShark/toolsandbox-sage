@@ -1,0 +1,1386 @@
+{
+  "created_from": {
+    "post_repair": "outputs/sage_official_live/import_agent_tau2_airline_skip_infra_helper_live40_20260523/dashboard/task_compare_data.json",
+    "pre_repair": "outputs/sage_official_live/import_agent_tau2_airline_official_live40_gpt4omini_20260523/dashboard/task_compare_data.json"
+  },
+  "runs": {
+    "post_repair": {
+      "run_dir": "outputs/sage_official_live/import_agent_tau2_airline_skip_infra_helper_live40_20260523",
+      "summary": {
+        "environment": "tau2-bench:airline",
+        "tasks_seen": 40,
+        "tasks_succeeded": 10,
+        "tools_born": 11,
+        "tools_accepted": 11,
+        "tools_reused": 75,
+        "model": "gpt-4o-mini",
+        "integrity_passed": true
+      },
+      "baseline": {
+        "tasks_seen": 40,
+        "tasks_succeeded": 9,
+        "success_rate": 0.225
+      },
+      "run_metadata": {
+        "status": "completed",
+        "official_harness": "tau2",
+        "comparison_valid": true,
+        "completed": 40,
+        "requested_samples": 40,
+        "selected_task_ids": [
+          "tau2:airline:0",
+          "tau2:airline:1",
+          "tau2:airline:2",
+          "tau2:airline:3",
+          "tau2:airline:4",
+          "tau2:airline:5",
+          "tau2:airline:6",
+          "tau2:airline:7",
+          "tau2:airline:8",
+          "tau2:airline:9",
+          "tau2:airline:10",
+          "tau2:airline:11",
+          "tau2:airline:12",
+          "tau2:airline:13",
+          "tau2:airline:14",
+          "tau2:airline:15",
+          "tau2:airline:16",
+          "tau2:airline:17",
+          "tau2:airline:18",
+          "tau2:airline:19",
+          "tau2:airline:20",
+          "tau2:airline:21",
+          "tau2:airline:22",
+          "tau2:airline:23",
+          "tau2:airline:24",
+          "tau2:airline:25",
+          "tau2:airline:26",
+          "tau2:airline:27",
+          "tau2:airline:28",
+          "tau2:airline:29",
+          "tau2:airline:30",
+          "tau2:airline:31",
+          "tau2:airline:32",
+          "tau2:airline:33",
+          "tau2:airline:34",
+          "tau2:airline:35",
+          "tau2:airline:36",
+          "tau2:airline:37",
+          "tau2:airline:38",
+          "tau2:airline:39"
+        ],
+        "registry_path": "outputs/sage_official_live/import_agent_tau2_airline_skip_infra_helper_live40_20260523/sage_import_registry/sage_registry.json",
+        "max_helpers": 3,
+        "active_helpers": 2,
+        "sage_import_mode": true,
+        "retry_policy": "next_task_only",
+        "baseline_cache": {
+          "policy": "use-if-eligible",
+          "path": "artifacts/sage_official_live/baseline_cache.json",
+          "cached": 40,
+          "fresh": 0,
+          "scope": "official_baseline_control_only"
+        }
+      },
+      "paired_counts": {
+        "gain": 5,
+        "regression": 4,
+        "both_win": 5,
+        "both_fail": 26
+      },
+      "tool_birth_skipped_count": 0,
+      "errors": {
+        "": 10,
+        "tau2_reward_below_1": 30
+      },
+      "helpers": [
+        {
+          "name": "sage_tool_argument_guidance_1",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 2,
+          "successes": 0,
+          "retired": false,
+          "guidance": "- Ensure to verify user details and reservation information before proceeding with cancellations to confirm eligibility for refunds.\n- Always check the time frame of the booking to determine if the cancellation policy applies, especially for recent reservations.\n- When processing cancellations, clearly communicate the status and refund timeline to the user to manage expectations.\n- Utilize tools effectively to retrieve necessary reservation details quickly, ensuring accurate information is provided to the user.\n- Implement a confirmation step before finalizing cancellations to ensure the user is aware and agrees to the action being taken."
+        },
+        {
+          "name": "sage_tool_argument_guidance_2",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 6,
+          "successes": 1,
+          "retired": true,
+          "guidance": "- Ensure all passenger details are accurately recorded and confirmed before proceeding with any actions.\n- Verify membership status or any applicable benefits that may influence compensation offers.\n- Clearly communicate compensation amounts and conditions to the user to avoid misunderstandings.\n- Document all interactions and confirmations for future reference and follow-up.\n- Encourage users to reach out for further assistance if they have additional needs or questions."
+        },
+        {
+          "name": "sage_tool_argument_guidance_3",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 6,
+          "successes": 1,
+          "retired": true,
+          "guidance": "- Ensure accurate user membership verification by cross-referencing user-provided information with system data before responding.\n- Implement a clear protocol for handling user disputes regarding account status, including escalation to human agents when necessary.\n- Utilize tools effectively to retrieve user details, and confirm the accuracy of the information before communicating it to the user.\n- Establish a stop-condition for interactions where user satisfaction is not met, allowing for immediate transfer to a supervisor or human agent.\n- Regularly validate and update the tool's data to minimize discrepancies in user membership levels and other critical information."
+        },
+        {
+          "name": "sage_tool_argument_guidance_4",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 9,
+          "successes": 2,
+          "retired": true,
+          "guidance": "- Ensure that the payment methods used for booking have sufficient balance to cover the total price of the flight.\n- Verify that the total payment amount matches the flight price before proceeding with the booking.\n- When modifying passenger details, confirm that the remaining passenger's information is accurate and complete.\n- If a flight is unavailable, promptly check for alternative flights and communicate options clearly to the user.\n- Maintain a clear record of user preferences and previous bookings to facilitate smoother transactions in future interactions."
+        },
+        {
+          "name": "sage_tool_argument_guidance_5",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 9,
+          "successes": 2,
+          "retired": true,
+          "guidance": "- Ensure that all flight options presented to the user are clearly detailed, including departure and arrival times, prices, and available seats.\n- When processing modifications, confirm the user's choice and payment method explicitly to avoid any confusion.\n- Validate that the payment method provided by the user is correctly referenced in the modification request to prevent transaction errors.\n- Maintain a friendly and accommodating tone throughout the interaction to enhance user experience, especially when handling requests or changes.\n- Implement a clear stop condition in the conversation flow to ensure that the interaction concludes appropriately when the user has no further requests."
+        },
+        {
+          "name": "sage_tool_argument_guidance_6",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 6,
+          "successes": 1,
+          "retired": true,
+          "guidance": "- Ensure to verify the payment method with the user before proceeding with any modifications to the reservation.\n- Always calculate the total cost of changes, including any additional fees for checked bags or upgrades, before confirming with the user.\n- Check the user's payment history to confirm sufficient balance for the requested changes, especially when using gift cards.\n- Maintain clear communication with the user regarding the status of their reservation and any modifications made.\n- Implement a stop condition to conclude the interaction once the user expresses satisfaction with the assistance provided."
+        },
+        {
+          "name": "sage_tool_argument_guidance_7",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 6,
+          "successes": 1,
+          "retired": true,
+          "guidance": "- Ensure all tool arguments are complete and correctly formatted, including reservation IDs, flight details, and payment information.\n- Verify that the flight dates and numbers are valid and correspond to the user's travel plans before submitting requests.\n- Check the payment history for any discrepancies or issues that may affect the transaction, ensuring sufficient funds or valid payment methods.\n- Confirm that the cabin class and flight type match the user's preferences and requirements for the reservation.\n- Implement a validation step to review all inputs before finalizing any updates to reservations to prevent errors."
+        },
+        {
+          "name": "sage_tool_argument_guidance_8",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 9,
+          "successes": 2,
+          "retired": true,
+          "guidance": "- Ensure that the total cost of the booking is clearly defined before processing payments, especially when multiple payment methods are involved.\n- Verify the payment method balances and ensure they cover the total cost before attempting to book a flight.\n- When encountering payment errors, clarify the total amount expected and the amounts being applied to avoid confusion.\n- If the system indicates a discrepancy in payment amounts, consider breaking down the booking into separate transactions to isolate issues.\n- In cases of persistent errors, escalate to a human agent for resolution to ensure customer satisfaction."
+        },
+        {
+          "name": "sage_task_completion_guidance_1",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 9,
+          "successes": 2,
+          "retired": true,
+          "guidance": "- Ensure clear communication of limitations regarding reservation modifications to avoid user frustration.\n- Implement a verification step to confirm user requests before proceeding with actions that cannot be fulfilled.\n- Utilize a consistent protocol for transferring users to human agents when automated assistance is insufficient.\n- Regularly review and update the knowledge base to reflect current policies and capabilities regarding passenger management.\n- Establish a stop-condition that triggers a transfer to a human agent when a request falls outside the automated system's capabilities."
+        },
+        {
+          "name": "sage_tool_argument_guidance_9",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 7,
+          "successes": 3,
+          "retired": false,
+          "guidance": "- Ensure that the total price is accurately calculated before proceeding with payment to avoid discrepancies.\n- Verify the balance of payment methods before attempting to use them to prevent transaction failures.\n- Implement a clear confirmation step for payment details to ensure the user is aware of the total amount being charged.\n- In case of payment errors, have a protocol in place to escalate the issue to a human agent for resolution.\n- Regularly check and update the payment processing system to ensure it reflects the correct pricing and available balances."
+        },
+        {
+          "name": "sage_tool_argument_guidance_10",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 6,
+          "successes": 3,
+          "retired": false,
+          "guidance": "- Ensure clarity in user requests by summarizing current flight details before making changes.\n- Confirm any changes to flight class or baggage allowances explicitly to avoid misunderstandings.\n- Utilize user membership status (e.g., gold member) to inform baggage policies and potential fees.\n- Maintain a clear record of all changes made to the reservation for transparency.\n- Encourage user feedback and confirm satisfaction with the final arrangements to enhance user experience."
+        }
+      ],
+      "failures": [
+        {
+          "status": "regression",
+          "task_id": "tau2:airline:1",
+          "baseline_success": true,
+          "sage_success": false,
+          "visible_helpers": [],
+          "baseline_error": "",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "regression",
+          "task_id": "tau2:airline:2",
+          "baseline_success": true,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_1"
+          ],
+          "baseline_error": "",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: I\u2019d like to book a round trip in economy class. The departure date would be next Friday.",
+          "sage_excerpt": "user: I\u2019m sorry, but I\u2019d like to mention something else first. I\u2019m really frustrated with a delayed flight from my most recent reservation."
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:3",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_2",
+            "sage_tool_argument_guidance_1"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "regression",
+          "task_id": "tau2:airline:4",
+          "baseline_success": true,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_3",
+            "sage_tool_argument_guidance_2"
+          ],
+          "baseline_error": "",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "regression",
+          "task_id": "tau2:airline:6",
+          "baseline_success": true,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_3",
+            "sage_tool_argument_guidance_2"
+          ],
+          "baseline_error": "",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: [{\"id\": \"call_N9zWRTwbxI8FxyTiayjie5hW\", \"name\": \"update_reservation_baggages\", \"arguments\": {\"reservation_id\": \"PEP4E0\", \"total_baggages\": 0, \"nonfree_baggages\": 0, \"payment_id\": \"credit_card_9302073\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:7",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_3",
+            "sage_tool_argument_guidance_2"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "tool: {\"reservation_id\": \"59XX6W\", \"user_id\": \"daiki_muller_1116\", \"origin\": \"LAS\", \"destination\": \"ATL\", \"flight_type\": \"round_trip\", \"cabin\": \"economy\", \"flights\": [{\"flight_number\": \"HAT007\", \"origin\": \"LAS\", \"destination\": \"ATL\", \"date\": \"2024-05-19\", \"price\": 168}, {\"flight_number\": \"HAT174\", \"origin\": \"ATL\", \"destination\": \"LAS\", \"date\": \"2024-05-29\", \"price\": 114}], \"passengers\": [{\"first_name\": \"Daiki\", \"last_name\": \"Muller\", \"dob\": \"1954-07-04\"}, {\"first_name\": \"Chen\", \"last_name\": \"Muller\", \"dob\": \"1982-03-25\"}], \"payment_history\": [{\"payment_id\": \"credit_card_2408938\", \"amount\": 624",
+          "sage_excerpt": "tool: [{\"flight_number\": \"HAT052\", \"origin\": \"ATL\", \"destination\": \"LAS\", \"status\": \"available\", \"scheduled_departure_time_est\": \"03:00:00\", \"scheduled_arrival_time_est\": \"07:00:00\", \"date\": null, \"available_seats\": {\"basic_economy\": 17, \"economy\": 18, \"business\": 4}, \"prices\": {\"basic_economy\": 96, \"economy\": 134, \"business\": 382}}, {\"flight_number\": \"HAT102\", \"origin\": \"ATL\", \"destination\": \"LAS\", \"status\": \"available\", \"scheduled_departure_time_est\": \"21:00:00\", \"scheduled_arrival_time_est\": \"01:00:00+1\", \"date\": null, \"available_seats\": {\"basic_economy\": 14, \"economy\": 15, \"business\": 5}, "
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:8",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_3",
+            "sage_tool_argument_guidance_2"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: [{\"id\": \"call_nLaasdKeTUnr0EZYN19Rcs8x\", \"name\": \"get_user_details\", \"arguments\": {\"user_id\": \"sophia_silva_7557\"}, \"requestor\": \"assistant\"}]",
+          "sage_excerpt": "assistant: [{\"id\": \"call_azCngmpSMGEhAF1qJ3nLMk3P\", \"name\": \"calculate\", \"arguments\": {\"expression\": \"348 - 150\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:9",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_3",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: I can assist you with canceling your reservations and modifying your flight. However, I will need some details to proceed:\n\n1. **User ID**: Please provide your user ID.\n2. **Reservation IDs**: Please provide the reservation IDs for the two reservations you want to cancel.\n3. **Reason for Cancellation**: What is the reason for canceling these reservations? (change of plan, airline cancelled flight, or other reasons)\n4. **Reservation ID for Modification**: Please provide the reservation ID for the flight you want to change to a nonstop flight.\n\nOnce I have this information, I can help"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:10",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: I appreciate the options! However, I really want to upgrade all passengers to business class and keep the May 24 date. If upgrading all passengers isn't possible within my budget, could you check if upgrading both the outbound and return flights would work instead?",
+          "sage_excerpt": "assistant: To confirm, here are the details of the modification:\n\n- **Reservation ID**: 4NQLHD\n- **New Flight Date**: May 24\n- **Cabin Class**: Business for all passengers\n\nPlease confirm that you would like me to proceed with these changes."
+        },
+        {
+          "status": "gain",
+          "task_id": "tau2:airline:11",
+          "baseline_success": false,
+          "sage_success": true,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:12",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Thank you for providing your user ID and reservation ID. What specific changes would you like to make to your reservation?",
+          "sage_excerpt": "user: Hello! I have an upcoming flight from Boston to Minneapolis, and I\u2019d like to make some changes to my reservation."
+        },
+        {
+          "status": "gain",
+          "task_id": "tau2:airline:13",
+          "baseline_success": false,
+          "sage_success": true,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:14",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "tool: {\"reservation_id\": \"K1NW8N\", \"user_id\": \"mohamed_silva_9265\", \"origin\": \"JFK\", \"destination\": \"SFO\", \"flight_type\": \"round_trip\", \"cabin\": \"basic_economy\", \"flights\": [{\"flight_number\": \"HAT023\", \"origin\": \"JFK\", \"destination\": \"SFO\", \"date\": \"2024-05-26\", \"price\": 53}, {\"flight_number\": \"HAT204\", \"origin\": \"SFO\", \"destination\": \"SEA\", \"date\": \"2024-05-28\", \"price\": 71}, {\"flight_number\": \"HAT021\", \"origin\": \"SEA\", \"destination\": \"JFK\", \"date\": \"2024-05-28\", \"price\": 65}], \"passengers\": [{\"first_name\": \"Mohamed\", \"last_name\": \"Silva\", \"dob\": \"1960-11-26\"}, {\"first_name\": \"Raj\", \"last_nam",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:15",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "tool: [[{\"flight_number\": \"HAT110\", \"origin\": \"ATL\", \"destination\": \"LGA\", \"status\": \"available\", \"scheduled_departure_time_est\": \"14:00:00\", \"scheduled_arrival_time_est\": \"16:30:00\", \"date\": \"2024-05-24\", \"available_seats\": {\"basic_economy\": 8, \"economy\": 9, \"business\": 16}, \"prices\": {\"basic_economy\": 62, \"economy\": 105, \"business\": 496}}, {\"flight_number\": \"HAT132\", \"origin\": \"LGA\", \"destination\": \"PHL\", \"status\": \"available\", \"scheduled_departure_time_est\": \"17:00:00\", \"scheduled_arrival_time_est\": \"18:00:00\", \"date\": \"2024-05-24\", \"available_seats\": {\"basic_economy\": 16, \"economy\": 8, \"bu",
+          "sage_excerpt": "user: Sure! My user ID is aarav_garcia_1177. However, I don't have my reservation ID handy. Is there another way to look up my booking?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:16",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: Sure! My user ID is aarav_garcia_1177. However, I don't have my reservation ID handy. Is there another way to look up my flight?",
+          "sage_excerpt": "user: Sure! My user ID is aarav_garcia_1177. However, I don't have my reservation ID handy. Is there another way to look up my flight?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:17",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "user: Sure! My user ID is omar_rossi_1241. I prefer not to provide my date of birth, but my name is Omar Rossi. Yes, I would like to proceed with adding the three checked bags and upgrading to economy class."
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:18",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_6"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: It seems that there was an issue with the downgrades because the specified flights are not available on the dates provided. \n\nTo proceed, I will need to check the available flights for each reservation. Please hold on for a moment while I gather that information.",
+          "sage_excerpt": "tool: Error: Payment method not found"
+        },
+        {
+          "status": "gain",
+          "task_id": "tau2:airline:19",
+          "baseline_success": false,
+          "sage_success": true,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_7",
+            "sage_tool_argument_guidance_6"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "",
+          "baseline_excerpt": "assistant: [{\"id\": \"call_9ya7Lc8g7fBxsN6GIZGusDCI\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"Z7GOZK\"}, \"requestor\": \"assistant\"}, {\"id\": \"call_bxOXiWBFsss1AcVDD4JyEPEu\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"K67C4W\"}, \"requestor\": \"assistant\"}, {\"id\": \"call_2PjFAilzWCp56s9hfQ7u9qRV\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"THY2DG\"}, \"requestor\": \"assistant\"}]",
+          "sage_excerpt": "user: Sure, my user ID is olivia_gonzalez_2305."
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:20",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_7",
+            "sage_tool_argument_guidance_6"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:21",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_7",
+            "sage_tool_argument_guidance_6"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: [{\"id\": \"call_6wX284L8Li0OhLQtVbxYnWDF\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"I57WUD\"}, \"requestor\": \"assistant\"}]",
+          "sage_excerpt": "assistant: [{\"id\": \"call_EXhQy8LDNuSYkW6THaE5SIU3\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"OI5L9G\"}, \"requestor\": \"assistant\"}, {\"id\": \"call_GDSCdkg4NL3ysbMqhp1XoPF5\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"AQLBTL\"}, \"requestor\": \"assistant\"}, {\"id\": \"call_9LFavsigSj9buuURlHYmHaaj\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"KA7I60\"}, \"requestor\": \"assistant\"}, {\"id\": \"call_ptvjWNHsi4S2uPRw3rRzPOVH\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"I57WUD\"}, \"requestor\": \"assistant\"}, {\"id\": \""
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:22",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_7",
+            "sage_tool_argument_guidance_6"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: [{\"id\": \"call_QwuyeGHJNL9BrLAJDCTcf77u\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"UM3OG5\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:23",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_7",
+            "sage_tool_argument_guidance_6"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: Actually, since I have three certificates, I have a great idea! Instead of using just one certificate for the booking, I would like to make three separate reservations. \n\nI will use the $500 certificate and all my gift cards for my reservation, certificate_9984806 for Raj, and the other certificate for Liam. \n\nCan you help me with that?",
+          "sage_excerpt": "tool: [{\"flight_number\": \"HAT023\", \"origin\": \"JFK\", \"destination\": \"SFO\", \"status\": \"available\", \"scheduled_departure_time_est\": \"14:00:00\", \"scheduled_arrival_time_est\": \"20:00:00\", \"date\": null, \"available_seats\": {\"basic_economy\": 8, \"economy\": 14, \"business\": 6}, \"prices\": {\"basic_economy\": 69, \"economy\": 162, \"business\": 364}}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:24",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_7",
+            "sage_tool_argument_guidance_8"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: [{\"id\": \"call_6UUKwY0RBDHFk60Wdq0ggk9r\", \"name\": \"search_direct_flight\", \"arguments\": {\"origin\": \"JFK\", \"destination\": \"LAX\", \"date\": \"2024-05-20\"}, \"requestor\": \"assistant\"}, {\"id\": \"call_J3rNRkEF1Q1URuHkLYdjwQdR\", \"name\": \"search_direct_flight\", \"arguments\": {\"origin\": \"LAX\", \"destination\": \"JFK\", \"date\": \"2024-05-25\"}, \"requestor\": \"assistant\"}]",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:26",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_tool_argument_guidance_8"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:28",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_tool_argument_guidance_8"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:29",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_tool_argument_guidance_8"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: [{\"id\": \"call_Uh4weykw4d9Ifbd9fZgndqP0\", \"name\": \"calculate\", \"arguments\": {\"expression\": \"171 + 154 + 50\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:30",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_tool_argument_guidance_8"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: I can help you with that! Could you please provide me with your user ID and the reservation ID for the flight you want to modify?",
+          "sage_excerpt": "assistant: I can help you with that! To proceed, could you please provide me with your user ID and the reservation ID for the flight you want to modify?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:31",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_tool_argument_guidance_8"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: I can help you with that. To proceed with changing your flight, I will need your user ID and reservation ID. If you don't have your reservation ID, I can help you locate it. Please provide me with the necessary information.",
+          "sage_excerpt": "assistant: I can help you with that. To proceed with changing your flight, I will need your user ID and reservation ID. If you don't have your reservation ID, I can help you locate it. Please provide me with the necessary information."
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:32",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_tool_argument_guidance_8"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "tool: [[{\"flight_number\": \"HAT202\", \"origin\": \"EWR\", \"destination\": \"MIA\", \"status\": \"available\", \"scheduled_departure_time_est\": \"07:00:00\", \"scheduled_arrival_time_est\": \"10:00:00\", \"date\": \"2024-05-21\", \"available_seats\": {\"basic_economy\": 6, \"economy\": 16, \"business\": 2}, \"prices\": {\"basic_economy\": 94, \"economy\": 196, \"business\": 221}}, {\"flight_number\": \"HAT008\", \"origin\": \"MIA\", \"destination\": \"LAX\", \"status\": \"available\", \"scheduled_departure_time_est\": \"11:00:00\", \"scheduled_arrival_time_est\": \"16:00:00\", \"date\": \"2024-05-21\", \"available_seats\": {\"basic_economy\": 3, \"economy\": 19, \"bu"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:33",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_tool_argument_guidance_9"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Since you have travel insurance, the fees for changing your flights will indeed be waived. \n\n### Summary of Changes:\n- **Outgoing Flight:** Change to **HAT072** departing at **9:00 AM** on **May 19, 2024**.\n- **Return Flight:** Change to **HAT278** on **May 23, 2024**.\n\nPlease confirm if you would like to proceed with these changes, and I will take care of it for you.",
+          "sage_excerpt": "user: I would like to change my outgoing flight to a nonstop flight on the next day, which is May 19th. Additionally, I want to move my return flight from SFO back by one day as well, to May 23rd. Please confirm if these changes can be made."
+        },
+        {
+          "status": "gain",
+          "task_id": "tau2:airline:34",
+          "baseline_success": false,
+          "sage_success": true,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_10",
+            "sage_tool_argument_guidance_9"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "",
+          "baseline_excerpt": "user: I would like to change my outbound flight to a nonstop flight on the next day, which would be May 19th. Additionally, I want to move my return flight back by one day to May 23rd, upgrade to business class, and add 2 checked bags. Can you help me with that?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:35",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_10",
+            "sage_tool_argument_guidance_9"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "tool: {\"reservation_id\": \"M20IZO\", \"user_id\": \"aarav_ahmed_6699\", \"origin\": \"JFK\", \"destination\": \"MCO\", \"flight_type\": \"one_way\", \"cabin\": \"economy\", \"flights\": [{\"flight_number\": \"HAT268\", \"origin\": \"JFK\", \"destination\": \"ATL\", \"date\": \"2024-05-22\", \"price\": 136}, {\"flight_number\": \"HAT010\", \"origin\": \"ATL\", \"destination\": \"MCO\", \"date\": \"2024-05-22\", \"price\": 109}], \"passengers\": [{\"first_name\": \"Aarav\", \"last_name\": \"Ahmed\", \"dob\": \"1981-05-26\"}, {\"first_name\": \"Daiki\", \"last_name\": \"Li\", \"dob\": \"1980-12-24\"}], \"payment_history\": [{\"payment_id\": \"credit_card_4959530\", \"amount\": 490}], \"cre",
+          "sage_excerpt": "assistant: I found an available flight from JFK to SFO on May 24. Here are the details:\n\n- **Flight Number**: HAT023\n- **Departure Time**: 14:00 EST\n- **Arrival Time**: 20:00 EST\n- **Cabin Class**: Economy\n- **Price**: $163\n- **Available Seats**: 2\n\nSince this is the only available economy class option, would you like to proceed with booking this flight? If so, please confirm the number of passengers and provide their details (first name, last name, and date of birth). You can book for up to five passengers."
+        },
+        {
+          "status": "gain",
+          "task_id": "tau2:airline:36",
+          "baseline_success": false,
+          "sage_success": true,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_10",
+            "sage_tool_argument_guidance_9"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:37",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_10",
+            "sage_tool_argument_guidance_9"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: Sure! My user ID is aarav_ahmed_6699.",
+          "sage_excerpt": "assistant: I can help you with that! First, I'll need your user ID to locate your reservations. Could you please provide it?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:39",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_10",
+            "sage_tool_argument_guidance_9"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "tool: {\"reservation_id\": \"UDMOP1\", \"user_id\": \"amelia_davis_8890\", \"origin\": \"SFO\", \"destination\": \"SFO\", \"flight_type\": \"round_trip\", \"cabin\": \"basic_economy\", \"flights\": [{\"flight_number\": \"HAT134\", \"origin\": \"SFO\", \"destination\": \"PHX\", \"date\": \"2024-05-28\", \"price\": 89}, {\"flight_number\": \"HAT032\", \"origin\": \"PHX\", \"destination\": \"SFO\", \"date\": \"2024-05-28\", \"price\": 52}, {\"flight_number\": \"HAT280\", \"origin\": \"SFO\", \"destination\": \"PHL\", \"date\": \"2024-05-29\", \"price\": 55}, {\"flight_number\": \"HAT199\", \"origin\": \"PHL\", \"destination\": \"SFO\", \"date\": \"2024-05-29\", \"price\": 55}], \"passengers\": ",
+          "sage_excerpt": "assistant: I can help you with that. Could you please provide me with your user ID and the reservation ID for the flights you want to cancel? Additionally, let me know the reason for the cancellation (change of plan, airline cancelled flight, or other reasons)."
+        }
+      ]
+    },
+    "pre_repair": {
+      "run_dir": "outputs/sage_official_live/import_agent_tau2_airline_official_live40_gpt4omini_20260523",
+      "summary": {
+        "environment": "tau2-bench:airline",
+        "tasks_seen": 40,
+        "tasks_succeeded": 8,
+        "tools_born": 10,
+        "tools_accepted": 10,
+        "tools_reused": 77,
+        "model": "gpt-4o-mini",
+        "integrity_passed": true
+      },
+      "baseline": {
+        "tasks_seen": 40,
+        "tasks_succeeded": 9,
+        "success_rate": 0.225
+      },
+      "run_metadata": {
+        "status": "completed",
+        "official_harness": "tau2",
+        "comparison_valid": true,
+        "completed": 40,
+        "requested_samples": 40,
+        "selected_task_ids": [
+          "tau2:airline:0",
+          "tau2:airline:1",
+          "tau2:airline:2",
+          "tau2:airline:3",
+          "tau2:airline:4",
+          "tau2:airline:5",
+          "tau2:airline:6",
+          "tau2:airline:7",
+          "tau2:airline:8",
+          "tau2:airline:9",
+          "tau2:airline:10",
+          "tau2:airline:11",
+          "tau2:airline:12",
+          "tau2:airline:13",
+          "tau2:airline:14",
+          "tau2:airline:15",
+          "tau2:airline:16",
+          "tau2:airline:17",
+          "tau2:airline:18",
+          "tau2:airline:19",
+          "tau2:airline:20",
+          "tau2:airline:21",
+          "tau2:airline:22",
+          "tau2:airline:23",
+          "tau2:airline:24",
+          "tau2:airline:25",
+          "tau2:airline:26",
+          "tau2:airline:27",
+          "tau2:airline:28",
+          "tau2:airline:29",
+          "tau2:airline:30",
+          "tau2:airline:31",
+          "tau2:airline:32",
+          "tau2:airline:33",
+          "tau2:airline:34",
+          "tau2:airline:35",
+          "tau2:airline:36",
+          "tau2:airline:37",
+          "tau2:airline:38",
+          "tau2:airline:39"
+        ],
+        "registry_path": "outputs/sage_official_live/import_agent_tau2_airline_official_live40_gpt4omini_20260523/sage_import_registry/sage_registry.json",
+        "max_helpers": 3,
+        "active_helpers": 2,
+        "sage_import_mode": true,
+        "retry_policy": "next_task_only",
+        "baseline_cache": {
+          "policy": "use-if-eligible",
+          "path": "artifacts/sage_official_live/baseline_cache.json",
+          "cached": 25,
+          "fresh": 15,
+          "scope": "official_baseline_control_only"
+        }
+      },
+      "paired_counts": {
+        "gain": 5,
+        "regression": 6,
+        "both_win": 3,
+        "both_fail": 26
+      },
+      "tool_birth_skipped_count": 0,
+      "errors": {
+        "tau2_runner_error:JSONDecodeError": 1,
+        "tau2_reward_below_1": 31,
+        "": 8
+      },
+      "helpers": [
+        {
+          "name": "sage_task_completion_guidance_1",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 6,
+          "successes": 1,
+          "retired": true,
+          "guidance": "- Ensure that the input data is properly formatted as valid JSON before processing to avoid decoding errors.\n- Implement error handling to catch and log JSONDecodeErrors, providing clear feedback on the nature of the input issue.\n- Validate the structure and content of the input data against expected schemas to prevent unexpected failures during parsing.\n- Consider adding preconditions to check for empty or malformed input before attempting to decode JSON.\n- Utilize tools or libraries that can provide detailed error messages for JSON parsing to aid in debugging and improving input quality."
+        },
+        {
+          "name": "sage_missing_information_guidance_1",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 1,
+          "successes": 0,
+          "retired": false,
+          "guidance": "- Ensure to actively encourage the user to ask questions while they wait, reinforcing that assistance is available.\n- Maintain a consistent tone of patience and support throughout the interaction, acknowledging the user's situation.\n- Verify that the user understands they can reach out at any time, and clarify any potential confusion about the waiting process.\n- Utilize clear and concise language to avoid misunderstandings, especially when discussing the arrival of the human agent.\n- Implement a stop-condition to transition the conversation if the user expresses a need for further assistance or if the human agent arrives."
+        },
+        {
+          "name": "sage_tool_argument_guidance_1",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 6,
+          "successes": 1,
+          "retired": true,
+          "guidance": "- Ensure to verify the number of passengers in a reservation before discussing compensation or assistance to avoid confusion.\n- When addressing customer frustrations, acknowledge their concerns and offer appropriate compensation based on company policy.\n- Always confirm the customer's acceptance of any compensation or assistance before proceeding with further actions.\n- Maintain a friendly and supportive tone throughout the conversation to enhance customer satisfaction.\n- Encourage customers to reach out again for any future needs, reinforcing a positive relationship."
+        },
+        {
+          "name": "sage_tool_argument_guidance_2",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 6,
+          "successes": 0,
+          "retired": true,
+          "guidance": "- Ensure that all required arguments for tool calls are provided and correctly formatted before execution.\n- Verify that the reservation ID and payment ID are valid and correspond to the user's current session.\n- Check that the total and non-free baggage counts are accurately reflected in the arguments to avoid discrepancies.\n- Confirm that the flight details, including dates and prices, are up-to-date and match the user's request.\n- Implement a validation step to ensure that the tool's response is checked for success before proceeding with further actions."
+        },
+        {
+          "name": "sage_tool_argument_guidance_3",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 6,
+          "successes": 1,
+          "retired": true,
+          "guidance": "- Ensure that the flight details, including flight number, date, and cabin class, are clearly communicated to the user to avoid confusion.\n- When adding passengers, confirm the details (name and date of birth) for each individual to ensure accurate booking.\n- Always verify the total price before proceeding with payment to ensure it aligns with the user's budget.\n- Utilize available payment methods effectively, and confirm the user's choice before finalizing the booking.\n- Provide a clear summary of the booking details after completion to reinforce user confidence and satisfaction."
+        },
+        {
+          "name": "sage_tool_argument_guidance_4",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 21,
+          "successes": 5,
+          "retired": true,
+          "guidance": "- Ensure that all flight details are verified before making updates to avoid errors related to flight availability.\n- Confirm the user's payment method and any potential additional charges before proceeding with changes to the reservation.\n- Always check the current baggage allowance and confirm any changes to baggage with the user to prevent discrepancies.\n- Implement a clear confirmation step after making changes to ensure the user is aware of the updates and any associated costs.\n- Maintain a structured approach to handle user requests, ensuring that all necessary information is gathered before executing tool calls."
+        },
+        {
+          "name": "sage_tool_argument_guidance_5",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 9,
+          "successes": 2,
+          "retired": true,
+          "guidance": "- Ensure that the assistant clearly communicates its limitations regarding specific requests, such as checking gift card balances, to avoid user frustration.\n- Implement a verification step to confirm whether the requested service is within the assistant's capabilities before proceeding with a transfer.\n- Utilize a consistent protocol for transferring users to human agents, including a summary of the user's request to provide context.\n- Regularly review and update the tool's argument-checking mechanisms to ensure they align with the latest service capabilities and user needs.\n- Establish clear stop-conditions for interactions that require human intervention to streamline the user experience."
+        },
+        {
+          "name": "sage_tool_argument_guidance_6",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 9,
+          "successes": 2,
+          "retired": true,
+          "guidance": "- Ensure that the reservation cancellation process is confirmed before proceeding with new flight searches to avoid conflicts.\n- When searching for flights, verify that the requested dates and destinations are available and adjust if necessary.\n- Utilize both direct and one-stop flight searches to maximize options for the user, especially when initial searches yield no results.\n- Always confirm the cabin class and flight type requested by the user to ensure alignment with their preferences.\n- If no flights are available, proactively suggest alternative dates or destinations to keep the conversation moving forward."
+        },
+        {
+          "name": "sage_tool_argument_guidance_7",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 7,
+          "successes": 2,
+          "retired": false,
+          "guidance": "- Ensure to verify the total cost calculations, including all applicable fees and insurance, before confirming bookings.\n- When a user's budget is not met, proactively suggest alternative dates or routes to find more affordable options.\n- Utilize available tools to check for multiple flight options and their respective prices to provide comprehensive assistance.\n- Encourage users to consider flexible travel dates or alternative transportation methods if their budget constraints are not met.\n- Always confirm the availability of seats and prices before presenting options to the user to avoid misinformation."
+        },
+        {
+          "name": "sage_tool_argument_guidance_8",
+          "helper_type": "prompt_guidance",
+          "family": "prompt_guidance_helper",
+          "uses": 6,
+          "successes": 2,
+          "retired": false,
+          "guidance": "- Ensure that the payment method has sufficient balance before processing upgrades or additional charges to avoid transaction failures.\n- When handling requests for upgrades or additional services, clearly communicate any potential costs and confirm the user's willingness to proceed.\n- Always verify the total number of checked bags and any associated fees before finalizing changes to a reservation.\n- Maintain a clear record of all changes made to a reservation, including the status of payments and any adjustments to baggage allowances.\n- Encourage users to provide alternative payment methods if their primary method does not cover the costs of requested changes."
+        }
+      ],
+      "failures": [
+        {
+          "status": "regression",
+          "task_id": "tau2:airline:0",
+          "baseline_success": true,
+          "sage_success": false,
+          "visible_helpers": [],
+          "baseline_error": "",
+          "sage_error": "tau2_runner_error:JSONDecodeError",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "tau2 official runner error: JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "status": "regression",
+          "task_id": "tau2:airline:1",
+          "baseline_success": true,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1"
+          ],
+          "baseline_error": "",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "user: Thank you! I appreciate your support. I\u2019ll wait for the human agent to arrive. If I think of any questions in the meantime, I\u2019ll be sure to ask."
+        },
+        {
+          "status": "regression",
+          "task_id": "tau2:airline:2",
+          "baseline_success": true,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_missing_information_guidance_1"
+          ],
+          "baseline_error": "",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: I\u2019d like to book a round trip in economy class. The departure date would be next Friday.",
+          "sage_excerpt": "user: I understand, but I really need to address the delayed flight issue first. It\u2019s been quite frustrating. The last reservation I made had a delay, but I can\u2019t remember the reservation number. There were three passengers in that booking. Can we discuss that?"
+        },
+        {
+          "status": "gain",
+          "task_id": "tau2:airline:3",
+          "baseline_success": false,
+          "sage_success": true,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_tool_argument_guidance_1"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "regression",
+          "task_id": "tau2:airline:4",
+          "baseline_success": true,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_1",
+            "sage_task_completion_guidance_1"
+          ],
+          "baseline_error": "",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: [{\"id\": \"call_l5OmWDzTfylQNliPDSHqLiRA\", \"name\": \"get_user_details\", \"arguments\": {\"user_id\": \"sophia_silva_7557\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "regression",
+          "task_id": "tau2:airline:5",
+          "baseline_success": true,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_tool_argument_guidance_1"
+          ],
+          "baseline_error": "",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: [{\"id\": \"call_sNTe0Djpfunw48XL6mAwIfQP\", \"name\": \"get_user_details\", \"arguments\": {\"user_id\": \"mei_brown_7075\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "regression",
+          "task_id": "tau2:airline:6",
+          "baseline_success": true,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_task_completion_guidance_1",
+            "sage_tool_argument_guidance_1"
+          ],
+          "baseline_error": "",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: [{\"id\": \"call_l8xYlrbg88clARjQFSwt9VlB\", \"name\": \"update_reservation_baggages\", \"arguments\": {\"reservation_id\": \"PEP4E0\", \"total_baggages\": 0, \"nonfree_baggages\": 0, \"payment_id\": \"credit_card_9302073\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:7",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_1",
+            "sage_tool_argument_guidance_2"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "tool: {\"reservation_id\": \"59XX6W\", \"user_id\": \"daiki_muller_1116\", \"origin\": \"LAS\", \"destination\": \"ATL\", \"flight_type\": \"round_trip\", \"cabin\": \"economy\", \"flights\": [{\"flight_number\": \"HAT007\", \"origin\": \"LAS\", \"destination\": \"ATL\", \"date\": \"2024-05-19\", \"price\": 168}, {\"flight_number\": \"HAT174\", \"origin\": \"ATL\", \"destination\": \"LAS\", \"date\": \"2024-05-29\", \"price\": 114}], \"passengers\": [{\"first_name\": \"Daiki\", \"last_name\": \"Muller\", \"dob\": \"1954-07-04\"}, {\"first_name\": \"Chen\", \"last_name\": \"Muller\", \"dob\": \"1982-03-25\"}], \"payment_history\": [{\"payment_id\": \"credit_card_2408938\", \"amount\": 624",
+          "sage_excerpt": "user: Yes, go ahead and cancel reservation ID 59XX6W."
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:8",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_1",
+            "sage_tool_argument_guidance_2"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: [{\"id\": \"call_nLaasdKeTUnr0EZYN19Rcs8x\", \"name\": \"get_user_details\", \"arguments\": {\"user_id\": \"sophia_silva_7557\"}, \"requestor\": \"assistant\"}]",
+          "sage_excerpt": "assistant: [{\"id\": \"call_ZFrwqZLTtN54Kd7d4u3spIx4\", \"name\": \"get_user_details\", \"arguments\": {\"user_id\": \"sophia_silva_7557\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:9",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_3",
+            "sage_tool_argument_guidance_2"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Unfortunately, there are no nonstop flights available from JFK to MCO on May 22, 2024. \n\nWould you like to keep your current reservation as is, or would you like to explore other options, such as changing the date or looking for one-stop flights? Please let me know how you would like to proceed!"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:10",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_3",
+            "sage_tool_argument_guidance_2"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: I appreciate the options! However, I really want to upgrade all passengers to business class and keep the May 24 date. If upgrading all passengers isn't possible within my budget, could you check if upgrading both the outbound and return flights would work instead?",
+          "sage_excerpt": "user: Sure! My user ID is liam_khan_2521. However, I don't have my reservation ID handy. Is there another way to look up my flight?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:11",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_3",
+            "sage_tool_argument_guidance_2"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Before proceeding with the downgrade, I need to confirm the following details:\n\n- **Cabin Class**: Basic economy\n- **Reservation ID**: GV1N64\n- **Payment Method**: Please provide a payment method (credit card or gift card) that is already in your profile for the payment or refund process.\n\nPlease confirm these details so I can proceed with the downgrade."
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:12",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_3",
+            "sage_tool_argument_guidance_2"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Thank you for providing your user ID and reservation ID. What specific changes would you like to make to your reservation?",
+          "sage_excerpt": "user: Hello! I have an upcoming flight from Boston to Minneapolis, and I would like to make some changes to my reservation."
+        },
+        {
+          "status": "gain",
+          "task_id": "tau2:airline:13",
+          "baseline_success": false,
+          "sage_success": true,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_3"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:14",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_3"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "tool: {\"reservation_id\": \"K1NW8N\", \"user_id\": \"mohamed_silva_9265\", \"origin\": \"JFK\", \"destination\": \"SFO\", \"flight_type\": \"round_trip\", \"cabin\": \"basic_economy\", \"flights\": [{\"flight_number\": \"HAT023\", \"origin\": \"JFK\", \"destination\": \"SFO\", \"date\": \"2024-05-26\", \"price\": 53}, {\"flight_number\": \"HAT204\", \"origin\": \"SFO\", \"destination\": \"SEA\", \"date\": \"2024-05-28\", \"price\": 71}, {\"flight_number\": \"HAT021\", \"origin\": \"SEA\", \"destination\": \"JFK\", \"date\": \"2024-05-28\", \"price\": 65}], \"passengers\": [{\"first_name\": \"Mohamed\", \"last_name\": \"Silva\", \"dob\": \"1960-11-26\"}, {\"first_name\": \"Raj\", \"last_nam",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "gain",
+          "task_id": "tau2:airline:15",
+          "baseline_success": false,
+          "sage_success": true,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_5"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "",
+          "baseline_excerpt": "tool: [[{\"flight_number\": \"HAT110\", \"origin\": \"ATL\", \"destination\": \"LGA\", \"status\": \"available\", \"scheduled_departure_time_est\": \"14:00:00\", \"scheduled_arrival_time_est\": \"16:30:00\", \"date\": \"2024-05-24\", \"available_seats\": {\"basic_economy\": 8, \"economy\": 9, \"business\": 16}, \"prices\": {\"basic_economy\": 62, \"economy\": 105, \"business\": 496}}, {\"flight_number\": \"HAT132\", \"origin\": \"LGA\", \"destination\": \"PHL\", \"status\": \"available\", \"scheduled_departure_time_est\": \"17:00:00\", \"scheduled_arrival_time_est\": \"18:00:00\", \"date\": \"2024-05-24\", \"available_seats\": {\"basic_economy\": 16, \"economy\": 8, \"bu",
+          "sage_excerpt": "assistant: I can help you with that! First, I need to obtain your user ID and reservation ID to proceed with the flight change. Could you please provide me with that information?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:16",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: Sure! My user ID is aarav_garcia_1177. However, I don't have my reservation ID handy. Is there another way to look up my flight?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:17",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: It appears that the system is still recognizing the previous passenger, which is causing an issue with the update. I will first remove the other passenger and then proceed with the other changes. Let me handle that now."
+        },
+        {
+          "status": "gain",
+          "task_id": "tau2:airline:18",
+          "baseline_success": false,
+          "sage_success": true,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_5"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "",
+          "baseline_excerpt": "assistant: It seems that there was an issue with the downgrades because the specified flights are not available on the dates provided. \n\nTo proceed, I will need to check the available flights for each reservation. Please hold on for a moment while I gather that information.",
+          "sage_excerpt": "tool: {\"reservation_id\": \"2FBBAH\", \"user_id\": \"omar_davis_3817\", \"origin\": \"DEN\", \"destination\": \"DEN\", \"flight_type\": \"round_trip\", \"cabin\": \"business\", \"flights\": [{\"flight_number\": \"HAT080\", \"origin\": \"DEN\", \"destination\": \"PHL\", \"date\": \"2024-05-28\", \"price\": 537}, {\"flight_number\": \"HAT076\", \"origin\": \"PHL\", \"destination\": \"DEN\", \"date\": \"2024-05-28\", \"price\": 996}, {\"flight_number\": \"HAT255\", \"origin\": \"DEN\", \"destination\": \"MIA\", \"date\": \"2024-05-30\", \"price\": 1440}, {\"flight_number\": \"HAT148\", \"origin\": \"MIA\", \"destination\": \"DEN\", \"date\": \"2024-05-30\", \"price\": 1417}], \"passengers\": ["
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:19",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_5",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: [{\"id\": \"call_9ya7Lc8g7fBxsN6GIZGusDCI\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"Z7GOZK\"}, \"requestor\": \"assistant\"}, {\"id\": \"call_bxOXiWBFsss1AcVDD4JyEPEu\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"K67C4W\"}, \"requestor\": \"assistant\"}, {\"id\": \"call_2PjFAilzWCp56s9hfQ7u9qRV\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"THY2DG\"}, \"requestor\": \"assistant\"}]",
+          "sage_excerpt": "user: My user ID is olivia_gonzalez_2305. I don't remember my reservation ID, though. I would like to change my return flight to a later time today if possible. If not, then the earliest flight tomorrow would work."
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:20",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_5"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:21",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_5"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: [{\"id\": \"call_6wX284L8Li0OhLQtVbxYnWDF\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"I57WUD\"}, \"requestor\": \"assistant\"}]",
+          "sage_excerpt": "assistant: [{\"id\": \"call_z3nxZmimMeKSWF5RpRul0h1Z\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"I57WUD\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:22",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_5"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:23",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_5"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: Actually, since I have three certificates, I have a great idea! Instead of using just one certificate for the booking, I would like to make three separate reservations. \n\nI will use the $500 certificate and all my gift cards for my reservation, certificate_9984806 for Raj, and the other certificate for Liam. \n\nCan you help me with that?",
+          "sage_excerpt": "assistant: [{\"id\": \"call_88ftXHgWDqZ8kl9o1lTfHb53\", \"name\": \"get_reservation_details\", \"arguments\": {\"reservation_id\": \"K1NW8N\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:24",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_6"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: [{\"id\": \"call_6UUKwY0RBDHFk60Wdq0ggk9r\", \"name\": \"search_direct_flight\", \"arguments\": {\"origin\": \"JFK\", \"destination\": \"LAX\", \"date\": \"2024-05-20\"}, \"requestor\": \"assistant\"}, {\"id\": \"call_J3rNRkEF1Q1URuHkLYdjwQdR\", \"name\": \"search_direct_flight\", \"arguments\": {\"origin\": \"LAX\", \"destination\": \"JFK\", \"date\": \"2024-05-25\"}, \"requestor\": \"assistant\"}]",
+          "sage_excerpt": "user: The passenger details are as follows:\n\n- **First Name:** Mia\n- **Last Name:** Kim\n- **Date of Birth:** You can find that in my user profile.\n\nPlease go ahead and complete the booking!"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:26",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_6",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:28",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_6",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:29",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_6",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: I can help you with that. To proceed, I need to gather some information from you:\n\n1. Could you please provide your user ID?\n2. What is your reservation ID for the roundtrip flights you want to change? If you don't have it, I can help you locate it.\n3. Please confirm that you want to change the flights without altering the origin, destination, or trip type.\n\nOnce I have this information, I can assist you further."
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:30",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_6",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: I can help you with that! Could you please provide me with your user ID and the reservation ID for the flight you want to modify?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:31",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_6",
+            "sage_tool_argument_guidance_4"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: I can help you with that. To proceed with changing your flight, I will need your user ID and reservation ID. If you don't have your reservation ID, I can help you locate it. Please provide me with the necessary information.",
+          "sage_excerpt": "assistant: [{\"id\": \"call_aZjFpm2hqYrWj9qi7XAm3fbW\", \"name\": \"cancel_reservation\", \"arguments\": {\"reservation_id\": \"DF89BM\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:32",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_6"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: I found some one-stop flight options from EWR to LAX on May 21 that may be more affordable. Here are the details for one of the options:\n\n### Flight Option:\n1. **First Leg:**\n   - **Flight Number:** HAT202\n   - **Origin:** EWR\n   - **Destination:** MIA\n   - **Scheduled Departure:** 07:00 AM EST\n   - **Scheduled Arrival:** 10:00 AM EST\n   - **Price:** $94 (Economy)\n\n2. **Second Leg:**\n   - **Flight Number:** HAT008\n   - **Origin:** MIA\n   - **Destination:** LAX\n   - **Scheduled Departure:** 11:00 AM EST\n   - **Scheduled Arrival:** 04:00 PM EST\n   - **Price:** $196 (Economy)\n\n### Tota"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:33",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_4",
+            "sage_tool_argument_guidance_7"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "assistant: Since you have travel insurance, the fees for changing your flights will indeed be waived. \n\n### Summary of Changes:\n- **Outgoing Flight:** Change to **HAT072** departing at **9:00 AM** on **May 19, 2024**.\n- **Return Flight:** Change to **HAT278** on **May 23, 2024**.\n\nPlease confirm if you would like to proceed with these changes, and I will take care of it for you.",
+          "sage_excerpt": "assistant: [{\"id\": \"call_pu3JfVSuI6kjQm82RQfBYI0B\", \"name\": \"search_direct_flight\", \"arguments\": {\"origin\": \"IAH\", \"destination\": \"SFO\", \"date\": \"2024-05-19\"}, \"requestor\": \"assistant\"}]"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:34",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_8",
+            "sage_tool_argument_guidance_7"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: I would like to change my outbound flight to a nonstop flight on the next day, which would be May 19th. Additionally, I want to move my return flight back by one day to May 23rd, upgrade to business class, and add 2 checked bags. Can you help me with that?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:35",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_8",
+            "sage_tool_argument_guidance_7"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "tool: {\"reservation_id\": \"M20IZO\", \"user_id\": \"aarav_ahmed_6699\", \"origin\": \"JFK\", \"destination\": \"MCO\", \"flight_type\": \"one_way\", \"cabin\": \"economy\", \"flights\": [{\"flight_number\": \"HAT268\", \"origin\": \"JFK\", \"destination\": \"ATL\", \"date\": \"2024-05-22\", \"price\": 136}, {\"flight_number\": \"HAT010\", \"origin\": \"ATL\", \"destination\": \"MCO\", \"date\": \"2024-05-22\", \"price\": 109}], \"passengers\": [{\"first_name\": \"Aarav\", \"last_name\": \"Ahmed\", \"dob\": \"1981-05-26\"}, {\"first_name\": \"Daiki\", \"last_name\": \"Li\", \"dob\": \"1980-12-24\"}], \"payment_history\": [{\"payment_id\": \"credit_card_4959530\", \"amount\": 490}], \"cre",
+          "sage_excerpt": "assistant: I can help you with that! First, I need to confirm a few details before proceeding with the booking:\n\n1. **User ID:** You have already provided your user ID as `aarav_ahmed_6699`.\n2. **Trip Type:** Is this a one-way or round trip?\n3. **Cabin Class:** You mentioned economy class.\n4. **Passengers:** How many passengers will be traveling? Please provide the first name, last name, and date of birth for each passenger.\n\nOnce I have this information, I can search for available flights for you."
+        },
+        {
+          "status": "gain",
+          "task_id": "tau2:airline:36",
+          "baseline_success": false,
+          "sage_success": true,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_8",
+            "sage_tool_argument_guidance_7"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "",
+          "baseline_excerpt": "assistant: Hi! How can I help you today?",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:37",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_8",
+            "sage_tool_argument_guidance_7"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "user: Sure! My user ID is aarav_ahmed_6699.",
+          "sage_excerpt": "assistant: To proceed, I need to confirm the reasons for the cancellations of reservations IFOYYZ and NQNU5R. Please provide the reasons (e.g., change of plan, airline cancelled flight, or other reasons) for each cancellation."
+        },
+        {
+          "status": "both_fail",
+          "task_id": "tau2:airline:39",
+          "baseline_success": false,
+          "sage_success": false,
+          "visible_helpers": [
+            "sage_tool_argument_guidance_8",
+            "sage_tool_argument_guidance_7"
+          ],
+          "baseline_error": "tau2_reward_below_1",
+          "sage_error": "tau2_reward_below_1",
+          "baseline_excerpt": "tool: {\"reservation_id\": \"UDMOP1\", \"user_id\": \"amelia_davis_8890\", \"origin\": \"SFO\", \"destination\": \"SFO\", \"flight_type\": \"round_trip\", \"cabin\": \"basic_economy\", \"flights\": [{\"flight_number\": \"HAT134\", \"origin\": \"SFO\", \"destination\": \"PHX\", \"date\": \"2024-05-28\", \"price\": 89}, {\"flight_number\": \"HAT032\", \"origin\": \"PHX\", \"destination\": \"SFO\", \"date\": \"2024-05-28\", \"price\": 52}, {\"flight_number\": \"HAT280\", \"origin\": \"SFO\", \"destination\": \"PHL\", \"date\": \"2024-05-29\", \"price\": 55}, {\"flight_number\": \"HAT199\", \"origin\": \"PHL\", \"destination\": \"SFO\", \"date\": \"2024-05-29\", \"price\": 55}], \"passengers\": ",
+          "sage_excerpt": "assistant: Hi! How can I help you today?"
+        }
+      ]
+    }
+  }
+}

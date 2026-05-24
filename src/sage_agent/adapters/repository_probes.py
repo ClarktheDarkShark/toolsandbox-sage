@@ -253,6 +253,7 @@ class TauBenchProbeAdapter(_StructuredRecordProbeAdapter):
     """Public-metadata probe for tau2/tau3 benchmark task repositories."""
 
     repo_root: Path = Path("external/tau2-bench")
+    environment_name: str = "tau2-bench"
     domains: tuple[str, ...] = (
         "airline",
         "retail",
@@ -262,7 +263,7 @@ class TauBenchProbeAdapter(_StructuredRecordProbeAdapter):
 
     def profile(self) -> EnvironmentProfile:
         return EnvironmentProfile(
-            name="tau2-bench",
+            name=self.environment_name,
             description=(
                 "tau2/tau3 conversational customer-service agent benchmark "
                 "metadata probe over public task records, policies, and domains."
@@ -277,6 +278,7 @@ class TauBenchProbeAdapter(_StructuredRecordProbeAdapter):
             ),
             metadata={
                 "repo": "https://github.com/sierra-research/tau2-bench",
+                "environment_name": self.environment_name,
                 "probe_mode": "public_task_metadata",
             },
         )
@@ -288,7 +290,10 @@ class TauBenchProbeAdapter(_StructuredRecordProbeAdapter):
             path = data_root / domain / "tasks.json"
             if not path.exists():
                 continue
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
             if not isinstance(payload, list):
                 continue
             for item in payload:
@@ -319,7 +324,7 @@ class TauBenchProbeAdapter(_StructuredRecordProbeAdapter):
                 )
         return _records_to_probe_tasks(
             records=records,
-            environment="tau2-bench",
+            environment=self.environment_name,
             prompt_template=(
                 "Select tau benchmark task {task_key} from visible public task "
                 "records and return its domain."

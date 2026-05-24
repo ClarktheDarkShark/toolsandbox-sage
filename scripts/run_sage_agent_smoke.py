@@ -8,12 +8,15 @@ fixed to gpt-4o-mini, matching the low-cost policy for this development stage.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import shutil
 import sys
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -144,6 +147,17 @@ def main() -> None:
     parser.add_argument("--run-id", default="")
     parser.add_argument("--dashboard-port", type=int, default=62630)
     parser.add_argument("--no-dashboard-open", action="store_true")
+    parser.add_argument(
+        "--baseline-cache",
+        choices=("use-if-eligible", "off"),
+        default="use-if-eligible",
+        help="Reuse exact matched LLM baseline controls when available.",
+    )
+    parser.add_argument(
+        "--baseline-cache-path",
+        type=Path,
+        default=Path("artifacts/sage_agent_standalone/baseline_cache.json"),
+    )
     args = parser.parse_args()
 
     if args.env and args.dataset and args.env != args.dataset:
@@ -174,7 +188,10 @@ def main() -> None:
             task_names=tuple(args.bbh_task) or BBHAdapter.task_names,
         )
     elif args.env in {"tau2-bench", "tau3-bench"}:
-        adapter = TauBenchProbeAdapter(repo_root=args.tau2_repo)
+        adapter = TauBenchProbeAdapter(
+            repo_root=args.tau2_repo,
+            environment_name=args.env,
+        )
     elif args.env == "terminal-bench":
         adapter = TerminalBenchProbeAdapter(repo_root=args.terminal_bench_repo)
     elif args.env in {"scienceagentbench", "science-agent-bench"}:
@@ -462,6 +479,8 @@ def _run_baseline(
                 limit=limit,
                 model=str(args.model),
                 timeout=float(args.llm_timeout),
+                cache_policy=str(args.baseline_cache),
+                cache_path=args.baseline_cache_path,
             )
         if isinstance(adapter, MiniGridAdapter):
             return _run_minigrid_llm_baseline(
@@ -469,6 +488,8 @@ def _run_baseline(
                 limit=limit,
                 model=str(args.model),
                 timeout=float(args.llm_timeout),
+                cache_policy=str(args.baseline_cache),
+                cache_path=args.baseline_cache_path,
             )
         if isinstance(adapter, BBHAdapter):
             return _run_bbh_llm_baseline(
@@ -476,40 +497,72 @@ def _run_baseline(
                 limit=limit,
                 model=str(args.model),
                 timeout=float(args.llm_timeout),
+                cache_policy=str(args.baseline_cache),
+                cache_path=args.baseline_cache_path,
             )
         raise SystemExit(f"--baseline llm is not implemented for env={args.env}")
     return _run_no_helper_baseline(adapter, limit=limit)
 
 
-def _run_repository_probe_llm_baseline(
-    adapter: EnvironmentAdapter, *, limit: int | None, model: str, timeout: float
-) -> dict[str, object]:
-    planner = OpenAIEnvironmentBaseline(model=model, timeout=timeout)
-    adapter.prepare()
-    results: list[dict[str, object]] = []
-    for task in adapter.tasks(limit=limit):
-        try:
-            selected_value = planner.select_visible_record_value(task)
-            result = adapter.score_selected_value(  # type: ignore[attr-defined]
+def _repository_probe_llm_baseline_task(
+    adapter: EnvironmentAdapter,
+    planner: OpenAIEnvironmentBaseline,
+    task: Any,
+) -> TaskRunResult:
+    try:
+        selected_value = planner.select_visible_record_value(task)
+        return cast(
+            TaskRunResult,
+            adapter.score_selected_value(  # type: ignore[attr-defined]
                 task,
                 selected_value,
                 transcript_prefix=(
                     f"LLM baseline selected visible record value {selected_value!r}"
                 ),
-            )
-        except Exception as exc:  # pragma: no cover - live API/environment failure
-            result = TaskRunResult(
-                task=task,
-                success=False,
-                score=0.0,
-                outcome_score=0.0,
-                transcript=(f"LLM baseline failed: {type(exc).__name__}: {exc}",),
-                error=str(exc),
-            )
-        results.append(_baseline_result_json(result))
+            ),
+        )
+    except Exception as exc:  # pragma: no cover - live API/environment failure
+        return TaskRunResult(
+            task=task,
+            success=False,
+            score=0.0,
+            outcome_score=0.0,
+            transcript=(f"LLM baseline failed: {type(exc).__name__}: {exc}",),
+            error=str(exc),
+        )
+
+
+def _run_repository_probe_llm_baseline(
+    adapter: EnvironmentAdapter,
+    *,
+    limit: int | None,
+    model: str,
+    timeout: float,
+    cache_policy: str,
+    cache_path: Path,
+) -> dict[str, object]:
+    planner = OpenAIEnvironmentBaseline(model=model, timeout=timeout)
+    adapter.prepare()
+    results: list[dict[str, object]] = []
+    counts = _baseline_cache_counts()
+    policy = f"llm_visible_metadata_probe_baseline:{model}"
+    for task in adapter.tasks(limit=limit):
+        key = _standalone_baseline_cache_key(
+            environment=adapter.profile().name, task=task, model=model, policy=policy
+        )
+        cached = _read_standalone_baseline_cache(cache_policy, cache_path, key)
+        if cached is not None:
+            counts["cached"] += 1
+            results.append(_mark_standalone_baseline_cache(cached, "cached", key))
+            continue
+        counts["fresh"] += 1
+        result = _repository_probe_llm_baseline_task(adapter, planner, task)
+        payload = _baseline_result_json(result)
+        _write_standalone_baseline_cache(cache_policy, cache_path, key, payload)
+        results.append(_mark_standalone_baseline_cache(payload, "fresh", key))
     successes = sum(1 for result in results if result["success"])
     return {
-        "policy": f"llm_visible_metadata_probe_baseline:{model}",
+        "policy": policy,
         "comparison_valid": False,
         "comparison_note": (
             "Live LLM baseline over the same public metadata-probe task stream. "
@@ -520,38 +573,66 @@ def _run_repository_probe_llm_baseline(
         "tasks_succeeded": successes,
         "success_rate": successes / len(results) if results else 0.0,
         "results": results,
+        "cache": _standalone_baseline_cache_metadata(cache_policy, cache_path, counts),
     }
 
 
+def _minigrid_llm_baseline_task(
+    adapter: MiniGridAdapter,
+    planner: OpenAIEnvironmentBaseline,
+    task: Any,
+) -> TaskRunResult:
+    try:
+        actions = planner.plan_minigrid_actions(task, max_steps=adapter.max_steps)
+        return adapter.run_action_sequence(
+            task,
+            actions,
+            transcript_prefix=(
+                f"LLM baseline planned {len(actions)} actions: {actions[:20]}"
+            ),
+        )
+    except Exception as exc:  # pragma: no cover - live API/environment failure
+        return TaskRunResult(
+            task=task,
+            success=False,
+            score=0.0,
+            outcome_score=0.0,
+            transcript=(f"LLM baseline failed: {type(exc).__name__}: {exc}",),
+            error=str(exc),
+        )
+
+
 def _run_minigrid_llm_baseline(
-    adapter: MiniGridAdapter, *, limit: int | None, model: str, timeout: float
+    adapter: MiniGridAdapter,
+    *,
+    limit: int | None,
+    model: str,
+    timeout: float,
+    cache_policy: str,
+    cache_path: Path,
 ) -> dict[str, object]:
     planner = OpenAIEnvironmentBaseline(model=model, timeout=timeout)
     adapter.prepare()
     results: list[dict[str, object]] = []
+    counts = _baseline_cache_counts()
+    policy = f"llm_visible_artifact_baseline:{model}"
     for task in adapter.tasks(limit=limit):
-        try:
-            actions = planner.plan_minigrid_actions(task, max_steps=adapter.max_steps)
-            result = adapter.run_action_sequence(
-                task,
-                actions,
-                transcript_prefix=(
-                    f"LLM baseline planned {len(actions)} actions: {actions[:20]}"
-                ),
-            )
-        except Exception as exc:  # pragma: no cover - live API/environment failure
-            result = TaskRunResult(
-                task=task,
-                success=False,
-                score=0.0,
-                outcome_score=0.0,
-                transcript=(f"LLM baseline failed: {type(exc).__name__}: {exc}",),
-                error=str(exc),
-            )
-        results.append(_baseline_result_json(result))
+        key = _standalone_baseline_cache_key(
+            environment=adapter.profile().name, task=task, model=model, policy=policy
+        )
+        cached = _read_standalone_baseline_cache(cache_policy, cache_path, key)
+        if cached is not None:
+            counts["cached"] += 1
+            results.append(_mark_standalone_baseline_cache(cached, "cached", key))
+            continue
+        counts["fresh"] += 1
+        result = _minigrid_llm_baseline_task(adapter, planner, task)
+        payload = _baseline_result_json(result)
+        _write_standalone_baseline_cache(cache_policy, cache_path, key, payload)
+        results.append(_mark_standalone_baseline_cache(payload, "fresh", key))
     successes = sum(1 for result in results if result["success"])
     return {
-        "policy": f"llm_visible_artifact_baseline:{model}",
+        "policy": policy,
         "comparison_valid": True,
         "comparison_note": (
             "Basic LLM baseline over visible MiniGrid task artifacts. It receives "
@@ -562,39 +643,67 @@ def _run_minigrid_llm_baseline(
         "tasks_succeeded": successes,
         "success_rate": successes / len(results) if results else 0.0,
         "results": results,
+        "cache": _standalone_baseline_cache_metadata(cache_policy, cache_path, counts),
     }
 
 
+def _bbh_llm_baseline_task(
+    adapter: BBHAdapter,
+    planner: OpenAIEnvironmentBaseline,
+    task: Any,
+) -> TaskRunResult:
+    try:
+        answer = planner.answer_text_task(
+            task,
+            answer_format=str(task.artifacts.get("answer_format", "exact string")),
+        )
+        return adapter.score_answer(
+            task,
+            answer,
+            transcript_prefix=f"LLM baseline answered {answer!r}",
+        )
+    except Exception as exc:  # pragma: no cover - live API/environment failure
+        return TaskRunResult(
+            task=task,
+            success=False,
+            score=0.0,
+            outcome_score=0.0,
+            transcript=(f"LLM baseline failed: {type(exc).__name__}: {exc}",),
+            error=str(exc),
+        )
+
+
 def _run_bbh_llm_baseline(
-    adapter: BBHAdapter, *, limit: int | None, model: str, timeout: float
+    adapter: BBHAdapter,
+    *,
+    limit: int | None,
+    model: str,
+    timeout: float,
+    cache_policy: str,
+    cache_path: Path,
 ) -> dict[str, object]:
     planner = OpenAIEnvironmentBaseline(model=model, timeout=timeout)
     adapter.prepare()
     results: list[dict[str, object]] = []
+    counts = _baseline_cache_counts()
+    policy = f"llm_visible_prompt_baseline:{model}"
     for task in adapter.tasks(limit=limit):
-        try:
-            answer = planner.answer_text_task(
-                task,
-                answer_format=str(task.artifacts.get("answer_format", "exact string")),
-            )
-            result = adapter.score_answer(
-                task,
-                answer,
-                transcript_prefix=f"LLM baseline answered {answer!r}",
-            )
-        except Exception as exc:  # pragma: no cover - live API/environment failure
-            result = TaskRunResult(
-                task=task,
-                success=False,
-                score=0.0,
-                outcome_score=0.0,
-                transcript=(f"LLM baseline failed: {type(exc).__name__}: {exc}",),
-                error=str(exc),
-            )
-        results.append(_baseline_result_json(result))
+        key = _standalone_baseline_cache_key(
+            environment=adapter.profile().name, task=task, model=model, policy=policy
+        )
+        cached = _read_standalone_baseline_cache(cache_policy, cache_path, key)
+        if cached is not None:
+            counts["cached"] += 1
+            results.append(_mark_standalone_baseline_cache(cached, "cached", key))
+            continue
+        counts["fresh"] += 1
+        result = _bbh_llm_baseline_task(adapter, planner, task)
+        payload = _baseline_result_json(result)
+        _write_standalone_baseline_cache(cache_policy, cache_path, key, payload)
+        results.append(_mark_standalone_baseline_cache(payload, "fresh", key))
     successes = sum(1 for result in results if result["success"])
     return {
-        "policy": f"llm_visible_prompt_baseline:{model}",
+        "policy": policy,
         "comparison_valid": True,
         "comparison_note": (
             "Basic LLM baseline over visible BIG-Bench Hard prompt text and "
@@ -604,7 +713,112 @@ def _run_bbh_llm_baseline(
         "tasks_succeeded": successes,
         "success_rate": successes / len(results) if results else 0.0,
         "results": results,
+        "cache": _standalone_baseline_cache_metadata(cache_policy, cache_path, counts),
     }
+
+
+def _baseline_cache_counts() -> dict[str, int]:
+    return {"cached": 0, "fresh": 0}
+
+
+def _standalone_baseline_cache_metadata(
+    cache_policy: str, cache_path: Path, counts: dict[str, int]
+) -> dict[str, object]:
+    return {
+        "policy": cache_policy,
+        "path": str(cache_path),
+        "cached": counts.get("cached", 0),
+        "fresh": counts.get("fresh", 0),
+        "scope": "standalone_llm_baseline_only",
+    }
+
+
+def _standalone_baseline_cache_key(
+    *, environment: str, task: Any, model: str, policy: str
+) -> str:
+    payload = {
+        "schema_version": 1,
+        "environment": environment,
+        "task_id": task.task_id,
+        "task_name": task.name,
+        "prompt_hash": hashlib.sha256(task.prompt.encode("utf-8")).hexdigest(),
+        "artifact_hash": hashlib.sha256(
+            json.dumps(dict(task.artifacts), sort_keys=True, default=str).encode(
+                "utf-8"
+            )
+        ).hexdigest(),
+        "metadata_hash": hashlib.sha256(
+            json.dumps(dict(task.metadata), sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest(),
+        "model": model,
+        "policy": policy,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _read_standalone_baseline_cache(
+    cache_policy: str, cache_path: Path, key: str
+) -> dict[str, object] | None:
+    if cache_policy == "off" or not cache_path.exists():
+        return None
+    try:
+        payload = json.loads(cache_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    records = payload.get("records", {})
+    if not isinstance(records, dict):
+        return None
+    entry = records.get(key)
+    if not isinstance(entry, dict):
+        return None
+    result = entry.get("result")
+    if not isinstance(result, dict):
+        return None
+    if "success" not in result or "score" not in result:
+        return None
+    return dict(result)
+
+
+def _write_standalone_baseline_cache(
+    cache_policy: str, cache_path: Path, key: str, result: dict[str, object]
+) -> None:
+    if cache_policy == "off":
+        return
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, object] = {"schema_version": 1, "records": {}}
+    if cache_path.exists():
+        try:
+            loaded = json.loads(cache_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                payload.update(loaded)
+        except Exception:
+            pass
+    records = payload.setdefault("records", {})
+    if not isinstance(records, dict):
+        records = {}
+        payload["records"] = records
+    clean_result = dict(result)
+    clean_result.pop("baseline_cache", None)
+    records[key] = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "result": clean_result,
+    }
+    tmp = cache_path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, cache_path)
+
+
+def _mark_standalone_baseline_cache(
+    result: dict[str, object], status: str, key: str
+) -> dict[str, object]:
+    marked = dict(result)
+    marked["baseline_cache"] = {"status": status, "key": key}
+    raw_artifacts = marked.get("artifacts", {})
+    artifacts = dict(raw_artifacts) if isinstance(raw_artifacts, dict) else {}
+    artifacts["baseline_cache_status"] = status
+    marked["artifacts"] = artifacts
+    return marked
 
 
 def _empty_summary(environment: str, model: str, registry_dir: Path) -> SAGERunSummary:

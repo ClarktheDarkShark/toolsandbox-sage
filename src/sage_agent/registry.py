@@ -103,6 +103,7 @@ def _spec_to_json(spec: HelperSpec) -> dict[str, Any]:
         "name": spec.name,
         "family": spec.family,
         "description": spec.description,
+        "helper_type": spec.helper_type,
         "input_schema": dict(spec.input_schema),
         "output_schema": dict(spec.output_schema),
         "positive_triggers": list(spec.positive_triggers),
@@ -116,6 +117,7 @@ def _spec_from_json(payload: dict[str, Any]) -> HelperSpec:
         name=str(payload["name"]),
         family=str(payload.get("family", "deterministic_helper")),
         description=str(payload.get("description", "")),
+        helper_type=str(payload.get("helper_type", "deterministic_callable")),
         input_schema=_str_map(payload.get("input_schema", {})),
         output_schema=_str_map(payload.get("output_schema", {})),
         positive_triggers=tuple(
@@ -162,7 +164,7 @@ def _candidate_to_json(candidate: HelperCandidate) -> dict[str, Any]:
 def _candidate_from_json(payload: dict[str, Any]) -> HelperCandidate:
     return HelperCandidate(
         spec=_spec_from_json(payload["spec"]),
-        code=str(payload["code"]),
+        code=str(payload.get("code", "")),
         validation_cases=tuple(
             _case_from_json(case)
             for case in payload.get("validation_cases", ())

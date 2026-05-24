@@ -10,6 +10,11 @@ from sage_agent.controller import SAGEAgent, SAGEConfig, SAGERunSummary
 from sage_agent.dashboard import open_standalone_dashboard, write_standalone_dashboard
 from sage_agent.gap_mining import mine_gap_signals
 from sage_agent.generators import OpenAIHelperGenerator, TemplateHelperGenerator
+from sage_agent.import_agent import (
+    SAGEImportAgent,
+    SAGEImportConfig,
+    paired_task_order,
+)
 from sage_agent.integrity import (
     IntegrityError,
     IntegrityIssue,
@@ -26,6 +31,10 @@ from sage_agent.interfaces import (
     HelperRepairGenerator,
     HelperSpec,
     HelperValidationReport,
+    ImportTaskContext,
+    ImportTaskObservation,
+    SAGEGuidance,
+    SAGEImportUpdate,
     TaskRunResult,
     TaskSpec,
     ToolUseRecord,
@@ -54,8 +63,14 @@ __all__ = [
     "ResearchIntegrityPolicy",
     "SAGEAgent",
     "SAGEConfig",
+    "SAGEGuidance",
+    "SAGEImportAgent",
+    "SAGEImportConfig",
+    "SAGEImportUpdate",
     "SAGERunSummary",
     "TemplateHelperGenerator",
+    "ImportTaskContext",
+    "ImportTaskObservation",
     "TaskRunResult",
     "TaskSpec",
     "ToolUseRecord",
@@ -63,5 +78,6 @@ __all__ = [
     "assess_helper_lifecycle",
     "mine_gap_signals",
     "open_standalone_dashboard",
+    "paired_task_order",
     "write_standalone_dashboard",
 ]

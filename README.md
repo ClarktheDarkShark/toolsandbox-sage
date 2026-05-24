@@ -82,6 +82,79 @@ agent = SAGEAgent(
 summary = agent.run(limit=20)
 ```
 
+For benchmarks that already own the simulator, scorer, task runner, and agent
+loop, use import-agent mode instead of rewriting the benchmark as a full SAGE
+adapter. The host harness stays in charge of execution; SAGE only supplies
+before-task guidance and consumes after-task official observations:
+
+```python
+from pathlib import Path
+
+from sage_agent import (
+    EnvironmentProfile,
+    ImportTaskContext,
+    ImportTaskObservation,
+    SAGEImportAgent,
+    SAGEImportConfig,
+)
+from sage_agent.generators import OpenAIHelperGenerator
+
+profile = EnvironmentProfile(
+    name="my-benchmark",
+    description="Host-owned simulator, scorer, and task runner.",
+    base_tools=("host_agent_loop", "official_scorer"),
+    helper_families=("prompt_guidance_helper", "action_planning_helper"),
+    safety_rules=("Use only visible task context and official observations.",),
+)
+
+sage = SAGEImportAgent(
+    environment_profile=profile,
+    registry_dir=Path("artifacts/my_benchmark_sage_registry"),
+    generator=OpenAIHelperGenerator(),
+    config=SAGEImportConfig(model="gpt-4o-mini", retry_policy="next_task_only"),
+)
+
+task_context = ImportTaskContext(
+    task_id=task.id,
+    name=task.name,
+    prompt=task.visible_prompt,
+    artifacts={"readme_excerpt": task.visible_readme},
+    metadata={"split": "dev-visible"},
+)
+
+guidance = sage.before_task(task_context)
+host_result = run_existing_harness_task(
+    task,
+    agent_system_prompt_extra=guidance.system_prompt,
+)
+
+sage.after_task(
+    task_context,
+    ImportTaskObservation(
+        success=host_result.success,
+        score=host_result.score,
+        transcript=tuple(host_result.visible_messages),
+        error=host_result.error,
+    ),
+)
+```
+
+Import-agent mode treats guidance as a first-class helper type. Retained
+helpers may be deterministic callables, prompt-guidance helpers, action-planning
+helpers, or scorer-feedback repair helpers, and all receive the same visibility,
+reuse, success, retirement, validation, and registry metadata. The import layer
+also exposes `paired_task_order(...)` so a host harness can keep baseline and
+SAGE task order fixed. `retry_policy="same_task"` may be used only when the
+host benchmark permits a clean same-task retry after helper birth; otherwise use
+`next_task_only` for standard paired comparisons.
+
+Import-agent mode treats infrastructure failures differently from task failures.
+Runner exceptions, parser errors, subprocess timeouts, Docker failures,
+authentication failures, and other harness problems are recorded as diagnostics
+and emit `tool_birth_skipped`; they do not birth reusable helpers. This guard was
+added after tau2 showed that a runner-side `JSONDecodeError` could otherwise
+create irrelevant prompt guidance and pollute later tasks.
+
 The standalone package lives in `src/sage_agent/`. It is intentionally
 environment-neutral: the core SAGE controller does not know about ToolSandbox,
 CyberGym, MiniGrid, contacts, reminders, PoC submission, Docker, grid worlds,
@@ -201,8 +274,31 @@ make sage_agent SAGE_DATASET=minigrid SAGE_SAMPLES=12 DASHBOARD_OPEN=0
 Selectable standalone datasets are `toolsandbox`, `toolsandbox-probe`,
 `cybergym`, `minigrid`, `bbh`, `tau2-bench`, `tau3-bench`, `terminal-bench`,
 `scienceagentbench`, and `science-agent-bench`. The tau, Terminal-Bench, and
-ScienceAgentBench integrations are public-metadata probes; they validate the
-portable SAGE lifecycle but are not official benchmark-score runs.
+ScienceAgentBench entries in the smoke runner are public-metadata probes; they
+validate portable SAGE plumbing but are not official benchmark-score runs.
+
+For harness-backed official runs, `scripts/run_sage_official_live.py` uses the
+same `SAGEImportAgent` boundary. It currently supports tau2/tau3 and
+Terminal-Bench where local official harness dependencies are available.
+Baseline controls can use an exact matched baseline cache with
+`--baseline-cache use-if-eligible`; SAGE/candidate arms are always fresh.
+
+```bash
+set -a; source .secrets/env.sh; set +a
+PYTHONPATH=src:external/tau2-bench/src:. python scripts/run_sage_official_live.py \
+  --dataset tau2-bench \
+  --samples 40 \
+  --model gpt-4o-mini \
+  --baseline-cache use-if-eligible \
+  --retry-policy next_task_only \
+  --dashboard-port 62630
+```
+
+The current import-agent validation matrix is recorded at
+`docs/sage_protocol/sage_import_agent_validation_matrix_20260523.md`. The
+latest official tau2 repair rerun scored cached baseline `9/40` and SAGE
+`10/40`; Terminal-Bench official40 is a runtime-feasibility blocker until a
+valid baseline cache and longer unattended run budget are available.
 
 Each smoke run writes an environment-neutral Task Compare dashboard under
 `outputs/sage_agent_standalone/<run_id>/dashboard/task_compare.html`; `index.html`

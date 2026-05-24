@@ -7,6 +7,7 @@ provides the same protocol for low-cost live generation with ``gpt-4o-mini``.
 from __future__ import annotations
 
 import json
+import re
 from importlib import import_module
 from typing import Any, cast
 
@@ -15,6 +16,7 @@ from sage_agent.interfaces import (
     GapSignal,
     HelperCandidate,
     HelperSpec,
+    TaskRunResult,
     ValidationCase,
 )
 
@@ -230,6 +232,37 @@ class OpenAIHelperGenerator:
         )
         return _candidate_from_payload(payload, gap, profile, validation_cases, model)
 
+    def generate_guidance(
+        self,
+        gap: GapSignal,
+        profile: EnvironmentProfile,
+        result: TaskRunResult,
+        *,
+        model: str,
+    ) -> HelperCandidate:
+        """Generate a prompt-guidance helper for import-mode harnesses."""
+
+        payload = self._complete_json(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You generate safe SAGE prompt-guidance helpers from "
+                        "official benchmark feedback. Return JSON with key "
+                        "'guidance'. The guidance must be reusable, actionable, "
+                        "and must not reveal hidden labels, reference solutions, "
+                        "expected answers, or task-specific IDs."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": _guidance_generation_prompt(gap, profile, result),
+                },
+            ],
+        )
+        return _guidance_candidate_from_payload(payload, gap, profile, result, model)
+
     def repair(
         self,
         gap: GapSignal,
@@ -336,6 +369,85 @@ def _unique_record_selector(
         validation_cases=validation_cases,
         metadata={"model": model, "environment": profile.name, "gap_key": gap.key},
     )
+
+
+def _guidance_generation_prompt(
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    result: TaskRunResult,
+) -> str:
+    payload = {
+        "environment": profile.name,
+        "environment_description": profile.description,
+        "gap_summary": gap.summary,
+        "failure_family": gap.generation_directives.get("failure_family", ""),
+        "visible_failure_evidence": list(gap.evidence),
+        "task_prompt_excerpt": result.task.prompt[:1200],
+        "transcript_excerpt": "\n".join(result.transcript)[-6000:],
+        "error": result.error[:800],
+        "requirements": (
+            "Return 2-5 concise bullet lines. Focus on reusable policy, "
+            "precondition, tool-use, argument-checking, calculation, validation, "
+            "or stop-condition guidance for later tasks in this environment. "
+            "Do not include task IDs, hidden labels, reference solutions, exact "
+            "answers, or benchmark-specific memorized strings."
+        ),
+    }
+    return json.dumps(payload, indent=2, sort_keys=True)
+
+
+def _guidance_candidate_from_payload(
+    payload: dict[str, Any],
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    result: TaskRunResult,
+    model: str,
+) -> HelperCandidate:
+    value = payload.get("guidance", "")
+    if isinstance(value, list):
+        guidance = "\n".join(str(item) for item in value)
+    else:
+        guidance = str(value)
+    guidance = _normalize_guidance_text(guidance)
+    name = gap.suggested_tool_name or _safe_name(gap.key)
+    return HelperCandidate(
+        spec=HelperSpec(
+            name=name,
+            family="prompt_guidance_helper",
+            helper_type="prompt_guidance",
+            description=gap.summary,
+            input_schema={"task_context": "visible external task context"},
+            output_schema={"system_prompt_guidance": "str"},
+            positive_triggers=tuple(gap.evidence),
+            negative_triggers=(
+                "hidden labels",
+                "reference solutions",
+                "task-specific expected answers",
+            ),
+            safety_notes=tuple(profile.safety_rules),
+        ),
+        code=guidance,
+        validation_cases=(),
+        metadata={
+            "model": model,
+            "environment": profile.name,
+            "gap_key": gap.key,
+            "helper_type": "prompt_guidance",
+            "source_task_name": result.task.name[:120],
+        },
+    )
+
+
+def _normalize_guidance_text(guidance: str) -> str:
+    lines = [line.strip() for line in guidance.splitlines() if line.strip()]
+    normalized: list[str] = []
+    for line in lines:
+        line = re.sub(r"^\s*[-*]\s*", "- ", line)
+        line = re.sub(r"^\s*\d+[.)]\s*", "- ", line)
+        if not line.startswith("- "):
+            line = f"- {line}"
+        normalized.append(line[:240])
+    return "\n".join(normalized[:5])
 
 
 def _log_signal_classifier(

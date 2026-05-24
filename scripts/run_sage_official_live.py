@@ -4,7 +4,8 @@
 This runner is intentionally separate from the repository-probe smoke runner.
 It uses each benchmark's own scorer when a scorer is available locally:
 
-* tau2/tau3: official tau2 simulation evaluator.
+* tau2: official tau2 simulation evaluator.
+* tau3: blocked unless a tau3 official harness is installed locally.
 * Terminal-Bench: official Docker harness and task parser.
 * ScienceAgentBench: blocked unless the non-redistributable benchmark artifacts
   are present under ``external/ScienceAgentBench/benchmark``.
@@ -18,6 +19,7 @@ official scorer outputs, not from repository metadata probes.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -33,7 +35,15 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from sage_agent import SAGERunSummary  # noqa: E402
+from sage_agent import (  # noqa: E402
+    EnvironmentProfile,
+    ImportTaskContext,
+    ImportTaskObservation,
+    OpenAIHelperGenerator,
+    SAGEImportAgent,
+    SAGEImportConfig,
+    SAGERunSummary,
+)
 from sage_agent.dashboard import (  # noqa: E402
     open_standalone_dashboard,
     write_standalone_dashboard,
@@ -46,7 +56,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--dataset",
-        choices=("tau2-bench", "tau3-bench", "terminal-bench", "scienceagentbench"),
+        choices=(
+            "tau2-bench",
+            "tau3-bench",
+            "terminal-bench",
+            "scienceagentbench",
+            "science-agent-bench",
+        ),
         required=True,
     )
     parser.add_argument("--samples", type=int, default=40)
@@ -55,8 +71,22 @@ def main() -> None:
         "--output-root", type=Path, default=Path("outputs/sage_official_live")
     )
     parser.add_argument("--run-id", default="")
-    parser.add_argument("--dashboard-port", type=int, default=62660)
+    parser.add_argument("--dashboard-port", type=int, default=62630)
     parser.add_argument("--no-dashboard-open", action="store_true")
+    parser.add_argument(
+        "--baseline-cache",
+        choices=("use-if-eligible", "off"),
+        default="use-if-eligible",
+        help=(
+            "Reuse exact matched official baseline controls when available. "
+            "SAGE/candidate arms are never served from this cache."
+        ),
+    )
+    parser.add_argument(
+        "--baseline-cache-path",
+        type=Path,
+        default=Path("artifacts/sage_official_live/baseline_cache.json"),
+    )
     parser.add_argument("--max-helpers", type=int, default=3)
     parser.add_argument(
         "--active-helpers",
@@ -65,6 +95,11 @@ def main() -> None:
         help="Most recent accepted helpers injected into an active task.",
     )
     parser.add_argument("--seed", type=int, default=300)
+    parser.add_argument(
+        "--retry-policy",
+        choices=("none", "same_task", "next_task_only"),
+        default="next_task_only",
+    )
     parser.add_argument("--tau2-repo", type=Path, default=Path("external/tau2-bench"))
     parser.add_argument("--tau2-domain", default="airline")
     parser.add_argument("--tau2-max-steps", type=int, default=200)
@@ -98,10 +133,22 @@ def main() -> None:
     if args.model != "gpt-4o-mini":
         raise SystemExit("Live development runs are capped to gpt-4o-mini.")
     _install_interrupt_handler()
+    _open_startup_dashboard(args)
 
-    if args.dataset in {"tau2-bench", "tau3-bench"}:
+    if args.dataset == "tau2-bench":
         _reexec_if_missing("tau2", ROOT / "artifacts/live_envs/tau2/bin/python")
         _run_tau2(args)
+    elif args.dataset == "tau3-bench":
+        _run_blocked_official_harness(
+            args,
+            environment="tau3-bench",
+            official_harness="tau3",
+            blocked_reason=(
+                "No tau3 official harness is installed in this checkout. "
+                "Using tau2 here would be a misleading validation."
+            ),
+            missing_artifacts=["external/tau3-bench official runner"],
+        )
     elif args.dataset == "terminal-bench":
         _reexec_if_missing(
             "terminal_bench", ROOT / "artifacts/live_envs/terminal_bench/bin/python"
@@ -130,6 +177,28 @@ def _reexec_if_missing(module_name: str, python_path: Path) -> None:
         f"{SRC}{os.pathsep}{env['PYTHONPATH']}" if env.get("PYTHONPATH") else str(SRC)
     )
     os.execvpe(str(python_path), [str(python_path), __file__, *sys.argv[1:]], env)
+
+
+def _open_startup_dashboard(args: argparse.Namespace) -> None:
+    environment = args.dataset
+    if args.dataset == "tau2-bench":
+        environment = f"tau2-bench:{args.tau2_domain}"
+    run_dir = _run_dir(args)
+    dashboard_path = _write_live_dashboard(
+        args=args,
+        run_dir=run_dir,
+        environment=environment,
+        baseline_results=[],
+        sage_events=[],
+        run_metadata={
+            "status": "starting_harness_setup",
+            "official_harness": args.dataset,
+            "comparison_valid": False,
+            "requested_samples": args.samples,
+            "baseline_cache": _baseline_cache_metadata(args, _baseline_cache_counts()),
+        },
+    )
+    _open_dashboard(args, dashboard_path)
 
 
 def _run_tau2(args: argparse.Namespace) -> None:
@@ -177,9 +246,15 @@ def _run_tau2(args: argparse.Namespace) -> None:
         pass
 
     run_dir = _run_dir(args)
-    helper_path = run_dir / "sage_prompt_helpers.md"
-    helper_path.write_text("", encoding="utf-8")
-    _write_prompt_registry(run_dir, [])
+    sage_import = _import_agent(
+        args=args,
+        run_dir=run_dir,
+        profile=_official_profile(
+            name=f"{args.dataset}:{args.tau2_domain}",
+            harness="tau2",
+            description="Official tau2 conversational simulator and scorer.",
+        ),
+    )
     tasks = get_tasks(
         args.tau2_domain,
         task_ids=list(args.tau2_task_id) if args.tau2_task_id else None,
@@ -199,7 +274,7 @@ def _run_tau2(args: argparse.Namespace) -> None:
 
     baseline_results: list[dict[str, Any]] = []
     sage_events: list[dict[str, Any]] = []
-    helper_guidance: list[str] = []
+    baseline_cache_counts = _baseline_cache_counts()
     dashboard_path = _write_live_dashboard(
         args=args,
         run_dir=run_dir,
@@ -211,6 +286,10 @@ def _run_tau2(args: argparse.Namespace) -> None:
             "official_harness": "tau2",
             "comparison_valid": True,
             "selected_task_ids": selected,
+            "registry_path": str(sage_import.registry.manifest_path),
+            "sage_import_mode": True,
+            "retry_policy": args.retry_policy,
+            "baseline_cache": _baseline_cache_metadata(args, baseline_cache_counts),
         },
     )
     _open_dashboard(args, dashboard_path)
@@ -223,75 +302,92 @@ def _run_tau2(args: argparse.Namespace) -> None:
                 prompt=f"Official tau2 {args.tau2_domain} task {task.id}",
                 metadata={"domain": args.tau2_domain, "source_task_id": task.id},
             )
-            print(
-                f"tau2 {args.tau2_domain}: task {index}/{len(tasks)} baseline {task.id}",
-                flush=True,
-            )
-            baseline_result = _run_one_tau2_task(
+            task_context = _import_context_from_task_spec(task_spec)
+            baseline_policy = f"official_tau2_llm_agent:{args.model}"
+            baseline_seed = args.seed + index
+            baseline_cache_key = _baseline_cache_key(
                 args=args,
-                run_single_task=run_single_task,
-                task=task,
+                harness="tau2",
                 task_spec=task_spec,
-                agent="llm_agent",
-                sage_guidance="",
-                seed=args.seed + index,
-                save_dir=run_dir / "tau2_artifacts" / "baseline",
-                policy=f"official_tau2_llm_agent:{args.model}",
+                policy=baseline_policy,
+                seed=baseline_seed,
+                extra={
+                    "domain": args.tau2_domain,
+                    "max_steps": args.tau2_max_steps,
+                    "timeout": args.tau2_timeout_sec,
+                },
             )
+            baseline_result = _read_baseline_cache(args, baseline_cache_key)
+            if baseline_result is not None:
+                baseline_cache_counts["cached"] += 1
+                baseline_result = _mark_baseline_cache(
+                    baseline_result, status="cached", key=baseline_cache_key
+                )
+                print(
+                    f"tau2 {args.tau2_domain}: task {index}/{len(tasks)} baseline cached {task.id}",
+                    flush=True,
+                )
+            else:
+                baseline_cache_counts["fresh"] += 1
+                print(
+                    f"tau2 {args.tau2_domain}: task {index}/{len(tasks)} baseline fresh {task.id}",
+                    flush=True,
+                )
+                baseline_result = _run_one_tau2_task(
+                    args=args,
+                    run_single_task=run_single_task,
+                    task=task,
+                    task_spec=task_spec,
+                    agent="llm_agent",
+                    sage_guidance="",
+                    seed=baseline_seed,
+                    save_dir=run_dir / "tau2_artifacts" / "baseline",
+                    policy=baseline_policy,
+                )
+                _write_baseline_cache(args, baseline_cache_key, baseline_result)
+                baseline_result = _mark_baseline_cache(
+                    baseline_result, status="fresh", key=baseline_cache_key
+                )
             baseline_results.append(baseline_result)
 
             print(
                 f"tau2 {args.tau2_domain}: task {index}/{len(tasks)} sage {task.id}",
                 flush=True,
             )
-            guidance_items, helper_names = _active_helpers(helper_guidance, args)
+            guidance = sage_import.before_task(task_context)
             sage_result = _run_one_tau2_task(
                 args=args,
                 run_single_task=run_single_task,
                 task=task,
                 task_spec=task_spec,
                 agent="sage_guided_tau_agent",
-                sage_guidance="\n\n".join(guidance_items),
+                sage_guidance=guidance.system_prompt,
                 seed=args.seed + 10_000 + index,
                 save_dir=run_dir / "tau2_artifacts" / "sage",
                 policy=f"official_tau2_sage_guided_agent:{args.model}",
-                visible_helpers=helper_names,
+                visible_helpers=guidance.visible_helpers,
             )
-            sage_events.append(_task_event_from_result(sage_result))
-
-            if not sage_result["success"] and len(helper_guidance) < args.max_helpers:
-                baseline_note = (
-                    "The baseline agent succeeded on the same task."
-                    if baseline_result.get("success")
-                    else "The baseline agent also failed on the same task."
-                )
-                helper = _generate_prompt_helper(
+            update = sage_import.after_task(
+                task_context, _import_observation_from_result(sage_result)
+            )
+            sage_events.extend(dict(event) for event in update.events)
+            if update.retry_recommended and update.retry_guidance is not None:
+                retry_result = _run_one_tau2_task(
                     args=args,
-                    dataset="tau2",
-                    task_id=task_spec["task_id"],
-                    transcript=sage_result.get("transcript", []),
-                    failure_summary=(
-                        "Official tau2 reward was below 1.0. " + baseline_note
-                    ),
+                    run_single_task=run_single_task,
+                    task=task,
+                    task_spec=task_spec,
+                    agent="sage_guided_tau_agent",
+                    sage_guidance=update.retry_guidance.system_prompt,
+                    seed=args.seed + 20_000 + index,
+                    save_dir=run_dir / "tau2_artifacts" / "sage_retry",
+                    policy=f"official_tau2_sage_guided_agent_retry:{args.model}",
+                    visible_helpers=update.retry_guidance.visible_helpers,
                 )
-                if helper:
-                    helper_guidance.append(
-                        f"### sage_prompt_helper_{len(helper_guidance) + 1}\n{helper}"
-                    )
-                    helper_path.write_text(
-                        "\n\n".join(helper_guidance), encoding="utf-8"
-                    )
-                    _write_prompt_registry(run_dir, helper_guidance)
-                    sage_events.append(
-                        {
-                            "event": "tool_birth",
-                            "tool_name": f"sage_prompt_helper_{len(helper_guidance)}",
-                            "accepted": True,
-                            "errors": [],
-                            "cases": 1,
-                            "task_id": task_spec["task_id"],
-                        }
-                    )
+                retry_update = sage_import.after_task(
+                    task_context, _import_observation_from_result(retry_result)
+                )
+                sage_events.extend(dict(event) for event in retry_update.events)
 
             _write_live_dashboard(
                 args=args,
@@ -308,6 +404,12 @@ def _run_tau2(args: argparse.Namespace) -> None:
                     "selected_task_ids": selected,
                     "max_helpers": args.max_helpers,
                     "active_helpers": args.active_helpers,
+                    "registry_path": str(sage_import.registry.manifest_path),
+                    "sage_import_mode": True,
+                    "retry_policy": args.retry_policy,
+                    "baseline_cache": _baseline_cache_metadata(
+                        args, baseline_cache_counts
+                    ),
                 },
             )
     except KeyboardInterrupt:
@@ -330,10 +432,13 @@ def _run_tau2(args: argparse.Namespace) -> None:
                 ),
                 "requested_samples": args.samples,
                 "selected_task_ids": selected,
-                "helper_path": str(helper_path),
+                "registry_path": str(sage_import.registry.manifest_path),
                 "stopped_at": datetime.now(timezone.utc).isoformat(),
                 "max_helpers": args.max_helpers,
                 "active_helpers": args.active_helpers,
+                "sage_import_mode": True,
+                "retry_policy": args.retry_policy,
+                "baseline_cache": _baseline_cache_metadata(args, baseline_cache_counts),
             },
         )
         _write_run_result(run_dir, baseline_results, sage_events, interrupted_dashboard)
@@ -362,9 +467,12 @@ def _run_tau2(args: argparse.Namespace) -> None:
             "completed": len(tasks),
             "requested_samples": args.samples,
             "selected_task_ids": selected,
-            "helper_path": str(helper_path),
+            "registry_path": str(sage_import.registry.manifest_path),
             "max_helpers": args.max_helpers,
             "active_helpers": args.active_helpers,
+            "sage_import_mode": True,
+            "retry_policy": args.retry_policy,
+            "baseline_cache": _baseline_cache_metadata(args, baseline_cache_counts),
         },
     )
     _write_run_result(run_dir, baseline_results, sage_events, final_dashboard)
@@ -446,7 +554,15 @@ def _run_terminal_bench(args: argparse.Namespace) -> None:
     run_dir = _run_dir(args)
     helper_path = run_dir / "sage_prompt_helpers.md"
     helper_path.write_text("", encoding="utf-8")
-    _write_prompt_registry(run_dir, [])
+    sage_import = _import_agent(
+        args=args,
+        run_dir=run_dir,
+        profile=_official_profile(
+            name="terminal-bench",
+            harness="terminal-bench",
+            description="Official Terminal-Bench Docker task runner and scorer.",
+        ),
+    )
     dataset_path = args.terminal_bench_repo / "original-tasks"
     dataset = Dataset(path=dataset_path)
     task_ids = (
@@ -468,7 +584,7 @@ def _run_terminal_bench(args: argparse.Namespace) -> None:
 
     baseline_results: list[dict[str, Any]] = []
     sage_events: list[dict[str, Any]] = []
-    helper_guidance: list[str] = []
+    baseline_cache_counts = _baseline_cache_counts()
     dashboard_path = _write_live_dashboard(
         args=args,
         run_dir=run_dir,
@@ -480,6 +596,10 @@ def _run_terminal_bench(args: argparse.Namespace) -> None:
             "official_harness": "terminal-bench",
             "comparison_valid": True,
             "selected_task_ids": task_ids,
+            "registry_path": str(sage_import.registry.manifest_path),
+            "sage_import_mode": True,
+            "retry_policy": args.retry_policy,
+            "baseline_cache": _baseline_cache_metadata(args, baseline_cache_counts),
         },
     )
     _open_dashboard(args, dashboard_path)
@@ -488,18 +608,82 @@ def _run_terminal_bench(args: argparse.Namespace) -> None:
         for index, task_id in enumerate(task_ids, start=1):
             baseline_run_id = f"baseline_{_slug(task_id)}"
             sage_run_id = f"sage_{_slug(task_id)}"
-            baseline_record = _run_one_terminal_task(
+            baseline_policy = f"official_terminal_bench_terminus:{args.model}"
+            baseline_task_spec = _task_spec(
+                task_id=f"terminal-bench:{task_id}",
+                name=f"Terminal-Bench {task_id}",
+                prompt=f"Official Terminal-Bench task {task_id}",
+                metadata={"source_task_id": task_id},
+            )
+            baseline_cache_key = _baseline_cache_key(
+                args=args,
+                harness="terminal-bench",
+                task_spec=baseline_task_spec,
+                policy=baseline_policy,
+                seed=None,
+                extra={
+                    "agent": "terminus",
+                    "dataset_path": str(dataset_path),
+                    "agent_timeout": args.terminal_agent_timeout_sec,
+                    "test_timeout": args.terminal_test_timeout_sec,
+                },
+            )
+            baseline_record = _read_baseline_cache(args, baseline_cache_key)
+            if baseline_record is not None:
+                baseline_cache_counts["cached"] += 1
+                baseline_record = _mark_baseline_cache(
+                    baseline_record, status="cached", key=baseline_cache_key
+                )
+            else:
+                baseline_cache_counts["fresh"] += 1
+                baseline_record = _run_one_terminal_task(
+                    args=args,
+                    run_dir=run_dir,
+                    task_id=task_id,
+                    run_id=baseline_run_id,
+                    agent_args=("--agent", "terminus"),
+                    policy=baseline_policy,
+                )
+                _write_baseline_cache(args, baseline_cache_key, baseline_record)
+                baseline_record = _mark_baseline_cache(
+                    baseline_record, status="fresh", key=baseline_cache_key
+                )
+            baseline_results.append(baseline_record)
+            _write_live_dashboard(
                 args=args,
                 run_dir=run_dir,
-                task_id=task_id,
-                run_id=baseline_run_id,
-                agent_args=("--agent", "terminus"),
-                policy=f"official_terminal_bench_terminus:{args.model}",
+                environment="terminal-bench",
+                baseline_results=baseline_results,
+                sage_events=sage_events,
+                run_metadata={
+                    "status": "running",
+                    "official_harness": "terminal-bench",
+                    "comparison_valid": True,
+                    "completed": index - 1,
+                    "baseline_completed": index,
+                    "requested_samples": args.samples,
+                    "selected_task_ids": task_ids,
+                    "max_helpers": args.max_helpers,
+                    "active_helpers": args.active_helpers,
+                    "registry_path": str(sage_import.registry.manifest_path),
+                    "sage_import_mode": True,
+                    "retry_policy": args.retry_policy,
+                    "baseline_cache": _baseline_cache_metadata(
+                        args, baseline_cache_counts
+                    ),
+                },
             )
-            baseline_results.append(baseline_record)
 
-            guidance_items, helper_names = _active_helpers(helper_guidance, args)
-            helper_path.write_text("\n\n".join(guidance_items), encoding="utf-8")
+            task_context = _import_context_from_task_spec(
+                _task_spec(
+                    task_id=f"terminal-bench:{task_id}",
+                    name=f"Terminal-Bench {task_id}",
+                    prompt=f"Official Terminal-Bench task {task_id}",
+                    metadata={"source_task_id": task_id},
+                )
+            )
+            guidance = sage_import.before_task(task_context)
+            helper_path.write_text(guidance.system_prompt, encoding="utf-8")
             sage_record = _run_one_terminal_task(
                 args=args,
                 run_dir=run_dir,
@@ -512,45 +696,34 @@ def _run_terminal_bench(args: argparse.Namespace) -> None:
                     f"helper_path={helper_path}",
                 ),
                 policy=f"official_terminal_bench_sage_guided_terminus:{args.model}",
-                visible_helpers=helper_names,
+                visible_helpers=guidance.visible_helpers,
             )
-            sage_events.append(_task_event_from_result(sage_record))
-
-            if not sage_record["success"] and len(helper_guidance) < args.max_helpers:
-                baseline_note = (
-                    "The baseline agent succeeded on the same task."
-                    if baseline_record.get("success")
-                    else "The baseline agent also failed on the same task."
+            update = sage_import.after_task(
+                task_context, _import_observation_from_result(sage_record)
+            )
+            sage_events.extend(dict(event) for event in update.events)
+            if update.retry_recommended and update.retry_guidance is not None:
+                helper_path.write_text(
+                    update.retry_guidance.system_prompt, encoding="utf-8"
                 )
-                helper = _generate_prompt_helper(
+                retry_record = _run_one_terminal_task(
                     args=args,
-                    dataset="terminal-bench",
-                    task_id=sage_record["task_id"],
-                    transcript=sage_record.get("transcript", []),
-                    failure_summary=(
-                        str(sage_record.get("error", "Official harness unresolved."))
-                        + " "
-                        + baseline_note
+                    run_dir=run_dir,
+                    task_id=task_id,
+                    run_id=f"{sage_run_id}_retry",
+                    agent_args=(
+                        "--agent-import-path",
+                        "sage_agent.terminal_bench_agent:SAGEGuidedTerminus",
+                        "--agent-kwarg",
+                        f"helper_path={helper_path}",
                     ),
+                    policy=f"official_terminal_bench_sage_guided_terminus_retry:{args.model}",
+                    visible_helpers=update.retry_guidance.visible_helpers,
                 )
-                if helper:
-                    helper_guidance.append(
-                        f"### sage_prompt_helper_{len(helper_guidance) + 1}\n{helper}"
-                    )
-                    helper_path.write_text(
-                        "\n\n".join(helper_guidance), encoding="utf-8"
-                    )
-                    _write_prompt_registry(run_dir, helper_guidance)
-                    sage_events.append(
-                        {
-                            "event": "tool_birth",
-                            "tool_name": f"sage_prompt_helper_{len(helper_guidance)}",
-                            "accepted": True,
-                            "errors": [],
-                            "cases": 1,
-                            "task_id": sage_record["task_id"],
-                        }
-                    )
+                retry_update = sage_import.after_task(
+                    task_context, _import_observation_from_result(retry_record)
+                )
+                sage_events.extend(dict(event) for event in retry_update.events)
 
             _write_live_dashboard(
                 args=args,
@@ -567,6 +740,12 @@ def _run_terminal_bench(args: argparse.Namespace) -> None:
                     "selected_task_ids": task_ids,
                     "max_helpers": args.max_helpers,
                     "active_helpers": args.active_helpers,
+                    "registry_path": str(sage_import.registry.manifest_path),
+                    "sage_import_mode": True,
+                    "retry_policy": args.retry_policy,
+                    "baseline_cache": _baseline_cache_metadata(
+                        args, baseline_cache_counts
+                    ),
                 },
             )
     except KeyboardInterrupt:
@@ -590,9 +769,13 @@ def _run_terminal_bench(args: argparse.Namespace) -> None:
                 "requested_samples": args.samples,
                 "selected_task_ids": task_ids,
                 "helper_path": str(helper_path),
+                "registry_path": str(sage_import.registry.manifest_path),
                 "stopped_at": datetime.now(timezone.utc).isoformat(),
                 "max_helpers": args.max_helpers,
                 "active_helpers": args.active_helpers,
+                "sage_import_mode": True,
+                "retry_policy": args.retry_policy,
+                "baseline_cache": _baseline_cache_metadata(args, baseline_cache_counts),
             },
         )
         _write_run_result(run_dir, baseline_results, sage_events, interrupted_dashboard)
@@ -622,8 +805,12 @@ def _run_terminal_bench(args: argparse.Namespace) -> None:
             "requested_samples": args.samples,
             "selected_task_ids": task_ids,
             "helper_path": str(helper_path),
+            "registry_path": str(sage_import.registry.manifest_path),
             "max_helpers": args.max_helpers,
             "active_helpers": args.active_helpers,
+            "sage_import_mode": True,
+            "retry_policy": args.retry_policy,
+            "baseline_cache": _baseline_cache_metadata(args, baseline_cache_counts),
         },
     )
     _write_run_result(run_dir, baseline_results, sage_events, final_dashboard)
@@ -804,11 +991,188 @@ def _active_helpers(
     )
 
 
+def _official_profile(
+    *, name: str, harness: str, description: str
+) -> EnvironmentProfile:
+    return EnvironmentProfile(
+        name=name,
+        description=description,
+        base_tools=("host_agent_loop", "official_scorer"),
+        action_tools=("host_agent_loop",),
+        observation_fields=("official_result", "transcript", "error"),
+        helper_families=(
+            "prompt_guidance_helper",
+            "action_planning_helper",
+            "scorer_feedback_repair_helper",
+        ),
+        safety_rules=(
+            "Use only visible task context and official result observations.",
+            "Do not use hidden labels, reference solutions, or expected answers.",
+            "Keep host harness task order paired between baseline and SAGE arms.",
+        ),
+        metadata={"official_harness": harness, "import_mode": True},
+    )
+
+
+def _import_agent(
+    *,
+    args: argparse.Namespace,
+    run_dir: Path,
+    profile: EnvironmentProfile,
+) -> SAGEImportAgent:
+    return SAGEImportAgent(
+        environment_profile=profile,
+        registry_dir=run_dir / "sage_import_registry",
+        generator=OpenAIHelperGenerator(),
+        config=SAGEImportConfig(
+            model=args.model,
+            registry_dir=run_dir / "sage_import_registry",
+            active_helpers=args.active_helpers,
+            max_new_helpers=args.max_helpers,
+            retry_policy=args.retry_policy,
+        ),
+    )
+
+
+def _import_context_from_task_spec(task_spec: dict[str, Any]) -> ImportTaskContext:
+    return ImportTaskContext(
+        task_id=str(task_spec["task_id"]),
+        name=str(task_spec["name"]),
+        prompt=str(task_spec.get("prompt", "")),
+        artifacts={
+            str(key): str(value)
+            for key, value in dict(task_spec.get("artifacts", {})).items()
+        },
+        metadata=dict(task_spec.get("metadata", {})),
+    )
+
+
+def _import_observation_from_result(result: dict[str, Any]) -> ImportTaskObservation:
+    return ImportTaskObservation(
+        success=bool(result.get("success")),
+        score=float(result.get("score", 0.0) or 0.0),
+        outcome_score=float(
+            result.get("outcome_score", result.get("score", 0.0)) or 0.0
+        ),
+        transcript=tuple(str(item) for item in result.get("transcript", ())),
+        artifacts=dict(result.get("artifacts", {})),
+        error=str(result.get("error", "")),
+    )
+
+
+def _baseline_cache_counts() -> dict[str, int]:
+    return {"cached": 0, "fresh": 0}
+
+
+def _baseline_cache_metadata(
+    args: argparse.Namespace, counts: dict[str, int]
+) -> dict[str, Any]:
+    return {
+        "policy": args.baseline_cache,
+        "path": str(args.baseline_cache_path),
+        "cached": counts.get("cached", 0),
+        "fresh": counts.get("fresh", 0),
+        "scope": "official_baseline_control_only",
+    }
+
+
+def _baseline_cache_key(
+    *,
+    args: argparse.Namespace,
+    harness: str,
+    task_spec: dict[str, Any],
+    policy: str,
+    seed: int | None,
+    extra: dict[str, Any],
+) -> str:
+    payload = {
+        "schema_version": 1,
+        "dataset": args.dataset,
+        "harness": harness,
+        "task_id": task_spec.get("task_id"),
+        "task_name": task_spec.get("name"),
+        "model": args.model,
+        "policy": policy,
+        "seed": seed,
+        "extra": extra,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _read_baseline_cache(args: argparse.Namespace, key: str) -> dict[str, Any] | None:
+    if args.baseline_cache == "off":
+        return None
+    if not args.baseline_cache_path.exists():
+        return None
+    try:
+        payload = json.loads(args.baseline_cache_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    records = payload.get("records", {})
+    if not isinstance(records, dict):
+        return None
+    entry = records.get(key)
+    if not isinstance(entry, dict):
+        return None
+    result = entry.get("result")
+    if not isinstance(result, dict):
+        return None
+    if "success" not in result or "score" not in result:
+        return None
+    return dict(result)
+
+
+def _write_baseline_cache(
+    args: argparse.Namespace, key: str, result: dict[str, Any]
+) -> None:
+    if args.baseline_cache == "off":
+        return
+    args.baseline_cache_path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = {"schema_version": 1, "records": {}}
+    if args.baseline_cache_path.exists():
+        try:
+            loaded = json.loads(args.baseline_cache_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                payload.update(loaded)
+        except Exception:
+            pass
+    records = payload.setdefault("records", {})
+    if not isinstance(records, dict):
+        records = {}
+        payload["records"] = records
+    clean_result = dict(result)
+    clean_result.pop("baseline_cache", None)
+    records[key] = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "result": clean_result,
+    }
+    tmp = args.baseline_cache_path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, args.baseline_cache_path)
+
+
+def _mark_baseline_cache(
+    result: dict[str, Any], *, status: str, key: str
+) -> dict[str, Any]:
+    marked = dict(result)
+    marked["baseline_cache"] = {"status": status, "key": key}
+    artifacts = dict(marked.get("artifacts", {}))
+    artifacts["baseline_cache_status"] = status
+    marked["artifacts"] = artifacts
+    return marked
+
+
 def _run_scienceagentbench(args: argparse.Namespace) -> None:
     run_dir = _run_dir(args)
     benchmark = args.scienceagentbench_repo / "benchmark"
     required = ("datasets", "eval_programs", "gold_programs", "scoring_rubrics")
     missing = [name for name in required if not (benchmark / name).exists()]
+    environment = (
+        "science-agent-bench"
+        if args.dataset == "science-agent-bench"
+        else "scienceagentbench"
+    )
     metadata = {
         "status": "blocked",
         "official_harness": "ScienceAgentBench",
@@ -824,7 +1188,45 @@ def _run_scienceagentbench(args: argparse.Namespace) -> None:
     dashboard_path = _write_live_dashboard(
         args=args,
         run_dir=run_dir,
-        environment="scienceagentbench",
+        environment=environment,
+        baseline_results=[],
+        sage_events=[],
+        run_metadata=metadata,
+    )
+    _open_dashboard(args, dashboard_path)
+    print(
+        json.dumps(
+            {
+                "run_dir": str(run_dir),
+                "dashboard_path": str(dashboard_path),
+                **metadata,
+            },
+            indent=2,
+        )
+    )
+
+
+def _run_blocked_official_harness(
+    args: argparse.Namespace,
+    *,
+    environment: str,
+    official_harness: str,
+    blocked_reason: str,
+    missing_artifacts: list[str],
+) -> None:
+    run_dir = _run_dir(args)
+    metadata = {
+        "status": "blocked",
+        "official_harness": official_harness,
+        "comparison_valid": False,
+        "blocked_reason": blocked_reason,
+        "missing_artifacts": missing_artifacts,
+    }
+    _write_manifest(run_dir, args, metadata)
+    dashboard_path = _write_live_dashboard(
+        args=args,
+        run_dir=run_dir,
+        environment=environment,
         baseline_results=[],
         sage_events=[],
         run_metadata=metadata,
@@ -960,11 +1362,14 @@ def _write_live_dashboard(
     sage_events: list[dict[str, Any]],
     run_metadata: dict[str, Any],
 ) -> Path:
+    registry_path = Path(
+        str(run_metadata.get("registry_path", run_dir / "sage_prompt_registry.json"))
+    )
     summary = _summary(
         environment=environment,
         model=args.model,
-        run_dir=run_dir,
         events=sage_events,
+        registry_path=registry_path,
     )
     baseline_successes = sum(1 for item in baseline_results if item.get("success"))
     baseline = {
@@ -981,14 +1386,18 @@ def _write_live_dashboard(
     return write_standalone_dashboard(
         summary,
         run_dir,
-        registry_path=run_dir / "sage_prompt_registry.json",
+        registry_path=registry_path,
         baseline=baseline,
         run_metadata=run_metadata,
     )
 
 
 def _summary(
-    *, environment: str, model: str, run_dir: Path, events: list[dict[str, Any]]
+    *,
+    environment: str,
+    model: str,
+    events: list[dict[str, Any]],
+    registry_path: Path,
 ) -> SAGERunSummary:
     task_events = [event for event in events if event.get("event") == "task_result"]
     tool_births = [event for event in events if event.get("event") == "tool_birth"]
@@ -1009,7 +1418,7 @@ def _summary(
         birth_task_retries=0,
         birth_task_retry_successes=0,
         model=model,
-        registry_path=str(run_dir / "sage_prompt_registry.json"),
+        registry_path=str(registry_path),
         integrity_passed=True,
         integrity_issues=0,
         lifecycle_decisions=(),
@@ -1188,6 +1597,7 @@ def _write_prompt_registry(run_dir: Path, helper_guidance: list[str]) -> None:
                 "spec": {
                     "name": name,
                     "family": "official_harness_prompt_guidance",
+                    "helper_type": "prompt_guidance",
                     "description": guidance,
                     "input_schema": {"official_feedback": "str"},
                     "output_schema": {"guidance": "str"},
@@ -1198,6 +1608,7 @@ def _write_prompt_registry(run_dir: Path, helper_guidance: list[str]) -> None:
                         "do not infer hidden benchmark labels",
                     ],
                 },
+                "code": guidance,
                 "metadata": {"source": "official_live_runner"},
             },
             "validation": {

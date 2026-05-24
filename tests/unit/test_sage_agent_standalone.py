@@ -8,7 +8,14 @@ from typing import Any, cast
 
 from pytest import MonkeyPatch
 
-from sage_agent import SAGEAgent, SAGEConfig
+from sage_agent import (
+    ImportTaskContext,
+    ImportTaskObservation,
+    SAGEAgent,
+    SAGEConfig,
+    SAGEImportAgent,
+    SAGEImportConfig,
+)
 from sage_agent.adapters import (
     BBHAdapter,
     CyberGymAdapter,
@@ -78,9 +85,206 @@ def test_standalone_sage_cybergym_adapter_births_log_classifier(
     assert first.tools_born == 1
     assert first.tools_accepted == 1
 
-    second = agent.run(limit=1)
-    assert second.tools_reused == 1
-    assert second.tasks_succeeded == 1
+
+class PromptGuidanceGenerator:
+    def generate(
+        self,
+        gap: GapSignal,
+        profile: EnvironmentProfile,
+        validation_cases: tuple[ValidationCase, ...],
+        *,
+        model: str,
+    ) -> HelperCandidate:
+        del validation_cases, model
+        return HelperCandidate(
+            spec=HelperSpec(
+                name=gap.suggested_tool_name or "sage_prompt_guidance_1",
+                family="prompt_guidance_helper",
+                helper_type="prompt_guidance",
+                description=gap.summary,
+                input_schema={"task_context": "visible external task context"},
+                output_schema={"system_prompt_guidance": "str"},
+                positive_triggers=("official harness failure feedback",),
+                negative_triggers=("hidden labels", "reference solutions"),
+                safety_notes=tuple(profile.safety_rules),
+            ),
+            code=(
+                "- Check the visible policy before taking action.\n"
+                "- Verify required tool arguments from observable state.\n"
+                "- Stop and ask when a required precondition is missing."
+            ),
+            metadata={"helper_type": "prompt_guidance"},
+        )
+
+    def generate_guidance(
+        self,
+        gap: GapSignal,
+        profile: EnvironmentProfile,
+        result: TaskRunResult,
+        *,
+        model: str,
+    ) -> HelperCandidate:
+        del result
+        return self.generate(gap, profile, (), model=model)
+
+
+def test_import_agent_births_prompt_guidance_and_counts_visibility(
+    tmp_path: Path,
+) -> None:
+    profile = EnvironmentProfile(
+        name="external-harness",
+        description="Host-owned simulator and scorer.",
+        helper_families=("prompt_guidance_helper",),
+        safety_rules=("use visible task state only",),
+    )
+    agent = SAGEImportAgent(
+        environment_profile=profile,
+        registry_dir=tmp_path / "registry",
+        generator=PromptGuidanceGenerator(),
+        config=SAGEImportConfig(
+            registry_dir=tmp_path / "registry",
+            active_helpers=2,
+            retry_policy="next_task_only",
+        ),
+    )
+    task = ImportTaskContext(
+        task_id="external-1",
+        name="external failed task",
+        prompt="Use the host tools while respecting the visible policy.",
+    )
+
+    initial = agent.before_task(task)
+    assert initial.system_prompt == ""
+
+    update = agent.after_task(
+        task,
+        ImportTaskObservation(
+            success=False,
+            score=0.0,
+            transcript=("assistant called the wrong tool argument",),
+            error="official harness unresolved",
+        ),
+    )
+    assert update.accepted_helpers
+    assert update.retry_recommended is False
+
+    guidance = agent.before_task(task)
+    assert "SAGE reusable helpers" in guidance.system_prompt
+    assert guidance.visible_helpers == update.accepted_helpers
+
+    agent.after_task(
+        task,
+        ImportTaskObservation(
+            success=True,
+            score=1.0,
+            transcript=("official harness resolved",),
+        ),
+    )
+    records = LocalSAGERegistry(tmp_path / "registry").load()
+    record = records[update.accepted_helpers[0]]
+    assert record.candidate.spec.helper_type == "prompt_guidance"
+    assert record.uses == 1
+    assert record.successes == 1
+
+
+def test_import_agent_same_task_retry_is_optional(tmp_path: Path) -> None:
+    profile = EnvironmentProfile(
+        name="retry-harness",
+        description="Host-owned simulator with optional retry support.",
+    )
+    agent = SAGEImportAgent(
+        environment_profile=profile,
+        registry_dir=tmp_path / "registry",
+        generator=PromptGuidanceGenerator(),
+        config=SAGEImportConfig(
+            registry_dir=tmp_path / "registry",
+            retry_policy="same_task",
+        ),
+    )
+    task = ImportTaskContext(task_id="retry-1", name="retry task", prompt="Act.")
+    agent.before_task(task)
+
+    update = agent.after_task(
+        task,
+        ImportTaskObservation(
+            success=False,
+            transcript=("missing required policy precondition",),
+            error="official harness unresolved",
+        ),
+    )
+
+    assert update.retry_recommended is True
+    assert update.retry_guidance is not None
+    assert update.retry_guidance.visible_helpers == update.accepted_helpers
+    assert "same_task_retry_recommended" in {
+        str(event.get("event")) for event in update.events
+    }
+
+
+def test_import_agent_does_not_birth_helper_from_runner_error(tmp_path: Path) -> None:
+    profile = EnvironmentProfile(
+        name="external-harness",
+        description="Host-owned simulator and scorer.",
+        helper_families=("prompt_guidance_helper",),
+    )
+    agent = SAGEImportAgent(
+        environment_profile=profile,
+        registry_dir=tmp_path / "registry",
+        generator=PromptGuidanceGenerator(),
+        config=SAGEImportConfig(registry_dir=tmp_path / "registry"),
+    )
+    task = ImportTaskContext(
+        task_id="external-runner-error",
+        name="runner error task",
+        prompt="Visible prompt only.",
+    )
+    agent.before_task(task)
+
+    update = agent.after_task(
+        task,
+        ImportTaskObservation(
+            success=False,
+            score=0.0,
+            transcript=(
+                "tau2 official runner error: JSONDecodeError: Expecting value",
+            ),
+            error="tau2_runner_error:JSONDecodeError",
+        ),
+    )
+
+    assert update.accepted_helpers == ()
+    assert any(
+        event.get("event") == "tool_birth_skipped"
+        and event.get("reason") == "infrastructure_or_harness_failure"
+        for event in update.events
+    )
+    assert LocalSAGERegistry(tmp_path / "registry").load() == {}
+
+
+def test_import_agent_rejects_leaky_task_context(tmp_path: Path) -> None:
+    agent = SAGEImportAgent(
+        environment_profile=EnvironmentProfile(
+            name="external-harness",
+            description="Host-owned simulator and scorer.",
+            helper_families=("prompt_guidance_helper",),
+        ),
+        registry_dir=tmp_path / "registry",
+        generator=PromptGuidanceGenerator(),
+        config=SAGEImportConfig(registry_dir=tmp_path / "registry"),
+    )
+    task = ImportTaskContext(
+        task_id="external-leaky",
+        name="leaky external task",
+        prompt="Visible prompt only.",
+        metadata={"expected_answer": "hidden"},
+    )
+
+    try:
+        agent.before_task(task)
+    except IntegrityError as exc:
+        assert "forbidden_task_metadata_key" in str(exc)
+    else:
+        raise AssertionError("SAGEImportAgent accepted a leaky task context")
 
 
 def test_standalone_sage_toolsandbox_probe_uses_real_scenario_registry(

@@ -65,6 +65,59 @@ class TaskRunResult:
 
 
 @dataclass(frozen=True)
+class ImportTaskContext:
+    """Task context supplied by an existing external harness.
+
+    Import mode is for benchmarks that already own task execution, simulation,
+    and scoring. The host passes only SAGE-visible task information here.
+    """
+
+    task_id: str
+    name: str
+    prompt: str = ""
+    artifacts: Mapping[str, str] = field(default_factory=dict)
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ImportTaskObservation:
+    """External-harness result normalized after a task attempt."""
+
+    success: bool
+    score: float = 0.0
+    outcome_score: float | None = None
+    transcript: tuple[str, ...] = ()
+    tool_uses: tuple[ToolUseRecord, ...] = ()
+    artifacts: Mapping[str, Any] = field(default_factory=dict)
+    error: str = ""
+
+
+@dataclass(frozen=True)
+class SAGEGuidance:
+    """Rendered SAGE guidance for an external harness task."""
+
+    system_prompt: str = ""
+    visible_helpers: tuple[str, ...] = ()
+    tool_schemas: tuple[Mapping[str, Any], ...] = ()
+    code_helpers: tuple[Mapping[str, Any], ...] = ()
+    policy_notes: tuple[str, ...] = ()
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SAGEImportUpdate:
+    """Lifecycle update produced after an external task observation."""
+
+    task_result: TaskRunResult
+    accepted_helpers: tuple[str, ...] = ()
+    rejected_helpers: tuple[str, ...] = ()
+    visible_helpers: tuple[str, ...] = ()
+    retry_recommended: bool = False
+    retry_guidance: SAGEGuidance | None = None
+    events: tuple[Mapping[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
 class GapSignal:
     """A reusable capability gap observed by an environment adapter."""
 
@@ -100,6 +153,7 @@ class HelperSpec:
     name: str
     family: str
     description: str
+    helper_type: str = "deterministic_callable"
     input_schema: Mapping[str, str] = field(default_factory=dict)
     output_schema: Mapping[str, str] = field(default_factory=dict)
     positive_triggers: tuple[str, ...] = ()
