@@ -32,8 +32,8 @@ where the benchmark already owns the runner, simulator, scorer, and agent loop.
 | tau2-bench airline official40, pre-repair | complete negative diagnosis | `9/40` | `8/40` | `25 cached / 15 fresh` controls; SAGE generated a bad generic JSON-error guidance helper from a runner failure | `outputs/sage_official_live/import_agent_tau2_airline_official_live40_gpt4omini_20260523/dashboard/task_compare.html` |
 | tau2-bench airline official40, post-repair | complete narrow positive | `9/40` | `10/40` | `40 cached / 0 fresh` controls; infrastructure/runner failures no longer trigger helper birth | `outputs/sage_official_live/import_agent_tau2_airline_skip_infra_helper_live40_20260523/dashboard/task_compare.html` |
 | Terminal-Bench official40 | blocked by runtime feasibility | partial `1/4` baseline, `1/3` SAGE | partial only | official Docker harness was started, but reached only 3 paired tasks after about 24 minutes; no valid 40-task baseline cache existed | `outputs/sage_official_live/import_agent_terminal_bench_official_live40_20260523/dashboard/task_compare.html` |
-| tau3-bench | blocked | n/a | n/a | no tau3 official harness installed; using tau2 would be misleading | `outputs/sage_official_live/import_agent_tau3_blocked_20260523/dashboard/task_compare.html` |
-| ScienceAgentBench / science-agent-bench | blocked | n/a | n/a | public clone contains benchmark placeholder only; password-protected artifacts are missing | `outputs/sage_official_live/import_agent_scienceagentbench_blocked_20260523/dashboard/task_compare.html` |
+| tau3-bench airline smoke1 | complete harness smoke | `1/1` | `1/1` | current `tau2-bench` checkout contains the tau3 release/task-fix layer; run is labeled `tau3-current-release` with `tau3:*` task IDs and separate baseline-cache keys | `outputs/sage_official_live/import_agent_tau3_airline_smoke1_20260523/dashboard/task_compare.html` |
+| ScienceAgentBench / science-agent-bench preflight | artifact-access gate, not vague missing-harness blocker | n/a | n/a | verified Hugging Face split loaded selected IDs `1-4`; official scoring still requires local `datasets`, `eval_programs`, `gold_programs`, and `scoring_rubrics` from `benchmark_verified.zip`; public SharePoint download attempt returned an authenticated sign-in page | `outputs/sage_official_live/import_agent_scienceagentbench_verified_artifact_preflight_20260523/dashboard/task_compare.html` |
 
 ## tau2 Failure And Repair
 
@@ -73,6 +73,13 @@ result is mixed:
 - Strong positive portability evidence: ToolSandbox, CyberGym, MiniGrid, BBH.
 - Narrow positive official-host evidence: tau2 after the infrastructure-failure
   helper-birth guard.
+- Tau3 is no longer classified as missing-harness in this checkout. It runs
+  through the current tau-bench release in `external/tau2-bench`, with separate
+  `tau3` labels so it is not conflated with tau2 evidence.
+- ScienceAgentBench verified inputs are reachable, but official outcome scoring
+  remains gated by the authors' non-redistributable artifact zip. The new
+  preflight and `scripts/prepare_scienceagentbench_artifacts.py` make the gate
+  exact and reproducible instead of treating the repository clone as unusable.
 - Remaining limitation: prompt-guidance helpers are still shallow for
   policy-heavy simulators. tau2 needs richer, environment-neutral
   state/action-policy helpers that derive reusable checks from visible tool

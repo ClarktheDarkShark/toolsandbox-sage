@@ -282,6 +282,9 @@ same `SAGEImportAgent` boundary. It currently supports tau2/tau3 and
 Terminal-Bench where local official harness dependencies are available.
 Baseline controls can use an exact matched baseline cache with
 `--baseline-cache use-if-eligible`; SAGE/candidate arms are always fresh.
+Tau3 is run through the current `tau2-bench` checkout, which now contains the
+tau3 release layer and task fixes; reports and baseline-cache keys are labeled
+with `tau3-bench` / `tau3:*` so tau2 and tau3 evidence do not mix.
 
 ```bash
 set -a; source .secrets/env.sh; set +a
@@ -291,6 +294,30 @@ PYTHONPATH=src:external/tau2-bench/src:. python scripts/run_sage_official_live.p
   --model gpt-4o-mini \
   --baseline-cache use-if-eligible \
   --retry-policy next_task_only \
+  --dashboard-port 62630
+```
+
+For ScienceAgentBench, verified task inputs are loaded from Hugging Face, but
+official scoring requires the authors' password-protected
+`benchmark_verified.zip` artifacts. The setup check is explicit and does not
+commit or redistribute those files:
+
+```bash
+python scripts/prepare_scienceagentbench_artifacts.py --attempt-download
+
+# If SharePoint requires browser authentication, download benchmark_verified.zip
+# manually from the official ScienceAgentBench link, then materialize it:
+python scripts/prepare_scienceagentbench_artifacts.py \
+  --artifact-zip /path/to/benchmark_verified.zip
+```
+
+The official runner records this state in the dashboard:
+
+```bash
+PYTHONPATH=src:. python scripts/run_sage_official_live.py \
+  --dataset scienceagentbench \
+  --samples 4 \
+  --model gpt-4o-mini \
   --dashboard-port 62630
 ```
 

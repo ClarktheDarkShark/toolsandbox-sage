@@ -1540,11 +1540,19 @@
   stopped as runtime-feasibility blocker after about 24 minutes, with only
   `3` paired tasks complete and no valid prior 40-task baseline cache. The run is
   partial evidence only, not a completed validation.
-- tau3-bench: blocked because no tau3 official harness is installed locally;
-  using tau2 would be misleading.
-- ScienceAgentBench / science-agent-bench: blocked because the public clone
-  contains a benchmark placeholder and the password-protected official artifacts
-  are missing.
+- tau3-bench smoke:
+  `outputs/sage_official_live/import_agent_tau3_airline_smoke1_20260523`;
+  baseline `1/1`, SAGE `1/1`. This uses the current `external/tau2-bench`
+  checkout, which now contains the tau3 release/task-fix layer, and labels the
+  run as `tau3-current-release` with `tau3:*` task IDs so tau2 and tau3 evidence
+  remain separated.
+- ScienceAgentBench / science-agent-bench preflight:
+  `outputs/sage_official_live/import_agent_scienceagentbench_verified_artifact_preflight_20260523`;
+  verified Hugging Face split loaded selected IDs `1-4`; official scoring remains
+  gated on local `datasets`, `eval_programs`, `gold_programs`, and
+  `scoring_rubrics` from `benchmark_verified.zip`. The public SharePoint download
+  attempt returned an authenticated sign-in page. New helper:
+  `scripts/prepare_scienceagentbench_artifacts.py`.
 - Reports/artifacts:
   `docs/sage_protocol/sage_import_agent_validation_matrix_20260523.md`,
   `docs/sage_protocol/sage_import_agent_tau2_failure_analysis.md`, and

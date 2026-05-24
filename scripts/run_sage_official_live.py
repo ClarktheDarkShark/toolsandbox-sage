@@ -5,10 +5,12 @@ This runner is intentionally separate from the repository-probe smoke runner.
 It uses each benchmark's own scorer when a scorer is available locally:
 
 * tau2: official tau2 simulation evaluator.
-* tau3: blocked unless a tau3 official harness is installed locally.
+* tau3: official current tau-bench release mode through tau2-bench, labeled
+  separately so caches and reports do not mix with tau2.
 * Terminal-Bench: official Docker harness and task parser.
-* ScienceAgentBench: blocked unless the non-redistributable benchmark artifacts
-  are present under ``external/ScienceAgentBench/benchmark``.
+* ScienceAgentBench: verified Hugging Face inputs plus an actionable official
+  artifact preflight. Full scoring requires the non-redistributable benchmark
+  artifacts under ``external/ScienceAgentBench/benchmark``.
 
 The SAGE arm is a lightweight live adaptation layer: failed official outcomes
 produce bounded prompt helpers with gpt-4o-mini, and later tasks run with those
@@ -102,6 +104,15 @@ def main() -> None:
     )
     parser.add_argument("--tau2-repo", type=Path, default=Path("external/tau2-bench"))
     parser.add_argument("--tau2-domain", default="airline")
+    parser.add_argument(
+        "--tau3-domain",
+        default="airline",
+        help=(
+            "Domain to use when --dataset tau3-bench. The current tau2-bench "
+            "checkout includes tau3 task-fix/knowledge releases; use this to "
+            "choose the text-mode tau family domain."
+        ),
+    )
     parser.add_argument("--tau2-max-steps", type=int, default=200)
     parser.add_argument("--tau2-timeout-sec", type=float, default=180.0)
     parser.add_argument(
@@ -128,6 +139,15 @@ def main() -> None:
         type=Path,
         default=Path("external/ScienceAgentBench"),
     )
+    parser.add_argument("--scienceagentbench-split", default="verified")
+    parser.add_argument(
+        "--scienceagentbench-artifact-zip",
+        type=Path,
+        help=(
+            "Optional local benchmark_verified.zip path. The runner will verify "
+            "that it can be materialized with scripts/prepare_scienceagentbench_artifacts.py."
+        ),
+    )
     args = parser.parse_args()
 
     if args.model != "gpt-4o-mini":
@@ -139,16 +159,8 @@ def main() -> None:
         _reexec_if_missing("tau2", ROOT / "artifacts/live_envs/tau2/bin/python")
         _run_tau2(args)
     elif args.dataset == "tau3-bench":
-        _run_blocked_official_harness(
-            args,
-            environment="tau3-bench",
-            official_harness="tau3",
-            blocked_reason=(
-                "No tau3 official harness is installed in this checkout. "
-                "Using tau2 here would be a misleading validation."
-            ),
-            missing_artifacts=["external/tau3-bench official runner"],
-        )
+        _reexec_if_missing("tau2", ROOT / "artifacts/live_envs/tau2/bin/python")
+        _run_tau2(args)
     elif args.dataset == "terminal-bench":
         _reexec_if_missing(
             "terminal_bench", ROOT / "artifacts/live_envs/terminal_bench/bin/python"
@@ -181,8 +193,8 @@ def _reexec_if_missing(module_name: str, python_path: Path) -> None:
 
 def _open_startup_dashboard(args: argparse.Namespace) -> None:
     environment = args.dataset
-    if args.dataset == "tau2-bench":
-        environment = f"tau2-bench:{args.tau2_domain}"
+    if args.dataset in {"tau2-bench", "tau3-bench"}:
+        environment = f"{args.dataset}:{_tau_domain(args)}"
     run_dir = _run_dir(args)
     dashboard_path = _write_live_dashboard(
         args=args,
@@ -246,28 +258,34 @@ def _run_tau2(args: argparse.Namespace) -> None:
         pass
 
     run_dir = _run_dir(args)
+    domain = _tau_domain(args)
+    harness = _tau_harness(args)
     sage_import = _import_agent(
         args=args,
         run_dir=run_dir,
         profile=_official_profile(
-            name=f"{args.dataset}:{args.tau2_domain}",
-            harness="tau2",
-            description="Official tau2 conversational simulator and scorer.",
+            name=f"{args.dataset}:{domain}",
+            harness=harness,
+            description=(
+                "Official tau conversational simulator and scorer from the "
+                "current tau2-bench checkout."
+            ),
         ),
     )
     tasks = get_tasks(
-        args.tau2_domain,
+        domain,
         task_ids=list(args.tau2_task_id) if args.tau2_task_id else None,
         num_tasks=None if args.tau2_task_id else args.samples,
     )[: args.samples]
-    selected = [_tau2_task_id(args.tau2_domain, task.id) for task in tasks]
+    selected = [_tau_task_id(args, domain, task.id) for task in tasks]
     _write_manifest(
         run_dir,
         args,
         {
             "dataset": args.dataset,
-            "official_harness": "tau2",
-            "domain": args.tau2_domain,
+            "official_harness": harness,
+            "domain": domain,
+            "tau_checkout": str(args.tau2_repo),
             "selected_task_ids": selected,
         },
     )
@@ -278,12 +296,12 @@ def _run_tau2(args: argparse.Namespace) -> None:
     dashboard_path = _write_live_dashboard(
         args=args,
         run_dir=run_dir,
-        environment=f"{args.dataset}:{args.tau2_domain}",
+        environment=f"{args.dataset}:{domain}",
         baseline_results=baseline_results,
         sage_events=sage_events,
         run_metadata={
             "status": "running",
-            "official_harness": "tau2",
+            "official_harness": harness,
             "comparison_valid": True,
             "selected_task_ids": selected,
             "registry_path": str(sage_import.registry.manifest_path),
@@ -297,22 +315,26 @@ def _run_tau2(args: argparse.Namespace) -> None:
     try:
         for index, task in enumerate(tasks, start=1):
             task_spec = _task_spec(
-                task_id=_tau2_task_id(args.tau2_domain, task.id),
-                name=f"tau2 {args.tau2_domain} {task.id}",
-                prompt=f"Official tau2 {args.tau2_domain} task {task.id}",
-                metadata={"domain": args.tau2_domain, "source_task_id": task.id},
+                task_id=_tau_task_id(args, domain, task.id),
+                name=f"{args.dataset} {domain} {task.id}",
+                prompt=f"Official {args.dataset} {domain} task {task.id}",
+                metadata={
+                    "domain": domain,
+                    "source_task_id": task.id,
+                    "official_harness": harness,
+                },
             )
             task_context = _import_context_from_task_spec(task_spec)
-            baseline_policy = f"official_tau2_llm_agent:{args.model}"
+            baseline_policy = f"official_{harness}_llm_agent:{args.model}"
             baseline_seed = args.seed + index
             baseline_cache_key = _baseline_cache_key(
                 args=args,
-                harness="tau2",
+                harness=harness,
                 task_spec=task_spec,
                 policy=baseline_policy,
                 seed=baseline_seed,
                 extra={
-                    "domain": args.tau2_domain,
+                    "domain": domain,
                     "max_steps": args.tau2_max_steps,
                     "timeout": args.tau2_timeout_sec,
                 },
@@ -324,13 +346,13 @@ def _run_tau2(args: argparse.Namespace) -> None:
                     baseline_result, status="cached", key=baseline_cache_key
                 )
                 print(
-                    f"tau2 {args.tau2_domain}: task {index}/{len(tasks)} baseline cached {task.id}",
+                    f"{harness} {domain}: task {index}/{len(tasks)} baseline cached {task.id}",
                     flush=True,
                 )
             else:
                 baseline_cache_counts["fresh"] += 1
                 print(
-                    f"tau2 {args.tau2_domain}: task {index}/{len(tasks)} baseline fresh {task.id}",
+                    f"{harness} {domain}: task {index}/{len(tasks)} baseline fresh {task.id}",
                     flush=True,
                 )
                 baseline_result = _run_one_tau2_task(
@@ -351,7 +373,7 @@ def _run_tau2(args: argparse.Namespace) -> None:
             baseline_results.append(baseline_result)
 
             print(
-                f"tau2 {args.tau2_domain}: task {index}/{len(tasks)} sage {task.id}",
+                f"{harness} {domain}: task {index}/{len(tasks)} sage {task.id}",
                 flush=True,
             )
             guidance = sage_import.before_task(task_context)
@@ -364,7 +386,7 @@ def _run_tau2(args: argparse.Namespace) -> None:
                 sage_guidance=guidance.system_prompt,
                 seed=args.seed + 10_000 + index,
                 save_dir=run_dir / "tau2_artifacts" / "sage",
-                policy=f"official_tau2_sage_guided_agent:{args.model}",
+                policy=f"official_{harness}_sage_guided_agent:{args.model}",
                 visible_helpers=guidance.visible_helpers,
             )
             update = sage_import.after_task(
@@ -381,7 +403,7 @@ def _run_tau2(args: argparse.Namespace) -> None:
                     sage_guidance=update.retry_guidance.system_prompt,
                     seed=args.seed + 20_000 + index,
                     save_dir=run_dir / "tau2_artifacts" / "sage_retry",
-                    policy=f"official_tau2_sage_guided_agent_retry:{args.model}",
+                    policy=f"official_{harness}_sage_guided_agent_retry:{args.model}",
                     visible_helpers=update.retry_guidance.visible_helpers,
                 )
                 retry_update = sage_import.after_task(
@@ -392,12 +414,12 @@ def _run_tau2(args: argparse.Namespace) -> None:
             _write_live_dashboard(
                 args=args,
                 run_dir=run_dir,
-                environment=f"{args.dataset}:{args.tau2_domain}",
+                environment=f"{args.dataset}:{domain}",
                 baseline_results=baseline_results,
                 sage_events=sage_events,
                 run_metadata={
                     "status": "running",
-                    "official_harness": "tau2",
+                    "official_harness": harness,
                     "comparison_valid": True,
                     "completed": index,
                     "requested_samples": args.samples,
@@ -416,12 +438,12 @@ def _run_tau2(args: argparse.Namespace) -> None:
         interrupted_dashboard = _write_live_dashboard(
             args=args,
             run_dir=run_dir,
-            environment=f"{args.dataset}:{args.tau2_domain}",
+            environment=f"{args.dataset}:{domain}",
             baseline_results=baseline_results,
             sage_events=sage_events,
             run_metadata={
                 "status": "stopped_interrupted",
-                "official_harness": "tau2",
+                "official_harness": harness,
                 "comparison_valid": True,
                 "completed": len(
                     [
@@ -457,12 +479,12 @@ def _run_tau2(args: argparse.Namespace) -> None:
     final_dashboard = _write_live_dashboard(
         args=args,
         run_dir=run_dir,
-        environment=f"{args.dataset}:{args.tau2_domain}",
+        environment=f"{args.dataset}:{domain}",
         baseline_results=baseline_results,
         sage_events=sage_events,
         run_metadata={
             "status": "completed",
-            "official_harness": "tau2",
+            "official_harness": harness,
             "comparison_valid": True,
             "completed": len(tasks),
             "requested_samples": args.samples,
@@ -486,11 +508,12 @@ def _run_tau2(args: argparse.Namespace) -> None:
 def _tau2_config(args: argparse.Namespace, *, agent: str, sage_guidance: str) -> Any:
     from tau2.data_model.simulation import TextRunConfig
 
+    domain = _tau_domain(args)
     llm_args_agent: dict[str, Any] = {"temperature": 0}
     if sage_guidance:
         llm_args_agent["sage_guidance"] = sage_guidance
     return TextRunConfig(
-        domain=args.tau2_domain,
+        domain=domain,
         agent=agent,
         user="user_simulator",
         llm_agent=args.model,
@@ -1173,16 +1196,45 @@ def _run_scienceagentbench(args: argparse.Namespace) -> None:
         if args.dataset == "science-agent-bench"
         else "scienceagentbench"
     )
+    sample_status = _scienceagentbench_verified_input_status(args)
+    if args.scienceagentbench_artifact_zip is not None and missing:
+        prepare_result = _prepare_scienceagentbench_from_zip(args, run_dir)
+        missing = [name for name in required if not (benchmark / name).exists()]
+    else:
+        prepare_result = {}
+
+    status = (
+        "scienceagentbench_artifacts_present_preflight_passed"
+        if not missing
+        else "blocked_official_scoring_artifacts_missing"
+    )
     metadata = {
-        "status": "blocked",
+        "status": status,
         "official_harness": "ScienceAgentBench",
         "comparison_valid": False,
-        "blocked_reason": (
-            "ScienceAgentBench GitHub clone contains only a benchmark placeholder. "
-            "Official scoring requires the password-protected benchmark artifacts."
+        "blocked_reason": ""
+        if not missing
+        else (
+            "ScienceAgentBench verified task inputs are available from Hugging Face, "
+            "but official scoring requires the password-protected benchmark_verified.zip "
+            "artifacts to be materialized locally. This runner no longer treats the "
+            "repository clone itself as missing; it reports the exact artifact gate."
         ),
         "missing_artifacts": missing,
         "required_path": str(benchmark),
+        "verified_split": args.scienceagentbench_split,
+        "verified_input_status": sample_status,
+        "artifact_prepare_result": prepare_result,
+        "artifact_prepare_command": (
+            "python scripts/prepare_scienceagentbench_artifacts.py "
+            "--artifact-zip /path/to/benchmark_verified.zip"
+        ),
+        "selected_task_ids": sample_status.get("selected_task_ids", []),
+        "note": (
+            "Inputs are safe to use for agent prompting. Official outcome scoring "
+            "must wait until datasets/eval_programs/gold_programs/scoring_rubrics "
+            "are present under external/ScienceAgentBench/benchmark."
+        ),
     }
     _write_manifest(run_dir, args, metadata)
     dashboard_path = _write_live_dashboard(
@@ -1204,6 +1256,73 @@ def _run_scienceagentbench(args: argparse.Namespace) -> None:
             indent=2,
         )
     )
+
+
+def _scienceagentbench_verified_input_status(
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    try:
+        from datasets import load_dataset
+    except Exception as exc:
+        return {
+            "available": False,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    try:
+        dataset = load_dataset(
+            "osunlp/ScienceAgentBench",
+            split=args.scienceagentbench_split,
+            streaming=True,
+        )
+        selected: list[str] = []
+        fields: list[str] = []
+        for index, row in zip(range(args.samples), dataset):
+            if index == 0:
+                fields = sorted(str(key) for key in row.keys())
+            selected.append(str(row.get("instance_id", index + 1)))
+    except Exception as exc:
+        return {
+            "available": False,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    return {
+        "available": True,
+        "dataset": "osunlp/ScienceAgentBench",
+        "split": args.scienceagentbench_split,
+        "selected_task_ids": selected,
+        "fields": fields,
+        "official_input_count_loaded": len(selected),
+    }
+
+
+def _prepare_scienceagentbench_from_zip(
+    args: argparse.Namespace, run_dir: Path
+) -> dict[str, Any]:
+    cmd = [
+        sys.executable,
+        "scripts/prepare_scienceagentbench_artifacts.py",
+        "--repo",
+        str(args.scienceagentbench_repo),
+        "--split",
+        args.scienceagentbench_split,
+        "--artifact-zip",
+        str(args.scienceagentbench_artifact_zip),
+        "--status-json",
+        str(run_dir / "scienceagentbench_artifact_status.json"),
+    ]
+    proc = subprocess.run(
+        cmd,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=600,
+    )
+    return {
+        "command": cmd,
+        "returncode": proc.returncode,
+        "stdout_tail": proc.stdout[-2000:],
+        "stderr_tail": proc.stderr[-2000:],
+    }
 
 
 def _run_blocked_official_harness(
@@ -1629,8 +1748,21 @@ def _write_prompt_registry(run_dir: Path, helper_guidance: list[str]) -> None:
     )
 
 
-def _tau2_task_id(domain: str, task_id: str) -> str:
-    return f"tau2:{domain}:{task_id}"
+def _tau_domain(args: argparse.Namespace) -> str:
+    if args.dataset == "tau3-bench":
+        return str(args.tau3_domain)
+    return str(args.tau2_domain)
+
+
+def _tau_harness(args: argparse.Namespace) -> str:
+    if args.dataset == "tau3-bench":
+        return "tau3-current-release"
+    return "tau2"
+
+
+def _tau_task_id(args: argparse.Namespace, domain: str, task_id: str) -> str:
+    prefix = "tau3" if args.dataset == "tau3-bench" else "tau2"
+    return f"{prefix}:{domain}:{task_id}"
 
 
 def _slug(value: str) -> str:
