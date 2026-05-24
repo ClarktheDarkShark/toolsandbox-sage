@@ -1546,6 +1546,16 @@
   checkout, which now contains the tau3 release/task-fix layer, and labels the
   run as `tau3-current-release` with `tau3:*` task IDs so tau2 and tau3 evidence
   remain separated.
+- tau3-bench airline official40:
+  `outputs/sage_official_live/import_agent_tau3_airline_official40_20260524`;
+  baseline `16/40`, SAGE `12/40`; gains `1`, regressions `5`, both-win `11`,
+  both-fail `23`; eight prompt helpers born and five parked. Decision: complete
+  negative validation for current import-mode prompt-helper policy.
+- Terminal-Bench repaired fast4:
+  `outputs/sage_official_live/import_agent_terminal_bench_tmp_fast4_20260524`;
+  baseline `1/4`, SAGE `1/4`; gains `1`, regressions `1`. This used a fresh
+  non-iCloud checkout at `/tmp/sage_benchmarks/terminal-bench`, which avoided
+  the previous file-copy/tar errors. Full40 remains runtime-budget blocked.
 - ScienceAgentBench / science-agent-bench preflight:
   `outputs/sage_official_live/import_agent_scienceagentbench_verified_artifact_preflight_20260523`;
   verified Hugging Face split loaded selected IDs `1-4`; official scoring remains
@@ -1553,6 +1563,9 @@
   `scoring_rubrics` from `benchmark_verified.zip`. The public SharePoint download
   attempt returned an authenticated sign-in page. New helper:
   `scripts/prepare_scienceagentbench_artifacts.py`.
+- science-agent-bench alias preflight:
+  `outputs/sage_official_live/import_agent_science_agent_bench_verified_artifact_preflight_20260524`;
+  same verified-input/artifact-gate result as `scienceagentbench`.
 - Reports/artifacts:
   `docs/sage_protocol/sage_import_agent_validation_matrix_20260523.md`,
   `docs/sage_protocol/sage_import_agent_tau2_failure_analysis.md`, and
