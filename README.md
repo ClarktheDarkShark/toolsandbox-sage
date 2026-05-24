@@ -84,8 +84,11 @@ summary = agent.run(limit=20)
 
 For benchmarks that already own the simulator, scorer, task runner, and agent
 loop, use import-agent mode instead of rewriting the benchmark as a full SAGE
-adapter. The host harness stays in charge of execution; SAGE only supplies
-before-task guidance and consumes after-task official observations:
+adapter. The host harness stays in charge of execution, but SAGE still runs the
+full lifecycle: helper selection, optional in-task helper refresh, action review
+where the host can intercept tool calls, post-task gap diagnosis, helper
+generation, validation, repair, registry retention, reuse accounting, lifecycle
+decisions, and optional same-task retry.
 
 ```python
 from pathlib import Path
@@ -103,7 +106,12 @@ profile = EnvironmentProfile(
     name="my-benchmark",
     description="Host-owned simulator, scorer, and task runner.",
     base_tools=("host_agent_loop", "official_scorer"),
-    helper_families=("prompt_guidance_helper", "action_planning_helper"),
+    helper_families=(
+        "deterministic_callable",
+        "prompt_guidance_helper",
+        "action_planning_helper",
+        "scorer_feedback_repair_helper",
+    ),
     safety_rules=("Use only visible task context and official observations.",),
 )
 
@@ -139,6 +147,38 @@ sage.after_task(
 )
 ```
 
+If the host harness can rebuild the actor prompt during a task, refresh guidance
+from the visible transcript before each model turn:
+
+```python
+guidance = sage.before_step(task_context, transcript=visible_messages)
+assistant_message = host_agent_next_turn(
+    task,
+    system_prompt_extra=guidance.system_prompt,
+)
+```
+
+If the host harness can inspect proposed tool calls before execution, use
+`review_action(...)` as a generic precondition and side-effect guard:
+
+```python
+review = sage.review_action(
+    task_context,
+    transcript=visible_messages,
+    proposed_actions=assistant_message.tool_calls,
+)
+if not review.allowed:
+    assistant_message = host_agent_next_turn(
+        task,
+        system_prompt_extra=review.guidance,
+    )
+```
+
+This is not a force-call path. SAGE does not execute the host's side-effecting
+tools. It only blocks or redirects a proposed action when an accepted helper,
+computed from visible task context and visible transcript, recommends abstention,
+missing-precondition handling, transfer, or escalation.
+
 Import-agent mode treats guidance as a first-class helper type. Retained
 helpers may be deterministic callables, prompt-guidance helpers, action-planning
 helpers, or scorer-feedback repair helpers, and all receive the same visibility,
@@ -147,6 +187,19 @@ also exposes `paired_task_order(...)` so a host harness can keep baseline and
 SAGE task order fixed. `retry_policy="same_task"` may be used only when the
 host benchmark permits a clean same-task retry after helper birth; otherwise use
 `next_task_only` for standard paired comparisons.
+
+Current import-agent validation includes:
+
+- `tau3-bench` airline official40 through the host tau runner/scorer: cached
+  baseline `16/40`, fresh SAGE `18/40`, gains `4`, regressions `2`.
+- Terminal-Bench official subset through the host Docker/task parser path:
+  cached baseline `0/2`, fresh SAGE `2/2` on the repaired concrete-repair
+  subset.
+- MiniGrid live40: cached baseline `18/40`, fresh SAGE `40/40`.
+- BIG-Bench Hard live40: cached baseline `16/40`, fresh SAGE `40/40`.
+- ToolSandbox and CyberGym remain stronger in their mature environment-adapter
+  runners, with cached controls and fresh SAGE arms documented under
+  `docs/sage_protocol/current_state.md`.
 
 Import-agent mode treats infrastructure failures differently from task failures.
 Runner exceptions, parser errors, subprocess timeouts, Docker failures,

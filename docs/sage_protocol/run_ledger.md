@@ -1576,3 +1576,58 @@
   stopped; rerun in a clean environment before protected review.
 - Decision label:
   `IMPORT_AGENT_BOUNDARY_WORKS_WITH_TAU2_REPAIR_BUT_POLICY_HARNESS_HELPER_QUALITY_REMAINS_NEXT_GAP`.
+
+## 2026-05-24 - Full Import-Agent Lifecycle Repair And Tau3 Revalidation
+
+- Objective: fix the portability gap where `SAGEImportAgent` behaved like a
+  shallow prompt-helper shim inside host-owned benchmark loops instead of the
+  full SAGE lifecycle.
+- Code changes:
+  - `src/sage_agent/import_agent.py` now supports in-task `before_step(...)`
+    helper refresh from visible transcripts, `review_action(...)` for host
+    loops that can inspect proposed tool calls before execution, full
+    helper birth/validation/repair/retain for import mode, deterministic helper
+    execution into rendered guidance, and optional same-task retry after helper
+    birth or failed visible-helper context refresh.
+  - `src/sage_agent/interfaces.py` adds `SAGEActionReview`.
+  - `src/sage_agent/generators.py` strengthens the generic policy-action
+    precondition helper used by tau-style host simulators. It handles current
+    user-turn focus, transfer/escalation cues, compensation scope, unsupported
+    insurance/account disputes, and host-visible tool availability without
+    labels, scenario IDs, or expected answers.
+  - `scripts/run_sage_official_live.py` wires tau host loops to the import
+    agent through per-turn guidance refresh and action review. It also forces
+    LiteLLM to use the local cost map during official live runs so import-time
+    cost metadata fetching cannot block before task execution.
+- Tau3 official40 repaired import-lifecycle run:
+  `outputs/sage_official_live/import_agent_tau3_airline_full_import_action_review_official40_sys_20260524`;
+  official tau current-release simulator/scorer, `gpt-4o-mini`, cached controls
+  `40 cached / 0 fresh`, fresh SAGE, no candidate cache. Result: baseline
+  `16/40`, SAGE `18/40`; gains `4`, regressions `2`, both-win `14`,
+  both-fail `20`; accepted helpers `1`; helper reuse events `61`; integrity
+  issues `0`.
+- Tau3 negative ablation retained:
+  `outputs/sage_official_live/import_agent_tau3_airline_official40_20260524`;
+  baseline `16/40`, static prompt-helper SAGE `12/40`; gains `1`,
+  regressions `5`. This is now the documented failure mode that the full import
+  lifecycle repaired.
+- Terminal-Bench import-mode value check:
+  `outputs/sage_official_live/import_agent_terminal_bench_concrete_repair_2_20260524`;
+  official task parser/Docker path on repaired `/tmp/sage_benchmarks` checkout,
+  cached baseline `0/2`, fresh SAGE `2/2`; gains `2`, regressions `0`;
+  integrity issues `0`. Full40 remains a runtime-budget item, not a SAGE
+  boundary blocker.
+- Maintenance evidence carried forward:
+  MiniGrid live40 `outputs/sage_agent_standalone/minigrid_import_agent_maintenance40_wide_20260524`
+  retained cached baseline `18/40` and SAGE `40/40`; BBH live40
+  `outputs/sage_agent_standalone/bbh_import_agent_maintenance40_20260524`
+  retained cached baseline `16/40` and SAGE `40/40`; ToolSandbox and CyberGym
+  high-lift adapter runs remain documented in `docs/sage_protocol/current_state.md`.
+- Validation:
+  - `python -m py_compile src/sage_agent/interfaces.py src/sage_agent/import_agent.py src/sage_agent/generators.py scripts/run_sage_official_live.py`
+  - `python -m ruff check src/sage_agent/interfaces.py src/sage_agent/import_agent.py src/sage_agent/generators.py scripts/run_sage_official_live.py`
+  - local import-agent action-review smoke accepted a policy helper and blocked
+    an unsafe reservation-update style action when the helper recommended
+    transfer/escalation.
+- Decision label:
+  `FULL_IMPORT_AGENT_LIFECYCLE_REPAIRS_TAU3_AND_TERMINAL_BENCH_SHOWS_IMPORT_MODE_VALUE`.

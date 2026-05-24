@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from sage_agent.gap_mining import mine_gap_signals
 from sage_agent.integrity import (
     ResearchIntegrityPolicy,
     check_gap_signal,
@@ -34,12 +35,15 @@ from sage_agent.interfaces import (
     HelperValidationReport,
     ImportTaskContext,
     ImportTaskObservation,
+    SAGEActionReview,
     SAGEGuidance,
     SAGEImportUpdate,
     TaskRunResult,
     TaskSpec,
+    ValidationCase,
 )
 from sage_agent.registry import LocalSAGERegistry
+from sage_agent.validation import validate_helper_candidate
 
 
 @dataclass(frozen=True)
@@ -50,9 +54,12 @@ class SAGEImportConfig:
     registry_dir: Path = Path(".sage_import_registry")
     active_helpers: int = 3
     max_new_helpers: int = 8
+    max_new_helpers_per_task: int = 2
+    repair_attempts: int = 1
     retry_policy: str = "next_task_only"
-    min_uses_before_lifecycle_action: int = 6
+    min_uses_before_lifecycle_action: int = 3
     weak_helper_success_rate: float = 0.25
+    prompt_guidance_fallback: bool = False
     integrity_policy: ResearchIntegrityPolicy = field(
         default_factory=ResearchIntegrityPolicy
     )
@@ -75,9 +82,12 @@ class SAGEImportAgent:
                 registry_dir=self.registry_dir,
                 active_helpers=base_config.active_helpers,
                 max_new_helpers=base_config.max_new_helpers,
+                max_new_helpers_per_task=base_config.max_new_helpers_per_task,
+                repair_attempts=base_config.repair_attempts,
                 retry_policy=base_config.retry_policy,
                 min_uses_before_lifecycle_action=base_config.min_uses_before_lifecycle_action,
                 weak_helper_success_rate=base_config.weak_helper_success_rate,
+                prompt_guidance_fallback=base_config.prompt_guidance_fallback,
                 integrity_policy=base_config.integrity_policy,
             )
         self.config = base_config
@@ -118,6 +128,134 @@ class SAGEImportAgent:
         self._events.append(event)
         return guidance
 
+    def before_step(
+        self,
+        task_context: ImportTaskContext,
+        transcript: Sequence[str],
+    ) -> SAGEGuidance:
+        """Refresh retained-helper guidance inside a host-owned task loop.
+
+        Some benchmark harnesses cannot expose SAGE as a callable tool, but they
+        can rebuild the agent prompt before each turn. This method gives those
+        harnesses the same retained-helper execution path used by ``before_task``
+        while adding the visible conversation so deterministic helpers can react
+        to mid-task policy changes, failed command output, or newly observed
+        user constraints.
+        """
+
+        metadata = dict(task_context.metadata)
+        metadata["last_transcript"] = "\n".join(str(line) for line in transcript[-16:])
+        step_context = ImportTaskContext(
+            task_id=task_context.task_id,
+            name=task_context.name,
+            prompt=task_context.prompt,
+            artifacts=task_context.artifacts,
+            metadata=metadata,
+        )
+        task = _task_from_context(step_context)
+        check_task_specs((task,), self.config.integrity_policy).raise_for_issues()
+        records = self.registry.load()
+        visible = _route_import_helpers(
+            task,
+            records,
+            active_helpers=max(0, self.config.active_helpers),
+        )
+        self._visible_by_task[task.task_id] = visible
+        guidance = _render_guidance(
+            profile=self.environment_profile,
+            task=task,
+            records={name: records[name] for name in visible if name in records},
+        )
+        self._events.append(
+            {
+                "event": "helper_visibility_step",
+                "task_id": task.task_id,
+                "visible_helpers": list(visible),
+                "helper_count": len(visible),
+            }
+        )
+        return guidance
+
+    def review_action(
+        self,
+        task_context: ImportTaskContext,
+        transcript: Sequence[str],
+        proposed_actions: Sequence[Mapping[str, Any]],
+    ) -> SAGEActionReview:
+        """Review host-proposed side-effecting actions against helper outputs.
+
+        This is optional for host harnesses. When a harness can intercept an
+        actor's proposed tool call before execution, SAGE can apply retained
+        helper outputs as a generic safety/precondition guard. The guard does
+        not invent labels or expected answers; it only blocks a proposed
+        side-effecting action when the current visible helper output recommends
+        transfer/escalation or abstention from visible context.
+        """
+
+        guidance = self.before_step(task_context, transcript)
+        helper_outputs_raw = guidance.metadata.get("helper_outputs", ())
+        helper_outputs: tuple[Mapping[str, Any], ...] = tuple(
+            item
+            for item in helper_outputs_raw
+            if isinstance(item, Mapping) and isinstance(item.get("output"), Mapping)
+        )
+        action_names = tuple(
+            name
+            for name in (_action_name(action) for action in proposed_actions)
+            if name
+        )
+        side_effecting = tuple(
+            name for name in action_names if _looks_side_effecting_action(name)
+        )
+        if not side_effecting:
+            return SAGEActionReview(
+                allowed=True,
+                visible_helpers=guidance.visible_helpers,
+                helper_outputs=helper_outputs,
+            )
+        for helper_output in helper_outputs:
+            output = helper_output.get("output")
+            if not isinstance(output, Mapping):
+                continue
+            if output.get("abstain") is True:
+                reason = str(output.get("abstain_reason") or "helper_abstain")
+                review = SAGEActionReview(
+                    allowed=False,
+                    reason=reason,
+                    guidance=_action_review_guidance(output, reason=reason),
+                    visible_helpers=guidance.visible_helpers,
+                    helper_outputs=helper_outputs,
+                )
+                self._events.append(
+                    _action_review_event(task_context, action_names, review)
+                )
+                return review
+            if output.get("should_transfer") is True:
+                unsafe_side_effecting = tuple(
+                    name
+                    for name in side_effecting
+                    if not _looks_transfer_or_escalation_action(name)
+                )
+                if not unsafe_side_effecting:
+                    continue
+                reason = "helper_recommends_transfer_or_escalation"
+                review = SAGEActionReview(
+                    allowed=False,
+                    reason=reason,
+                    guidance=_action_review_guidance(output, reason=reason),
+                    visible_helpers=guidance.visible_helpers,
+                    helper_outputs=helper_outputs,
+                )
+                self._events.append(
+                    _action_review_event(task_context, action_names, review)
+                )
+                return review
+        return SAGEActionReview(
+            allowed=True,
+            visible_helpers=guidance.visible_helpers,
+            helper_outputs=helper_outputs,
+        )
+
     def after_task(
         self,
         task_context: ImportTaskContext,
@@ -155,53 +293,12 @@ class SAGEImportAgent:
             and helper_birth_decision == "generate"
             and _active_helper_count(self.registry.load()) < self.config.max_new_helpers
         ):
-            gap = _make_prompt_guidance_gap(
-                profile=self.environment_profile,
+            birth_events, accepted, rejected = self._run_full_birth_lifecycle(
                 task=task,
                 result=result,
-                registry=self.registry,
+                records=self.registry.load(),
             )
-            check_gap_signal(gap, self.config.integrity_policy).raise_for_issues()
-            candidate = _generate_prompt_guidance_candidate(
-                generator=self.generator,
-                gap=gap,
-                profile=self.environment_profile,
-                result=result,
-                model=self.config.model,
-            )
-            candidate_integrity = check_helper_candidate(
-                candidate, gap, self.config.integrity_policy
-            )
-            validation = _validate_prompt_guidance_candidate(
-                candidate,
-                gap=gap,
-                integrity_errors=tuple(
-                    f"{issue.kind}:{issue.detail}"
-                    for issue in candidate_integrity.issues
-                ),
-            )
-            events.append(
-                {
-                    "event": "tool_birth",
-                    "tool_name": candidate.spec.name,
-                    "helper_type": candidate.spec.helper_type,
-                    "family": candidate.spec.family,
-                    "accepted": validation.accepted,
-                    "errors": list(validation.errors),
-                    "cases": validation.cases_run,
-                    "task_id": task.task_id,
-                }
-            )
-            if validation.accepted:
-                self.registry.add(
-                    candidate,
-                    validation,
-                    birth_gap_key=gap.key,
-                    birth_environment=self.environment_profile.name,
-                )
-                accepted.append(candidate.spec.name)
-            else:
-                rejected.append(candidate.spec.name)
+            events.extend(birth_events)
         elif not result.success and helper_birth_decision != "generate":
             events.append(
                 {
@@ -216,13 +313,30 @@ class SAGEImportAgent:
         retry_recommended = False
         if accepted and self.config.retry_policy == "same_task":
             retry_recommended = True
-            retry_guidance = self.before_task(task_context)
+            retry_guidance = self.before_task(
+                _retry_context_with_observation(task_context, result)
+            )
             events.append(
                 {
                     "event": "same_task_retry_recommended",
                     "task_id": task.task_id,
                     "tool_name": ",".join(accepted),
                     "visible_helpers": list(retry_guidance.visible_helpers),
+                    "reason": "new_helper_birth",
+                }
+            )
+        elif not result.success and visible and self.config.retry_policy == "same_task":
+            retry_recommended = True
+            retry_guidance = self.before_task(
+                _retry_context_with_observation(task_context, result)
+            )
+            events.append(
+                {
+                    "event": "same_task_retry_recommended",
+                    "task_id": task.task_id,
+                    "tool_name": ",".join(visible),
+                    "visible_helpers": list(retry_guidance.visible_helpers),
+                    "reason": "failed_visible_helper_context_refresh",
                 }
             )
 
@@ -236,6 +350,175 @@ class SAGEImportAgent:
             retry_guidance=retry_guidance,
             events=tuple(events),
         )
+
+    def _run_full_birth_lifecycle(
+        self,
+        *,
+        task: TaskSpec,
+        result: TaskRunResult,
+        records: Mapping[str, HelperRecord],
+    ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+        """Generate, validate, repair, and retain full helpers for import mode."""
+
+        events: list[dict[str, Any]] = []
+        accepted: list[str] = []
+        rejected: list[str] = []
+        births_this_task = 0
+        for gap in _import_gap_candidates(
+            profile=self.environment_profile,
+            task=task,
+            result=result,
+            records=records,
+            registry=self.registry,
+        ):
+            if (
+                _active_helper_count(self.registry.load())
+                >= self.config.max_new_helpers
+            ):
+                break
+            if births_this_task >= self.config.max_new_helpers_per_task:
+                break
+            if _active_gap_already_has_helper(self.registry.load(), gap):
+                events.append(
+                    {
+                        "event": "tool_generation_skipped_existing",
+                        "gap_key": gap.key,
+                        "task_id": task.task_id,
+                        "tool_name": gap.suggested_tool_name or "",
+                    }
+                )
+                continue
+            check_gap_signal(gap, self.config.integrity_policy).raise_for_issues()
+            validation_cases = _import_validation_cases_for_gap(gap, result)
+            candidate = self.generator.generate(
+                gap,
+                self.environment_profile,
+                validation_cases,
+                model=self.config.model,
+            )
+            validation = self._validate_generated_candidate(candidate, gap)
+            for attempt in range(self.config.repair_attempts):
+                if validation.accepted or not _supports_repair(self.generator):
+                    break
+                candidate = self.generator.repair(  # type: ignore[attr-defined]
+                    gap,
+                    self.environment_profile,
+                    candidate,
+                    validation.errors,
+                    validation_cases,
+                    model=self.config.model,
+                )
+                validation = self._validate_generated_candidate(candidate, gap)
+                events.append(
+                    {
+                        "event": "tool_repair",
+                        "tool_name": candidate.spec.name,
+                        "helper_type": candidate.spec.helper_type,
+                        "attempt": attempt + 1,
+                        "accepted": validation.accepted,
+                        "errors": list(validation.errors),
+                    }
+                )
+            events.append(
+                {
+                    "event": "tool_birth",
+                    "tool_name": candidate.spec.name,
+                    "helper_type": candidate.spec.helper_type,
+                    "family": candidate.spec.family,
+                    "accepted": validation.accepted,
+                    "errors": list(validation.errors),
+                    "cases": validation.cases_run,
+                    "task_id": task.task_id,
+                    "gap_key": gap.key,
+                }
+            )
+            births_this_task += 1
+            if validation.accepted:
+                self.registry.add(
+                    candidate,
+                    validation,
+                    birth_gap_key=gap.key,
+                    birth_environment=self.environment_profile.name,
+                )
+                accepted.append(candidate.spec.name)
+            else:
+                rejected.append(candidate.spec.name)
+        if (
+            not accepted
+            and self.config.prompt_guidance_fallback
+            and _active_helper_count(self.registry.load()) < self.config.max_new_helpers
+        ):
+            prompt_events, prompt_accepted, prompt_rejected = (
+                self._run_prompt_guidance_fallback(task=task, result=result)
+            )
+            events.extend(prompt_events)
+            accepted.extend(prompt_accepted)
+            rejected.extend(prompt_rejected)
+        return events, accepted, rejected
+
+    def _validate_generated_candidate(
+        self, candidate: HelperCandidate, gap: GapSignal
+    ) -> HelperValidationReport:
+        candidate_integrity = check_helper_candidate(
+            candidate, gap, self.config.integrity_policy
+        )
+        integrity_errors = tuple(
+            f"{issue.kind}:{issue.detail}" for issue in candidate_integrity.issues
+        )
+        if candidate.spec.helper_type == "prompt_guidance":
+            return _validate_prompt_guidance_candidate(
+                candidate, gap=gap, integrity_errors=integrity_errors
+            )
+        if integrity_errors:
+            return HelperValidationReport(
+                accepted=False,
+                errors=integrity_errors,
+                cases_run=0,
+                cases_passed=0,
+                runtime_smoke_passed=False,
+                side_effect_free=False,
+            )
+        return validate_helper_candidate(candidate)
+
+    def _run_prompt_guidance_fallback(
+        self, *, task: TaskSpec, result: TaskRunResult
+    ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+        gap = _make_prompt_guidance_gap(
+            profile=self.environment_profile,
+            task=task,
+            result=result,
+            registry=self.registry,
+        )
+        check_gap_signal(gap, self.config.integrity_policy).raise_for_issues()
+        candidate = _generate_prompt_guidance_candidate(
+            generator=self.generator,
+            gap=gap,
+            profile=self.environment_profile,
+            result=result,
+            model=self.config.model,
+        )
+        validation = self._validate_generated_candidate(candidate, gap)
+        event = {
+            "event": "tool_birth",
+            "tool_name": candidate.spec.name,
+            "helper_type": candidate.spec.helper_type,
+            "family": candidate.spec.family,
+            "accepted": validation.accepted,
+            "errors": list(validation.errors),
+            "cases": validation.cases_run,
+            "task_id": task.task_id,
+            "gap_key": gap.key,
+            "fallback": True,
+        }
+        if validation.accepted:
+            self.registry.add(
+                candidate,
+                validation,
+                birth_gap_key=gap.key,
+                birth_environment=self.environment_profile.name,
+            )
+            return [event], [candidate.spec.name], []
+        return [event], [], [candidate.spec.name]
 
     def _retire_weak_helpers(self, events: list[dict[str, Any]]) -> None:
         records = self.registry.load()
@@ -270,6 +553,98 @@ def paired_task_order(task_ids: Sequence[str], *, seed: int = 0) -> tuple[str, .
     return tuple(task_id for _, task_id in sorted(decorated))
 
 
+def _action_name(action: Mapping[str, Any]) -> str:
+    function = action.get("function")
+    if isinstance(function, Mapping) and function.get("name"):
+        return str(function.get("name"))
+    for key in ("name", "tool_name", "action"):
+        value = action.get(key)
+        if value:
+            return str(value)
+    return ""
+
+
+def _looks_side_effecting_action(name: str) -> bool:
+    lowered = name.lower()
+    read_prefixes = (
+        "get_",
+        "list_",
+        "search_",
+        "find_",
+        "lookup_",
+        "check_",
+        "read_",
+        "view_",
+        "query_",
+    )
+    if lowered.startswith(read_prefixes):
+        return False
+    side_effect_terms = (
+        "add",
+        "book",
+        "buy",
+        "cancel",
+        "charge",
+        "create",
+        "delete",
+        "issue",
+        "modify",
+        "pay",
+        "purchase",
+        "refund",
+        "remove",
+        "reserve",
+        "schedule",
+        "send",
+        "set_",
+        "transfer",
+        "update",
+        "write",
+    )
+    return any(term in lowered for term in side_effect_terms)
+
+
+def _looks_transfer_or_escalation_action(name: str) -> bool:
+    lowered = name.lower()
+    return "transfer" in lowered or "escalat" in lowered or "human" in lowered
+
+
+def _action_review_guidance(output: Mapping[str, Any], *, reason: str) -> str:
+    safe_next = str(output.get("safe_next_step") or "").strip()
+    missing = output.get("missing_preconditions")
+    lines = [
+        f"SAGE action review blocked the proposed side-effecting action: {reason}.",
+    ]
+    if safe_next:
+        lines.append(f"Safe next step: {safe_next}")
+    if isinstance(missing, list) and missing:
+        lines.append(
+            "Visible precondition risks: "
+            + "; ".join(str(item) for item in missing[:4])
+        )
+    if output.get("should_transfer") is True:
+        lines.append(
+            "Use transfer/escalation if the host policy provides that path; otherwise explain the policy limitation instead of taking the blocked action."
+        )
+    if output.get("abstain") is True:
+        lines.append("Ask for missing information or decline the unsafe action.")
+    return "\n".join(lines)
+
+
+def _action_review_event(
+    task_context: ImportTaskContext,
+    action_names: Sequence[str],
+    review: SAGEActionReview,
+) -> dict[str, Any]:
+    return {
+        "event": "action_review_blocked",
+        "task_id": task_context.task_id,
+        "proposed_actions": list(action_names),
+        "reason": review.reason,
+        "visible_helpers": list(review.visible_helpers),
+    }
+
+
 def _task_from_context(context: ImportTaskContext) -> TaskSpec:
     return TaskSpec(
         task_id=context.task_id,
@@ -277,6 +652,33 @@ def _task_from_context(context: ImportTaskContext) -> TaskSpec:
         prompt=context.prompt,
         artifacts=dict(context.artifacts),
         metadata=dict(context.metadata),
+    )
+
+
+def _retry_context_with_observation(
+    context: ImportTaskContext, result: TaskRunResult
+) -> ImportTaskContext:
+    metadata = dict(context.metadata)
+    metadata["last_transcript"] = "\n".join(result.transcript[-16:])
+    feedback_parts = [result.error]
+    parser_results = result.artifacts.get("parser_results")
+    failure_mode = result.artifacts.get("failure_mode")
+    if failure_mode:
+        feedback_parts.append(f"failure_mode: {failure_mode}")
+    if parser_results:
+        feedback_parts.append(
+            "parser_results: " + json.dumps(parser_results, sort_keys=True, default=str)
+        )
+    feedback_parts.extend(result.transcript[-6:])
+    metadata["last_feedback"] = "\n".join(
+        part for part in feedback_parts if str(part).strip()
+    ).strip()
+    return ImportTaskContext(
+        task_id=context.task_id,
+        name=context.name,
+        prompt=context.prompt,
+        artifacts=context.artifacts,
+        metadata=metadata,
     )
 
 
@@ -332,6 +734,7 @@ def _render_guidance(
     ]
     tool_schemas: list[Mapping[str, Any]] = []
     code_helpers: list[Mapping[str, Any]] = []
+    helper_outputs: list[Mapping[str, Any]] = []
     policy_notes = tuple(profile.safety_rules)
     for name, record in records.items():
         spec = record.candidate.spec
@@ -340,12 +743,6 @@ def _render_guidance(
                 f"\n[{name}] prompt guidance\n{record.candidate.code.strip()}"
             )
         elif spec.helper_type == "deterministic_callable":
-            sections.append(
-                f"\n[{name}] deterministic helper\n"
-                f"{spec.description}\n"
-                f"Inputs: {json.dumps(dict(spec.input_schema), sort_keys=True)}\n"
-                f"Outputs: {json.dumps(dict(spec.output_schema), sort_keys=True)}"
-            )
             code_helpers.append(
                 {
                     "name": name,
@@ -355,6 +752,22 @@ def _render_guidance(
                     "code": record.candidate.code,
                 }
             )
+            output = _execute_import_helper(record, task)
+            if output is not None:
+                helper_outputs.append(
+                    {
+                        "name": name,
+                        "family": spec.family,
+                        "helper_type": spec.helper_type,
+                        "output": output,
+                    }
+                )
+                sections.append(
+                    f"\n[{name}] structured helper output\n"
+                    f"{_format_helper_output(output)}"
+                )
+            else:
+                sections.append(f"\n[{name}] deterministic helper\n{spec.description}")
         else:
             sections.append(f"\n[{name}] {spec.helper_type}\n{spec.description}")
         tool_schemas.append(
@@ -377,8 +790,552 @@ def _render_guidance(
             "environment": profile.name,
             "task_id": task.task_id,
             "render_mode": "system_prompt",
+            "helper_outputs": helper_outputs,
         },
     )
+
+
+def _format_helper_output(output: Mapping[str, Any]) -> str:
+    lines: list[str] = []
+    focus = output.get("recommended_focus")
+    if focus:
+        lines.append(f"- Focus: {focus}")
+    safe_next = output.get("safe_next_step")
+    if safe_next:
+        lines.append(f"- Safe next step: {safe_next}")
+    must_verify = output.get("must_verify")
+    if isinstance(must_verify, list) and must_verify:
+        lines.append(
+            "- Verify before acting: "
+            + "; ".join(str(item) for item in must_verify[:5])
+        )
+    missing = output.get("missing_preconditions")
+    if isinstance(missing, list) and missing:
+        lines.append(
+            "- Missing/precondition risks: "
+            + "; ".join(str(item) for item in missing[:4])
+        )
+    commands = output.get("commands_to_consider")
+    if isinstance(commands, list) and commands:
+        lines.append(
+            "- Commands/checks to consider: "
+            + "; ".join(str(item) for item in commands[:4])
+        )
+    if output.get("abstain") is True and output.get("abstain_reason"):
+        lines.append(f"- Abstain reason: {output.get('abstain_reason')}")
+    if output.get("should_transfer") is True:
+        lines.append(
+            "- Recommended action: transfer/escalate instead of taking a write or compensation action unless visible policy explicitly permits direct completion."
+        )
+    if not lines:
+        lines.append(json.dumps(output, sort_keys=True, default=str)[:700])
+    return "\n".join(lines[:6])
+
+
+def _execute_import_helper(
+    record: HelperRecord, task: TaskSpec
+) -> Mapping[str, Any] | None:
+    spec = record.candidate.spec
+    if spec.helper_type != "deterministic_callable":
+        return None
+    namespace: dict[str, Any] = {}
+    try:
+        compiled = compile(
+            record.candidate.code, f"<sage-import-helper:{spec.name}>", "exec"
+        )
+        exec(  # noqa: S102 - accepted helpers are prevalidated as side-effect-free
+            compiled,
+            {
+                "__builtins__": {
+                    "abs": abs,
+                    "all": all,
+                    "any": any,
+                    "bool": bool,
+                    "dict": dict,
+                    "float": float,
+                    "int": int,
+                    "isinstance": isinstance,
+                    "len": len,
+                    "list": list,
+                    "max": max,
+                    "min": min,
+                    "range": range,
+                    "round": round,
+                    "set": set,
+                    "sorted": sorted,
+                    "str": str,
+                    "sum": sum,
+                    "tuple": tuple,
+                }
+            },
+            namespace,
+        )
+        function = namespace.get(spec.name)
+        if not callable(function):
+            return None
+        output: object = function(**_helper_inputs_for_task(spec, task))
+        if isinstance(output, Mapping):
+            return output
+        return {"result": output}
+    except Exception as exc:
+        return {
+            "abstain": True,
+            "abstain_reason": f"helper_execution_error:{type(exc).__name__}",
+        }
+
+
+def _helper_inputs_for_task(spec: HelperSpec, task: TaskSpec) -> dict[str, Any]:
+    artifacts = dict(task.artifacts)
+    metadata = dict(task.metadata)
+    inputs: dict[str, Any] = {}
+    for key, type_name in spec.input_schema.items():
+        lowered_key = str(key).lower()
+        lowered_type = str(type_name).lower()
+        if lowered_key in {"task_prompt", "prompt", "task_context", "description"}:
+            inputs[str(key)] = "\n".join([task.name, task.prompt]).strip()
+        elif lowered_key == "domain_policy":
+            inputs[str(key)] = artifacts.get("domain_policy", "")
+        elif lowered_key in {"available_tools", "tool_names"}:
+            inputs[str(key)] = artifacts.get("available_tools", "")
+        elif lowered_key == "transcript":
+            inputs[str(key)] = metadata.get("last_transcript", "")
+        elif lowered_key == "artifact_summary":
+            inputs[str(key)] = artifacts.get("artifact_summary", "")
+        elif lowered_key == "readme":
+            inputs[str(key)] = artifacts.get("readme", "")
+        elif lowered_key == "feedback":
+            parser_results = artifacts.get("parser_results", "")
+            inputs[str(key)] = metadata.get("last_feedback", "") or str(parser_results)
+        elif lowered_key == "max_candidates":
+            inputs[str(key)] = 8
+        elif "list" in lowered_type:
+            inputs[str(key)] = []
+        elif "int" in lowered_type:
+            inputs[str(key)] = 0
+        elif "float" in lowered_type:
+            inputs[str(key)] = 0.0
+        elif "bool" in lowered_type:
+            inputs[str(key)] = False
+        else:
+            inputs[str(key)] = artifacts.get(str(key), metadata.get(str(key), ""))
+    return inputs
+
+
+def _import_gap_candidates(
+    *,
+    profile: EnvironmentProfile,
+    task: TaskSpec,
+    result: TaskRunResult,
+    records: Mapping[str, HelperRecord],
+    registry: LocalSAGERegistry,
+) -> tuple[GapSignal, ...]:
+    """Return full helper gaps for import mode before prompt fallback."""
+
+    gaps: list[GapSignal] = []
+    if _looks_like_policy_action_context(profile, result):
+        gaps.append(
+            GapSignal(
+                key=f"import_policy_action_preconditions:{profile.name}",
+                summary=(
+                    "Create a structured helper that converts visible policy, "
+                    "tool, and transcript cues into action preconditions, "
+                    "required checks, safe next steps, and transfer/abstain "
+                    "signals for host-owned policy simulators."
+                ),
+                source_task_id=task.task_id,
+                source_environment=profile.name,
+                severity=0.9,
+                suggested_tool_name=_next_helper_name(
+                    registry.load(), prefix="plan_policy_action_preconditions"
+                ),
+                suggested_helper_family="policy_action_precondition_planner",
+                evidence=(
+                    "official transcript",
+                    "host tool or policy cues",
+                    "failed task outcome",
+                ),
+                required_inputs={
+                    "task_prompt": "str",
+                    "domain_policy": "str",
+                    "transcript": "str",
+                    "available_tools": "str",
+                },
+                expected_outputs={
+                    "recommended_focus": "str",
+                    "must_verify": "list[str]",
+                    "missing_preconditions": "list[str]",
+                    "safe_next_step": "str",
+                    "should_transfer": "bool",
+                    "abstain": "bool",
+                    "abstain_reason": "str",
+                },
+                generation_directives={
+                    "template": "policy_action_precondition_planner"
+                },
+            )
+        )
+    if _looks_like_execution_feedback_context(profile, task, result):
+        gaps.append(
+            GapSignal(
+                key=f"import_execution_feedback_repair:{profile.name}",
+                summary=(
+                    "Create a structured helper that turns visible public task "
+                    "instructions, execution transcripts, and official "
+                    "post-attempt failure feedback into a bounded repair plan. "
+                    "The helper must recommend what to inspect or verify next; "
+                    "it must not inspect hidden tests, reference solutions, "
+                    "labels, or environment-private answers."
+                ),
+                source_task_id=task.task_id,
+                source_environment=profile.name,
+                severity=0.9,
+                suggested_tool_name=_next_helper_name(
+                    registry.load(), prefix="plan_execution_feedback_repair"
+                ),
+                suggested_helper_family="execution_feedback_repair_planner",
+                evidence=(
+                    "visible public task instruction",
+                    "official post-attempt failure feedback",
+                    "host-owned execution transcript",
+                ),
+                required_inputs={
+                    "task_prompt": "str",
+                    "feedback": "str",
+                    "transcript": "str",
+                    "available_tools": "str",
+                },
+                expected_outputs={
+                    "recommended_focus": "str",
+                    "must_verify": "list[str]",
+                    "commands_to_consider": "list[str]",
+                    "safe_next_step": "str",
+                    "abstain": "bool",
+                    "abstain_reason": "str",
+                },
+                generation_directives={"template": "terminal_task_repair_planner"},
+            )
+        )
+    gaps.extend(
+        mine_gap_signals(
+            profile=profile,
+            task=task,
+            result=result,
+            helpers=records,
+        )
+    )
+    return _dedupe_gap_sequence(gaps)
+
+
+def _import_validation_cases_for_gap(
+    gap: GapSignal, result: TaskRunResult
+) -> tuple[ValidationCase, ...]:
+    template = str(gap.generation_directives.get("template", ""))
+    if template == "policy_action_precondition_planner":
+        return (
+            ValidationCase(
+                name="cancel_refund_policy_preconditions",
+                inputs={
+                    "task_prompt": "Airline cancellation request",
+                    "domain_policy": (
+                        "Cancellations require reservation ownership, refund "
+                        "eligibility, and policy permission before any write tool."
+                    ),
+                    "transcript": (
+                        "user asks to cancel; assistant must check refundability "
+                        "and cannot proceed if policy forbids it"
+                    ),
+                    "available_tools": "get_reservation update_reservation transfer_to_human",
+                },
+                expected={
+                    "recommended_focus": "cancellation_or_refund_policy",
+                    "abstain": False,
+                },
+            ),
+            ValidationCase(
+                name="reservation_change_policy_preconditions",
+                inputs={
+                    "task_prompt": "Change flight reservation",
+                    "domain_policy": (
+                        "Reservation changes require identity, flight option, "
+                        "fare difference, and accepted payment method."
+                    ),
+                    "transcript": "user wants to change flight and pay with gift card",
+                    "available_tools": "search_flights update_reservation",
+                },
+                expected={
+                    "recommended_focus": "reservation_change_policy",
+                    "abstain": False,
+                },
+            ),
+            ValidationCase(
+                name="discretionary_compensation_transfer",
+                inputs={
+                    "task_prompt": (
+                        "Customer requests more substantial compensation after a "
+                        "cancelled business flight caused a missed meeting."
+                    ),
+                    "domain_policy": (
+                        "Compensation certificates have fixed policy amounts. "
+                        "Transfer requests outside the fixed policy to a human agent."
+                    ),
+                    "transcript": (
+                        "user says the certificate is not enough and asks to "
+                        "reconsider because they missed an important meeting"
+                    ),
+                    "available_tools": "send_certificate transfer_to_human_agents",
+                },
+                expected={
+                    "recommended_focus": "compensation_scope_or_escalation_policy",
+                    "should_transfer": True,
+                    "abstain": False,
+                },
+            ),
+            ValidationCase(
+                name="delayed_complaint_without_change_path",
+                inputs={
+                    "task_prompt": "Customer is frustrated about a delayed flight.",
+                    "domain_policy": (
+                        "Delay compensation is only available after a qualifying "
+                        "change or cancellation path. Otherwise transfer or decline."
+                    ),
+                    "transcript": (
+                        "user complains about a delayed flight inconvenience, "
+                        "asks for a certificate, and says they will call back "
+                        "later for the unrelated booking"
+                    ),
+                    "available_tools": "send_certificate transfer_to_human_agents",
+                },
+                expected={
+                    "recommended_focus": "delayed_flight_compensation_scope",
+                    "should_transfer": True,
+                    "abstain": False,
+                },
+            ),
+            ValidationCase(
+                name="unsupported_insurance_dispute_transfer",
+                inputs={
+                    "task_prompt": "Customer says purchased insurance is missing.",
+                    "domain_policy": (
+                        "Only listed host tools may mutate reservations. "
+                        "Insurance disputes without a direct tool must be "
+                        "transferred to a human agent."
+                    ),
+                    "transcript": (
+                        "user says the insurance coverage is not showing, "
+                        "believes this is an error, and asks the assistant to "
+                        "resolve the issue without transfer"
+                    ),
+                    "available_tools": (
+                        "get_reservation_details update_reservation_baggages "
+                        "update_reservation_passengers transfer_to_human_agents"
+                    ),
+                },
+                expected={
+                    "recommended_focus": "unsupported_policy_or_account_dispute",
+                    "should_transfer": True,
+                    "abstain": False,
+                },
+            ),
+        )
+    if template == "terminal_task_repair_planner":
+        return (
+            ValidationCase(
+                name="regex_date_feedback_repair",
+                inputs={
+                    "task_prompt": (
+                        "Write a script that extracts valid dates from a log file."
+                    ),
+                    "feedback": (
+                        'parser_results: {"test_regex_matches_dates": "failed"}'
+                    ),
+                    "transcript": "pytest failed on date matching",
+                    "available_tools": "bash python pytest sed grep",
+                },
+                expected={
+                    "recommended_focus": "regex_or_date_matching_repair",
+                    "abstain": False,
+                },
+            ),
+            ValidationCase(
+                name="jsonl_output_feedback_repair",
+                inputs={
+                    "task_prompt": "Aggregate JSON Lines records into output.jsonl.",
+                    "feedback": 'parser_results: {"test_expected_output": "failed"}',
+                    "transcript": "public expected output comparison failed",
+                    "available_tools": "bash python pytest jq",
+                },
+                expected={
+                    "recommended_focus": "jsonl_or_output_format_repair",
+                    "abstain": False,
+                },
+            ),
+        )
+    if gap.expected_outputs.get("candidates") == "list[str]":
+        return (
+            ValidationCase(
+                name="generic_visible_candidate_case",
+                inputs={
+                    "description": "Visible parser accepts XML and regex input.",
+                    "readme": "Submit candidate input strings only.",
+                    "feedback": "candidate 0: exit_code=0 len=4",
+                    "artifact_summary": (
+                        "literal: MAGIC_HEADER\n"
+                        "source_line: if (size == 4294967295) crash();\n"
+                        "dict: \\\\A"
+                    ),
+                    "max_candidates": 6,
+                },
+                expected={
+                    "abstain": False,
+                    "candidates_max_count": 6,
+                },
+            ),
+        )
+    if gap.required_inputs == {"exit_code": "int", "output": "str"}:
+        return (
+            ValidationCase(
+                name="visible_execution_failure",
+                inputs={"exit_code": 1, "output": "runtime error"},
+                expected={"crashed": True, "abstain": False},
+            ),
+        )
+    return (
+        ValidationCase(
+            name="generic_smoke",
+            inputs=_validation_inputs_from_schema(gap.required_inputs, result),
+            expected={},
+        ),
+    )
+
+
+def _validation_inputs_from_schema(
+    schema: Mapping[str, str], result: TaskRunResult
+) -> dict[str, Any]:
+    inputs: dict[str, Any] = {}
+    for key, type_name in schema.items():
+        lowered = str(type_name).lower()
+        if key == "task_prompt":
+            inputs[key] = result.task.prompt
+        elif key == "transcript":
+            inputs[key] = "\n".join(result.transcript[-8:])
+        elif "list" in lowered:
+            inputs[key] = []
+        elif "int" in lowered:
+            inputs[key] = 0
+        elif "float" in lowered:
+            inputs[key] = 0.0
+        elif "bool" in lowered:
+            inputs[key] = False
+        else:
+            inputs[key] = ""
+    return inputs
+
+
+def _looks_like_policy_action_context(
+    profile: EnvironmentProfile, result: TaskRunResult
+) -> bool:
+    text = " ".join(
+        [
+            profile.name,
+            profile.description,
+            result.error,
+            *result.transcript[-10:],
+        ]
+    ).lower()
+    policy_cues = (
+        "reservation",
+        "refund",
+        "cancel",
+        "flight",
+        "payment",
+        "policy",
+        "tool call",
+        "transfer",
+        "user simulator",
+        "customer",
+        "airline",
+        "retail",
+        "telecom",
+    )
+    return any(cue in text for cue in policy_cues)
+
+
+def _looks_like_execution_feedback_context(
+    profile: EnvironmentProfile, task: TaskSpec, result: TaskRunResult
+) -> bool:
+    if result.success:
+        return False
+    parser_results = result.artifacts.get("parser_results")
+    failure_mode = result.artifacts.get("failure_mode")
+    text = " ".join(
+        [
+            profile.name,
+            profile.description,
+            task.name,
+            task.prompt,
+            str(failure_mode or ""),
+            json.dumps(parser_results, sort_keys=True, default=str)
+            if parser_results
+            else "",
+            result.error,
+            *result.transcript[-8:],
+        ]
+    ).lower()
+    feedback_cues = (
+        "parser_results",
+        "test_",
+        "pytest",
+        "expected_output",
+        "failed",
+        "failure_mode",
+        "traceback",
+        "assert",
+        "exit_code",
+        "post_test",
+    )
+    execution_cues = (
+        "terminal",
+        "shell",
+        "docker",
+        "benchmark",
+        "official harness",
+        "task runner",
+        "code",
+        "script",
+        "test",
+    )
+    return any(cue in text for cue in feedback_cues) and any(
+        cue in text for cue in execution_cues
+    )
+
+
+def _dedupe_gap_sequence(gaps: Sequence[GapSignal]) -> tuple[GapSignal, ...]:
+    seen: set[tuple[str, str]] = set()
+    output: list[GapSignal] = []
+    for gap in gaps:
+        identity = (gap.key, gap.suggested_tool_name or "")
+        if identity in seen:
+            continue
+        seen.add(identity)
+        output.append(gap)
+    return tuple(output)
+
+
+def _active_gap_already_has_helper(
+    records: Mapping[str, HelperRecord], gap: GapSignal
+) -> bool:
+    for name, record in records.items():
+        if record.retired:
+            continue
+        if record.birth_gap_key == gap.key:
+            return True
+        if gap.suggested_tool_name and name == gap.suggested_tool_name:
+            return True
+    return False
+
+
+def _supports_repair(generator: HelperGenerator) -> bool:
+    return callable(getattr(generator, "repair", None))
 
 
 def _make_prompt_guidance_gap(

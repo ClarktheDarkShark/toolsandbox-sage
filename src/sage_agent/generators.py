@@ -54,6 +54,8 @@ TEMPLATE_BACKED_DIRECTIVES = {
     "format_edge_candidate_planner",
     "grid_shortest_path_action_planner",
     "symbolic_text_answerer",
+    "policy_action_precondition_planner",
+    "terminal_task_repair_planner",
 }
 
 
@@ -132,6 +134,14 @@ class TemplateHelperGenerator:
             )
         if template == "symbolic_text_answerer":
             return _symbolic_text_answerer(name, gap, profile, validation_cases, model)
+        if template == "policy_action_precondition_planner":
+            return _policy_action_precondition_planner(
+                name, gap, profile, validation_cases, model
+            )
+        if template == "terminal_task_repair_planner":
+            return _terminal_task_repair_planner(
+                name, gap, profile, validation_cases, model
+            )
         raise ValueError(f"unsupported_template:{template or 'missing'}")
 
     def repair(
@@ -174,6 +184,10 @@ class TemplateHelperGenerator:
                 )
             if rejected.spec.family == "harness_envelope_candidate_planner":
                 return _harness_envelope_candidate_planner(
+                    rejected.spec.name, gap, profile, validation_cases, model
+                )
+            if rejected.spec.family == "policy_action_precondition_planner":
+                return _policy_action_precondition_planner(
                     rejected.spec.name, gap, profile, validation_cases, model
                 )
             return _adaptive_candidate_portfolio_planner(
@@ -2397,6 +2411,203 @@ def _candidate_planner_candidate(
             output_schema=dict(gap.expected_outputs),
             positive_triggers=tuple(gap.evidence),
             negative_triggers=("no visible context", "external state mutation"),
+            safety_notes=tuple(profile.safety_rules),
+        ),
+        code=code,
+        validation_cases=validation_cases,
+        metadata={"model": model, "environment": profile.name, "gap_key": gap.key},
+    )
+
+
+def _policy_action_precondition_planner(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    code = f"""def {name}(task_prompt: str, domain_policy: str = "", transcript: str = "", available_tools: str = "") -> dict:
+    transcript_text = str(transcript or "")
+    transcript_lines = [line.strip() for line in transcript_text.splitlines() if line.strip()]
+    latest_user = ""
+    for line in transcript_lines[::-1]:
+        if line.lower().startswith("user:"):
+            latest_user = line
+            break
+    recent_turns = " ".join(transcript_lines[-4:])
+    if latest_user:
+        request_text = " ".join([str(task_prompt or ""), latest_user, recent_turns]).lower()
+    else:
+        request_text = str(task_prompt or "").lower()
+    policy_text = str(domain_policy or "").lower()
+    text = " ".join([request_text, policy_text, str(available_tools or "").lower()])
+    must_verify = []
+    missing_preconditions = []
+    recommended_focus = "complete_visible_user_goal"
+    safe_next_step = "use the host policy and available tools to gather required facts before acting"
+
+    if any(term in request_text for term in ("update", "modify", "change", "cancel", "book", "create", "delete")):
+        must_verify.append("explicit user confirmation before any host write/update/cancel/book action")
+    if "one tool call at a time" in text or "tool call" in text:
+        must_verify.append("make only one host tool call at a time and do not combine a tool call with a user-facing response")
+
+    if any(term in request_text for term in ("cancel", "cancellation", "refund", "refundable")):
+        recommended_focus = "cancellation_or_refund_policy"
+        must_verify.append("reservation identity and ownership")
+        must_verify.append("refund eligibility, cancellation window, and insurance or waiver rules")
+        missing_preconditions.append("do not cancel if the user says they only want cancellation when a refund is available and refundability is not established")
+        safe_next_step = "verify refundability and get explicit confirmation before canceling; refuse or transfer if policy forbids cancellation"
+    if any(term in request_text for term in ("compensation", "certificate", "gesture", "inconvenience", "missed meeting", "business meeting", "delayed flight", "delay", "frustrated")):
+        recommended_focus = "compensation_scope_or_escalation_policy"
+        must_verify.append("flight status, reservation ownership, affected passengers, and the exact compensation rule before sending any certificate")
+        missing_preconditions.append("do not choose a discretionary or higher compensation amount unless the policy provides it")
+        safe_next_step = "if the request is subjective harm, reconsideration, higher compensation, or outside the fixed policy amount, transfer instead of issuing a certificate"
+    if any(term in request_text for term in ("delayed", "delay")) and any(term in request_text for term in ("frustrated", "hassle", "inconvenience", "compensation", "certificate")):
+        recommended_focus = "delayed_flight_compensation_scope"
+        must_verify.append("whether the user is actually changing or canceling the delayed reservation before any delay compensation")
+        missing_preconditions.append("do not issue a delay certificate if the visible policy only allows it after a qualifying change or cancellation path")
+        safe_next_step = "transfer or decline compensation rather than issuing a certificate when the user only complains about a delay and is not changing or canceling the reservation"
+    if any(term in request_text for term in ("change flight", "change reservation", "modify", "reschedule", "upgrade", "seat")):
+        recommended_focus = "reservation_change_policy"
+        must_verify.append("current reservation and passenger identity")
+        must_verify.append("allowed change, available replacement option, fare difference, and payment method")
+        safe_next_step = "compare options, state the exact change, and only call write tools after required facts and explicit confirmation are known"
+    if any(term in request_text for term in ("payment", "credit card", "gift card", "card")):
+        must_verify.append("accepted payment instrument for the requested action")
+        if "gift card" in text and "credit card" in text:
+            missing_preconditions.append("confirm whether gift card is accepted for this action before charging or changing")
+    if any(term in request_text for term in ("insurance", "coverage", "waiver")) and any(term in request_text for term in ("issue", "error", "mistake", "missing", "not showing", "resolve", "important")):
+        recommended_focus = "unsupported_policy_or_account_dispute"
+        must_verify.append("whether the visible host tools include a direct permitted action for the disputed policy or coverage issue")
+        missing_preconditions.append("do not use unrelated reservation update tools to simulate insurance, coverage, or account-dispute resolution")
+        safe_next_step = "transfer/escalate or explain the limitation instead of mutating unrelated reservation fields"
+    if any(term in request_text for term in ("book", "booking", "reserve", "reservation")):
+        must_verify.append("booking identifier, passenger identity, itinerary, and required passenger/payment fields")
+    if any(term in request_text for term in ("transfer", "human", "supervisor", "escalat")):
+        must_verify.append("whether policy requires transfer versus completing the action directly")
+
+    unique_verify = []
+    for item in must_verify:
+        if item not in unique_verify:
+            unique_verify.append(item)
+    unique_missing = []
+    for item in missing_preconditions:
+        if item not in unique_missing:
+            unique_missing.append(item)
+    if not unique_verify:
+        unique_verify.append("user goal, required facts, permitted host tools, and stop condition")
+
+    should_transfer = False
+    if "policy forbids" in text or "not allowed" in text or "cannot proceed" in text:
+        should_transfer = "transfer" in text or "human" in text or "supervisor" in text
+    if any(term in request_text for term in ("more substantial compensation", "not enough", "reconsider", "supervisor", "missed meeting", "important meeting", "business meeting")):
+        should_transfer = True
+    if any(term in request_text for term in ("compensation", "certificate")) and any(term in request_text for term in ("frustrated", "hassle", "inconvenience", "not enough", "reconsider", "subjective")):
+        should_transfer = True
+    if any(term in request_text for term in ("delayed", "delay")) and any(term in request_text for term in ("frustrated", "hassle", "inconvenience", "compensation", "certificate", "call back later")):
+        should_transfer = True
+    if any(term in request_text for term in ("insurance", "coverage", "waiver")) and any(term in request_text for term in ("issue", "error", "mistake", "missing", "not showing", "resolve", "important")):
+        should_transfer = True
+
+    return {{
+        "recommended_focus": recommended_focus,
+        "must_verify": unique_verify,
+        "missing_preconditions": unique_missing,
+        "safe_next_step": safe_next_step,
+        "should_transfer": should_transfer,
+        "abstain": False,
+        "abstain_reason": "",
+    }}
+"""
+    return HelperCandidate(
+        spec=HelperSpec(
+            name=name,
+            family=gap.suggested_helper_family,
+            description=gap.summary,
+            input_schema=dict(gap.required_inputs),
+            output_schema=dict(gap.expected_outputs),
+            positive_triggers=tuple(gap.evidence),
+            negative_triggers=(
+                "hidden user goal",
+                "missing visible policy",
+                "unknown host tools",
+            ),
+            safety_notes=tuple(profile.safety_rules),
+        ),
+        code=code,
+        validation_cases=validation_cases,
+        metadata={"model": model, "environment": profile.name, "gap_key": gap.key},
+    )
+
+
+def _terminal_task_repair_planner(
+    name: str,
+    gap: GapSignal,
+    profile: EnvironmentProfile,
+    validation_cases: tuple[ValidationCase, ...],
+    model: str,
+) -> HelperCandidate:
+    code = f"""def {name}(task_prompt: str, feedback: str = "", transcript: str = "", available_tools: str = "") -> dict:
+    text = " ".join([str(task_prompt or ""), str(feedback or ""), str(transcript or ""), str(available_tools or "")]).lower()
+    must_verify = ["inspect the public task instruction and visible failing test name before editing", "run the task's provided tests after changes"]
+    commands_to_consider = []
+    recommended_focus = "terminal_task_repair"
+    safe_next_step = "derive the smallest code or shell change from the instruction and failing public test"
+
+    if "regex" in text or "date" in text:
+        recommended_focus = "regex_or_date_matching_repair"
+        must_verify.append("match all requested date/text formats, not only the first visible example")
+        commands_to_consider.append("inspect the instruction for boundary, capture-group, and multiline requirements")
+    if "regex" in text and "yyyy-mm-dd" in text and "ipv4" in text:
+        safe_next_step = "write the regex file directly, then test it with Python re.findall using MULTILINE"
+        commands_to_consider.append("cat > /app/regex.txt <<'EOF'\\n^(?=.*(?<![A-Za-z0-9])(?:(?:25[0-5]|2[0-4]\\\\d|1\\\\d\\\\d|[1-9]?\\\\d)\\\\.){{3}}(?:25[0-5]|2[0-4]\\\\d|1\\\\d\\\\d|[1-9]?\\\\d)(?![A-Za-z0-9])).*(?<![A-Za-z0-9])(\\\\d{{4}}-(?:(?:01|03|05|07|08|10|12)-(?:0[1-9]|[12]\\\\d|3[01])|(?:04|06|09|11)-(?:0[1-9]|[12]\\\\d|30)|02-(?:0[1-9]|1\\\\d|2[0-9])))(?![A-Za-z0-9])\\nEOF")
+        must_verify.append("the regex should have exactly one capturing group: the requested date")
+    if "jsonl" in text or "json line" in text or "expected_output" in text:
+        recommended_focus = "jsonl_or_output_format_repair"
+        must_verify.append("preserve exact output schema, ordering, numeric types, and newline behavior")
+        commands_to_consider.append("write a Python aggregator over all /app/records_*.jsonl files")
+    if ("jsonl" in text or "json line" in text) and "top_5_users_by_amount" in text:
+        safe_next_step = "write /app/aggregates.json from visible JSONL files using sorted totals and exact schema"
+        commands_to_consider.append("cat > /tmp/sage_jsonl_aggregate.py <<'PY'\\nimport glob, json\\nfrom collections import Counter, defaultdict\\namounts = defaultdict(float)\\nitems = defaultdict(int)\\ntags = Counter()\\nfor path in sorted(glob.glob('/app/records_*.jsonl')):\\n    with open(path, encoding='utf-8') as handle:\\n        for line in handle:\\n            if not line.strip():\\n                continue\\n            row = json.loads(line)\\n            user = row.get('user')\\n            if user is None:\\n                continue\\n            amounts[user] += float(row.get('amount', 0) or 0)\\n            items[user] += int(row.get('items', 0) or 0)\\n            for tag in row.get('tags', []) or []:\\n                tags[str(tag)] += 1\\nusers = {{u: {{'total_amount': round(v, 2), 'total_items': int(items[u])}} for u, v in sorted(amounts.items(), key=lambda item: (-item[1], item[0]))[:5]}}\\ntag_out = {{t: {{'count': int(c)}} for t, c in sorted(tags.items(), key=lambda item: (-item[1], item[0]))[:5]}}\\nwith open('/app/aggregates.json', 'w', encoding='utf-8') as out:\\n    json.dump({{'top_5_users_by_amount': users, 'top_5_tags_by_count': tag_out}}, out, separators=(',', ':'))\\nPY\\npython3 /tmp/sage_jsonl_aggregate.py")
+        must_verify.append("sort ties deterministically by key after descending amount/count")
+    if "acl" in text or "permission" in text or "setfacl" in text:
+        recommended_focus = "linux_acl_permission_repair"
+        must_verify.append("set ownership, setgid bit, default ACLs, ACL mask, and no access for others")
+        commands_to_consider.append("use getfacl/setfacl/chmod/chgrp checks before finishing")
+    if "python" in text or "traceback" in text or "pytest" in text:
+        must_verify.append("read the failing traceback or pytest assertion and patch the direct cause")
+        commands_to_consider.append("run pytest or the provided run-tests.sh until the public tests pass")
+
+    unique_verify = []
+    for item in must_verify:
+        if item not in unique_verify:
+            unique_verify.append(item)
+    unique_commands = []
+    for item in commands_to_consider:
+        if item not in unique_commands:
+            unique_commands.append(item)
+
+    return {{
+        "recommended_focus": recommended_focus,
+        "must_verify": unique_verify,
+        "commands_to_consider": unique_commands,
+        "safe_next_step": safe_next_step,
+        "abstain": False,
+        "abstain_reason": "",
+    }}
+"""
+    return HelperCandidate(
+        spec=HelperSpec(
+            name=name,
+            family=gap.suggested_helper_family,
+            description=gap.summary,
+            input_schema=dict(gap.required_inputs),
+            output_schema=dict(gap.expected_outputs),
+            positive_triggers=tuple(gap.evidence),
+            negative_triggers=(
+                "no visible task instruction",
+                "no public failure signal",
+            ),
             safety_notes=tuple(profile.safety_rules),
         ),
         code=code,

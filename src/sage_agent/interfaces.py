@@ -118,6 +118,17 @@ class SAGEImportUpdate:
 
 
 @dataclass(frozen=True)
+class SAGEActionReview:
+    """Import-mode review of a host actor's proposed action/tool call."""
+
+    allowed: bool
+    reason: str = ""
+    guidance: str = ""
+    visible_helpers: tuple[str, ...] = ()
+    helper_outputs: tuple[Mapping[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
 class GapSignal:
     """A reusable capability gap observed by an environment adapter."""
 

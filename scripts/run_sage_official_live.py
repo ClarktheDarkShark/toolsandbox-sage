@@ -12,10 +12,12 @@ It uses each benchmark's own scorer when a scorer is available locally:
   artifact preflight. Full scoring requires the non-redistributable benchmark
   artifacts under ``external/ScienceAgentBench/benchmark``.
 
-The SAGE arm is a lightweight live adaptation layer: failed official outcomes
-produce bounded prompt helpers with gpt-4o-mini, and later tasks run with those
-helpers injected into the benchmark agent. The dashboard is generated from the
-official scorer outputs, not from repository metadata probes.
+The SAGE arm uses the import-agent boundary for host-owned harnesses: retained
+helpers are selected before each task, refreshed inside compatible task loops,
+new helpers go through the full generate/validate/repair/retain lifecycle after
+failed outcomes, and optional same-task retry is exposed when the harness allows
+it. The dashboard is generated from official scorer outputs, not repository
+metadata probes.
 """
 
 from __future__ import annotations
@@ -50,6 +52,8 @@ from sage_agent.dashboard import (  # noqa: E402
     open_standalone_dashboard,
     write_standalone_dashboard,
 )
+
+_TAU_SAGE_RUNTIME_CONTEXTS: dict[str, tuple[SAGEImportAgent, ImportTaskContext]] = {}
 
 
 def main() -> None:
@@ -185,6 +189,10 @@ def _reexec_if_missing(module_name: str, python_path: Path) -> None:
         )
     env = dict(os.environ)
     env["SAGE_OFFICIAL_LIVE_REEXEC"] = "1"
+    # LiteLLM otherwise attempts a remote model-cost-map fetch at import time,
+    # which can block before the official task loop starts. This affects only
+    # cost metadata; model calls and benchmark scoring are unchanged.
+    env.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
     env["PYTHONPATH"] = (
         f"{SRC}{os.pathsep}{env['PYTHONPATH']}" if env.get("PYTHONPATH") else str(SRC)
     )
@@ -215,15 +223,26 @@ def _open_startup_dashboard(args: argparse.Namespace) -> None:
 
 def _run_tau2(args: argparse.Namespace) -> None:
     from tau2.agent.llm_agent import LLMAgent
+    from tau2.data_model.message import MultiToolMessage, SystemMessage, UserMessage
     from tau2.registry import registry
     from tau2.runner import get_tasks, run_single_task
+    from tau2.utils.llm_utils import generate
 
     _quiet_loguru()
 
     class SAGEGuidedTauAgent(LLMAgent):
-        def __init__(self, *agent_args, sage_guidance: str = "", **kwargs) -> None:
+        def __init__(
+            self,
+            *agent_args,
+            sage_guidance: str = "",
+            sage_import_agent: SAGEImportAgent | None = None,
+            sage_task_context: ImportTaskContext | None = None,
+            **kwargs,
+        ) -> None:
             super().__init__(*agent_args, **kwargs)
             self._sage_guidance = sage_guidance.strip()
+            self._sage_import_agent = sage_import_agent
+            self._sage_task_context = sage_task_context
 
         @property
         def system_prompt(self) -> str:
@@ -239,15 +258,123 @@ def _run_tau2(args: argparse.Namespace) -> None:
                 "outcomes. Follow the domain policy and available tools exactly."
             )
 
+        def _generate_next_message(self, message, state):
+            if isinstance(message, UserMessage) and message.is_audio:
+                raise ValueError("User message cannot be audio.")
+            if isinstance(message, MultiToolMessage):
+                state.messages.extend(message.tool_messages)
+            else:
+                state.messages.append(message)
+            transcript = [
+                line for line in map(self._message_line, state.messages) if line
+            ]
+            system_prompt = self._dynamic_system_prompt(transcript)
+            assistant_message = generate(
+                model=self.llm,
+                tools=self.tools,
+                messages=[SystemMessage(role="system", content=system_prompt)]
+                + state.messages,
+                call_name="agent_response",
+                **self.llm_args,
+            )
+            review = self._review_proposed_actions(transcript, assistant_message)
+            if review is not None and not review.allowed:
+                guarded_prompt = (
+                    f"{system_prompt}\n\n"
+                    "<sage_action_review>\n"
+                    f"{review.guidance}\n"
+                    "Generate a corrected response now. Do not repeat the "
+                    "blocked side-effecting action unless visible policy and "
+                    "the SAGE review both allow it.\n"
+                    "</sage_action_review>"
+                )
+                assistant_message = generate(
+                    model=self.llm,
+                    tools=self.tools,
+                    messages=[SystemMessage(role="system", content=guarded_prompt)]
+                    + state.messages,
+                    call_name="agent_response",
+                    **self.llm_args,
+                )
+            return assistant_message
+
+        def _dynamic_system_prompt(self, transcript: list[str]) -> str:
+            base = super().system_prompt
+            guidance = self._sage_guidance
+            if (
+                self._sage_import_agent is not None
+                and self._sage_task_context is not None
+            ):
+                refreshed = self._sage_import_agent.before_step(
+                    self._sage_task_context,
+                    transcript,
+                )
+                if refreshed.system_prompt:
+                    guidance = refreshed.system_prompt
+            if not guidance.strip():
+                return base
+            return (
+                f"{base}\n\n"
+                "<sage_generated_helpers>\n"
+                f"{guidance.strip()}\n"
+                "</sage_generated_helpers>\n"
+                "Use SAGE helpers as reusable, validated decision support for "
+                "the current visible conversation. Treat the current structured "
+                "helper output as a required checklist before any write, cancel, "
+                "payment, compensation, or other side-effecting tool call. If a "
+                "helper recommends transfer, escalation, abstention, or missing "
+                "precondition handling, follow that safe next step unless the "
+                "visible domain policy explicitly permits direct completion. If "
+                "helpers conflict with the domain policy or observed tool "
+                "results, the domain policy and tool results win."
+            )
+
+        @staticmethod
+        def _message_line(message: Any) -> str:
+            role = str(getattr(message, "role", type(message).__name__))
+            content = getattr(message, "content", None)
+            if not content and getattr(message, "tool_calls", None):
+                content = json.dumps(
+                    [call.model_dump(mode="json") for call in message.tool_calls],
+                    ensure_ascii=True,
+                )
+            return f"{role}: {str(content)[:1200]}" if content else ""
+
+        def _review_proposed_actions(self, transcript: list[str], assistant_message):
+            if self._sage_import_agent is None or self._sage_task_context is None:
+                return None
+            actions = []
+            for call in getattr(assistant_message, "tool_calls", None) or []:
+                if hasattr(call, "model_dump"):
+                    actions.append(call.model_dump(mode="json"))
+                elif isinstance(call, dict):
+                    actions.append(call)
+            if not actions:
+                return None
+            return self._sage_import_agent.review_action(
+                self._sage_task_context,
+                transcript,
+                actions,
+            )
+
     def create_sage_guided_tau_agent(tools, domain_policy, **kwargs):
         llm_args = dict(kwargs.get("llm_args") or {})
         guidance = str(llm_args.pop("sage_guidance", ""))
+        runtime_key = str(llm_args.pop("sage_runtime_key", ""))
+        sage_import_agent = None
+        sage_task_context = None
+        if runtime_key:
+            runtime_context = _TAU_SAGE_RUNTIME_CONTEXTS.get(runtime_key)
+            if runtime_context is not None:
+                sage_import_agent, sage_task_context = runtime_context
         return SAGEGuidedTauAgent(
             tools=tools,
             domain_policy=domain_policy,
             llm=kwargs.get("llm"),
             llm_args=llm_args,
             sage_guidance=guidance,
+            sage_import_agent=sage_import_agent,
+            sage_task_context=sage_task_context,
         )
 
     try:
@@ -277,6 +404,8 @@ def _run_tau2(args: argparse.Namespace) -> None:
         task_ids=list(args.tau2_task_id) if args.tau2_task_id else None,
         num_tasks=None if args.tau2_task_id else args.samples,
     )[: args.samples]
+    domain_policy_text = _tau_domain_policy_text(args, domain)
+    available_tools_text = _tau_available_tools_text(domain)
     selected = [_tau_task_id(args, domain, task.id) for task in tasks]
     _write_manifest(
         run_dir,
@@ -318,6 +447,10 @@ def _run_tau2(args: argparse.Namespace) -> None:
                 task_id=_tau_task_id(args, domain, task.id),
                 name=f"{args.dataset} {domain} {task.id}",
                 prompt=f"Official {args.dataset} {domain} task {task.id}",
+                artifacts={
+                    "domain_policy": domain_policy_text,
+                    "available_tools": available_tools_text,
+                },
                 metadata={
                     "domain": domain,
                     "source_task_id": task.id,
@@ -384,7 +517,9 @@ def _run_tau2(args: argparse.Namespace) -> None:
                 task_spec=task_spec,
                 agent="sage_guided_tau_agent",
                 sage_guidance=guidance.system_prompt,
-                seed=args.seed + 10_000 + index,
+                sage_import_agent=sage_import,
+                sage_task_context=task_context,
+                seed=baseline_seed,
                 save_dir=run_dir / "tau2_artifacts" / "sage",
                 policy=f"official_{harness}_sage_guided_agent:{args.model}",
                 visible_helpers=guidance.visible_helpers,
@@ -401,7 +536,9 @@ def _run_tau2(args: argparse.Namespace) -> None:
                     task_spec=task_spec,
                     agent="sage_guided_tau_agent",
                     sage_guidance=update.retry_guidance.system_prompt,
-                    seed=args.seed + 20_000 + index,
+                    sage_import_agent=sage_import,
+                    sage_task_context=task_context,
+                    seed=baseline_seed,
                     save_dir=run_dir / "tau2_artifacts" / "sage_retry",
                     policy=f"official_{harness}_sage_guided_agent_retry:{args.model}",
                     visible_helpers=update.retry_guidance.visible_helpers,
@@ -512,6 +649,9 @@ def _tau2_config(args: argparse.Namespace, *, agent: str, sage_guidance: str) ->
     llm_args_agent: dict[str, Any] = {"temperature": 0}
     if sage_guidance:
         llm_args_agent["sage_guidance"] = sage_guidance
+    sage_runtime_key = getattr(args, "_sage_runtime_key", "")
+    if sage_runtime_key:
+        llm_args_agent["sage_runtime_key"] = sage_runtime_key
     return TextRunConfig(
         domain=domain,
         agent=agent,
@@ -542,7 +682,23 @@ def _run_one_tau2_task(
     save_dir: Path,
     policy: str,
     visible_helpers: tuple[str, ...] = (),
+    sage_import_agent: SAGEImportAgent | None = None,
+    sage_task_context: ImportTaskContext | None = None,
 ) -> dict[str, Any]:
+    previous_sage_runtime_key = getattr(args, "_sage_runtime_key", "")
+    runtime_key = ""
+    if sage_import_agent is not None and sage_task_context is not None:
+        runtime_key = (
+            f"{id(sage_import_agent)}:{sage_task_context.task_id}:{seed}:{policy}"
+        )
+        _TAU_SAGE_RUNTIME_CONTEXTS[runtime_key] = (
+            sage_import_agent,
+            sage_task_context,
+        )
+        setattr(args, "_sage_runtime_key", runtime_key)
+    else:
+        if hasattr(args, "_sage_runtime_key"):
+            delattr(args, "_sage_runtime_key")
     try:
         simulation = run_single_task(
             _tau2_config(args, agent=agent, sage_guidance=sage_guidance),
@@ -552,6 +708,7 @@ def _run_one_tau2_task(
             verbose_logs=False,
         )
     except Exception as exc:
+        _restore_tau_runtime_context(args, previous_sage_runtime_key, runtime_key)
         return {
             **task_spec,
             "policy": policy,
@@ -563,12 +720,27 @@ def _run_one_tau2_task(
             "artifacts": {"exception_type": type(exc).__name__},
             "error": f"tau2_runner_error:{type(exc).__name__}",
         }
+    _restore_tau_runtime_context(args, previous_sage_runtime_key, runtime_key)
     return _tau2_result_json(
         task_spec=task_spec,
         simulation=simulation,
         policy=policy,
         visible_helpers=visible_helpers,
     )
+
+
+def _restore_tau_runtime_context(
+    args: argparse.Namespace,
+    previous_runtime_key: str,
+    runtime_key: str,
+) -> None:
+    if runtime_key:
+        _TAU_SAGE_RUNTIME_CONTEXTS.pop(runtime_key, None)
+    if previous_runtime_key:
+        setattr(args, "_sage_runtime_key", previous_runtime_key)
+    else:
+        if hasattr(args, "_sage_runtime_key"):
+            delattr(args, "_sage_runtime_key")
 
 
 def _run_terminal_bench(args: argparse.Namespace) -> None:
@@ -632,10 +804,13 @@ def _run_terminal_bench(args: argparse.Namespace) -> None:
             baseline_run_id = f"baseline_{_slug(task_id)}"
             sage_run_id = f"sage_{_slug(task_id)}"
             baseline_policy = f"official_terminal_bench_terminus:{args.model}"
+            terminal_instruction = _terminal_task_instruction(dataset_path, task_id)
             baseline_task_spec = _task_spec(
                 task_id=f"terminal-bench:{task_id}",
                 name=f"Terminal-Bench {task_id}",
-                prompt=f"Official Terminal-Bench task {task_id}",
+                prompt=terminal_instruction
+                or f"Official Terminal-Bench task {task_id}",
+                artifacts={"readme": terminal_instruction},
                 metadata={"source_task_id": task_id},
             )
             baseline_cache_key = _baseline_cache_key(
@@ -701,7 +876,9 @@ def _run_terminal_bench(args: argparse.Namespace) -> None:
                 _task_spec(
                     task_id=f"terminal-bench:{task_id}",
                     name=f"Terminal-Bench {task_id}",
-                    prompt=f"Official Terminal-Bench task {task_id}",
+                    prompt=terminal_instruction
+                    or f"Official Terminal-Bench task {task_id}",
+                    artifacts={"readme": terminal_instruction},
                     metadata={"source_task_id": task_id},
                 )
             )
@@ -998,6 +1175,26 @@ def _stop_terminal_containers(run_id: str) -> None:
             )
 
 
+def _terminal_task_instruction(dataset_path: Path, task_id: str) -> str:
+    path = dataset_path / task_id / "task.yaml"
+    if not path.exists():
+        return ""
+    try:
+        import yaml
+
+        payload = yaml.safe_load(path.read_text(encoding="utf-8", errors="replace"))
+        if isinstance(payload, dict):
+            value = payload.get("instruction", "")
+            return str(value)[:20000]
+    except Exception:
+        pass
+    text = path.read_text(encoding="utf-8", errors="replace")
+    marker = "instruction:"
+    if marker not in text:
+        return ""
+    return text.split(marker, 1)[1].split("\nauthor_", 1)[0].strip()[:20000]
+
+
 def _active_helpers(
     helper_guidance: list[str], args: argparse.Namespace
 ) -> tuple[list[str], tuple[str, ...]]:
@@ -1024,8 +1221,10 @@ def _official_profile(
         action_tools=("host_agent_loop",),
         observation_fields=("official_result", "transcript", "error"),
         helper_families=(
+            "deterministic_callable",
             "prompt_guidance_helper",
             "action_planning_helper",
+            "policy_action_precondition_planner",
             "scorer_feedback_repair_helper",
         ),
         safety_rules=(
@@ -1052,6 +1251,8 @@ def _import_agent(
             registry_dir=run_dir / "sage_import_registry",
             active_helpers=args.active_helpers,
             max_new_helpers=args.max_helpers,
+            max_new_helpers_per_task=2,
+            repair_attempts=1,
             retry_policy=args.retry_policy,
         ),
     )
@@ -1626,13 +1827,18 @@ def _terminal_transcript(task_run_path: Path) -> list[str]:
 
 
 def _task_spec(
-    *, task_id: str, name: str, prompt: str, metadata: dict[str, Any]
+    *,
+    task_id: str,
+    name: str,
+    prompt: str,
+    metadata: dict[str, Any],
+    artifacts: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     return {
         "task_id": task_id,
         "name": name,
         "prompt": prompt,
-        "artifacts": {},
+        "artifacts": artifacts or {},
         "metadata": metadata,
     }
 
@@ -1758,6 +1964,35 @@ def _tau_harness(args: argparse.Namespace) -> str:
     if args.dataset == "tau3-bench":
         return "tau3-current-release"
     return "tau2"
+
+
+def _tau_domain_policy_text(args: argparse.Namespace, domain: str) -> str:
+    domain_dir = args.tau2_repo / "data" / "tau2" / "domains" / domain
+    for filename in (
+        "policy.md",
+        "main_policy.md",
+        "tech_support_workflow.md",
+        "tech_support_manual.md",
+    ):
+        path = domain_dir / filename
+        if path.exists():
+            return path.read_text(encoding="utf-8", errors="replace")[:20000]
+    return ""
+
+
+def _tau_available_tools_text(domain: str) -> str:
+    try:
+        module = __import__(f"tau2.domains.{domain}.tools", fromlist=[""])
+    except Exception:
+        return ""
+    names = []
+    for name in dir(module):
+        if name.startswith("_"):
+            continue
+        value = getattr(module, name)
+        if callable(value):
+            names.append(name)
+    return ", ".join(sorted(names))
 
 
 def _tau_task_id(args: argparse.Namespace, domain: str, task_id: str) -> str:

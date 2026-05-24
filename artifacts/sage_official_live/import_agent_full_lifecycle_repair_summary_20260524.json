@@ -1,0 +1,96 @@
+{
+  "date": "2026-05-24",
+  "branch": "codex/sage-standalone-agent",
+  "decision": "FULL_IMPORT_AGENT_LIFECYCLE_REPAIRS_TAU3_AND_TERMINAL_BENCH_SHOWS_IMPORT_MODE_VALUE",
+  "code_paths": [
+    "src/sage_agent/import_agent.py",
+    "src/sage_agent/interfaces.py",
+    "src/sage_agent/generators.py",
+    "scripts/run_sage_official_live.py"
+  ],
+  "capabilities_added": [
+    "before_step transcript-conditioned helper refresh for host-owned loops",
+    "review_action pre-execution action review for compatible host tool calls",
+    "full import-mode helper generation, validation, repair, retention, reuse, and lifecycle accounting",
+    "optional same-task retry after helper birth or failed visible-helper context refresh",
+    "local LiteLLM cost-map mode for official live runs to avoid import-time metadata fetch stalls"
+  ],
+  "validation_runs": [
+    {
+      "dataset": "tau3-bench",
+      "run": "outputs/sage_official_live/import_agent_tau3_airline_full_import_action_review_official40_sys_20260524",
+      "samples": 40,
+      "baseline_successes": 16,
+      "sage_successes": 18,
+      "gains": 4,
+      "regressions": 2,
+      "baseline_cache": {
+        "policy": "use-if-eligible",
+        "cached": 40,
+        "fresh": 0
+      },
+      "sage_cache": "fresh",
+      "integrity_issues": 0,
+      "status": "positive_repaired_import_lifecycle"
+    },
+    {
+      "dataset": "tau3-bench",
+      "run": "outputs/sage_official_live/import_agent_tau3_airline_official40_20260524",
+      "samples": 40,
+      "baseline_successes": 16,
+      "sage_successes": 12,
+      "gains": 1,
+      "regressions": 5,
+      "status": "negative_static_prompt_helper_ablation"
+    },
+    {
+      "dataset": "terminal-bench",
+      "run": "outputs/sage_official_live/import_agent_terminal_bench_concrete_repair_2_20260524",
+      "samples": 2,
+      "baseline_successes": 0,
+      "sage_successes": 2,
+      "gains": 2,
+      "regressions": 0,
+      "integrity_issues": 0,
+      "status": "positive_official_subset"
+    },
+    {
+      "dataset": "minigrid",
+      "run": "outputs/sage_agent_standalone/minigrid_import_agent_maintenance40_wide_20260524",
+      "samples": 40,
+      "baseline_successes": 18,
+      "sage_successes": 40,
+      "baseline_cache": {
+        "policy": "use-if-eligible",
+        "cached": 40,
+        "fresh": 0
+      },
+      "integrity_issues": 0,
+      "status": "maintenance_success"
+    },
+    {
+      "dataset": "bbh",
+      "run": "outputs/sage_agent_standalone/bbh_import_agent_maintenance40_20260524",
+      "samples": 40,
+      "baseline_successes": 16,
+      "sage_successes": 40,
+      "baseline_cache": {
+        "policy": "use-if-eligible",
+        "cached": 40,
+        "fresh": 0
+      },
+      "integrity_issues": 0,
+      "status": "maintenance_success"
+    }
+  ],
+  "blocked_or_limited": [
+    {
+      "dataset": "scienceagentbench",
+      "reason": "official scoring requires local benchmark_verified.zip artifacts not available in this checkout"
+    },
+    {
+      "dataset": "terminal-bench",
+      "reason": "full40 remains runtime-budget limited; subset uses official parser/Docker path and demonstrates value"
+    }
+  ]
+}
