@@ -44,6 +44,12 @@ optional same-task retry.
 - LiteLLM's import-time remote cost-map fetch is disabled for official live
   harnesses with `LITELLM_LOCAL_MODEL_COST_MAP=True`. This changes only cost
   metadata loading, not model calls, task scoring, or SAGE routing.
+- Local execution note: the repository-local tau virtualenv had broken/slow
+  OpenAI/LiteLLM imports during this pass. The successful tau3 repaired run used
+  the official `external/tau2-bench` source checkout via `PYTHONPATH` with the
+  system Python environment. The tau runner, simulator, scorer, task set, model,
+  seeds, cache policy, and SAGE code path remained the same; only the Python
+  package environment changed to avoid a local virtualenv import failure.
 - ScienceAgentBench is no longer a vague missing-harness blocker. The runner
   proves that verified task inputs load and reports the exact missing official
   scoring artifact directories.
