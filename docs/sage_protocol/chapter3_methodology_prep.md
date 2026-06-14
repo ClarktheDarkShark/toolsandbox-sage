@@ -4,7 +4,8 @@ Decision label: `chapter 3 methodology package ready`
 
 ## Framing
 
-SAGE is the research system. The coding agent is a development assistant used to implement, audit, and operate the experimental pipeline. Dissertation language should attribute the method, tool lifecycle, routing policy, validation gates, and statistical comparisons to SAGE and the protocol, not to the external coding assistant.
+Dissertation language should attribute the method, tool lifecycle, routing
+policy, validation gates, and statistical comparisons to SAGE and the protocol.
 
 Outcome/task-completion is the primary endpoint. Canonical/reference similarity is secondary and must be reported honestly, especially where deterministic helpers substitute intermediate routes.
 

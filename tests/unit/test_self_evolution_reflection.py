@@ -204,6 +204,118 @@ def test_reflection_routes_repairs_harmful_calls_without_global_retirement(
     assert decision["harmful_called_count"] == 1
 
 
+def test_reflection_keeps_positive_tool_with_side_effect_audit(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario()
+    cache = ControlBaselineCache(tmp_path / "cache")
+    _add_cached_baseline(
+        cache,
+        tmp_path,
+        name="add_reminder_content_and_week_delta_and_time",
+        scenario=scenario,
+        score=0.0,
+        outcome=0.0,
+    )
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=cache,
+        pulse_interval=1,
+        min_pulse_tasks=1,
+        stop_if_off_track=False,
+    )
+
+    controller.assess_scenario(
+        scenario_name="add_reminder_content_and_week_delta_and_time",
+        baseline_scenario=scenario,
+        result={"similarity": 1.0, "outcome_similarity": 1.0},
+        selection_record={
+            "generated_tools_visible": ["prepare_reminder_creation_args"],
+            "generated_tools_called": ["prepare_reminder_creation_args"],
+            "generated_tools_attempted": ["prepare_reminder_creation_args"],
+            "generated_tools_failed": [],
+        },
+        side_effect_failures=["prepare_reminder_creation_args"],
+    )
+
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )
+    decision = lifecycle["tool_lifecycle"]["prepare_reminder_creation_args"]
+    assert decision["decision"] == "retain_with_safety_audit"
+    assert decision["side_effect_incident_count"] == 1
+
+    actions = [
+        json.loads(line)
+        for line in (tmp_path / "run" / "self_evolution_tool_lifecycle.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert actions == [
+        {
+            "tool_name": "prepare_reminder_creation_args",
+            "decision": "needs_safety_audit",
+            "reason": "side_effect_preservation_audit",
+            "scenario": "add_reminder_content_and_week_delta_and_time",
+        }
+    ]
+
+
+def test_reflection_keeps_neutral_tool_with_side_effect_audit(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario()
+    cache = ControlBaselineCache(tmp_path / "cache")
+    _add_cached_baseline(
+        cache,
+        tmp_path,
+        name="add_reminder_content_and_date_and_time",
+        scenario=scenario,
+        score=1.0,
+        outcome=1.0,
+    )
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=cache,
+        pulse_interval=1,
+        min_pulse_tasks=1,
+        stop_if_off_track=False,
+    )
+
+    controller.assess_scenario(
+        scenario_name="add_reminder_content_and_date_and_time",
+        baseline_scenario=scenario,
+        result={"similarity": 1.0, "outcome_similarity": 1.0},
+        selection_record={
+            "generated_tools_visible": ["prepare_reminder_creation_args"],
+            "generated_tools_called": ["prepare_reminder_creation_args"],
+            "generated_tools_attempted": ["prepare_reminder_creation_args"],
+            "generated_tools_failed": [],
+        },
+        side_effect_failures=["prepare_reminder_creation_args"],
+    )
+
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )
+    decision = lifecycle["tool_lifecycle"]["prepare_reminder_creation_args"]
+    assert decision["decision"] == "retain_with_safety_audit"
+    assert (
+        decision["decision_reason"] == "positive_called_subset_with_side_effect_audit"
+    )
+    assert decision["side_effect_incident_count"] == 1
+
+
 def test_reflection_hydrates_feedback_on_resume(tmp_path: Path) -> None:
     scenario = _scenario()
     cache = ControlBaselineCache(tmp_path / "cache")

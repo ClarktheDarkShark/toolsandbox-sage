@@ -21,6 +21,7 @@ from tool_sandbox.common.tool_discovery import ToolBackend
 
 CACHE_SCHEMA_VERSION = 1
 MIN_COMPATIBLE_RUNS = 3
+MIN_COMPATIBLE_RUNS_ENV = "SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS"
 CACHE_ROOT = Path("artifacts/baselines/control_task_baselines")
 DEFAULT_TOOL_BACKEND = ToolBackend("DEFAULT")
 CACHE_MATCH_POLICY = "task_name_agent_user_base_tool_policy_min3"
@@ -86,10 +87,21 @@ def _experimental_task_only_cache_enabled() -> bool:
     }
 
 
+def min_compatible_runs() -> int:
+    raw = os.environ.get(MIN_COMPATIBLE_RUNS_ENV)
+    if raw is None or not raw.strip():
+        return MIN_COMPATIBLE_RUNS
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return MIN_COMPATIBLE_RUNS
+
+
 def active_cache_match_policy() -> str:
+    minimum = min_compatible_runs()
     if _experimental_task_only_cache_enabled():
-        return EXPERIMENTAL_TASK_ONLY_CACHE_POLICY
-    return CACHE_MATCH_POLICY
+        return EXPERIMENTAL_TASK_ONLY_CACHE_POLICY.replace("min3", f"min{minimum}")
+    return CACHE_MATCH_POLICY.replace("min3", f"min{minimum}")
 
 
 def active_task_level_cache_fields() -> tuple[str, ...]:
@@ -120,7 +132,7 @@ def _timestamp_anchor(value: Any) -> float | None:
             key is not None
             and key.endswith("timestamp")
             and key != "sandbox_message_index"
-            and isinstance(item, int | float)
+            and isinstance(item, (int, float))
             and item
         ):
             timestamps.append(float(item))
@@ -160,7 +172,7 @@ def _canonicalize_for_checksum(
         and key is not None
         and key.endswith("timestamp")
         and key != "sandbox_message_index"
-        and isinstance(value, int | float)
+        and isinstance(value, (int, float))
         and value
     ):
         return round(float(value) - timestamp_anchor, 3)
@@ -279,6 +291,22 @@ def compatibility_context(
     base_tool_policy: str,
     manifest_path: Path,
 ) -> dict[str, Any]:
+    if _experimental_task_only_cache_enabled():
+        return {
+            "scenario_key": scenario_key,
+            "scenario_checksum": "task_only_cache_bypassed",
+            "initial_state_checksum": "task_only_cache_bypassed",
+            "agent_model": agent,
+            "user_model": user,
+            "model_version": "task_only_cache_model_user_bypassed",
+            "model_parameters_hash": "task_only_cache_bypassed",
+            "prompt_hashes": {},
+            "runner_version": "task_only_cache_bypassed",
+            "scorer_version": "task_only_cache_bypassed",
+            "toolsandbox_version": "task_only_cache_bypassed",
+            "manifest_checksum": sha256_file(manifest_path),
+            "base_tool_policy": base_tool_policy,
+        }
     scenario = apply_base_tool_policy(scenario, base_tool_policy)
     models = paired_model_metadata(
         agent_model=agent,
@@ -360,6 +388,16 @@ class ControlBaselineCache:
         self.records_dir = root / "records"
         self.manifest_path = root / "cache_manifest.json"
         self.index_path = root / "index.jsonl"
+        self.compact_records_path = root / "compact_records.jsonl"
+        self._index_rows_cache: list[dict[str, Any]] | None = None
+        self._index_rows_by_scenario_cache: dict[str, list[dict[str, Any]]] | None = (
+            None
+        )
+        self._record_cache: dict[Path, dict[str, Any]] = {}
+        self._compact_records_cache: list[dict[str, Any]] | None = None
+        self._compact_records_by_scenario_cache: (
+            dict[str, list[dict[str, Any]]] | None
+        ) = None
         self.records_dir.mkdir(parents=True, exist_ok=True)
         self.root.mkdir(parents=True, exist_ok=True)
         self._ensure_manifest()
@@ -375,6 +413,7 @@ class ControlBaselineCache:
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "policy": {
                         "min_compatible_completed_runs": MIN_COMPATIBLE_RUNS,
+                        "min_compatible_completed_runs_env": MIN_COMPATIBLE_RUNS_ENV,
                         "cache_scope": "control_arm_only",
                         "cache_match_policy": CACHE_MATCH_POLICY,
                         "task_level_fields": list(TASK_LEVEL_CACHE_FIELDS),
@@ -464,12 +503,25 @@ class ControlBaselineCache:
                 "tool_call_count": result_row.get("tool_call_count"),
                 "wall_time_seconds": result_row.get("wall_time_seconds"),
             },
+            "llm_usage": {
+                "llm_usage_recorded": result_row.get("llm_usage_recorded"),
+                "llm_call_count": result_row.get("llm_call_count"),
+                "llm_live_call_count": result_row.get("llm_live_call_count"),
+                "llm_cached_call_count": result_row.get("llm_cached_call_count"),
+                "llm_prompt_tokens": result_row.get("llm_prompt_tokens"),
+                "llm_completion_tokens": result_row.get("llm_completion_tokens"),
+                "llm_total_tokens": result_row.get("llm_total_tokens"),
+                "llm_usage_available_count": result_row.get(
+                    "llm_usage_available_count"
+                ),
+            },
             "transcript_path": str(transcript) if transcript.exists() else None,
             "transcript_hash": transcript_hash,
             "result_row": result_row,
         }
         record_path = self.records_dir / f"{record_id}.json"
         record_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        self._record_cache[record_path] = record
         with self.index_path.open("a", encoding="utf-8") as handle:
             handle.write(
                 json.dumps(
@@ -486,25 +538,100 @@ class ControlBaselineCache:
                 )
                 + "\n"
             )
+        with self.compact_records_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+        self._index_rows_cache = None
+        self._index_rows_by_scenario_cache = None
+        self._compact_records_cache = None
+        self._compact_records_by_scenario_cache = None
         return record
 
     def _index_rows(self) -> list[dict[str, Any]]:
+        if self._index_rows_cache is not None:
+            return self._index_rows_cache
         if not self.index_path.exists():
             return []
         rows: list[dict[str, Any]] = []
-        for line in self.index_path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
+        with self.index_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
                 rows.append(json.loads(line))
+        self._index_rows_cache = rows
         return rows
 
-    def compatible_records(self, context: dict[str, Any]) -> list[dict[str, Any]]:
-        records: list[dict[str, Any]] = []
+    def _index_rows_by_scenario(self) -> dict[str, list[dict[str, Any]]]:
+        if self._index_rows_by_scenario_cache is not None:
+            return self._index_rows_by_scenario_cache
+        by_scenario: dict[str, list[dict[str, Any]]] = {}
         for row in self._index_rows():
+            scenario_key = str(row.get("scenario_key") or "")
+            if not scenario_key:
+                continue
+            by_scenario.setdefault(scenario_key, []).append(row)
+        self._index_rows_by_scenario_cache = by_scenario
+        return by_scenario
+
+    def _read_record(self, path: Path) -> dict[str, Any]:
+        if path not in self._record_cache:
+            self._record_cache[path] = _read_json(path, {})
+        return self._record_cache[path]
+
+    def _compact_records(self) -> list[dict[str, Any]]:
+        if self._compact_records_cache is not None:
+            return self._compact_records_cache
+        if not self.compact_records_path.exists():
+            self._compact_records_cache = []
+            return []
+        records: list[dict[str, Any]] = []
+        with self.compact_records_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(record, dict):
+                    records.append(record)
+        self._compact_records_cache = records
+        return records
+
+    def _compact_records_by_scenario(self) -> dict[str, list[dict[str, Any]]]:
+        if self._compact_records_by_scenario_cache is not None:
+            return self._compact_records_by_scenario_cache
+        by_scenario: dict[str, list[dict[str, Any]]] = {}
+        for record in self._compact_records():
+            scenario_key = str(record.get("scenario_key") or "")
+            if not scenario_key:
+                continue
+            by_scenario.setdefault(scenario_key, []).append(record)
+        self._compact_records_by_scenario_cache = by_scenario
+        return by_scenario
+
+    def compatible_records(self, context: dict[str, Any]) -> list[dict[str, Any]]:
+        minimum = min_compatible_runs()
+        compact_records = self._compact_records_by_scenario().get(
+            str(context.get("scenario_key") or ""), []
+        )
+        if compact_records:
+            matches = [
+                record
+                for record in compact_records
+                if record.get("valid_for_cache")
+                and record.get("complete_run")
+                and record.get("scenario_key") == context.get("scenario_key")
+                and _record_matches_context(record, context)
+            ]
+            if len(matches) >= minimum:
+                return matches
+        records: list[dict[str, Any]] = []
+        for row in self._index_rows_by_scenario().get(
+            str(context.get("scenario_key") or ""), []
+        ):
             if not row.get("valid_for_cache"):
                 continue
-            if row.get("scenario_key") != context.get("scenario_key"):
-                continue
-            record = _read_json(Path(str(row["record_path"])), {})
+            record = self._read_record(Path(str(row["record_path"])))
             if (
                 record.get("valid_for_cache")
                 and record.get("complete_run")
@@ -514,12 +641,13 @@ class ControlBaselineCache:
         return records
 
     def lookup(self, context: dict[str, Any]) -> CacheLookup:
+        minimum = min_compatible_runs()
         records = self.compatible_records(context)
-        if len(records) < MIN_COMPATIBLE_RUNS:
+        if len(records) < minimum:
             return CacheLookup(
                 str(context["scenario_key"]),
                 False,
-                "fewer_than_3_compatible_completed_controls",
+                f"fewer_than_{minimum}_compatible_completed_controls",
                 compatible_record_ids=tuple(
                     str(record.get("record_id")) for record in records
                 ),
@@ -547,6 +675,7 @@ class ControlBaselineCache:
                     "experimental_model_user_bypass": (
                         _experimental_task_only_cache_enabled()
                     ),
+                    "min_compatible_completed_runs": minimum,
                     "compatible_count": len(records),
                     "canonical_mean": sum(canonical) / len(canonical),
                     "canonical_variance": _variance(canonical),
@@ -762,6 +891,7 @@ def build_control_cache_report(
         "cache_match_policy": active_cache_match_policy(),
         "task_level_fields": list(active_task_level_cache_fields()),
         "experimental_model_user_bypass": _experimental_task_only_cache_enabled(),
+        "min_compatible_completed_runs": min_compatible_runs(),
         "control_source": control_source,
         "cached_control_tasks": len(cached_scenarios),
         "fresh_control_tasks": len(fresh_scenarios),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -13,10 +14,67 @@ from sage_ts.experiments.v2_flags import (
 )
 from sage_ts.generation.tool_spec import StructuredInadequacyEvidence, ToolFamily
 from sage_ts.validation.sandbox_validator import ToolExample
-from tool_sandbox.common.execution_context import ScenarioCategories
+from tool_sandbox.common.execution_context import (
+    DatabaseNamespace,
+    RoleType,
+    ScenarioCategories,
+)
 from tool_sandbox.common.scenario import Scenario
 
 SAFE_ABSTAIN_BIRTH_ENV = "SAGE_ENABLE_SAFE_ABSTAIN_BIRTH"
+DIRECT_STATUS_LOOKUP_ENV = "SAGE_ENABLE_DIRECT_STATUS_LOOKUP_TOOL"
+DISABLE_SCENARIO_NAME_BIRTH_ENV = "SAGE_DISABLE_SCENARIO_NAME_BIRTH"
+SCENARIO_METADATA_POLICY_ENV = "SAGE_SCENARIO_METADATA_POLICY"
+
+
+@dataclass(frozen=True)
+class VisibleTaskContext:
+    """Observable task context available before a ToolSandbox run starts."""
+
+    user_request: str
+    available_tools: tuple[str, ...]
+    signals: tuple[str, ...]
+    primary_family_key: str
+
+    def routing_text(self) -> str:
+        return " ".join(
+            [
+                f"request={self.user_request}",
+                f"tools={' '.join(self.available_tools)}",
+                f"signals={' '.join(self.signals)}",
+                f"family={self.primary_family_key}",
+            ]
+        ).strip()
+
+    def generation_label(self) -> str:
+        request = " ".join(self.user_request.split())
+        if len(request) > 220:
+            request = f"{request[:217]}..."
+        return (
+            "visible_task_context("
+            f"family={self.primary_family_key}; "
+            f"signals={','.join(self.signals)}; "
+            f"request={request!r})"
+        )
+
+
+def _direct_status_lookup_enabled() -> bool:
+    raw = os.environ.get(DIRECT_STATUS_LOOKUP_ENV, "1").strip().lower()
+    return raw not in {"0", "false", "no", "off", "disabled"}
+
+
+def _scenario_name_birth_disabled() -> bool:
+    raw = os.environ.get(DISABLE_SCENARIO_NAME_BIRTH_ENV, "").strip().lower()
+    if raw in {"1", "true", "yes", "on", "enabled"}:
+        return True
+    policy = os.environ.get(SCENARIO_METADATA_POLICY_ENV, "").strip().lower()
+    return policy in {
+        "visible_context",
+        "visible-context",
+        "visible",
+        "no_scenario_names",
+        "no-scenario-names",
+    }
 
 
 def _similarity(result: dict[str, Any]) -> float:
@@ -128,9 +186,11 @@ def _is_contact_lookup_query_scenario(scenario_name: str) -> bool:
         return False
     return scenario_name.startswith(
         (
+            "remove_contact_by_phone",
             "search_name_with_relationship",
             "search_phone_number_with_name",
             "search_relationship_with_phone_number",
+            "search_sender_phone_number_with_content",
         )
     )
 
@@ -145,6 +205,12 @@ def _is_contact_update_by_id_scenario(scenario_name: str) -> bool:
     if "ambiguous" in scenario_name or "insufficient_information" in scenario_name:
         return False
     return scenario_name.startswith("update_contact_with_id_and_phone_number")
+
+
+def _is_add_contact_action_scenario(scenario_name: str) -> bool:
+    if "ambiguous" in scenario_name or "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith("add_contact_with_name_and_phone_number")
 
 
 def _is_send_message_contact_lookup_scenario(scenario_name: str) -> bool:
@@ -188,10 +254,15 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
             "set should_abstain true, missing_information to those missing tool "
             "names, safe_next_action to ask_user_or_abstain, and a final answer "
             "recommendation that says the action cannot be completed with the "
-            "currently available information/tools. If requested_action is a "
-            "contact or reminder side-effect and target_identifier is blank, "
-            "abstain with missing_target_identifier. If visible_records_count is "
-            "greater than 1 and the target is not unique, abstain for ambiguity. "
+            "currently available information/tools. For contact modify/remove "
+            "requests, a raw phone number or name is not a safe record id unless "
+            "a visible search/helper result resolved it to a stable contact "
+            "record. If contact lookup is unavailable, abstain with a precise "
+            "missing contact lookup/tool reason instead of a generic answer. If "
+            "requested_action is a contact or reminder side-effect and "
+            "target_identifier is blank, abstain with missing_target_identifier. "
+            "If visible_records_count is greater than 1 and the target is not "
+            "unique, abstain for ambiguity. "
             "If required tools are available and a unique target identifier is "
             "present, set should_abstain false, missing_information empty, "
             "safe_next_action continue_with_original_tool, and blank final answer "
@@ -227,7 +298,10 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
                     "required_original_tools": ["search_contacts"],
                     "safe_next_action": "ask_user_or_abstain",
                     "final_answer_recommendation": (
-                        "I do not have enough information to complete the action."
+                        "I do not have enough information to safely remove the "
+                        "contact with phone number +15550100. I would need a "
+                        "contact name or person_id, or access to search contacts, "
+                        "before I can remove it."
                     ),
                     "abstain_reason": "missing_required_original_tool",
                 },
@@ -316,12 +390,144 @@ def _is_direct_service_precondition_scenario(scenario_name: str) -> bool:
     )
 
 
+def _is_device_status_lookup_scenario(scenario_name: str) -> bool:
+    if not _direct_status_lookup_enabled():
+        return False
+    if "insufficient_information" in scenario_name:
+        return False
+    return scenario_name.startswith(
+        (
+            "get_wifi",
+            "get_cellular",
+            "get_location",
+            "get_low_battery",
+        )
+    )
+
+
+def _is_direct_scalar_contact_action_scenario(scenario_name: str) -> bool:
+    if "insufficient_information" in scenario_name:
+        return False
+    if "ambiguous" in scenario_name:
+        return False
+    return scenario_name.startswith(
+        (
+            "remove_contact_with_id",
+            "send_message_with_phone_number_and_content",
+        )
+    )
+
+
+def _device_status_lookup_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    getter_tools = (
+        "get_wifi_status",
+        "get_cellular_service_status",
+        "get_location_service_status",
+        "get_low_battery_mode_status",
+    )
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="derived_value:plan_device_status_lookup",
+        observation=(
+            "Read-only device-status tasks need a helper that selects the exact "
+            "original ToolSandbox getter for wifi, cellular, location service, "
+            "or low-battery mode, then normalizes the visible boolean getter "
+            "result into a concise final answer. Generate a deterministic helper "
+            "named plan_device_status_lookup. Inputs: user_request and "
+            "visible_state_result. Before the getter result is visible, return "
+            "should_call true, the matching getter tool_name, and empty arguments. "
+            "After a getter result such as True/False is visible, return "
+            "should_call false and final_answer_recommendation. The helper must "
+            "never call setters or infer hidden state."
+        ),
+        allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "user_request": "Can you check whether wifi is on?",
+                    "visible_state_result": "",
+                },
+                {
+                    "tool_name": "get_wifi_status",
+                    "arguments": {},
+                    "should_call": True,
+                    "target_service": "wifi",
+                    "status_value": False,
+                    "status_label": "Wifi",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Is my cellular service on?",
+                    "visible_state_result": "True",
+                },
+                {
+                    "tool_name": "",
+                    "arguments": {},
+                    "should_call": False,
+                    "target_service": "cellular",
+                    "status_value": True,
+                    "status_label": "Cellular service",
+                    "final_answer_recommendation": "Cellular service is on.",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Turn on wifi",
+                    "visible_state_result": "",
+                },
+                {
+                    "tool_name": "",
+                    "arguments": {},
+                    "should_call": False,
+                    "target_service": "",
+                    "status_value": False,
+                    "status_label": "",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "not_read_only_status_lookup",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="read_only_device_status_lookup_gap",
+        inadequacy_signals=("visible_raw_data_lacking_deterministic_transform",),
+        failed_tool_calls=getter_tools,
+        visible_data_gaps=(
+            "read-only device-status request must route through the matching original getter",
+        ),
+        planner_failures=("status lookup answered without original getter",),
+    )
+
+
 def _is_reminder_optional_location_argument_scenario(scenario_name: str) -> bool:
     return (
         "insufficient_information" not in scenario_name
         and scenario_name.startswith("add_reminder_content_and_")
         and "_time" in scenario_name
         and "weekday_delta" not in scenario_name
+        and (
+            "week_delta" in scenario_name
+            or "_location" in scenario_name
+            or "low_battery_mode" in scenario_name
+            or "wifi_off" in scenario_name
+            or "location_off" in scenario_name
+        )
+    )
+
+
+def _is_reminder_location_search_argument_scenario(scenario_name: str) -> bool:
+    return (
+        "insufficient_information" not in scenario_name
+        and scenario_name.startswith("add_reminder_content_and_")
+        and "_time" in scenario_name
+        and "_location" in scenario_name
     )
 
 
@@ -380,8 +586,77 @@ def _plan_device_state_action_sequence_observation(
             ),
             ToolExample(
                 {
+                    "user_request": (
+                        "Add a reminder to buy chocolate milk at Whole Foods."
+                    ),
+                    "visible_state_or_error": (
+                        "PermissionError: Location service is not enabled."
+                    ),
+                },
+                {
+                    "tool_name": "set_low_battery_mode_status",
+                    "arguments": {"on": False},
+                    "should_call": True,
+                    "reason": "clear_low_battery_before_enabling_service",
+                    "action_sequence": [
+                        {
+                            "tool_name": "set_low_battery_mode_status",
+                            "arguments": {"on": False},
+                            "reason": "clear_low_battery_before_enabling_service",
+                        },
+                        {
+                            "tool_name": "set_location_service_status",
+                            "arguments": {"on": True},
+                            "reason": "set_location_on",
+                        },
+                        {
+                            "tool_name": "set_wifi_status",
+                            "arguments": {"on": True},
+                            "reason": ("enable_wifi_for_downstream_location_search"),
+                        },
+                    ],
+                    "final_response_recommendation": "continue_original_task",
+                    "continue_original_task_after_sequence": True,
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
                     "user_request": "Send Sam the message hello",
-                    "visible_state_or_error": "cellular service is disabled",
+                    "visible_state_or_error": (
+                        "cellular service is disabled and low battery mode is on"
+                    ),
+                },
+                {
+                    "tool_name": "set_low_battery_mode_status",
+                    "arguments": {"on": False},
+                    "should_call": True,
+                    "reason": "clear_low_battery_before_enabling_service",
+                    "action_sequence": [
+                        {
+                            "tool_name": "set_low_battery_mode_status",
+                            "arguments": {"on": False},
+                            "reason": "clear_low_battery_before_enabling_service",
+                        },
+                        {
+                            "tool_name": "set_cellular_service_status",
+                            "arguments": {"on": True},
+                            "reason": "set_cellular_on",
+                        },
+                    ],
+                    "final_response_recommendation": "continue_original_task",
+                    "continue_original_task_after_sequence": True,
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Send Sam the message hello",
+                    "visible_state_or_error": (
+                        "cellular service is disabled and low battery mode is off"
+                    ),
                 },
                 {
                     "tool_name": "set_cellular_service_status",
@@ -452,24 +727,26 @@ def _reminder_optional_location_argument_observation(
             "are known. Inputs: content, "
             "resolved_reminder_timestamp, current_timestamp, day_offset, hour, "
             "minute, local_utc_offset_hours, location_requested, location_required, "
-            "location_available, latitude, longitude, and location_lookup_failed. "
+            "location_available, latitude, longitude, location_lookup_failed, and "
+            "optional current_datetime_info from timestamp_to_datetime_info. "
             "Return a dict with add_reminder_kwargs, should_call_add_reminder, "
             "abstain_reason, location_status, and timestamp_source. "
             "add_reminder_kwargs must be directly splattable into the original "
             "ToolSandbox add_reminder(content, reminder_timestamp, latitude, "
             "longitude) side-effect tool. If resolved_reminder_timestamp is "
-            "present, use it directly. Otherwise use local-day timestamp "
-            "arithmetic, not current_timestamp plus raw hours. Formula: "
-            "offset_seconds = local_utc_offset_hours * 3600; local_seconds = "
-            "current_timestamp + offset_seconds; local_midnight = floor("
-            "local_seconds / 86400) * 86400; reminder_timestamp = local_midnight "
-            "+ day_offset * 86400 - offset_seconds + hour * 3600 + minute * 60. "
-            "Prefer resolved_reminder_timestamp whenever current benchmark "
-            "timestamp context already makes the reminder time clear. In "
-            "ToolSandbox reminder creation, plain relative times like 'tomorrow "
-            "at 5 PM' mean local device time by default, so do not ask the user "
-            "for timezone or UTC offset again unless the request is truly "
-            "ambiguous. "
+            "present for an absolute date/time request, use it directly. For "
+            "relative local dates such as tomorrow at 5 PM, derive the sandbox "
+            "local offset from current_timestamp plus current_datetime_info; do "
+            "not trust a guessed UTC offset or add raw hours to the current "
+            "timestamp. If an explicit hour is supplied but minute is omitted, "
+            "treat minute as 0 for a top-of-hour request. If "
+            "current_datetime_info is missing for a relative local "
+            "date, abstain and ask the actor to call timestamp_to_datetime_info "
+            "on the current timestamp before retrying the generated tool. "
+            "If an explicit date/time request has already been resolved to a "
+            "timestamp, use that timestamp directly. If no explicit timestamp is "
+            "available and the task depends on relative time, require current-time "
+            "context instead of treating current_timestamp as the reminder time. "
             "Set location_requested to true when the user mentioned a location "
             "that you would like to attach if resolution succeeds. Set "
             "location_required to true only when the user explicitly requires "
@@ -496,10 +773,18 @@ def _reminder_optional_location_argument_observation(
                     "content": "Buy tickets",
                     "resolved_reminder_timestamp": None,
                     "current_timestamp": 0.0,
+                    "current_datetime_info": {
+                        "year": 1970,
+                        "month": 1,
+                        "day": 1,
+                        "hour": 0,
+                        "minute": 0,
+                        "second": 0,
+                    },
                     "day_offset": 1,
                     "hour": 17,
                     "minute": 0,
-                    "local_utc_offset_hours": 0.0,
+                    "local_utc_offset_hours": None,
                     "location_requested": False,
                     "location_required": False,
                     "location_available": False,
@@ -517,7 +802,7 @@ def _reminder_optional_location_argument_observation(
                     "should_call_add_reminder": True,
                     "abstain_reason": "",
                     "location_status": "omitted_optional",
-                    "timestamp_source": "relative_fields",
+                    "timestamp_source": "current_datetime_info",
                 },
             ),
             ToolExample(
@@ -525,6 +810,7 @@ def _reminder_optional_location_argument_observation(
                     "content": "Team meeting",
                     "resolved_reminder_timestamp": 1777500000.0,
                     "current_timestamp": 1777428906.0,
+                    "current_datetime_info": {},
                     "day_offset": 0,
                     "hour": 0,
                     "minute": 0,
@@ -555,6 +841,14 @@ def _reminder_optional_location_argument_observation(
                     "content": "Meet at park",
                     "resolved_reminder_timestamp": None,
                     "current_timestamp": 0.0,
+                    "current_datetime_info": {
+                        "year": 1970,
+                        "month": 1,
+                        "day": 1,
+                        "hour": 0,
+                        "minute": 0,
+                        "second": 0,
+                    },
                     "day_offset": 1,
                     "hour": 14,
                     "minute": 0,
@@ -571,7 +865,7 @@ def _reminder_optional_location_argument_observation(
                     "should_call_add_reminder": False,
                     "abstain_reason": "required_location_unresolved",
                     "location_status": "required_missing",
-                    "timestamp_source": "relative_fields",
+                    "timestamp_source": "current_datetime_info",
                 },
                 negative_applicability=True,
             ),
@@ -580,6 +874,14 @@ def _reminder_optional_location_argument_observation(
                     "content": "Buy chocolate milk at Whole Foods",
                     "resolved_reminder_timestamp": 1777776000.0,
                     "current_timestamp": 1777687768.0,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 6,
+                        "day": 1,
+                        "hour": 16,
+                        "minute": 49,
+                        "second": 28,
+                    },
                     "day_offset": 1,
                     "hour": 17,
                     "minute": 0,
@@ -598,15 +900,108 @@ def _reminder_optional_location_argument_observation(
                         "optional_location_lookup_pending_do_not_call_add_reminder"
                     ),
                     "location_status": "lookup_pending",
-                    "timestamp_source": "relative_fields",
+                    "timestamp_source": "current_datetime_info",
                 },
                 negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "buy chocolate milk",
+                    "resolved_reminder_timestamp": None,
+                    "current_timestamp": None,
+                    "current_datetime_info": {},
+                    "day_offset": None,
+                    "hour": None,
+                    "minute": None,
+                    "local_utc_offset_hours": 0.0,
+                    "location_requested": True,
+                    "location_required": True,
+                    "location_available": True,
+                    "latitude": 37.3738083,
+                    "longitude": -122.0314225,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "abstain_reason": "missing_time_info",
+                    "location_status": "provided",
+                    "timestamp_source": "none",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "buy chocolate milk",
+                    "resolved_reminder_timestamp": None,
+                    "current_timestamp": 1780598838.0,
+                    "current_datetime_info": {},
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": None,
+                    "location_requested": False,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {},
+                    "should_call_add_reminder": False,
+                    "abstain_reason": (
+                        "missing_current_datetime_info_call_timestamp_to_datetime_info"
+                    ),
+                    "location_status": "omitted_optional",
+                    "timestamp_source": "none",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "buy chocolate milk at Whole Foods",
+                    "resolved_reminder_timestamp": 1780633200.0,
+                    "current_timestamp": 1780612184.0,
+                    "current_datetime_info": {},
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": -7.0,
+                    "location_requested": True,
+                    "location_required": False,
+                    "location_available": True,
+                    "latitude": 37.3738083,
+                    "longitude": -122.0314225,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {
+                        "content": "buy chocolate milk",
+                        "reminder_timestamp": 1780633200.0,
+                        "latitude": 37.3738083,
+                        "longitude": -122.0314225,
+                    },
+                    "should_call_add_reminder": True,
+                    "abstain_reason": "",
+                    "location_status": "provided",
+                    "timestamp_source": "resolved",
+                },
+                held_out=True,
             ),
             ToolExample(
                 {
                     "content": "Buy chocolate milk at Whole Foods",
                     "resolved_reminder_timestamp": 1777776000.0,
                     "current_timestamp": 0.0,
+                    "current_datetime_info": {
+                        "year": 1970,
+                        "month": 1,
+                        "day": 1,
+                        "hour": 0,
+                        "minute": 0,
+                        "second": 0,
+                    },
                     "day_offset": 1,
                     "hour": 17,
                     "minute": 0,
@@ -619,15 +1014,55 @@ def _reminder_optional_location_argument_observation(
                     "location_lookup_failed": False,
                 },
                 {
-                    "add_reminder_kwargs": {},
-                    "should_call_add_reminder": False,
-                    "abstain_reason": (
-                        "optional_location_lookup_pending_do_not_call_add_reminder"
-                    ),
-                    "location_status": "lookup_pending",
-                    "timestamp_source": "relative_fields",
+                    "add_reminder_kwargs": {
+                        "content": "Buy chocolate milk at Whole Foods",
+                        "reminder_timestamp": 1777776000.0,
+                        "latitude": None,
+                        "longitude": None,
+                    },
+                    "should_call_add_reminder": True,
+                    "abstain_reason": "",
+                    "location_status": "omitted_optional",
+                    "timestamp_source": "resolved",
                 },
-                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "content": "buy chocolate milk",
+                    "resolved_reminder_timestamp": None,
+                    "current_timestamp": 1780597924.689969,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 6,
+                        "day": 4,
+                        "hour": 11,
+                        "minute": 32,
+                        "second": 4,
+                    },
+                    "day_offset": 1,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": -4.0,
+                    "location_requested": False,
+                    "location_required": False,
+                    "location_available": False,
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                    "location_lookup_failed": False,
+                },
+                {
+                    "add_reminder_kwargs": {
+                        "content": "buy chocolate milk",
+                        "reminder_timestamp": 1780704000.0,
+                        "latitude": None,
+                        "longitude": None,
+                    },
+                    "should_call_add_reminder": True,
+                    "abstain_reason": "",
+                    "location_status": "omitted_optional",
+                    "timestamp_source": "current_datetime_info",
+                },
+                held_out=True,
             ),
         ),
         generation_allowed=True,
@@ -638,6 +1073,299 @@ def _reminder_optional_location_argument_observation(
         ),
         visible_data_gaps=(
             "relative day/time and optional location must be converted into add_reminder kwargs",
+        ),
+    )
+
+
+def _location_search_argument_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:prepare_location_search_args",
+        observation=(
+            "Reminder-location tasks repeatedly fail when the user provided a "
+            "visible place phrase but the actor drops qualifiers such as street "
+            "names or passes placeholder coordinates into the original "
+            "search_location_around_lat_lon ToolSandbox lookup. Generate a "
+            "deterministic argument-preparation tool named "
+            "prepare_location_search_args. Inputs: user_request, optional "
+            "location_phrase, latitude, and longitude. Return "
+            "search_location_kwargs, should_call_downstream_tool, "
+            "downstream_tool_name, downstream_tool_kwargs, location_query, and "
+            "abstain_reason. The tool must preserve the full visible place phrase "
+            "such as 'Whole Foods on Stevens Creek' and must omit latitude and "
+            "longitude when the only values are missing or placeholder 0.0. It "
+            "must abstain before location lookup when a reminder request has a "
+            "visible place phrase but no visible reminder date/time, because the "
+            "actor should ask for the required reminder time before spending "
+            "turns on location or device-state prerequisites. It must abstain "
+            "when a broad place name has no visible current coordinates, because "
+            "the actor should first obtain current coordinates before searching "
+            "an unqualified venue name. It "
+            "must not search for locations, invent coordinates, or complete the "
+            "reminder; the actor must still call the original ToolSandbox "
+            "search_location_around_lat_lon and then use only visible returned "
+            "coordinates."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "user_request": (
+                        "Remind me to buy chocolate milk tomorrow 5PM at Whole "
+                        "Foods on Stevens Creek."
+                    ),
+                    "location_phrase": "",
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                },
+                {
+                    "search_location_kwargs": {
+                        "location": "Whole Foods on Stevens Creek",
+                    },
+                    "should_call_downstream_tool": True,
+                    "downstream_tool_name": "search_location_around_lat_lon",
+                    "downstream_tool_kwargs": {
+                        "location": "Whole Foods on Stevens Creek",
+                    },
+                    "location_query": "Whole Foods on Stevens Creek",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": (
+                        "Please create a reminder to pick up pasta tomorrow at "
+                        "5 PM near Trader Joe's on Market Street."
+                    ),
+                    "location_phrase": "",
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                },
+                {
+                    "search_location_kwargs": {
+                        "location": "Trader Joe's on Market Street",
+                    },
+                    "should_call_downstream_tool": True,
+                    "downstream_tool_name": "search_location_around_lat_lon",
+                    "downstream_tool_kwargs": {
+                        "location": "Trader Joe's on Market Street",
+                    },
+                    "location_query": "Trader Joe's on Market Street",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Whole Foods on Stevens Creek",
+                    "location_phrase": "Whole Foods",
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                },
+                {
+                    "search_location_kwargs": {
+                        "location": "Whole Foods on Stevens Creek",
+                    },
+                    "should_call_downstream_tool": True,
+                    "downstream_tool_name": "search_location_around_lat_lon",
+                    "downstream_tool_kwargs": {
+                        "location": "Whole Foods on Stevens Creek",
+                    },
+                    "location_query": "Whole Foods on Stevens Creek",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Remind me to buy milk tomorrow at 5 PM.",
+                    "location_phrase": "",
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                },
+                {
+                    "search_location_kwargs": {},
+                    "should_call_downstream_tool": False,
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "location_query": "",
+                    "abstain_reason": "missing_location_phrase",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "",
+                    "location_phrase": "Whole Foods",
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                },
+                {
+                    "search_location_kwargs": {},
+                    "should_call_downstream_tool": True,
+                    "downstream_tool_name": "get_current_location",
+                    "downstream_tool_kwargs": {},
+                    "location_query": "Whole Foods",
+                    "abstain_reason": (
+                        "need_current_coordinates_for_broad_location_query"
+                    ),
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": ("Remind me to buy chocolate milk at Whole Foods."),
+                    "location_phrase": "Whole Foods",
+                    "latitude": 0.0,
+                    "longitude": 0.0,
+                },
+                {
+                    "search_location_kwargs": {},
+                    "should_call_downstream_tool": False,
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "location_query": "Whole Foods",
+                    "abstain_reason": ("missing_reminder_time_before_location_lookup"),
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "",
+                    "location_phrase": "Whole Foods",
+                    "latitude": 37.323,
+                    "longitude": -122.039,
+                },
+                {
+                    "search_location_kwargs": {
+                        "location": "Whole Foods",
+                        "latitude": 37.323,
+                        "longitude": -122.039,
+                    },
+                    "should_call_downstream_tool": True,
+                    "downstream_tool_name": "search_location_around_lat_lon",
+                    "downstream_tool_kwargs": {
+                        "location": "Whole Foods",
+                        "latitude": 37.323,
+                        "longitude": -122.039,
+                    },
+                    "location_query": "Whole Foods",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="location_search_argument_preparation_gap",
+        inadequacy_signals=("final_action_argument_preparation",),
+        failed_tool_calls=("search_location_around_lat_lon",),
+        repeated_failed_tool_calls=("search_location_around_lat_lon",),
+        visible_data_gaps=(
+            "visible location phrase must become original location-search kwargs",
+        ),
+        planner_failures=(
+            "actor dropped place qualifiers or used placeholder coordinates",
+        ),
+    )
+
+
+def _add_contact_argument_observation(scenario_name: str) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:prepare_add_contact_args",
+        observation=(
+            "Add-contact tasks repeatedly contain the name and phone number in "
+            "visible user text, but the actor may search or modify an existing "
+            "record instead of preparing the original add_contact side-effect "
+            "call. Generate a deterministic action-argument tool named "
+            "prepare_add_contact_args. It must accept user_request, optional "
+            "name, optional phone_number, and optional relationship; normalize "
+            "only the visible phone formatting; and return downstream_tool_name "
+            "add_contact plus downstream_tool_kwargs/add_contact_kwargs. The "
+            "tool prepares arguments only and must not search, modify, or create "
+            "contacts itself."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "user_request": (
+                        "Please add a contact for Stephen Sondheim with phone "
+                        "number +1 (987) 654-3210."
+                    ),
+                    "name": "",
+                    "phone_number": "",
+                    "relationship": "",
+                },
+                {
+                    "add_contact_kwargs": {
+                        "name": "Stephen Sondheim",
+                        "phone_number": "+19876543210",
+                    },
+                    "should_call_downstream_tool": True,
+                    "downstream_tool_name": "add_contact",
+                    "downstream_tool_kwargs": {
+                        "name": "Stephen Sondheim",
+                        "phone_number": "+19876543210",
+                    },
+                    "normalized_phone_number": "+19876543210",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "",
+                    "name": "Avery Stone",
+                    "phone_number": "+1 555 0100",
+                    "relationship": "friend",
+                },
+                {
+                    "add_contact_kwargs": {
+                        "name": "Avery Stone",
+                        "phone_number": "+15550100",
+                        "relationship": "friend",
+                    },
+                    "should_call_downstream_tool": True,
+                    "downstream_tool_name": "add_contact",
+                    "downstream_tool_kwargs": {
+                        "name": "Avery Stone",
+                        "phone_number": "+15550100",
+                        "relationship": "friend",
+                    },
+                    "normalized_phone_number": "+15550100",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Add a contact for Morgan.",
+                    "name": "",
+                    "phone_number": "",
+                    "relationship": "",
+                },
+                {
+                    "add_contact_kwargs": {},
+                    "should_call_downstream_tool": False,
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "normalized_phone_number": "",
+                    "abstain_reason": "missing_name_or_phone_number",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="add_contact_argument_preparation_gap",
+        inadequacy_signals=("final_action_argument_preparation",),
+        failed_tool_calls=("add_contact",),
+        repeated_failed_tool_calls=("add_contact",),
+        visible_data_gaps=(
+            "visible name and phone number must become original add_contact kwargs",
+        ),
+        planner_failures=(
+            "actor searched or modified contacts instead of add_contact",
         ),
     )
 
@@ -653,11 +1381,15 @@ def _next_weekday_timestamp_observation(scenario_name: str) -> CapabilityObserva
             "calling add_reminder. Generate a deterministic canonicalizer named "
             "next_weekday_time_to_timestamp. Inputs: current_timestamp, "
             "target_isoweekday where Monday=1 and Sunday=7, hour, minute, and "
-            "local_utc_offset_hours. Return a float Unix timestamp for the next "
-            "occurrence of that weekday strictly after the current local date; if "
-            "the target weekday is today, use seven days later. Use local day "
-            "arithmetic with local_utc_offset_hours; do not ask the user for a "
-            "timezone when the task already provides or implies one. The helper "
+            "current_datetime_info from timestamp_to_datetime_info(current_timestamp). "
+            "Keep local_utc_offset_hours only as a deprecated compatibility input; "
+            "do not trust a guessed offset. Return a float Unix timestamp for the next "
+            "occurrence of that weekday/time strictly after the current local "
+            "timestamp; if the target weekday is today and the target time is "
+            "still in the future, use today, otherwise use seven days later. "
+            "Derive the sandbox local offset from current_timestamp and current_datetime_info, and "
+            "return 0.0 if that visible local datetime context is missing or "
+            "inconsistent. The helper "
             "must not call add_reminder; the actor must still call the original "
             "ToolSandbox add_reminder with the returned reminder_timestamp."
         ),
@@ -670,6 +1402,15 @@ def _next_weekday_timestamp_observation(scenario_name: str) -> CapabilityObserva
                     "hour": 17,
                     "minute": 0,
                     "local_utc_offset_hours": -4,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 5,
+                        "day": 12,
+                        "hour": 10,
+                        "minute": 21,
+                        "second": 47,
+                        "isoweekday": 2,
+                    },
                 },
                 1778878800.0,
             ),
@@ -680,6 +1421,15 @@ def _next_weekday_timestamp_observation(scenario_name: str) -> CapabilityObserva
                     "hour": 8,
                     "minute": 30,
                     "local_utc_offset_hours": -4,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 5,
+                        "day": 15,
+                        "hour": 12,
+                        "minute": 0,
+                        "second": 0,
+                        "isoweekday": 5,
+                    },
                 },
                 1779453000.0,
                 held_out=True,
@@ -691,6 +1441,67 @@ def _next_weekday_timestamp_observation(scenario_name: str) -> CapabilityObserva
                     "hour": 17,
                     "minute": 0,
                     "local_utc_offset_hours": -4,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 5,
+                        "day": 12,
+                        "hour": 10,
+                        "minute": 21,
+                        "second": 47,
+                        "isoweekday": 2,
+                    },
+                },
+                0.0,
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1780609395.536667,
+                    "target_isoweekday": 5,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": -4,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 6,
+                        "day": 4,
+                        "hour": 14,
+                        "minute": 43,
+                        "second": 15,
+                        "isoweekday": 4,
+                    },
+                },
+                1780704000.0,
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1780644041.436888,
+                    "target_isoweekday": 5,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": 0,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 6,
+                        "day": 5,
+                        "hour": 0,
+                        "minute": 20,
+                        "second": 41,
+                        "isoweekday": 5,
+                    },
+                },
+                1780704000.0,
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1780609395.536667,
+                    "target_isoweekday": 5,
+                    "hour": 17,
+                    "minute": 0,
+                    "local_utc_offset_hours": -4,
+                    "current_datetime_info": {},
                 },
                 0.0,
                 negative_applicability=True,
@@ -721,8 +1532,11 @@ def _relative_day_time_timestamp_observation(
             "timestamp passed to the original add_reminder or modify_reminder "
             "ToolSandbox call. Generate a deterministic canonicalizer named "
             "relative_day_time_to_timestamp with inputs current_timestamp, "
-            "day_offset, hour, minute, and local_utc_offset_hours. Use local day "
-            "arithmetic and return only the timestamp; never create or modify the "
+            "day_offset, hour, minute, current_datetime_info, and optional "
+            "local_utc_offset_hours. current_datetime_info must be the visible "
+            "dict returned by timestamp_to_datetime_info(current_timestamp), so "
+            "the helper preserves ToolSandbox local time without hard-coding a "
+            "timezone. Return only the timestamp; never create or modify the "
             "reminder inside the helper."
         ),
         allowed_families=(str(ToolFamily.CANONICALIZER),),
@@ -733,7 +1547,16 @@ def _relative_day_time_timestamp_observation(
                     "day_offset": 1,
                     "hour": 17,
                     "minute": 0,
-                    "local_utc_offset_hours": -4,
+                    "local_utc_offset_hours": 0,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 4,
+                        "day": 28,
+                        "hour": 22,
+                        "minute": 15,
+                        "second": 6,
+                        "isoweekday": 2,
+                    },
                 },
                 1777496400.0,
             ),
@@ -743,7 +1566,16 @@ def _relative_day_time_timestamp_observation(
                     "day_offset": 2,
                     "hour": 8,
                     "minute": 30,
-                    "local_utc_offset_hours": -4,
+                    "local_utc_offset_hours": 0,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 4,
+                        "day": 28,
+                        "hour": 22,
+                        "minute": 15,
+                        "second": 6,
+                        "isoweekday": 2,
+                    },
                 },
                 1777552200.0,
                 held_out=True,
@@ -754,7 +1586,16 @@ def _relative_day_time_timestamp_observation(
                     "day_offset": 1,
                     "hour": 25,
                     "minute": 0,
-                    "local_utc_offset_hours": -4,
+                    "local_utc_offset_hours": 0,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 4,
+                        "day": 28,
+                        "hour": 22,
+                        "minute": 15,
+                        "second": 6,
+                        "isoweekday": 2,
+                    },
                 },
                 0.0,
                 negative_applicability=True,
@@ -853,7 +1694,7 @@ def _resolve_search_window_or_bounds_observation(
             ToolExample(
                 {
                     "current_timestamp": 1777380998.0,
-                    "phrase": "yesterday",
+                    "phrase": "todo item I made yesterday",
                     "target_domain": "reminder",
                     "timestamp_intent": "creation",
                     "direction": "yesterday",
@@ -864,14 +1705,38 @@ def _resolve_search_window_or_bounds_observation(
                 {
                     "target_tool_name": "search_reminder",
                     "search_kwargs": {
-                        "creation_timestamp_lowerbound": 1777248000.0,
-                        "creation_timestamp_upperbound": 1777334399.0,
+                        "creation_timestamp_lowerbound": 1777294478.0,
+                        "creation_timestamp_upperbound": 1777294718.0,
                     },
                     "should_call_search": True,
                     "abstain_reason": "",
                     "interpretation": "yesterday",
                     "bounds_source": "resolved_direction",
                 },
+            ),
+            ToolExample(
+                {
+                    "current_timestamp": 1777380998.0,
+                    "phrase": "yesterday",
+                    "target_domain": "reminder",
+                    "timestamp_intent": "reminder",
+                    "direction": "yesterday",
+                    "content_keyword": "",
+                    "lookback_days": 0,
+                    "timezone_offset": 0.0,
+                },
+                {
+                    "target_tool_name": "search_reminder",
+                    "search_kwargs": {
+                        "reminder_timestamp_lowerbound": 1777294478.0,
+                        "reminder_timestamp_upperbound": 1777294718.0,
+                    },
+                    "should_call_search": True,
+                    "abstain_reason": "",
+                    "interpretation": "yesterday",
+                    "bounds_source": "resolved_direction",
+                },
+                held_out=True,
             ),
             ToolExample(
                 {
@@ -1258,6 +2123,104 @@ def _days_between_timestamps_observation(
     )
 
 
+def _holiday_search_args_observation(scenario_name: str) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:prepare_holiday_search_args",
+        observation=(
+            "Holiday timestamp lookup tasks require stable original search_holiday "
+            "arguments from the visible user request. The actor has previously "
+            "invented stale numeric years for 'this year' requests. Generate a "
+            "deterministic helper named prepare_holiday_search_args that accepts "
+            "user_request: str and visible_current_year: int, extracts the visible "
+            "holiday name, and returns should_call_search_holiday plus "
+            "search_holiday_kwargs. It must omit the year unless the user supplied "
+            "an explicit numeric year, so the original environment resolves the "
+            "current year. It must not compute or encode holiday timestamps."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "user_request": "What is the timestamp for Thanksgiving?",
+                    "visible_current_year": 0,
+                },
+                {
+                    "should_call_search_holiday": True,
+                    "search_holiday_kwargs": {"holiday_name": "Thanksgiving"},
+                    "holiday_name": "Thanksgiving",
+                    "year_policy": "environment_resolves_year",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "What is the timestamp for Thanksgiving in 2027?",
+                    "visible_current_year": 0,
+                },
+                {
+                    "should_call_search_holiday": True,
+                    "search_holiday_kwargs": {
+                        "holiday_name": "Thanksgiving",
+                        "year": 2027,
+                    },
+                    "holiday_name": "Thanksgiving",
+                    "year_policy": "explicit_year",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "What is the holiday timestamp?",
+                    "visible_current_year": 0,
+                },
+                {
+                    "should_call_search_holiday": False,
+                    "search_holiday_kwargs": {},
+                    "holiday_name": "",
+                    "year_policy": "missing_holiday_name",
+                    "final_answer_recommendation": (
+                        "I need the holiday name before I can look up its timestamp."
+                    ),
+                    "abstain_reason": "missing_holiday_name",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="holiday_timestamp_search_args_need_visible_year_policy",
+        inadequacy_signals=(
+            "wrong_original_tool_arguments",
+            "invented_temporal_context",
+        ),
+        failed_tool_calls=("search_holiday",),
+        visible_data_gaps=(
+            "visible holiday label must become original search_holiday kwargs",
+        ),
+    )
+
+
+def _is_holiday_timestamp_scenario(scenario_name: str) -> bool:
+    lower = scenario_name.lower()
+    return "timestamp" in lower and any(
+        token in lower
+        for token in (
+            "holiday",
+            "thanksgiving",
+            "christmas",
+            "easter",
+            "halloween",
+            "memorial_day",
+            "labor_day",
+            "independence_day",
+            "veterans_day",
+        )
+    )
+
+
 def _contact_lookup_query_planner_observation(
     scenario_name: str,
 ) -> CapabilityObservation:
@@ -1268,30 +2231,39 @@ def _contact_lookup_query_planner_observation(
             "Repeated contact lookup failures happen before any side effect: the "
             "agent has a visible scalar contact constraint from the user request "
             "but fails to turn it into the original search_contacts kwargs and "
-            "the answer field to extract afterward. Generate a deterministic "
-            "pre-search lookup planner named plan_contact_lookup_query. Inputs "
-            "must be scalar strings only: contact_name, phone_number, "
-            "relationship, and requested_field. Return exactly "
+            "the answer or target field to extract afterward. Generate a "
+            "deterministic pre-search lookup planner named "
+            "plan_contact_lookup_query. Inputs are visible scalar constraints "
+            "contact_name, phone_number, relationship, and requested_field, plus "
+            "optional selected_record after search_contacts returns one visible "
+            "contact record. "
+            "Return exactly "
             "should_call_search_contacts, search_contacts_kwargs, answer_field, "
-            "and abstain_reason. When one or more safe visible constraints are "
+            "selected_record, answer_value, final_answer_recommendation, "
+            "copy_exactly, and abstain_reason. When one or more safe visible constraints are "
             "present, set should_call_search_contacts true and include only "
             "nonblank original search_contacts kwargs: name from contact_name, "
             "phone_number from phone_number, and relationship from relationship. "
-            "Preserve requested_field as answer_field so the actor can answer "
-            "after the original search_contacts result is visible. Abstain when "
+            "Do not add optional filters such as is_self unless they were "
+            "explicitly provided as helper inputs. Preserve requested_field as "
+            "answer_field so the actor can answer or select a side-effect target "
+            "after the original search_contacts result is visible. When "
+            "selected_record is supplied for an answer-only lookup, extract the "
+            "requested field into answer_value and, when safe, "
+            "final_answer_recommendation without adding unrelated fields. Abstain when "
             "requested_field is blank, when no lookup constraint is supplied, "
             "when requested_field is unsupported, or when the task asks to add, "
-            "modify, remove, send, or handle insufficient information instead of "
-            "answering a scalar lookup. The helper must never call "
+            "or handle insufficient information instead of answering a scalar "
+            "lookup or locating a target for a preserved original side-effect "
+            "tool. The helper must never call "
             "search_contacts and must never modify contacts; it only prepares "
             "the next original ToolSandbox search call. Include positive "
             "triggers for search_name_with_relationship, "
             "search_phone_number_with_name, and "
-            "search_relationship_with_phone_number. Include negative triggers "
-            "for add_contact, remove_contact, modify_contact, send_message, "
-            "insufficient_information, ambiguous contacts, and non-contact "
-            "tasks. List search_contacts in required_original_tool_calls and "
-            "preserves_side_effect_tools."
+            "search_relationship_with_phone_number, and remove_contact_by_phone. "
+            "Include negative triggers for add_contact, insufficient_information, "
+            "ambiguous contacts, and non-contact tasks. List search_contacts in "
+            "required_original_tool_calls and preserves_side_effect_tools."
         ),
         allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
         validation_examples=(
@@ -1306,6 +2278,10 @@ def _contact_lookup_query_planner_observation(
                     "should_call_search_contacts": True,
                     "search_contacts_kwargs": {"name": "Homer S"},
                     "answer_field": "phone_number",
+                    "selected_record": {},
+                    "answer_value": "",
+                    "final_answer_recommendation": "",
+                    "copy_exactly": False,
                     "abstain_reason": "",
                 },
             ),
@@ -1320,6 +2296,10 @@ def _contact_lookup_query_planner_observation(
                     "should_call_search_contacts": True,
                     "search_contacts_kwargs": {"relationship": "boss"},
                     "answer_field": "name",
+                    "selected_record": {},
+                    "answer_value": "",
+                    "final_answer_recommendation": "",
+                    "copy_exactly": False,
                     "abstain_reason": "",
                 },
                 held_out=True,
@@ -1335,8 +2315,93 @@ def _contact_lookup_query_planner_observation(
                     "should_call_search_contacts": True,
                     "search_contacts_kwargs": {"phone_number": "+10000000000"},
                     "answer_field": "relationship",
+                    "selected_record": {},
+                    "answer_value": "",
+                    "final_answer_recommendation": "",
+                    "copy_exactly": False,
                     "abstain_reason": "",
                 },
+            ),
+            ToolExample(
+                {
+                    "contact_name": "",
+                    "phone_number": "+10000000000",
+                    "relationship": "",
+                    "requested_field": "relationship",
+                    "selected_record": {
+                        "person_id": "p1",
+                        "name": "Homer S",
+                        "phone_number": "+10000000000",
+                        "relationship": "boss",
+                    },
+                },
+                {
+                    "should_call_search_contacts": False,
+                    "search_contacts_kwargs": {"phone_number": "+10000000000"},
+                    "answer_field": "relationship",
+                    "selected_record": {
+                        "person_id": "p1",
+                        "name": "Homer S",
+                        "phone_number": "+10000000000",
+                        "relationship": "boss",
+                    },
+                    "answer_value": "boss",
+                    "final_answer_recommendation": "+10000000000 is your boss",
+                    "copy_exactly": True,
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "contact_name": "Homer S",
+                    "phone_number": "",
+                    "relationship": "",
+                    "requested_field": "phone_number",
+                    "selected_record": {
+                        "person_id": "p1",
+                        "name": "Homer S",
+                        "phone_number": "+10000000000",
+                        "relationship": "boss",
+                    },
+                },
+                {
+                    "should_call_search_contacts": False,
+                    "search_contacts_kwargs": {"name": "Homer S"},
+                    "answer_field": "phone_number",
+                    "selected_record": {
+                        "person_id": "p1",
+                        "name": "Homer S",
+                        "phone_number": "+10000000000",
+                        "relationship": "boss",
+                    },
+                    "answer_value": "+10000000000",
+                    "final_answer_recommendation": (
+                        "Homer S's phone number is +10000000000"
+                    ),
+                    "copy_exactly": True,
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "contact_name": "",
+                    "phone_number": "+12453344098",
+                    "relationship": "",
+                    "requested_field": "person_id",
+                },
+                {
+                    "should_call_search_contacts": True,
+                    "search_contacts_kwargs": {"phone_number": "+12453344098"},
+                    "answer_field": "person_id",
+                    "selected_record": {},
+                    "answer_value": "",
+                    "final_answer_recommendation": "",
+                    "copy_exactly": False,
+                    "abstain_reason": "",
+                },
+                held_out=True,
             ),
             ToolExample(
                 {
@@ -1349,6 +2414,10 @@ def _contact_lookup_query_planner_observation(
                     "should_call_search_contacts": False,
                     "search_contacts_kwargs": {},
                     "answer_field": "phone_number",
+                    "selected_record": {},
+                    "answer_value": "",
+                    "final_answer_recommendation": "",
+                    "copy_exactly": False,
                     "abstain_reason": "missing_lookup_constraint",
                 },
                 negative_applicability=True,
@@ -1465,6 +2534,25 @@ def _send_message_contact_lookup_observation(
                 },
                 negative_applicability=True,
             ),
+            ToolExample(
+                {
+                    "recipient_name": "Fredrik Thordendal",
+                    "message_content": "",
+                },
+                {
+                    "should_call_search_contacts": False,
+                    "search_contacts_kwargs": {},
+                    "downstream_tool_name": "",
+                    "message_content": "",
+                    "abstain_reason": "missing_message_content",
+                    "next_step": "ask_for_message_content",
+                    "final_answer_recommendation": (
+                        "What message would you like to send to Fredrik Thordendal?"
+                    ),
+                },
+                negative_applicability=True,
+                held_out=True,
+            ),
         ),
         generation_allowed=True,
         reason="send_message_named_recipient_needs_contact_lookup_planner",
@@ -1500,7 +2588,11 @@ def _contact_relationship_batch_update_observation(
             "call may happen before search_contacts; when source and target "
             "relationships are known but contacts is empty, return "
             "should_call_search_contacts true with search_contacts_kwargs using "
-            "the source relationship. After contacts are visible, return "
+            "the source relationship. When source_relationship is "
+            "'__all_contacts__', this means all non-self contacts and the helper "
+            "must return search_contacts_kwargs {'is_self': False} rather than "
+            "sending the sentinel as a real relationship filter. After contacts "
+            "are visible, return "
             "selected_contacts and downstream_tool_kwargs_list containing one "
             "modify_contact kwargs object per selected non-self contact, plus "
             "downstream_tool_name='modify_contact' and should_call_tools true. "
@@ -1583,7 +2675,73 @@ def _contact_relationship_batch_update_observation(
                     ],
                     "should_call_tools": True,
                     "abstain_reason": "",
-                    "final_answer_recommendation": "All matching contacts can be updated after the original modify_contact calls.",
+                    "final_answer_recommendation": "Ada and Grace are now your enemies.",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Update all contacts as enemies",
+                    "source_relationship": "__all_contacts__",
+                    "target_relationship": "enemy",
+                    "contacts": [],
+                },
+                {
+                    "phase": "search_required",
+                    "source_relationship": "__all_contacts__",
+                    "target_relationship": "enemy",
+                    "should_call_search_contacts": True,
+                    "search_contacts_kwargs": {"is_self": False},
+                    "selected_contacts": [],
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs_list": [],
+                    "should_call_tools": False,
+                    "abstain_reason": "",
+                    "final_answer_recommendation": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Update all contacts as enemies",
+                    "source_relationship": "__all_contacts__",
+                    "target_relationship": "enemy",
+                    "contacts": [
+                        {
+                            "person_id": "self",
+                            "name": "Me",
+                            "relationship": "self",
+                            "is_self": True,
+                        },
+                        {
+                            "person_id": "p1",
+                            "name": "Ada",
+                            "relationship": "friend",
+                            "is_self": False,
+                        },
+                    ],
+                },
+                {
+                    "phase": "modify_required",
+                    "source_relationship": "__all_contacts__",
+                    "target_relationship": "enemy",
+                    "should_call_search_contacts": False,
+                    "search_contacts_kwargs": {},
+                    "selected_contacts": [
+                        {
+                            "person_id": "p1",
+                            "name": "Ada",
+                            "relationship": "friend",
+                            "is_self": False,
+                        },
+                    ],
+                    "downstream_tool_name": "modify_contact",
+                    "downstream_tool_kwargs_list": [
+                        {"person_id": "p1", "relationship": "enemy"},
+                    ],
+                    "should_call_tools": True,
+                    "abstain_reason": "",
+                    "final_answer_recommendation": "Ada is now your enemy.",
                 },
                 held_out=True,
             ),
@@ -1794,6 +2952,252 @@ def _message_counterparty_contact_update_observation(
     )
 
 
+def _message_counterparty_search_plan_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    def counterparty_expected(payload: dict) -> dict:
+        expected = {
+            "selected_message": {},
+            "counterparty_phone_number": "",
+            "answer_value": "",
+            "exact_final_answer": "",
+            "final_answer_recommendation": "",
+            "copy_exactly": False,
+        }
+        expected.update(payload)
+        return expected
+
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:plan_message_counterparty_search",
+        observation=(
+            "Message-counterparty contact updates can fail before the selector "
+            "helper has useful records because the actor must first retrieve the "
+            "current user's stable person id and then issue the original "
+            "search_messages call with a concrete sender or recipient id. Generate "
+            "a deterministic side-effect-free helper named "
+            "plan_message_counterparty_search. Inputs must be message_direction, "
+            "selection_mode, self_person_id, content_keyword, and optional visible "
+            "messages from search_messages. On the first "
+            "call, when self_person_id is blank, return phase "
+            "self_lookup_required, should_call_search_contacts true, "
+            "search_contacts_kwargs {'is_self': True}, should_call_search_messages "
+            "false, and empty search_messages_kwargs. After the actor obtains "
+            "self_person_id from the original search_contacts result, a second "
+            "call must return phase message_search_required, "
+            "should_call_search_messages true, and search_messages_kwargs using "
+            "sender_person_id for sent/outgoing/from-me directions or "
+            "recipient_person_id for received/incoming/to-me directions. Preserve "
+            "selection_mode so a later visible-record selector can choose latest "
+            "or oldest. When visible search_messages records are provided, return "
+            "the requested sender or recipient phone number as a final-answer-ready "
+            "value. The helper must never call search_contacts, "
+            "search_messages, or modify_contact; it only prepares the original "
+            "lookup calls that make the later generated selector/action helper "
+            "callable. Abstain on missing or invalid message_direction, invalid "
+            "selection_mode, or ambiguous either-direction requests."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "message_direction": "sent",
+                    "selection_mode": "latest",
+                    "self_person_id": "",
+                    "content_keyword": "",
+                },
+                counterparty_expected(
+                    {
+                        "phase": "self_lookup_required",
+                        "message_direction": "sent",
+                        "selection_mode": "latest",
+                        "should_call_search_contacts": True,
+                        "search_contacts_kwargs": {"is_self": True},
+                        "should_call_search_messages": False,
+                        "search_messages_kwargs": {},
+                        "should_call_tool": True,
+                        "abstain_reason": "",
+                        "next_step": "call search_contacts, then call this helper again with self_person_id",
+                    }
+                ),
+            ),
+            ToolExample(
+                {
+                    "message_direction": "sent",
+                    "selection_mode": "latest",
+                    "self_person_id": "self-id",
+                    "content_keyword": "",
+                },
+                counterparty_expected(
+                    {
+                        "phase": "message_search_required",
+                        "message_direction": "sent",
+                        "selection_mode": "latest",
+                        "should_call_search_contacts": False,
+                        "search_contacts_kwargs": {},
+                        "should_call_search_messages": True,
+                        "search_messages_kwargs": {"sender_person_id": "self-id"},
+                        "should_call_tool": True,
+                        "abstain_reason": "",
+                        "next_step": "call search_messages with search_messages_kwargs",
+                    }
+                ),
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "message_direction": "received",
+                    "selection_mode": "oldest",
+                    "self_person_id": "self-id",
+                    "content_keyword": "invoice",
+                },
+                counterparty_expected(
+                    {
+                        "phase": "message_search_required",
+                        "message_direction": "received",
+                        "selection_mode": "oldest",
+                        "should_call_search_contacts": False,
+                        "search_contacts_kwargs": {},
+                        "should_call_search_messages": True,
+                        "search_messages_kwargs": {
+                            "recipient_person_id": "self-id",
+                            "content": "invoice",
+                        },
+                        "should_call_tool": True,
+                        "abstain_reason": "",
+                        "next_step": "call search_messages with search_messages_kwargs",
+                    }
+                ),
+            ),
+            ToolExample(
+                {
+                    "message_direction": "received",
+                    "selection_mode": "latest",
+                    "self_person_id": "",
+                    "content_keyword": "GPU",
+                    "messages": [
+                        {
+                            "sender_phone_number": "+18307976530",
+                            "recipient_phone_number": "+11233344455",
+                            "content": "Hey kid, you want some GPU?",
+                            "creation_timestamp": 1781008782.0,
+                        }
+                    ],
+                },
+                counterparty_expected(
+                    {
+                        "phase": "answer_ready",
+                        "message_direction": "received",
+                        "selection_mode": "latest",
+                        "should_call_search_contacts": False,
+                        "search_contacts_kwargs": {},
+                        "should_call_search_messages": False,
+                        "search_messages_kwargs": {},
+                        "should_call_tool": False,
+                        "abstain_reason": "",
+                        "next_step": "answer with final_answer_recommendation",
+                        "selected_message": {
+                            "sender_phone_number": "+18307976530",
+                            "recipient_phone_number": "+11233344455",
+                            "content": "Hey kid, you want some GPU?",
+                            "creation_timestamp": 1781008782.0,
+                        },
+                        "counterparty_phone_number": "+18307976530",
+                        "answer_value": "+18307976530",
+                        "exact_final_answer": "+18307976530 asked you if you want some GPU",
+                        "final_answer_recommendation": "+18307976530 asked you if you want some GPU",
+                        "copy_exactly": True,
+                    }
+                ),
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "message_direction": "outgoing",
+                    "selection_mode": "latest",
+                    "self_person_id": "self-id",
+                    "content_keyword": "",
+                    "messages": [
+                        {
+                            "sender_person_id": "other-id",
+                            "sender_phone_number": "+10000000000",
+                            "recipient_person_id": "self-id",
+                            "recipient_phone_number": "+11233344455",
+                            "content": "Good, keep me posted",
+                            "creation_timestamp": 1781283797.0,
+                        }
+                    ],
+                },
+                counterparty_expected(
+                    {
+                        "phase": "answer_ready",
+                        "message_direction": "sent",
+                        "selection_mode": "latest",
+                        "should_call_search_contacts": False,
+                        "search_contacts_kwargs": {},
+                        "should_call_search_messages": False,
+                        "search_messages_kwargs": {},
+                        "should_call_tool": False,
+                        "abstain_reason": "",
+                        "next_step": "answer with final_answer_recommendation",
+                        "selected_message": {
+                            "sender_person_id": "other-id",
+                            "sender_phone_number": "+10000000000",
+                            "recipient_person_id": "self-id",
+                            "recipient_phone_number": "+11233344455",
+                            "content": "Good, keep me posted",
+                            "creation_timestamp": 1781283797.0,
+                        },
+                        "counterparty_phone_number": "+10000000000",
+                        "answer_value": "+10000000000",
+                        "exact_final_answer": "+10000000000",
+                        "final_answer_recommendation": "+10000000000",
+                        "copy_exactly": True,
+                    }
+                ),
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "message_direction": "either",
+                    "selection_mode": "latest",
+                    "self_person_id": "self-id",
+                    "content_keyword": "",
+                },
+                counterparty_expected(
+                    {
+                        "phase": "abstain",
+                        "message_direction": "either",
+                        "selection_mode": "latest",
+                        "should_call_search_contacts": False,
+                        "search_contacts_kwargs": {},
+                        "should_call_search_messages": False,
+                        "search_messages_kwargs": {},
+                        "should_call_tool": False,
+                        "abstain_reason": "ambiguous_message_direction",
+                        "next_step": "ask_for_sent_or_received_direction",
+                    }
+                ),
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="message_counterparty_search_needs_self_id_planner",
+        inadequacy_signals=(
+            "planner_failed_to_issue_available_search",
+            "visible_records_missing_before_selector",
+            "side_effect_argument_preparation_failure",
+        ),
+        failed_tool_calls=("search_contacts", "search_messages"),
+        visible_data_gaps=(
+            "message counterparty selectors need self_person_id and visible message records",
+        ),
+        planner_failures=(
+            "prepare self lookup then original message search before counterparty selector",
+        ),
+    )
+
+
 def _contact_update_by_id_observation(scenario_name: str) -> CapabilityObservation:
     return CapabilityObservation(
         scenario_name=scenario_name,
@@ -1804,6 +3208,9 @@ def _contact_update_by_id_observation(scenario_name: str) -> CapabilityObservati
             "number. Generate a deterministic side-effect-free planner named "
             "plan_contact_update_from_id. Inputs must be scalar strings: "
             "person_id, phone_number, name, relationship, and user_request. "
+            "Treat name and relationship as optional update fields; if the actor "
+            "omits either field, the helper must behave as though an empty string "
+            "was supplied rather than abstaining. "
             "Return downstream_tool_name, downstream_tool_kwargs, "
             "should_call_tool, and abstain_reason. "
             "When person_id is present and at least one update field is present, "
@@ -1887,6 +3294,113 @@ def _contact_update_by_id_observation(scenario_name: str) -> CapabilityObservati
         ),
         planner_failures=(
             "prepare modify_contact kwargs from visible scalar id update",
+        ),
+    )
+
+
+def _direct_scalar_contact_action_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="composite:prepare_direct_contact_action_args",
+        observation=(
+            "Direct scalar contact/message action tasks need a generated tool "
+            "that prepares exact kwargs for the original ToolSandbox side-effect "
+            "tool from user-visible scalar inputs. Generate a deterministic "
+            "side-effect-free planner named prepare_direct_contact_action_args. "
+            "Inputs: action_type, contact_name, phone_number, relationship, "
+            "record_id, target_field, new_value, message_text, and user_request. "
+            "The helper must support add_contact, modify_contact, remove_contact, "
+            "and send_message actions, but it must never call those original "
+            "tools itself. It should return downstream_tool_name, "
+            "downstream_tool_kwargs, should_call_tool, and abstain_reason. "
+            "For remove_contact, require record_id/person_id. For send_message, "
+            "require phone_number and message_text. For modify_contact, require "
+            "record_id/person_id plus at least one update field. For add_contact, "
+            "require contact_name and phone_number. The helper must abstain for "
+            "search, recency, relationship-batch, reminder, or insufficient "
+            "information tasks."
+        ),
+        allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "action_type": "remove_contact",
+                    "contact_name": "",
+                    "phone_number": "",
+                    "relationship": "",
+                    "record_id": "person-123",
+                    "target_field": "",
+                    "new_value": "",
+                    "message_text": "",
+                    "user_request": "Remove contact id person-123",
+                },
+                {
+                    "downstream_tool_name": "remove_contact",
+                    "downstream_tool_kwargs": {"person_id": "person-123"},
+                    "should_call_tool": True,
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "action_type": "send_message",
+                    "contact_name": "",
+                    "phone_number": "+1 (555) 0100",
+                    "relationship": "",
+                    "record_id": "",
+                    "target_field": "",
+                    "new_value": "",
+                    "message_text": "Running late",
+                    "user_request": "Send +1 (555) 0100 Running late",
+                },
+                {
+                    "downstream_tool_name": "send_message_with_phone_number",
+                    "downstream_tool_kwargs": {
+                        "phone_number": "+15550100",
+                        "content": "Running late",
+                    },
+                    "should_call_tool": True,
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "action_type": "send_message",
+                    "contact_name": "",
+                    "phone_number": "",
+                    "relationship": "",
+                    "record_id": "",
+                    "target_field": "",
+                    "new_value": "",
+                    "message_text": "Hello",
+                    "user_request": "Search messages with content Hello",
+                },
+                {
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "should_call_tool": False,
+                    "abstain_reason": "not_direct_scalar_contact_action",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="direct_scalar_contact_action_argument_gap",
+        inadequacy_signals=("side_effect_argument_preparation_failure",),
+        failed_tool_calls=(
+            "add_contact",
+            "modify_contact",
+            "remove_contact",
+            "send_message_with_phone_number",
+        ),
+        visible_data_gaps=(
+            "visible scalar action inputs must be converted into exact original ToolSandbox kwargs",
+        ),
+        planner_failures=(
+            "direct scalar side-effect action executed with incomplete or drifted kwargs",
         ),
     )
 
@@ -2161,7 +3675,7 @@ def _recency_action_target_observation(
                     "selected_id": "",
                     "selected_timestamp": 20.0,
                     "action_type": "modify_reminder",
-                    "downstream_tool_name": "modify_reminder",
+                    "downstream_tool_name": "",
                     "downstream_tool_kwargs": {},
                     "should_call_tool": False,
                     "tie_candidates": [
@@ -2475,7 +3989,7 @@ def _stock_symbol_extraction_observation(
             "answer field from a visible search_stock result. The base tool can "
             "return a dictionary with symbol values such as 'NASDAQ:AAPL' or "
             "'AAPL', but agents sometimes fail to normalize and report the symbol "
-            "only. Generate a small deterministic helper named extract_stock_symbol. "
+            "only. Generate a small deterministic tool named extract_stock_symbol. "
             "Input: stock_payload dict returned by search_stock. Return the symbol "
             "string with any exchange prefix removed. Abstain with an empty string "
             "if the payload does not contain a usable string symbol."
@@ -2504,13 +4018,14 @@ def _is_external_answer_extraction_scenario(scenario_name: str) -> bool:
         return False
     if "stock_symbol" in scenario_name or "low_battery" in scenario_name:
         return False
+    if scenario_name.startswith(
+        ("find_temperature", "find_temperature_f_with_location")
+    ):
+        return False
     return scenario_name.startswith(
         (
-            "find_distance_with_location_name",
-            "find_address_with_lat_lon",
             "find_phone_number_with_location_name",
-            "find_temperature",
-            "find_temperature_f_with_location",
+            "find_distance_with_location_name",
             "convert_currency",
             "convert_currency_canonicalize",
         )
@@ -2531,20 +4046,23 @@ def _external_service_answer_extraction_observation(
             "helper named extract_service_answer_field. Input: service_payload dict "
             "copied from a visible result row or dictionary returned by an original "
             "ToolSandbox lookup/conversion tool. Return a dict with answer_value, "
-            "answer_kind, answer_unit, and abstain_reason. Recognize common visible "
-            "fields such as phone_number, address, current_temperature, "
-            "temperature, distance, converted_amount, convertedAmount, amount, and "
-            "value. Return answer_value as a string and preserve any visible unit "
-            "field as answer_unit when present. Abstain with an empty answer_value "
-            "when no supported scalar answer field is present. This helper must "
+            "answer_kind, answer_unit, should_call_downstream_tool, "
+            "downstream_tool_name, downstream_tool_kwargs, exact_final_answer, "
+            "final_answer_recommendation, copy_exactly, and abstain_reason. "
+            "Recognize common visible fields such as phone_number, address, "
+            "distance_km, distance, converted_amount, convertedAmount, amount, "
+            "value, and scalar conversion results. Return answer_value as a "
+            "string and preserve visible unit fields such as currency_code, "
+            "unit, and distance_unit as answer_unit when present. Abstain with "
+            "an empty answer_value when no supported scalar answer field is "
+            "present. This helper must "
             "not call external services itself, must not perform side effects, and "
             "must not replace the original ToolSandbox lookup or conversion call; "
             "it only extracts the final answer from visible output after that "
             "original call returns. Its required_original_tool_calls and "
             "preserves_side_effect_tools must use concrete ToolSandbox producer "
             "names from this list only: search_location_around_lat_lon, "
-            "search_weather_around_lat_lon, search_lat_lon, "
-            "calculate_lat_lon_distance, convert_currency, and unit_conversion. "
+            "search_lat_lon, calculate_lat_lon_distance, and convert_currency. "
             "Do not invent placeholder producer names such as search_service_payload."
         ),
         allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
@@ -2560,20 +4078,12 @@ def _external_service_answer_extraction_observation(
                     "answer_value": "+1 (555) 0100",
                     "answer_kind": "phone_number",
                     "answer_unit": "",
-                    "abstain_reason": "",
-                },
-            ),
-            ToolExample(
-                {
-                    "service_payload": {
-                        "current_temperature": 21.5,
-                        "temperature_unit": "Celsius",
-                    }
-                },
-                {
-                    "answer_value": "21.5",
-                    "answer_kind": "current_temperature",
-                    "answer_unit": "Celsius",
+                    "should_call_downstream_tool": False,
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "exact_final_answer": "+1 (555) 0100",
+                    "final_answer_recommendation": "+1 (555) 0100",
+                    "copy_exactly": True,
                     "abstain_reason": "",
                 },
             ),
@@ -2583,6 +4093,55 @@ def _external_service_answer_extraction_observation(
                     "answer_value": "1 Main St, Springfield",
                     "answer_kind": "address",
                     "answer_unit": "",
+                    "should_call_downstream_tool": False,
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "exact_final_answer": "1 Main St, Springfield",
+                    "final_answer_recommendation": "1 Main St, Springfield",
+                    "copy_exactly": True,
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "service_payload": {
+                        "converted_amount": 123.45,
+                        "currency_code": "EUR",
+                    }
+                },
+                {
+                    "answer_value": "123.45",
+                    "answer_kind": "converted_amount",
+                    "answer_unit": "EUR",
+                    "should_call_downstream_tool": False,
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "exact_final_answer": "123.45 EUR",
+                    "final_answer_recommendation": "123.45 EUR",
+                    "copy_exactly": True,
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "service_payload": {"distance_km": 67.96238310230461},
+                    "requested_unit": "kilometers",
+                    "answer_subject": "Golden Gate Bridge",
+                },
+                {
+                    "answer_value": "67.96238310230461",
+                    "answer_kind": "distance",
+                    "answer_unit": "km",
+                    "should_call_downstream_tool": False,
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "exact_final_answer": (
+                        "You are approximately 67.96 kilometers away from Golden Gate Bridge."
+                    ),
+                    "final_answer_recommendation": (
+                        "You are approximately 67.96 kilometers away from Golden Gate Bridge."
+                    ),
+                    "copy_exactly": True,
                     "abstain_reason": "",
                 },
                 held_out=True,
@@ -2593,6 +4152,12 @@ def _external_service_answer_extraction_observation(
                     "answer_value": "",
                     "answer_kind": "",
                     "answer_unit": "",
+                    "should_call_downstream_tool": False,
+                    "downstream_tool_name": "",
+                    "downstream_tool_kwargs": {},
+                    "exact_final_answer": "",
+                    "final_answer_recommendation": "",
+                    "copy_exactly": False,
                     "abstain_reason": "no_supported_answer_field",
                 },
                 negative_applicability=True,
@@ -2606,11 +4171,9 @@ def _external_service_answer_extraction_observation(
         ),
         failed_tool_calls=(
             "search_location_around_lat_lon",
-            "search_weather_around_lat_lon",
             "search_lat_lon",
             "calculate_lat_lon_distance",
             "convert_currency",
-            "unit_conversion",
         ),
         final_answer_route_mismatch=True,
     )
@@ -2851,6 +4414,10 @@ class CapabilityObservation:
     final_answer_route_mismatch: bool = False
     # "heuristic" = scenario-name prefix only; "transcript_verified" = signal confirmed in transcript
     evidence_source: str = "heuristic"
+    # For clean methodology runs, generation and routing use visible task
+    # context rather than ToolSandbox scenario names.
+    task_context_label: str = ""
+    task_family_key: str = ""
 
     def to_inadequacy_evidence(self) -> StructuredInadequacyEvidence:
         return StructuredInadequacyEvidence(
@@ -2864,8 +4431,16 @@ class CapabilityObservation:
         )
 
     def to_json(self) -> dict[str, Any]:
+        source_task_id_redacted = (
+            self.evidence_source == "visible_task_context"
+            and bool(self.task_context_label)
+        )
+        scenario_label = (
+            self.task_context_label if source_task_id_redacted else self.scenario_name
+        )
         return {
-            "scenario_name": self.scenario_name,
+            "scenario_name": scenario_label,
+            "source_task_id_redacted": source_task_id_redacted,
             "canonical_key": self.canonical_key,
             "observation": self.observation,
             "allowed_families": list(self.allowed_families),
@@ -2881,8 +4456,1090 @@ class CapabilityObservation:
             "generation_allowed": self.generation_allowed,
             "reason": self.reason,
             "evidence_source": self.evidence_source,
+            "task_context_label": self.task_context_label,
+            "task_family_key": self.task_family_key,
             "inadequacy_evidence": self.to_inadequacy_evidence().to_json(),
         }
+
+
+def visible_task_context_from_scenario(scenario: Scenario) -> VisibleTaskContext:
+    """Extract only user-visible task text and available tool names."""
+
+    request = ""
+    try:
+        sandbox_db = scenario.starting_context.get_database(
+            DatabaseNamespace.SANDBOX,
+            get_all_history_snapshots=True,
+            drop_sandbox_message_index=False,
+        )
+        for row in sandbox_db.iter_rows(named=True):
+            if (
+                row.get("sender") == RoleType.USER
+                and row.get("recipient") == RoleType.AGENT
+            ):
+                content = str(row.get("content") or "").strip()
+                if content:
+                    request = content
+    except Exception:
+        request = ""
+    try:
+        available = scenario.starting_context.get_available_tools(
+            scrambling_allowed=False
+        )
+        tools = tuple(sorted(str(name) for name in available))
+    except Exception:
+        tools = ()
+    signals = _visible_task_signals(request, tools)
+    return VisibleTaskContext(
+        user_request=request,
+        available_tools=tools,
+        signals=signals,
+        primary_family_key=_visible_primary_family(signals),
+    )
+
+
+_UUID_LIKE_RE = re.compile(
+    r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
+    re.IGNORECASE,
+)
+
+
+def _has_phone_like_value(text: str) -> bool:
+    scrubbed = _UUID_LIKE_RE.sub(" ", text)
+    for match in re.finditer(
+        r"(?<![A-Za-z0-9])\+?\d[\d\s().-]{6,}\d(?![A-Za-z0-9])",
+        scrubbed,
+    ):
+        digit_count = len(re.sub(r"\D", "", match.group(0)))
+        if 7 <= digit_count <= 15:
+            return True
+    return False
+
+
+def _has_any(text: str, tokens: tuple[str, ...]) -> bool:
+    return any(token in text for token in tokens)
+
+
+def _visible_task_signals(
+    user_request: str,
+    available_tools: tuple[str, ...],
+) -> tuple[str, ...]:
+    text = user_request.lower()
+    tools = set(available_tools)
+    signals: list[str] = []
+    has_visible_identifier = bool(
+        re.search(r"\b(?:id|person id|contact id)\s+[a-z0-9-]{6,}", text)
+    )
+    contacted_recency_target = _has_any(
+        text,
+        (
+            "whoever i contacted",
+            "whoever contacted me",
+            "contacted last",
+            "last contacted",
+            "i contacted last",
+            "contacted most recently",
+            "most recently contacted",
+            "who did i talk to",
+            "who did i speak to",
+            "talk to last",
+            "talked to last",
+            "speak to last",
+            "spoke to last",
+            "last talked",
+            "last spoke",
+            "most recently talked",
+            "most recently spoke",
+        ),
+    )
+    message_counterparty_target = (
+        "search_messages" in tools
+        and (
+            contacted_recency_target
+            or _has_any(
+                text,
+                (
+                    "latest",
+                    "oldest",
+                    "recent",
+                    "last message",
+                    "last person",
+                    "last contact",
+                    "most recent message",
+                    "last conversation",
+                    "last chat",
+                ),
+            )
+        )
+        and _has_any(
+            text,
+            (
+                "contacted",
+                "message",
+                "messages",
+                "text",
+                "sent",
+                "asked me",
+                "talk",
+                "talked",
+                "speak",
+                "spoke",
+                "chat",
+                "conversation",
+            ),
+        )
+    )
+    recency_or_indirect_target = message_counterparty_target or _has_any(
+        text,
+        (
+            "latest",
+            "oldest",
+            "recent",
+            "last message",
+            "last person",
+            "last contact",
+            "first text",
+            "first ever",
+            "first message",
+            "earliest",
+            "most recent",
+            "who sent",
+            "whoever i contacted",
+            "contacted last",
+            "last contacted",
+            "asked me",
+            "sent me",
+            "which contact",
+            "who did i talk to",
+            "who did i speak to",
+            "talk to last",
+            "talked to last",
+            "spoke to last",
+            "last conversation",
+            "last chat",
+        ),
+    )
+
+    def add(signal: str, condition: bool) -> None:
+        if condition and signal not in signals:
+            signals.append(signal)
+
+    add("insufficient_information", "insufficient information" in text)
+    add("has_phone_number", _has_phone_like_value(text))
+    add(
+        "contact",
+        bool(
+            tools
+            & {"search_contacts", "add_contact", "modify_contact", "remove_contact"}
+        )
+        and (
+            "has_phone_number" in signals
+            or has_visible_identifier
+            or _has_any(
+                text,
+                (
+                    "contact",
+                    "phone",
+                    "relationship",
+                    "person",
+                    "friend",
+                    "enemy",
+                    "enemies",
+                    "coworker",
+                    "coworkers",
+                    "boss",
+                    "bosses",
+                ),
+            )
+        ),
+    )
+    add(
+        "add_contact",
+        "add_contact" in tools
+        and _has_any(text, ("add ", "create ", "save "))
+        and "contact" in text,
+    )
+    remove_contact_intent = _has_any(
+        text,
+        (
+            "remove",
+            "delete",
+            "get rid",
+            "get him out",
+            "get her out",
+            "get them out",
+            "get this person out",
+            "out of my contact",
+            "out of my contacts",
+        ),
+    )
+    add(
+        "requested_remove_contact",
+        remove_contact_intent and ("contact" in text or "has_phone_number" in signals),
+    )
+    add(
+        "remove_contact",
+        "remove_contact" in tools and "requested_remove_contact" in signals,
+    )
+    add(
+        "modify_contact",
+        "modify_contact" in tools
+        and _has_any(text, ("update", "modify", "change"))
+        and "contact" in text,
+    )
+    phone_contact_target_lookup = "has_phone_number" in signals and (
+        "requested_remove_contact" in signals or "modify_contact" in signals
+    )
+    underspecified_contact_action_lookup = (
+        "requested_remove_contact" in signals
+        and "search_contacts" in tools
+        and not has_visible_identifier
+    )
+    add(
+        "contact_lookup",
+        "search_contacts" in tools
+        and (
+            _has_any(
+                text,
+                ("phone number", "relationship", "who is", "what is", "who are"),
+            )
+            or phone_contact_target_lookup
+            or underspecified_contact_action_lookup
+        )
+        and (
+            _has_any(
+                text,
+                ("contact", "friend", "enemy", "boss", "coworker", "phone", "number"),
+            )
+            or "has_phone_number" in signals
+        ),
+    )
+    relationship_update_request = _has_any(
+        text,
+        ("update", "modify", "change", "make", "turn", "set "),
+    )
+    relationship_group_request = _has_any(
+        text,
+        (
+            "all ",
+            "all of",
+            "everyone",
+            "them",
+            "friends",
+            "enemies",
+            "coworkers",
+            "bosses",
+        ),
+    )
+    relationship_target_request = _has_any(
+        text,
+        (
+            "friend",
+            "friends",
+            "enemy",
+            "enemies",
+            "coworker",
+            "coworkers",
+            "boss",
+            "bosses",
+            "relationship",
+        ),
+    )
+    relationship_group_lookup_for_possible_followup = (
+        "search_contacts" in tools
+        and "modify_contact" in tools
+        and not relationship_update_request
+        and relationship_group_request
+        and relationship_target_request
+        and _has_any(text, ("who are", "which", "list", "show", "find", "search"))
+    )
+    add(
+        "relationship_batch_update",
+        "modify_contact" in tools
+        and "search_contacts" in tools
+        and relationship_group_request
+        and relationship_target_request
+        and (
+            relationship_update_request
+            or relationship_group_lookup_for_possible_followup
+        ),
+    )
+    direct_scalar_action = (
+        not recency_or_indirect_target
+        and "relationship_batch_update" not in signals
+        and bool(
+            tools
+            & {
+                "add_contact",
+                "modify_contact",
+                "remove_contact",
+                "send_message_with_phone_number",
+            }
+        )
+        and (
+            (
+                "send_message_with_phone_number" in tools
+                and "has_phone_number" in signals
+                and _has_any(text, ("send", "text", "message"))
+            )
+            or (
+                "add_contact" in tools
+                and "add_contact" in signals
+                and "has_phone_number" in signals
+            )
+            or (
+                bool(tools & {"modify_contact", "remove_contact"})
+                and has_visible_identifier
+                and _has_any(text, ("remove", "delete", "update", "modify"))
+            )
+        )
+    )
+    add("direct_contact_action", direct_scalar_action)
+    add(
+        "safe_abstain_needed",
+        "requested_remove_contact" in signals
+        and (
+            "remove_contact" not in tools
+            or ("search_contacts" not in tools and _has_phone_like_value(text))
+        ),
+    )
+    add(
+        "safe_abstain_needed",
+        "modify_contact" in signals
+        and (
+            "modify_contact" not in tools
+            or (
+                "search_contacts" not in tools
+                and not ("id " in text or "person" in text)
+            )
+        ),
+    )
+
+    add(
+        "message",
+        bool(tools & {"search_messages", "send_message_with_phone_number"})
+        and _has_any(
+            text,
+            (
+                "message",
+                "messages",
+                "text",
+                "contacted",
+                "send",
+                "sent me",
+                "asked me",
+            ),
+        ),
+    )
+    message_lookup_intent = _has_any(
+        text,
+        (
+            "find",
+            "look for",
+            "search",
+            "what does",
+            "what's",
+            "which message",
+            "which text",
+            "oldest",
+            "latest",
+            "earliest",
+            "first message",
+            "first text",
+            "first ever",
+            "last message",
+            "last text",
+            "most recent",
+            "sent me",
+            "asked me",
+        ),
+    )
+    explicit_send_message_intent = (
+        "send_message_with_phone_number" in tools
+        and not message_lookup_intent
+        and (
+            _has_any(text, ("send", "message to", "text to", "tell ", "ask "))
+            or bool(re.search(r"\btext\s+(?:\+?\d|[a-z][a-z0-9_'-]+)\b", text))
+        )
+    )
+    add("send_message", explicit_send_message_intent)
+    add(
+        "named_message_recipient",
+        "search_contacts" in tools
+        and "send_message" in signals
+        and not _has_phone_like_value(text),
+    )
+    add(
+        "safe_abstain_needed",
+        "send_message" in signals
+        and "search_contacts" not in tools
+        and not _has_phone_like_value(text),
+    )
+    message_search_followup_possible = (
+        "search_messages" in tools
+        and _has_any(text, ("find", "look for", "search"))
+        and _has_any(text, ("message", "messages", "text"))
+        and not _has_any(text, ("send", "sent me", "asked me", "which phone number"))
+    )
+    add(
+        "message_recency",
+        "search_messages" in tools
+        and _has_any(
+            text,
+            (
+                "latest",
+                "oldest",
+                "earliest",
+                "recent",
+                "last message",
+                "last text",
+                "first message",
+                "first text",
+                "first ever",
+                "most recent",
+            ),
+        ),
+    )
+    add("message_search_followup_possible", message_search_followup_possible)
+    add(
+        "message_counterparty_lookup",
+        "search_messages" in tools
+        and _has_any(
+            text,
+            (
+                "which phone number",
+                "who asked",
+                "who sent",
+                "asked me",
+                "sent me",
+                "which contact",
+                "whoever i contacted",
+                "contacted last",
+                "last contacted",
+                "who did i talk to",
+                "who did i speak to",
+                "talk to last",
+                "talked to last",
+                "spoke to last",
+                "last conversation",
+                "last chat",
+            ),
+        ),
+    )
+    add(
+        "message_counterparty_update",
+        "modify_contact" in tools
+        and "search_messages" in tools
+        and message_counterparty_target
+        and _has_any(text, ("update", "modify", "change")),
+    )
+
+    request_mentions_reminder = _has_any(text, ("reminder", "remind", "todo", "to-do"))
+    add(
+        "reminder",
+        bool(
+            tools
+            & {"add_reminder", "modify_reminder", "remove_reminder", "search_reminder"}
+        )
+        and request_mentions_reminder,
+    )
+    add(
+        "reminder_create",
+        "add_reminder" in tools and _has_any(text, ("remind", "reminder", "todo")),
+    )
+    add(
+        "reminder_modify",
+        "modify_reminder" in tools
+        and _has_any(text, ("modify", "update", "change"))
+        and "reminder" in text,
+    )
+    add(
+        "reminder_remove",
+        "remove_reminder" in tools
+        and _has_any(text, ("remove", "delete", "get rid", "cancel", "clear"))
+        and "reminder" in text,
+    )
+    add(
+        "relative_time",
+        _has_any(
+            text,
+            (
+                "tomorrow",
+                "tonight",
+                "next ",
+                "in a week",
+                "in two",
+                "days from",
+                "weeks from",
+                "today",
+                "yesterday",
+                "upcoming",
+                "later",
+            ),
+        ),
+    )
+    add(
+        "weekday_time",
+        _has_any(
+            text,
+            (
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+            ),
+        ),
+    )
+    add("explicit_time", bool(re.search(r"\b\d{1,2}(:\d{2})?\s*(am|pm)\b", text)))
+    add(
+        "location_phrase",
+        bool(tools & {"search_location_around_lat_lon", "search_lat_lon"})
+        and _has_any(
+            text,
+            (
+                " at ",
+                " near ",
+                " around ",
+                "location",
+                "address",
+                "distance",
+                "how far",
+                "how many km",
+                "how many miles",
+                "km to",
+                "miles to",
+                "phone number of",
+            ),
+        ),
+    )
+    recency_search_domain = bool(
+        {
+            "message",
+            "message_recency",
+            "message_counterparty_lookup",
+            "message_counterparty_update",
+            "reminder",
+            "reminder_create",
+            "reminder_modify",
+            "reminder_remove",
+        }
+        & set(signals)
+    )
+    add(
+        "recency_search",
+        recency_search_domain
+        and bool(tools & {"search_reminder", "search_messages"})
+        and _has_any(
+            text,
+            (
+                "latest",
+                "oldest",
+                "earliest",
+                "first ",
+                "first ever",
+                "recent",
+                "yesterday",
+                "today",
+                "upcoming",
+                "next",
+                "later",
+                "made",
+                "created",
+                "last ",
+            ),
+        ),
+    )
+    add(
+        "recency_action",
+        "recency_search" in signals
+        and "reminder" in signals
+        and bool(tools & {"modify_reminder", "remove_reminder"}),
+    )
+
+    add(
+        "device_status_read",
+        bool(
+            tools
+            & {
+                "get_wifi_status",
+                "get_cellular_service_status",
+                "get_location_service_status",
+                "get_low_battery_mode_status",
+            }
+        )
+        and _has_any(text, ("is my", "whether", "status", "check"))
+        and _has_any(text, ("wifi", "cellular", "location", "low battery")),
+    )
+    direct_device_state_request = bool(
+        tools
+        & {
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+            "set_low_battery_mode_status",
+        }
+    ) and (
+        _has_any(text, ("turn on", "turn off", "enable", "disable"))
+        and _has_any(text, ("wifi", "cellular", "location", "low battery"))
+    )
+    dependent_state_need = _has_any(
+        text,
+        (
+            "resolve any issue",
+            "issue alone",
+            "whatever you need",
+            "if needed",
+            "can't send",
+            "cannot send",
+            "can't access",
+            "cannot access",
+            "can't connect",
+            "cannot connect",
+            "cellphone signal",
+            "current location",
+            "connected to the internet",
+            "access my current location",
+            "so you can",
+            "in order to",
+            "to search",
+            "to send",
+            "to find",
+        ),
+    )
+    add("direct_device_state_action", direct_device_state_request)
+    add(
+        "device_state_action",
+        direct_device_state_request or dependent_state_need,
+    )
+    add(
+        "state_precondition_possible",
+        "safe_abstain_needed" not in signals
+        and bool(
+            tools
+            & {
+                "set_wifi_status",
+                "set_cellular_service_status",
+                "set_location_service_status",
+                "set_low_battery_mode_status",
+            }
+        )
+        and bool(
+            tools
+            & {
+                "send_message_with_phone_number",
+                "search_location_around_lat_lon",
+                "search_lat_lon",
+                "calculate_lat_lon_distance",
+                "search_holiday",
+            }
+        )
+        and (
+            dependent_state_need
+            or _has_any(
+                text, ("cellular off", "wifi off", "location off", "low battery")
+            )
+        ),
+    )
+
+    add(
+        "holiday",
+        "search_holiday" in tools
+        and _has_any(
+            text,
+            (
+                "holiday",
+                "christmas",
+                "thanksgiving",
+                "easter",
+                "halloween",
+                "memorial day",
+                "labor day",
+                "independence day",
+                "veterans day",
+            ),
+        ),
+    )
+    add(
+        "calendar_distance",
+        "holiday" in signals
+        and _has_any(text, ("how many days", "days until", "days till", "when is")),
+    )
+    add(
+        "currency_lookup",
+        "convert_currency" in tools
+        and (
+            _has_any(
+                text, ("currency", "convert", "usd", "cny", "eur", "gbp", "jpy", "$")
+            )
+            or "how much is" in text
+        ),
+    )
+    contact_workflow = bool(
+        {
+            "contact",
+            "add_contact",
+            "requested_remove_contact",
+            "remove_contact",
+            "modify_contact",
+            "direct_contact_action",
+            "relationship_batch_update",
+        }
+        & set(signals)
+    )
+    external_query_text = _has_any(
+        text,
+        (
+            "temperature",
+            "temp",
+            "weather",
+            "celsius",
+            "fahrenheit",
+            "distance",
+            "how far",
+            "how many km",
+            "how many miles",
+            "km to",
+            "miles to",
+            "currency",
+            "convert",
+            "stock",
+            "address",
+            "business",
+            "restaurant",
+            "store",
+            "venue",
+        ),
+    ) or (
+        "phone number" in text
+        and not contact_workflow
+        and _has_any(
+            text,
+            (
+                "find",
+                "what is",
+                "what's",
+                "lookup",
+                "look up",
+                "business",
+                "restaurant",
+                "store",
+                "venue",
+            ),
+        )
+    )
+    add(
+        "external_lookup",
+        bool(
+            tools
+            & {
+                "search_lat_lon",
+                "search_location_around_lat_lon",
+                "search_weather_around_lat_lon",
+                "calculate_lat_lon_distance",
+                "convert_currency",
+                "search_stock",
+            }
+        )
+        and (external_query_text or "currency_lookup" in signals),
+    )
+    add(
+        "stock_lookup",
+        "search_stock" in tools and _has_any(text, ("stock", "ticker", "symbol")),
+    )
+    add(
+        "service_answer_extraction",
+        "external_lookup" in signals
+        and "stock_lookup" not in signals
+        and bool(
+            tools
+            & {
+                "search_lat_lon",
+                "search_location_around_lat_lon",
+                "search_weather_around_lat_lon",
+                "calculate_lat_lon_distance",
+                "convert_currency",
+            }
+        )
+        and (
+            _has_any(
+                text,
+                (
+                    "what is",
+                    "what's",
+                    "find",
+                    "how far",
+                    "how many km",
+                    "how many miles",
+                    "km to",
+                    "miles to",
+                    "convert",
+                    "phone number",
+                    "address",
+                    "distance",
+                    "temperature",
+                    "temp",
+                    "weather",
+                    "forecast",
+                    "celsius",
+                    "fahrenheit",
+                ),
+            )
+            or "currency_lookup" in signals
+        ),
+    )
+    return tuple(signals)
+
+
+def _visible_primary_family(signals: tuple[str, ...]) -> str:
+    priority = (
+        "relationship_batch_update",
+        "named_message_recipient",
+        "message_counterparty_lookup",
+        "message_counterparty_update",
+        "recency_action",
+        "recency_search",
+        "reminder_create",
+        "add_contact",
+        "direct_contact_action",
+        "contact_lookup",
+        "device_state_action",
+        "device_status_read",
+        "stock_lookup",
+        "holiday",
+        "service_answer_extraction",
+        "external_lookup",
+        "message",
+        "contact",
+        "reminder",
+    )
+    for signal in priority:
+        if signal in signals:
+            return signal
+    return "general_visible_task"
+
+
+def _visible_observation(
+    observation: CapabilityObservation,
+    context: VisibleTaskContext,
+    task_family_key: str,
+    reason: str,
+) -> CapabilityObservation:
+    sanitized_observation = _sanitize_visible_observation_text(observation.observation)
+    return replace(
+        observation,
+        observation=sanitized_observation,
+        task_context_label=context.generation_label(),
+        task_family_key=task_family_key,
+        evidence_source="visible_task_context",
+        reason=f"visible_task_context:{reason}",
+    )
+
+
+def _sanitize_visible_observation_text(text: str) -> str:
+    sanitized = text
+    sanitized = re.sub(
+        r"Include positive triggers for search_name_with_relationship, "
+        r"search_phone_number_with_name, and search_relationship_with_phone_number, "
+        r"and remove_contact_by_phone\.",
+        "Include positive triggers for visible contact lookup, contact field answer, "
+        "and contact side-effect target-resolution requests.",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"and scenario families beginning update_contact_relationship_with_relationship\.",
+        "and visible relationship-group update wording.",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"scenario families beginning [A-Za-z0-9_]+",
+        "visible task families for the same capability",
+        sanitized,
+    )
+    return sanitized
+
+
+def classify_visible_task_observations(
+    scenario_name: str,
+    scenario: Scenario,
+) -> tuple[CapabilityObservation, ...]:
+    """Classify tool-birth opportunities from visible task text and tool schemas."""
+
+    context = visible_task_context_from_scenario(scenario)
+    signals = set(context.signals)
+    observations: list[CapabilityObservation] = []
+
+    def add(
+        observation: CapabilityObservation,
+        task_family_key: str,
+        reason: str,
+    ) -> None:
+        observations.append(
+            _visible_observation(observation, context, task_family_key, reason)
+        )
+
+    if "insufficient_information" in signals or "safe_abstain_needed" in signals:
+        add(
+            _safe_action_or_abstain_observation(scenario_name),
+            "safe_abstain",
+            "insufficient_information_guard",
+        )
+    if "device_status_read" in signals and _direct_status_lookup_enabled():
+        add(
+            _device_status_lookup_observation(scenario_name),
+            "device_status_read",
+            "read_only_device_status",
+        )
+    if "device_state_action" in signals or "state_precondition_possible" in signals:
+        add(
+            _plan_device_state_action_sequence_observation(scenario_name),
+            "device_state_action",
+            "visible_device_or_precondition_action",
+        )
+    reminder_argument_gap = bool(
+        "relative_time" in signals
+        or "location_phrase" in signals
+        or "state_precondition_possible" in signals
+        or "device_state_action" in signals
+    )
+    if "reminder_create" in signals and reminder_argument_gap:
+        add(
+            _reminder_optional_location_argument_observation(scenario_name),
+            "reminder_create",
+            "visible_reminder_creation",
+        )
+    if "reminder_create" in signals:
+        if "relative_time" in signals and "weekday_time" not in signals:
+            add(
+                _relative_day_time_timestamp_observation(scenario_name),
+                "relative_time",
+                "visible_relative_time",
+            )
+        if "weekday_time" in signals:
+            add(
+                _next_weekday_timestamp_observation(scenario_name),
+                "weekday_time",
+                "visible_weekday_time",
+            )
+        if "location_phrase" in signals:
+            add(
+                _location_search_argument_observation(scenario_name),
+                "location_phrase",
+                "visible_location_phrase",
+            )
+    if "add_contact" in signals:
+        add(
+            _add_contact_argument_observation(scenario_name),
+            "add_contact",
+            "visible_add_contact_request",
+        )
+    if "direct_contact_action" in signals:
+        add(
+            _direct_scalar_contact_action_observation(scenario_name),
+            "direct_contact_action",
+            "visible_scalar_contact_or_message_action",
+        )
+    if "contact_lookup" in signals:
+        add(
+            _contact_lookup_query_planner_observation(scenario_name),
+            "contact_lookup",
+            "visible_contact_lookup_constraint",
+        )
+    if "named_message_recipient" in signals:
+        add(
+            _send_message_contact_lookup_observation(scenario_name),
+            "named_message_recipient",
+            "visible_named_message_recipient",
+        )
+    if "relationship_batch_update" in signals:
+        add(
+            _contact_relationship_batch_update_observation(scenario_name),
+            "relationship_batch_update",
+            "visible_relationship_batch_update",
+        )
+    if "message_counterparty_update" in signals:
+        add(
+            _message_counterparty_search_plan_observation(scenario_name),
+            "message_counterparty_update",
+            "visible_message_counterparty_update_search_plan",
+        )
+        add(
+            _message_counterparty_contact_update_observation(scenario_name),
+            "message_counterparty_update",
+            "visible_message_counterparty_update",
+        )
+    if "message_counterparty_lookup" in signals:
+        add(
+            _message_counterparty_search_plan_observation(scenario_name),
+            "message_counterparty_lookup",
+            "visible_message_counterparty_lookup",
+        )
+    if "recency_search" in signals:
+        add(
+            _resolve_search_window_or_bounds_observation(scenario_name),
+            "recency_search",
+            "visible_recency_search",
+        )
+        add(
+            _latest_record_selection_observation(scenario_name),
+            "recency_search",
+            "visible_recency_selection",
+        )
+        if "message_recency" in signals:
+            add(
+                _message_content_by_recency_observation(scenario_name),
+                "message_recency",
+                "visible_message_recency_answer",
+            )
+    message_recency_visible = (
+        "message_recency" in signals or "message_search_followup_possible" in signals
+    )
+    if message_recency_visible and "recency_search" not in signals:
+        add(
+            _message_content_by_recency_observation(scenario_name),
+            "message_recency",
+            "visible_message_recency_answer",
+        )
+    if "recency_action" in signals:
+        add(
+            _recency_action_target_observation(scenario_name),
+            "recency_action",
+            "visible_recency_side_effect_target",
+        )
+    if "location_phrase" in signals and "external_lookup" in signals:
+        add(
+            _location_search_argument_observation(scenario_name),
+            "location_phrase",
+            "visible_external_location_phrase",
+        )
+    if "holiday" in signals:
+        add(
+            _holiday_search_args_observation(scenario_name),
+            "holiday_lookup",
+            "visible_holiday_lookup",
+        )
+        if "calendar_distance" in signals:
+            add(
+                _days_between_timestamps_observation(scenario_name),
+                "calendar_distance",
+                "visible_calendar_distance",
+            )
+    if "stock_lookup" in signals:
+        add(
+            _stock_symbol_extraction_observation(scenario_name),
+            "stock_lookup",
+            "visible_stock_lookup",
+        )
+    if "service_answer_extraction" in signals:
+        add(
+            _external_service_answer_extraction_observation(scenario_name),
+            "service_answer_extraction",
+            "visible_service_answer",
+        )
+
+    return tuple(observations)
 
 
 def classify_scenario_observations(
@@ -2971,9 +5628,11 @@ def classify_scenario_observations(
                         "reminder but often write the wrong timestamp. Generate a "
                         "small deterministic canonicalizer named "
                         "relative_day_time_to_timestamp that accepts current_timestamp, "
-                        "day_offset, hour, minute, and local_utc_offset_hours. Use "
-                        "local_utc_offset_hours=-4 for the current ToolSandbox local "
-                        "environment unless another offset is explicitly known."
+                        "day_offset, hour, minute, current_datetime_info, and optional "
+                        "local_utc_offset_hours. current_datetime_info must be the "
+                        "visible dict returned by timestamp_to_datetime_info("
+                        "current_timestamp), so the helper preserves ToolSandbox "
+                        "local time without hard-coding a timezone."
                     ),
                     allowed_families=(str(ToolFamily.CANONICALIZER),),
                     validation_examples=(
@@ -2983,7 +5642,16 @@ def classify_scenario_observations(
                                 "day_offset": 1,
                                 "hour": 17,
                                 "minute": 0,
-                                "local_utc_offset_hours": -4,
+                                "local_utc_offset_hours": 0,
+                                "current_datetime_info": {
+                                    "year": 2026,
+                                    "month": 4,
+                                    "day": 28,
+                                    "hour": 22,
+                                    "minute": 15,
+                                    "second": 6,
+                                    "isoweekday": 2,
+                                },
                             },
                             1777496400.0,
                         ),
@@ -2993,7 +5661,16 @@ def classify_scenario_observations(
                                 "day_offset": 2,
                                 "hour": 8,
                                 "minute": 30,
-                                "local_utc_offset_hours": -4,
+                                "local_utc_offset_hours": 0,
+                                "current_datetime_info": {
+                                    "year": 2026,
+                                    "month": 4,
+                                    "day": 28,
+                                    "hour": 22,
+                                    "minute": 15,
+                                    "second": 6,
+                                    "isoweekday": 2,
+                                },
                             },
                             1777552200.0,
                         ),
@@ -3015,6 +5692,9 @@ def classify_scenario_observations(
             observations.append(_latest_record_selection_observation(scenario_name))
         if _is_message_counterparty_contact_update_scenario(scenario_name):
             observations.append(
+                _message_counterparty_search_plan_observation(scenario_name)
+            )
+            observations.append(
                 _message_counterparty_contact_update_observation(scenario_name)
             )
         if _is_recency_action_target_scenario(scenario_name):
@@ -3023,7 +5703,9 @@ def classify_scenario_observations(
             observations.append(
                 _post_selection_side_effect_args_observation(scenario_name)
             )
-        if _is_medium_grain_constraint_action_scenario(scenario_name):
+        if _is_medium_grain_constraint_action_scenario(
+            scenario_name
+        ) and not _is_contact_relationship_batch_update_scenario(scenario_name):
             observations.append(
                 _constraint_to_action_planner_observation(scenario_name)
             )
@@ -3043,10 +5725,25 @@ def classify_scenario_observations(
     if similarity < 1.0 and _is_reminder_optional_location_argument_scenario(
         scenario_name
     ):
-        return (_reminder_optional_location_argument_observation(scenario_name),)
+        observations = [_reminder_optional_location_argument_observation(scenario_name)]
+        if _is_reminder_location_search_argument_scenario(scenario_name):
+            observations.append(_location_search_argument_observation(scenario_name))
+        if _is_direct_service_precondition_scenario(scenario_name):
+            observations.append(
+                _plan_device_state_action_sequence_observation(scenario_name)
+            )
+        return tuple(observations)
 
     if similarity < 1.0 and _is_contact_update_by_id_scenario(scenario_name):
         return (_contact_update_by_id_observation(scenario_name),)
+
+    if similarity < 1.0 and _is_direct_scalar_contact_action_scenario(scenario_name):
+        return (_direct_scalar_contact_action_observation(scenario_name),)
+
+    if similarity < 1.0 and _is_contact_relationship_batch_update_scenario(
+        scenario_name
+    ):
+        return (_contact_relationship_batch_update_observation(scenario_name),)
 
     if similarity < 1.0 and _is_medium_grain_constraint_action_scenario(scenario_name):
         return (_constraint_to_action_planner_observation(scenario_name),)
@@ -3063,6 +5760,9 @@ def classify_scenario_observations(
             observations.append(_latest_record_selection_observation(scenario_name))
         if _is_message_counterparty_contact_update_scenario(scenario_name):
             observations.append(
+                _message_counterparty_search_plan_observation(scenario_name)
+            )
+            observations.append(
                 _message_counterparty_contact_update_observation(scenario_name)
             )
         if _is_recency_action_target_scenario(scenario_name):
@@ -3071,7 +5771,11 @@ def classify_scenario_observations(
             observations.append(
                 _post_selection_side_effect_args_observation(scenario_name)
             )
-        if _is_medium_grain_constraint_action_scenario(scenario_name):
+        if _is_contact_relationship_batch_update_scenario(scenario_name):
+            observations.append(
+                _contact_relationship_batch_update_observation(scenario_name)
+            )
+        elif _is_medium_grain_constraint_action_scenario(scenario_name):
             observations.append(
                 _constraint_to_action_planner_observation(scenario_name)
             )
@@ -3095,11 +5799,18 @@ def classify_scenario_observations(
             observations.append(
                 _post_selection_side_effect_args_observation(scenario_name)
             )
-        if _is_medium_grain_constraint_action_scenario(scenario_name):
+        if _is_contact_relationship_batch_update_scenario(scenario_name):
+            observations.append(
+                _contact_relationship_batch_update_observation(scenario_name)
+            )
+        elif _is_medium_grain_constraint_action_scenario(scenario_name):
             observations.append(
                 _constraint_to_action_planner_observation(scenario_name)
             )
         return tuple(observations)
+
+    if similarity < 1.0 and _is_add_contact_action_scenario(scenario_name):
+        return (_add_contact_argument_observation(scenario_name),)
 
     if similarity < 1.0 and _is_visible_record_constraint_scenario(scenario_name):
         observations = []
@@ -3117,7 +5828,11 @@ def classify_scenario_observations(
             observations.append(
                 _post_selection_side_effect_args_observation(scenario_name)
             )
-        if _is_medium_grain_constraint_action_scenario(scenario_name):
+        if _is_contact_relationship_batch_update_scenario(scenario_name):
+            observations.append(
+                _contact_relationship_batch_update_observation(scenario_name)
+            )
+        elif _is_medium_grain_constraint_action_scenario(scenario_name):
             observations.append(
                 _constraint_to_action_planner_observation(scenario_name)
             )
@@ -3126,6 +5841,9 @@ def classify_scenario_observations(
     if similarity < 1.0 and scenario_name.startswith("find_days_till_holiday"):
         return (_days_between_timestamps_observation(scenario_name),)
 
+    if similarity < 1.0 and _is_holiday_timestamp_scenario(scenario_name):
+        return (_holiday_search_args_observation(scenario_name),)
+
     if similarity < 1.0 and scenario_name.startswith(
         "find_stock_symbol_with_company_name"
     ):
@@ -3133,6 +5851,9 @@ def classify_scenario_observations(
 
     if similarity < 1.0 and _is_external_answer_extraction_scenario(scenario_name):
         return (_external_service_answer_extraction_observation(scenario_name),)
+
+    if similarity < 1.0 and _is_device_status_lookup_scenario(scenario_name):
+        return (_device_status_lookup_observation(scenario_name),)
 
     if similarity < 1.0 and _is_direct_service_precondition_scenario(scenario_name):
         observations = [_next_service_tool_call_observation(scenario_name)]
@@ -3186,16 +5907,23 @@ def classify_planned_scenario_observations(
     paying one failure per helper family before the registry can improve.
     """
 
+    if _scenario_name_birth_disabled():
+        return ()
+
     observations: list[CapabilityObservation] = []
 
     if "insufficient_information" in scenario_name:
         observations.append(_safe_action_or_abstain_observation(scenario_name))
+    if _is_medium_grain_constraint_action_scenario(scenario_name):
+        observations.append(_constraint_to_action_planner_observation(scenario_name))
     if _is_next_weekday_reminder_scenario(scenario_name):
         observations.append(_next_weekday_timestamp_observation(scenario_name))
     if _is_reminder_optional_location_argument_scenario(scenario_name):
         observations.append(
             _reminder_optional_location_argument_observation(scenario_name)
         )
+    if _is_reminder_location_search_argument_scenario(scenario_name):
+        observations.append(_location_search_argument_observation(scenario_name))
     if _is_contact_update_by_id_scenario(scenario_name):
         observations.append(_contact_update_by_id_observation(scenario_name))
     if _is_contact_lookup_query_scenario(scenario_name):
@@ -3208,6 +5936,9 @@ def classify_planned_scenario_observations(
         observations.append(_send_message_contact_lookup_observation(scenario_name))
     if _is_message_counterparty_contact_update_scenario(scenario_name):
         observations.append(
+            _message_counterparty_search_plan_observation(scenario_name)
+        )
+        observations.append(
             _message_counterparty_contact_update_observation(scenario_name)
         )
     if _is_message_recency_extreme_scenario(scenario_name):
@@ -3216,17 +5947,34 @@ def classify_planned_scenario_observations(
         observations.append(_recency_action_target_observation(scenario_name))
     if _is_post_selection_side_effect_prep_scenario(scenario_name):
         observations.append(_post_selection_side_effect_args_observation(scenario_name))
-    if scenario_name.startswith("modify_reminder_with_recency_latest"):
+    if scenario_name.startswith(
+        (
+            "modify_reminder_with_recency_latest",
+            "add_reminder_content_and_week_delta_and_time",
+        )
+    ):
         observations.append(_relative_day_time_timestamp_observation(scenario_name))
     if _is_search_window_or_bounds_scenario(scenario_name):
         observations.append(_resolve_search_window_or_bounds_observation(scenario_name))
     if scenario_name.startswith("find_days_till_holiday"):
         observations.append(_days_between_timestamps_observation(scenario_name))
+    if _is_holiday_timestamp_scenario(scenario_name):
+        observations.append(_holiday_search_args_observation(scenario_name))
+    if _is_external_answer_extraction_scenario(scenario_name):
+        observations.append(
+            _external_service_answer_extraction_observation(scenario_name)
+        )
+    if _is_direct_scalar_contact_action_scenario(scenario_name):
+        observations.append(_direct_scalar_contact_action_observation(scenario_name))
+    if _is_add_contact_action_scenario(scenario_name):
+        observations.append(_add_contact_argument_observation(scenario_name))
     if _is_direct_service_precondition_scenario(scenario_name):
         observations.append(
             _plan_device_state_action_sequence_observation(scenario_name)
         )
         observations.append(_next_service_tool_call_observation(scenario_name))
+    if _is_device_status_lookup_scenario(scenario_name):
+        observations.append(_device_status_lookup_observation(scenario_name))
 
     planned: list[CapabilityObservation] = []
     for observation in observations:

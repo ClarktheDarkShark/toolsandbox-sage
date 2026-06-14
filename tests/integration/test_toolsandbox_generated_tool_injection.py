@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
-from sage_ts.orchestration.toy_mechanism import canonicalizer_tool
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.toolsandbox_integration import (
@@ -22,6 +21,35 @@ from tool_sandbox.common.message_conversion import Message
 from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_conversion import convert_to_openai_tool
 from tool_sandbox.roles.execution_environment import respond_to_single_message
+
+
+def canonicalizer_tool() -> GeneratedTool:
+    spec = ToolSpec(
+        tool_name="canonicalize_connectivity_label",
+        family=ToolFamily.CANONICALIZER,
+        description="Normalize connectivity labels to stable internal labels.",
+        inputs=(ToolInput("label", "str", "Raw connectivity label."),),
+        output_annotation="str",
+        generalization_rationale=(
+            "Connectivity labels recur across ToolSandbox scenarios with spacing, "
+            "punctuation, and synonym variants."
+        ),
+        inadequacy_evidence=(
+            "ToolSandbox contains connectivity state tools, but no reusable tool for "
+            "normalizing noisy user-facing connectivity labels."
+        ),
+    )
+    code = """
+def canonicalize_connectivity_label(label: str) -> str:
+    cleaned = label.strip().lower().replace("-", " ").replace("_", " ")
+    cleaned = " ".join(cleaned.split())
+    if cleaned in {"wi fi", "wifi", "wireless"}:
+        return "wifi"
+    if cleaned in {"cell", "cellular", "mobile data"}:
+        return "cellular"
+    return cleaned
+"""
+    return GeneratedTool(spec=spec, code=code)
 
 
 def _registry_with_canonicalizer(tmp_path: Path) -> RegistryStore:
@@ -1665,10 +1693,10 @@ def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
     assert tool_name not in unrelated_search.starting_context.name_to_tool
     assert tool_name in suppressed_relative_no_location.starting_context.name_to_tool
     assert tool_name in absolute_date_time.starting_context.name_to_tool
-    assert tool_name not in weekday_relative.starting_context.name_to_tool
+    assert tool_name in weekday_relative.starting_context.name_to_tool
     assert tool_name not in insufficient.starting_context.name_to_tool
     assert tool_name not in modify.starting_context.name_to_tool
-    assert tool_name not in service_precondition.starting_context.name_to_tool
+    assert tool_name in service_precondition.starting_context.name_to_tool
     assert tool_name in applicable.starting_context.name_to_tool
     reminder_helper = applicable.starting_context.name_to_tool[tool_name]
     assert "LAST prep step immediately before" in (reminder_helper.__doc__ or "")
@@ -1953,7 +1981,7 @@ def test_relative_time_helper_only_exposed_on_relative_datetime_scenarios(
     tool_name = "relative_day_time_to_timestamp"
     assert tool_name not in unrelated.starting_context.name_to_tool
     assert tool_name in relative.starting_context.name_to_tool
-    assert tool_name not in whole_week_delta.starting_context.name_to_tool
+    assert tool_name in whole_week_delta.starting_context.name_to_tool
 
 
 def test_recency_bounds_helper_only_exposed_on_creation_recency_tasks(
@@ -2065,8 +2093,10 @@ def test_lifecycle_hides_negative_called_subset_family(
                 "tool_lifecycle": {
                     "prepare_reminder_creation_args": {
                         "decision": "needs_route_repair",
+                        "harmful_called_count": 2,
                         "harmful_called_scenarios": [
-                            "add_reminder_content_and_week_delta_and_time"
+                            "add_reminder_content_and_week_delta_and_time",
+                            "add_reminder_content_and_week_delta_and_time_alt",
                         ],
                     }
                 },
@@ -2090,9 +2120,53 @@ def test_lifecycle_hides_negative_called_subset_family(
     assert "prepare_reminder_creation_args" not in result.starting_context.name_to_tool
 
 
-def test_contact_constraint_helper_is_suppressed_after_low_adoption(
+def test_lifecycle_keeps_mixed_positive_route_repair_visible(
     tmp_path: Path,
 ) -> None:
+    store = _registry_with_reminder_creation_args(tmp_path)
+    (tmp_path / "tool_lifecycle.json").write_text(
+        json.dumps(
+            {
+                "artifact_type": "self_evolution_tool_lifecycle",
+                "tool_lifecycle": {
+                    "prepare_reminder_creation_args": {
+                        "decision": "retain_with_route_repair",
+                        "harmful_called_count": 1,
+                        "helpful_called_count": 20,
+                        "harmful_called_scenarios": [
+                            "add_reminder_content_and_week_delta_and_time"
+                        ],
+                        "route_repair_families": [
+                            "add_reminder_content_and_week_delta_and_time"
+                        ],
+                    }
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    scenario = Scenario(
+        starting_context=ExecutionContext(
+            tool_allow_list=["add_reminder", "end_conversation"]
+        )
+    )
+
+    result = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="add_reminder_content_and_week_delta_and_time_3_distraction_tools",
+    )
+
+    assert "prepare_reminder_creation_args" in result.starting_context.name_to_tool
+
+
+def test_contact_constraint_helper_is_suppressed_after_low_adoption(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE", raising=False)
+    monkeypatch.delenv("SAGE_DIAGNOSTIC_FORCE_TOOL_NAME", raising=False)
     store = _registry_with_contact_constraint_helper(tmp_path)
     scenario = Scenario(
         starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
@@ -2149,6 +2223,12 @@ def test_stock_symbol_helper_only_exposed_on_stock_lookup(
         scenario,
         store,
         scenario_name="find_stock_symbol_with_company_name_low_battery_mode",
+        task_context_text=(
+            "request=What's the stock symbol for Apple? "
+            "tools=search_stock end_conversation "
+            "signals=external_lookup stock_lookup family=stock_lookup"
+        ),
+        task_family_key="stock_lookup",
     )
 
     tool_name = "extract_stock_symbol"

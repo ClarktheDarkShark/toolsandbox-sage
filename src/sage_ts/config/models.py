@@ -28,6 +28,16 @@ MODEL_METADATA: dict[str, dict[str, Any]] = {
         "structured_outputs": True,
         "temperature_supported": False,
     },
+    "gpt-5": {
+        "api_model": "gpt-5",
+        "family": "gpt-5",
+        "context_window": 400000,
+        "max_output_tokens": 128000,
+        "chat_completions": True,
+        "function_calling": True,
+        "structured_outputs": True,
+        "temperature_supported": False,
+    },
 }
 
 

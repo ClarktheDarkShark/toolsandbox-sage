@@ -90,6 +90,18 @@ def test_helper_contribution_splits_called_visible_and_hidden(tmp_path: Path) ->
     assert helper["visible_not_called_subset"]["outcome_regressions"] == 1
     assert summary["accepted_but_uncalled_tools"] == ["new_idle"]
     assert summary["helpers"]["new_idle"]["origin"] == "newly_generated"
+    buckets = summary["selection_attribution_buckets"]
+    assert buckets["called_generated_tool"]["scenarios"] == ["called"]
+    assert buckets["called_generated_tool"]["mean_outcome_delta"] == 0.7
+    assert buckets["generated_tool_visible_not_called"]["scenarios"] == ["ignored"]
+    assert buckets["generated_tool_visible_not_called"]["outcome_regressions"] == 1
+    assert buckets["no_visible_generated_tool"]["scenarios"] == ["hidden"]
+    assert (
+        summary["selection_attribution_claim_guidance"][
+            "generated_helper_attributed_bucket"
+        ]
+        == "called_generated_tool"
+    )
 
 
 def test_helper_contribution_flags_called_subset_route_mismatch(tmp_path: Path) -> None:

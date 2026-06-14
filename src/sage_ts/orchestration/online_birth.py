@@ -13,6 +13,7 @@ from sage_ts.adequacy.failure_memory import generation_failure_memory_context
 from sage_ts.adequacy.inadequacy_classifier import (
     CapabilityObservation,
     classify_planned_scenario_observations,
+    classify_visible_task_observations,
 )
 from sage_ts.evaluation.task_strata import base_task_family, expected_helper_fit
 from sage_ts.experiments.v2_flags import (
@@ -29,6 +30,7 @@ from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proo
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.live_candidate_check import run_lightweight_live_candidate_check
 from sage_ts.validation.sandbox_validator import (
+    ToolExample,
     ValidationResult,
     validate_generated_tool,
 )
@@ -75,12 +77,17 @@ def suggested_tool_name(canonical_key: str) -> str | None:
         and suffix == "constraint_to_action_planner"
     ):
         return "constraint_to_action_planner"
+    if suffix == "prepare_direct_contact_action_args":
+        return "prepare_direct_contact_action_args"
     return suffix
 
 
 BROADER_HELPER_OVERLAPS = {
     "derived_value:recency_timestamp_bounds": ("resolve_search_window_or_bounds",),
     "derived_value:message_search_time_window": ("resolve_search_window_or_bounds",),
+    "composite:prepare_side_effect_args_from_selected_record": (
+        "constraint_to_action_planner",
+    ),
     "state_precondition:next_service_tool_call": (
         "plan_device_state_action_sequence_v3",
     ),
@@ -91,6 +98,9 @@ PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
 DEFAULT_CANDIDATE_REPAIR_ATTEMPTS = 2
 PROACTIVE_BIRTH_ENV = "SAGE_SELF_EVOLVING_PROACTIVE_BIRTH"
 PROACTIVE_BIRTH_SCOPE_ENV = "SAGE_SELF_EVOLVING_PROACTIVE_SCOPE"
+SCENARIO_METADATA_POLICY_ENV = "SAGE_SCENARIO_METADATA_POLICY"
+DISABLE_SCENARIO_NAME_BIRTH_ENV = "SAGE_DISABLE_SCENARIO_NAME_BIRTH"
+DISABLE_SCENARIO_NAME_ROUTING_ENV = "SAGE_DISABLE_SCENARIO_NAME_ROUTING"
 PROACTIVE_SCOPE_MANIFEST = "manifest"
 PROACTIVE_SCOPE_JUST_IN_TIME = "just_in_time"
 FIRST_OBSERVATION_BIRTH_KEYS = frozenset(
@@ -100,15 +110,24 @@ FIRST_OBSERVATION_BIRTH_KEYS = frozenset(
         "composite:plan_contact_lookup_query",
         "composite:plan_contact_relationship_batch_update",
         "composite:plan_contact_update_from_id",
+        "composite:plan_message_counterparty_search",
+        "composite:prepare_direct_contact_action_args",
         "composite:plan_send_message_contact_lookup",
+        "composite:prepare_holiday_search_args",
+        "composite:prepare_add_contact_args",
+        "composite:prepare_location_search_args",
         "composite:prepare_reminder_creation_args",
-        "composite:prepare_side_effect_args_from_selected_record",
         "composite:select_message_counterparty_for_contact_update",
+        "derived_value:days_between_timestamps",
+        "derived_value:extract_service_answer_field",
+        "derived_value:extract_stock_symbol",
+        "derived_value:plan_device_status_lookup",
         "derived_value:resolve_search_window_or_bounds",
         "search_filter:select_action_target_by_recency",
         "search_filter:select_message_content_by_recency",
         "search_filter:select_record_by_timestamp_extreme",
         "state_precondition:plan_device_state_action_sequence",
+        "validation:prepare_safe_action_or_abstain",
     }
 )
 CHAIN_ROUTING_FAMILIES_BY_KEY = {
@@ -120,6 +139,12 @@ CHAIN_ROUTING_FAMILIES_BY_KEY = {
     "composite:plan_contact_update_from_id": (
         "update_contact_with_id_and_phone_number",
         "contact_id_update_argument_planning",
+    ),
+    "composite:prepare_direct_contact_action_args": (
+        "remove_contact_with_id",
+        "send_message_with_phone_number_and_content",
+        "add_contact_with_name_and_phone_number",
+        "update_contact_with_id_and_phone_number",
     ),
     "composite:plan_send_message_contact_lookup": (
         "send_message_with_contact_content",
@@ -150,6 +175,131 @@ CHAIN_ROUTING_FAMILIES_BY_KEY = {
     ),
 }
 
+VISIBLE_ROUTING_FAMILIES_BY_KEY = {
+    "canonicalizer:next_weekday_time_to_timestamp": (
+        "weekday_time",
+        "reminder_create",
+        "reminder_modify",
+    ),
+    "canonicalizer:relative_day_time_timestamp": (
+        "relative_time",
+        "reminder_create",
+        "reminder_modify",
+    ),
+    "composite:prepare_add_contact_args": (
+        "add_contact",
+        "direct_contact_action",
+        "contact_creation",
+    ),
+    "composite:prepare_direct_contact_action_args": (
+        "direct_contact_action",
+        "add_contact",
+        "remove_contact",
+        "modify_contact",
+        "send_message",
+    ),
+    "composite:plan_contact_lookup_query": (
+        "contact_lookup",
+        "contact_phone_lookup",
+        "contact_relationship_lookup",
+        "contact_side_effect_target_lookup",
+    ),
+    "composite:plan_send_message_contact_lookup": (
+        "named_message_recipient",
+        "send_message",
+    ),
+    "composite:plan_contact_relationship_batch_update": (
+        "relationship_batch_update",
+        "contact_bulk_update",
+        "contact_lookup",
+    ),
+    "composite:prepare_location_search_args": (
+        "location_phrase",
+        "reminder_create",
+        "external_lookup",
+    ),
+    "composite:prepare_reminder_creation_args": (
+        "reminder_create",
+        "relative_time",
+        "weekday_time",
+        "location_phrase",
+    ),
+    "composite:prepare_holiday_search_args": (
+        "holiday_lookup",
+        "holiday",
+        "calendar_distance",
+    ),
+    "derived_value:extract_stock_symbol": (
+        "stock_lookup",
+        "external_lookup",
+    ),
+    "composite:plan_message_counterparty_search": (
+        "message_counterparty_lookup",
+        "message",
+        "contact_lookup",
+    ),
+    "composite:select_message_counterparty_for_contact_update": (
+        "message_counterparty_update",
+        "message_recency",
+        "modify_contact",
+    ),
+    "derived_value:resolve_search_window_or_bounds": (
+        "recency_search",
+        "message_recency",
+        "reminder_recency",
+        "recency_action",
+    ),
+    "search_filter:select_record_by_timestamp_extreme": (
+        "recency_search",
+        "message_recency",
+        "reminder_recency",
+    ),
+    "search_filter:select_message_content_by_recency": (
+        "message_recency",
+        "recency_search",
+        "answer_extraction",
+    ),
+    "search_filter:select_action_target_by_recency": (
+        "recency_action",
+        "modify_contact",
+        "modify_reminder",
+        "remove_reminder",
+    ),
+    "derived_value:days_between_timestamps": (
+        "calendar_distance",
+        "holiday",
+        "deadline_distance",
+    ),
+    "derived_value:extract_service_answer_field": (
+        "service_answer_extraction",
+        "external_lookup",
+        "currency_lookup",
+        "weather_lookup",
+        "temperature_lookup",
+    ),
+    "derived_value:plan_device_status_lookup": (
+        "device_status_read",
+        "wifi_status",
+        "cellular_status",
+        "location_status",
+        "battery_status",
+    ),
+    "state_precondition:plan_device_state_action_sequence": (
+        "device_state_action",
+        "state_precondition_possible",
+        "wifi",
+        "cellular",
+        "location_service",
+        "low_battery_mode",
+    ),
+    "validation:prepare_safe_action_or_abstain": (
+        "safe_abstain",
+        "insufficient_information",
+        "safe_abstain_needed",
+        "missing_lookup",
+    ),
+}
+
 
 def _dedupe_nonempty(items: tuple[str, ...] | list[str]) -> tuple[str, ...]:
     seen: set[str] = set()
@@ -164,6 +314,67 @@ def _dedupe_nonempty(items: tuple[str, ...] | list[str]) -> tuple[str, ...]:
         seen.add(key)
         kept.append(value)
     return tuple(kept)
+
+
+def visible_context_metadata_enabled() -> bool:
+    raw = os.environ.get(SCENARIO_METADATA_POLICY_ENV, "").strip().lower()
+    disable_birth = os.environ.get(DISABLE_SCENARIO_NAME_BIRTH_ENV, "").strip().lower()
+    disable_routing = (
+        os.environ.get(DISABLE_SCENARIO_NAME_ROUTING_ENV, "").strip().lower()
+    )
+    if disable_birth in {"1", "true", "yes", "on", "enabled"}:
+        return True
+    if disable_routing in {"1", "true", "yes", "on", "enabled"}:
+        return True
+    return raw in {
+        "visible_context",
+        "visible-context",
+        "visible",
+        "no_scenario_names",
+        "no-scenario-names",
+    }
+
+
+def _observation_family_key(observation: CapabilityObservation) -> str:
+    value = str(observation.task_family_key or "").strip()
+    if value:
+        return value
+    return base_task_family(observation.scenario_name)
+
+
+SCENARIO_LIKE_LABEL_PREFIXES = (
+    "add_reminder_",
+    "remove_reminder_",
+    "modify_reminder_",
+    "search_reminder_",
+    "add_contact_",
+    "remove_contact_",
+    "modify_contact_",
+    "update_contact_",
+    "search_message_",
+    "search_sender_",
+    "send_message_",
+    "search_phone_",
+    "search_name_",
+    "search_relationship_",
+    "find_days_",
+    "find_distance_",
+    "find_holiday_",
+    "find_thanksgiving_",
+    "find_phone_",
+    "find_temperature",
+    "convert_currency",
+    "get_wifi",
+    "get_cellular",
+    "wifi_off",
+    "cellular_off",
+    "turn_on_",
+)
+
+
+def _scenario_like_label(item: str) -> bool:
+    value = str(item or "").strip().lower()
+    return value.startswith(SCENARIO_LIKE_LABEL_PREFIXES)
 
 
 def _normalize_family_label(label: str) -> str:
@@ -204,22 +415,39 @@ def _normalize_live_birth_routing_metadata(
     """
 
     family_candidates: list[str] = []
-    for item in tool.spec.applicable_task_families:
-        family_candidates.extend(_expanded_family_labels(item))
+    visible_context_observation = bool(observation.task_context_label)
+    if not visible_context_observation:
+        for item in tool.spec.applicable_task_families:
+            family_candidates.extend(_expanded_family_labels(item))
     for item in base_families:
         family_candidates.extend(_expanded_family_labels(item))
-    family_candidates.extend(_expanded_family_labels(observation.scenario_name))
-    for item in CHAIN_ROUTING_FAMILIES_BY_KEY.get(observation.canonical_key, ()):
-        family_candidates.extend(_expanded_family_labels(item))
+    if observation.task_family_key:
+        family_candidates.extend(_expanded_family_labels(observation.task_family_key))
+    if not visible_context_observation:
+        family_candidates.extend(_expanded_family_labels(observation.scenario_name))
+        for item in CHAIN_ROUTING_FAMILIES_BY_KEY.get(observation.canonical_key, ()):
+            family_candidates.extend(_expanded_family_labels(item))
+    else:
+        for item in VISIBLE_ROUTING_FAMILIES_BY_KEY.get(observation.canonical_key, ()):
+            family_candidates.extend(_expanded_family_labels(item))
     normalized_families = _dedupe_nonempty(family_candidates)
     if not normalized_families:
         return tool
-    positive_triggers = _dedupe_nonempty(
-        [*tool.spec.positive_triggers, *normalized_families]
+    positive_seed = (
+        [item for item in tool.spec.positive_triggers if not _scenario_like_label(item)]
+        if visible_context_observation
+        else list(tool.spec.positive_triggers)
+    )
+    positive_triggers = _dedupe_nonempty([*positive_seed, *normalized_families])
+    negative_triggers = (
+        [item for item in tool.spec.negative_triggers if not _scenario_like_label(item)]
+        if visible_context_observation
+        else list(tool.spec.negative_triggers)
     )
     if (
         normalized_families == tool.spec.applicable_task_families
         and positive_triggers == tool.spec.positive_triggers
+        and tuple(negative_triggers) == tool.spec.negative_triggers
     ):
         return tool
     return replace(
@@ -228,8 +456,22 @@ def _normalize_live_birth_routing_metadata(
             tool.spec,
             applicable_task_families=normalized_families,
             positive_triggers=positive_triggers,
+            negative_triggers=_dedupe_nonempty(negative_triggers),
         ),
     )
+
+
+def _observation_public_context(observation: CapabilityObservation) -> dict[str, Any]:
+    """Return a non-oracle task label for birth/lifecycle events."""
+
+    context = observation.task_context_label or observation.scenario_name
+    payload: dict[str, Any] = {"scenario": context}
+    if observation.task_context_label:
+        payload["source_task_id_redacted"] = True
+        payload["task_context_label"] = observation.task_context_label
+    if observation.task_family_key:
+        payload["task_family_key"] = observation.task_family_key
+    return payload
 
 
 def existing_broader_helper(
@@ -246,6 +488,254 @@ def existing_broader_helper(
         ):
             return tool_name
     return None
+
+
+def _resolve_window_validation_examples() -> tuple[ToolExample, ...]:
+    """Validation examples for the broad recency search-plan helper.
+
+    Narrow ``recency_timestamp_bounds`` observations predate the broader
+    ``resolve_search_window_or_bounds`` helper and carry bounds-only examples.
+    When repair upgrades the helper to the broader search-plan contract, validate
+    against the upgraded contract instead of the obsolete narrow signature.
+    """
+
+    return (
+        ToolExample(
+            {
+                "current_timestamp": 1700000000.0,
+                "phrase": "todo item I made yesterday",
+                "target_domain": "reminder",
+                "timestamp_intent": "creation",
+                "direction": "yesterday",
+                "content_keyword": "",
+                "lookback_days": 0,
+                "timezone_offset": 0.0,
+            },
+            {
+                "target_tool_name": "search_reminder",
+                "search_kwargs": {
+                    "creation_timestamp_lowerbound": 1699913480.0,
+                    "creation_timestamp_upperbound": 1699913720.0,
+                },
+                "should_call_search": True,
+                "abstain_reason": "",
+                "interpretation": "yesterday",
+                "bounds_source": "resolved_direction",
+            },
+        ),
+        ToolExample(
+            {
+                "current_timestamp": 1700000000.0,
+                "phrase": "yesterday",
+                "target_domain": "reminder",
+                "timestamp_intent": "reminder",
+                "direction": "yesterday",
+                "content_keyword": "",
+                "lookback_days": 0,
+                "timezone_offset": 0.0,
+            },
+            {
+                "target_tool_name": "search_reminder",
+                "search_kwargs": {
+                    "reminder_timestamp_lowerbound": 1699913480.0,
+                    "reminder_timestamp_upperbound": 1699913720.0,
+                },
+                "should_call_search": True,
+                "abstain_reason": "",
+                "interpretation": "yesterday",
+                "bounds_source": "resolved_direction",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "current_timestamp": 1700000000.0,
+                "phrase": "latest",
+                "target_domain": "message",
+                "timestamp_intent": "message_creation",
+                "direction": "latest",
+                "content_keyword": "hello",
+                "lookback_days": 0,
+                "timezone_offset": 0.0,
+            },
+            {
+                "target_tool_name": "search_messages",
+                "search_kwargs": {
+                    "creation_timestamp_upperbound": 1700000000.0,
+                    "content": "hello",
+                },
+                "should_call_search": True,
+                "abstain_reason": "",
+                "interpretation": "latest",
+                "bounds_source": "resolved_direction",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "current_timestamp": 1700000000.0,
+                "phrase": "most recent",
+                "target_domain": "reminder",
+                "timestamp_intent": "reminder",
+                "direction": "latest",
+                "content_keyword": "",
+                "lookback_days": 7,
+                "timezone_offset": 0.0,
+            },
+            {
+                "target_tool_name": "search_reminder",
+                "search_kwargs": {
+                    "creation_timestamp_lowerbound": 1699395200.0,
+                    "creation_timestamp_upperbound": 1700000000.0,
+                },
+                "should_call_search": True,
+                "abstain_reason": "",
+                "interpretation": "latest",
+                "bounds_source": "resolved_direction",
+            },
+            held_out=True,
+        ),
+    )
+
+
+def _prepare_location_validation_examples() -> tuple[ToolExample, ...]:
+    """Validation examples for generated location-search argument preparation."""
+
+    return (
+        ToolExample(
+            {
+                "user_request": "Add a reminder to buy milk at Whole Foods on Stevens Creek tomorrow.",
+                "location_phrase": "",
+                "latitude": 0.0,
+                "longitude": 0.0,
+            },
+            {
+                "search_location_kwargs": {
+                    "location": "Whole Foods on Stevens Creek",
+                },
+                "should_call_downstream_tool": True,
+                "downstream_tool_name": "search_location_around_lat_lon",
+                "downstream_tool_kwargs": {
+                    "location": "Whole Foods on Stevens Creek",
+                },
+                "location_query": "Whole Foods on Stevens Creek",
+                "abstain_reason": "",
+            },
+        ),
+        ToolExample(
+            {
+                "user_request": "Add a reminder to buy milk at Whole Foods.",
+                "location_phrase": "Whole Foods",
+                "latitude": 0.0,
+                "longitude": 0.0,
+            },
+            {
+                "search_location_kwargs": {},
+                "should_call_downstream_tool": False,
+                "downstream_tool_name": "",
+                "downstream_tool_kwargs": {},
+                "location_query": "Whole Foods",
+                "abstain_reason": "missing_reminder_time_before_location_lookup",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "user_request": "Whole Foods on Stevens Creek",
+                "location_phrase": "Whole Foods",
+                "latitude": 0.0,
+                "longitude": 0.0,
+            },
+            {
+                "search_location_kwargs": {
+                    "location": "Whole Foods on Stevens Creek",
+                },
+                "should_call_downstream_tool": True,
+                "downstream_tool_name": "search_location_around_lat_lon",
+                "downstream_tool_kwargs": {
+                    "location": "Whole Foods on Stevens Creek",
+                },
+                "location_query": "Whole Foods on Stevens Creek",
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "user_request": "Find a Whole Foods near me.",
+                "location_phrase": "Whole Foods",
+                "latitude": 0.0,
+                "longitude": 0.0,
+            },
+            {
+                "search_location_kwargs": {},
+                "should_call_downstream_tool": True,
+                "downstream_tool_name": "get_current_location",
+                "downstream_tool_kwargs": {},
+                "location_query": "Whole Foods",
+                "abstain_reason": "need_current_coordinates_for_broad_location_query",
+            },
+        ),
+        ToolExample(
+            {
+                "user_request": "Find a Whole Foods near me.",
+                "location_phrase": "Whole Foods",
+                "latitude": 37.323,
+                "longitude": -122.032,
+            },
+            {
+                "search_location_kwargs": {
+                    "location": "Whole Foods",
+                    "latitude": 37.323,
+                    "longitude": -122.032,
+                },
+                "should_call_downstream_tool": True,
+                "downstream_tool_name": "search_location_around_lat_lon",
+                "downstream_tool_kwargs": {
+                    "location": "Whole Foods",
+                    "latitude": 37.323,
+                    "longitude": -122.032,
+                },
+                "location_query": "Whole Foods",
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "user_request": "Add a reminder tomorrow at 5 PM.",
+                "location_phrase": "",
+                "latitude": 0.0,
+                "longitude": 0.0,
+            },
+            {
+                "search_location_kwargs": {},
+                "should_call_downstream_tool": False,
+                "downstream_tool_name": "",
+                "downstream_tool_kwargs": {},
+                "location_query": "",
+                "abstain_reason": "missing_location_phrase",
+            },
+            negative_applicability=True,
+        ),
+    )
+
+
+def _validation_examples_for_tool(
+    tool: GeneratedTool,
+    observation: CapabilityObservation,
+) -> tuple[ToolExample, ...]:
+    if (
+        observation.canonical_key == "derived_value:recency_timestamp_bounds"
+        and tool.spec.tool_name == "resolve_search_window_or_bounds"
+    ):
+        return _resolve_window_validation_examples()
+    if (
+        observation.canonical_key == "composite:prepare_location_search_args"
+        and tool.spec.tool_name == "prepare_location_search_args"
+    ):
+        return _prepare_location_validation_examples()
+    return observation.validation_examples
 
 
 def _proactive_birth_enabled() -> bool:
@@ -322,6 +812,17 @@ class OnlineBirthController:
 
     def prime_from_scenario_names(self, scenario_names: tuple[str, ...]) -> None:
         """Birth early tools from unlabeled manifest task-family text when enabled."""
+        if visible_context_metadata_enabled():
+            self.proactive_manifest_primed = True
+            self._event(
+                "proactive_manifest_reflection_skipped",
+                {
+                    "scenario_count": len(scenario_names),
+                    "metadata_policy": "visible_context",
+                    "reason": "scenario_names_not_allowed_for_tool_birth",
+                },
+            )
+            return
         if (
             not _proactive_birth_enabled()
             or _proactive_birth_scope() != PROACTIVE_SCOPE_MANIFEST
@@ -357,14 +858,16 @@ class OnlineBirthController:
             },
         )
 
-    def prime_before_scenario(self, scenario_name: str) -> list[str]:
+    def prime_before_scenario(
+        self, scenario_name: str, scenario: Any | None = None
+    ) -> list[str]:
         """Birth helpers just in time from visible task text before the task runs.
 
         This path is intentionally oracle-free: it uses the same unlabeled
-        scenario-name classifier as manifest priming and runs before the task's
-        candidate trajectory is played or scored. It gives a newly born helper a
-        natural same-task adoption chance without force-calling it or using
-        result feedback from the task.
+        task context available to the actor before the candidate trajectory is
+        played or scored. It gives a newly born helper a natural same-task
+        adoption chance without force-calling it or using result feedback from
+        the task.
         """
 
         if (
@@ -375,14 +878,20 @@ class OnlineBirthController:
         accepted: list[str] = []
         observation_count = 0
         keys_before = set(self.generated_keys)
-        for observation in classify_planned_scenario_observations(scenario_name):
+        if visible_context_metadata_enabled():
+            if scenario is None:
+                return []
+            observations = classify_visible_task_observations(scenario_name, scenario)
+        else:
+            observations = classify_planned_scenario_observations(scenario_name)
+        for observation in observations:
             if not observation.generation_allowed:
                 continue
             observation_count += 1
             self._event(
                 "jit_proactive_inadequacy_detected",
                 {
-                    "scenario_name": scenario_name,
+                    **_observation_public_context(observation),
                     "canonical_key": observation.canonical_key,
                     "evidence_source": observation.evidence_source,
                     "reason": observation.reason,
@@ -393,10 +902,28 @@ class OnlineBirthController:
                 accepted.append(tool_name)
         born_keys = sorted(set(self.generated_keys) - keys_before)
         if observation_count or born_keys:
+            task_context = ""
+            task_family_key = ""
+            source_task_id_redacted = False
+            first = next(iter(observations), None)
+            if first is not None and first.task_context_label:
+                task_context = first.task_context_label
+                task_family_key = first.task_family_key
+                source_task_id_redacted = True
+            context_payload = (
+                {
+                    "scenario": task_context,
+                    "task_context_label": task_context,
+                    "task_family_key": task_family_key,
+                    "source_task_id_redacted": source_task_id_redacted,
+                }
+                if task_context
+                else {"scenario": scenario_name}
+            )
             self._event(
                 "jit_proactive_scenario_reflection_completed",
                 {
-                    "scenario_name": scenario_name,
+                    **context_payload,
                     "observation_count": observation_count,
                     "born_or_suppressed_keys": born_keys,
                     "accepted_tools": accepted,
@@ -477,7 +1004,11 @@ class OnlineBirthController:
             "repeated_failed_tool_calls": list(observation.repeated_failed_tool_calls),
             "failed_tool_calls": list(observation.failed_tool_calls),
             "inadequacy_signals": list(observation.inadequacy_signals),
-            "current_helper_fit": expected_helper_fit(observation.scenario_name),
+            "current_helper_fit": (
+                ()
+                if observation.task_context_label
+                else expected_helper_fit(observation.scenario_name)
+            ),
             "positive_applicability_example_count": sum(
                 1
                 for item in observation.validation_examples
@@ -497,10 +1028,10 @@ class OnlineBirthController:
         )
         self.counts[observation.canonical_key] += 1
         self.scenarios_by_key.setdefault(observation.canonical_key, set()).add(
-            observation.scenario_name
+            observation.task_context_label or observation.scenario_name
         )
         self.base_families_by_key.setdefault(observation.canonical_key, set()).add(
-            base_task_family(observation.scenario_name)
+            _observation_family_key(observation)
         )
         # Log heuristic observations that cannot be transcript-verified.
         if observation.evidence_source == "heuristic":
@@ -599,7 +1130,7 @@ class OnlineBirthController:
             return None
 
         request = ToolGenerationRequest(
-            scenario_name=observation.scenario_name,
+            scenario_name=observation.task_context_label or observation.scenario_name,
             observation=observation.observation,
             allowed_families=observation.allowed_families,
             validation_examples=tuple(
@@ -723,19 +1254,20 @@ class OnlineBirthController:
                 "tool_birth_rejected",
                 {
                     "canonical_key": observation.canonical_key,
-                    "scenario": observation.scenario_name,
+                    **_observation_public_context(observation),
                     "error": f"{type(exc).__name__}:{exc}",
                     "rejection_count": self.rejected_counts[observation.canonical_key],
                 },
             )
             return None
 
+        birth_context = observation.task_context_label or observation.scenario_name
         append_jsonl(
             self.output_dir / "tool_birth_events.jsonl",
             {
                 "canonical_key": observation.canonical_key,
-                "scenario": observation.scenario_name,
-                "birth_scenario": observation.scenario_name,
+                **_observation_public_context(observation),
+                "birth_scenario": birth_context,
                 "evidence_source": observation.evidence_source,
                 "observation_reason": observation.reason,
                 "tool_name": tool.spec.tool_name,
@@ -775,7 +1307,7 @@ class OnlineBirthController:
             {
                 "canonical_key": observation.canonical_key,
                 "tool_name": tool.spec.tool_name,
-                "scenario": observation.scenario_name,
+                **_observation_public_context(observation),
                 "errors": list(validation.errors),
                 "source_example_count": validation.source_example_count,
                 "held_out_check_count": validation.held_out_check_count,
@@ -799,7 +1331,7 @@ class OnlineBirthController:
             entry = RegistryEntry.accepted(
                 tool,
                 validation,
-                birth_scenario=observation.scenario_name,
+                birth_scenario=birth_context,
             )
             self.store.put(entry)
             saved_entry = self.store.get(tool.spec.tool_name) or entry
@@ -815,7 +1347,7 @@ class OnlineBirthController:
                     "event": "registry_save",
                     "registry_dir": str(self.store.root),
                     "tool_name": tool.spec.tool_name,
-                    "birth_scenario": observation.scenario_name,
+                    "birth_scenario": birth_context,
                     "snapshot_path": str(snapshot_path),
                 },
             )
@@ -824,7 +1356,7 @@ class OnlineBirthController:
                 {
                     "canonical_key": observation.canonical_key,
                     "tool_name": tool.spec.tool_name,
-                    "scenario": observation.scenario_name,
+                    **_observation_public_context(observation),
                     "family": tool.spec.family.value,
                     "snapshot_path": str(snapshot_path),
                 },
@@ -834,7 +1366,7 @@ class OnlineBirthController:
                 {
                     "registry_dir": str(self.store.root),
                     "tool_name": tool.spec.tool_name,
-                    "scenario": observation.scenario_name,
+                    **_observation_public_context(observation),
                 },
             )
             return tool.spec.tool_name
@@ -845,7 +1377,7 @@ class OnlineBirthController:
                 {
                     "canonical_key": observation.canonical_key,
                     "tool_name": tool.spec.tool_name,
-                    "scenario": observation.scenario_name,
+                    **_observation_public_context(observation),
                     "errors": list(validation.errors),
                     "rejection_count": self.rejected_counts[observation.canonical_key],
                 },
@@ -857,6 +1389,7 @@ class OnlineBirthController:
         tool: GeneratedTool,
         observation: CapabilityObservation,
     ) -> tuple[Any, Any, ValidationResult]:
+        examples = _validation_examples_for_tool(tool, observation)
         memory_gate = evaluate_candidate_gate(
             tool.spec,
             failure_memory_path=self.failure_memory_path,
@@ -877,7 +1410,7 @@ class OnlineBirthController:
         if feature_enabled(LIVE_VALIDATION):
             live_check = run_lightweight_live_candidate_check(
                 tool,
-                observation.validation_examples,
+                examples,
             )
             if not live_check.accepted:
                 return (
@@ -892,6 +1425,6 @@ class OnlineBirthController:
             live_check,
             validate_generated_tool(
                 tool,
-                examples=observation.validation_examples,
+                examples=examples,
             ),
         )

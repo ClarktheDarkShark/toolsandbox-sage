@@ -375,6 +375,42 @@ def _is_insufficient_information_guard(spec: Any) -> bool:
     )
 
 
+def _is_lookup_answer_planner(spec: Any, input_names: set[str]) -> bool:
+    """Identify two-stage lookup helpers that answer from a selected record."""
+    if spec.family != ToolFamily.COMPOSITE_WORKFLOW_HELPER:
+        return False
+    if "selected_record" not in input_names:
+        return False
+    output_props = {}
+    if isinstance(spec.output_schema, dict):
+        raw_props = spec.output_schema.get("properties", {})
+        if isinstance(raw_props, dict):
+            output_props = raw_props
+    if not {
+        "answer_field",
+        "answer_value",
+        "final_answer_recommendation",
+    }.issubset(output_props):
+        return False
+    has_search_kwargs = any(
+        str(key).startswith("search_") and str(key).endswith("_kwargs")
+        for key in output_props
+    )
+    if not has_search_kwargs:
+        return False
+    evidence_text = " ".join(
+        (
+            spec.tool_name,
+            spec.description,
+            spec.reason_tool_is_decisive,
+            spec.generalization_rationale,
+            " ".join(spec.positive_triggers),
+            " ".join(spec.applicable_task_families),
+        )
+    ).lower()
+    return "answer" in evidence_text and "lookup" in evidence_text
+
+
 def _scenario_has_recency_action_signal(scenario_name: str) -> bool:
     return any(
         token in scenario_name
@@ -495,6 +531,7 @@ def score_registry_entry_for_scenario(
     if (
         spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER
         and "selected_record" in input_names
+        and not _is_lookup_answer_planner(spec, input_names)
         and not any(
             token in scenario_lower
             for token in (

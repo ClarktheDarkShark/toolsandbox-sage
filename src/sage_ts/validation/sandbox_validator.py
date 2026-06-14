@@ -204,13 +204,16 @@ def validate_generated_tool(
             replay = normalize_generated_tool_output(
                 tool, schema.function(**example.inputs), inputs=example.inputs
             )
+            expected = normalize_generated_tool_output(
+                tool, example.expected, inputs=example.inputs
+            )
         except Exception as exc:
             errors.append(f"{label}_error:{type(exc).__name__}:{exc}")
             continue
         if actual != replay:
             errors.append(f"{label}_nondeterministic:{actual!r}!={replay!r}")
-        if actual != example.expected:
-            errors.append(f"{label}_mismatch:{actual!r}!={example.expected!r}")
+        if actual != expected:
+            errors.append(f"{label}_mismatch:{actual!r}!={expected!r}")
         if not _json_serializable(actual):
             errors.append(f"{label}_non_json_serializable_output")
 

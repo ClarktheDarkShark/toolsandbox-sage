@@ -14,6 +14,7 @@ from sage_ts.config.models import (
     resolve_model_name,
     supports_temperature,
 )
+from sage_ts.evaluation.llm_usage import record_chat_completion_usage
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ class OpenAIChatAdapter:
         self.client = OpenAI(
             base_url="https://api.openai.com/v1",
             timeout=_openai_request_timeout_seconds(),
+            max_retries=_openai_max_retries(),
         )
 
     def complete(self, request: ChatRequest) -> str:
@@ -53,6 +55,13 @@ class OpenAIChatAdapter:
             response = self.client.chat.completions.create(
                 model=model, messages=messages
             )
+        record_chat_completion_usage(
+            source="sage_generation",
+            model=model,
+            messages=messages,
+            tools=None,
+            response=response,
+        )
         content = cast(str, response.choices[0].message.content)
         if content is None:
             raise ValueError("OpenAI response had no content")
@@ -65,3 +74,11 @@ def _openai_request_timeout_seconds() -> float:
         return max(float(raw), 1.0)
     except ValueError:
         return 90.0
+
+
+def _openai_max_retries() -> int:
+    raw = os.environ.get("SAGE_OPENAI_MAX_RETRIES", "").strip()
+    try:
+        return max(int(raw), 0) if raw else 2
+    except ValueError:
+        return 2

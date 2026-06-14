@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
@@ -30,6 +31,90 @@ def _scenario_rows(run_dir: Path) -> list[dict[str, Any]]:
     return list(_read_json(source).get("per_scenario_results", []))
 
 
+def _parse_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _file_mtime(path: Path) -> datetime | None:
+    if not path.exists():
+        return None
+    return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+
+
+def _run_segment_wall_time_seconds(run_dir: Path) -> float | None:
+    manifest = _read_json(run_dir.parent / "sage_ts_run_manifest.json")
+    started_at = _parse_datetime(manifest.get("started_at"))
+    if started_at is None:
+        return None
+
+    live_summary_path = run_dir / "live_result_summary.json"
+    live_summary = _read_json(live_summary_path)
+    ended_at = (
+        _parse_datetime(live_summary.get("updated_at"))
+        or _file_mtime(run_dir / "result_summary.json")
+        or _file_mtime(live_summary_path)
+    )
+    if ended_at is None:
+        return None
+    return max(0.0, (ended_at - started_at).total_seconds())
+
+
+def _resume_checkpoint_wall_time_seconds(
+    resume_dir: Path,
+    completed_limit: int,
+) -> float | None:
+    if completed_limit <= 0:
+        return 0.0
+    manifest = _read_json(resume_dir.parent / "sage_ts_run_manifest.json")
+    started_at = _parse_datetime(manifest.get("started_at"))
+    if started_at is None:
+        return None
+    checkpoint_root = resume_dir / "registry_checkpoints"
+    prefix = f"after_{completed_limit:04d}_"
+    for checkpoint in sorted(checkpoint_root.glob(f"{prefix}*/checkpoint.json")):
+        payload = _read_json(checkpoint)
+        if _optional_int(payload.get("completed_count")) != completed_limit:
+            continue
+        checkpoint_at = _file_mtime(checkpoint)
+        if checkpoint_at is None:
+            continue
+        offset = _resume_wall_time_offset_seconds(manifest)
+        return offset + max(0.0, (checkpoint_at - started_at).total_seconds())
+    return None
+
+
+def _resume_wall_time_offset_seconds(manifest: dict[str, Any]) -> float:
+    resume_from_dir = manifest.get("resume_from_dir")
+    completed_limit = _optional_int(manifest.get("resume_completed_limit"))
+    if not resume_from_dir or completed_limit is None:
+        return 0.0
+    resume_dir = Path(str(resume_from_dir))
+    checkpoint_seconds = _resume_checkpoint_wall_time_seconds(
+        resume_dir,
+        completed_limit,
+    )
+    if checkpoint_seconds is not None:
+        return checkpoint_seconds
+    previous_seconds = _run_wall_time_seconds(resume_dir)
+    return previous_seconds or 0.0
+
+
+def _run_wall_time_seconds(run_dir: Path) -> float | None:
+    segment_seconds = _run_segment_wall_time_seconds(run_dir)
+    if segment_seconds is None:
+        return None
+    manifest = _read_json(run_dir.parent / "sage_ts_run_manifest.json")
+    return segment_seconds + _resume_wall_time_offset_seconds(manifest)
+
+
 def _optional_float(value: Any) -> float | None:
     if value is None:
         return None
@@ -39,9 +124,62 @@ def _optional_float(value: Any) -> float | None:
         return None
 
 
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _sum_optional_int(rows: list[dict[str, Any]], key: str) -> int | None:
+    values = [_optional_int(row.get(key)) for row in rows if row.get(key) is not None]
+    clean = [value for value in values if value is not None]
+    return sum(clean) if clean else None
+
+
+def _llm_usage_summary(rows: list[dict[str, Any]], run_dir: Path) -> dict[str, Any]:
+    recorded_rows = [row for row in rows if row.get("llm_usage_recorded")]
+    artifact_summary = _read_json(run_dir / "llm_usage_summary.json")
+    if not recorded_rows and artifact_summary:
+        return {
+            "llm_usage_recorded": bool(artifact_summary.get("llm_usage_recorded")),
+            "llm_call_count": artifact_summary.get("llm_call_count"),
+            "llm_live_call_count": artifact_summary.get("llm_live_call_count"),
+            "llm_cached_call_count": artifact_summary.get("llm_cached_call_count"),
+            "llm_prompt_tokens": artifact_summary.get("llm_prompt_tokens"),
+            "llm_completion_tokens": artifact_summary.get("llm_completion_tokens"),
+            "llm_total_tokens": artifact_summary.get("llm_total_tokens"),
+            "llm_usage_available_count": artifact_summary.get(
+                "llm_usage_available_count"
+            ),
+            "llm_usage_by_source": artifact_summary.get("llm_usage_by_source", {}),
+        }
+    return {
+        "llm_usage_recorded": bool(recorded_rows),
+        "llm_call_count": _sum_optional_int(recorded_rows, "llm_call_count"),
+        "llm_live_call_count": _sum_optional_int(recorded_rows, "llm_live_call_count"),
+        "llm_cached_call_count": _sum_optional_int(
+            recorded_rows, "llm_cached_call_count"
+        ),
+        "llm_prompt_tokens": _sum_optional_int(recorded_rows, "llm_prompt_tokens"),
+        "llm_completion_tokens": _sum_optional_int(
+            recorded_rows, "llm_completion_tokens"
+        ),
+        "llm_total_tokens": _sum_optional_int(recorded_rows, "llm_total_tokens"),
+        "llm_usage_available_count": _sum_optional_int(
+            recorded_rows, "llm_usage_available_count"
+        ),
+        "llm_usage_by_source": {},
+    }
+
+
 def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, Any]:
     """Summarize one run using JSON artifacts only."""
     rows = _scenario_rows(run_dir)
+    manifest = _read_json(run_dir.parent / "sage_ts_run_manifest.json")
+    wall_time_resume_offset_seconds = _resume_wall_time_offset_seconds(manifest)
     birth_events = _read_jsonl(run_dir / "tool_birth_events.jsonl")
     reuse_events = _read_jsonl(run_dir / "reuse_events.jsonl")
     run_events = _read_jsonl(run_dir / "sage_run_events.jsonl")
@@ -56,6 +194,7 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
         _read_json(registry_dir / "registry_manifest.json") if registry_dir else {}
     )
     similarities = [float(row.get("similarity", 0.0)) for row in rows]
+    llm_usage = _llm_usage_summary(rows, run_dir)
     outcome_similarities = [
         score
         for row in rows
@@ -109,6 +248,8 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
             "status",
             "complete" if (run_dir / "result_summary.json").exists() else "unknown",
         ),
+        "wall_time_seconds": _run_wall_time_seconds(run_dir),
+        "wall_time_resume_offset_seconds": wall_time_resume_offset_seconds,
         "success_count": len(successful),
         "mean_similarity": sum(similarities) / len(similarities)
         if similarities
@@ -121,6 +262,7 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
             else None
         ),
         "total_turns": sum(int(row.get("turn_count", 0)) for row in rows),
+        **llm_usage,
         "exception_count": len(exceptions),
         "tool_generation_count": len(birth_events),
         "accepted_tool_count": len(accepted_births),
@@ -255,6 +397,12 @@ def compare_runs(
                 "outcome_delta": outcome_delta,
                 "control_turns": control_rows[name].get("turn_count"),
                 "candidate_turns": candidate_rows[name].get("turn_count"),
+                "control_llm_call_count": control_rows[name].get("llm_call_count"),
+                "candidate_llm_call_count": candidate_rows[name].get("llm_call_count"),
+                "control_llm_total_tokens": control_rows[name].get("llm_total_tokens"),
+                "candidate_llm_total_tokens": candidate_rows[name].get(
+                    "llm_total_tokens"
+                ),
             }
         )
     gains = [row for row in deltas if row["delta"] > 0]

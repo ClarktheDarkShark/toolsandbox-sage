@@ -86,6 +86,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       margin-top: 5px;
       overflow-wrap: anywhere;
     }
+    .runtime-line { margin-top: 3px; }
     .metrics {
       display: grid;
       grid-template-columns: repeat(3, minmax(180px, 1fr));
@@ -93,10 +94,84 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       margin-top: 10px;
       max-width: 960px;
     }
-    .run-progress {
-      display: inline-flex;
-      align-items: baseline;
-      gap: 10px;
+    .cache-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      max-width: 960px;
+    }
+    .cache-pill {
+      border: 1px solid var(--line);
+      background: var(--panel2);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+    }
+	    .cache-pill strong {
+	      color: var(--text);
+	      margin-right: 4px;
+	    }
+	    .live-tool-panel {
+	      display: none;
+	      max-width: 960px;
+	      margin-top: 10px;
+	      border: 1px solid var(--line);
+	      background: var(--panel2);
+	      border-radius: 8px;
+	      padding: 10px 12px;
+	      box-shadow: 0 8px 22px var(--shadow);
+	    }
+	    .live-tool-panel.active {
+	      display: block;
+	    }
+	    .live-tool-head {
+	      display: flex;
+	      justify-content: space-between;
+	      gap: 12px;
+	      align-items: baseline;
+	      color: var(--muted);
+	      font-size: 12px;
+	    }
+	    .live-tool-head strong {
+	      color: var(--text);
+	      font-size: 13px;
+	      text-transform: uppercase;
+	      letter-spacing: .06em;
+	    }
+	    .live-tool-table {
+	      width: 100%;
+	      border-collapse: collapse;
+	      margin-top: 8px;
+	      font-size: 12px;
+	      font-variant-numeric: tabular-nums;
+	    }
+	    .live-tool-table th,
+	    .live-tool-table td {
+	      border-top: 1px solid var(--line);
+	      padding: 6px 5px;
+	      text-align: left;
+	      vertical-align: top;
+	    }
+	    .live-tool-table th {
+	      color: var(--muted);
+	      font-size: 10px;
+	      text-transform: uppercase;
+	      letter-spacing: .06em;
+	    }
+	    .live-tool-name {
+	      max-width: 270px;
+	      overflow-wrap: anywhere;
+	      color: var(--ink);
+	      font-weight: 750;
+	    }
+	    .run-progress {
+	      display: inline-flex;
+	      align-items: baseline;
+	      gap: 10px;
       margin-top: 12px;
       border: 1px solid var(--line);
       background: var(--panel2);
@@ -150,6 +225,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     .good { color: var(--green); }
     .bad { color: var(--red); }
     .warn { color: var(--amber); }
+    .neutral { color: var(--muted); }
     main {
       display: grid;
       grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
@@ -597,6 +673,65 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       padding: 8px 10px;
       cursor: pointer;
     }
+    .tool-code-link {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+      display: inline;
+      font: inherit;
+      font-weight: 800;
+      padding: 0;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+    .tool-code-link:hover,
+    .tool-code-link:focus-visible {
+      color: var(--blue);
+      text-decoration: underline;
+      outline: none;
+    }
+    .code-panel {
+      width: min(1040px, 96vw);
+    }
+    .code-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+    .code-explanation {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel2);
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 12px;
+      padding: 12px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .code-explanation-title {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      margin-bottom: 7px;
+      text-transform: uppercase;
+    }
+    .code-block {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0a1018;
+      color: var(--ink);
+      max-height: calc(100vh - 150px);
+      overflow: auto;
+      padding: 14px;
+      white-space: pre;
+    }
     a {
       color: var(--blue);
       text-decoration: none;
@@ -632,6 +767,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           <span class="env-badge" id="envBadge">ToolSandbox</span>
         </div>
         <div class="subtitle" id="subtitle">Loading run data...</div>
+        <div class="subtitle runtime-line" id="runtimeLine"></div>
       </div>
       <select id="dashboardSwitch" class="dashboard-switch" aria-label="Switch dashboard">
         <option value="index.html">Overview</option>
@@ -640,9 +776,11 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       </select>
     </div>
     <div class="run-progress" id="runProgress"></div>
-    <div class="metrics" id="metrics"></div>
-    <div class="metrics tool-metrics" id="toolMetrics"></div>
-  </header>
+	    <div class="metrics" id="metrics"></div>
+	    <div class="metrics tool-metrics" id="toolMetrics"></div>
+	    <div class="cache-panel" id="cachePanel"></div>
+	    <div class="live-tool-panel" id="liveToolPanel"></div>
+	  </header>
   <main>
     <aside>
       <input id="search" class="search" placeholder="Filter tasks" />
@@ -660,6 +798,22 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <button class="close" id="closeTools">Close</button>
       </div>
       <div id="toolTable"></div>
+    </div>
+  </div>
+  <div class="drawer" id="toolCodeDrawer" aria-hidden="true">
+    <div class="drawer-panel code-panel">
+      <div class="drawer-head">
+        <div>
+          <h2 id="toolCodeTitle" style="margin:0">Tool Code</h2>
+          <div class="code-meta" id="toolCodeMeta"></div>
+        </div>
+        <button class="close" id="closeToolCode">Close</button>
+      </div>
+      <div class="code-explanation">
+        <div class="code-explanation-title">Explanation</div>
+        <div id="toolCodeExplanation"></div>
+      </div>
+      <pre class="code-block" id="toolCodeBlock"></pre>
     </div>
   </div>
   <script>
@@ -682,6 +836,53 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     };
     const num = (v, d = 3) => finite(v) ? Number(v).toFixed(d) : "-";
     const signedNum = (v, d = 3) => finite(v) ? (Number(v) >= 0 ? "+" : "") + Number(v).toFixed(d) : "-";
+    const intNum = (v) => finite(v) ? new Intl.NumberFormat("en-US", {maximumFractionDigits: 0}).format(Number(v)) : "-";
+    const tokenNum = (v) => {
+      if (!finite(v)) return "-";
+      const n = Number(v);
+      if (Math.abs(n) >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+      if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)}K`;
+      return intNum(n);
+    };
+    const durationText = (seconds) => {
+      if (!finite(seconds)) return "N/A";
+      const total = Math.max(0, Math.round(Number(seconds)));
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const secs = total % 60;
+      if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+      if (minutes > 0) return `${minutes}m ${String(secs).padStart(2, "0")}s`;
+      return `${secs}s`;
+    };
+    const llmRecorded = (rowOrSummary, prefix = "") => {
+      const key = prefix ? `${prefix}_llm_usage_recorded` : "llm_usage_recorded";
+      const callsKey = prefix ? `${prefix}_llm_call_count` : "llm_call_count";
+      const tokensKey = prefix ? `${prefix}_llm_total_tokens` : "llm_total_tokens";
+      return Boolean(rowOrSummary?.[key]) || finite(rowOrSummary?.[callsKey]) || finite(rowOrSummary?.[tokensKey]);
+    };
+    const llmPairValue = (controlValue, candidateValue, formatter) => `${formatter(controlValue)} / ${formatter(candidateValue)}`;
+    const baselineCacheUsed = () => {
+      const cache = payload?.control_cache || {};
+      const pairedCached = pairs.filter((pair) => pair?.control?.control_cache_source === "cached").length;
+      return pairedCached > 0 || Number(cache.cached_control_tasks || 0) > 0 || String(cache.control_source || cache.source || "").toLowerCase() === "cached";
+    };
+    const totalTimePairValue = (summary) => {
+      const baseline = baselineCacheUsed() ? "N/A" : durationText(summary.control_wall_time_seconds);
+      return `${baseline} / ${durationText(summary.candidate_wall_time_seconds)}`;
+    };
+    const totalTimeHint = (summary) => {
+      const baselineNote = baselineCacheUsed()
+        ? "baseline served from cache"
+        : finite(summary.control_wall_time_seconds)
+          ? "baseline wall time"
+          : "baseline time not recorded";
+      const sageNote = finite(summary.candidate_wall_time_seconds)
+        ? finite(summary.candidate_wall_time_resume_offset_seconds) && Number(summary.candidate_wall_time_resume_offset_seconds) > 0
+          ? "SAGE wall time including checkpoint"
+          : "SAGE wall time"
+        : "SAGE time not recorded";
+      return `${baselineNote}; ${sageNote}`;
+    };
     const relLift = (delta, baseline) => {
       if (!finite(delta) || !finite(baseline)) return null;
       const d = Number(delta);
@@ -697,7 +898,28 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       }
       return `${signedNum(delta)} ${unit} delta`;
     };
-    const cls = (v) => Number(v || 0) > 0 ? "good" : Number(v || 0) < 0 ? "bad" : "";
+    const formatRuntimeLine = () => {
+      const raw = payload?.runtime_at || payload?.created_at || payload?.started_at || payload?.start_time || payload?.run_started_at || payload?.summary?.created_at || "";
+      if (!raw) return "";
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return "";
+      const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+        timeZone: "America/New_York",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(date).map((part) => [part.type, part.value]));
+      return `Runtime: ${parts.hour}${parts.minute}, ${parts.day} ${parts.month} ${parts.year}`;
+    };
+    const cls = (v) => {
+      const numeric = Number(v);
+      if (!Number.isFinite(numeric)) return "";
+      if (Math.abs(numeric) <= 1e-12) return "neutral";
+      return numeric > 0 ? "good" : "bad";
+    };
     const outcome = (row) => row?.outcome_similarity ?? row?.outcome_milestone_similarity ?? null;
     function initDashboardSwitch() {
       const select = document.getElementById("dashboardSwitch");
@@ -750,35 +972,146 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       </div>`;
     }
 
-    function maybeValue(value) {
-      return value === null || value === undefined ? "n/a" : value;
+    function cachePill(label, value) {
+      if (value === null || value === undefined || value === "") return "";
+      return `<span class="cache-pill"><strong>${esc(label)}</strong>${esc(value)}</span>`;
     }
 
-    function gainLossText(gains, regressions) {
+	    function renderCachePanel() {
+	      const cache = payload?.control_cache || {};
+	      const hasCacheReport = Object.keys(cache).length > 0;
+      if (!hasCacheReport && !(payload?.summary || payload?.arm_progress)) {
+        document.getElementById("cachePanel").innerHTML = "";
+        return;
+      }
+      const progress = payload?.arm_progress?.control || {};
+      const summary = payload?.summary || {};
+      const completed = progress.completed ?? summary.control_completed ?? 0;
+      const total = progress.total ?? summary.scenario_count ?? 0;
+      const misses = cache.cache_misses || {};
+      const missText = Object.entries(misses)
+        .filter(([, value]) => Number(value || 0) > 0)
+        .map(([key, value]) => `${value} ${key.replaceAll("_", " ")}`)
+        .join(" · ");
+      const hash = cache.cache_manifest_hash ? String(cache.cache_manifest_hash).slice(0, 12) : "";
+      const rowCached = pairs.filter((pair) => pair?.control?.control_cache_source === "cached").length;
+      const rowFresh = pairs.filter((pair) => pair?.control && pair?.control?.control_cache_source !== "cached").length;
+      const cached = cache.cached_control_tasks ?? rowCached;
+      const fresh = cache.fresh_control_tasks ?? (rowCached ? rowFresh : (total || completed || 0));
+      const mode = cache.mode || (rowCached ? "use-if-eligible" : "off");
+      const source = cache.control_source || cache.source || (rowCached ? "cached row summaries" : "fresh baseline");
+      document.getElementById("cachePanel").innerHTML = [
+        cachePill("Control cache", `${cached} cached / ${fresh} fresh`),
+        cachePill("Mode", mode),
+        cachePill("Source", source),
+        cachePill("Misses", missText),
+        cachePill("Manifest", hash),
+	        cache.live_dashboard_seeded_from_preflight ? cachePill("Live note", "seeded from preflight until runner finalizes report") : "",
+	      ].filter(Boolean).join("");
+	    }
+
+	    function renderToolSummaryPanel() {
+	      const panel = document.getElementById("liveToolPanel");
+	      if (!panel) return;
+	      const tools = payload?.tool_summary || {};
+	      const rows = Array.isArray(tools.tools) ? tools.tools : [];
+	      if (!rows.length) {
+	        panel.innerHTML = "";
+	        panel.classList.remove("active");
+	        return;
+	      }
+	      const topRows = rows.slice(0, 8).map((tool) => `<tr>
+	        <td class="live-tool-name">${toolNameButton(tool)}<div class="small">${esc(tool.decision || "")}</div></td>
+	        <td>${esc(maybeValue(tool.visible_count, "pending"))}</td>
+	        <td>${esc(tool.called_count ?? 0)}</td>
+	        <td class="${cls(tool.called_subset_mean_outcome_delta)}">${esc(contributionDeltaText(tool))}</td>
+	        <td>${esc(gainLossText(tool.outcome_gains, tool.outcome_regressions, tool.contribution_pending))}</td>
+	        <td>${esc(tool.side_effect_incident_count ?? 0)} side-effect<br><span class="small">${esc(tool.runtime_incident_count ?? 0)} runtime</span></td>
+	      </tr>`).join("");
+	      const visibilitySummary = tools.visible_tool_count === null || tools.visible_tool_count === undefined
+	        ? "visibility pending"
+	        : `${intNum(tools.visible_tool_count)} visible`;
+	      const contributionSummary = tools.outcome_gains === null || tools.outcome_gains === undefined || tools.outcome_regressions === null || tools.outcome_regressions === undefined
+	        ? "contribution pending"
+	        : `${intNum(tools.outcome_gains)} gains / ${intNum(tools.outcome_regressions)} regressions`;
+	      const summary = [
+	        visibilitySummary,
+	        `${intNum(tools.called_tool_count ?? 0)} called`,
+	        contributionSummary,
+	        `${intNum(tools.side_effect_incident_count ?? 0)} side-effect rows`,
+	        `${intNum(tools.runtime_incident_count ?? 0)} runtime incidents`,
+	      ].join(" / ");
+	      panel.innerHTML = `<div class="live-tool-head"><strong>Live Tool Contribution</strong><span>${esc(summary)}</span></div>
+	        <table class="live-tool-table">
+	          <thead><tr><th>Tool</th><th>Visible</th><th>Called</th><th>Outcome Delta</th><th>Gain / Regression</th><th>Safety</th></tr></thead>
+	          <tbody>${topRows}</tbody>
+	        </table>`;
+	      panel.classList.add("active");
+	    }
+
+	    function toolNameButton(tool) {
+	      const name = tool?.name || "-";
+	      return `<button type="button" class="tool-code-link" data-tool-code-name="${esc(name)}">${esc(name)}</button>`;
+	    }
+
+	    function maybeValue(value, missingLabel) {
+	      return value === null || value === undefined ? (missingLabel || "n/a") : value;
+    }
+
+    function contributionDeltaText(tool) {
+      if (tool?.contribution_pending) return "pending";
+      return signedNum(tool?.called_subset_mean_outcome_delta);
+    }
+
+    function gainLossText(gains, regressions, pending) {
+      if (pending) return "pending";
       if (gains === null && regressions === null) return "n/a";
       if (gains === undefined && regressions === undefined) return "n/a";
       return `${gains ?? 0} gains / ${regressions ?? 0} regressions`;
     }
 
     function plannedTaskCount(summary) {
-      const selected = Math.max(
-        Number(summary.scenario_count || 0),
-        Number(payload?.arm_progress?.control?.scenario_count || 0),
-        Number(payload?.arm_progress?.candidate?.scenario_count || 0),
-        Number(pairs.length || 0),
-      );
       const modeMatch = String(payload?.mode || "").match(/_(\d+)$/);
       const modeCap = modeMatch ? Number(modeMatch[1]) : 0;
-      return Math.max(selected, modeCap);
+      const explicit = [
+        payload?.scenario_count,
+        payload?.planned_scenario_count,
+        summary.planned_scenario_count,
+        payload?.requested_samples,
+        summary.requested_samples,
+        payload?.requested_limit,
+        summary.requested_limit,
+        payload?.arm_progress?.control?.scenario_count,
+        payload?.arm_progress?.candidate?.scenario_count,
+        modeCap,
+      ].map((value) => Number(value || 0)).find((value) => value > 0);
+      if (explicit) return explicit;
+      return Math.max(Number(summary.scenario_count || 0), Number(pairs.length || 0));
+    }
+
+    function armProgress(arm, summaryKey) {
+      const s = payload?.summary || {};
+      const progress = payload?.arm_progress?.[arm] || {};
+      const total = plannedTaskCount(s);
+      const completedRaw = progress.completed_count ?? s[summaryKey] ?? 0;
+      const plannedRaw = progress.scenario_count ?? total;
+      const planned = Number(plannedRaw || total || 0);
+      const completed = Math.min(Number(completedRaw || 0), planned || Number(completedRaw || 0));
+      return {
+        completed,
+        planned,
+        status: progress.status || (completed > 0 ? "running" : "pending"),
+      };
     }
 
     function renderMetrics() {
       const s = payload.summary || {};
       const tools = payload.tool_summary || {};
-      const selectedTasks = Math.max(Number(s.scenario_count || 0), Number(pairs.length || 0));
       const totalTasks = plannedTaskCount(s);
-      const baselineDone = s.control_completed ?? 0;
-      const sageDone = s.candidate_completed ?? s.current_completed ?? 0;
+      const baselineProgress = armProgress("control", "control_completed");
+      const sageProgress = armProgress("candidate", "candidate_completed");
+      const baselineDone = baselineProgress.completed;
+      const sageDone = sageProgress.completed;
       const matched = Math.min(baselineDone, sageDone);
       const paired = pairedMetrics(s);
       const baselineScore = paired.baselineScore;
@@ -790,9 +1123,27 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const outcomeDelta = finite(baselineOutcome) && finite(sageOutcome) ? Number(sageOutcome) - Number(baselineOutcome) : null;
       const outcomeLift = relLift(outcomeDelta, baselineOutcome);
       const used = tools.called_tool_count ?? 0;
-      const total = tools.registry_tool_count ?? tools.tool_count ?? 0;
-      const selectedNote = selectedTasks && selectedTasks !== totalTasks ? ` · ${selectedTasks} selected/matched` : "";
-      document.getElementById("runProgress").innerHTML = `<span class="label">Run Progress</span><strong>${matched || 0}/${totalTasks || 0}</strong><span>baseline ${baselineDone}/${totalTasks || 0} · SAGE ${sageDone}/${totalTasks || 0}${selectedNote}</span>`;
+      const total = (tools.registry_tool_count || tools.tool_count || 0);
+      const contributionTools = tools.contribution_tool_count || tools.tool_count || total;
+      const bornEvents = Math.max(
+        Number(tools.generated_tool_birth_count || 0),
+        Number(tools.generated_tool_birth_event_count || 0),
+      );
+      const controlUsageRecorded = llmRecorded(s, "control");
+      const candidateUsageRecorded = llmRecorded(s, "candidate");
+      const llmCallsValue = controlUsageRecorded || candidateUsageRecorded
+        ? llmPairValue(s.control_llm_call_count, s.candidate_llm_call_count, intNum)
+        : "- / -";
+      const llmTokensValue = controlUsageRecorded || candidateUsageRecorded
+        ? llmPairValue(s.control_llm_total_tokens, s.candidate_llm_total_tokens, tokenNum)
+        : "- / -";
+      const llmCallsHint = controlUsageRecorded || candidateUsageRecorded
+        ? `live ${intNum(s.control_llm_live_call_count)} / ${intNum(s.candidate_llm_live_call_count)} · cached ${intNum(s.control_llm_cached_call_count)} / ${intNum(s.candidate_llm_cached_call_count)}`
+        : "usage not recorded in this run";
+      const llmTokensHint = controlUsageRecorded || candidateUsageRecorded
+        ? `prompt ${tokenNum(s.control_llm_prompt_tokens)} / ${tokenNum(s.candidate_llm_prompt_tokens)} · completion ${tokenNum(s.control_llm_completion_tokens)} / ${tokenNum(s.candidate_llm_completion_tokens)}`
+        : "OpenAI usage metadata unavailable";
+      document.getElementById("runProgress").innerHTML = `<span class="label">Run Progress</span><strong>${matched || 0}/${totalTasks || 0}</strong><span>baseline ${baselineDone}/${totalTasks || 0} ${esc(baselineProgress.status)} · SAGE ${sageDone}/${totalTasks || 0} ${esc(sageProgress.status)}</span>`;
       document.getElementById("metrics").innerHTML = [
         metric("Baseline Score", num(baselineScore), `${paired.scoreCount || matched || 0} paired score tasks`),
         metric("SAGE Score", num(sageScore), `${paired.scoreCount || matched || 0} paired score tasks`),
@@ -800,14 +1151,25 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         metric("Baseline Outcome", num(baselineOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("SAGE Outcome", num(sageOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("Outcome Lift", liftPct(outcomeLift, approxZeroBaselineLift(outcomeDelta, baselineOutcome)), liftHint(outcomeDelta, baselineOutcome, "outcome"), cls(outcomeDelta)),
+        metric("Total Time B / S", totalTimePairValue(s), totalTimeHint(s)),
+        metric("LLM Calls B / S", llmCallsValue, llmCallsHint),
+        metric("Tokens B / S", llmTokensValue, llmTokensHint),
       ].join("");
-      document.getElementById("toolMetrics").innerHTML = metric("Tools Born / Used", `${tools.generated_tool_birth_count || 0} / ${used}`, `${total} registry tools; click for contribution`, "warn", true);
-      const cell = document.getElementById("toolsMetric");
-      cell?.addEventListener("click", openTools);
-      cell?.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") openTools();
-      });
-    }
+	      document.getElementById("toolMetrics").innerHTML = metric(
+	        "New Tools / Called",
+	        `${bornEvents} / ${used}`,
+	        `${total} registry tools present · ${contributionTools} contribution tools; click for contribution`,
+	        bornEvents > 0 ? "good" : "warn",
+	        true,
+	      );
+	      const cell = document.getElementById("toolsMetric");
+	      cell?.addEventListener("click", openTools);
+	      cell?.addEventListener("keydown", (event) => {
+	        if (event.key === "Enter" || event.key === " ") openTools();
+	      });
+	      renderCachePanel();
+	      renderToolSummaryPanel();
+	    }
 
     function pairDelta(pair) {
       const c = pair.control || {};
@@ -1208,6 +1570,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
             <div class="mini"><div class="label">SAGE Outcome</div><div class="value">${pct(outcome(candidate))}</div></div>
             <div class="mini"><div class="label">Outcome Lift</div><div class="value ${cls(d.outcomeDelta)}">${liftPct(relLift(d.outcomeDelta, outcome(control)), approxZeroBaselineLift(d.outcomeDelta, outcome(control)))}</div><div class="hint">${approxZeroBaselineLift(d.outcomeDelta, outcome(control)) ? liftHint(d.outcomeDelta, outcome(control), "outcome") : `${num(outcome(control))} -> ${num(outcome(candidate))}; delta ${signedNum(d.outcomeDelta)}`}</div></div>
             <div class="mini"><div class="label">Turns B / S</div><div class="value">${esc(control.turn_count ?? "-")} / ${esc(candidate.turn_count ?? "-")}</div></div>
+            <div class="mini"><div class="label">LLM Calls B / S</div><div class="value">${esc(llmPairValue(control.llm_call_count, candidate.llm_call_count, intNum))}</div><div class="hint">live ${esc(llmPairValue(control.llm_live_call_count, candidate.llm_live_call_count, intNum))}</div></div>
+            <div class="mini"><div class="label">Tokens B / S</div><div class="value">${esc(llmPairValue(control.llm_total_tokens, candidate.llm_total_tokens, tokenNum))}</div><div class="hint">prompt ${esc(llmPairValue(control.llm_prompt_tokens, candidate.llm_prompt_tokens, tokenNum))}</div></div>
             <div class="mini"><div class="label">Control Cache</div><div class="value">${esc(control.control_cache_source || "-")}</div></div>
             <div class="mini"><div class="label">SAGE Tool Events</div><div class="value">${esc(toolEvents(pair).length)}</div></div>
           </div>
@@ -1242,18 +1606,18 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     function openTools() {
       const tools = payload.tool_summary || {};
       const rows = tools.tools || [];
-      const visibilityKnown = rows.some((tool) => tool.visible_count !== null && tool.visible_count !== undefined);
-      const contributionKnown = rows.some((tool) => tool.called_subset_mean_outcome_delta !== null && tool.called_subset_mean_outcome_delta !== undefined);
-      document.getElementById("toolDrawerSub").textContent = `${rows.length} tools; ${tools.called_tool_count || 0} called naturally in this run.${visibilityKnown ? "" : " Visibility counts were not exported for this run."}${contributionKnown ? "" : " Contribution columns are unavailable from reuse-event fallback data."}`;
+      const visibilityKnown = Boolean(tools.visibility_known ?? rows.some((tool) => tool.visible_count !== null && tool.visible_count !== undefined));
+      const contributionKnown = Boolean(tools.contribution_known ?? rows.some((tool) => tool.called_subset_mean_outcome_delta !== null && tool.called_subset_mean_outcome_delta !== undefined));
+      document.getElementById("toolDrawerSub").textContent = `${rows.length} tools; ${tools.called_tool_count || 0} called naturally in this run.${visibilityKnown ? "" : " Visibility counts are pending until live selection artifacts are available."}${contributionKnown ? "" : " Contribution columns are pending until completed paired called-tool tasks are available."}`;
       document.getElementById("toolTable").innerHTML = `<table>
         <thead><tr><th>Tool</th><th>Origin</th><th>Visible</th><th>Called</th><th>VNC</th><th>Outcome Contribution</th><th>Score Contribution</th><th>Safety</th></tr></thead>
         <tbody>${rows.map((tool) => `<tr>
-          <td><strong>${esc(tool.name)}</strong><div class="small">${esc(tool.decision || "")}</div></td>
+          <td><strong>${toolNameButton(tool)}</strong><div class="small">${esc(tool.decision || "")}</div></td>
           <td>${esc(tool.origin || "-")}</td>
-          <td>${esc(maybeValue(tool.visible_count))}</td>
+          <td>${esc(maybeValue(tool.visible_count, "pending"))}</td>
           <td>${esc(tool.called_count ?? 0)}</td>
-          <td>${esc(maybeValue(tool.visible_not_called_count))}</td>
-          <td class="${cls(tool.called_subset_mean_outcome_delta)}">${signedNum(tool.called_subset_mean_outcome_delta)}<div class="small">${esc(gainLossText(tool.outcome_gains, tool.outcome_regressions))}</div></td>
+          <td>${esc(maybeValue(tool.visible_not_called_count, "pending"))}</td>
+          <td class="${cls(tool.called_subset_mean_outcome_delta)}">${esc(contributionDeltaText(tool))}<div class="small">${esc(gainLossText(tool.outcome_gains, tool.outcome_regressions, tool.contribution_pending))}</div></td>
           <td class="${cls(tool.called_subset_mean_canonical_delta)}">${signedNum(tool.called_subset_mean_canonical_delta)}</td>
           <td>${esc(tool.side_effect_incident_count ?? 0)} side effects<br><span class="small">${esc(tool.runtime_incident_count ?? 0)} runtime incidents</span></td>
         </tr>`).join("")}</tbody>
@@ -1265,6 +1629,32 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     function closeTools() {
       document.getElementById("toolDrawer").classList.remove("open");
       document.getElementById("toolDrawer").setAttribute("aria-hidden", "true");
+    }
+
+    function toolByName(name) {
+      const rows = payload?.tool_summary?.tools || [];
+      return rows.find((tool) => tool.name === name) || null;
+    }
+
+    function openToolCode(name) {
+      const tool = toolByName(name);
+      const code = tool?.code || "Code unavailable in this dashboard payload.";
+      const meta = [
+        tool?.family,
+        tool?.code_hash ? `hash ${tool.code_hash}` : "",
+        tool?.description || "",
+      ].filter(Boolean).join(" · ");
+      document.getElementById("toolCodeTitle").textContent = name || "Tool Code";
+      document.getElementById("toolCodeMeta").textContent = meta;
+      document.getElementById("toolCodeExplanation").textContent = tool?.plain_language_explanation || "No explanation is available for this tool.";
+      document.getElementById("toolCodeBlock").textContent = code;
+      document.getElementById("toolCodeDrawer").classList.add("open");
+      document.getElementById("toolCodeDrawer").setAttribute("aria-hidden", "false");
+    }
+
+    function closeToolCode() {
+      document.getElementById("toolCodeDrawer").classList.remove("open");
+      document.getElementById("toolCodeDrawer").setAttribute("aria-hidden", "true");
     }
 
     function captureScrollState() {
@@ -1293,8 +1683,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       if (["complete", "completed", "done", "failed", "error"].includes(status)) return true;
       const s = payload.summary || {};
       const totalTasks = plannedTaskCount(s);
-      const baselineDone = Number(s.control_completed ?? 0);
-      const sageDone = Number(s.candidate_completed ?? s.current_completed ?? 0);
+      const baselineDone = armProgress("control", "control_completed").completed;
+      const sageDone = armProgress("candidate", "candidate_completed").completed;
       return totalTasks > 0 && Math.min(baselineDone, sageDone) >= totalTasks;
     }
 
@@ -1308,27 +1698,58 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       }
       if (refreshTimer === null) {
         refreshTimer = window.setInterval(() => {
-          refresh({preserveScroll: true}).catch((error) => console.error(error));
+          refresh({preserveScroll: true}).catch((error) => {
+            if (!isTransientDataError(error)) console.error(error);
+          });
         }, 5000);
       }
     }
 
+    function isTransientDataError(error) {
+      const message = String(error?.message || error || "");
+      return error instanceof SyntaxError || message.includes("empty dashboard data");
+    }
+
+    const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+    async function fetchDashboardJson(url) {
+      const response = await fetch(url, {cache: "no-store"});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const text = await response.text();
+      if (!text.trim()) throw new SyntaxError("empty dashboard data");
+      return JSON.parse(text);
+    }
+
     async function refresh(options = {}) {
       const scrollState = options.preserveScroll ? captureScrollState() : null;
-      const response = await fetch(`task_compare_data.json?ts=${Date.now()}`, {cache: "no-store"});
-      payload = await response.json();
+      let lastError = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          payload = await fetchDashboardJson(`task_compare_data.json?ts=${Date.now()}`);
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+          if (!isTransientDataError(error)) throw error;
+          await sleep(250);
+        }
+      }
+      if (lastError) {
+        if (payload && isTransientDataError(lastError)) return;
+        throw lastError;
+      }
       pairs = payload.pairs || [];
       const s = payload.summary || {};
-      const baselineDone = s.control_completed ?? 0;
-      const sageDone = s.candidate_completed ?? s.current_completed ?? 0;
-      const matched = Math.min(baselineDone, sageDone);
       const totalTasks = plannedTaskCount(s);
-      const selectedTasks = Math.max(Number(s.scenario_count || 0), Number(pairs.length || 0));
-      const matchedText = selectedTasks && selectedTasks !== totalTasks ? `${matched || 0}/${totalTasks || 0} cap · ${selectedTasks} matched tasks` : `${matched || 0}/${totalTasks || 0} matched tasks`;
+      const baselineDone = armProgress("control", "control_completed").completed;
+      const sageDone = armProgress("candidate", "candidate_completed").completed;
+      const matched = Math.min(baselineDone, sageDone);
+      const matchedText = `${matched || 0}/${totalTasks || 0} matched tasks`;
       const environmentName = envDisplayName(payload.environment || payload.benchmark || s.environment || "ToolSandbox");
       document.title = `Task Compare - ${environmentName} - SAGE`;
       document.getElementById("envBadge").textContent = environmentName;
       document.getElementById("subtitle").textContent = `${payload.mode || "run"} · ${payload.status || "unknown"} · ${payload.agent || ""} · ${matchedText} · refreshed ${new Date().toLocaleTimeString()}`;
+      document.getElementById("runtimeLine").textContent = formatRuntimeLine();
       if (selected >= pairs.length) selected = Math.max(0, pairs.length - 1);
       renderMetrics();
       renderList();
@@ -1344,17 +1765,34 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         initDashboardSwitch();
         document.getElementById("search").addEventListener("input", renderList);
         document.getElementById("closeTools").addEventListener("click", closeTools);
+        document.getElementById("closeToolCode").addEventListener("click", closeToolCode);
         document.getElementById("toolDrawer").addEventListener("click", (event) => {
           if (event.target.id === "toolDrawer") closeTools();
         });
+        document.getElementById("toolCodeDrawer").addEventListener("click", (event) => {
+          if (event.target.id === "toolCodeDrawer") closeToolCode();
+        });
+        document.addEventListener("click", (event) => {
+          const target = event.target?.closest?.("[data-tool-code-name]");
+          if (!target) return;
+          event.preventDefault();
+          openToolCode(target.getAttribute("data-tool-code-name"));
+        });
         window.addEventListener("keydown", (event) => {
-          if (event.key === "Escape") closeTools();
+          if (event.key === "Escape") {
+            closeToolCode();
+            closeTools();
+          }
         });
         updateRefreshTimer();
       }
     }
 
     load().catch((error) => {
+      if (isTransientDataError(error)) {
+        window.setTimeout(load, 1000);
+        return;
+      }
       document.getElementById("detail").innerHTML = `<div class="section"><strong>Dashboard load failed.</strong><pre>${esc(error.stack || error.message || error)}</pre></div>`;
       console.error(error);
     });

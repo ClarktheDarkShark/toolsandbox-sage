@@ -302,7 +302,7 @@ TASK_FOCUS_HTML = r"""<!doctype html>
           {l:"Delta", v:fmtD(d), n:d===null?"":d>0?"improvement":d<0?"regression":"no change", cls:d===null?"":d>0?"good":d<0?"bad":""},
           {l:"Lift", v:fmtPct(lift), n:"vs baseline", cls:present(lift) && Number(lift)>0?"good":present(lift) && Number(lift)<0?"bad":""},
           ...(od===null?[]:[{l:"Outcome Delta", v:fmtD(od), n:`${fmt(oc)} → ${fmt(os)}`, cls:od>0?"good":od<0?"bad":""}]),
-          {l:"Tools", v:`${s.accepted_tools||0} born`, n:`${s.reuse_count||0} reuse · ${s.generated_tool_attempted_scenarios||0} attempts · ${s.generated_tool_called_scenarios||0} called · ${s.generated_tool_failed_scenarios||0} failed`},
+          {l:"Tools", v:`${s.accepted_tools||0} new`, n:`${s.reuse_count||0} reuse · ${s.generated_tool_attempted_scenarios||0} attempts · ${s.generated_tool_called_scenarios||0} called · ${s.generated_tool_failed_scenarios||0} failed`},
           {l:"Baseline Progress", v:progressText(cp), n:cp.status},
           {l:"SAGE Progress", v:progressText(sp), n:sp.status},
         ];
@@ -310,7 +310,7 @@ TASK_FOCUS_HTML = r"""<!doctype html>
         const sp = armProgressFor("candidate", s.candidate_completed);
         cards = [
           {l:"SAGE Score", v:fmt(s.candidate_mean_similarity), n:`${s.candidate_completed||0} done`},
-          {l:"Tools Born", v:`${s.accepted_tools||0}`, n:"accepted"},
+          {l:"New Tools", v:`${s.accepted_tools||0}`, n:"accepted this run"},
           {l:"Reuse Calls", v:`${s.reuse_count||0}`, n:"generated tool uses"},
           {l:"Tool Attempts", v:`${s.generated_tool_attempted_scenarios||0}`, n:`${s.generated_tool_called_scenarios||0} called · ${s.generated_tool_failed_scenarios||0} failed`},
           {l:"Turns", v:`${s.current_turns||0}`, n:"total"},
@@ -682,14 +682,22 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       requestAnimationFrame(() => restoreScroll(scroll));
     }
 
+    async function fetchDashboardJson(url) {
+      const r = await fetch(url, {cache:"no-store"});
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const text = await r.text();
+      if (!text.trim()) throw new SyntaxError("empty dashboard data");
+      return JSON.parse(text);
+    }
+
     async function refresh() {
       try {
-        const r = await fetch(`task_focus_data.json?ts=${Date.now()}`, {cache:"no-store"});
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        data = await r.json();
+        data = await fetchDashboardJson(`task_focus_data.json?ts=${Date.now()}`);
         render();
       } catch(e) {
-        document.getElementById("chat").innerHTML = `<div class="empty">Data unavailable: ${esc(e.message)}</div>`;
+        if (!data || !(e instanceof SyntaxError)) {
+          document.getElementById("chat").innerHTML = `<div class="empty">Data unavailable: ${esc(e.message)}</div>`;
+        }
       }
     }
 

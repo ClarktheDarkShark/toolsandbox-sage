@@ -126,8 +126,6 @@ crossed zero. Canonical/reference behavior was mixed.
   task.
 - Scenario-name-based routing is a current runtime dependency and should be
   reported transparently.
-- The development assistant is not SAGE. SAGE is the research system being
-  evaluated.
 
 ## Future Methodology Option
 

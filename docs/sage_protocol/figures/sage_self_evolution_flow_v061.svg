@@ -1,0 +1,234 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1550" viewBox="0 0 2400 1550">
+  <defs>
+    <linearGradient id="pageBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbfdff"/>
+      <stop offset="100%" stop-color="#eef4f8"/>
+    </linearGradient>
+    <linearGradient id="loopBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3a8fd8"/>
+      <stop offset="100%" stop-color="#2468a9"/>
+    </linearGradient>
+    <linearGradient id="loopTeal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#19bba8"/>
+      <stop offset="100%" stop-color="#08786f"/>
+    </linearGradient>
+    <linearGradient id="loopGold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f4b943"/>
+      <stop offset="100%" stop-color="#b67607"/>
+    </linearGradient>
+    <linearGradient id="loopViolet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9275d8"/>
+      <stop offset="100%" stop-color="#6547a6"/>
+    </linearGradient>
+    <linearGradient id="loopCoral" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e47458"/>
+      <stop offset="100%" stop-color="#a84933"/>
+    </linearGradient>
+    <radialGradient id="registryGlow" cx="50%" cy="50%" r="62%">
+      <stop offset="0%" stop-color="#18bca7" stop-opacity="0.22"/>
+      <stop offset="55%" stop-color="#3a8fd8" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="cardShadow" x="-15%" y="-25%" width="130%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#24415d" flood-opacity="0.18"/>
+    </filter>
+    <filter id="hubShadow" x="-35%" y="-35%" width="170%" height="170%">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#24415d" flood-opacity="0.26"/>
+    </filter>
+    <pattern id="dotGrid" width="36" height="36" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.2" fill="#9fb3c8" opacity="0.28"/>
+    </pattern>
+    <marker id="arrowBlue" markerWidth="24" markerHeight="24" refX="21" refY="12" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 24 12 L 0 24 Z" fill="#2468a9"/>
+    </marker>
+    <marker id="arrowTeal" markerWidth="24" markerHeight="24" refX="21" refY="12" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 24 12 L 0 24 Z" fill="#08786f"/>
+    </marker>
+    <marker id="arrowGold" markerWidth="24" markerHeight="24" refX="21" refY="12" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 24 12 L 0 24 Z" fill="#b67607"/>
+    </marker>
+    <marker id="arrowViolet" markerWidth="24" markerHeight="24" refX="21" refY="12" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 24 12 L 0 24 Z" fill="#6547a6"/>
+    </marker>
+    <marker id="arrowCoral" markerWidth="24" markerHeight="24" refX="21" refY="12" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 24 12 L 0 24 Z" fill="#a84933"/>
+    </marker>
+    <style>
+      .title { font-family: Arial, Helvetica, sans-serif; font-weight: 800; fill: #132238; letter-spacing: 0; }
+      .subtitle { font-family: Arial, Helvetica, sans-serif; font-weight: 400; fill: #52687d; letter-spacing: 0; }
+      .phase { font-family: Arial, Helvetica, sans-serif; font-weight: 800; fill: #ffffff; letter-spacing: 1.2px; }
+      .cardTitle { font-family: Arial, Helvetica, sans-serif; font-weight: 800; fill: #132238; letter-spacing: 0; }
+      .cardText { font-family: Arial, Helvetica, sans-serif; font-weight: 400; fill: #52687d; letter-spacing: 0; }
+      .badgeText { font-family: Arial, Helvetica, sans-serif; font-weight: 800; fill: #32506d; letter-spacing: 0.5px; }
+      .small { font-family: Arial, Helvetica, sans-serif; font-weight: 700; fill: #52687d; letter-spacing: 0; }
+      .num { font-family: Arial, Helvetica, sans-serif; font-weight: 800; fill: #ffffff; letter-spacing: 0; }
+      .flow { fill: none; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: 0.92; }
+      .feedback { fill: none; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 18 14; opacity: 0.90; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="2400" height="1550" fill="url(#pageBg)"/>
+  <rect x="0" y="0" width="2400" height="1550" fill="url(#dotGrid)"/>
+
+  <text x="105" y="92" class="title" font-size="48">SAGE Self-Evolution Loop</text>
+  <text x="108" y="134" class="subtitle" font-size="22">A governed generated-tool lifecycle: visible gap detection, controlled tool birth, validation proof, natural reuse, and lifecycle suppression or repair.</text>
+
+  <rect x="92" y="180" width="2216" height="1190" rx="36" fill="#ffffff" stroke="#d9e3ec" stroke-width="2" filter="url(#cardShadow)"/>
+  <rect x="128" y="224" width="2144" height="1075" rx="30" fill="#f7fafc" stroke="#c6d5e2" stroke-width="2" stroke-dasharray="12 10"/>
+
+  <rect x="162" y="248" width="450" height="42" rx="21" fill="#eef5fb" stroke="#c6d5e2" stroke-width="1"/>
+  <text x="190" y="276" class="small" font-size="17">ToolSandbox substrate remains fixed</text>
+  <rect x="1560" y="248" width="560" height="42" rx="21" fill="#eefaf8" stroke="#8bd8cc" stroke-width="1"/>
+  <text x="1590" y="276" class="small" font-size="17" fill="#08786f">SAGE routes generated tools only after validation proof</text>
+
+  <path d="M 548 409 C 760 245 1072 222 1315 260 C 1610 306 1843 435 1988 650" fill="none" stroke="#d6edf9" stroke-width="32" stroke-linecap="round"/>
+  <path d="M 1914 909 C 1730 1135 1398 1243 1074 1217 C 765 1192 482 1034 350 822" fill="none" stroke="#efe9fb" stroke-width="32" stroke-linecap="round"/>
+  <path d="M 350 822 C 218 612 293 472 548 409" fill="none" stroke="#f4e4d5" stroke-width="32" stroke-linecap="round"/>
+
+  <rect x="208" y="329" width="230" height="42" rx="21" fill="url(#loopBlue)"/>
+  <text x="244" y="357" class="phase" font-size="16">DISCOVER</text>
+  <rect x="1010" y="298" width="230" height="42" rx="21" fill="url(#loopTeal)"/>
+  <text x="1050" y="326" class="phase" font-size="16">GENERATE</text>
+  <rect x="1752" y="412" width="230" height="42" rx="21" fill="url(#loopGold)"/>
+  <text x="1796" y="440" class="phase" font-size="16">VALIDATE</text>
+  <rect x="360" y="1095" width="230" height="42" rx="21" fill="url(#loopViolet)"/>
+  <text x="400" y="1123" class="phase" font-size="16">ROUTE</text>
+  <rect x="225" y="850" width="230" height="42" rx="21" fill="url(#loopCoral)"/>
+  <text x="275" y="878" class="phase" font-size="16">GOVERN</text>
+
+  <g filter="url(#hubShadow)">
+    <ellipse cx="1210" cy="752" rx="350" ry="260" fill="url(#registryGlow)"/>
+    <path d="M 1210 477 L 1448 615 L 1448 890 L 1210 1028 L 972 890 L 972 615 Z" fill="#ffffff" stroke="#18bca7" stroke-width="4"/>
+    <path d="M 1210 540 L 1392 646 L 1392 858 L 1210 964 L 1028 858 L 1028 646 Z" fill="#eefaf8" stroke="#9be0d6" stroke-width="2"/>
+    <circle cx="1210" cy="618" r="34" fill="url(#loopTeal)"/>
+    <text x="1201" y="631" class="num" font-size="30">7</text>
+    <text x="1085" y="727" class="title" font-size="34">Registry Admission</text>
+    <text x="1060" y="770" class="subtitle" font-size="20">Accepted tool, validation result,</text>
+    <text x="1090" y="798" class="subtitle" font-size="20">code hash, and lifecycle state</text>
+    <rect x="1048" y="845" width="324" height="42" rx="21" fill="#ffffff" stroke="#18bca7" stroke-width="2"/>
+    <text x="1088" y="873" class="badgeText" font-size="16" fill="#08786f">CURRENT PROOF REQUIRED</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="190" y="420" width="335" height="122" rx="18" fill="#ffffff" stroke="#3a8fd8" stroke-width="2"/>
+    <circle cx="230" cy="462" r="25" fill="url(#loopBlue)"/>
+    <text x="223" y="472" class="num" font-size="26">1</text>
+    <text x="270" y="456" class="cardTitle" font-size="21">Visible Task Context</text>
+    <text x="224" y="494" class="cardText" font-size="16">Task text, visible state,</text>
+    <text x="224" y="518" class="cardText" font-size="16">and native tool affordances.</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="565" y="325" width="335" height="122" rx="18" fill="#ffffff" stroke="#19bba8" stroke-width="2"/>
+    <circle cx="605" cy="367" r="25" fill="url(#loopTeal)"/>
+    <text x="598" y="377" class="num" font-size="26">2</text>
+    <text x="645" y="361" class="cardTitle" font-size="21">Inadequacy Observation</text>
+    <text x="599" y="399" class="cardText" font-size="16">A structured capability gap,</text>
+    <text x="599" y="423" class="cardText" font-size="16">not a hidden benchmark answer.</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="940" y="325" width="335" height="122" rx="18" fill="#ffffff" stroke="#19bba8" stroke-width="2"/>
+    <circle cx="980" cy="367" r="25" fill="url(#loopTeal)"/>
+    <text x="973" y="377" class="num" font-size="26">3</text>
+    <text x="1020" y="361" class="cardTitle" font-size="21">Online Birth Decision</text>
+    <text x="974" y="399" class="cardText" font-size="16">Checks recurrence, coverage,</text>
+    <text x="974" y="423" class="cardText" font-size="16">and generation eligibility.</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="1315" y="325" width="335" height="122" rx="18" fill="#ffffff" stroke="#19bba8" stroke-width="2"/>
+    <circle cx="1355" cy="367" r="25" fill="url(#loopTeal)"/>
+    <text x="1348" y="377" class="num" font-size="26">4</text>
+    <text x="1395" y="361" class="cardTitle" font-size="21">Candidate Generation</text>
+    <text x="1349" y="399" class="cardText" font-size="16">Produces helper code, schema,</text>
+    <text x="1349" y="423" class="cardText" font-size="16">triggers, and abstention logic.</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="1690" y="495" width="335" height="122" rx="18" fill="#ffffff" stroke="#f4b943" stroke-width="2"/>
+    <circle cx="1730" cy="537" r="25" fill="url(#loopGold)"/>
+    <text x="1723" y="547" class="num" font-size="26">5</text>
+    <text x="1770" y="531" class="cardTitle" font-size="21">Candidate Gate</text>
+    <text x="1724" y="569" class="cardText" font-size="16">Rejects thin, unsafe,</text>
+    <text x="1724" y="593" class="cardText" font-size="16">or non-general tools.</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="1810" y="720" width="335" height="122" rx="18" fill="#ffffff" stroke="#f4b943" stroke-width="2"/>
+    <circle cx="1850" cy="762" r="25" fill="url(#loopGold)"/>
+    <text x="1843" y="772" class="num" font-size="26">6</text>
+    <text x="1890" y="756" class="cardTitle" font-size="21">Sandbox Validation</text>
+    <text x="1844" y="794" class="cardText" font-size="16">AST, schema, examples,</text>
+    <text x="1844" y="818" class="cardText" font-size="16">negative cases, smoke trace.</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="1740" y="930" width="335" height="122" rx="18" fill="#ffffff" stroke="#9275d8" stroke-width="2"/>
+    <circle cx="1780" cy="972" r="25" fill="url(#loopViolet)"/>
+    <text x="1773" y="982" class="num" font-size="26">8</text>
+    <text x="1820" y="966" class="cardTitle" font-size="21">Runtime Routing</text>
+    <text x="1774" y="1004" class="cardText" font-size="16">Selects a bounded helper</text>
+    <text x="1774" y="1028" class="cardText" font-size="16">bundle for the task.</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="1365" y="1080" width="335" height="122" rx="18" fill="#ffffff" stroke="#9275d8" stroke-width="2"/>
+    <circle cx="1405" cy="1122" r="25" fill="url(#loopViolet)"/>
+    <text x="1398" y="1132" class="num" font-size="26">9</text>
+    <text x="1445" y="1116" class="cardTitle" font-size="21">Tool Injection</text>
+    <text x="1399" y="1154" class="cardText" font-size="16">Compiles into ToolSandbox;</text>
+    <text x="1399" y="1178" class="cardText" font-size="16">scrambling is preserved.</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="990" y="1080" width="335" height="122" rx="18" fill="#ffffff" stroke="#3a8fd8" stroke-width="2"/>
+    <circle cx="1030" cy="1122" r="25" fill="url(#loopBlue)"/>
+    <text x="1012" y="1132" class="num" font-size="26">10</text>
+    <text x="1070" y="1116" class="cardTitle" font-size="21">Actor Use</text>
+    <text x="1024" y="1154" class="cardText" font-size="16">Generated tool is optional;</text>
+    <text x="1024" y="1178" class="cardText" font-size="16">natural selection is observed.</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="615" y="1080" width="335" height="122" rx="18" fill="#ffffff" stroke="#e47458" stroke-width="2"/>
+    <circle cx="655" cy="1122" r="25" fill="url(#loopCoral)"/>
+    <text x="637" y="1132" class="num" font-size="26">11</text>
+    <text x="695" y="1116" class="cardTitle" font-size="21">Reuse + Side-Effect Logs</text>
+    <text x="649" y="1154" class="cardText" font-size="16">Tracks visible, called, failed,</text>
+    <text x="649" y="1178" class="cardText" font-size="16">and downstream native calls.</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="240" y="930" width="335" height="122" rx="18" fill="#ffffff" stroke="#e47458" stroke-width="2"/>
+    <circle cx="280" cy="972" r="25" fill="url(#loopCoral)"/>
+    <text x="262" y="982" class="num" font-size="26">12</text>
+    <text x="320" y="966" class="cardTitle" font-size="21">Reflection and Lifecycle</text>
+    <text x="274" y="1004" class="cardText" font-size="16">Retain, repair, audit,</text>
+    <text x="274" y="1028" class="cardText" font-size="16">hide, park, or retire.</text>
+  </g>
+
+  <path class="flow" d="M 525 470 C 548 430 550 390 565 372" stroke="#2468a9" marker-end="url(#arrowBlue)"/>
+  <path class="flow" d="M 900 386 H 918" stroke="#08786f" marker-end="url(#arrowTeal)"/>
+  <path class="flow" d="M 1275 386 H 1293" stroke="#08786f" marker-end="url(#arrowTeal)"/>
+  <path class="flow" d="M 1650 410 C 1676 428 1690 452 1707 477" stroke="#08786f" marker-end="url(#arrowTeal)"/>
+  <path class="flow" d="M 1900 617 C 1930 642 1940 680 1925 700" stroke="#b67607" marker-end="url(#arrowGold)"/>
+  <path class="flow" d="M 1810 780 C 1660 765 1540 758 1475 755" stroke="#b67607" marker-end="url(#arrowGold)"/>
+  <path class="flow" d="M 1500 865 C 1630 900 1695 930 1720 948" stroke="#6547a6" marker-end="url(#arrowViolet)"/>
+  <path class="flow" d="M 1740 990 C 1620 1030 1525 1062 1703 1116" stroke="#6547a6" marker-end="url(#arrowViolet)"/>
+  <path class="flow" d="M 1365 1139 H 1346" stroke="#6547a6" marker-end="url(#arrowViolet)"/>
+  <path class="flow" d="M 990 1139 H 972" stroke="#2468a9" marker-end="url(#arrowBlue)"/>
+  <path class="flow" d="M 615 1139 H 595" stroke="#a84933" marker-end="url(#arrowCoral)"/>
+  <path class="feedback" d="M 240 974 C 130 780 138 590 246 480" stroke="#a84933" marker-end="url(#arrowCoral)"/>
+
+  <rect x="204" y="596" width="230" height="42" rx="21" fill="#ffffff" stroke="#3a8fd8" stroke-width="2"/>
+  <text x="238" y="624" class="badgeText" font-size="16" fill="#2468a9">NO ORACLE DATA</text>
+  <rect x="990" y="1248" width="295" height="42" rx="21" fill="#ffffff" stroke="#3a8fd8" stroke-width="2"/>
+  <text x="1031" y="1276" class="badgeText" font-size="16" fill="#2468a9">NATURAL USE ONLY</text>
+  <rect x="1610" y="1248" width="330" height="42" rx="21" fill="#ffffff" stroke="#e47458" stroke-width="2"/>
+  <text x="1650" y="1276" class="badgeText" font-size="16" fill="#a84933">SIDE EFFECTS AUDITED</text>
+
+  <rect x="155" y="1312" width="2090" height="48" rx="18" fill="#132238"/>
+  <text x="188" y="1343" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="800" fill="#ffffff">v061 boundary:</text>
+  <text x="326" y="1343" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#dbe7f1">visible-context metadata, no scenario-name routing shortcut, native ToolSandbox tools retained, and generated tools must pass validation proof before routing.</text>
+</svg>

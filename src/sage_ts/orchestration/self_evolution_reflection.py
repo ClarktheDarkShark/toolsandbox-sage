@@ -86,6 +86,9 @@ class ToolLifecycleStats:
     scenarios: list[str] = field(default_factory=list)
     harmful_called_scenarios: list[str] = field(default_factory=list)
     helpful_called_scenarios: list[str] = field(default_factory=list)
+    families: list[str] = field(default_factory=list)
+    harmful_called_families: list[str] = field(default_factory=list)
+    helpful_called_families: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
         called_score_mean = _mean(self.called_score_deltas)
@@ -106,12 +109,14 @@ class ToolLifecycleStats:
             "harmful_called_count": len(self.harmful_called_scenarios),
             "helpful_called_count": len(self.helpful_called_scenarios),
             "route_repair_families": sorted(
-                {
-                    base_task_family(scenario)
-                    for scenario in self.harmful_called_scenarios
-                    if scenario
-                }
+                {family for family in self.harmful_called_families if family}
             ),
+            "task_contexts": self.scenarios[-20:],
+            "task_families": self.families[-20:],
+            "harmful_called_task_contexts": self.harmful_called_scenarios[-20:],
+            "helpful_called_task_contexts": self.helpful_called_scenarios[-20:],
+            "harmful_called_families": self.harmful_called_families[-20:],
+            "helpful_called_families": self.helpful_called_families[-20:],
             "scenarios": self.scenarios[-20:],
             "harmful_called_scenarios": self.harmful_called_scenarios[-20:],
             "helpful_called_scenarios": self.helpful_called_scenarios[-20:],
@@ -215,6 +220,10 @@ class SelfEvolutionReflectionController:
         scenario_name = str(row.get("scenario") or "")
         if not scenario_name:
             return
+        task_context_label = str(row.get("task_context_label") or scenario_name)
+        task_family_key = str(
+            row.get("task_family_key") or base_task_family(scenario_name)
+        )
 
         self.completed_count += 1
         if row.get("control_cache_hit", row.get("control_cache_eligible")):
@@ -244,7 +253,7 @@ class SelfEvolutionReflectionController:
         ]
         self.side_effect_incidents += len(side_effect_failures)
 
-        family = base_task_family(scenario_name)
+        family = task_family_key
         bucket = self.bucket_stats.setdefault(
             family,
             {
@@ -294,8 +303,10 @@ class SelfEvolutionReflectionController:
             set(visible) | set(called) | set(attempted) | set(failed)
         ):
             stats = self.tool_stats.setdefault(tool_name, ToolLifecycleStats())
-            if scenario_name not in stats.scenarios:
-                stats.scenarios.append(scenario_name)
+            if task_context_label not in stats.scenarios:
+                stats.scenarios.append(task_context_label)
+            if family not in stats.families:
+                stats.families.append(family)
             if tool_name in visible:
                 stats.visible_count += 1
                 if score_delta is not None:
@@ -309,9 +320,11 @@ class SelfEvolutionReflectionController:
                 if outcome_delta is not None:
                     stats.called_outcome_deltas.append(outcome_delta)
                 if self._is_harmful_call(score_delta, outcome_delta):
-                    stats.harmful_called_scenarios.append(scenario_name)
+                    stats.harmful_called_scenarios.append(task_context_label)
+                    stats.harmful_called_families.append(family)
                 elif self._is_helpful_call(score_delta, outcome_delta):
-                    stats.helpful_called_scenarios.append(scenario_name)
+                    stats.helpful_called_scenarios.append(task_context_label)
+                    stats.helpful_called_families.append(family)
             if tool_name in attempted:
                 stats.attempted_count += 1
             if tool_name in failed:
@@ -329,6 +342,8 @@ class SelfEvolutionReflectionController:
         result: dict[str, Any],
         selection_record: dict[str, Any],
         side_effect_failures: list[str],
+        task_context_label: str | None = None,
+        task_family_key: str | None = None,
     ) -> ReflectionDecision:
         """Record feedback and optionally stop a run at a pulse boundary."""
 
@@ -360,10 +375,11 @@ class SelfEvolutionReflectionController:
         called = list(selection_record.get("generated_tools_called") or [])
         attempted = list(selection_record.get("generated_tools_attempted") or [])
         failed = list(selection_record.get("generated_tools_failed") or [])
-        family = base_task_family(scenario_name)
+        lifecycle_context = task_context_label or scenario_name
+        family = task_family_key or base_task_family(scenario_name)
 
         immediate_actions = self._immediate_lifecycle_actions(
-            scenario_name=scenario_name,
+            scenario_name=lifecycle_context,
             called_tools=called,
             side_effect_failures=side_effect_failures,
             score_delta=score_delta,
@@ -373,6 +389,9 @@ class SelfEvolutionReflectionController:
         task_feedback = {
             "event": "self_evolution_task_assessed",
             "scenario": scenario_name,
+            "task_context_label": lifecycle_context,
+            "task_family_key": family,
+            "source_task_id_redacted": bool(task_context_label),
             "base_family": family,
             "completed_count": self.completed_count + 1,
             "control_cache_eligible": lookup.eligible,
@@ -406,8 +425,10 @@ class SelfEvolutionReflectionController:
         score_delta: float | None,
         outcome_delta: float | None,
     ) -> bool:
-        if outcome_delta is not None and outcome_delta <= -0.35:
-            return True
+        if outcome_delta is not None:
+            if outcome_delta >= 0:
+                return False
+            return outcome_delta <= -0.25
         return score_delta is not None and score_delta <= -0.50
 
     def _is_helpful_call(
@@ -448,6 +469,21 @@ class SelfEvolutionReflectionController:
         append_jsonl(self.output_dir / "self_evolution_tool_lifecycle.jsonl", action)
         return action
 
+    def _safety_audit_tool(
+        self,
+        tool_name: str,
+        reason: str,
+        scenario_name: str,
+    ) -> dict[str, Any]:
+        action = {
+            "tool_name": tool_name,
+            "decision": "needs_safety_audit",
+            "reason": reason,
+            "scenario": scenario_name,
+        }
+        append_jsonl(self.output_dir / "self_evolution_tool_lifecycle.jsonl", action)
+        return action
+
     def _immediate_lifecycle_actions(
         self,
         *,
@@ -460,13 +496,22 @@ class SelfEvolutionReflectionController:
     ) -> list[dict[str, Any]]:
         actions: list[dict[str, Any]] = []
         for tool_name in side_effect_failures:
-            actions.append(
-                self._retire_tool(
-                    tool_name,
-                    "side_effect_preservation_failure",
-                    scenario_name,
+            if exception_type or self._is_harmful_call(score_delta, outcome_delta):
+                actions.append(
+                    self._retire_tool(
+                        tool_name,
+                        "side_effect_preservation_failure",
+                        scenario_name,
+                    )
                 )
-            )
+            else:
+                actions.append(
+                    self._safety_audit_tool(
+                        tool_name,
+                        "side_effect_preservation_audit",
+                        scenario_name,
+                    )
+                )
         for tool_name in called_tools:
             if tool_name in self.retired_this_run:
                 continue
@@ -497,15 +542,39 @@ class SelfEvolutionReflectionController:
             reason = "insufficient_evidence"
             called_outcome = row["called_outcome_delta_mean"]
             called_score = row["called_score_delta_mean"]
+            helpful_count = len(stats.helpful_called_scenarios)
+            harmful_count = len(stats.harmful_called_scenarios)
+            if called_outcome is not None:
+                positive_called_subset = called_outcome > 0.05 or (
+                    called_outcome >= 0 and helpful_count > harmful_count
+                )
+            else:
+                positive_called_subset = (
+                    called_score is not None and called_score > 0.05
+                ) or helpful_count > harmful_count
+            if called_outcome is not None:
+                negative_called_subset = called_outcome < -0.05
+            else:
+                negative_called_subset = (
+                    called_score is not None and called_score < -0.05
+                ) or harmful_count > helpful_count
             if tool_name in self.retired_this_run:
                 decision = "parked"
                 reason = "retired_this_run"
-            elif stats.side_effect_incident_count:
+            elif stats.side_effect_incident_count and negative_called_subset:
                 decision = "park"
-                reason = "side_effect_incident"
+                reason = "side_effect_incident_with_negative_called_subset"
             elif stats.harmful_called_scenarios and stats.helpful_called_scenarios:
                 decision = "retain_with_route_repair"
-                reason = "mixed_called_subset_family_specific_repair"
+                if stats.side_effect_incident_count:
+                    reason = (
+                        "mixed_called_subset_family_specific_repair_with_safety_audit"
+                    )
+                else:
+                    reason = "mixed_called_subset_family_specific_repair"
+            elif stats.side_effect_incident_count:
+                decision = "retain_with_safety_audit"
+                reason = "positive_called_subset_with_side_effect_audit"
             elif stats.harmful_called_scenarios:
                 decision = "needs_route_repair"
                 reason = "harmful_called_subset_without_global_retirement"

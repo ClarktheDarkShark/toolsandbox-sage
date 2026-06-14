@@ -17,6 +17,13 @@ import polars as pl
 from tqdm import tqdm
 
 from sage_ts.adapters.role_factory import make_agent, make_user
+from sage_ts.evaluation.llm_usage import (
+    clear_scenario_usage,
+    install_llm_usage_tracking,
+    reset_llm_usage,
+    snapshot_scenario_usage,
+    write_llm_usage_artifacts,
+)
 from sage_ts.evaluation.outcome_score import compute_outcome_score
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY, apply_base_tool_policy
 from tool_sandbox.cli import write_result_summary
@@ -48,6 +55,7 @@ class ToolSandboxRunConfig:
     run_type: str = "baseline"
     base_tool_policy: str = UPSTREAM_POLICY
     resume_from_dir: Path | None = None
+    resume_completed_limit: int | None = None
 
 
 def git_sha() -> str | None:
@@ -102,7 +110,11 @@ def _output_directory(config: ToolSandboxRunConfig) -> Path:
     )
 
 
-def _resume_rows(resume_from_dir: Path | None) -> list[dict[str, Any]]:
+def _resume_rows(
+    resume_from_dir: Path | None,
+    *,
+    completed_limit: int | None = None,
+) -> list[dict[str, Any]]:
     if resume_from_dir is None:
         return []
     for filename in ("result_summary.json", "live_result_summary.json"):
@@ -111,27 +123,87 @@ def _resume_rows(resume_from_dir: Path | None) -> list[dict[str, Any]]:
             continue
         payload = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(payload, list):
-            return [row for row in payload if isinstance(row, dict)]
+            rows = [row for row in payload if isinstance(row, dict)]
+            return rows[:completed_limit] if completed_limit is not None else rows
         rows = payload.get("per_scenario_results")
         if isinstance(rows, list):
-            return [row for row in rows if isinstance(row, dict)]
+            parsed = [row for row in rows if isinstance(row, dict)]
+            return parsed[:completed_limit] if completed_limit is not None else parsed
     return []
 
 
 def _copy_resume_artifacts(
-    resume_from_dir: Path | None, output_directory: Path
+    resume_from_dir: Path | None,
+    output_directory: Path,
+    *,
+    completed_limit: int | None = None,
 ) -> None:
     if resume_from_dir is None or not resume_from_dir.exists():
         return
-    trajectories = resume_from_dir / "trajectories"
-    if trajectories.exists():
-        shutil.copytree(
-            trajectories,
-            output_directory / "trajectories",
-            dirs_exist_ok=True,
+    warnings: list[dict[str, str]] = []
+    retained_rows = _resume_rows(resume_from_dir, completed_limit=completed_limit)
+    retained_names = {
+        str(row.get("name"))
+        for row in retained_rows
+        if str(row.get("name", "")).strip()
+    }
+
+    def record_warning(stage: str, src: Path, error: BaseException) -> None:
+        warnings.append(
+            {
+                "stage": stage,
+                "source": str(src),
+                "error_type": type(error).__name__,
+                "error": str(error),
+            }
         )
+
+    trajectories = resume_from_dir / "trajectories"
+    if trajectories.exists() and os.environ.get(
+        "SAGE_TS_SKIP_RESUME_TRAJECTORY_COPY"
+    ) not in {"1", "true", "TRUE", "yes"}:
+        try:
+            if completed_limit is None:
+                shutil.copytree(
+                    trajectories,
+                    output_directory / "trajectories",
+                    dirs_exist_ok=True,
+                )
+            else:
+                target = output_directory / "trajectories"
+                target.mkdir(parents=True, exist_ok=True)
+                for scenario_name in retained_names:
+                    src = trajectories / scenario_name
+                    if src.exists():
+                        shutil.copytree(src, target / scenario_name, dirs_exist_ok=True)
+        except (OSError, shutil.Error) as exc:
+            record_warning("copy_trajectories", trajectories, exc)
     for path in resume_from_dir.glob("*.jsonl"):
-        shutil.copy2(path, output_directory / path.name)
+        try:
+            if completed_limit is None:
+                shutil.copy2(path, output_directory / path.name)
+            else:
+                filtered_lines: list[str] = []
+                for line in path.read_text(encoding="utf-8").splitlines():
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    scenario = row.get("scenario")
+                    if scenario in retained_names:
+                        filtered_lines.append(json.dumps(row, sort_keys=True))
+                if filtered_lines:
+                    (output_directory / path.name).write_text(
+                        "\n".join(filtered_lines) + "\n",
+                        encoding="utf-8",
+                    )
+        except OSError as exc:
+            record_warning("copy_jsonl", path, exc)
+    if warnings:
+        (output_directory / "resume_artifact_copy_warnings.json").write_text(
+            json.dumps(warnings, indent=2) + "\n",
+            encoding="utf-8",
+        )
 
 
 def _transient_scenario_retry_attempts() -> int:
@@ -301,7 +373,13 @@ def run_scenario_sequence(
     write_run_manifest(config)
     output_directory = _output_directory(config)
     output_directory.mkdir(parents=True, exist_ok=True)
-    _copy_resume_artifacts(config.resume_from_dir, output_directory)
+    install_llm_usage_tracking()
+    reset_llm_usage(run_dir=output_directory, arm=config.run_type)
+    _copy_resume_artifacts(
+        config.resume_from_dir,
+        output_directory,
+        completed_limit=config.resume_completed_limit,
+    )
 
     name_to_scenario = resolve_scenarios(
         desired_scenario_names=list(config.scenario_names),
@@ -309,7 +387,10 @@ def run_scenario_sequence(
     )
     prior_by_name = {
         str(row.get("name")): row
-        for row in _resume_rows(config.resume_from_dir)
+        for row in _resume_rows(
+            config.resume_from_dir,
+            completed_limit=config.resume_completed_limit,
+        )
         if row.get("name") in set(config.scenario_names)
     }
     result_summary: list[dict[str, Any]] = [
@@ -391,6 +472,8 @@ def run_scenario_sequence(
             result = (
                 result_hook(name, active_scenario, result, output_directory) or result
             )
+        result.update(snapshot_scenario_usage(name))
+        clear_scenario_usage(name)
         stop_requested = bool(result.pop("_sage_stop_run", False))
         stop_reason = result.pop("_sage_stop_reason", None)
         result_summary.append(result)
@@ -416,6 +499,7 @@ def run_scenario_sequence(
             status="running",
             scenario_count=len(config.scenario_names),
         )
+        write_llm_usage_artifacts(output_directory)
         if progress_hook is not None:
             progress_hook(
                 output_directory,
@@ -450,6 +534,7 @@ def run_scenario_sequence(
         status=final_status,
         scenario_count=len(config.scenario_names),
     )
+    write_llm_usage_artifacts(output_directory)
     if progress_hook is not None:
         progress_hook(
             output_directory,

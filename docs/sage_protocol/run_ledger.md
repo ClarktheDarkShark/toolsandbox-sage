@@ -1,5 +1,37 @@
 # Run Ledger
 
+## 2026-05-28
+
+- `tau3 final-attempt framework repair probes` completed.
+  - Branch: `codex/sage-standalone-agent`.
+  - Objective: close the tau3 gap using general SAGE framework repairs while preserving the ToolSandbox-proven premise: generated Python helpers must be real callable tools, not prompt-only guidance, and success must be attributable to helper use/bridge behavior rather than stochastic LLM variance.
+  - Repairs implemented: confirmation-aware action bridge across recent user turns; safe direct execution of generated read-only lookup actions; helper-output leakage prevention so SAGE helper outputs cannot be re-mined as visible record IDs; stricter transfer/escalation and policy-helper routing; router abstention when no helper has a positive contextual match.
+  - Validation: `PYTHONPATH=src python -m py_compile src/sage_agent/import_agent.py src/sage_agent/generators.py scripts/run_tau3_sageagent_parity.py`; `PYTHONPATH=src:. pytest tests/unit/test_sage_agent_standalone.py -q` passed `80` tests.
+  - Probes stopped early by monitor:
+    - `outputs/sage_official_live/tau3_sageagent_replay_helpers20_v12_state_replay_policy_lookup_20260528_01`: stopped at 4 tasks, baseline `3`, SAGE `1`.
+    - `outputs/sage_official_live/tau3_sageagent_replay_helpers20_v15_safe_direct_lookup_20260528_01`: stopped at 7 tasks, baseline `6`, SAGE `5`, generated-helper calls `30`, direct helper actions `2`.
+    - `outputs/sage_official_live/tau3_sageagent_replay_helpers20_v16_routing_safe_direct_20260528_01`: stopped at 4 tasks, baseline `3`, SAGE `2`, generated-helper calls `18`.
+    - `outputs/sage_official_live/tau3_sageagent_replay_helpers20_v17_positive_route_floor_20260528_01`: stopped at 3 tasks, baseline `2`, SAGE `1`.
+    - `outputs/sage_official_live/tau3_sageagent_manual_prototype20_v1_20260528_01`: manual-helper ablation stopped at 4 tasks, baseline `3`, SAGE `3`, one gain and one regression.
+  - Best complete recent tau3 run remains `outputs/sage_official_live/tau3_sageagent_replay_helpers20_v4_bounded_20260528_01`, baseline `8/20`, SAGE `9/20`, three gains and two regressions; not scale-ready.
+  - Decision label: `TAU3_NOT_SCALE_READY: HOST_OWNED_DIALOGUE_HELPER_EXPOSURE_STILL_TOO_NOISY`.
+  - Report: `docs/sage_protocol/tau3_final_attempt_framework_report_20260528.md`.
+
+## 2026-05-25
+
+- `tau3 SAGEAgent callable-helper parity repair` partially completed.
+  - Branch: `codex/sage-standalone-agent`.
+  - Objective: revisit the high-lift ToolSandbox v70/v71 mechanism and apply the same callable generated-helper lifecycle to tau3, rather than prompt-only import guidance.
+  - ToolSandbox reference mechanism: empty generated registry; self-evolving Praxis preset; just-in-time helper birth; same-task fair retry; medium-grain helper families; generated helpers exposed as callable tools; bounded routing; cached controls; fresh SAGE; no force-calls.
+  - tau3 root cause: prompt-only import mode was not equivalent to ToolSandbox SAGE. It produced broad policy/planning helpers and did not reliably execute generated Python helpers as first-class tools before official host actions.
+  - General repairs: added medium-grain visible host-action subtype mining; prioritized concrete callable helpers over broad policy helpers; inserted concrete helper outputs into the post-helper host action prompt; sanitized mixed helper/host tool-call turns; allowed generated helper wrappers to accept structured keyword arguments; bounded per-task birth/retry budgets; made OpenAI generation/refinement timeout-safe; and made tau3 baseline cache seeds task-identity based rather than subset-position based.
+  - tau3 fresh aggregate evidence before the final adapter-safety patch: `outputs/sage_official_live/tau3_sageagent_duplicate_guard_first40_20260525`, official tau3 airline baseline `12/40`, SAGE `18/40`, gains `7`, regressions `1`, tools born/accepted `14/14`, helper reuses `347`, integrity issues `0`.
+  - tau3 seeded adapter diagnostic after the patch: `outputs/sage_official_live/tau3_sageagent_seeded_error_replay_cachefixed_norefine_25_44_20260525`, cached controls `2/2`, mature generated registry reused `27` helper calls, runner/message-shape/argument-wrapper errors `0`; task outcome `0/2`, so this is adapter-safety evidence only, not value evidence.
+  - ToolSandbox maintenance verification after Python 3.9 cache fix: `outputs/sage_agent_standalone/toolsandbox_verify20_self_evolving_policy_py39fix2_20260525/mechanism_40_20260525_145447`, controls `20 cached / 0 fresh`, fresh SAGE score `0.728002 -> 0.868634`, outcome `0.454649 -> 0.887500`, accepted helpers `12`, natural generated-tool-called scenarios `10`, generated-tool failures `0`, runtime exceptions `0`, protocol gate `PASS`.
+  - Post-priority diagnostic: `outputs/sage_official_live/tau3_sageagent_bounded_concrete_first20_20260525`, controls `20 cached / 0 fresh`, official tau3 airline SAGE `8/20` versus baseline `8/20`, gains `2`, regressions `2`, tools born/accepted/reused `16/15/243`, integrity issues `0`. This confirmed concrete helper birth/reuse but showed that task-success-only helper accounting overvalued helpers that merely preserved baseline successes.
+  - Additional general repair: helper registry records now track paired `contribution_gains` and `contribution_regressions` when a matched baseline outcome is available; routing penalizes repeated paired regressions and rewards actual paired gains. Contribution counts are per helper per task, not per repeated helper call. This is dataset-neutral and applies to import-mode and adapter-owned SAGEAgent paths.
+  - Decision label: `TOOLSANDBOX_HIGH_LIFT_MECHANISM_MAINTAINED; TAU3_CALLABLE_HELPER_PARITY_PRESENT; TAU3_VALUE_CALIBRATION_NEEDS_FRESH_40_TASK_RERUN_WITH_CONTRIBUTION_AWARE_ROUTING`.
+
 ## 2026-05-20
 
 - `Standalone ToolSandbox self-evolving policy backtrace verify20` completed.
@@ -1631,3 +1663,858 @@
     transfer/escalation.
 - Decision label:
   `FULL_IMPORT_AGENT_LIFECYCLE_REPAIRS_TAU3_AND_TERMINAL_BENCH_SHOWS_IMPORT_MODE_VALUE`.
+
+## 2026-05-27 - Tau3 SAGEAgent Parity Option-Repair Run
+
+- Objective: test whether tau3 can use the same high-lift SAGE behavior proven
+  on ToolSandbox: identify deterministic gaps, generate real callable helpers,
+  validate/repair them, store them, route them into later tasks, and count only
+  gains attributable to generated helper use.
+- Runner: `scripts/run_tau3_sageagent_parity.py`, official tau3-current-release
+  airline host loop, `gpt-4o-mini`, cached baseline controls where eligible,
+  fresh SAGE execution, no candidate task cache.
+- Code repairs in this pass:
+  - import-helper sandbox now permits `enumerate` for accepted deterministic
+    helpers;
+  - source-record lookup templates can continue past already-visible records to
+    find the actual related source reservation/date;
+  - host-action templates can prepare visible cancellation, booking,
+    reservation-change, direct/one-stop search, and partial allowed-action
+    specs from visible data;
+  - option-selection templates now parse explicit option-number choices such as
+    "Option 2" and expose selected flight codes/dates.
+- Fresh20 run:
+  `outputs/sage_official_live/tau3_sageagent_fresh20_option_repair_v6_20260527_01`;
+  dashboard:
+  `outputs/sage_official_live/tau3_sageagent_fresh20_option_repair_v6_20260527_01/dashboard/task_compare.html`.
+- Hashes: dashboard data
+  `07a89205e9b4d27991b4ba57d026f6d5c3dc1eea01f6002ca8679005e71a19e8`;
+  registry
+  `5db233a4efb5bdc33fbe78a42d773d171547fce2bb5f615a44975c6557e8cc8d`.
+- Result on valid non-infra rows: baseline `6/15`, SAGE `8/15`; net `+2`;
+  generated-tool-attributed gains `1`; generated-tool-attributed regressions
+  `0`; infra rows `5`.
+- Tool lifecycle: tools born `28`, accepted `17`, rejected `11`, reused `252`;
+  birth-task retries `7`, retry successes `1`.
+- Attribution: `tau3:airline:13` is the valid helper-attributed gain, using
+  `prepare_visible_baggage_entitlement_action_args`. `tau3:airline:1` was a
+  SAGE gain but not helper-attributed and is not counted as generated-tool
+  evidence.
+- Interpretation: tau3 now has real callable-helper parity mechanics, not only
+  prompt guidance, and the option repair removed the prior valid regression.
+  The result is still not ToolSandbox-scale; broad scale should wait for a
+  general candidate-quality and candidate-budget repair that increases
+  helper-attributed gains across hard tau3 families.
+- Decision label:
+  `PARTIAL_TAU3_SAGEAGENT_PARITY_REAL_CALLABLE_HELPER_GAIN_NOT_SCALE_READY`.
+
+## 2026-05-29 - Tau3 Action-Spec Validation Diagnostic
+
+- Objective: continue tau3 SAGEAgent portability by strengthening the generated
+  helper action-spec contract in SAGE core and checking whether tau3 20 can
+  produce clean generated-helper-attributed lift.
+- Code changes:
+  - core validation rejects inconsistent action specs and mismatched
+    `next_action`/legacy action fields;
+  - read-only lookup actions can be called while side-effect preconditions
+    remain unresolved;
+  - generation prompts and visible-action schemas request `status`, `reason`,
+    and `next_action`;
+  - tau3 bridge consumes `next_action` as a fallback.
+- Validation:
+  - py_compile on SAGE core, tau3 runner, CyberGym runner, and ToolSandbox
+    protocol runner passed;
+  - standalone unit suite passed `85 passed, 2 warnings`;
+  - focused CyberGym planner subset passed `8 passed`;
+  - `git diff --check` passed.
+- First diagnostic:
+  `outputs/sage_official_live/tau3_generalization20_20260529_183539`;
+  stopped after 2 SAGE task records because the initial strict contract rejected
+  a valid read-only policy lookup. Partial: baseline cache `8/20`, SAGE `1/2`,
+  born/accepted/reused `1 / 0 / 0`.
+- Second diagnostic:
+  `outputs/sage_official_live/tau3_generalization20_action_spec_v2_20260529_184112`;
+  stopped after 7 SAGE task records due suspected runtime/generation stall.
+  Partial: baseline cache `8/20`; SAGE controller success `3/7`;
+  born/accepted/reused `14 / 11 / 31`; retries `3`, retry successes `1`;
+  integrity issues `0`.
+- Attribution notes: v2 showed one same-task retry success on `tau3:airline:0`
+  and one helper-used gain on `tau3:airline:1`, but also helper-used
+  regressions in the completed partial slice.
+- Error log: `artifacts/tau3_errors_20260529_185534.log`.
+- Focused report:
+  `docs/sage_protocol/tau3_action_spec_replay_validation_20260529.md`.
+- Decision label: `BLOCKED: tau3_action_spec_helpers_not_clean_20_ready`.
+- Next action: add stricter replay/shadow routing and a tau3 gap-generation
+  budget cap before rerunning tau3 20.
+
+## 2026-05-29 - Full ToolSandbox v71-Style No-Cache Usage Run
+
+- Objective: rerun the complete ToolSandbox full benchmark with the native
+  self-evolving Praxis implementation while disabling the control baseline cache
+  so LLM calls and token use are measured directly.
+- Prior mixed-cache run
+  `outputs/self_evolving_sage/full_toolsandbox_v71_20260529_183043/online_build_full_20260529_184527`
+  was stopped at user request and preserved under its original output/artifact
+  directories.
+- Active run:
+  `outputs/self_evolving_sage/full_toolsandbox_v71_nocache_usage_20260529_194548/online_build_full_20260529_194554`.
+- Dashboard:
+  `outputs/self_evolving_sage/full_toolsandbox_v71_nocache_usage_20260529_194548/online_build_full_20260529_194554/dashboard/task_compare.html`.
+- Configuration: `online_build_full`, full `1032`-scenario manifest, native
+  ToolSandbox self-evolving Praxis, actor/user/generation model all
+  `gpt-4o-mini`, generation on, control cache off, SAGE task cache off, OpenAI
+  response cache disabled, RapidAPI fixture cache read-only.
+- Manifest SHA-256:
+  `21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec`.
+- Usage sanity check before launch:
+  `artifacts/self_evolving_sage/usage_sanity_20260529_194509`, confirming
+  actor and generation calls record live call counts and token totals with
+  `gpt-4o-mini-2024-07-18`.
+- Live early check: after 13 fresh control scenarios, exported usage showed
+  `43` live LLM calls, `0` cached LLM calls, and `42481` total tokens.
+- Dashboard repair: added an explicit no-cache control-cache report for this
+  run and updated dashboard fallback rendering so no-cache runs display
+  `0 cached / 1032 fresh`, `Mode off`, and `Source fresh` instead of hiding the
+  cache panel.
+- Per-task usage cache:
+  `outputs/self_evolving_sage/full_toolsandbox_v71_nocache_usage_20260529_194548/online_build_full_20260529_194554/llm_usage_task_cache.json`
+  and companion `.jsonl` are being updated by
+  `scripts/cache_llm_usage_by_task.py`. The policy is immediate write per
+  completed task with no minimum-count gate.
+- Dashboard hardening: live dashboard refresh now ignores transient partial
+  JSON reads during writes and retries on the next poll; verified in a fresh
+  browser tab with task compare still showing no-cache and LLM usage panels.
+- Live disconnect analysis at approximately `510/1032` SAGE candidate tasks:
+  current paired completed lift is much smaller than v71 broad500
+  (`+0.0386` canonical, `+0.0625` outcome at the checkpoint), but the run is
+  not comparable to the v71 headline on a single axis. v71 used the 500-task
+  formal manifest with cached control baselines; this run uses the 1032-task
+  full manifest with fresh controls. On the formal500 names, the fresh control
+  baseline in this run scores about `0.7728` canonical and `0.7219` outcome,
+  versus v71 cached control `0.6568` canonical and `0.4947` outcome. The full
+  manifest also delays high-gain contact/message/recency families: for example,
+  `modify_contact_with_message_recency` begins at full-manifest index `504`,
+  `remove_contact_by_phone` at `576`, `search_message_with_recency_latest` at
+  `688`, `send_message_with_contact_content_cellular_off` at `880`, and
+  `update_contact_relationship_with_relationship` at `984`. Helper birth counts
+  match this explanation: accepted helpers rose from 6 before that segment to 9
+  shortly after index `504`, while v71 broad500 had 16 accepted helpers by 500
+  tasks.
+- Live dashboard data enrichment was added with
+  `scripts/patch_live_dashboard_data.py` so the active dashboard surfaces
+  visibility counts, called-subset deltas, and side-effect preservation rows
+  before the final helper contribution export. The patcher only rewrites
+  dashboard JSON after runner exports and does not affect task execution,
+  scoring, tool routing, or transcripts. Initial enrichment surfaced 10
+  accepted tools, 7 naturally called tools, 10 visible tools, and 3
+  side-effect preservation rows for audit.
+- Latest-code regression relative to v71 found during monitoring:
+  `resolve_search_window_or_bounds` was rejected twice in the active run under
+  `derived_value:recency_timestamp_bounds` because the repaired broad search
+  helper was validated against obsolete bounds-only examples containing
+  `recency_label`. v71 accepted this helper and called it in 83 scenarios, so
+  the missing lane is a concrete contributor to lower lift beyond cache/sample
+  effects. A next-run source repair was added to validate the upgraded helper
+  against broad search-plan examples; `tests/unit/test_online_birth.py` passed
+  `44 passed, 2 warnings`. This repair was applied after the active run started
+  and is not part of the active run's loaded code.
+- Updated checkpoint at `615/1032` SAGE candidate tasks: full-run completed
+  slice is `0.752282 -> 0.771548` canonical/reference, delta `+0.019266`, and
+  `0.623709 -> 0.696125` outcome/task completion, delta `+0.072415`.
+  Formal500 overlap is only `185/500` scenarios so far. On those same scenario
+  names, the current fresh control is much stronger than the v71 cached control
+  (`0.808151` vs `0.656123` canonical; `0.735934` vs `0.484067` outcome), and
+  v71's SAGE arm was still much stronger on the same subset (`+0.218223`
+  canonical, `+0.435562` outcome). This supports a three-part explanation:
+  fresh no-cache controls compress lift, the 1032-task manifest delays the
+  high-yield v71 helper lanes, and latest-code behavior has at least one
+  concrete regression in the recency-window helper path.
+- Dashboard update during the active run: added a visible live tool-contribution
+  panel to task compare and restarted the HTML patch watcher. Browser
+  verification at `648/1032` matched tasks showed LLM calls/tokens, cache status,
+  and top helper contribution rows visible in the page header. Focused dashboard
+  validation passed: `13 passed in 2.46s`.
+- Live recency checkpoint around `698/1032`: the active run has begun recovering
+  generated-helper contribution in the delayed recency/message segment
+  (`resolve_search_window_or_bounds` `42` visible / `32` called, called-subset
+  outcome delta `+0.214359`; `select_message_content_by_recency` `10` visible /
+  `9` called, called-subset outcome delta `+0.206610`). The overall completed
+  slice remains far below v71 (`+0.077621` outcome delta), and family-level
+  comparison shows current recency/message gains are still much weaker than the
+  v71 artifact. The current run should therefore be treated as a no-cache full
+  dataset diagnostic and usage-measurement run, not as a clean reproduction of
+  the v71 broad500 lift.
+- Updated disconnect checkpoint around `781/1032`: completed-slice
+  canonical/reference delta is approximately `+0.029104`; outcome/task
+  completion delta is approximately `+0.081833`; total recorded cached LLM
+  calls remain `0`. The run is operationally healthy, but it is not matching
+  v71 because the comparison changed from cached formal500 controls to fresh
+  full-dataset controls, high-yield helper lanes are delayed by the full
+  manifest order, and latest-code behavior differs from the v71 artifact.
+  The clearest regression is the early double rejection of
+  `resolve_search_window_or_bounds` due to obsolete `recency_label` validation
+  examples when the helper had been upgraded to the broader search-plan
+  contract. A next-run repair exists in
+  `src/sage_ts/orchestration/online_birth.py`, but it is not loaded in the
+  already-running process.
+- Lifecycle preset parity check: the active run's event ledger confirms that
+  self-evolving Praxis defaults were applied (`SAGE_SELF_EVOLVING_PROACTIVE_BIRTH=1`,
+  `SAGE_SELF_EVOLVING_PROACTIVE_SCOPE=just_in_time`,
+  `SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE=1`,
+  `SAGE_ENABLE_SAFE_ABSTAIN_BIRTH=1`, `SAGE_PRAXIS_BRIDGE_POLICY=combined`).
+  Missing lifecycle flags are therefore not the explanation for the low lift.
+- Updated no-cache disconnect checkpoint around `907/1032`: completed-slice
+  canonical/reference delta is approximately `+0.043694`; outcome/task
+  completion delta is approximately `+0.093913`; naturally called generated
+  helper scenarios are `443`; LLM cached calls remain `0`. The formal500
+  overlap confirms that most of the v71 lift gap comes from the requested
+  no-cache fresh baseline: on the `398` completed formal500-overlap scenarios,
+  active fresh control outcome is `0.701393` versus v71 cached control
+  `0.408984`, while active SAGE is `0.803003` versus v71 SAGE `0.861516`.
+  The run also confirms latest-code drift: the high-yield
+  `resolve_search_window_or_bounds` helper was rejected twice early under the
+  old `recency_label` validation contract and only accepted later under the
+  broader helper key.
+- Final no-cache full-dataset result:
+  `outputs/self_evolving_sage/full_toolsandbox_v71_nocache_usage_20260529_194548/online_build_full_20260529_194554`.
+  Canonical/reference score `0.750138 -> 0.791681` (`+0.041543`, `+5.54%`);
+  outcome/task completion `0.648824 -> 0.741156` (`+0.092332`). Usage accounting
+  recorded `15,651` total LLM calls and `21,456,951` total tokens
+  (`21,066,079` prompt, `390,872` completion); cached LLM calls `0`; every
+  recorded event used `gpt-4o-mini`. Tool lifecycle: `26` birth rows, `17`
+  accepted, `9` rejected, `14` repair-attempted, `546` naturally called
+  generated-tool scenarios, `217` outcome-gain rows, `68` outcome-regression
+  rows, `4` side-effect preservation rows, and `0` runtime incidents.
+- Final formal500 overlap: active no-cache/fresh-control outcome
+  `0.721944 -> 0.830761` (`+0.108816`) versus v71 cached-control outcome
+  `0.494746 -> 0.880845` (`+0.386099`). The active fresh control is `+0.227198`
+  outcome points above the v71 cached control, while the active SAGE arm is
+  `-0.050084` below v71 on the same scenario names.
+- Final interpretation: retain v71 as the strongest ToolSandbox evidence and
+  v70 as the clean safety-reference run. Treat this run as a no-cache
+  full-dataset usage/robustness diagnostic. It confirms that the low observed
+  lift is driven by stronger fresh controls, delayed full-manifest helper
+  compounding, and latest-code drift in the recency-window helper path.
+- Validation: `git diff --check`, py_compile, and the focused unit suite passed
+  (`161 passed, 2 warnings`).
+- Decision label: `COMPLETED_FULL_TOOLSANDBOX_NOCACHE_USAGE_DIAGNOSTIC_DO_NOT_PROMOTE_OVER_V71`.
+
+## 2026-05-29 - Tau3 Shadow Helper Bridge Repair
+
+- Objective: make tau3 SAGEAgent behave more like ToolSandbox SAGE by exposing
+  generated helpers as callable/structured control points, not hidden telemetry
+  or broad prompt guidance.
+- Code changes:
+  - fixed shadow mode so helper preflight outputs are injected into the actor
+    context by default; `--direct-only-shadow-helpers` is now an explicit
+    ablation;
+  - added bounded helper execution timeouts and retryable tau2 official-runner
+    exception handling;
+  - tightened contribution accounting so sanitized abstain outputs cannot create
+    false helper-attributed regressions;
+  - added active cancellation/refund intent gating so "the airline canceled my
+    flight" does not authorize `cancel_reservation`;
+  - added regression tests for booking-intent, cancellation-intent,
+    action-spec, stale reservation, helper timeout, and contribution accounting
+    behavior.
+- Best completed diagnostic:
+  `outputs/sage_official_live/tau3_shadow_cancel_gate20_20260529_224218`.
+- Dashboard:
+  `outputs/sage_official_live/tau3_shadow_cancel_gate20_20260529_224218/dashboard/task_compare.html`.
+- Result: baseline `8/20`, final SAGE `11/20`, initial SAGE `9/20`;
+  tools born/accepted/reused `12 / 12 / 120`; birth retries `8`, retry
+  successes `4`; integrity issues `0`.
+- Strict attribution: one clean callable-helper gain on `tau3:airline:11`.
+  Other final gains are logged as non-strict because helper outputs were absent
+  or non-actionable.
+- Safety: zero helper-attributed final regressions. The earlier
+  `prepare_visible_cancellation_refund_action_args` regression was reproduced,
+  diagnosed, and repaired with the active intent gate.
+- Parked ablation:
+  `outputs/sage_official_live/tau3_shadow_route_gate20_20260529_231249` scored
+  SAGE `7/20` vs baseline `8/20`; hard route suppression starved useful helper
+  exposure and is not the scaling path.
+- Focused report:
+  `docs/sage_protocol/tau3_shadow_bridge_repair_20260529.md`.
+- Validation: py_compile passed; standalone unit suite passed
+  `94 passed, 2 warnings`; `git diff --check` passed.
+- Decision label:
+  `PROMISING_TAU3_SHADOW_BRIDGE_ONE_STRICT_CALLABLE_GAIN_REFINE_BEFORE_60`.
+- Next action: improve exact payment/option-selection helpers and lifecycle
+  parking for repeated non-gain record lookup calls, then rerun tau3 20 before
+  considering tau3 60.
+
+## 2026-05-30 - Tau3 Medium-Grain Replay/Action Repair
+
+- Best completed run:
+  `outputs/sage_official_live/tau3_medium_grain_generalization20_20260530_022037`.
+- Dashboard:
+  `outputs/sage_official_live/tau3_medium_grain_generalization20_20260530_022037/dashboard/task_compare.html`.
+- Command:
+  `PYTHONPATH=src:. python scripts/run_tau3_sageagent_parity.py --samples 20 --domain airline --model gpt-4o-mini --generation-model gpt-5 --baseline-cache use-if-eligible --dashboard-port 62639 --max-helpers 32 --active-helpers 5 --max-tools-per-task 4 --max-same-task-retries 1 --max-refinements 2 --transient-retries 2 --generation-timeout-sec 120 --source-guided-host-action-generation --run-id tau3_medium_grain_generalization20_20260530_022037`.
+- Result: cached baseline `8/20`, final SAGE `12/20`; tools
+  born/accepted/reused `22 / 19 / 103`; birth retries `9`, retry successes
+  `2`; integrity issues `0`.
+- Generated-tool attribution: registry recorded `2` contribution gains on
+  `prepare_visible_reservation_change_action_args`; strict final
+  helper-attributed regressions `0`.
+- Lifecycle: non-actionable option helper exposure regression was parked;
+  two initial baseline-success/SAGE-fail cases were rescued by same-task retry.
+- Follow-up diagnostics:
+  - `outputs/sage_official_live/tau3_retry_bundle_task8_20260530_025232`
+    confirmed the retry-bundle fix carried record lookup, booking/payment, and
+    option helpers into task `8`; it still failed due copied free baggage.
+  - `outputs/sage_official_live/tau3_baggage_repair_task8_20260530_025823`
+    and
+    `outputs/sage_official_live/tau3_baggage_repair_task8_rerun_20260530_025900`
+    are invalid infrastructure reruns: OpenAI/LiteLLM DNS/connectivity failed
+    before helper behavior could be tested.
+- Code validation: py_compile for SAGE core/runners passed; standalone unit
+  suite passed `106` tests with `2` dependency warnings.
+- Decision label:
+  `PROMISING_TAU3_MEDIUM_GRAIN_HELPERS_POSITIVE_20_REFINE_AFTER_API_RECOVERY`.
+- Next action: rerun task `tau3:airline:8` after OpenAI chat sanity recovers,
+  then rerun tau3 20 and gate tau3 60 on clean generated-tool-attributed gains.
+
+## 2026-05-30 - ToolSandbox Full Dataset Recovery V6
+
+- Completed run:
+  `outputs/toolsandbox_recovery_ladder_20260530/full_v6/online_build_full_20260530_140256`.
+- Dashboard:
+  `http://127.0.0.1:62624/outputs/toolsandbox_recovery_ladder_20260530/full_v6/online_build_full_20260530_140256/dashboard/task_compare.html`.
+- Configuration: native ToolSandbox self-evolving Praxis,
+  `online_build_full`, `gpt-4o-mini` actor/user/generation, generation on,
+  SAGE cache off, OpenAI response cache disabled, empty starting registry,
+  full manifest SHA-256
+  `21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec`.
+- Control cache: `use-if-eligible`, mixed source with `689` cached and `343`
+  fresh controls.
+- Final full metrics: canonical/reference `0.693253 -> 0.829701`
+  (`+0.136448`, `+19.68%`); outcome/task completion
+  `0.506399 -> 0.788966` (`+0.282568`, `+55.80%`); exact successes
+  `148 -> 498`; runtime exceptions `0`; protocol gate `PASS`.
+- Tool lifecycle: accepted `17` live-born helpers; generated helpers called in
+  `556` scenario contexts; dashboard contribution rows `459` outcome gains and
+  `52` outcome regressions; generated-tool runtime failures `0`.
+- Safety caveat: `2` side-effect preservation rows, both for
+  `prepare_reminder_creation_args` on
+  `add_reminder_content_and_week_delta_and_time_multiple_user_turn_alt`
+  variants.
+- Formal500 comparison: formal500 v6 scored `+30.04%` canonical lift and
+  `+76.70%` outcome lift, while full_v6 scored `+19.68%` and `+55.80%`. The
+  full run meets the requested minimum full-dataset gate but does not supersede
+  formal500 v6 or v71 as the strongest ToolSandbox evidence.
+- Revised blocker assessment: ceiling compression is not a primary explanation;
+  the control means were low enough for substantial improvement. The actual
+  blockers are missing helper coverage/adoption in full-only service-answer
+  lanes (`convert_currency`, `find_temperature`, `find_phone_number`,
+  `find_current_location`), rejection of `plan_send_message_contact_lookup` on
+  exact advisory text mismatches, weak natural adoption of
+  `extract_service_answer_field`, `prepare_reminder_creation_args`, and
+  `prepare_safe_action_or_abstain`, canonical-score loss from `find_days`, and
+  add-reminder multi-turn timestamp/location regressions. Wrong model or
+  missing self-evolving Praxis lifecycle settings are ruled out by the
+  manifest.
+- Report:
+  `docs/sage_protocol/toolsandbox_full_v6_recovery_report_20260530.md`.
+- Decision label:
+  `FULL_DATASET_RECOVERY_PASSES_MINIMUM_GATE_DOES_NOT_SUPERSEDE_FORMAL500_V6`.
+
+## 2026-05-31 - tau3 No-Revisit Helper Bridge Recovery
+
+- Completed run:
+  `outputs/sage_official_live/tau3_no_revisit_recovery_gate60f_20260531_001355`.
+- Dashboard:
+  `http://127.0.0.1:62746/outputs/sage_official_live/tau3_no_revisit_recovery_gate60f_20260531_001355/dashboard/task_compare.html`.
+- Command:
+  `PYTHONPATH=src:. python scripts/run_tau3_sageagent_parity.py --samples 60 --domain airline --model gpt-4o-mini --generation-model gpt-5 --baseline-cache use-if-eligible --dashboard-port 62746 --max-helpers 48 --active-helpers 6 --helper-pool-size 12 --max-tools-per-task 9 --max-same-task-retries 0 --max-refinements 2 --transient-retries 4 --generation-timeout-sec 120 --direct-only-shadow-helpers --enable-direct-actions --proactive-helper-bootstrap --proactive-bootstrap-limit 9 --run-id tau3_no_revisit_recovery_gate60f_20260531_001355`.
+- Sample/window: requested `60`; materialized first `50` airline tasks in this
+  checkout.
+- Baseline cache: `use-if-eligible`, `50/50` cached.
+- SAGE cache: off/fresh SAGE arm.
+- Model: `gpt-4o-mini`.
+- Generation model: `gpt-5`.
+- Result: baseline `15/50`, SAGE `29/50`; first 20 slice `8/20` baseline,
+  `15/20` SAGE; absolute lift `+14` tasks (`+28` percentage points),
+  relative success lift `+93.33%`.
+- Same-task retries: `0`; this was a no-revisit run.
+- Generated tools born/accepted/reused: `22 / 22 / 1162`.
+- Bridge activity: `144` direct helper actions, `77` official action repairs,
+  `30` final-answer repairs.
+- Paired gains:
+  `tau3:airline:1`, `8`, `11`, `12`, `13`, `15`, `18`, `26`, `28`, `34`,
+  `38`, `40`, `43`, `48`.
+- Paired losses: none.
+- Runtime/helper incidents: `0`; integrity issues `0`.
+- Leakage/safety notes: no hidden labels, expected answers, reference
+  trajectories, or scorer internals inspected. Baseline/control used cached
+  records; SAGE arm was fresh.
+- Validation: SAGE core/runners py_compile passed; standalone unit suite
+  passed `160` tests with `2` dependency warnings; `git diff --check` passed.
+- Audit note: import-readiness audit is specific to `SAGEImportAgent` and
+  failed on this SAGEAgent parity run for boundary/event-name reasons; not used
+  as an integrity blocker for this run.
+- Report:
+  `docs/sage_protocol/tau3_no_revisit_tool_generation_recovery_20260531.md`.
+- Decision label:
+  `KEEP_AND_SCALE_NO_REVISIT_TAU3_HELPER_BRIDGE`.
+- Next action: update audit/export coverage for SAGEAgent parity attribution,
+  inspect remaining misses for the next general helper class, then run CyberGym
+  and ToolSandbox maintenance checks.
+
+## 2026-05-31 - ToolSandbox Fullprefix500 Reference Resume
+
+- Active run:
+  `/tmp/toolsandbox-sage-local-run/outputs/toolsandbox_recovery_ladder_20260531_v60/fullprefix500_r11_launchd_reference_20260531_140308/online_build_500_20260531_140312`.
+- Dashboard:
+  `http://127.0.0.1:62679/outputs/toolsandbox_recovery_ladder_20260531_v60/fullprefix500_r11_launchd_reference_20260531_140308/online_build_500_20260531_140312/dashboard/task_compare.html`.
+- Correct dataset: ToolSandbox `online_build_500` with manifest
+  `artifacts/toolsandbox_recovery_ladder_20260531_v60/full_standard_prefix500.json`.
+- Launch/resume: direct launchd script
+  `artifacts/toolsandbox_recovery_ladder_20260531_v60/run_fullprefix500_direct_reference_launchd.sh`
+  running from `/tmp/toolsandbox-sage-local-run`; resumed from the best local
+  partial at `413/500`.
+- Live status at 2026-05-31 14:07 EDT: `417/500` matched tasks, control
+  `500/500` complete, SAGE running; canonical score `0.685114 -> 0.898871`
+  (`+31.20%`), outcome `0.521966 -> 0.888864`, accepted helpers `7`,
+  reuse events `267`, generated-tool-called scenarios `142`, current
+  exceptions `0`, generated-tool failures `0`, runtime incidents `0`,
+  side-effect incidents `0`.
+- Process hygiene: stopped off-track focused20/mechanism diagnostic PIDs
+  `17152` and `18977` because they used `focused_regression20_r12.json` /
+  `mechanism_40` and conflicted with the requested fullprefix500 comparison.
+- Decision: keep running and monitor through
+  `check-fullprefix500-sage-comparison`; once the reference reaches `500/500`,
+  launch the same-manifest GPT-5-generation comparison with a fresh registry.
+
+## 2026-05-31 - ToolSandbox Fullprefix500 Current-Impl GPT-5 Comparison
+
+- Active run:
+  `/tmp/toolsandbox-sage-local-run/outputs/toolsandbox_recovery_ladder_20260531_v60/fullprefix500_current_impl_gpt5_20260531_141546/online_build_500_20260531_141550`.
+- Dashboard:
+  `http://127.0.0.1:62680/outputs/toolsandbox_recovery_ladder_20260531_v60/fullprefix500_current_impl_gpt5_20260531_141546/online_build_500_20260531_141550/dashboard/task_compare.html`.
+- Correct dataset: same ToolSandbox `online_build_500` manifest as the
+  reference, `artifacts/toolsandbox_recovery_ladder_20260531_v60/full_standard_prefix500.json`.
+- Launch: direct launchd script
+  `artifacts/toolsandbox_recovery_ladder_20260531_v60/run_fullprefix500_current_impl_gpt5_launchd.sh`
+  running from `/tmp/toolsandbox-sage-local-run`.
+- Configuration: fresh registry
+  `artifacts/toolsandbox_recovery_ladder_20260531_v60/fullprefix500_current_impl_gpt5_registry_20260531_141546`,
+  actor/user `gpt-4o-mini`, generation model `gpt-5`, generation on, SAGE
+  cache off, OpenAI response cache disabled, strict control cache.
+- Final status at 2026-05-31 15:16 EDT: complete, control `500/500`, SAGE
+  `500/500`.
+- Final metrics: reference canonical `0.711718 -> 0.897120` (`+26.05%`
+  lift), outcome `0.549273 -> 0.866160`, outcome delta `+0.316886`;
+  GPT-5 comparison canonical `0.711718 -> 0.904691` (`+27.11%` lift),
+  outcome `0.549273 -> 0.867849`, outcome delta `+0.318575`.
+- Difference: GPT-5 comparison improved SAGE canonical score by `+0.007570`,
+  canonical lift by `+1.06` percentage points, and outcome delta by
+  `+0.001689`.
+- Helper/safety counts: reference accepted `7`, called scenarios `181`, reuse
+  `356`; GPT-5 comparison accepted `7`, called scenarios `164`, reuse `278`;
+  both had `0` current exceptions, generated-tool failed scenarios, runtime
+  incidents, and side-effect incidents.
+- Comparison artifacts:
+  `artifacts/toolsandbox_recovery_ladder_20260531_v60/fullprefix500_reference_vs_current_impl_gpt5_comparison_20260531_151627.json`
+  and
+  `artifacts/toolsandbox_recovery_ladder_20260531_v60/fullprefix500_reference_vs_current_impl_gpt5_comparison_20260531_151627.md`.
+- Decision: keep / analyze helper attribution and residual misses before
+  making a stronger mechanism claim.
+
+## 2026-06-06 - Chapter 3 Tool-Generation-Only Full Standard v258
+
+- Run:
+  `outputs/chapter3_tool_generation_only_clean_primary/v258_full_standard_resume_from_v257_polars1/online_build_full_20260606_042103`.
+- Dashboard:
+  `http://127.0.0.1:63114/outputs/chapter3_tool_generation_only_clean_primary/v258_full_standard_resume_from_v257_polars1/online_build_full_20260606_042103/dashboard/task_compare.html`.
+- Configuration: ToolSandbox `online_build_full`, manifest
+  `docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json`,
+  `self-evolving-praxis`, actor/user/generation `gpt-4o-mini`, generation on,
+  SAGE cache off, OpenAI response cache disabled, control cache
+  `1032` cached / `0` fresh, `SAGE_PRAXIS_BRIDGE_POLICY=disabled`,
+  routing evidence disabled, no diagnostic force-call environment active.
+- Resume/runtime note: v257 stalled at `976/1032` in local Polars dataframe
+  filtering; v258 resumed from v257 with `POLARS_MAX_THREADS=1` as a runtime
+  stability setting only.
+- Final status: complete, control `1032/1032`, SAGE `1032/1032`.
+- Final metrics: score `0.692244 -> 0.814618`, delta `+0.122374`, lift
+  `+17.68%`; outcome `0.495835 -> 0.727857`, delta `+0.232022`, lift
+  `+46.79%`; exact successes `95 -> 360`.
+- Tool evidence: `22` accepted tools, `21` called tools, `1063` reuse events,
+  generated-tool-called scenarios `629`, generated-tool failed scenarios `1`.
+- Safety/runtime: runtime exceptions `0`; runtime incidents `0`; side-effect
+  preservation failure rows `14`.
+- Major blockers: `next_weekday_time_to_timestamp`, noisy
+  `next_service_tool_call`, device-state/service-condition tasks, and
+  side-effect preservation failures in message/contact/device planning tools.
+- Report:
+  `docs/sage_protocol/chapter3_full_standard_v258_report_20260606.md`.
+- Decision: keep as completed full-dataset evidence, but do not promote as the
+  final clean claim run until the side-effect preservation failures are repaired
+  and the outcome target is re-tested.
+
+## 2026-06-06 - Core Implementation Cleanup
+
+- Scope: narrowed active runtime code to the native ToolSandbox SAGE Praxis
+  implementation used for Chapter 3 evidence.
+- Retained: `scripts/run_sage_protocol.py`, full-run preparation, Chapter 3
+  figure rendering, `src/sage_ts/`, `tool_sandbox/`, and focused retained-path
+  unit/integration tests.
+- Removed: standalone/import-agent runtime package, CyberGym/tau active runtime
+  scripts, older v2 campaign/matrix/feedback-packet scripts, one-off static
+  registration scripts, toy mechanism modules, and tests tied only to retired
+  experiment paths.
+- Package boundary: `pyproject.toml` now includes `tool_sandbox*` and
+  `sage_ts*`; `sage_agent*` is no longer an install target.
+- Evidence boundary preserved: autonomous tool generation, validation/repair,
+  registry retention, routing/reuse, same-task fair chance, tool-specific actor
+  guidance, contribution logging, and Task Compare dashboards. Primary evidence
+  remains `SAGE_PRAXIS_BRIDGE_POLICY=disabled`.
+- Accounting fix: generated-tool failures are excluded from the successful
+  generated-tool-called set for the same scenario in
+  `src/sage_ts/adapters/sage_run_adapter.py`.
+- Validation: `make compile` passed; `make test-core` passed with `306 passed,
+  4 warnings`; `make test` passed with `623 passed, 4 warnings`; stale-reference
+  scan for retired active code paths returned no matches.
+- Manifest:
+  `docs/sage_protocol/core_implementation_cleanup_manifest_20260606.md`.
+- Decision: keep cleanup. The next exact-success validation is a deliberate
+  full ToolSandbox evidence run, not a cleanup smoke check.
+
+## 2026-06-06 - Chapter 3 Cost/Lift Repair v271 Full Standard
+
+- Run:
+  `outputs/chapter3_cost_lift_repair/v271_improved_full_standard_validation/online_build_full_20260606_125800`.
+- Dashboard:
+  `http://127.0.0.1:63137/outputs/chapter3_cost_lift_repair/v271_improved_full_standard_validation/online_build_full_20260606_125800/dashboard/task_compare.html`.
+- Configuration: ToolSandbox `online_build_full`, manifest
+  `docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json`,
+  `self-evolving-praxis`, actor/user/generation `gpt-4o-mini`, generation on,
+  SAGE cache off, OpenAI response cache disabled, control cache
+  `1032` cached / `0` fresh, `SAGE_PRAXIS_BRIDGE_POLICY=disabled`,
+  `SAGE_GENERATED_TOOL_GUIDANCE_MODE=legacy`, synthetic repair off,
+  visible-not-called retry off, routing evidence disabled, frozen
+  ToolSandbox clock.
+- Final status: complete, control `1032/1032`, SAGE `1032/1032`.
+- Final metrics: score `0.692244 -> 0.811489`, delta `+0.119246`, lift
+  `+17.23%`; outcome `0.495835 -> 0.748297`, delta `+0.252462`, lift
+  `+50.92%`; exact successes `95 -> 343`.
+- Tool evidence: `22` accepted tools, `21` called tools, `1053` reuse events,
+  generated-tool-called scenarios `564`, generated-tool failed scenarios `1`.
+- Safety/runtime: runtime exceptions `0`; generated-tool runtime failures were
+  nonfatal.
+- Cost: candidate `11,404` LLM calls and `18,068,841` tokens; control `4,649`
+  LLM calls and `6,205,340` tokens.
+- Attribution: generated-tool-called subset showed score lift `+30.97%` and
+  outcome lift `+88.44%`; overall score remained below `20%` because late
+  noncalled and weakly served task families added enough regressions.
+- Decision: retain as one of the best clean full-dataset, bridge-disabled SAGE
+  runs to date. Continue cost/lift repair before treating it as the final
+  Chapter 3 claim run.
+
+## 2026-06-09 - Clean Fair v078 500 Standard-Order Validation
+
+- Run:
+  `outputs/chapter3_clean_fair_primary/v078_500_standard_order/online_build_500_20260608_231904`.
+- Dashboard:
+  `http://127.0.0.1:62624/outputs/chapter3_clean_fair_primary/v078_500_standard_order/online_build_500_20260608_231904/dashboard/task_compare.html`.
+- Configuration: ToolSandbox `online_build_500`, manifest
+  `docs/sage_protocol/manifests/v2_1_formal_500.json`, self-evolving Praxis,
+  actor/user/generation `gpt-4o-mini`, generation on, SAGE cache off, OpenAI
+  response cache disabled, control cache `500` cached / `0` fresh,
+  `SAGE_PRAXIS_BRIDGE_POLICY=disabled`, generated-tool guidance `minimal`,
+  generated-tool docstrings `compact`, visible-not-called retry off,
+  generated-tool contract retry attempts `0`, synthetic repair off,
+  side-effect fair-chance extra turns off, runtime generated-tool bundle cap
+  `4`, frozen ToolSandbox clock.
+- Final status: complete, control `500/500`, SAGE `500/500`.
+- Final metrics: score `0.660480 -> 0.878402`, delta `+0.217921`, lift
+  `+32.99%`; outcome `0.491010 -> 0.702091`, delta `+0.211082`, lift
+  `+42.99%`; exact successes `36 -> 219`.
+- Generated-tool evidence: `19` accepted tools, `17` called accepted tools,
+  `773` reuse events, generated-tool-called scenarios `419`, generated-tool
+  failed scenarios `0`.
+- Safety/runtime: runtime exceptions `0`; API exceptions `0`.
+- Attribution: generated-tool-called subset showed score lift `+42.67%` and
+  outcome lift `+65.35%`. Rows without generated-tool calls were net negative
+  and pulled down overall outcome lift.
+- Main blockers: no-visible/direct-status rows (`get_wifi`, `get_cellular`),
+  direct state-changing rows without generated-tool coverage
+  (`remove_contact_with_id`, `send_message_with_phone_number_and_content`),
+  selected relationship/message/reminder recency perturbations, and a small
+  set of holiday/date rows with milestone-credit misses.
+- Methods tracker:
+  `docs/sage_protocol/chapter3_clean_sage_methods_tracker.md`.
+- Decision: keep as the current primary clean 500 evidence version for the
+  no-extra-turn, bridge-disabled methodology. Next full-dataset run should use
+  this clean v078 path unless another change improves generated-tool coverage
+  through autonomous tool generation and natural tool use.
+
+## 2026-06-09 - Clean Fair v080 Full Standard Paused Checkpoint
+
+- Run:
+  `outputs/chapter3_clean_fair_primary/v080_full_direct_status_action_completion_allow_external/online_build_full_20260609_090841`.
+- Dashboard:
+  `http://127.0.0.1:62624/outputs/chapter3_clean_fair_primary/v080_full_direct_status_action_completion_allow_external/online_build_full_20260609_090841/dashboard/task_compare.html`.
+- Configuration: ToolSandbox `online_build_full`, manifest
+  `docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json`,
+  self-evolving Praxis, actor/user/generation `gpt-4o-mini`, generation on,
+  SAGE cache off, OpenAI response cache disabled, cached controls,
+  `SAGE_PRAXIS_BRIDGE_POLICY=disabled`, generated-tool guidance `minimal`,
+  generated-tool docstrings `compact`, visible-not-called retry off,
+  generated-tool contract retry attempts `0`, synthetic repair off,
+  side-effect fair-chance extra turns off, runtime generated-tool bundle cap
+  `4`, frozen ToolSandbox clock, RapidAPI fixture cache read-only.
+- Pause status: deliberately paused at 414/1032 completed SAGE rows after
+  `find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_description_scrambled`.
+- Checkpoint metrics: score `0.681699 -> 0.833450`, delta/lift `+0.151752 /
+  +22.26%`; outcome `0.360279 -> 0.529744`, delta/lift `+0.169464 /
+  +47.04%`.
+- Generated-tool-called checkpoint subset: 332 rows, score lift `+28.42%`,
+  outcome lift `+66.12%`.
+- Safety/runtime at pause: 10 tools born, 9 called, generated-tool failures
+  `0`, runtime exceptions `0`, side-effect incidents `0`.
+- Resume script:
+  `artifacts/chapter3_clean_fair_primary/run_v080_resume_after_0414.sh`.
+- Resume seed:
+  `artifacts/chapter3_clean_fair_primary/v080_resume_after_0414_registry_seed`.
+- Decision: resume from the copied `after_0414` registry checkpoint with
+  `--resume-run-root` and `--resume-completed-limit 414`. Do not reuse the
+  live registry directory from the interrupted process, because the interrupt
+  occurred during the next scenario's OpenAI call.
+
+## 2026-06-09 - Clean Fair v082 Full Resume Before Status Block
+
+- Run:
+  `outputs/chapter3_clean_fair_primary/v082_full_resume_before_get_cellular_20260609_200356/online_build_full_20260609_200401`.
+- Dashboard:
+  `http://127.0.0.1:62624/outputs/chapter3_clean_fair_primary/v082_full_resume_before_get_cellular_20260609_200356/online_build_full_20260609_200401/dashboard/task_compare.html`.
+- Configuration: ToolSandbox `online_build_full`, manifest
+  `docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json`,
+  self-evolving Praxis, actor/user/generation `gpt-4o-mini`, generation on,
+  SAGE cache off, OpenAI response cache disabled, cached controls,
+  `SAGE_PRAXIS_BRIDGE_POLICY=disabled`, generated-tool guidance `minimal`,
+  generated-tool docstrings `compact`, visible-not-called retry off,
+  generated-tool contract retry attempts `0`, synthetic repair off,
+  side-effect fair-chance extra turns off, runtime generated-tool bundle cap
+  `4`, frozen ToolSandbox clock, RapidAPI fixture cache read-only.
+- Resume source:
+  `outputs/chapter3_clean_fair_primary/v081_full_resume_after_0414_20260609_192213/online_build_full_20260609_192219`.
+- Resume checkpoint: copied registry checkpoint after row 488
+  (`after_0488_find_thanksgiving_timestamp_all_tools`) into
+  `artifacts/chapter3_clean_fair_primary/v082_resume_before_get_cellular_registry_seed`.
+- Corrective method: generated-tool answer completion takes precedence over
+  generated-tool adoption guidance after a generated tool returns a final answer
+  recommendation; SAGE selects original `end_conversation` when visible on
+  post-completion drift turns.
+- Validation before run: `python -m py_compile
+  src/sage_ts/adapters/openai_toolsandbox_roles.py` passed; focused actor-policy
+  suite passed with `25 passed`.
+- First audit point: all 8 completed `get_cellular*` rows and all 8 completed
+  `get_wifi*` rows reached SAGE score `1.0` and SAGE outcome `1.0`, with
+  generated `plan_device_status_lookup` called in every row.
+- Status: in progress as of 2026-06-09 20:10 PT. Final metrics pending.
+
+## 2026-06-09 - Clean Fair v083 Full Resume Paused at Row 515
+
+- Run:
+  `outputs/chapter3_clean_fair_primary/v083_full_resume_clean_reminder_fix_20260609_204358/online_build_full_20260609_204403`.
+- Dashboard:
+  `http://127.0.0.1:62624/outputs/chapter3_clean_fair_primary/v083_full_resume_clean_reminder_fix_20260609_204358/online_build_full_20260609_204403/dashboard/task_compare.html`.
+- Configuration: ToolSandbox `online_build_full`, manifest
+  `docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json`,
+  self-evolving Praxis, actor/user/generation `gpt-4o-mini`, generation on,
+  SAGE cache off, OpenAI response cache disabled, cached controls,
+  `SAGE_PRAXIS_BRIDGE_POLICY=disabled`, generated-tool guidance `minimal`,
+  generated-tool docstrings `compact`, visible-not-called retry off,
+  generated-tool contract retry attempts `0`, synthetic repair off,
+  side-effect fair-chance extra turns off, runtime generated-tool bundle cap
+  `4`, frozen ToolSandbox clock, RapidAPI fixture cache read-only.
+- Resume source:
+  `outputs/chapter3_clean_fair_primary/v081_full_resume_after_0414_20260609_192213/online_build_full_20260609_192219`.
+- Resume checkpoint for v083 start: row 488 from the v081 run.
+- Corrective method added before v083: selected-record generated tools are not
+  considered ready until visible record evidence exists; reminder-recency tool
+  choice keeps original timestamp/context tools in the visible chain before
+  generated timestamp conversion and original reminder mutation; generated
+  final-answer completion remains ahead of additional tool adoption guidance.
+- Pause status: deliberately paused at 515/1032 completed paired rows on
+  2026-06-09 20:58 PT. The interrupt occurred during
+  `modify_contact_with_message_recency_alt_3_distraction_tools_arg_description_scrambled`;
+  that in-flight row is not part of the resume checkpoint.
+- Last completed row:
+  `modify_contact_with_message_recency_alt_3_distraction_tools`.
+- Checkpoint metrics: score `0.707514 -> 0.847946`, delta/lift `+0.140432 /
+  +19.85%`; outcome `0.492576 -> 0.697381`, delta/lift `+0.204805 /
+  +41.58%`.
+- Generated-tool evidence at pause: 17 accepted tools, 692 reuse events, 424
+  generated-tool-called scenarios, 1 generated-tool failed scenario.
+- Runtime/safety at pause: 0 runtime exceptions in dashboard summary. The stop
+  traceback was the intentional keyboard interrupt, not a run failure pattern.
+- Resume script:
+  `artifacts/chapter3_clean_fair_primary/run_v084_resume_after_0515.sh`.
+- Resume seed:
+  `outputs/chapter3_clean_fair_primary/v083_full_resume_clean_reminder_fix_20260609_204358/online_build_full_20260609_204403/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_06_09_2026_20_44_14/registry_checkpoints/after_0515_modify_contact_with_message_recency_alt_3_distraction_tools`.
+- Decision: resume shortly from row 515 using v084 script. Do not seed from the
+  live registry directory after interruption; use the row-515 registry
+  checkpoint.
+
+## 2026-06-11 - Clean Fair v111 Scenario-Name-Free 500
+
+- Run:
+  `outputs/chapter3_clean_fair_primary/v111_visible_context_no_scenario_names_direct_route_guard_500/online_build_500_20260611_003844`.
+- Dashboard:
+  `http://127.0.0.1:62624/outputs/chapter3_clean_fair_primary/v111_visible_context_no_scenario_names_direct_route_guard_500/online_build_500_20260611_003844/dashboard/task_compare.html`.
+- Configuration: ToolSandbox `online_build_500`, manifest
+  `docs/sage_protocol/manifests/v2_1_formal_500.json`, self-evolving Praxis,
+  actor/user/generation `gpt-4o-mini`, generation on, SAGE cache off, OpenAI
+  response cache disabled, cached controls, `SAGE_SCENARIO_METADATA_POLICY=visible_context`,
+  `SAGE_PRAXIS_BRIDGE_POLICY=disabled`, generated-tool guidance `minimal`,
+  generated-tool docstrings `compact`, visible-not-called retry off,
+  generated-tool contract retry attempts `0`, synthetic repair off,
+  side-effect fair-chance extra turns off, frozen ToolSandbox clock, RapidAPI
+  fixture cache read-only.
+- Method change: ToolSandbox scenario names are not used for generated-tool birth
+  or routing. SAGE uses visible request text, available tool schemas, derived
+  visible capability signals, and visible capability-family labels. Online
+  reflection remains enabled as explicit task feedback for lifecycle decisions.
+- Controls: 500 cached / 0 fresh.
+- Score: `0.660480 -> 0.757465`, delta/lift `+0.096984 / +14.68%`.
+- Outcome: `0.491010 -> 0.756004`, delta/lift `+0.264994 / +53.97%`.
+- Generated-tool evidence: 20 accepted tools, 430 reuse events, 261
+  generated-tool-called scenarios in the dashboard summary, 37 generated-tool
+  failed scenarios, 0 runtime exceptions.
+- Safety/evidence audit: 0 runtime incidents, 0 side-effect preservation
+  incidents, and 0 exact ToolSandbox scenario-name findings across scanned
+  registry and lifecycle artifacts.
+- Attribution finding: generated-tool-called rows remain strongly positive
+  while visible-not-called and no-visible-generated-tool rows are slightly
+  negative on score. The remaining score gap is therefore not hidden bridge
+  behavior; it is concentrated in natural tool adoption, contract robustness,
+  and scorer-milestone mismatch cases.
+- Decision: promote v111 as the current clean 500-task candidate for the
+  scenario-name-free Chapter 3 methodology. Do not restore scenario-name
+  routing, bridge completions, or SAGE-only retry turns.
+
+## 2026-06-12 - Pre-Final Full Dataset Uncached Parallel Run v140
+
+- Run:
+  `outputs/chapter3_clean_fair_primary/v140_prefinal_full_uncached_parallel/online_build_full_20260612_065229`.
+- Dashboard:
+  `http://127.0.0.1:62650/outputs/chapter3_clean_fair_primary/v140_prefinal_full_uncached_parallel/online_build_full_20260612_065229/dashboard/task_compare.html`.
+- Purpose: pre-final full-dataset data collection with a fresh uncached baseline
+  and fresh SAGE arm running in parallel.
+- Configuration: ToolSandbox `online_build_full`, manifest
+  `docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json`,
+  self-evolving Praxis, actor/user/generation `gpt-4o-mini`, generation on,
+  SAGE cache off, OpenAI response cache disabled, control cache `off`,
+  `--parallel-arms`, `SAGE_SCENARIO_METADATA_POLICY=visible_context`,
+  `SAGE_PRAXIS_BRIDGE_POLICY=disabled`, generated-tool guidance `minimal`,
+  generated-tool docstrings `compact`, visible-not-called retry off,
+  birth-scenario fair chance off, side-effect fair-chance extra turns off,
+  generated-tool contract retry attempts `0`, synthetic repair off, runtime
+  generated-tool bundle cap `4`, frozen ToolSandbox clock, RapidAPI fixture
+  cache read-only. Live dashboard refresh uses
+  `SAGE_DASHBOARD_LOAD_TASK_MESSAGES=0` to avoid serializing full transcripts
+  during long parallel runs.
+- Baseline/SAGE execution discipline: both arms are live OpenAI calls; no
+  cached controls are eligible; dashboard comparison uses paired completed rows
+  while the two arms progress independently.
+- Initial live check at 63 paired rows: score `0.788826 -> 1.000000`,
+  delta/lift `+0.211174 / +26.77%`; outcome `0.613270 -> 1.000000`,
+  delta/lift `+0.386730 / +63.06%`; 5 accepted tools, 53
+  generated-tool-called scenarios, 0 generated-tool failures, 0 runtime
+  exceptions; usage summaries showed 0 cached LLM calls in both arms.
+- Mid-run live check at 145 paired rows: score `0.585372 -> 0.784893`,
+  lift `+34.08%`; outcome `0.271628 -> 0.585808`, lift `+115.67%`; 6
+  accepted tools, 131 generated-tool-called scenarios, 0 generated-tool
+  failures, 0 runtime exceptions; usage summaries still showed 0 cached LLM
+  calls in both arms.
+- Fast-dashboard live check at 302 paired rows: score lift `+15.59%`;
+  outcome lift `+62.90%`; 10 accepted tools, 200 generated-tool-called
+  scenarios, 0 generated-tool failures, 0 runtime exceptions, and 0 cached LLM
+  calls in both arms. Interpretation at this point: outcome lift remains above
+  the Chapter 3 minimum, while canonical/reference score lift has diluted below
+  20% as the manifest enters rows with weaker generated-tool coverage and/or
+  milestone accounting mismatch.
+- Fast-dashboard live check at 502 paired rows: score lift `+8.73%`; outcome
+  lift `+52.11%`; 13 accepted tools, 330 generated-tool-called scenarios, 0
+  generated-tool failures, 0 runtime exceptions, and 0 cached LLM calls in both
+  arms. Interpretation at this point: outcome lift recovered slightly above the
+  Chapter 3 minimum, but canonical/reference score lift remains well below the
+  desired score target.
+- 500-row diagnostic: generated-tool-called rows were materially stronger than
+  not-called rows. Called rows had mean score delta about `+0.089` and mean
+  outcome delta about `+0.279`; not-called rows had mean score delta about
+  `+0.029` and mean outcome delta about `+0.071`. The main drag at this point
+  was not tool failure; it was weaker coverage or regressions in temperature,
+  days-till/date, and some distance/current-location rows.
+- Fast-dashboard live check at 759 paired rows: score lift `+7.73%`; outcome
+  lift `+63.07%`; 20 accepted tools, 455 generated-tool-called scenarios, 0
+  generated-tool failures, 0 runtime exceptions, and 0 cached LLM calls in both
+  arms. Baseline/control had completed all 1,032 tasks by this point; SAGE was
+  still running. Interpretation: outcome lift remained strong, while
+  canonical/reference score lift stayed below the score target.
+- Final result: score `0.733175 -> 0.782680`, delta/lift
+  `+0.049505 / +6.75%`; outcome `0.452803 -> 0.655135`, delta/lift
+  `+0.202333 / +44.68%`.
+- Final lifecycle evidence: 22 accepted tools, 534 generated-tool-called
+  scenarios, 14 generated-tool failed scenarios, 0 runtime exceptions.
+- Final usage evidence: baseline `9,489` live LLM calls and `10,455,939`
+  tokens; SAGE `10,655` live LLM calls and `16,389,805` tokens; cached LLM
+  calls `0 / 0`.
+- Final attribution split: generated-tool-called rows drove the observed lift.
+  Called rows had mean score delta about `+0.096` and mean outcome delta about
+  `+0.341`; not-called rows had mean score delta about `-0.001` and mean
+  outcome delta about `+0.012`.
+- Final caveats: outcome lift was positive but below the `50%` target; score
+  lift was positive but below the desired score target. The 14 generated-tool
+  failed rows all involved `relative_day_time_to_timestamp` on reminder
+  recency/yesterday search variants. Contribution audit reported 5
+  side-effect-preservation flags: 2 for `plan_device_state_action_sequence_v3`
+  and 3 for `select_action_target_by_recency`; these require adjudication
+  before treating this run as final claim evidence.
+- Status: complete.
+- Dashboard note: the original parent dashboard exporter became stale around
+  row 221 because full transcript serialization was too heavy for live refresh.
+  A separate fast live-dashboard refresher was started with
+  `SAGE_DASHBOARD_LOAD_TASK_MESSAGES=0`; this changes dashboard payload size
+  only and does not affect scoring, tool generation, routing, LLM calls, or
+  task execution.
+
+## 2026-06-13 - Canonical SAGE Full Dataset v061
+
+- Run:
+  `outputs/chapter3_token_reduction/v061_finish_v059_full/online_build_full_20260613_203410`.
+- Dashboard:
+  `outputs/chapter3_token_reduction/v061_finish_v059_full/online_build_full_20260613_203410/dashboard/task_compare.html`.
+- Protocol manifest:
+  `outputs/chapter3_token_reduction/v061_finish_v059_full/online_build_full_20260613_203410/protocol_manifest.json`.
+- Configuration: ToolSandbox `online_build_full`, manifest
+  `docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json`,
+  self-evolving Praxis, actor/user/generation `gpt-4o-mini`, generation on,
+  SAGE cache off, OpenAI response cache disabled, cached controls,
+  `SAGE_PRAXIS_BRIDGE_POLICY=disabled`,
+  `SAGE_SCENARIO_METADATA_POLICY=visible_context`,
+  `SAGE_DISABLE_SCENARIO_NAME_BIRTH=1`,
+  `SAGE_DISABLE_SCENARIO_NAME_ROUTING=1`, generated-tool guidance `minimal`,
+  generated-tool docstrings `compact`, visible-not-called retry off,
+  side-effect fair-chance extra turns off, generated-tool contract retry
+  attempts `0`, generated-tool synthetic repair off, runtime generated-tool
+  bundle cap `4`, frozen ToolSandbox clock, RapidAPI fixture cache read-only.
+- Completed paired tasks: `1032/1032`.
+- Score: `0.733214 -> 0.801186`, delta/lift `+0.067971 / +9.27%`.
+- Outcome: `0.454251 -> 0.757267`, delta/lift `+0.303016 / +66.71%`.
+- Exact successes: baseline `201`, SAGE `406`.
+- Generated-tool evidence: 22 accepted/generated tools in registry, 21 called
+  tools, 1,171 reuse events, 825 generated-tool-called scenarios, 3
+  generated-tool failure rows.
+- Runtime/safety: 0 runtime exceptions, 0 runtime incidents, 1 side-effect
+  preservation incident.
+- LLM usage: baseline `10,465,294` tokens; SAGE `17,245,671` tokens.
+- Decision: preserve v061 as the canonical SAGE publication configuration.
+  Earlier v70/v71/v111/v140/v258 runs remain historical comparison evidence,
+  but v061 is now the implementation and evidence boundary referred to as
+  "SAGE" in the repository.

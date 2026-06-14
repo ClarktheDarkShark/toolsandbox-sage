@@ -290,6 +290,238 @@ def test_composite_output_normalization_fills_safe_defaults() -> None:
     assert normalized["safety_notes"] == "call downstream ToolSandbox side-effect next"
 
 
+def test_generated_kwargs_normalization_removes_null_optional_values() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_reminder_creation_args",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare final add_reminder kwargs.",
+            inputs=(),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "add_reminder_kwargs": {"type": "object"},
+                    "should_call_add_reminder": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("add_reminder",),
+            negative_triggers=("missing time",),
+            preserves_side_effect_tools=("add_reminder",),
+            required_original_tool_calls=("add_reminder",),
+            generalization_rationale="Reminder args recur.",
+            estimated_step_compression=2,
+            cross_task_applicability_count=2,
+            applicable_task_families=("add_reminder",),
+            reason_tool_is_decisive="Prepares original add_reminder kwargs.",
+            shortfall_cluster_evidence=("composite:prepare_reminder_creation_args",),
+            known_failure_mechanisms_addressed=("side_effect_argument_preparation",),
+            final_state_preservation_plan="Caller executes add_reminder later.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Missing reminder argument planner.",
+                signals=("side_effect_argument_preparation_failure",),
+            ),
+        ),
+        code="def prepare_reminder_creation_args() -> dict:\n    return {}\n",
+    )
+    raw = {
+        "add_reminder_kwargs": {
+            "content": "buy milk",
+            "reminder_timestamp": 1711136400.0,
+            "latitude": None,
+            "longitude": None,
+        },
+        "should_call_add_reminder": True,
+        "abstain_reason": "",
+    }
+
+    normalized = normalize_generated_tool_output(tool, raw)
+
+    assert normalized["add_reminder_kwargs"] == {
+        "content": "buy milk",
+        "reminder_timestamp": 1711136400.0,
+    }
+
+
+def test_safe_abstention_normalization_rejects_unresolved_side_effect_target() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_safe_action_or_abstain",
+            family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+            description="Prepare safe abstention decisions.",
+            inputs=(
+                ToolInput("user_request", "str", "User request."),
+                ToolInput("requested_action", "str", "Requested action."),
+                ToolInput("target_identifier", "str", "Target id."),
+                ToolInput("required_original_tools", "list", "Required tools."),
+                ToolInput("available_original_tools", "list", "Available tools."),
+                ToolInput("visible_records_count", "int", "Visible records."),
+            ),
+            output_annotation="dict",
+            output_schema={"type": "object", "properties": {}},
+            positive_triggers=("insufficient_information",),
+            negative_triggers=("safe action",),
+            preserves_side_effect_tools=("remove_contact",),
+            required_original_tool_calls=("remove_contact",),
+            generalization_rationale="Safe action decisions recur.",
+            reason_tool_is_decisive="Prevents unsafe side effects.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Unsafe unresolved target.",
+                signals=("missing_target_identifier",),
+            ),
+        ),
+        code="def prepare_safe_action_or_abstain(*args, **kwargs):\n    return {}\n",
+    )
+    raw = {
+        "should_abstain": False,
+        "missing_information": [],
+        "required_original_tools": [],
+        "safe_next_action": "continue_with_original_tool",
+        "final_answer_recommendation": "",
+        "abstain_reason": "",
+    }
+
+    normalized = normalize_generated_tool_output(
+        tool,
+        raw,
+        inputs={
+            "requested_action": "remove_contact",
+            "target_identifier": "+12453344098",
+            "visible_records_count": 0,
+        },
+    )
+
+    assert normalized["should_abstain"] is True
+    assert normalized["missing_information"] == ["target_identifier"]
+    assert normalized["abstain_reason"] == "missing_target_identifier"
+
+
+def test_safe_abstention_normalization_preserves_missing_original_tool_priority() -> (
+    None
+):
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_safe_action_or_abstain",
+            family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+            description="Prepare safe abstention decisions.",
+            inputs=(
+                ToolInput("user_request", "str", "User request."),
+                ToolInput("requested_action", "str", "Requested action."),
+                ToolInput("target_identifier", "str", "Target id."),
+                ToolInput("required_original_tools", "list", "Required tools."),
+                ToolInput("available_original_tools", "list", "Available tools."),
+                ToolInput("visible_records_count", "int", "Visible records."),
+            ),
+            output_annotation="dict",
+            output_schema={"type": "object", "properties": {}},
+            positive_triggers=("insufficient_information",),
+            negative_triggers=("safe action",),
+            preserves_side_effect_tools=("search_contacts", "modify_contact"),
+            required_original_tool_calls=("search_contacts", "modify_contact"),
+            generalization_rationale="Safe action decisions recur.",
+            reason_tool_is_decisive="Prevents unsafe side effects.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Missing original tool blocks safe target resolution.",
+                signals=("missing_original_tool_precondition",),
+            ),
+        ),
+        code="def prepare_safe_action_or_abstain(*args, **kwargs):\n    return {}\n",
+    )
+    raw = {
+        "should_abstain": True,
+        "missing_information": ["search_contacts"],
+        "required_original_tools": ["search_contacts"],
+        "safe_next_action": "ask_user_or_abstain",
+        "final_answer_recommendation": (
+            "I do not have enough information to identify the contact because "
+            "contact search is unavailable."
+        ),
+        "abstain_reason": "missing_required_original_tool",
+    }
+
+    normalized = normalize_generated_tool_output(
+        tool,
+        raw,
+        inputs={
+            "requested_action": "modify_contact",
+            "target_identifier": "",
+            "required_original_tools": ["search_contacts"],
+            "available_original_tools": ["modify_contact"],
+            "visible_records_count": 0,
+        },
+    )
+
+    assert normalized["should_abstain"] is True
+    assert normalized["missing_information"] == ["contact_lookup"]
+    assert normalized["abstain_reason"] == "missing_required_original_tool"
+    assert normalized["final_answer_recommendation"] == (
+        "I do not have enough information to identify the contact because "
+        "contact search is unavailable."
+    )
+
+
+def test_safe_abstention_normalization_forces_current_city_location_lookup() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_safe_action_or_abstain",
+            family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+            description="Prepare safe abstention decisions.",
+            inputs=(
+                ToolInput("user_request", "str", "User request."),
+                ToolInput("requested_action", "str", "Requested action."),
+                ToolInput("target_identifier", "str", "Target id."),
+                ToolInput("required_original_tools", "list", "Required tools."),
+                ToolInput("available_original_tools", "list", "Available tools."),
+                ToolInput("visible_records_count", "int", "Visible records."),
+            ),
+            output_annotation="dict",
+            output_schema={"type": "object", "properties": {}},
+            positive_triggers=("insufficient_information",),
+            negative_triggers=("safe action",),
+            preserves_side_effect_tools=("get_current_location",),
+            required_original_tool_calls=("get_current_location",),
+            generalization_rationale="Safe action decisions recur.",
+            reason_tool_is_decisive="Prevents unsafe side effects.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Missing location lookup blocks safe current-city lookup.",
+                signals=("missing_original_tool_precondition",),
+            ),
+        ),
+        code="def prepare_safe_action_or_abstain(*args, **kwargs):\n    return {}\n",
+    )
+    raw = {
+        "should_abstain": False,
+        "missing_information": [],
+        "required_original_tools": [],
+        "safe_next_action": "continue_with_original_tool",
+        "final_answer_recommendation": "",
+        "abstain_reason": "",
+    }
+
+    normalized = normalize_generated_tool_output(
+        tool,
+        raw,
+        inputs={
+            "user_request": "What city am I in?",
+            "requested_action": "get my current city",
+            "target_identifier": "current location",
+            "required_original_tools": [],
+            "available_original_tools": ["set_location_service_status"],
+            "visible_records_count": 0,
+        },
+    )
+
+    assert normalized["should_abstain"] is True
+    assert normalized["missing_information"] == ["location_lookup"]
+    assert normalized["required_original_tools"] == ["location_lookup"]
+    assert normalized["abstain_reason"] == "missing_required_original_tool"
+    assert normalized["final_answer_recommendation"] == (
+        "I cannot determine what city you are in because I do not have access "
+        "to your current location, GPS, or latitude and longitude coordinates."
+    )
+
+
 def test_generic_composite_abstention_clears_downstream_action() -> None:
     tool = GeneratedTool(
         spec=ToolSpec(
@@ -414,6 +646,107 @@ def test_generic_contact_lookup_abstention_fills_missing_constraint_reason() -> 
         "answer_field": "phone_number",
         "abstain_reason": "missing_lookup_constraint",
     }
+
+
+def test_search_contacts_kwargs_converts_all_contacts_sentinel() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="plan_contact_relationship_batch_update",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare relationship batch update kwargs.",
+            inputs=(
+                ToolInput("source_relationship", "str", "Source relationship."),
+                ToolInput("target_relationship", "str", "Target relationship."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_call_search_contacts": {"type": "boolean"},
+                    "search_contacts_kwargs": {"type": "object"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("all contacts as enemies",),
+            preserves_side_effect_tools=("search_contacts", "modify_contact"),
+            required_original_tool_calls=("search_contacts", "modify_contact"),
+            generalization_rationale="Relationship batches recur.",
+            reason_tool_is_decisive="Prepares original search and modify kwargs.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="All-contact relationship update needs non-self search kwargs.",
+                signals=("side_effect_argument_preparation_failure",),
+            ),
+        ),
+        code="def plan_contact_relationship_batch_update(*args, **kwargs):\n    return {}\n",
+    )
+
+    normalized = normalize_generated_tool_output(
+        tool,
+        {
+            "should_call_search_contacts": True,
+            "search_contacts_kwargs": {"relationship": "__all_contacts__"},
+            "abstain_reason": "",
+        },
+    )
+
+    assert normalized["search_contacts_kwargs"] == {"is_self": False}
+
+
+def test_send_message_lookup_normalization_fills_advisory_fields() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="plan_send_message_contact_lookup",
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            description="Prepare contact lookup before sending a message.",
+            inputs=(
+                ToolInput("recipient_name", "str", "Recipient name."),
+                ToolInput("message_content", "str", "Message body."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_call_search_contacts": {"type": "boolean"},
+                    "search_contacts_kwargs": {"type": "object"},
+                    "downstream_tool_name": {"type": "string"},
+                    "message_content": {"type": "string"},
+                    "next_step": {"type": "string"},
+                    "final_answer_recommendation": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("send message by contact name",),
+            preserves_side_effect_tools=(
+                "search_contacts",
+                "send_message_with_phone_number",
+            ),
+            required_original_tool_calls=("search_contacts",),
+            generalization_rationale="Named-recipient send tasks need lookup planning.",
+            reason_tool_is_decisive="It preserves lookup before send.",
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary="Send-message helper advisory fields were brittle.",
+                signals=("validation_output_shape",),
+            ),
+        ),
+        code="def plan_send_message_contact_lookup(*args, **kwargs):\n    return {}\n",
+    )
+    raw = {
+        "should_call_search_contacts": True,
+        "search_contacts_kwargs": {"name": "Ada"},
+        "downstream_tool_name": "send_message_with_phone_number",
+        "message_content": "On my way",
+        "next_step": "",
+        "final_answer_recommendation": "",
+        "abstain_reason": "",
+    }
+
+    normalized = normalize_generated_tool_output(tool, raw)
+
+    assert normalized["next_step"] == (
+        "call search_contacts, then send_message_with_phone_number"
+    )
+    assert "send_message_with_phone_number" in normalized["final_answer_recommendation"]
+    assert normalized["abstain_reason"] == ""
 
 
 def test_composite_output_normalization_enforces_ambiguity_abstention() -> None:

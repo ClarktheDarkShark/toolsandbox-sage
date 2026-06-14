@@ -1,8 +1,14 @@
 # mypy: ignore-errors
+import os
+
+import pytest
+
 from scripts.run_sage_protocol import (
     SAGE_POLICY_AUTO,
     SAGE_POLICY_NONE,
     SAGE_POLICY_SELF_EVOLVING_PRAXIS,
+    SAGE_POLICY_SELF_EVOLVING_PRAXIS_COMBINED,
+    SELF_EVOLVING_PRAXIS_COMBINED_ENV_DEFAULTS,
     SELF_EVOLVING_PRAXIS_ENV_DEFAULTS,
     _apply_sage_policy_preset,
     _generation_enabled_by_default,
@@ -12,6 +18,20 @@ from scripts.run_sage_protocol import (
     _route_mismatch_qualified,
     _snapshot_registry_for_gate,
 )
+
+
+@pytest.fixture(autouse=True)
+def _restore_sage_environment() -> None:
+    tracked_keys = set(SELF_EVOLVING_PRAXIS_COMBINED_ENV_DEFAULTS)
+    before = {key: os.environ.get(key) for key in tracked_keys}
+    try:
+        yield
+    finally:
+        for key, value in before.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def test_discovery_manifest_enables_generation_in_transfer_mode() -> None:
@@ -50,7 +70,7 @@ def test_explicit_sage_policy_override_is_preserved() -> None:
     )
 
 
-def test_self_evolving_praxis_policy_sets_high_lift_runtime_defaults(
+def test_self_evolving_praxis_policy_sets_tool_generation_runtime_defaults(
     monkeypatch,
 ) -> None:
     for key in SELF_EVOLVING_PRAXIS_ENV_DEFAULTS:
@@ -61,6 +81,7 @@ def test_self_evolving_praxis_policy_sets_high_lift_runtime_defaults(
     assert applied
     for key, expected in SELF_EVOLVING_PRAXIS_ENV_DEFAULTS.items():
         assert applied[key] == {"value": expected, "source": "preset_default"}
+    assert applied["SAGE_PRAXIS_BRIDGE_POLICY"]["value"] == "disabled"
 
 
 def test_self_evolving_praxis_policy_preserves_explicit_environment(
@@ -73,6 +94,29 @@ def test_self_evolving_praxis_policy_preserves_explicit_environment(
     assert applied["SAGE_PRAXIS_BRIDGE_POLICY"] == {
         "value": "disabled",
         "source": "preexisting_environment",
+    }
+
+
+def test_self_evolving_praxis_policy_rejects_enabled_bridge_environment(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
+
+    with pytest.raises(ValueError, match="autonomous tool-generation policy"):
+        _apply_sage_policy_preset(SAGE_POLICY_SELF_EVOLVING_PRAXIS)
+
+
+def test_combined_praxis_policy_keeps_bridge_as_explicit_ablation(
+    monkeypatch,
+) -> None:
+    for key in SELF_EVOLVING_PRAXIS_COMBINED_ENV_DEFAULTS:
+        monkeypatch.delenv(key, raising=False)
+
+    applied = _apply_sage_policy_preset(SAGE_POLICY_SELF_EVOLVING_PRAXIS_COMBINED)
+
+    assert applied["SAGE_PRAXIS_BRIDGE_POLICY"] == {
+        "value": "combined",
+        "source": "preset_default",
     }
 
 

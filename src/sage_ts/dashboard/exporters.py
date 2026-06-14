@@ -220,6 +220,9 @@ def _generated_tool_events(
 def _cached_control_transcript(
     control_cache: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    load_transcripts = os.environ.get(
+        "SAGE_DASHBOARD_LOAD_CACHED_CONTROL_TRANSCRIPTS", ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
     record_ids = control_cache.get("record_ids")
     if not isinstance(record_ids, list):
         return [], None
@@ -232,6 +235,14 @@ def _cached_control_transcript(
         ):
             continue
         record_path = records_dir / f"{record_id}.json"
+        if not load_transcripts:
+            return [], {
+                "source": "control_task_baseline_cache",
+                "record_id": record_id,
+                "record_path": str(record_path),
+                "transcript_loaded": False,
+                "transcript_load_policy": "disabled_for_live_dashboard",
+            }
         record = _read_json(record_path)
         transcript_path = record.get("transcript_path")
         if not isinstance(transcript_path, str) or not transcript_path:
@@ -239,17 +250,26 @@ def _cached_control_transcript(
         transcript = Path(transcript_path)
         if not transcript.is_absolute():
             transcript = _repo_root() / transcript
+        source = {
+            "source": "control_task_baseline_cache",
+            "record_id": record_id,
+            "record_path": str(record_path),
+            "transcript_path": transcript_path,
+            "transcript_hash": record.get("transcript_hash"),
+            "transcript_loaded": False,
+        }
         conversation = _read_json_value(transcript, [])
         raw_messages = [m for m in conversation if isinstance(m, dict)]
         if raw_messages:
-            return raw_messages, {
-                "source": "control_task_baseline_cache",
-                "record_id": record_id,
-                "record_path": str(record_path),
-                "transcript_path": transcript_path,
-                "transcript_hash": record.get("transcript_hash"),
-            }
+            source["transcript_loaded"] = True
+            return raw_messages, source
     return [], None
+
+
+def _dashboard_load_task_messages() -> bool:
+    return os.environ.get(
+        "SAGE_DASHBOARD_LOAD_TASK_MESSAGES", "1"
+    ).strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _compact_content(value: Any, *, limit: int = 10000) -> str:
@@ -1186,6 +1206,7 @@ def _task_focus_rows(
     active_scenario_name = (
         currently_running_data.get("scenario") if currently_running_data else None
     )
+    load_messages = _dashboard_load_task_messages()
     phantom: set[str] = (
         {active_scenario_name}
         if active_scenario_name
@@ -1198,11 +1219,23 @@ def _task_focus_rows(
         key=lambda name: (order.get(name, 10_000), name),
     ):
         result = rows.get(scenario)
-        conversation = _read_json_value(
-            run_dir / "trajectories" / scenario / "conversation.json", []
+        conversation = (
+            _read_json_value(
+                run_dir / "trajectories" / scenario / "conversation.json", []
+            )
+            if load_messages
+            else []
         )
         raw_messages = [m for m in conversation if isinstance(m, dict)]
-        phase = run_dir.relative_to(run_root).parts[0]
+        try:
+            relative_parts = run_dir.relative_to(run_root).parts
+        except ValueError:
+            relative_parts = ()
+        if relative_parts:
+            phase = relative_parts[0]
+        else:
+            path_hint = "/".join(run_dir.parts[-3:]).lower()
+            phase = "control" if "control" in path_hint else "candidate"
         milestones = _milestones_from_result(result or {}, raw_messages)
         minefields = _minefields_from_result(result or {}, raw_messages)
         control_cache = (
@@ -1260,6 +1293,33 @@ def _task_focus_rows(
                 else result.get("outcome_checks", []),
                 "score": None if result is None else result.get("similarity"),
                 "turn_count": None if result is None else result.get("turn_count"),
+                "llm_usage_recorded": False
+                if result is None
+                else bool(result.get("llm_usage_recorded")),
+                "llm_call_count": None
+                if result is None
+                else result.get("llm_call_count"),
+                "llm_live_call_count": None
+                if result is None
+                else result.get("llm_live_call_count"),
+                "llm_cached_call_count": None
+                if result is None
+                else result.get("llm_cached_call_count"),
+                "llm_prompt_tokens": None
+                if result is None
+                else result.get("llm_prompt_tokens"),
+                "llm_completion_tokens": None
+                if result is None
+                else result.get("llm_completion_tokens"),
+                "llm_total_tokens": None
+                if result is None
+                else result.get("llm_total_tokens"),
+                "llm_usage_available_count": None
+                if result is None
+                else result.get("llm_usage_available_count"),
+                "llm_usage_by_source": {}
+                if result is None
+                else result.get("llm_usage_by_source", {}),
                 "exception_type": None
                 if result is None
                 else result.get("exception_type"),
@@ -1450,6 +1510,8 @@ def _write_task_focus_dashboard(
         "status": data.get("status"),
         "agent": data.get("agent"),
         "base_tool_policy": data.get("base_tool_policy"),
+        "control_cache": data.get("control_cache"),
+        "cohort_preflight": data.get("cohort_preflight"),
         "summary": {
             "scenario_count": data.get("scenario_count"),
             "control_completed": data.get("control", {}).get("scenario_count"),
@@ -1457,12 +1519,66 @@ def _write_task_focus_dashboard(
             "control_mean_outcome_similarity": data.get("control", {}).get(
                 "mean_outcome_similarity"
             ),
+            "control_llm_usage_recorded": data.get("control", {}).get(
+                "llm_usage_recorded"
+            ),
+            "control_llm_call_count": data.get("control", {}).get("llm_call_count"),
+            "control_llm_live_call_count": data.get("control", {}).get(
+                "llm_live_call_count"
+            ),
+            "control_llm_cached_call_count": data.get("control", {}).get(
+                "llm_cached_call_count"
+            ),
+            "control_llm_prompt_tokens": data.get("control", {}).get(
+                "llm_prompt_tokens"
+            ),
+            "control_llm_completion_tokens": data.get("control", {}).get(
+                "llm_completion_tokens"
+            ),
+            "control_llm_total_tokens": data.get("control", {}).get("llm_total_tokens"),
+            "control_llm_usage_available_count": data.get("control", {}).get(
+                "llm_usage_available_count"
+            ),
+            "control_wall_time_seconds": data.get("control", {}).get(
+                "wall_time_seconds"
+            ),
+            "control_wall_time_resume_offset_seconds": data.get("control", {}).get(
+                "wall_time_resume_offset_seconds"
+            ),
             "candidate_completed": data.get("candidate", {}).get("scenario_count"),
             "candidate_mean_similarity": data.get("candidate", {}).get(
                 "mean_similarity"
             ),
             "candidate_mean_outcome_similarity": data.get("candidate", {}).get(
                 "mean_outcome_similarity"
+            ),
+            "candidate_llm_usage_recorded": data.get("candidate", {}).get(
+                "llm_usage_recorded"
+            ),
+            "candidate_llm_call_count": data.get("candidate", {}).get("llm_call_count"),
+            "candidate_llm_live_call_count": data.get("candidate", {}).get(
+                "llm_live_call_count"
+            ),
+            "candidate_llm_cached_call_count": data.get("candidate", {}).get(
+                "llm_cached_call_count"
+            ),
+            "candidate_llm_prompt_tokens": data.get("candidate", {}).get(
+                "llm_prompt_tokens"
+            ),
+            "candidate_llm_completion_tokens": data.get("candidate", {}).get(
+                "llm_completion_tokens"
+            ),
+            "candidate_llm_total_tokens": data.get("candidate", {}).get(
+                "llm_total_tokens"
+            ),
+            "candidate_llm_usage_available_count": data.get("candidate", {}).get(
+                "llm_usage_available_count"
+            ),
+            "candidate_wall_time_seconds": data.get("candidate", {}).get(
+                "wall_time_seconds"
+            ),
+            "candidate_wall_time_resume_offset_seconds": data.get("candidate", {}).get(
+                "wall_time_resume_offset_seconds"
             ),
             "accepted_tools": current.get("accepted_tool_count", 0),
             "reuse_count": current.get("reuse_count", 0),
@@ -1514,6 +1630,240 @@ def _tool_count(row: dict[str, Any], count_key: str, list_key: str) -> int:
     return 0
 
 
+def _named_entry_count(value: Any) -> int:
+    if isinstance(value, dict):
+        return len([name for name in value if name])
+    if isinstance(value, list):
+        return len({str(name) for name in value if name})
+    return 0
+
+
+def _mean_float(values: list[float]) -> float | None:
+    return sum(values) / len(values) if values else None
+
+
+def _candidate_run_dir_from_data(data: dict[str, Any]) -> Path | None:
+    candidate = data.get("candidate")
+    if not isinstance(candidate, dict):
+        return None
+    raw = candidate.get("run_dir")
+    if not raw:
+        return None
+    return _resolve_run_dir(Path(str(raw)))
+
+
+def _add_tool_scenario(
+    mapping: dict[str, set[str]],
+    tool: Any,
+    scenario: str,
+) -> None:
+    if not scenario or not tool:
+        return
+    mapping.setdefault(str(tool), set()).add(scenario)
+
+
+def _live_tool_selection_counts(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    run_dir = _candidate_run_dir_from_data(data)
+    if run_dir is None:
+        return {}
+    visible_by_tool: dict[str, set[str]] = {}
+    called_by_tool: dict[str, set[str]] = {}
+    failed_by_tool: dict[str, set[str]] = {}
+    attempted_by_tool: dict[str, set[str]] = {}
+
+    visibility_rows = _read_jsonl(run_dir / "scenario_tool_visibility.jsonl")
+    for row in visibility_rows:
+        scenario = str(row.get("scenario") or "")
+        for tool in row.get("generated_tools", []) or []:
+            _add_tool_scenario(visible_by_tool, tool, scenario)
+
+    selection_rows = _read_jsonl(run_dir / "scenario_tool_selection.jsonl")
+    for row in selection_rows:
+        scenario = str(row.get("scenario") or "")
+        for tool in row.get("generated_tools_visible", []) or []:
+            _add_tool_scenario(visible_by_tool, tool, scenario)
+        for tool in row.get("generated_tools_called", []) or []:
+            _add_tool_scenario(called_by_tool, tool, scenario)
+        for tool in row.get("generated_tools_failed", []) or []:
+            _add_tool_scenario(failed_by_tool, tool, scenario)
+        for tool in row.get("generated_tools_attempted", []) or []:
+            _add_tool_scenario(attempted_by_tool, tool, scenario)
+
+    for event in data.get("reuse_events", []) or []:
+        scenario = str(event.get("scenario") or "")
+        tool = event.get("tool_name") or event.get("tool")
+        _add_tool_scenario(called_by_tool, tool, scenario)
+
+    tool_names = (
+        set(visible_by_tool)
+        | set(called_by_tool)
+        | set(failed_by_tool)
+        | set(attempted_by_tool)
+    )
+    counts: dict[str, dict[str, Any]] = {}
+    for tool in sorted(tool_names):
+        visible = visible_by_tool.get(tool, set())
+        called = called_by_tool.get(tool, set())
+        failed = failed_by_tool.get(tool, set())
+        attempted = attempted_by_tool.get(tool, set())
+        counts[tool] = {
+            "visible_count": len(visible),
+            "called_scenario_count": len(called),
+            "visible_not_called_count": len(visible - called),
+            "failed_attempt_count": len(failed),
+            "attempted_scenario_count": len(attempted),
+        }
+    return counts
+
+
+def _live_called_tool_delta_stats(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    stats: dict[str, dict[str, Any]] = {}
+    for row in data.get("scenarios", []) or []:
+        if not isinstance(row, dict):
+            continue
+        tools = row.get("reused_tools") or []
+        if not isinstance(tools, list) or not tools:
+            continue
+        scenario = str(row.get("scenario") or "")
+        canonical_delta = _optional_float(row.get("delta"))
+        outcome_delta = _optional_float(row.get("outcome_delta"))
+        if canonical_delta is None and outcome_delta is None:
+            continue
+        for tool in tools:
+            tool_name = str(tool)
+            entry = stats.setdefault(
+                tool_name,
+                {
+                    "scenarios": set(),
+                    "canonical_deltas": [],
+                    "outcome_deltas": [],
+                },
+            )
+            entry["scenarios"].add(scenario)
+            if canonical_delta is not None:
+                entry["canonical_deltas"].append(canonical_delta)
+            if outcome_delta is not None:
+                entry["outcome_deltas"].append(outcome_delta)
+
+    result: dict[str, dict[str, Any]] = {}
+    for tool, raw in stats.items():
+        canonical = list(raw["canonical_deltas"])
+        outcome = list(raw["outcome_deltas"])
+        result[tool] = {
+            "scenario_count": len(raw["scenarios"]),
+            "mean_canonical_delta": _mean_float(canonical),
+            "mean_outcome_delta": _mean_float(outcome),
+            "canonical_gains": sum(1 for value in canonical if value > 0),
+            "canonical_regressions": sum(1 for value in canonical if value < 0),
+            "canonical_preserved": sum(1 for value in canonical if value == 0),
+            "outcome_gains": sum(1 for value in outcome if value > 0),
+            "outcome_regressions": sum(1 for value in outcome if value < 0),
+            "outcome_preserved": sum(1 for value in outcome if value == 0),
+        }
+    return result
+
+
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if item]
+    if value:
+        return [str(value)]
+    return []
+
+
+def _sentence_list(values: list[str], *, limit: int = 5) -> str:
+    shown = values[:limit]
+    if not shown:
+        return ""
+    if len(values) > limit:
+        shown.append(f"{len(values) - limit} more")
+    if len(shown) == 1:
+        return shown[0]
+    return ", ".join(shown[:-1]) + f", and {shown[-1]}"
+
+
+def _plain_language_tool_explanation(
+    name: str,
+    raw: dict[str, Any],
+    spec: dict[str, Any],
+) -> str:
+    description = str(spec.get("description") or "").strip()
+    family = str(spec.get("family") or "generated helper").replace("_", " ")
+    birth_scenario = str(raw.get("birth_scenario") or "").strip()
+    rationale = str(spec.get("generalization_rationale") or "").strip()
+    abstain = str(spec.get("abstain_behavior") or "").strip()
+    positives = _sentence_list(_string_list(spec.get("positive_triggers")))
+    negatives = _sentence_list(_string_list(spec.get("negative_triggers")))
+    original_tools = _sentence_list(
+        _string_list(spec.get("required_original_tool_calls"))
+        or _string_list(spec.get("preserves_side_effect_tools"))
+    )
+    failure_modes = _sentence_list(
+        _string_list(spec.get("known_failure_mechanisms_addressed"))
+    )
+
+    paragraphs = [
+        (f"{name} is a {family}." + (f" {description}" if description else ""))
+    ]
+    if birth_scenario:
+        paragraphs.append(
+            "It was created after SAGE saw a reusable pattern in this task context: "
+            f"{birth_scenario}"
+        )
+    if rationale:
+        paragraphs.append(f"Why it exists: {rationale}")
+    elif failure_modes:
+        paragraphs.append(
+            "Why it exists: it addresses recurring failure modes such as "
+            f"{failure_modes}."
+        )
+    if positives:
+        paragraphs.append(
+            f"It is intended to be used when the task matches: {positives}."
+        )
+    if negatives:
+        paragraphs.append(f"It should avoid tasks matching: {negatives}.")
+    if original_tools:
+        paragraphs.append(
+            "It does not replace the original ToolSandbox action. It prepares or "
+            f"normalizes inputs before the agent calls: {original_tools}."
+        )
+    if abstain:
+        paragraphs.append(
+            f"When inputs are unsafe or incomplete, it should abstain: {abstain}"
+        )
+    return "\n\n".join(paragraphs)
+
+
+def _registry_tool_details(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    manifest = data.get("registry_manifest")
+    if not isinstance(manifest, dict):
+        return {}
+    tools = manifest.get("tools")
+    if not isinstance(tools, dict):
+        return {}
+    details: dict[str, dict[str, Any]] = {}
+    for name, raw in tools.items():
+        if not isinstance(raw, dict):
+            continue
+        tool_payload = raw.get("tool")
+        if not isinstance(tool_payload, dict):
+            continue
+        spec = tool_payload.get("spec")
+        if not isinstance(spec, dict):
+            spec = {}
+        details[str(name)] = {
+            "code": tool_payload.get("code"),
+            "description": spec.get("description"),
+            "family": spec.get("family"),
+            "plain_language_explanation": _plain_language_tool_explanation(
+                str(name), raw, spec
+            ),
+            "code_hash": raw.get("code_hash"),
+        }
+    return details
+
+
 def _task_compare_tool_summary(
     run_root: Path,
     data: dict[str, Any],
@@ -1521,6 +1871,12 @@ def _task_compare_tool_summary(
     contribution = _read_json(run_root / "helper_contribution_summary.json")
     helpers = contribution.get("helpers") if isinstance(contribution, dict) else {}
     tools: list[dict[str, Any]] = []
+    registry_details = _registry_tool_details(data)
+    born = {
+        str(event.get("tool_name") or event.get("tool") or "")
+        for event in data.get("birth_events", []) or []
+        if event.get("accepted") and (event.get("tool_name") or event.get("tool"))
+    }
     if isinstance(helpers, dict):
         for name, raw in helpers.items():
             if not isinstance(raw, dict):
@@ -1531,6 +1887,7 @@ def _task_compare_tool_summary(
             tool = {
                 "name": str(name),
                 "origin": raw.get("origin"),
+                **registry_details.get(str(name), {}),
                 "visible_count": _tool_count(raw, "visible_count", "visible_scenarios"),
                 "called_count": _tool_count(raw, "called_count", "called_scenarios"),
                 "visible_not_called_count": _tool_count(
@@ -1557,6 +1914,8 @@ def _task_compare_tool_summary(
                 "runtime_incident_count": _count_incidents(
                     raw.get("runtime_incidents")
                 ),
+                "contribution_source": "helper_contribution_summary",
+                "contribution_pending": False,
             }
             if tool["side_effect_incident_count"] or tool["runtime_incident_count"]:
                 tool["decision"] = "inspect"
@@ -1572,33 +1931,64 @@ def _task_compare_tool_summary(
                 tool["decision"] = "visible or retained; no natural call"
             tools.append(tool)
 
-    if not tools:
+    existing_names = {str(tool.get("name") or "") for tool in tools}
+    missing_live_names = born - existing_names
+    if not tools or missing_live_names:
+        live_counts = _live_tool_selection_counts(data)
+        live_stats = _live_called_tool_delta_stats(data)
         reuse_counts: dict[str, int] = {}
         for event in data.get("reuse_events", []) or []:
             tool_name = str(event.get("tool_name") or event.get("tool") or "")
             if tool_name:
                 reuse_counts[tool_name] = reuse_counts.get(tool_name, 0) + 1
-        born = {
-            str(event.get("tool_name") or event.get("tool") or "")
-            for event in data.get("birth_events", []) or []
-            if event.get("accepted") and (event.get("tool_name") or event.get("tool"))
-        }
-        for name in sorted(set(reuse_counts) | born):
+        fallback_names = set(reuse_counts) | born | set(live_counts) | set(live_stats)
+        for name in sorted(fallback_names - existing_names):
+            counts = live_counts.get(name, {})
+            stats = live_stats.get(name, {})
+            called_count = reuse_counts.get(name, 0) or int(
+                counts.get("called_scenario_count") or 0
+            )
+            outcome_known = stats.get("mean_outcome_delta") is not None
+            contribution_pending = bool(called_count and not outcome_known)
+            if outcome_known:
+                decision = "provisional live paired subset"
+            elif contribution_pending:
+                decision = "live contribution pending"
+            elif name in born:
+                decision = "accepted; no natural call yet"
+            else:
+                decision = "live reuse event fallback"
             tools.append(
                 {
                     "name": name,
                     "origin": "generated" if name in born else "retained",
-                    "visible_count": None,
-                    "called_count": reuse_counts.get(name, 0),
-                    "visible_not_called_count": None,
-                    "failed_attempt_count": 0,
-                    "called_subset_mean_canonical_delta": None,
-                    "called_subset_mean_outcome_delta": None,
-                    "outcome_gains": None,
-                    "outcome_regressions": None,
+                    **registry_details.get(name, {}),
+                    "visible_count": counts.get("visible_count"),
+                    "called_count": called_count,
+                    "called_scenario_count": counts.get("called_scenario_count"),
+                    "visible_not_called_count": counts.get("visible_not_called_count"),
+                    "failed_attempt_count": counts.get("failed_attempt_count", 0),
+                    "called_subset_scenario_count": stats.get("scenario_count", 0),
+                    "called_subset_mean_canonical_delta": stats.get(
+                        "mean_canonical_delta"
+                    ),
+                    "called_subset_mean_outcome_delta": stats.get("mean_outcome_delta"),
+                    "canonical_gains": stats.get("canonical_gains"),
+                    "canonical_regressions": stats.get("canonical_regressions"),
+                    "outcome_gains": stats.get("outcome_gains")
+                    if outcome_known
+                    else None,
+                    "outcome_regressions": stats.get("outcome_regressions")
+                    if outcome_known
+                    else None,
+                    "outcome_preserved": stats.get("outcome_preserved")
+                    if outcome_known
+                    else None,
                     "side_effect_incident_count": 0,
                     "runtime_incident_count": 0,
-                    "decision": "reuse event fallback",
+                    "contribution_source": "live_reuse_event_fallback",
+                    "contribution_pending": contribution_pending,
+                    "decision": decision,
                 }
             )
 
@@ -1609,31 +1999,68 @@ def _task_compare_tool_summary(
             str(item.get("name") or ""),
         ),
     )
-    birth_count = sum(
+    birth_event_count = sum(
         1 for event in data.get("birth_events", []) or [] if event.get("accepted")
     )
+    helper_tool_count = len(helpers) if isinstance(helpers, dict) else 0
+    accepted_tool_count = (
+        _named_entry_count(contribution.get("accepted_tools"))
+        if isinstance(contribution, dict)
+        else 0
+    )
+    contribution_tool_count = max(helper_tool_count, accepted_tool_count, len(tools))
+    contribution_registry_size = (
+        contribution.get("registry_size") if isinstance(contribution, dict) else None
+    )
+    registry_tool_count = max(
+        [
+            count
+            for count in (
+                contribution_registry_size
+                if isinstance(contribution_registry_size, int)
+                else None,
+                len(registry_details),
+                len(tools),
+            )
+            if isinstance(count, int)
+        ],
+        default=0,
+    )
+    birth_count = max(birth_event_count, accepted_tool_count, registry_tool_count)
     called_tool_count = sum(
         1 for tool in tools if int(tool.get("called_count") or 0) > 0
     )
     visibility_known = any(tool.get("visible_count") is not None for tool in tools)
+    outcome_counts_known = any(tool.get("outcome_gains") is not None for tool in tools)
+    contribution_known = any(
+        tool.get("called_subset_mean_outcome_delta") is not None for tool in tools
+    )
     return {
-        "registry_tool_count": contribution.get("registry_size")
-        if isinstance(contribution, dict)
-        else len(tools),
+        "registry_tool_count": registry_tool_count,
         "runtime_bundle_size": contribution.get("runtime_bundle_size")
         if isinstance(contribution, dict)
         else None,
         "tool_count": len(tools),
         "generated_tool_birth_count": birth_count,
+        "generated_tool_birth_event_count": birth_event_count,
+        "contribution_tool_count": contribution_tool_count or len(tools),
         "called_tool_count": called_tool_count,
         "visible_tool_count": (
             sum(1 for tool in tools if (tool.get("visible_count") or 0) > 0)
             if visibility_known
             else None
         ),
-        "outcome_gains": sum(int(tool.get("outcome_gains") or 0) for tool in tools),
-        "outcome_regressions": sum(
-            int(tool.get("outcome_regressions") or 0) for tool in tools
+        "visibility_known": visibility_known,
+        "contribution_known": contribution_known,
+        "outcome_gains": (
+            sum(int(tool.get("outcome_gains") or 0) for tool in tools)
+            if outcome_counts_known
+            else None
+        ),
+        "outcome_regressions": (
+            sum(int(tool.get("outcome_regressions") or 0) for tool in tools)
+            if outcome_counts_known
+            else None
         ),
         "side_effect_incident_count": sum(
             int(tool.get("side_effect_incident_count") or 0) for tool in tools
@@ -1641,6 +2068,9 @@ def _task_compare_tool_summary(
         "runtime_incident_count": sum(
             int(tool.get("runtime_incident_count") or 0) for tool in tools
         ),
+        "source": "helper_contribution_summary"
+        if tools and helpers
+        else "live_fallback",
         "accepted_tools": contribution.get("accepted_tools", [])
         if isinstance(contribution, dict)
         else [],
@@ -1649,6 +2079,16 @@ def _task_compare_tool_summary(
         )
         if isinstance(contribution, dict)
         else [],
+        "selection_attribution_buckets": contribution.get(
+            "selection_attribution_buckets", {}
+        )
+        if isinstance(contribution, dict)
+        else {},
+        "selection_attribution_claim_guidance": contribution.get(
+            "selection_attribution_claim_guidance", {}
+        )
+        if isinstance(contribution, dict)
+        else {},
         "tools": tools,
     }
 
@@ -1726,6 +2166,10 @@ def _scenario_table(
                 "status": status,
                 "control_turns": c_row.get("turn_count"),
                 "candidate_turns": s_row.get("turn_count"),
+                "control_llm_call_count": c_row.get("llm_call_count"),
+                "candidate_llm_call_count": s_row.get("llm_call_count"),
+                "control_llm_total_tokens": c_row.get("llm_total_tokens"),
+                "candidate_llm_total_tokens": s_row.get("llm_total_tokens"),
                 "control_exception": c_row.get("exception_type"),
                 "candidate_exception": s_row.get("exception_type"),
                 "control_cache_source": c_cache_source,

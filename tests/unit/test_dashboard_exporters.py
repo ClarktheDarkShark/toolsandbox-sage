@@ -23,11 +23,18 @@ def _write_summary(path: Path, rows: list[dict[str, object]]) -> None:
     )
 
 
-def _write_live_summary(path: Path, rows: list[dict[str, object]]) -> None:
+def _write_live_summary(
+    path: Path,
+    rows: list[dict[str, object]],
+    *,
+    updated_at=None,
+) -> None:
     path.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, object] = {"per_scenario_results": rows}
+    if updated_at is not None:
+        payload["updated_at"] = updated_at
     (path / "live_result_summary.json").write_text(
-        json.dumps({"per_scenario_results": rows}) + "\n",
-        encoding="utf-8",
+        json.dumps(payload) + "\n", encoding="utf-8"
     )
 
 
@@ -43,6 +50,46 @@ def test_dashboard_json_readers_tolerate_in_progress_empty_files(
     assert exporters._read_json(partial, {"status": "pending"}) == {"status": "pending"}
     assert exporters._read_json_value(empty, []) == []
     assert exporters._read_json_value(partial, []) == []
+
+
+def test_cached_control_transcript_loading_is_opt_in(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo = tmp_path / "repo"
+    records = repo / "artifacts" / "baselines" / "control_task_baselines" / "records"
+    records.mkdir(parents=True)
+    record_id = "a" * 64
+    transcript = repo / "old_run" / "trajectories" / "scenario" / "conversation.json"
+    transcript.parent.mkdir(parents=True)
+    transcript.write_text(
+        json.dumps([{"role": "assistant", "content": "cached transcript"}]) + "\n",
+        encoding="utf-8",
+    )
+    (records / f"{record_id}.json").write_text(
+        json.dumps(
+            {
+                "transcript_path": str(transcript.relative_to(repo)),
+                "transcript_hash": "hash",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(exporters, "_repo_root", lambda: repo)
+    monkeypatch.delenv("SAGE_DASHBOARD_LOAD_CACHED_CONTROL_TRANSCRIPTS", raising=False)
+
+    messages, source = exporters._cached_control_transcript({"record_ids": [record_id]})
+
+    assert messages == []
+    assert source["record_id"] == record_id
+    assert source["transcript_loaded"] is False
+    assert source["transcript_load_policy"] == "disabled_for_live_dashboard"
+
+    monkeypatch.setenv("SAGE_DASHBOARD_LOAD_CACHED_CONTROL_TRANSCRIPTS", "1")
+    messages, source = exporters._cached_control_transcript({"record_ids": [record_id]})
+
+    assert messages == [{"role": "assistant", "content": "cached transcript"}]
+    assert source["transcript_loaded"] is True
 
 
 def test_open_dashboard_falls_back_to_macos_open(tmp_path: Path, monkeypatch) -> None:
@@ -106,6 +153,16 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
     candidate = run_root / "candidate" / "candidate_run"
     registry = run_root / "registry"
     registry.mkdir(parents=True)
+    control.parent.mkdir(parents=True)
+    candidate.parent.mkdir(parents=True)
+    (control.parent / "sage_ts_run_manifest.json").write_text(
+        json.dumps({"started_at": "2026-05-31T12:00:00+00:00"}) + "\n",
+        encoding="utf-8",
+    )
+    (candidate.parent / "sage_ts_run_manifest.json").write_text(
+        json.dumps({"started_at": "2026-05-31T12:00:00+00:00"}) + "\n",
+        encoding="utf-8",
+    )
     _write_summary(
         control,
         [
@@ -113,6 +170,14 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
                 "name": "a",
                 "similarity": 0.2,
                 "turn_count": 6,
+                "llm_usage_recorded": True,
+                "llm_call_count": 2,
+                "llm_prompt_tokens": 120,
+                "llm_completion_tokens": 30,
+                "llm_total_tokens": 150,
+                "llm_live_call_count": 2,
+                "llm_cached_call_count": 0,
+                "llm_usage_available_count": 2,
                 "categories": ["CANONICALIZATION"],
                 "control_cache_source": "cached",
                 "control_cache": {
@@ -124,6 +189,11 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
             {"name": "b", "similarity": 1.0, "turn_count": 4, "categories": []},
         ],
     )
+    _write_live_summary(
+        control,
+        [],
+        updated_at="2026-05-31T12:02:00+00:00",
+    )
     _write_summary(
         candidate,
         [
@@ -131,10 +201,23 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
                 "name": "a",
                 "similarity": 1.0,
                 "turn_count": 4,
+                "llm_usage_recorded": True,
+                "llm_call_count": 3,
+                "llm_prompt_tokens": 210,
+                "llm_completion_tokens": 45,
+                "llm_total_tokens": 255,
+                "llm_live_call_count": 3,
+                "llm_cached_call_count": 0,
+                "llm_usage_available_count": 3,
                 "categories": ["CANONICALIZATION"],
             },
             {"name": "b", "similarity": 0.5, "turn_count": 5, "categories": []},
         ],
+    )
+    _write_live_summary(
+        candidate,
+        [],
+        updated_at="2026-05-31T12:04:00+00:00",
     )
     (candidate / "tool_birth_events.jsonl").write_text(
         json.dumps({"accepted": True, "tool_name": "helper"}) + "\n",
@@ -175,6 +258,8 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
     data = json.loads((index.parent / "data.json").read_text(encoding="utf-8"))
     assert data["comparison"]["gain_count"] == 1
     assert data["comparison"]["regression_count"] == 1
+    assert data["control"]["wall_time_seconds"] == pytest.approx(120.0)
+    assert data["candidate"]["wall_time_seconds"] == pytest.approx(240.0)
     assert data["candidate"]["accepted_tool_count"] == 1
     assert data["candidate"]["reuse_count"] == 1
     assert data["model_metadata"]["agent"]["resolved_model"] == "gpt-4o-mini"
@@ -186,9 +271,391 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
         (index.parent / "task_focus_data.json").read_text(encoding="utf-8")
     )
     assert task_focus["tasks"][0]["control_cache_source"] == "cached"
+    assert task_focus["summary"]["control_llm_call_count"] == 2
+    assert task_focus["summary"]["candidate_llm_total_tokens"] == 255
+    assert task_focus["pairs"][0]["control"]["llm_call_count"] == 2
+    assert task_focus["pairs"][0]["candidate"]["llm_total_tokens"] == 255
+    task_compare = json.loads(
+        (index.parent / "task_compare_data.json").read_text(encoding="utf-8")
+    )
+    assert task_compare["summary"]["control_llm_total_tokens"] == 150
+    assert task_compare["summary"]["candidate_llm_call_count"] == 3
+    assert task_compare["summary"]["control_wall_time_seconds"] == pytest.approx(120.0)
+    assert task_compare["summary"]["candidate_wall_time_seconds"] == pytest.approx(
+        240.0
+    )
+    task_compare_html = (index.parent / "task_compare.html").read_text(encoding="utf-8")
+    assert "Total Time B / S" in task_compare_html
+    assert "LLM Calls B / S" in task_compare_html
+    assert "Tokens B / S" in task_compare_html
     assert "control source: cached" in (index.parent / "index.html").read_text(
         encoding="utf-8"
     )
+
+
+def test_task_compare_live_tool_summary_uses_partial_fallback_data(
+    tmp_path: Path,
+) -> None:
+    run_root = tmp_path / "run"
+    control = run_root / "control" / "control_run"
+    candidate = run_root / "candidate" / "candidate_run"
+    registry = run_root / "registry"
+    registry.mkdir(parents=True)
+    _write_summary(
+        control,
+        [
+            {
+                "name": "called",
+                "similarity": 0.4,
+                "outcome_similarity": 0.25,
+            },
+            {
+                "name": "visible_only",
+                "similarity": 1.0,
+                "outcome_similarity": 1.0,
+            },
+        ],
+    )
+    _write_summary(
+        candidate,
+        [
+            {
+                "name": "called",
+                "similarity": 0.8,
+                "outcome_similarity": 0.75,
+            },
+            {
+                "name": "visible_only",
+                "similarity": 1.0,
+                "outcome_similarity": 1.0,
+            },
+        ],
+    )
+    (candidate / "tool_birth_events.jsonl").write_text(
+        json.dumps({"accepted": True, "tool_name": "helper"}) + "\n",
+        encoding="utf-8",
+    )
+    (candidate / "reuse_events.jsonl").write_text(
+        json.dumps({"scenario": "called", "tool_name": "helper"}) + "\n",
+        encoding="utf-8",
+    )
+    (candidate / "scenario_tool_visibility.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"scenario": "called", "generated_tools": ["helper"]}),
+                json.dumps({"scenario": "visible_only", "generated_tools": ["helper"]}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (candidate / "scenario_tool_selection.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "scenario": "called",
+                        "generated_tools_visible": ["helper"],
+                        "generated_tools_called": ["helper"],
+                        "generated_tools_failed": [],
+                        "generated_tools_attempted": ["helper"],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "scenario": "visible_only",
+                        "generated_tools_visible": ["helper"],
+                        "generated_tools_called": [],
+                        "generated_tools_failed": [],
+                        "generated_tools_attempted": [],
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    index = write_protocol_dashboard(
+        run_root,
+        mode="online_build_full",
+        status="running",
+        phase="comparison",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        generation_enabled=True,
+        base_tool_policy="upstream",
+        scenario_count=2,
+        control_dir=control,
+        candidate_dir=candidate,
+        registry_dir=registry,
+    )
+
+    task_compare = json.loads(
+        (index.parent / "task_compare_data.json").read_text(encoding="utf-8")
+    )
+    tool_summary = task_compare["tool_summary"]
+    assert tool_summary["source"] == "live_fallback"
+    assert tool_summary["visibility_known"] is True
+    assert tool_summary["contribution_known"] is True
+    assert tool_summary["visible_tool_count"] == 1
+    assert tool_summary["outcome_gains"] == 1
+    helper = tool_summary["tools"][0]
+    assert helper["name"] == "helper"
+    assert helper["visible_count"] == 2
+    assert helper["called_count"] == 1
+    assert helper["visible_not_called_count"] == 1
+    assert helper["called_subset_mean_canonical_delta"] == pytest.approx(0.4)
+    assert helper["called_subset_mean_outcome_delta"] == pytest.approx(0.5)
+    assert helper["contribution_pending"] is False
+    assert helper["decision"] == "provisional live paired subset"
+
+
+def test_task_compare_tool_birth_count_uses_registry_for_resumed_runs(
+    tmp_path: Path,
+) -> None:
+    run_root = tmp_path / "run"
+    control = run_root / "control" / "control_run"
+    candidate = run_root / "candidate" / "candidate_run"
+    registry = run_root / "registry"
+    registry.mkdir(parents=True)
+    (registry / "registry_manifest.json").write_text(
+        json.dumps(
+            {
+                "tools": {
+                    "retained_helper": {
+                        "tool": {
+                            "spec": {"description": "Retained before checkpoint."},
+                            "code": "def retained_helper():\n    return {}\n",
+                        }
+                    },
+                    "new_helper": {
+                        "tool": {
+                            "spec": {"description": "Accepted after resume."},
+                            "code": "def new_helper():\n    return {}\n",
+                        }
+                    },
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _write_summary(
+        control,
+        [
+            {"name": "retained", "similarity": 0.0, "outcome_similarity": 0.0},
+            {"name": "new", "similarity": 0.0, "outcome_similarity": 0.0},
+        ],
+    )
+    _write_summary(
+        candidate,
+        [
+            {
+                "name": "retained",
+                "similarity": 1.0,
+                "outcome_similarity": 1.0,
+            },
+            {"name": "new", "similarity": 1.0, "outcome_similarity": 1.0},
+        ],
+    )
+    (candidate / "tool_birth_events.jsonl").write_text(
+        json.dumps({"accepted": True, "tool_name": "new_helper"}) + "\n",
+        encoding="utf-8",
+    )
+    (candidate / "reuse_events.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"scenario": "retained", "tool_name": "retained_helper"}),
+                json.dumps({"scenario": "new", "tool_name": "new_helper"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (candidate / "scenario_tool_selection.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "scenario": "retained",
+                        "generated_tools_visible": ["retained_helper"],
+                        "generated_tools_called": ["retained_helper"],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "scenario": "new",
+                        "generated_tools_visible": ["new_helper"],
+                        "generated_tools_called": ["new_helper"],
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    index = write_protocol_dashboard(
+        run_root,
+        mode="online_build_full",
+        status="running",
+        phase="comparison",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        generation_enabled=True,
+        base_tool_policy="upstream",
+        scenario_count=2,
+        control_dir=control,
+        candidate_dir=candidate,
+        registry_dir=registry,
+    )
+
+    task_compare = json.loads(
+        (index.parent / "task_compare_data.json").read_text(encoding="utf-8")
+    )
+    tool_summary = task_compare["tool_summary"]
+    assert task_compare["summary"]["accepted_tools"] == 1
+    assert tool_summary["generated_tool_birth_event_count"] == 1
+    assert tool_summary["generated_tool_birth_count"] == 2
+    assert tool_summary["registry_tool_count"] == 2
+    assert tool_summary["tool_count"] == 2
+    assert tool_summary["called_tool_count"] == 2
+
+
+def test_task_compare_tool_summary_backfills_stale_helper_contribution_births(
+    tmp_path: Path,
+) -> None:
+    run_root = tmp_path / "run"
+    control = run_root / "control" / "control_run"
+    candidate = run_root / "candidate" / "candidate_run"
+    registry = run_root / "registry"
+    registry.mkdir(parents=True)
+    (registry / "registry_manifest.json").write_text(
+        json.dumps(
+            {
+                "tools": {
+                    "helper": {
+                        "tool": {
+                            "spec": {
+                                "family": "test_family",
+                                "description": "Original helper.",
+                                "positive_triggers": ["called tasks"],
+                                "generalization_rationale": "The original pattern recurs.",
+                            },
+                            "code": "def helper():\n    return {'ok': True}\n",
+                        },
+                        "code_hash": "hash-helper",
+                    },
+                    "late_helper": {
+                        "tool": {
+                            "spec": {
+                                "family": "test_family",
+                                "description": "Late helper.",
+                                "positive_triggers": ["late tasks"],
+                                "negative_triggers": ["unsafe task"],
+                                "generalization_rationale": "The late pattern recurs.",
+                            },
+                            "code": "def late_helper():\n    return {'late': True}\n",
+                        },
+                        "code_hash": "hash-late",
+                    },
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _write_summary(
+        control,
+        [{"name": "called", "similarity": 0.0, "outcome_similarity": 0.0}],
+    )
+    _write_summary(
+        candidate,
+        [{"name": "called", "similarity": 1.0, "outcome_similarity": 1.0}],
+    )
+    (candidate / "tool_birth_events.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"accepted": True, "tool_name": "helper"}),
+                json.dumps({"accepted": True, "tool_name": "late_helper"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (candidate / "reuse_events.jsonl").write_text(
+        json.dumps({"scenario": "called", "tool_name": "helper"}) + "\n",
+        encoding="utf-8",
+    )
+    (run_root / "helper_contribution_summary.json").write_text(
+        json.dumps(
+            {
+                "registry_size": 1,
+                "helpers": {
+                    "helper": {
+                        "origin": "newly_generated",
+                        "visible_count": 1,
+                        "called_count": 1,
+                        "visible_not_called_count": 0,
+                        "failed_attempt_count": 0,
+                        "called_subset": {
+                            "scenario_count": 1,
+                            "mean_canonical_delta": 1.0,
+                            "mean_outcome_delta": 1.0,
+                            "canonical_gains": 1,
+                            "canonical_regressions": 0,
+                            "outcome_gains": 1,
+                            "outcome_regressions": 0,
+                            "outcome_preserved": 0,
+                        },
+                    }
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    index = write_protocol_dashboard(
+        run_root,
+        mode="online_build_full",
+        status="running",
+        phase="comparison",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        generation_enabled=True,
+        base_tool_policy="upstream",
+        scenario_count=2,
+        control_dir=control,
+        candidate_dir=candidate,
+        registry_dir=registry,
+    )
+
+    task_compare = json.loads(
+        (index.parent / "task_compare_data.json").read_text(encoding="utf-8")
+    )
+    tool_summary = task_compare["tool_summary"]
+    assert tool_summary["generated_tool_birth_count"] == 2
+    assert tool_summary["tool_count"] == 2
+    assert [tool["name"] for tool in tool_summary["tools"]] == [
+        "helper",
+        "late_helper",
+    ]
+    assert tool_summary["tools"][0]["code"].startswith("def helper")
+    assert tool_summary["tools"][0]["code_hash"] == "hash-helper"
+    assert "Original helper." in tool_summary["tools"][0]["plain_language_explanation"]
+    assert (
+        "Why it exists: The original pattern recurs."
+        in tool_summary["tools"][0]["plain_language_explanation"]
+    )
+    assert tool_summary["tools"][1]["code"].startswith("def late_helper")
+    assert tool_summary["tools"][1]["description"] == "Late helper."
+    assert (
+        "It should avoid tasks matching: unsafe task."
+        in tool_summary["tools"][1]["plain_language_explanation"]
+    )
+    assert tool_summary["tools"][1]["decision"] == "accepted; no natural call yet"
 
 
 def test_task_focus_balanced_summary_uses_only_complete_pairs() -> None:

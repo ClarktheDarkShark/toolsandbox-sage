@@ -4,21 +4,38 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sage_ts.adequacy.inadequacy_classifier import (
+    _visible_task_signals,
     classify_planned_scenario_observations,
     classify_scenario_observations,
+    classify_visible_task_observations,
 )
-from sage_ts.generation.tool_generator import ToolGenerationRequest
+from sage_ts.generation.tool_generator import (
+    ToolGenerationRequest,
+    _prepare_location_search_args_contract_tool,
+    _resolve_search_window_or_bounds_contract_tool,
+)
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.orchestration.online_birth import (
     CHAIN_ROUTING_FAMILIES_BY_KEY,
+    FIRST_OBSERVATION_BIRTH_KEYS,
     OnlineBirthController,
     _normalize_live_birth_routing_metadata,
     _original_tool_contract_errors,
+    _prepare_location_validation_examples,
+    _validation_examples_for_tool,
 )
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
-from sage_ts.validation.sandbox_validator import ValidationResult
-from tool_sandbox.common.execution_context import ExecutionContext, ScenarioCategories
+from sage_ts.validation.sandbox_validator import (
+    ValidationResult,
+    validate_generated_tool,
+)
+from tool_sandbox.common.execution_context import (
+    DatabaseNamespace,
+    ExecutionContext,
+    RoleType,
+    ScenarioCategories,
+)
 from tool_sandbox.common.scenario import Scenario
 
 _TOOL_NAME = "recency_to_timestamp_bounds"
@@ -38,6 +55,353 @@ def test_contact_update_counterparty_helper_does_not_route_to_answer_only_sender
     assert "modify_contact_with_message_recency" in families
     assert "modify_contact_with_message_recency_alt" in families
     assert "search_sender_phone_number_with_content" not in families
+
+
+def test_first_observation_birth_includes_direct_status_and_day_distance() -> None:
+    assert "derived_value:plan_device_status_lookup" in FIRST_OBSERVATION_BIRTH_KEYS
+    assert (
+        "composite:prepare_direct_contact_action_args" in FIRST_OBSERVATION_BIRTH_KEYS
+    )
+    assert "composite:constraint_to_action_planner" not in FIRST_OBSERVATION_BIRTH_KEYS
+    assert (
+        "composite:prepare_side_effect_args_from_selected_record"
+        not in FIRST_OBSERVATION_BIRTH_KEYS
+    )
+    assert "derived_value:days_between_timestamps" in FIRST_OBSERVATION_BIRTH_KEYS
+    assert "derived_value:extract_stock_symbol" in FIRST_OBSERVATION_BIRTH_KEYS
+    assert "composite:prepare_holiday_search_args" in FIRST_OBSERVATION_BIRTH_KEYS
+
+
+def test_direct_status_lookup_observation_enabled_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("SAGE_ENABLE_DIRECT_STATUS_LOOKUP_TOOL", raising=False)
+
+    planned = classify_planned_scenario_observations("get_wifi")
+    result_backed = classify_scenario_observations(
+        "get_wifi",
+        Scenario(
+            starting_context=ExecutionContext(tool_allow_list=["get_wifi_status"])
+        ),
+        {"similarity": 0.9},
+    )
+
+    assert "derived_value:plan_device_status_lookup" in {
+        observation.canonical_key for observation in planned
+    }
+    assert "derived_value:plan_device_status_lookup" in {
+        observation.canonical_key for observation in result_backed
+    }
+
+
+def test_visible_context_contact_phone_mutation_is_not_external_lookup() -> None:
+    signals = _visible_task_signals(
+        "Remove phone number +12453344098 from my contact",
+        (
+            "search_contacts",
+            "remove_contact",
+            "search_location_around_lat_lon",
+            "calculate_lat_lon_distance",
+            "convert_currency",
+        ),
+    )
+
+    assert "contact_lookup" in signals
+    assert "external_lookup" not in signals
+    assert "service_answer_extraction" not in signals
+
+
+def test_visible_context_raw_phone_remove_births_contact_lookup_signal() -> None:
+    signals = _visible_task_signals(
+        "Remove +12453344098 from my contact",
+        (
+            "search_contacts",
+            "remove_contact",
+            "search_location_around_lat_lon",
+            "calculate_lat_lon_distance",
+        ),
+    )
+
+    assert "requested_remove_contact" in signals
+    assert "contact_lookup" in signals
+    assert "external_lookup" not in signals
+    assert "location_phrase" not in signals
+
+
+def test_visible_context_get_rid_phone_remove_births_contact_lookup_signal() -> None:
+    signals = _visible_task_signals(
+        "Get rid of +12453344098",
+        (
+            "search_contacts",
+            "remove_contact",
+            "search_location_around_lat_lon",
+            "calculate_lat_lon_distance",
+        ),
+    )
+
+    assert "requested_remove_contact" in signals
+    assert "contact_lookup" in signals
+    assert "external_lookup" not in signals
+    assert "location_phrase" not in signals
+
+
+def test_visible_context_pronoun_out_of_contacts_births_contact_lookup_signal() -> None:
+    signals = _visible_task_signals(
+        "The guy at +12453344098, I feel like we don't talk much anymore. "
+        "Get him out of my contacts.",
+        (
+            "search_contacts",
+            "remove_contact",
+            "search_location_around_lat_lon",
+            "calculate_lat_lon_distance",
+        ),
+    )
+
+    assert "requested_remove_contact" in signals
+    assert "contact_lookup" in signals
+    assert "external_lookup" not in signals
+
+
+def test_visible_context_underspecified_contact_remove_births_contact_lookup_signal() -> (
+    None
+):
+    signals = _visible_task_signals(
+        "I want to delete someone from my contact",
+        (
+            "search_contacts",
+            "remove_contact",
+        ),
+    )
+
+    assert "requested_remove_contact" in signals
+    assert "contact_lookup" in signals
+
+
+def test_visible_context_external_lookup_keeps_distance_and_phone_queries() -> None:
+    external_tools = (
+        "search_location_around_lat_lon",
+        "calculate_lat_lon_distance",
+        "convert_currency",
+    )
+
+    distance_signals = _visible_task_signals(
+        "How far is Whole Foods from me?", external_tools
+    )
+    phone_signals = _visible_task_signals(
+        "Find the phone number for Whole Foods",
+        external_tools,
+    )
+
+    assert "external_lookup" in distance_signals
+    assert "service_answer_extraction" in distance_signals
+    assert "external_lookup" in phone_signals
+    assert "service_answer_extraction" in phone_signals
+
+
+def test_visible_context_weather_lookup_is_external_service_payload() -> None:
+    signals = _visible_task_signals(
+        "What's the temperature near Grand Canyon in Fahrenheit?",
+        ("search_weather_around_lat_lon", "unit_conversion", "end_conversation"),
+    )
+
+    assert "external_lookup" in signals
+    assert "service_answer_extraction" in signals
+
+
+def test_visible_context_weather_lookup_handles_temp_abbreviation() -> None:
+    signals = _visible_task_signals(
+        "Current temp Grand Canyon. I can't read Celsius.",
+        ("search_weather_around_lat_lon", "unit_conversion", "end_conversation"),
+    )
+
+    assert "external_lookup" in signals
+    assert "service_answer_extraction" in signals
+
+
+def test_visible_context_weather_today_ignores_distractor_recency_tools() -> None:
+    signals = _visible_task_signals(
+        "What's the lowest temperature in Grand Canyon today",
+        (
+            "search_weather_around_lat_lon",
+            "search_location_around_lat_lon",
+            "unit_conversion",
+            "search_messages",
+            "search_reminder",
+            "end_conversation",
+        ),
+    )
+
+    assert "relative_time" in signals
+    assert "external_lookup" in signals
+    assert "service_answer_extraction" in signals
+    assert "recency_search" not in signals
+
+
+def test_location_search_contract_extracts_place_not_task_wrapper() -> None:
+    request = ToolGenerationRequest(
+        scenario_name="visible_task_context(family=reminder_create)",
+        observation="visible location argument preparation",
+        allowed_families=("composite_workflow_helper",),
+        validation_examples=(),
+        suggested_tool_name="prepare_location_search_args",
+    )
+    tool = _prepare_location_search_args_contract_tool(request)
+
+    validation = validate_generated_tool(tool, _prepare_location_validation_examples())
+
+    assert validation.accepted
+
+
+def test_visible_reminder_relative_time_births_timestamp_tool_without_scenario_name() -> (
+    None
+):
+    context = ExecutionContext(
+        tool_allow_list=[
+            "add_reminder",
+            "search_location_around_lat_lon",
+            "timestamp_to_datetime_info",
+        ]
+    )
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.USER,
+                "recipient": RoleType.AGENT,
+                "content": "Remind me to buy milk tomorrow at 5 PM.",
+            }
+        ],
+    )
+    scenario = Scenario(starting_context=context)
+
+    observations = classify_visible_task_observations("redacted", scenario)
+    keys = {observation.canonical_key for observation in observations}
+
+    assert "canonicalizer:relative_day_time_timestamp" in keys
+    assert "composite:prepare_reminder_creation_args" in keys
+
+
+def test_visible_context_stock_lookup_birth_signal_from_request_text() -> None:
+    signals = _visible_task_signals(
+        "What's the stock symbol for Apple?",
+        ("search_stock", "end_conversation"),
+    )
+
+    assert "stock_lookup" in signals
+    assert "external_lookup" in signals
+    assert "service_answer_extraction" not in signals
+
+
+def test_visible_context_direct_device_setting_is_not_precondition_workflow() -> None:
+    signals = _visible_task_signals(
+        "Turn off cellular service.",
+        (
+            "set_cellular_service_status",
+            "get_cellular_service_status",
+            "send_message_with_phone_number",
+            "search_location_around_lat_lon",
+        ),
+    )
+
+    assert "direct_device_state_action" in signals
+    assert "device_state_action" in signals
+    assert "state_precondition_possible" not in signals
+
+
+def test_visible_context_dependent_device_setting_is_precondition_workflow() -> None:
+    signals = _visible_task_signals(
+        "Send a message to Alex saying hi. Resolve any issue alone.",
+        (
+            "set_cellular_service_status",
+            "get_cellular_service_status",
+            "send_message_with_phone_number",
+            "search_contacts",
+        ),
+    )
+
+    assert "state_precondition_possible" in signals
+
+
+def test_visible_context_relationship_lookup_can_seed_batch_update_for_followup() -> (
+    None
+):
+    signals = _visible_task_signals(
+        "Who are my friends?",
+        ("search_contacts", "modify_contact"),
+    )
+
+    assert "contact_lookup" in signals
+    assert "relationship_batch_update" in signals
+
+
+def test_visible_context_relationship_update_requires_change_intent() -> None:
+    signals = _visible_task_signals(
+        "Can you update all of them to enemies?",
+        ("search_contacts", "modify_contact"),
+    )
+
+    assert "relationship_batch_update" in signals
+
+
+def test_visible_context_contact_message_recency_update_is_not_generic_recency_action() -> (
+    None
+):
+    signals = _visible_task_signals(
+        "Update the phone number of the last person I sent a message to to +10293847563",
+        ("search_messages", "modify_contact", "search_contacts"),
+    )
+
+    assert "message_counterparty_update" in signals
+    assert "direct_contact_action" not in signals
+    assert "recency_action" not in signals
+
+
+def test_visible_context_contacted_last_update_is_message_counterparty_update() -> None:
+    signals = _visible_task_signals(
+        "Find whoever I contacted last, change his cell to +10293847563.",
+        ("search_messages", "modify_contact", "search_contacts"),
+    )
+
+    assert "message_counterparty_update" in signals
+    assert "message_counterparty_lookup" in signals
+    assert "direct_contact_action" not in signals
+    assert "recency_action" not in signals
+
+
+def test_visible_context_reminder_recency_update_still_routes_recency_action() -> None:
+    signals = _visible_task_signals(
+        "Postpone my most recent reminder to tomorrow 5PM.",
+        ("search_reminder", "modify_reminder"),
+    )
+
+    assert "recency_action" in signals
+
+
+def test_direct_status_lookup_observation_can_be_disabled_for_ablation(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAGE_ENABLE_DIRECT_STATUS_LOOKUP_TOOL", "0")
+
+    observations = classify_planned_scenario_observations("get_wifi")
+
+    assert "derived_value:plan_device_status_lookup" not in {
+        observation.canonical_key for observation in observations
+    }
+
+
+def test_direct_scalar_action_births_contact_action_planner() -> None:
+    observations = classify_planned_scenario_observations("remove_contact_with_id")
+
+    assert "composite:prepare_direct_contact_action_args" in {
+        observation.canonical_key for observation in observations
+    }
+
+
+def test_planned_add_contact_births_argument_preparation_tool() -> None:
+    observations = classify_planned_scenario_observations(
+        "add_contact_with_name_and_phone_number"
+    )
+
+    keys = {observation.canonical_key for observation in observations}
+    assert "composite:prepare_add_contact_args" in keys
 
 
 def test_generic_dependency_bundle_observation_uses_allowed_tool_structure(
@@ -274,6 +638,7 @@ class FakeContactLookupGenerator:
                 ToolInput("phone_number", "str", "Visible phone number."),
                 ToolInput("relationship", "str", "Visible relationship."),
                 ToolInput("requested_field", "str", "Requested answer field."),
+                ToolInput("selected_record", "dict", "Visible contact record."),
             ),
             output_annotation="dict",
             output_schema={
@@ -282,6 +647,10 @@ class FakeContactLookupGenerator:
                     "should_call_search_contacts": {"type": "boolean"},
                     "search_contacts_kwargs": {"type": "object"},
                     "answer_field": {"type": "string"},
+                    "selected_record": {"type": "object"},
+                    "answer_value": {"type": "string"},
+                    "final_answer_recommendation": {"type": "string"},
+                    "copy_exactly": {"type": "boolean"},
                     "abstain_reason": {"type": "string"},
                 },
             },
@@ -308,7 +677,7 @@ class FakeContactLookupGenerator:
             },
         )
         code = """
-def plan_contact_lookup_query(contact_name: str = "", phone_number: str = "", relationship: str = "", requested_field: str = "") -> dict:
+def plan_contact_lookup_query(contact_name: str = "", phone_number: str = "", relationship: str = "", requested_field: str = "", selected_record: dict = {}) -> dict:
     requested = str(requested_field or "").strip()
     kwargs = {}
     if str(contact_name or "").strip():
@@ -318,10 +687,19 @@ def plan_contact_lookup_query(contact_name: str = "", phone_number: str = "", re
     if str(relationship or "").strip():
         kwargs["relationship"] = str(relationship).strip()
     if not requested:
-        return {"should_call_search_contacts": False, "search_contacts_kwargs": {}, "answer_field": "", "abstain_reason": "missing_requested_field"}
+        return {"should_call_search_contacts": False, "search_contacts_kwargs": {}, "answer_field": "", "selected_record": {}, "answer_value": "", "final_answer_recommendation": "", "copy_exactly": False, "abstain_reason": "missing_requested_field"}
+    selected = selected_record if isinstance(selected_record, dict) else {}
+    if selected:
+        value = str(selected.get(requested) or "").strip()
+        final = value
+        if requested == "phone_number" and str(contact_name or "").strip():
+            final = str(contact_name).strip() + "'s phone number is " + value
+        if requested == "relationship" and str(phone_number or "").strip():
+            final = str(phone_number).strip() + " is your " + value
+        return {"should_call_search_contacts": False, "search_contacts_kwargs": kwargs, "answer_field": requested, "selected_record": selected, "answer_value": value, "final_answer_recommendation": final, "copy_exactly": bool(final), "abstain_reason": ""}
     if not kwargs:
-        return {"should_call_search_contacts": False, "search_contacts_kwargs": {}, "answer_field": requested, "abstain_reason": "missing_lookup_constraint"}
-    return {"should_call_search_contacts": True, "search_contacts_kwargs": kwargs, "answer_field": requested, "abstain_reason": ""}
+        return {"should_call_search_contacts": False, "search_contacts_kwargs": {}, "answer_field": requested, "selected_record": {}, "answer_value": "", "final_answer_recommendation": "", "copy_exactly": False, "abstain_reason": "missing_lookup_constraint"}
+    return {"should_call_search_contacts": True, "search_contacts_kwargs": kwargs, "answer_field": requested, "selected_record": {}, "answer_value": "", "final_answer_recommendation": "", "copy_exactly": False, "abstain_reason": ""}
 """.strip()
         return GeneratedTool(spec=spec, code=code)
 
@@ -810,6 +1188,36 @@ def test_existing_broader_registry_tool_suppresses_narrow_birth(
     assert _RESOLVE_WINDOW_TOOL_NAME in events
 
 
+def test_recency_bounds_repair_validates_against_broader_window_contract() -> None:
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
+    )
+    observations = classify_scenario_observations(
+        "search_message_with_recency_latest",
+        scenario,
+        {"similarity": 0},
+    )
+    recency = next(
+        observation
+        for observation in observations
+        if observation.canonical_key == "derived_value:recency_timestamp_bounds"
+    )
+    request = ToolGenerationRequest(
+        scenario_name=recency.scenario_name,
+        observation=recency.observation,
+        allowed_families=recency.allowed_families,
+        suggested_tool_name=_RESOLVE_WINDOW_TOOL_NAME,
+    )
+    tool = _resolve_search_window_or_bounds_contract_tool(request)
+
+    examples = _validation_examples_for_tool(tool, recency)
+
+    assert examples != recency.validation_examples
+    assert all("recency_label" not in example.inputs for example in examples)
+    validation = validate_generated_tool(tool, examples=examples)
+    assert validation.accepted, validation.errors
+
+
 def test_modify_reminder_relative_datetime_observation_is_canonicalizer() -> None:
     scenario = Scenario(
         categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
@@ -836,7 +1244,16 @@ def test_modify_reminder_relative_datetime_observation_is_canonicalizer() -> Non
         "day_offset": 1,
         "hour": 17,
         "minute": 0,
-        "local_utc_offset_hours": -4,
+        "local_utc_offset_hours": 0,
+        "current_datetime_info": {
+            "year": 2026,
+            "month": 4,
+            "day": 28,
+            "hour": 22,
+            "minute": 15,
+            "second": 6,
+            "isoweekday": 2,
+        },
     }
     assert relative.validation_examples[0].expected == 1777496400.0
 
@@ -854,8 +1271,15 @@ def test_add_reminder_optional_location_observation_prepares_side_effect_args() 
         {"similarity": 0.2},
     )
 
-    assert len(observations) == 1
-    observation = observations[0]
+    assert {observation.canonical_key for observation in observations} == {
+        "composite:prepare_reminder_creation_args",
+        "composite:prepare_location_search_args",
+    }
+    observation = next(
+        item
+        for item in observations
+        if item.canonical_key == "composite:prepare_reminder_creation_args"
+    )
     assert observation.canonical_key == "composite:prepare_reminder_creation_args"
     assert observation.allowed_families == (str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),)
     assert observation.generation_allowed
@@ -871,7 +1295,7 @@ def test_add_reminder_optional_location_observation_prepares_side_effect_args() 
         "should_call_add_reminder": True,
         "location_status": "omitted_optional",
         "abstain_reason": "",
-        "timestamp_source": "relative_fields",
+        "timestamp_source": "current_datetime_info",
     }
 
 
@@ -925,6 +1349,57 @@ def test_message_recency_answer_prioritizes_final_answer_helper() -> None:
     assert "search_filter:select_message_content_by_recency" in keys
     assert "search_filter:select_record_by_timestamp_extreme" not in keys
     assert keys[0] == "search_filter:select_message_content_by_recency"
+
+
+def test_visible_context_first_ever_text_marks_message_recency() -> None:
+    signals = _visible_task_signals(
+        "What's the first ever text I have?",
+        ("search_messages",),
+    )
+
+    assert "message" in signals
+    assert "message_recency" in signals
+    assert "recency_search" in signals
+
+
+def test_visible_context_oldest_message_with_send_tool_is_read_only() -> None:
+    signals = _visible_task_signals(
+        "What does my oldest message say?",
+        (
+            "search_messages",
+            "send_message_with_phone_number",
+            "get_current_timestamp",
+        ),
+    )
+
+    assert "message" in signals
+    assert "message_recency" in signals
+    assert "recency_search" in signals
+    assert "send_message" not in signals
+    assert "safe_abstain_needed" not in signals
+
+
+def test_visible_context_explicit_text_request_still_marks_send_intent() -> None:
+    signals = _visible_task_signals(
+        "Text Alice that I am running late",
+        (
+            "search_contacts",
+            "send_message_with_phone_number",
+        ),
+    )
+
+    assert "send_message" in signals
+    assert "named_message_recipient" in signals
+
+
+def test_visible_context_vague_message_search_marks_followup_possible() -> None:
+    signals = _visible_task_signals(
+        "There's a text I want to find",
+        ("search_messages",),
+    )
+
+    assert "message" in signals
+    assert "message_search_followup_possible" in signals
 
 
 def test_rejected_birth_can_retry_on_later_observation(tmp_path: Path) -> None:
@@ -1089,6 +1564,7 @@ def test_modify_contact_message_recency_marks_message_window_diagnostic() -> Non
 
     assert {observation.canonical_key for observation in observations} == {
         "search_filter:select_record_by_timestamp_extreme",
+        "composite:plan_message_counterparty_search",
         "composite:select_message_counterparty_for_contact_update",
         "search_filter:select_action_target_by_recency",
         "composite:prepare_side_effect_args_from_selected_record",
@@ -1168,6 +1644,32 @@ def test_holiday_distance_failure_requests_timestamp_diff_helper() -> None:
     }
 
 
+def test_holiday_timestamp_failure_requests_search_args_helper() -> None:
+    scenario = Scenario(
+        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
+    )
+    observations = classify_scenario_observations(
+        "find_thanksgiving_timestamp",
+        scenario,
+        {"similarity": 0.5},
+    )
+
+    assert len(observations) == 1
+    observation = observations[0]
+    assert observation.canonical_key == "composite:prepare_holiday_search_args"
+    assert observation.generation_allowed
+    assert observation.validation_examples[0].expected["search_holiday_kwargs"] == {
+        "holiday_name": "Thanksgiving"
+    }
+
+
+def test_planned_holiday_timestamp_births_search_args_helper() -> None:
+    observations = classify_planned_scenario_observations("find_thanksgiving_timestamp")
+
+    keys = {observation.canonical_key for observation in observations}
+    assert "composite:prepare_holiday_search_args" in keys
+
+
 def test_direct_contact_remove_by_phone_failure_births_constraint_helpers() -> None:
     scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
 
@@ -1178,7 +1680,7 @@ def test_direct_contact_remove_by_phone_failure_births_constraint_helpers() -> N
     )
 
     assert [item.canonical_key for item in observations] == [
-        "search_filter:select_visible_record_by_constraints",
+        "composite:plan_contact_lookup_query",
         "composite:prepare_side_effect_args_from_selected_record",
     ]
 
@@ -1229,7 +1731,6 @@ def test_contact_update_failure_births_contact_selection_helper() -> None:
 
     assert [item.canonical_key for item in observations] == [
         "composite:plan_contact_relationship_batch_update",
-        "composite:prepare_side_effect_args_from_selected_record",
     ]
     assert observations[0].failed_tool_calls == ("search_contacts", "modify_contact")
 
@@ -1283,6 +1784,9 @@ def test_message_counterparty_update_births_contact_update_selector() -> None:
     )
 
     assert "composite:select_message_counterparty_for_contact_update" in [
+        item.canonical_key for item in observations
+    ]
+    assert "composite:plan_message_counterparty_search" in [
         item.canonical_key for item in observations
     ]
     counterparty = next(
@@ -1380,7 +1884,7 @@ def test_external_payload_failure_births_answer_extraction_helper() -> None:
     scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
 
     observations = classify_scenario_observations(
-        "find_temperature_f_with_location_3_distraction_tools_arg_description_scrambled",
+        "find_phone_number_with_location_name_3_distraction_tools_arg_description_scrambled",
         scenario,
         {"similarity": 0.5},
     )
@@ -1400,7 +1904,7 @@ def test_external_payload_failure_births_answer_extraction_helper() -> None:
 def test_external_payload_contract_rejects_placeholder_original_tool() -> None:
     scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
     observation = classify_scenario_observations(
-        "find_temperature_f_with_location_3_distraction_tools_arg_description_scrambled",
+        "find_phone_number_with_location_name_3_distraction_tools_arg_description_scrambled",
         scenario,
         {"similarity": 0.5},
     )[0]
@@ -1456,7 +1960,7 @@ def test_medium_grain_constraint_action_observation_is_opt_in(
 
     monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "contract_synthesis")
     disabled = classify_scenario_observations(
-        "update_contact_relationship_with_relationship_3_distraction_tools",
+        "remove_contact_by_phone_3_distraction_tools",
         scenario,
         {"similarity": 0.0},
     )
@@ -1470,7 +1974,7 @@ def test_medium_grain_constraint_action_observation_is_opt_in(
         "contract_synthesis,medium_grain_skills",
     )
     enabled = classify_scenario_observations(
-        "update_contact_relationship_with_relationship_3_distraction_tools",
+        "remove_contact_by_phone_3_distraction_tools",
         scenario,
         {"similarity": 0.0},
     )
@@ -1483,6 +1987,26 @@ def test_medium_grain_constraint_action_observation_is_opt_in(
     assert medium.allowed_families == ("composite_workflow_helper",)
     assert len(medium.validation_examples) >= 4
     assert any(item.negative_applicability for item in medium.validation_examples)
+
+
+def test_relationship_batch_observation_preferred_over_generic_constraint_planner(
+    monkeypatch,
+) -> None:
+    scenario = Scenario(starting_context=ExecutionContext())
+    monkeypatch.setenv(
+        "SAGE_V2_EXPERIMENT_FEATURES",
+        "contract_synthesis,medium_grain_skills",
+    )
+
+    observations = classify_scenario_observations(
+        "update_contact_relationship_with_relationship_3_distraction_tools",
+        scenario,
+        {"similarity": 0.0},
+    )
+    keys = [item.canonical_key for item in observations]
+
+    assert "composite:plan_contact_relationship_batch_update" in keys
+    assert "composite:constraint_to_action_planner" not in keys
 
 
 def test_direct_state_failure_births_trace_compatible_tool_call_helper() -> None:

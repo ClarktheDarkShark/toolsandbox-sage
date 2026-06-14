@@ -251,6 +251,15 @@ def _record_event(event: str, cache_key: str) -> None:
         )
 
 
+def _note_usage_cache_status(status: str) -> None:
+    try:
+        from sage_ts.evaluation.llm_usage import note_openai_response_cache_status
+
+        note_openai_response_cache_status(status)
+    except Exception:
+        return
+
+
 def _read_cached_response(cache_key: str) -> dict[str, Any] | None:
     if _CACHE_ROOT is None:
         return None
@@ -408,6 +417,7 @@ def install_openai_response_cache(
             _METRICS["hits"] += 1
             _METRICS["cached_model_call_count"] += 1
             _record_event("cache_hit", cache_key)
+            _note_usage_cache_status("hit")
             return ChatCompletion.model_validate(cached_response)
 
         _METRICS["misses"] += 1
@@ -430,6 +440,7 @@ def install_openai_response_cache(
                 response=response.model_dump(mode="json"),
             )
             _record_event("cache_write", cache_key)
+        _note_usage_cache_status("miss")
         return response
 
     OpenAIAPIAgent.model_inference = cast(Any, cached_model_inference)  # type: ignore[method-assign]

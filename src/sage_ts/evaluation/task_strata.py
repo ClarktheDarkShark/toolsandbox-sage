@@ -65,6 +65,7 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "direct_state_precondition_service_enablement",
         "generic_multi_tool_composition",
     ),
+    "plan_device_status_lookup": ("direct_state_precondition_service_enablement",),
     "recover_from_tool_error": ("direct_state_precondition_service_enablement",),
     "next_service_enablement_action": ("direct_state_precondition_service_enablement",),
     "prepare_reminder_creation_args": (
@@ -84,9 +85,18 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "contact_message_search_disambiguation",
         "generic_multi_tool_composition",
     ),
+    "prepare_direct_contact_action_args": (
+        "contact_message_search_disambiguation",
+        "generic_multi_tool_composition",
+    ),
     "plan_send_message_contact_lookup": (
         "contact_message_search_disambiguation",
         "direct_state_precondition_service_enablement",
+        "generic_multi_tool_composition",
+    ),
+    "plan_message_counterparty_search": (
+        "contact_message_search_disambiguation",
+        "record_filtering_ranking_latest_selection",
         "generic_multi_tool_composition",
     ),
     "select_message_counterparty_for_contact_update": (
@@ -126,7 +136,11 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
         "plan_contact_relationship_batch_update",
     ),
     "composite:plan_contact_update_from_id": ("plan_contact_update_from_id",),
+    "composite:prepare_direct_contact_action_args": (
+        "prepare_direct_contact_action_args",
+    ),
     "composite:plan_send_message_contact_lookup": ("plan_send_message_contact_lookup",),
+    "composite:plan_message_counterparty_search": ("plan_message_counterparty_search",),
     "composite:select_message_counterparty_for_contact_update": (
         "select_message_counterparty_for_contact_update",
     ),
@@ -148,6 +162,7 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
     "state_precondition:plan_device_state_action_sequence": (
         "plan_device_state_action_sequence_v3",
     ),
+    "derived_value:plan_device_status_lookup": ("plan_device_status_lookup",),
     "search_filter:select_message_content_by_recency": (
         "select_message_content_by_recency",
     ),
@@ -188,6 +203,18 @@ DIRECT_SERVICE_HELPER_PREFIXES = (
     "turn_on_cellular_low_battery_mode",
     "turn_on_location_low_battery_mode",
     "send_message_with_contact_content_cellular_off",
+)
+
+DEVICE_STATUS_HELPER_PREFIXES = (
+    "get_wifi",
+    "get_cellular",
+    "get_location",
+    "get_low_battery",
+)
+
+DIRECT_SCALAR_CONTACT_ACTION_PREFIXES = (
+    "remove_contact_with_id",
+    "send_message_with_phone_number_and_content",
 )
 
 DOWNSTREAM_SERVICE_HELPER_PREFIXES = (
@@ -411,6 +438,7 @@ def expected_helper_fit(
     if "insufficient_information" not in name and name.startswith(
         "modify_contact_with_message_recency"
     ):
+        helpers.append("plan_message_counterparty_search")
         helpers.append("select_message_counterparty_for_contact_update")
     if "insufficient_information" not in name and name.startswith(
         (
@@ -429,14 +457,21 @@ def expected_helper_fit(
     ):
         helpers.append("plan_device_state_action_sequence_v3")
     if "insufficient_information" not in name and name.startswith(
+        DEVICE_STATUS_HELPER_PREFIXES
+    ):
+        helpers.append("plan_device_status_lookup")
+    if "insufficient_information" not in name and name.startswith(
         (
+            "remove_contact_by_phone",
             "search_name_with_relationship",
             "search_phone_number_with_name",
             "search_relationship_with_phone_number",
+            "search_sender_phone_number_with_content",
         )
     ):
         helpers.append("plan_contact_lookup_query")
-        helpers.append("extract_contact_field_from_search_result")
+        if not name.startswith("remove_contact_by_phone"):
+            helpers.append("extract_contact_field_from_search_result")
     if "insufficient_information" not in name and name.startswith(
         "update_contact_relationship_with_relationship"
     ):
@@ -445,6 +480,14 @@ def expected_helper_fit(
         "update_contact_with_id_and_phone_number"
     ):
         helpers.append("plan_contact_update_from_id")
+    if "insufficient_information" not in name and name.startswith(
+        DIRECT_SCALAR_CONTACT_ACTION_PREFIXES
+    ):
+        helpers.append("prepare_direct_contact_action_args")
+    if "insufficient_information" not in name and name.startswith(
+        "add_contact_with_name_and_phone_number"
+    ):
+        helpers.append("prepare_add_contact_args")
     if "insufficient_information" not in name and name.startswith(
         "send_message_with_contact_content"
     ):
@@ -499,6 +542,7 @@ def expected_birth_opportunities(
         and "insufficient_information" not in name
         and name.startswith("modify_contact_with_message_recency")
     ):
+        opportunities.append("composite:plan_message_counterparty_search")
         opportunities.append("composite:select_message_counterparty_for_contact_update")
     # Do not count bounds-only message window helpers as claim-grade birth
     # opportunities; latest/oldest failures need selection/action helpers.
@@ -537,6 +581,8 @@ def expected_birth_opportunities(
             opportunities.append("composite:plan_contact_relationship_batch_update")
         if name.startswith("update_contact_with_id_and_phone_number"):
             opportunities.append("composite:plan_contact_update_from_id")
+        if name.startswith(DIRECT_SCALAR_CONTACT_ACTION_PREFIXES):
+            opportunities.append("composite:prepare_direct_contact_action_args")
     if (
         "ambiguous" not in name
         and "insufficient_information" not in name
@@ -552,15 +598,16 @@ def expected_birth_opportunities(
         opportunities.append("composite:constraint_to_action_planner")
     if name.startswith("find_days_till_holiday"):
         opportunities.append("derived_value:days_between_timestamps")
+    if "insufficient_information" not in name and name.startswith(
+        "add_reminder_content_and_week_delta_and_time"
+    ):
+        opportunities.append("canonicalizer:relative_day_time_timestamp")
     if name.startswith("find_stock_symbol_with_company_name"):
         opportunities.append("derived_value:extract_stock_symbol")
     if name.startswith(
         (
-            "find_distance_with_location_name",
             "find_address_with_lat_lon",
             "find_phone_number_with_location_name",
-            "find_temperature",
-            "find_temperature_f_with_location",
             "convert_currency",
             "convert_currency_canonicalize",
         )
@@ -569,6 +616,8 @@ def expected_birth_opportunities(
     if name.startswith(DIRECT_SERVICE_HELPER_PREFIXES):
         opportunities.append("state_precondition:plan_device_state_action_sequence")
         opportunities.append("state_precondition:next_service_tool_call")
+    if name.startswith(DEVICE_STATUS_HELPER_PREFIXES):
+        opportunities.append("derived_value:plan_device_status_lookup")
     if name.startswith(DOWNSTREAM_SERVICE_HELPER_PREFIXES):
         opportunities.append("state_precondition:recover_from_tool_error")
     if (
@@ -577,6 +626,12 @@ def expected_birth_opportunities(
         and name.startswith("send_message_with_contact_content")
     ):
         opportunities.append("composite:plan_send_message_contact_lookup")
+    if (
+        "ambiguous" not in name
+        and "insufficient_information" not in name
+        and name.startswith("add_contact_with_name_and_phone_number")
+    ):
+        opportunities.append("composite:prepare_add_contact_args")
     if (
         name.startswith("add_reminder_content_and_")
         and "_time" in name

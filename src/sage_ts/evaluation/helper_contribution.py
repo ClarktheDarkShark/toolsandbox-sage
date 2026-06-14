@@ -60,7 +60,11 @@ def _scenario_deltas(
             candidate_rows[name].get("outcome_similarity")
         )
         deltas[name] = {
+            "control_similarity": control_similarity,
+            "candidate_similarity": candidate_similarity,
             "canonical_delta": candidate_similarity - control_similarity,
+            "control_outcome_similarity": control_outcome,
+            "candidate_outcome_similarity": candidate_outcome,
             "outcome_delta": (
                 candidate_outcome - control_outcome
                 if control_outcome is not None and candidate_outcome is not None
@@ -121,6 +125,98 @@ def _subset_stats(
         ),
     }
     return stats
+
+
+def _selection_bucket_stats(
+    scenarios: set[str],
+    deltas_by_scenario: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    rows = [
+        deltas_by_scenario[name]
+        for name in sorted(scenarios)
+        if name in deltas_by_scenario
+    ]
+    canonical_deltas = [float(row["canonical_delta"]) for row in rows]
+    outcome_deltas = [
+        float(row["outcome_delta"])
+        for row in rows
+        if row.get("outcome_delta") is not None
+    ]
+    control_scores = [float(row["control_similarity"]) for row in rows]
+    candidate_scores = [float(row["candidate_similarity"]) for row in rows]
+    control_outcomes = [
+        float(row["control_outcome_similarity"])
+        for row in rows
+        if row.get("control_outcome_similarity") is not None
+    ]
+    candidate_outcomes = [
+        float(row["candidate_outcome_similarity"])
+        for row in rows
+        if row.get("candidate_outcome_similarity") is not None
+    ]
+    control_score = _mean(control_scores)
+    candidate_score = _mean(candidate_scores)
+    control_outcome = _mean(control_outcomes)
+    candidate_outcome = _mean(candidate_outcomes)
+    canonical_delta = _mean(canonical_deltas)
+    outcome_delta = _mean(outcome_deltas)
+    return {
+        "scenario_count": len(rows),
+        "scenarios": sorted(name for name in scenarios if name in deltas_by_scenario),
+        "control_mean_similarity": control_score,
+        "candidate_mean_similarity": candidate_score,
+        "mean_canonical_delta": canonical_delta,
+        "canonical_lift_percent": (
+            (canonical_delta / control_score) * 100.0
+            if control_score not in (None, 0.0) and canonical_delta is not None
+            else None
+        ),
+        "control_mean_outcome_similarity": control_outcome,
+        "candidate_mean_outcome_similarity": candidate_outcome,
+        "mean_outcome_delta": outcome_delta,
+        "outcome_lift_percent": (
+            (outcome_delta / control_outcome) * 100.0
+            if control_outcome not in (None, 0.0) and outcome_delta is not None
+            else None
+        ),
+        "canonical_gains": sum(1 for value in canonical_deltas if value > 0),
+        "canonical_regressions": sum(1 for value in canonical_deltas if value < 0),
+        "canonical_preserved": sum(1 for value in canonical_deltas if value == 0),
+        "outcome_gains": sum(1 for value in outcome_deltas if value > 0),
+        "outcome_regressions": sum(1 for value in outcome_deltas if value < 0),
+        "outcome_preserved": sum(1 for value in outcome_deltas if value == 0),
+    }
+
+
+def _selection_attribution_buckets(
+    selection: list[dict[str, Any]],
+    deltas_by_scenario: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    buckets: dict[str, set[str]] = {
+        "called_generated_tool": set(),
+        "generated_tool_visible_not_called": set(),
+        "no_visible_generated_tool": set(),
+        "missing_selection_record": set(deltas_by_scenario),
+    }
+    for row in selection:
+        scenario = str(row.get("scenario", ""))
+        if scenario not in deltas_by_scenario:
+            continue
+        buckets["missing_selection_record"].discard(scenario)
+        called_count = int(row.get("called_generated_tool_count", 0) or 0)
+        visible_count = int(row.get("visible_generated_tool_count", 0) or 0)
+        called_tools = row.get("generated_tools_called", []) or []
+        visible_tools = row.get("generated_tools_visible", []) or []
+        if called_count > 0 or called_tools:
+            buckets["called_generated_tool"].add(scenario)
+        elif visible_count > 0 or visible_tools:
+            buckets["generated_tool_visible_not_called"].add(scenario)
+        else:
+            buckets["no_visible_generated_tool"].add(scenario)
+    return {
+        name: _selection_bucket_stats(scenarios, deltas_by_scenario)
+        for name, scenarios in buckets.items()
+    }
 
 
 def build_helper_contribution_summary(
@@ -249,6 +345,24 @@ def build_helper_contribution_summary(
         "compute_cache_token_metrics": {
             "candidate_openai_response_cache": candidate_metrics,
             "candidate_prompt_cache": prompt_metrics,
+        },
+        "selection_attribution_buckets": _selection_attribution_buckets(
+            selection, deltas_by_scenario
+        ),
+        "selection_attribution_claim_guidance": {
+            "generated_helper_attributed_bucket": "called_generated_tool",
+            "non_attributed_buckets": [
+                "generated_tool_visible_not_called",
+                "no_visible_generated_tool",
+                "missing_selection_record",
+            ],
+            "note": (
+                "Only scenarios with a generated helper actually called should be "
+                "claimed as generated-helper-attributed gains. Visible-not-called "
+                "and no-visible-helper lift may reflect adapter, bridge, routing, "
+                "baseline variance, or ordinary model behavior and must be reported "
+                "separately."
+            ),
         },
         "selection_event_count": len(selection),
         "visibility_event_count": len(visibility),

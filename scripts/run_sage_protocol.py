@@ -73,6 +73,7 @@ MODES = (
     "online_build_100",
     "online_build_250",
     "online_build_500",
+    "online_build_full",
     # Frozen transfer checks
     "transfer_40",
     "transfer_60",
@@ -89,17 +90,32 @@ MODES = (
 SAGE_POLICY_NONE = "none"
 SAGE_POLICY_AUTO = "auto"
 SAGE_POLICY_SELF_EVOLVING_PRAXIS = "self-evolving-praxis"
+SAGE_POLICY_SELF_EVOLVING_PRAXIS_COMBINED = "self-evolving-praxis-combined"
 SAGE_POLICIES = (
     SAGE_POLICY_AUTO,
     SAGE_POLICY_NONE,
     SAGE_POLICY_SELF_EVOLVING_PRAXIS,
+    SAGE_POLICY_SELF_EVOLVING_PRAXIS_COMBINED,
 )
 SELF_EVOLVING_PRAXIS_ENV_DEFAULTS = {
     "SAGE_SELF_EVOLVING_PROACTIVE_BIRTH": "1",
     "SAGE_SELF_EVOLVING_PROACTIVE_SCOPE": "just_in_time",
-    "SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE": "1",
+    "SAGE_SCENARIO_METADATA_POLICY": "visible_context",
+    "SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE": "0",
+    "SAGE_SELF_EVOLVING_VISIBLE_NOT_CALLED_RETRY": "0",
+    "SAGE_SIDE_EFFECT_FAIR_CHANCE_EXTRA_TURNS": "0",
     "SAGE_ENABLE_SAFE_ABSTAIN_BIRTH": "1",
-    "SAGE_PRAXIS_BRIDGE_POLICY": "combined",
+    "SAGE_PRAXIS_BRIDGE_POLICY": "disabled",
+    "SAGE_GENERATED_TOOL_GUIDANCE_MODE": "minimal",
+    "SAGE_GENERATED_TOOL_FIRST_ATTEMPT_CHOICE": "1",
+    "SAGE_GENERATED_TOOL_CONTINUATION_CHOICE": "1",
+    "SAGE_GENERATED_TOOL_CONTRACT_RETRY_ATTEMPTS": "0",
+    "SAGE_GENERATED_TOOL_SYNTHETIC_REPAIR": "0",
+    "SAGE_GENERATED_TOOL_DOCSTRING_MODE": "compact",
+    "SAGE_MAX_RUNTIME_GENERATED_TOOL_BUNDLE_SIZE": "4",
+    "SAGE_SELF_EVOLVING_REFLECTION": "1",
+    "SAGE_SELF_EVOLVING_PULSE_INTERVAL": "4",
+    "SAGE_SELF_EVOLVING_MIN_PULSE_TASKS": "8",
     "SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS": "4",
     "SAGE_V2_EXPERIMENT_FEATURES": (
         "contract_synthesis,candidate_repair,dependency_logic,medium_grain_skills"
@@ -107,6 +123,15 @@ SELF_EVOLVING_PRAXIS_ENV_DEFAULTS = {
     "SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS": "120",
     "SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY": "1",
 }
+SELF_EVOLVING_PRAXIS_COMBINED_ENV_DEFAULTS = {
+    **SELF_EVOLVING_PRAXIS_ENV_DEFAULTS,
+    "SAGE_PRAXIS_BRIDGE_POLICY": "combined",
+}
+
+
+def _bridge_policy_value_enabled(value: str | None) -> bool:
+    raw = (value or "").strip().lower()
+    return raw in {"1", "true", "yes", "on", "combined", "full"}
 
 
 def _apply_sage_policy_preset(policy: str) -> dict[str, dict[str, str]]:
@@ -114,10 +139,28 @@ def _apply_sage_policy_preset(policy: str) -> dict[str, dict[str, str]]:
 
     if policy == SAGE_POLICY_NONE:
         return {}
-    if policy != SAGE_POLICY_SELF_EVOLVING_PRAXIS:
+    if policy == SAGE_POLICY_SELF_EVOLVING_PRAXIS:
+        defaults = SELF_EVOLVING_PRAXIS_ENV_DEFAULTS
+        bridge_value = os.environ.get("SAGE_PRAXIS_BRIDGE_POLICY")
+        if _bridge_policy_value_enabled(bridge_value):
+            raise ValueError(
+                "--sage-policy self-evolving-praxis is the autonomous "
+                "tool-generation policy and requires SAGE_PRAXIS_BRIDGE_POLICY "
+                "to be unset or disabled. Use --sage-policy "
+                "self-evolving-praxis-combined only for bridge-policy ablations."
+            )
+    elif policy == SAGE_POLICY_SELF_EVOLVING_PRAXIS_COMBINED:
+        defaults = SELF_EVOLVING_PRAXIS_COMBINED_ENV_DEFAULTS
+        bridge_value = os.environ.get("SAGE_PRAXIS_BRIDGE_POLICY")
+        if bridge_value is not None and not _bridge_policy_value_enabled(bridge_value):
+            raise ValueError(
+                "--sage-policy self-evolving-praxis-combined requires "
+                "SAGE_PRAXIS_BRIDGE_POLICY to be unset or enabled."
+            )
+    else:
         raise ValueError(f"Unknown SAGE policy preset: {policy}")
     applied: dict[str, dict[str, str]] = {}
-    for key, desired_value in SELF_EVOLVING_PRAXIS_ENV_DEFAULTS.items():
+    for key, desired_value in defaults.items():
         existing = os.environ.get(key)
         if existing is None:
             os.environ[key] = desired_value
@@ -168,6 +211,7 @@ def _generation_enabled_by_default(mode: str, manifest_type: str) -> bool:
         "online_build_100",
         "online_build_250",
         "online_build_500",
+        "online_build_full",
         "extended_reuse_100",
     }
     if mode in generation_modes:
@@ -189,6 +233,34 @@ def _is_frozen_transfer_mode(mode: str) -> bool:
         "full_benchmark",
     }
     return mode in frozen_modes
+
+
+def _manifest_split_for_mode(mode: str) -> str:
+    """Map run modes to manifest split names.
+
+    ``full_benchmark`` remains a frozen validation mode, so the generation-enabled
+    whole-dataset build lane uses its own mode name while reading the same sealed
+    manifest split.
+    """
+
+    if mode in {
+        "online_build_100",
+        "online_build_250",
+        "online_build_500",
+        "online_build_full",
+    }:
+        return "full_benchmark"
+    return mode
+
+
+def _scenario_limit_for_mode(mode: str) -> int | None:
+    if mode == "online_build_100":
+        return 100
+    if mode == "online_build_250":
+        return 250
+    if mode == "online_build_500":
+        return 500
+    return None
 
 
 DIAGNOSTIC_FORCE_ENV_VARS = (
@@ -641,6 +713,7 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
                 resume_from_dir=Path(params["control_resume_dir"])
                 if params.get("control_resume_dir")
                 else None,
+                resume_completed_limit=params.get("resume_completed_limit"),
             ),
             progress_hook=progress,
             event_hook=event_hook,
@@ -767,6 +840,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 resume_from_dir=Path(params["candidate_resume_dir"])
                 if params.get("candidate_resume_dir")
                 else None,
+                resume_completed_limit=params.get("resume_completed_limit"),
                 manifest_path=Path(params["manifest"]),
             ),
             generator=generator,
@@ -1007,6 +1081,14 @@ def main() -> None:
         help="Seed each arm from a prior interrupted paired protocol run root.",
     )
     parser.add_argument(
+        "--resume-completed-limit",
+        type=int,
+        help=(
+            "When resuming, copy only the first N completed rows from each prior "
+            "arm. This resumes before a known bad checkpoint after a framework fix."
+        ),
+    )
+    parser.add_argument(
         "--allow-empty-birth-preflight",
         action="store_true",
         help=(
@@ -1035,7 +1117,11 @@ def main() -> None:
         os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = str(time.time())
     toolsandbox_fixed_now = os.environ.get("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP")
 
-    scenario_names = tuple(load_split_names(args.manifest, args.mode))
+    split_name = _manifest_split_for_mode(args.mode)
+    scenario_names = tuple(load_split_names(args.manifest, split_name))
+    scenario_limit = _scenario_limit_for_mode(args.mode)
+    if scenario_limit is not None:
+        scenario_names = scenario_names[:scenario_limit]
     manifest_type = _manifest_type(args.manifest)
     model_metadata = paired_model_metadata(
         agent_model=args.agent,
@@ -1053,6 +1139,11 @@ def main() -> None:
     fresh_control_dir: Path | None = None
     control_resume_dir = _resume_arm_dir(args.resume_run_root, "control")
     candidate_resume_dir = _resume_arm_dir(args.resume_run_root, "candidate")
+    resume_completed_limit = (
+        max(0, args.resume_completed_limit)
+        if args.resume_completed_limit is not None
+        else None
+    )
     generation_enabled = _generation_enabled_by_default(args.mode, manifest_type)
     if args.generation == "on":
         generation_enabled = True
@@ -1164,6 +1255,7 @@ def main() -> None:
         "phase_started",
         {
             "mode": args.mode,
+            "manifest_split": split_name,
             "manifest_type": manifest_type,
             "run_root": str(run_root),
             "scenario_count": len(scenario_names),
@@ -1268,6 +1360,7 @@ def main() -> None:
         {
             "run_root": str(run_root),
             "mode": args.mode,
+            "manifest_split": split_name,
             "manifest_type": manifest_type,
             "status": "running",
             "agent": args.agent,
@@ -1410,6 +1503,7 @@ def main() -> None:
             "candidate_resume_dir": str(candidate_resume_dir)
             if candidate_resume_dir
             else None,
+            "resume_completed_limit": resume_completed_limit,
         }
         ctx = get_context("spawn")
         control_process = ctx.Process(
@@ -1556,6 +1650,9 @@ def main() -> None:
                     resume_from_dir=control_resume_dir
                     if fresh_control_scenarios == scenario_names
                     else None,
+                    resume_completed_limit=resume_completed_limit
+                    if fresh_control_scenarios == scenario_names
+                    else None,
                 ),
                 progress_hook=control_progress,
                 event_hook=campaign_event,
@@ -1654,6 +1751,7 @@ def main() -> None:
                 recurrence_threshold=args.recurrence_threshold,
                 base_tool_policy=args.base_tool_policy,
                 resume_from_dir=candidate_resume_dir,
+                resume_completed_limit=resume_completed_limit,
                 manifest_path=args.manifest,
             ),
             generator=generator,
@@ -1759,6 +1857,7 @@ def main() -> None:
     refresh_dashboard("comparison", "complete")
     manifest = {
         "mode": args.mode,
+        "manifest_split": split_name,
         "manifest_type": manifest_type,
         "agent": args.agent,
         "user": args.user,
@@ -1786,6 +1885,7 @@ def main() -> None:
             "quality_gate_failures", []
         ),
         "resume_run_root": str(args.resume_run_root) if args.resume_run_root else None,
+        "resume_completed_limit": resume_completed_limit,
         "control_resume_dir": str(control_resume_dir) if control_resume_dir else None,
         "candidate_resume_dir": str(candidate_resume_dir)
         if candidate_resume_dir
@@ -1842,6 +1942,7 @@ def main() -> None:
         {
             "run_root": str(run_root),
             "mode": args.mode,
+            "manifest_split": split_name,
             "manifest_type": manifest_type,
             "status": "complete",
             "agent": args.agent,

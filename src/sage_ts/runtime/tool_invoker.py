@@ -1,4 +1,4 @@
-"""Runtime invocation for accepted generated helpers."""
+"""Runtime invocation for accepted generated tools."""
 
 from __future__ import annotations
 

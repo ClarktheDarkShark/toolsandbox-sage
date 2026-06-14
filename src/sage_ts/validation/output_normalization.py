@@ -20,11 +20,18 @@ def _dedupe_strings(values: Any) -> list[str]:
     deduped: list[str] = []
     for item in values:
         text = str(item)
+        if text.startswith("functions."):
+            text = text.split(".", 1)[1]
         if text in seen:
             continue
         seen.add(text)
         deduped.append(text)
     return deduped
+
+
+def _append_unique(values: list[str], value: str) -> None:
+    if value not in values:
+        values.append(value)
 
 
 def _normalize_constraint_value(field_name: str, value: Any) -> str:
@@ -101,13 +108,89 @@ def _has_contact_lookup_constraint(inputs: dict[str, Any] | None) -> bool:
     return False
 
 
+def _normalize_send_message_contact_lookup_output(
+    value: dict[str, Any],
+) -> dict[str, Any]:
+    """Fill non-operational advisory fields for send-message lookup planners."""
+    required_keys = {
+        "should_call_search_contacts",
+        "search_contacts_kwargs",
+        "downstream_tool_name",
+        "message_content",
+        "next_step",
+        "final_answer_recommendation",
+    }
+    if not required_keys <= set(value):
+        return value
+    normalized = dict(value)
+    if (
+        bool(normalized.get("should_call_search_contacts"))
+        and isinstance(normalized.get("search_contacts_kwargs"), dict)
+        and str(normalized.get("downstream_tool_name") or "")
+        == "send_message_with_phone_number"
+        and str(normalized.get("message_content") or "").strip()
+    ):
+        if not str(normalized.get("next_step") or "").strip():
+            normalized["next_step"] = (
+                "call search_contacts, then send_message_with_phone_number"
+            )
+        if not str(normalized.get("final_answer_recommendation") or "").strip():
+            normalized["final_answer_recommendation"] = (
+                "After search_contacts returns exactly one matching contact, call "
+                "send_message_with_phone_number with that contact's phone number "
+                "and the prepared message_content."
+            )
+    return normalized
+
+
+def _strip_null_values_from_generated_kwargs(value: dict[str, Any]) -> dict[str, Any]:
+    """Remove null optional arguments from helper-prepared downstream kwargs."""
+    normalized = dict(value)
+    for key, item in list(normalized.items()):
+        if key.endswith("_kwargs") and isinstance(item, dict):
+            cleaned = {k: v for k, v in item.items() if v is not None}
+            if key == "search_contacts_kwargs" and str(
+                cleaned.get("relationship") or ""
+            ).strip().lower() in {"__all_contacts__", "all_contacts", "all contacts"}:
+                cleaned.pop("relationship", None)
+                cleaned.setdefault("is_self", False)
+            normalized[key] = cleaned
+        elif key.endswith("_kwargs_list") and isinstance(item, list):
+            cleaned_items: list[Any] = []
+            for entry in item:
+                if isinstance(entry, dict):
+                    cleaned_items.append(
+                        {k: v for k, v in entry.items() if v is not None}
+                    )
+                else:
+                    cleaned_items.append(entry)
+            normalized[key] = cleaned_items
+        elif key == "action_sequence" and isinstance(item, list):
+            cleaned_sequence: list[Any] = []
+            for entry in item:
+                if not isinstance(entry, dict):
+                    cleaned_sequence.append(entry)
+                    continue
+                cleaned_entry = dict(entry)
+                arguments = cleaned_entry.get("arguments")
+                if isinstance(arguments, dict):
+                    cleaned_entry["arguments"] = {
+                        k: v for k, v in arguments.items() if v is not None
+                    }
+                cleaned_sequence.append(cleaned_entry)
+            normalized[key] = cleaned_sequence
+    return normalized
+
+
 def _normalize_generic_composite_output(
     value: dict[str, Any],
     *,
     inputs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Make abstaining composite helper outputs side-effect safe and comparable."""
-    normalized = dict(value)
+    normalized = _strip_null_values_from_generated_kwargs(
+        _normalize_send_message_contact_lookup_output(dict(value))
+    )
     abstain_reason = _normalize_abstain_reason(normalized.get("abstain_reason"))
     if (
         not abstain_reason
@@ -128,7 +211,7 @@ def _normalize_generic_composite_output(
             else "missing_requested_field"
         )
     if not abstain_reason:
-        return normalized
+        return _strip_null_values_from_generated_kwargs(normalized)
     normalized["abstain_reason"] = abstain_reason
     should_call_tool = bool(normalized.get("should_call_tool"))
     should_call_tools = bool(normalized.get("should_call_tools"))
@@ -140,7 +223,7 @@ def _normalize_generic_composite_output(
             normalized["downstream_tool_kwargs"] = {}
         if "downstream_tool_kwargs_list" in normalized:
             normalized["downstream_tool_kwargs_list"] = []
-    return normalized
+    return _strip_null_values_from_generated_kwargs(normalized)
 
 
 def _record_index(inputs: dict[str, Any] | None, record: dict[str, Any]) -> int:
@@ -228,11 +311,104 @@ def _normalize_validation_abstention_output(
     *,
     inputs: dict[str, Any] | None,
 ) -> dict[str, Any]:
+    def to_capability(raw: Any) -> str:
+        text = str(raw or "").strip()
+        if text.startswith("functions."):
+            text = text.split(".", 1)[1]
+        normalized_text = text.lower().replace("-", "_").replace(" ", "_")
+        mapping = {
+            "search_contacts": "contact_lookup",
+            "remove_contact": "contact_removal",
+            "delete_contact": "contact_removal",
+            "modify_contact": "contact_update",
+            "update_contact": "contact_update",
+            "search_messages": "message_lookup",
+            "send_message": "message_send",
+            "send_message_with_phone_number": "message_send",
+            "search_reminder": "reminder_lookup",
+            "remove_reminder": "reminder_removal",
+            "modify_reminder": "reminder_update",
+            "add_reminder": "reminder_creation",
+            "get_current_location": "location_lookup",
+            "get_current_city": "location_lookup",
+            "find_current_city": "location_lookup",
+            "current_city": "location_lookup",
+            "current_location": "location_lookup",
+            "get_my_current_city": "location_lookup",
+            "get_my_current_location": "location_lookup",
+            "where_am_i": "location_lookup",
+            "what_city_am_i_in": "location_lookup",
+        }
+        return mapping.get(text, mapping.get(normalized_text, text))
+
     normalized = dict(value)
-    missing_information = _dedupe_strings(normalized.get("missing_information"))
-    required_original_tools = _dedupe_strings(normalized.get("required_original_tools"))
+    missing_information = [
+        to_capability(item)
+        for item in _dedupe_strings(normalized.get("missing_information"))
+    ]
+    required_original_tools = [
+        to_capability(item)
+        for item in _dedupe_strings(normalized.get("required_original_tools"))
+    ]
     if not required_original_tools and inputs:
-        required_original_tools = _dedupe_strings(inputs.get("required_original_tools"))
+        required_original_tools = [
+            to_capability(item)
+            for item in _dedupe_strings(inputs.get("required_original_tools"))
+        ]
+    available_original_tools = (
+        [
+            to_capability(item)
+            for item in _dedupe_strings(inputs.get("available_original_tools"))
+        ]
+        if inputs
+        else []
+    )
+    action = to_capability((inputs or {}).get("requested_action"))
+    user_request_lower = str((inputs or {}).get("user_request") or "").lower()
+    if action == "location_lookup" and "location_lookup" not in required_original_tools:
+        required_original_tools.append("location_lookup")
+    if not required_original_tools and any(
+        phrase in user_request_lower
+        for phrase in (
+            "current city",
+            "current location",
+            "where am i",
+            "what city am i",
+            "which city am i",
+        )
+    ):
+        action = "location_lookup"
+        required_original_tools.append("location_lookup")
+    missing_required_tools = [
+        tool for tool in required_original_tools if tool not in available_original_tools
+    ]
+    for tool in missing_required_tools:
+        _append_unique(missing_information, tool)
+    target = str((inputs or {}).get("target_identifier") or "").strip()
+    try:
+        visible_records_count = int((inputs or {}).get("visible_records_count") or 0)
+    except (TypeError, ValueError):
+        visible_records_count = 0
+    stable_id_pattern = re.compile(
+        r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+        r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    )
+    id_required_actions = {
+        "contact_removal",
+        "contact_update",
+        "reminder_removal",
+        "reminder_update",
+        "remove_contact",
+        "modify_contact",
+        "remove_reminder",
+        "modify_reminder",
+    }
+    if action in id_required_actions:
+        target_is_stable_id = bool(stable_id_pattern.match(target))
+        if not missing_required_tools and (
+            not target or (visible_records_count <= 0 and not target_is_stable_id)
+        ):
+            _append_unique(missing_information, "target_identifier")
     normalized["missing_information"] = missing_information
     normalized["required_original_tools"] = required_original_tools
 
@@ -244,14 +420,26 @@ def _normalize_validation_abstention_output(
 
     if should_abstain:
         reason = str(normalized.get("abstain_reason") or "").strip()
-        if "target_identifier" in missing_lower or "target" in missing_lower:
+        final_answer_recommendation = str(
+            normalized.get("final_answer_recommendation") or ""
+        ).strip()
+        if missing_required_tools:
+            reason = "missing_required_original_tool"
+        elif "target_identifier" in missing_lower or "target" in missing_lower:
             reason = "missing_target_identifier"
         elif missing_information:
             reason = "missing_required_original_tool"
         normalized["safe_next_action"] = "ask_user_or_abstain"
         normalized["abstain_reason"] = reason or "insufficient_information"
+        if action == "location_lookup" and "location_lookup" in missing_lower:
+            final_answer_recommendation = (
+                "I cannot determine what city you are in because I do not have "
+                "access to your current location, GPS, or latitude and longitude "
+                "coordinates."
+            )
         normalized["final_answer_recommendation"] = (
-            "I do not have enough information to complete the action."
+            final_answer_recommendation
+            or "I do not have enough information to complete the action."
         )
     else:
         normalized["missing_information"] = []
@@ -276,6 +464,7 @@ def normalize_generated_tool_output(
     """
     if not isinstance(value, dict):
         return value
+    value = _strip_null_values_from_generated_kwargs(value)
     if tool.spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
         output_schema = tool.spec.output_schema or {}
         output_props = output_schema.get("properties", {})

@@ -35,6 +35,15 @@ def test_add_reminder_location_argument_prep_matches_birth_path() -> None:
     )
 
 
+def test_add_contact_matches_generated_argument_tool_fit() -> None:
+    scenario = "add_contact_with_name_and_phone_number"
+
+    assert "prepare_add_contact_args" in expected_helper_fit(scenario)
+    assert "composite:prepare_add_contact_args" in expected_birth_opportunities(
+        scenario
+    )
+
+
 def test_direct_contact_remove_by_phone_matches_visible_record_constraint_helper() -> (
     None
 ):
@@ -106,6 +115,15 @@ def test_contact_lookup_tasks_match_lookup_query_helpers() -> None:
     )
 
 
+def test_remove_contact_by_phone_matches_lookup_query_helper() -> None:
+    scenario = "remove_contact_by_phone_10_distraction_tools"
+
+    assert "plan_contact_lookup_query" in expected_helper_fit(scenario)
+    assert "composite:plan_contact_lookup_query" in expected_birth_opportunities(
+        scenario
+    )
+
+
 def test_raw_latest_message_matches_retrieval_window_and_selector() -> None:
     scenario = "search_message_with_recency_latest_multiple_user_turn_alt"
 
@@ -125,6 +143,7 @@ def test_modify_contact_message_recency_matches_trace_compatible_helpers() -> No
 
     assert "contact_message_search_disambiguation" in classify_task_strata(scenario)
     assert "select_record_by_timestamp_extreme" in expected_helper_fit(scenario)
+    assert "plan_message_counterparty_search" in expected_helper_fit(scenario)
     assert "select_message_counterparty_for_contact_update" in expected_helper_fit(
         scenario
     )
@@ -132,6 +151,9 @@ def test_modify_contact_message_recency_matches_trace_compatible_helpers() -> No
         expected_birth_opportunities(scenario)
     )
     assert "composite:select_message_counterparty_for_contact_update" in (
+        expected_birth_opportunities(scenario)
+    )
+    assert "composite:plan_message_counterparty_search" in (
         expected_birth_opportunities(scenario)
     )
     assert "search_filter:select_action_target_by_recency" in (
@@ -264,10 +286,19 @@ def test_stock_symbol_task_matches_extraction_birth_path() -> None:
 
 
 def test_external_service_answer_tasks_match_answer_extraction_birth_path() -> None:
-    scenario = "find_temperature_f_with_location_3_distraction_tools"
+    scenario = "find_phone_number_with_location_name_3_distraction_tools"
 
     assert "weather_location_current_city_distance" in classify_task_strata(scenario)
     assert "derived_value:extract_service_answer_field" in (
+        expected_birth_opportunities(scenario)
+    )
+
+
+def test_temperature_tasks_do_not_birth_broad_service_answer_extractor() -> None:
+    scenario = "find_temperature_f_with_location_3_distraction_tools"
+
+    assert "weather_location_current_city_distance" in classify_task_strata(scenario)
+    assert "derived_value:extract_service_answer_field" not in (
         expected_birth_opportunities(scenario)
     )
 
@@ -379,7 +410,7 @@ def test_cohort_policy_report_warns_when_birth_has_no_later_reuse() -> None:
     )
 
 
-def test_cohort_policy_report_warns_when_helper_fit_is_too_sparse() -> None:
+def test_cohort_policy_report_reflects_direct_action_coverage() -> None:
     scenarios = [
         "search_message_with_recency_latest",
         "find_stock_symbol_with_company_name",
@@ -401,8 +432,9 @@ def test_cohort_policy_report_warns_when_helper_fit_is_too_sparse() -> None:
         registry_tool_count=3,
     )
 
-    assert report["expected_helper_fit_share"] < 0.5
-    assert "low_expected_helper_fit_share" in report["warnings"]
+    assert report["expected_helper_fit_share"] > 0.5
+    assert "helper_fit_share_too_sparse" not in report["warnings"]
+    assert "external_service_cases_present" in report["warnings"]
 
 
 def test_cohort_policy_report_fails_near_duplicate_dominated_20() -> None:

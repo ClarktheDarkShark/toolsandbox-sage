@@ -235,6 +235,27 @@ DASHBOARD_HTML = r"""<!doctype html>
     function metric(label, value, hint, cls = "") {
       return `<div class="card"><div class="label">${label}</div><div class="value ${cls}">${value}</div><div class="hint">${hint}</div></div>`;
     }
+    function controlCacheMetric(data) {
+      const cache = data.control_cache || {};
+      const hasCacheReport = Object.keys(cache).length > 0;
+      if (!hasCacheReport && !data.summary) return null;
+      const cached = Number(cache.cached_control_tasks ?? cache.cached_tasks ?? 0);
+      const fresh = Number(cache.fresh_control_tasks ?? cache.fresh_tasks ?? data.summary?.scenario_count ?? 0);
+      const source = cache.control_source || cache.source || "fresh baseline";
+      const mode = cache.mode || "off";
+      const misses = cache.cache_misses || {};
+      const missText = Object.entries(misses)
+        .filter(([, value]) => Number(value || 0) > 0)
+        .map(([key, value]) => `${value} ${key.replaceAll("_", " ")}`)
+        .join(" · ");
+      const hash = cache.cache_manifest_hash ? ` · hash ${String(cache.cache_manifest_hash).slice(0, 10)}` : "";
+      const seeded = cache.live_dashboard_seeded_from_preflight ? " · live preflight seed" : "";
+      return metric(
+        "Control Cache",
+        `${cached}/${fresh}`,
+        `cached / fresh · ${source} · ${mode}${missText ? " · " + missText : ""}${hash}${seeded}`
+      );
+    }
     function render(data) {
       state = data;
       document.title = `ToolSandbox SAGE · ${data.mode || "run"}`;
@@ -253,6 +274,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const planned = data.scenario_count || "?";
       const metrics = [
         metric("Run", `${completed}/${planned}`, `${data.status || "unknown"} · ${data.phase || "waiting"}`),
+        controlCacheMetric(data),
         metric("Score Lift", pct(data.mean_similarity_delta || 0), `${pct(c.mean_similarity)} → ${pct(s.mean_similarity)}`, deltaCls),
         metric("Perfect Tasks", `${c.success_count || 0} → ${s.success_count || 0}`, "exact success, control → SAGE"),
         metric("Accepted Tools", s.accepted_tool_count || 0, `${(s.accepted_tools || []).join(", ") || "none yet"}`, (s.accepted_tool_count || 0) > 0 ? "good" : "warn"),
@@ -361,15 +383,22 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (table) table.scrollTop = snapshot.tableTop;
       window.scrollTo(snapshot.x, snapshot.y);
     }
+    async function fetchDashboardJson(url) {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const text = await res.text();
+      if (!text.trim()) throw new SyntaxError("empty dashboard data");
+      return JSON.parse(text);
+    }
     async function refresh() {
       try {
         const scroll = captureScroll();
-        const res = await fetch(`data.json?ts=${Date.now()}`, { cache: "no-store" });
-        if (!res.ok) throw new Error(`${res.status}`);
-        render(await res.json());
+        render(await fetchDashboardJson(`data.json?ts=${Date.now()}`));
         requestAnimationFrame(() => restoreScroll(scroll));
       } catch (err) {
-        document.getElementById("subtitle").textContent = `Dashboard data unavailable: ${err}`;
+        if (!state || !(err instanceof SyntaxError)) {
+          document.getElementById("subtitle").textContent = `Dashboard data unavailable: ${err}`;
+        }
       }
     }
     document.getElementById("search").addEventListener("input", renderRows);

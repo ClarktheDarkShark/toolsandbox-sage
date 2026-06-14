@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" role="img" aria-labelledby="title desc">
+  <title id="title">High-Level SAGE Lifecycle</title>
+  <desc id="desc">A simple vertical diagram showing the SAGE lifecycle from task attempt through gap detection, tool generation, validation, registry storage, routing, tool use, and evidence logging.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f9fb; }
+      .title { font: 700 30px Arial, sans-serif; fill: #17202a; }
+      .subtitle { font: 400 16px Arial, sans-serif; fill: #4d5b68; }
+      .box { stroke-width: 2; rx: 14; ry: 14; }
+      .box-title { font: 700 18px Arial, sans-serif; fill: #17202a; }
+      .box-text { font: 400 14px Arial, sans-serif; fill: #34495e; }
+      .arrow { stroke: #35495e; stroke-width: 2.6; fill: none; marker-end: url(#arrowhead); }
+      .loop { stroke: #52796f; stroke-width: 2.6; fill: none; marker-end: url(#arrowhead-green); stroke-dasharray: 8 7; }
+      .loop-label { font: 700 13px Arial, sans-serif; fill: #52796f; }
+      .note { font: 400 13px Arial, sans-serif; fill: #51606f; }
+      .note-strong { font: 700 13px Arial, sans-serif; fill: #17202a; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M 0 0 L 10 4 L 0 8 z" fill="#35495e"/>
+    </marker>
+    <marker id="arrowhead-green" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M 0 0 L 10 4 L 0 8 z" fill="#52796f"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="900" height="900"/>
+
+  <text class="title" x="70" y="58">SAGE: High-Level Lifecycle</text>
+  <text class="subtitle" x="70" y="86">SAGE improves by generating, validating, registering, routing, and reusing tools.</text>
+
+  <rect class="box" x="260" y="120" width="380" height="68" fill="#e8f3f8" stroke="#4f8aa8"/>
+  <text class="box-title" x="330" y="148">1. Attempt Task</text>
+  <text class="box-text" x="330" y="171">Actor uses the current tool set.</text>
+
+  <line class="arrow" x1="450" y1="188" x2="450" y2="218"/>
+
+  <rect class="box" x="260" y="218" width="380" height="68" fill="#fff4df" stroke="#c48a2c"/>
+  <text class="box-title" x="330" y="246">2. Detect Gap</text>
+  <text class="box-text" x="330" y="269">Identify a missing or brittle capability.</text>
+
+  <line class="arrow" x1="450" y1="286" x2="450" y2="316"/>
+
+  <rect class="box" x="260" y="316" width="380" height="68" fill="#eef7ea" stroke="#6fa45f"/>
+  <text class="box-title" x="330" y="344">3. Generate Tool</text>
+  <text class="box-text" x="330" y="367">Create a deterministic candidate tool.</text>
+
+  <line class="arrow" x1="450" y1="384" x2="450" y2="414"/>
+
+  <rect class="box" x="260" y="414" width="380" height="68" fill="#f4ecf7" stroke="#8f6aa6"/>
+  <text class="box-title" x="330" y="442">4. Validate And Repair</text>
+  <text class="box-text" x="330" y="465">Check schema, calls, outputs, and safety.</text>
+
+  <line class="arrow" x1="450" y1="482" x2="450" y2="512"/>
+
+  <rect class="box" x="260" y="512" width="380" height="68" fill="#e8f3f8" stroke="#4f8aa8"/>
+  <text class="box-title" x="330" y="540">5. Store In Registry</text>
+  <text class="box-text" x="330" y="563">Save accepted tools with metadata.</text>
+
+  <line class="arrow" x1="450" y1="580" x2="450" y2="610"/>
+
+  <rect class="box" x="260" y="610" width="380" height="68" fill="#eef7ea" stroke="#6fa45f"/>
+  <text class="box-title" x="330" y="638">6. Route Tools</text>
+  <text class="box-text" x="330" y="661">Expose a small relevant tool bundle.</text>
+
+  <line class="arrow" x1="450" y1="678" x2="450" y2="708"/>
+
+  <rect class="box" x="260" y="708" width="380" height="68" fill="#fff4df" stroke="#c48a2c"/>
+  <text class="box-title" x="330" y="736">7. Reuse And Measure</text>
+  <text class="box-text" x="330" y="759">Log calls, gains, failures, and cost.</text>
+
+  <path class="loop" d="M 260 742 C 118 735, 118 168, 260 154"/>
+  <text class="loop-label" x="92" y="420" transform="rotate(-90 92 420)">future tasks reuse accepted tools</text>
+
+  <rect x="92" y="825" width="716" height="44" rx="10" ry="10" fill="#ffffff" stroke="#d5dde5" stroke-width="1.5"/>
+  <text class="note-strong" x="118" y="852">Boundary:</text>
+  <text class="note" x="192" y="852">SAGE gains must come from generated tools, validation, routing, and measured reuse.</text>
+</svg>

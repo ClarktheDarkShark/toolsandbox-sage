@@ -14,6 +14,12 @@ from sage_ts.evaluation.control_baseline_cache import (
 from sage_ts.evaluation.task_strata import cohort_policy_report
 
 
+@pytest.fixture(autouse=True)
+def _default_cache_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY", raising=False)
+    monkeypatch.delenv("SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS", raising=False)
+
+
 def _context(
     name: str = "task", *, model: str = "gpt-4o-mini", scorer: str = "scorer"
 ) -> dict:
@@ -129,6 +135,27 @@ def test_eligibility_requires_three_compatible_completed_runs(tmp_path: Path) ->
     assert lookup.stats is not None
     assert lookup.stats["compatible_count"] == 3
     assert lookup.stats["canonical_variance"] > 0
+
+
+def test_min_compatible_runs_can_be_overridden_for_recovery_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = ControlBaselineCache(tmp_path / "cache")
+    ctx = _context()
+    _add(cache, ctx, _row(similarity=0.75, outcome=0.5), tmp_path)
+
+    assert not cache.lookup(ctx).eligible
+    monkeypatch.setenv("SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS", "1")
+    lookup = cache.lookup(ctx)
+
+    assert lookup.eligible
+    assert lookup.row is not None
+    assert lookup.row["similarity"] == pytest.approx(0.75)
+    assert lookup.stats is not None
+    assert lookup.stats["min_compatible_completed_runs"] == 1
+    assert lookup.stats["cache_match_policy"] == (
+        "task_name_agent_user_base_tool_policy_min1"
+    )
 
 
 def test_task_level_cache_ignores_state_runner_scorer_and_sandbox_changes(
