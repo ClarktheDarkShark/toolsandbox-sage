@@ -21,6 +21,20 @@ PINNED_BENCHMARK_SHA256 = (
 PINNED_SCENARIO_ORDER_SHA256 = (
     "fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176"
 )
+PINNED_PILOT_BENCHMARK_SHA256 = (
+    "378b681dbe86e0f27c911c485c6257075c9fe377f7c993f8083cba35a2fdda90"
+)
+PINNED_PILOT_SCENARIO_ORDER_SHA256 = (
+    "ce19bea3a0ff404487c195dd68a9f07f3e8705a9ed59364a534b13385da09d5e"
+)
+PUBLICATION_COHORT_PINS: dict[str, tuple[int, str, str]] = {
+    "full": (1032, PINNED_BENCHMARK_SHA256, PINNED_SCENARIO_ORDER_SHA256),
+    "pilot": (
+        30,
+        PINNED_PILOT_BENCHMARK_SHA256,
+        PINNED_PILOT_SCENARIO_ORDER_SHA256,
+    ),
+}
 PINNED_PUBLICATION_ENVIRONMENT_LOCK_SHA256 = (
     "5c3ea1802331bf45809fd3e3e31fd8352473449e709cd7a443d03d1975477d1f"
 )
@@ -52,6 +66,18 @@ LLM_USAGE_SOURCE_INTEGER_FIELDS = tuple(
 )
 _PUBLICATION_LOCK_LINE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;]+)$")
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def publication_cohort_pins(cohort: str) -> tuple[int, str, str]:
+    """Return immutable task-count, benchmark, and order pins for one cohort."""
+
+    try:
+        return PUBLICATION_COHORT_PINS[cohort]
+    except KeyError as exc:
+        choices = ", ".join(sorted(PUBLICATION_COHORT_PINS))
+        raise ValueError(
+            f"Unknown publication cohort {cohort!r}; expected one of: {choices}."
+        ) from exc
 
 
 def _external_distribution_lock_identity(lock_path: Path) -> tuple[int, str]:
@@ -960,25 +986,283 @@ def verify_run(
     }
 
 
+def verify_pinned_run(
+    search_root: Path,
+    *,
+    cohort: str = "full",
+    expect_reflection: str,
+) -> dict[str, Any]:
+    """Verify one internally pinned publication cohort without caller-supplied pins."""
+
+    if expect_reflection not in {"same-run-fresh", "not-applicable"}:
+        raise ValueError(
+            "expect_reflection must be 'same-run-fresh' or 'not-applicable'."
+        )
+    expected_tasks, expected_benchmark, expected_order = publication_cohort_pins(cohort)
+    result = verify_run(
+        search_root,
+        expected_tasks=expected_tasks,
+        expect_reflection=expect_reflection,
+        expected_benchmark_sha256=expected_benchmark,
+        expected_scenario_order_sha256=expected_order,
+    )
+    result["publication_cohort"] = cohort
+    return result
+
+
+def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
+    """Revalidate a complete, same-source 30-task selector pilot artifact."""
+
+    evidence_path = evidence_path.resolve()
+    if evidence_path.name != "actor_selection_experiment_manifest.json":
+        raise ValueError(
+            "Selector pilot evidence must be actor_selection_experiment_manifest.json."
+        )
+    evidence = _read_json(evidence_path)
+    expected_tasks, expected_benchmark_sha256, expected_order_sha256 = (
+        publication_cohort_pins("pilot")
+    )
+    required_evidence = {
+        "schema_version": 1,
+        "experiment": "sage_auto_selection",
+        "stage": "pilot",
+        "status": "complete",
+        "scenario_count": expected_tasks,
+        "policy_generation_enabled": True,
+        "auto_generation_enabled": False,
+        "auto_evolution_source": "matched_policy_inventory_authority",
+        "persistent_response_cache_reuse": False,
+        "stability_gate_passed": True,
+        "stability_gate_reasons": [],
+        "benchmark_manifest_sha256": expected_benchmark_sha256,
+        "scenario_order_sha256": expected_order_sha256,
+    }
+    for field, expected in required_evidence.items():
+        if evidence.get(field) != expected:
+            raise ValueError(
+                f"Selector pilot evidence field {field!r} is "
+                f"{evidence.get(field)!r}; expected {expected!r}."
+            )
+
+    run_root = evidence_path.parent.resolve()
+    protocol_path = _resolve_declared_path(
+        run_root,
+        evidence.get("policy_protocol_manifest_path"),
+        "policy_protocol_manifest_path",
+        required_parent=run_root,
+    )
+    if (
+        protocol_path != run_root / "protocol_manifest.json"
+        or not protocol_path.is_file()
+    ):
+        raise ValueError(
+            "Selector pilot evidence does not link its same-run protocol manifest."
+        )
+    protocol_sha256 = hashlib.sha256(protocol_path.read_bytes()).hexdigest()
+    if evidence.get("policy_protocol_manifest_sha256") != protocol_sha256:
+        raise ValueError("Selector pilot policy protocol digest has drifted.")
+    protocol = _read_json(protocol_path)
+    if (
+        protocol.get("candidate_actor_selection_mode") != "policy"
+        or protocol.get("inventory_authority_mode") != "capture"
+        or protocol.get("scenario_count") != expected_tasks
+        or protocol.get("benchmark_manifest_sha256") != expected_benchmark_sha256
+        or protocol.get("scenario_order_sha256") != expected_order_sha256
+    ):
+        raise ValueError(
+            "Selector pilot policy protocol is not the pinned policy-authority donor."
+        )
+
+    current_source = _clean_source_identity(REPO_ROOT)
+    source_identity = evidence.get("source_identity")
+    if not isinstance(source_identity, dict) or any(
+        source_identity.get(field) != current_source[field]
+        for field in ("git_commit", "git_tree")
+    ):
+        raise ValueError(
+            "Selector pilot evidence source does not match the current clean source."
+        )
+
+    policy_dir = _resolve_declared_path(
+        run_root,
+        evidence.get("policy_run_dir"),
+        "policy_run_dir",
+        required_parent=run_root / "candidate",
+    )
+    protocol_policy_dir = _resolve_declared_path(
+        run_root,
+        protocol.get("candidate_dir"),
+        "candidate_dir",
+        required_parent=run_root / "candidate",
+    )
+    if policy_dir != protocol_policy_dir or not policy_dir.is_dir():
+        raise ValueError("Selector pilot policy run link does not match its protocol.")
+    auto_dir = _resolve_declared_path(
+        run_root,
+        evidence.get("auto_run_dir"),
+        "auto_run_dir",
+        required_parent=run_root / "sage_auto_selection",
+    )
+    if not auto_dir.is_dir():
+        raise ValueError("Selector pilot auto-selection run is missing.")
+    authority_path = _resolve_declared_path(
+        run_root,
+        evidence.get("inventory_authority_path"),
+        "inventory_authority_path",
+    )
+    if not authority_path.is_file():
+        raise ValueError("Selector pilot inventory authority is missing.")
+    authority_sha256 = hashlib.sha256(authority_path.read_bytes()).hexdigest()
+    if (
+        evidence.get("inventory_authority_sha256") != authority_sha256
+        or protocol.get("inventory_authority_manifest_sha256") != authority_sha256
+        or evidence.get("inventory_authority_tasks_sha256")
+        != protocol.get("inventory_authority_tasks_sha256")
+    ):
+        raise ValueError("Selector pilot inventory authority digest has drifted.")
+
+    benchmark_path = _resolve_declared_path(
+        run_root,
+        evidence.get("benchmark_manifest_path"),
+        "benchmark_manifest_path",
+    )
+    protocol_benchmark_path = _resolve_declared_path(
+        run_root,
+        protocol.get("benchmark_manifest_path"),
+        "benchmark_manifest_path",
+    )
+    if (
+        benchmark_path != protocol_benchmark_path
+        or not benchmark_path.is_file()
+        or hashlib.sha256(benchmark_path.read_bytes()).hexdigest()
+        != expected_benchmark_sha256
+    ):
+        raise ValueError("Selector pilot benchmark link or bytes have drifted.")
+
+    comparison_path = _resolve_declared_path(
+        run_root,
+        evidence.get("outcome_comparison_path"),
+        "outcome_comparison_path",
+        required_parent=run_root,
+    )
+    if (
+        comparison_path != run_root / "actor_selection_outcome_comparison.json"
+        or not comparison_path.is_file()
+    ):
+        raise ValueError("Selector pilot outcome-comparison artifact is missing.")
+    status_path = run_root / "sage_auto_selection_arm_status.json"
+    status = _read_json(status_path)
+    status_run_dir = _resolve_declared_path(
+        run_root,
+        status.get("run_dir"),
+        "sage_auto_selection_arm_status.run_dir",
+        required_parent=run_root / "sage_auto_selection",
+    )
+    if (
+        status.get("arm") != "sage_auto_selection"
+        or status.get("status") != "complete"
+        or status_run_dir != auto_dir
+    ):
+        raise ValueError("Selector pilot auto-selection completion status is invalid.")
+
+    integrity = verify_pinned_run(
+        run_root,
+        cohort="pilot",
+        expect_reflection="same-run-fresh",
+    )
+    if Path(str(integrity.get("run_root") or "")).resolve() != run_root:
+        raise ValueError("Selector pilot publication verifier selected another run.")
+
+    from sage_ts.evaluation.actor_selection_comparison import (
+        verify_matched_actor_selection_experiment,
+    )
+
+    recomputed_comparison = verify_matched_actor_selection_experiment(
+        policy_dir=policy_dir,
+        auto_dir=auto_dir,
+        authority_path=authority_path,
+        require_zero_generated_tool_failures=True,
+    )
+    stored_comparison = _read_json(comparison_path)
+    if stored_comparison != recomputed_comparison:
+        raise ValueError(
+            "Selector pilot comparison does not match recomputed evidence."
+        )
+    if (
+        recomputed_comparison.get("stability_gate_passed") is not True
+        or recomputed_comparison.get("stability_gate_reasons") != []
+        or recomputed_comparison.get("scenario_count") != expected_tasks
+    ):
+        raise ValueError("Selector pilot stability gate did not pass on revalidation.")
+
+    return {
+        "status": "pass",
+        "stage": "pilot",
+        "scenario_count": expected_tasks,
+        "evidence_path": str(evidence_path),
+        "evidence_sha256": hashlib.sha256(evidence_path.read_bytes()).hexdigest(),
+        "policy_protocol_manifest_sha256": protocol_sha256,
+        "inventory_authority_sha256": authority_sha256,
+        "inventory_authority_tasks_sha256": evidence.get(
+            "inventory_authority_tasks_sha256"
+        ),
+        "benchmark_manifest_sha256": expected_benchmark_sha256,
+        "scenario_order_sha256": expected_order_sha256,
+        "git_commit": current_source["git_commit"],
+        "git_tree": current_source["git_tree"],
+        "stability_gate_passed": True,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--search-root", type=Path, required=True)
-    parser.add_argument("--expected-tasks", type=int, default=1032)
+    parser.add_argument("--search-root", type=Path)
+    parser.add_argument(
+        "--cohort",
+        choices=tuple(sorted(PUBLICATION_COHORT_PINS)),
+        default="full",
+        help="Internally pinned publication cohort (default: full).",
+    )
+    parser.add_argument(
+        "--selector-pilot-evidence",
+        type=Path,
+        help=(
+            "Revalidate a completed pinned selector pilot manifest instead of a "
+            "new publication run."
+        ),
+    )
     parser.add_argument(
         "--expect-reflection",
         choices=("same-run-fresh", "not-applicable"),
-        required=True,
     )
     args = parser.parse_args()
+    verification_label = (
+        "selector_pilot_evidence_verification"
+        if args.selector_pilot_evidence is not None
+        else "publication_run_verification"
+    )
     try:
-        result = verify_run(
-            args.search_root,
-            expected_tasks=args.expected_tasks,
-            expect_reflection=args.expect_reflection,
-        )
+        if args.selector_pilot_evidence is not None:
+            if args.search_root is not None or args.expect_reflection is not None:
+                parser.error(
+                    "--selector-pilot-evidence cannot be combined with "
+                    "--search-root or --expect-reflection"
+                )
+            result = verify_selector_pilot_evidence(args.selector_pilot_evidence)
+        else:
+            if args.search_root is None or args.expect_reflection is None:
+                parser.error(
+                    "--search-root and --expect-reflection are required for run "
+                    "verification"
+                )
+            result = verify_pinned_run(
+                args.search_root,
+                cohort=args.cohort,
+                expect_reflection=args.expect_reflection,
+            )
     except ValueError as exc:
-        raise SystemExit(f"publication_run_verification=failed\n{exc}") from exc
-    print("publication_run_verification=pass")
+        raise SystemExit(f"{verification_label}=failed\n{exc}") from exc
+    print(f"{verification_label}=pass")
     print(json.dumps(result, indent=2))
 
 

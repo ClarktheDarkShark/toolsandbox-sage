@@ -12,6 +12,9 @@ from scripts.run_sage_protocol import (
     SAGE_POLICY_SELF_EVOLVING_PRAXIS,
     SELF_EVOLVING_PRAXIS_ENV_DEFAULTS,
     _apply_sage_policy_preset,
+    _candidate_arm_name,
+    _candidate_arm_root,
+    _candidate_generation_enabled,
     _generation_enabled_by_default,
     _protocol_gate_decision,
     _resolve_sage_policy_preset,
@@ -52,6 +55,122 @@ def test_transfer_mode_stays_frozen_for_non_discovery_manifest() -> None:
 
 def test_mechanism_mode_enables_generation_by_default() -> None:
     assert _generation_enabled_by_default("mechanism_40", "anything") is True
+
+
+def test_auto_actor_selection_uses_explicit_third_arm_label(tmp_path) -> None:
+    assert _candidate_arm_name("policy") == "candidate"
+    assert _candidate_arm_name("auto") == "sage_auto_selection"
+    assert _candidate_arm_root(tmp_path, "policy") == tmp_path / "candidate"
+    assert _candidate_arm_root(tmp_path, "auto") == tmp_path / "sage_auto_selection"
+
+
+def test_inventory_replay_suppresses_arm_specific_generation(tmp_path) -> None:
+    assert _candidate_generation_enabled(True, None) is True
+    assert _candidate_generation_enabled(False, None) is False
+    assert _candidate_generation_enabled(True, tmp_path / "authority") is False
+
+
+def test_failed_gate_restores_registry_and_lifecycle_bytes(tmp_path) -> None:
+    run_root = tmp_path / "run"
+    registry = tmp_path / "registry"
+    registry.mkdir()
+    original_manifest = b'{"tools":{"before":{}}}\n'
+    original_lifecycle = b'{"tool_lifecycle":{"before":{}}}\n'
+    (registry / "registry_manifest.json").write_bytes(original_manifest)
+    (registry / "tool_lifecycle.json").write_bytes(original_lifecycle)
+
+    snapshot = _snapshot_registry_for_gate(run_root, registry)
+    (registry / "registry_manifest.json").write_text(
+        '{"tools":{"after":{}}}\n', encoding="utf-8"
+    )
+    (registry / "tool_lifecycle.json").write_text(
+        '{"tool_lifecycle":{"after":{}}}\n', encoding="utf-8"
+    )
+
+    restored = _restore_registry_after_failed_gate(
+        run_root=run_root,
+        registry_dir=registry,
+        snapshot=snapshot,
+    )
+
+    assert (registry / "registry_manifest.json").read_bytes() == original_manifest
+    assert (registry / "tool_lifecycle.json").read_bytes() == original_lifecycle
+    assert restored["files"]["registry_manifest.json"]["failed_snapshot_path"]
+    assert restored["files"]["tool_lifecycle.json"]["failed_snapshot_path"]
+
+
+def test_protocol_cli_rejects_unknown_actor_selection_mode(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_sage_protocol.py",
+            "--mode",
+            "mechanism_40",
+            "--manifest",
+            "unused.json",
+            "--actor-selection-mode",
+            "unsupported",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_protocol_main()
+
+    assert exc_info.value.code == 2
+
+
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        (
+            [
+                "--actor-selection-mode",
+                "auto",
+                "--inventory-authority-capture-dir",
+                "authority",
+            ],
+            "capture-dir requires --actor-selection-mode policy",
+        ),
+        (
+            ["--inventory-authority-replay-dir", "authority"],
+            "replay-dir requires --actor-selection-mode auto",
+        ),
+        (
+            [
+                "--inventory-authority-capture-dir",
+                "authority",
+                "--resume-run-root",
+                "prior-run",
+            ],
+            "capture/replay forbids --resume-run-root",
+        ),
+        (
+            ["--inventory-authority-capture-dir", "authority"],
+            "capture/replay requires --freeze-toolsandbox-clock",
+        ),
+    ],
+)
+def test_protocol_cli_rejects_invalid_inventory_authority_pairing(
+    monkeypatch,
+    arguments,
+    message,
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_sage_protocol.py",
+            "--mode",
+            "mechanism_40",
+            "--manifest",
+            "unused.json",
+            *arguments,
+        ],
+    )
+
+    with pytest.raises(SystemExit, match=message):
+        run_protocol_main()
 
 
 def test_auto_sage_policy_uses_praxis_for_generation_enabled_runs() -> None:

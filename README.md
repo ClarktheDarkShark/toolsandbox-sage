@@ -70,6 +70,65 @@ additionally requires a clean Git tree
 and the exact validated isolated Python environment before it can start either
 arm.
 
+### Matched actor-selection arm
+
+The actor exposes an explicit `actor_selection_mode=policy|auto` setting. The
+default `policy` mode is the publication implementation: selector prompting,
+the selection cascade, dynamic generated-schema filtering, wrapped-native
+schema hiding, and any named `tool_choice` remain active. The experimental
+`auto` mode takes the first branch in actor inference and sends the original
+conversation plus every routed native and generated schema directly to the
+upstream model. It does not run any of those policy-selection interventions.
+
+The comparison is fail-closed and matched per task. A policy donor run captures
+the exact actor-ready registry and lifecycle bytes after same-task tool birth,
+plus routing decisions, generated entries, tool order, allow-list, source,
+models, environment, clock, benchmark, and fixture hashes. Before each auto
+task, replay restores that donor state and verifies the routed inventory before
+the first model request. Independent generation, reflection, and lifecycle
+mutation are disabled only in the replay arm because allowing them to run again
+would create a different inventory and confound the selection comparison. Thus
+the estimand is the actor-selection effect conditional on the policy donor's
+exact adaptive tool-birth and lifecycle schedule.
+
+Every actor request is linked one-to-one to its model-usage record. The run
+stores exact native/generated schema bundles in a content-addressed catalog and
+asserts that every auto request has mode `auto`, no named `tool_choice`, and the
+complete routed schema bundle. The post-run comparison excludes canonical
+similarity and reports only outcome-evaluator values. It also rejects response
+cache hits, task/order drift, schema drift, terminal runtime exceptions, and
+incomplete generated-tool attempts. The pilot additionally requires zero
+generated-tool execution failures before the full comparison is allowed; the
+full comparison records those failures as outcome-relevant behavior instead of
+silently discarding the arm.
+
+Run the sealed 30-task feasibility pilot first:
+
+```bash
+source .venv-publication/bin/activate
+SAGE_RUN_STAMP=selector_pilot_$(date +%Y%m%d_%H%M%S) \
+  ./scripts/run_native_action_4omini_ab.sh pilot 63105 native-only
+```
+
+The pilot automatically runs a fresh control, policy donor, and matched auto
+arm. Only after its stability gate passes, run one 1,032-task comparison:
+
+```bash
+source .venv-publication/bin/activate
+SAGE_AUTO_SELECTION_EXPERIMENT=1 \
+SAGE_AUTO_SELECTION_PILOT_EVIDENCE=/absolute/path/to/actor_selection_experiment_manifest.json \
+SAGE_RUN_STAMP=selector_full_$(date +%Y%m%d_%H%M%S) \
+  ./scripts/run_native_action_4omini_ab.sh full 63105 native-only
+```
+
+The normal `full` command remains the original two-arm protocol unless
+`SAGE_AUTO_SELECTION_EXPERIMENT=1` is set. Selector runs add
+`actor_selection_outcome_comparison.json` and
+`actor_selection_experiment_manifest.json` to the protocol run root, alongside
+the policy `candidate/` and `sage_auto_selection/` run directories.
+The full selector launcher re-verifies the supplied pilot manifest and all of
+its sealed artifacts before making any new model request.
+
 “Fresh model call” here means that SAGE does not replay a stored model response.
 OpenAI separately enables provider-managed prompt-prefix caching for supported
 models. GPT-4o Mini can therefore report cached input tokens even though it

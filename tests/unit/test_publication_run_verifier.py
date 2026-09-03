@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+import sage_ts.evaluation.actor_selection_comparison as actor_selection_comparison
 import scripts.run_sage_protocol as protocol_runner
 import scripts.verify_publication_run as publication_verifier
 from scripts.run_chapter4_evidence_campaign import _job_command
@@ -369,6 +370,170 @@ def _verification_pins(run_root: Path) -> dict[str, str]:
         "expected_benchmark_sha256": str(protocol["benchmark_manifest_sha256"]),
         "expected_scenario_order_sha256": str(protocol["scenario_order_sha256"]),
     }
+
+
+def test_publication_cohort_pins_are_internal_and_exact() -> None:
+    assert publication_verifier.publication_cohort_pins("full") == (
+        1032,
+        publication_verifier.PINNED_BENCHMARK_SHA256,
+        publication_verifier.PINNED_SCENARIO_ORDER_SHA256,
+    )
+    assert publication_verifier.publication_cohort_pins("pilot") == (
+        30,
+        publication_verifier.PINNED_PILOT_BENCHMARK_SHA256,
+        publication_verifier.PINNED_PILOT_SCENARIO_ORDER_SHA256,
+    )
+    with pytest.raises(ValueError, match="Unknown publication cohort"):
+        publication_verifier.publication_cohort_pins("custom")
+
+
+def test_pinned_run_resolves_pins_without_caller_values(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_verify_run(search_root: Path, **kwargs: object) -> dict[str, object]:
+        observed["search_root"] = search_root
+        observed.update(kwargs)
+        return {"status": "pass"}
+
+    monkeypatch.setattr(publication_verifier, "verify_run", fake_verify_run)
+
+    result = publication_verifier.verify_pinned_run(
+        tmp_path,
+        cohort="pilot",
+        expect_reflection="same-run-fresh",
+    )
+
+    assert observed == {
+        "search_root": tmp_path,
+        "expected_tasks": 30,
+        "expect_reflection": "same-run-fresh",
+        "expected_benchmark_sha256": (
+            publication_verifier.PINNED_PILOT_BENCHMARK_SHA256
+        ),
+        "expected_scenario_order_sha256": (
+            publication_verifier.PINNED_PILOT_SCENARIO_ORDER_SHA256
+        ),
+    }
+    assert result == {"status": "pass", "publication_cohort": "pilot"}
+    with pytest.raises(ValueError, match="expect_reflection"):
+        publication_verifier.verify_pinned_run(
+            tmp_path,
+            cohort="pilot",
+            expect_reflection="unknown",
+        )
+
+
+def test_selector_full_gate_revalidates_linked_pilot_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "online_build_full_pilot"
+    policy_dir = run_root / "candidate" / "policy_run"
+    auto_dir = run_root / "sage_auto_selection" / "auto_run"
+    policy_dir.mkdir(parents=True)
+    auto_dir.mkdir(parents=True)
+    benchmark_path = tmp_path / "pilot_manifest.json"
+    benchmark_path.write_text('{"sealed": true}\n', encoding="utf-8")
+    benchmark_sha256 = hashlib.sha256(benchmark_path.read_bytes()).hexdigest()
+    order_sha256 = "3" * 64
+    monkeypatch.setitem(
+        publication_verifier.PUBLICATION_COHORT_PINS,
+        "pilot",
+        (30, benchmark_sha256, order_sha256),
+    )
+    authority_path = tmp_path / "authority" / "inventory_authority.json"
+    _write_json(authority_path, {"complete": True})
+    authority_sha256 = hashlib.sha256(authority_path.read_bytes()).hexdigest()
+    tasks_sha256 = "4" * 64
+    protocol_path = run_root / "protocol_manifest.json"
+    _write_json(
+        protocol_path,
+        {
+            "candidate_actor_selection_mode": "policy",
+            "inventory_authority_mode": "capture",
+            "inventory_authority_manifest_sha256": authority_sha256,
+            "inventory_authority_tasks_sha256": tasks_sha256,
+            "scenario_count": 30,
+            "benchmark_manifest_path": str(benchmark_path),
+            "benchmark_manifest_sha256": benchmark_sha256,
+            "scenario_order_sha256": order_sha256,
+            "candidate_dir": str(policy_dir),
+        },
+    )
+    protocol_sha256 = hashlib.sha256(protocol_path.read_bytes()).hexdigest()
+    comparison = {
+        "schema_version": 1,
+        "experiment": "sage_auto_selection",
+        "scenario_count": 30,
+        "stability_gate_passed": True,
+        "stability_gate_reasons": [],
+    }
+    comparison_path = run_root / "actor_selection_outcome_comparison.json"
+    _write_json(comparison_path, comparison)
+    _write_json(
+        run_root / "sage_auto_selection_arm_status.json",
+        {
+            "arm": "sage_auto_selection",
+            "status": "complete",
+            "run_dir": str(auto_dir),
+        },
+    )
+    evidence_path = run_root / "actor_selection_experiment_manifest.json"
+    _write_json(
+        evidence_path,
+        {
+            "schema_version": 1,
+            "experiment": "sage_auto_selection",
+            "stage": "pilot",
+            "status": "complete",
+            "scenario_count": 30,
+            "policy_generation_enabled": True,
+            "auto_generation_enabled": False,
+            "auto_evolution_source": "matched_policy_inventory_authority",
+            "persistent_response_cache_reuse": False,
+            "stability_gate_passed": True,
+            "stability_gate_reasons": [],
+            "policy_protocol_manifest_path": str(protocol_path),
+            "policy_protocol_manifest_sha256": protocol_sha256,
+            "policy_run_dir": str(policy_dir),
+            "auto_run_dir": str(auto_dir),
+            "inventory_authority_path": str(authority_path),
+            "inventory_authority_sha256": authority_sha256,
+            "inventory_authority_tasks_sha256": tasks_sha256,
+            "benchmark_manifest_path": str(benchmark_path),
+            "benchmark_manifest_sha256": benchmark_sha256,
+            "scenario_order_sha256": order_sha256,
+            "source_identity": {
+                "git_commit": TEST_GIT_COMMIT,
+                "git_tree": TEST_GIT_TREE,
+            },
+            "outcome_comparison_path": str(comparison_path),
+        },
+    )
+    monkeypatch.setattr(
+        publication_verifier,
+        "verify_pinned_run",
+        lambda *args, **kwargs: {"run_root": str(run_root), "status": "pass"},
+    )
+    monkeypatch.setattr(
+        actor_selection_comparison,
+        "verify_matched_actor_selection_experiment",
+        lambda **kwargs: comparison,
+    )
+
+    result = publication_verifier.verify_selector_pilot_evidence(evidence_path)
+
+    assert result["status"] == "pass"
+    assert result["scenario_count"] == 30
+    assert result["stability_gate_passed"] is True
+    assert result["git_commit"] == TEST_GIT_COMMIT
+    assert (
+        result["evidence_sha256"]
+        == hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+    )
 
 
 def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:

@@ -7,6 +7,7 @@ from typing import Optional
 import pytest
 
 from sage_ts.adapters.sage_run_adapter import (
+    InventoryAuthorityError,
     SageRunConfig,
     _side_effect_followup_failures,
     _side_effect_followup_failures_from_trace_events,
@@ -357,6 +358,707 @@ def _registry_with_canonicalizer(path: Path) -> RegistryStore:
     store = RegistryStore(path)
     store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
     return store
+
+
+@pytest.fixture
+def matched_authority_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP", "1784832588")
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.git_sha",
+        lambda: "a" * 40,
+    )
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter._tracked_source_state",
+        lambda _root: {
+            "tracked_changes_present": False,
+            "tracked_diff_sha256": "b" * 64,
+        },
+    )
+
+
+def test_inventory_authority_capture_and_replay_restore_exact_pre_task_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    matched_authority_context: None,
+) -> None:
+    del matched_authority_context
+    benchmark_manifest = tmp_path / "benchmark_manifest.json"
+    benchmark_manifest.write_text('{"sealed": true}\n', encoding="utf-8")
+    rapidapi_fixture = tmp_path / "rapidapi_fixture.json"
+    rapidapi_fixture.write_text('{"fixture": "sealed"}\n', encoding="utf-8")
+    monkeypatch.setenv("TOOLSANDBOX_RAPID_CACHE_MODE", "strict")
+    monkeypatch.setenv("TOOLSANDBOX_RAPID_CACHE_PATH", str(rapidapi_fixture))
+    monkeypatch.setenv("SAGE_OPENAI_MAX_RETRIES", "5")
+    donor_store = _registry_with_canonicalizer(tmp_path / "donor_registry")
+    donor_lifecycle = {
+        "artifact_type": "self_evolution_tool_lifecycle",
+        "tool_lifecycle": {},
+    }
+    (donor_store.root / "tool_lifecycle.json").write_text(
+        json.dumps(donor_lifecycle) + "\n",
+        encoding="utf-8",
+    )
+    authority_root = tmp_path / "inventory_authority"
+    scenario_names = ("toy_birth", "toy_birth_2")
+
+    def capture_sequence(
+        config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        result_hook: Optional[ResultHook] = None,
+        **_kwargs: object,
+    ) -> Path:
+        assert config.actor_selection_mode == "policy"
+        output_dir = tmp_path / "capture_run"
+        output_dir.mkdir()
+        for index, name in enumerate(scenario_names):
+            monkeypatch.setenv("SAGE_TS_SCENARIO_ORDER_INDEX", str(index))
+            scenario = Scenario(
+                starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+            )
+            enhanced = scenario_transform(name, scenario, output_dir)
+            if index == 0:
+                partial = json.loads(
+                    (authority_root / "inventory_authority.partial.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                assert partial["complete"] is False
+                assert partial["expected_task_count"] == 2
+                assert partial["task_count"] == 1
+                assert partial["last_task"]["scenario"] == scenario_names[0]
+                assert "tasks" not in partial
+                assert "tasks_sha256" not in partial
+            assert (
+                "canonicalize_connectivity_label"
+                in enhanced.starting_context.get_available_tools(
+                    scrambling_allowed=False
+                )
+            )
+            if result_hook is not None:
+                result_hook(name, enhanced, {"similarity": 1.0}, output_dir)
+        return output_dir
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        capture_sequence,
+    )
+    run_sage_with_registry(
+        SageRunConfig(
+            agent="gpt-4o-mini",
+            user="gpt-4o-mini",
+            scenario_names=scenario_names,
+            output_dir=tmp_path / "capture_output",
+            registry_dir=donor_store.root,
+            generation_model="gpt-4o-mini-generation",
+            recurrence_threshold=3,
+            actor_selection_mode="policy",
+            manifest_path=benchmark_manifest,
+            inventory_authority_capture_dir=authority_root,
+        )
+    )
+
+    authority = json.loads(
+        (authority_root / "inventory_authority.json").read_text(encoding="utf-8")
+    )
+    assert not (authority_root / "inventory_authority.partial.json").exists()
+    assert authority["complete"] is True
+    assert authority["source_actor_selection_mode"] == "policy"
+    assert authority["source_generation_enabled"] is False
+    assert authority["expected_task_count"] == 2
+    assert len(authority["tasks"]) == 2
+    shared_context = authority["shared_context"]
+    assert shared_context["agent"] == "gpt-4o-mini"
+    assert shared_context["user"] == "gpt-4o-mini"
+    assert shared_context["generation_model"] == "gpt-4o-mini-generation"
+    assert shared_context["benchmark_manifest_present"] is True
+    assert shared_context["benchmark_manifest_sha256"]
+    assert shared_context["base_tool_policy"] == "upstream"
+    assert shared_context["recurrence_threshold"] == 3
+    assert shared_context["fixed_toolsandbox_timestamp"] == "1784832588"
+    assert shared_context["source_git_commit"] == "a" * 40
+    assert shared_context["tracked_source_state"] == {
+        "tracked_changes_present": False,
+        "tracked_diff_sha256": "b" * 64,
+    }
+    assert shared_context["behavior_environment"]["SAGE_OPENAI_MAX_RETRIES"] == "5"
+    assert shared_context["rapidapi_fixture"]["configured"] is True
+    assert shared_context["rapidapi_fixture"]["present"] is True
+    assert shared_context["rapidapi_fixture"]["sha256"]
+    assert authority["shared_context_sha256"]
+    assert authority["scenario_names"] == list(scenario_names)
+    assert authority["task_count"] == 2
+    assert [task["routed_generated_tool_names"] for task in authority["tasks"]] == [
+        ["canonicalize_connectivity_label"],
+        ["canonicalize_connectivity_label"],
+    ]
+    assert all(task["routed_inventory_sha256"] for task in authority["tasks"])
+
+    replay_store = RegistryStore(tmp_path / "replay_registry")
+
+    def replay_sequence(
+        config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        result_hook: Optional[ResultHook] = None,
+        **_kwargs: object,
+    ) -> Path:
+        assert config.actor_selection_mode == "auto"
+        output_dir = tmp_path / "replay_run"
+        output_dir.mkdir()
+        for index, name in enumerate(scenario_names):
+            monkeypatch.setenv("SAGE_TS_SCENARIO_ORDER_INDEX", str(index))
+            scenario = Scenario(
+                starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+            )
+            enhanced = scenario_transform(name, scenario, output_dir)
+            assert (
+                "canonicalize_connectivity_label"
+                in enhanced.starting_context.get_available_tools(
+                    scrambling_allowed=False
+                )
+            )
+            restored = replay_store.get("canonicalize_connectivity_label")
+            assert restored is not None and not restored.retired
+            tool = enhanced.starting_context.get_available_tools(
+                scrambling_allowed=False
+            )["canonicalize_connectivity_label"]
+            assert tool("Wi-Fi") == "wifi"
+            if result_hook is not None:
+                result_hook(name, enhanced, {"similarity": 1.0}, output_dir)
+            if index == 0:
+                # Simulate an arm-specific lifecycle decision after task 1. Task 2
+                # must still receive the donor's unretired entry and lifecycle.
+                replay_store.retire("canonicalize_connectivity_label")
+                (replay_store.root / "tool_lifecycle.json").write_text(
+                    json.dumps(
+                        {
+                            "tool_lifecycle": {
+                                "canonicalize_connectivity_label": {
+                                    "decision": "parked"
+                                }
+                            }
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+        return output_dir
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        replay_sequence,
+    )
+    replay_output = run_sage_with_registry(
+        SageRunConfig(
+            agent="gpt-4o-mini",
+            user="gpt-4o-mini",
+            scenario_names=scenario_names,
+            output_dir=tmp_path / "replay_output",
+            registry_dir=replay_store.root,
+            generation_model="gpt-4o-mini-generation",
+            recurrence_threshold=3,
+            actor_selection_mode="auto",
+            manifest_path=benchmark_manifest,
+            inventory_authority_replay_dir=authority_root,
+        )
+    )
+
+    replay_summary = json.loads(
+        (replay_output / "selection_summary.json").read_text(encoding="utf-8")
+    )
+    assert replay_summary["inventory_authority_mode"] == "replay"
+    assert replay_summary["inventory_authority_task_count"] == 2
+    assert replay_summary["inventory_authority_controls_later_exposure"] is True
+    assert replay_summary["generation_enabled"] is False
+    assert replay_summary["inventory_authority_source_generation_enabled"] is False
+    assert (
+        replay_summary["inventory_authority_shared_context_sha256"]
+        == authority["shared_context_sha256"]
+    )
+    assert (
+        replay_summary["inventory_authority_tasks_sha256"] == authority["tasks_sha256"]
+    )
+    replay_reuse_events = [
+        json.loads(line)
+        for line in (replay_output / "reuse_events.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    assert [event["scenario"] for event in replay_reuse_events] == list(scenario_names)
+    assert all(
+        event["tool_name"] == "canonicalize_connectivity_label"
+        for event in replay_reuse_events
+    )
+    restored_entry = replay_store.get("canonicalize_connectivity_label")
+    assert restored_entry is not None and restored_entry.reuse_count == 0
+    assert (
+        json.loads(
+            (replay_store.root / "tool_lifecycle.json").read_text(encoding="utf-8")
+        )
+        == donor_lifecycle
+    )
+
+
+def test_inventory_authority_captures_same_task_birth_and_replay_skips_repriming(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    matched_authority_context: None,
+) -> None:
+    del matched_authority_context
+    authority_root = tmp_path / "inventory_authority"
+    donor_store = RegistryStore(tmp_path / "donor_registry")
+    scenario_names = ("toy_birth",)
+
+    class FakeBirthController:
+        prime_allowed = True
+        initialization_count = 0
+        prime_count = 0
+
+        def __init__(self, *, store: RegistryStore, **_kwargs: object) -> None:
+            type(self).initialization_count += 1
+            self.store = store
+
+        def prime_before_scenario(
+            self, _scenario_name: str, _scenario: Scenario
+        ) -> list[str]:
+            type(self).prime_count += 1
+            if not self.prime_allowed:
+                raise AssertionError("replay must not independently re-prime births")
+            born = _registry_with_canonicalizer(self.store.root)
+            assert born.get("canonicalize_connectivity_label") is not None
+            return ["canonicalize_connectivity_label"]
+
+    class FakeReflectionController:
+        @classmethod
+        def from_env(cls, **_kwargs: object) -> "FakeReflectionController":
+            return cls()
+
+        def assert_fresh_control_complete(
+            self, _scenario_names: tuple[str, ...]
+        ) -> None:
+            return None
+
+    def one_scenario_sequence(
+        _config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / (
+            "capture_run" if FakeBirthController.prime_allowed else "replay_run"
+        )
+        output_dir.mkdir()
+        monkeypatch.setenv("SAGE_TS_SCENARIO_ORDER_INDEX", "0")
+        scenario = Scenario(
+            starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        )
+        enhanced = scenario_transform("toy_birth", scenario, output_dir)
+        assert (
+            "canonicalize_connectivity_label"
+            in enhanced.starting_context.get_available_tools(scrambling_allowed=False)
+        )
+        return output_dir
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.OnlineBirthController",
+        FakeBirthController,
+    )
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.SelfEvolutionReflectionController",
+        FakeReflectionController,
+    )
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        one_scenario_sequence,
+    )
+    run_sage_with_registry(
+        SageRunConfig(
+            agent="gpt-4o-mini",
+            user="gpt-4o-mini",
+            scenario_names=scenario_names,
+            output_dir=tmp_path / "capture_output",
+            registry_dir=donor_store.root,
+            inventory_authority_capture_dir=authority_root,
+        ),
+        generator=object(),  # type: ignore[arg-type]
+    )
+    authority = json.loads(
+        (authority_root / "inventory_authority.json").read_text(encoding="utf-8")
+    )
+    assert authority["source_generation_enabled"] is True
+    assert authority["tasks"][0]["registry_manifest_present"] is True
+    assert authority["tasks"][0]["routed_generated_tool_names"] == [
+        "canonicalize_connectivity_label"
+    ]
+    assert FakeBirthController.initialization_count == 1
+    assert FakeBirthController.prime_count == 1
+
+    FakeBirthController.prime_allowed = False
+    replay_store = RegistryStore(tmp_path / "replay_registry")
+    run_sage_with_registry(
+        SageRunConfig(
+            agent="gpt-4o-mini",
+            user="gpt-4o-mini",
+            scenario_names=scenario_names,
+            output_dir=tmp_path / "replay_output",
+            registry_dir=replay_store.root,
+            actor_selection_mode="auto",
+            inventory_authority_replay_dir=authority_root,
+        )
+    )
+    assert FakeBirthController.initialization_count == 1
+    assert FakeBirthController.prime_count == 1
+
+
+def test_inventory_authority_replay_rejects_independent_generator(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="requires generator=None"):
+        run_sage_with_registry(
+            SageRunConfig(
+                agent="gpt-4o-mini",
+                user="gpt-4o-mini",
+                scenario_names=("toy_birth",),
+                output_dir=tmp_path / "replay_output",
+                registry_dir=tmp_path / "replay_registry",
+                actor_selection_mode="auto",
+                inventory_authority_replay_dir=tmp_path / "inventory_authority",
+            ),
+            generator=object(),  # type: ignore[arg-type]
+        )
+
+
+def test_inventory_authority_replay_rejects_nonempty_registry(
+    tmp_path: Path,
+) -> None:
+    registry = tmp_path / "replay_registry"
+    registry.mkdir()
+    (registry / "tool_lifecycle.json").write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="requires an empty registry directory"):
+        run_sage_with_registry(
+            SageRunConfig(
+                agent="gpt-4o-mini",
+                user="gpt-4o-mini",
+                scenario_names=("toy_birth",),
+                output_dir=tmp_path / "replay_output",
+                registry_dir=registry,
+                actor_selection_mode="auto",
+                inventory_authority_replay_dir=tmp_path / "inventory_authority",
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    ("capture", "actor_selection_mode", "message"),
+    (
+        (True, "auto", "capture requires actor_selection_mode='policy'"),
+        (False, "policy", "replay requires actor_selection_mode='auto'"),
+    ),
+)
+def test_inventory_authority_core_enforces_treatment_modes(
+    tmp_path: Path,
+    *,
+    capture: bool,
+    actor_selection_mode: str,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        run_sage_with_registry(
+            SageRunConfig(
+                agent="gpt-4o-mini",
+                user="gpt-4o-mini",
+                scenario_names=("toy_birth",),
+                output_dir=tmp_path / "output",
+                registry_dir=tmp_path / "registry",
+                actor_selection_mode=actor_selection_mode,
+                inventory_authority_capture_dir=(
+                    tmp_path / "authority" if capture else None
+                ),
+                inventory_authority_replay_dir=(
+                    None if capture else tmp_path / "authority"
+                ),
+            )
+        )
+
+
+def test_inventory_authority_requires_frozen_toolsandbox_clock(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP", raising=False)
+    with pytest.raises(ValueError, match="requires a fixed ToolSandbox timestamp"):
+        run_sage_with_registry(
+            SageRunConfig(
+                agent="gpt-4o-mini",
+                user="gpt-4o-mini",
+                scenario_names=("toy_birth",),
+                output_dir=tmp_path / "output",
+                registry_dir=tmp_path / "registry",
+                actor_selection_mode="policy",
+                inventory_authority_capture_dir=tmp_path / "authority",
+            )
+        )
+
+
+def test_inventory_authority_replay_rejects_shared_context_drift_before_run(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    matched_authority_context: None,
+) -> None:
+    del matched_authority_context
+    donor_store = _registry_with_canonicalizer(tmp_path / "donor_registry")
+    authority_root = tmp_path / "inventory_authority"
+
+    def capture_sequence(
+        _config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / "capture_run"
+        output_dir.mkdir()
+        monkeypatch.setenv("SAGE_TS_SCENARIO_ORDER_INDEX", "0")
+        scenario_transform(
+            "toy_birth",
+            Scenario(
+                starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+            ),
+            output_dir,
+        )
+        return output_dir
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        capture_sequence,
+    )
+    base_config = {
+        "agent": "gpt-4o-mini",
+        "user": "gpt-4o-mini",
+        "scenario_names": ("toy_birth",),
+        "generation_model": "gpt-4o-mini-generation",
+    }
+    run_sage_with_registry(
+        SageRunConfig(
+            **base_config,
+            output_dir=tmp_path / "capture_output",
+            registry_dir=donor_store.root,
+            actor_selection_mode="policy",
+            inventory_authority_capture_dir=authority_root,
+        )
+    )
+
+    run_started = False
+
+    def must_not_run(*_args: object, **_kwargs: object) -> Path:
+        nonlocal run_started
+        run_started = True
+        raise AssertionError("shared-context drift reached the scenario runner")
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        must_not_run,
+    )
+    with pytest.raises(ValueError, match="generation_model"):
+        run_sage_with_registry(
+            SageRunConfig(
+                **{**base_config, "generation_model": "different-generation-model"},
+                output_dir=tmp_path / "model_drift_output",
+                registry_dir=tmp_path / "model_drift_registry",
+                actor_selection_mode="auto",
+                inventory_authority_replay_dir=authority_root,
+            )
+        )
+    assert run_started is False
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter._tracked_source_state",
+        lambda _root: {
+            "tracked_changes_present": True,
+            "tracked_diff_sha256": "c" * 64,
+        },
+    )
+    with pytest.raises(ValueError, match="tracked_source_state"):
+        run_sage_with_registry(
+            SageRunConfig(
+                **base_config,
+                output_dir=tmp_path / "source_drift_output",
+                registry_dir=tmp_path / "source_drift_registry",
+                actor_selection_mode="auto",
+                inventory_authority_replay_dir=authority_root,
+            )
+        )
+    assert run_started is False
+
+
+def test_inventory_authority_replay_preflight_rejects_corrupt_state_before_run(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    matched_authority_context: None,
+) -> None:
+    del matched_authority_context
+    donor_store = _registry_with_canonicalizer(tmp_path / "donor_registry")
+    authority_root = tmp_path / "inventory_authority"
+
+    def capture_sequence(
+        _config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / "capture_run"
+        output_dir.mkdir()
+        monkeypatch.setenv("SAGE_TS_SCENARIO_ORDER_INDEX", "0")
+        scenario_transform(
+            "toy_birth",
+            Scenario(
+                starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+            ),
+            output_dir,
+        )
+        return output_dir
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        capture_sequence,
+    )
+    run_sage_with_registry(
+        SageRunConfig(
+            agent="gpt-4o-mini",
+            user="gpt-4o-mini",
+            scenario_names=("toy_birth",),
+            output_dir=tmp_path / "capture_output",
+            registry_dir=donor_store.root,
+            inventory_authority_capture_dir=authority_root,
+        )
+    )
+    authority_path = authority_root / "inventory_authority.json"
+    authority = json.loads(authority_path.read_text(encoding="utf-8"))
+    run_started = False
+
+    def must_not_run(*_args: object, **_kwargs: object) -> Path:
+        nonlocal run_started
+        run_started = True
+        raise AssertionError("corrupt replay reached the scenario runner")
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        must_not_run,
+    )
+    authority["source_actor_selection_mode"] = "auto"
+    authority_path.write_text(json.dumps(authority) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="policy-selection source arm"):
+        run_sage_with_registry(
+            SageRunConfig(
+                agent="gpt-4o-mini",
+                user="gpt-4o-mini",
+                scenario_names=("toy_birth",),
+                output_dir=tmp_path / "source_mode_replay_output",
+                registry_dir=tmp_path / "source_mode_replay_registry",
+                actor_selection_mode="auto",
+                inventory_authority_replay_dir=authority_root,
+            )
+        )
+    assert run_started is False
+
+    authority["source_actor_selection_mode"] = "policy"
+    authority["source_generation_enabled"] = "unknown"
+    authority_path.write_text(json.dumps(authority) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="source_generation_enabled"):
+        run_sage_with_registry(
+            SageRunConfig(
+                agent="gpt-4o-mini",
+                user="gpt-4o-mini",
+                scenario_names=("toy_birth",),
+                output_dir=tmp_path / "provenance_replay_output",
+                registry_dir=tmp_path / "provenance_replay_registry",
+                actor_selection_mode="auto",
+                inventory_authority_replay_dir=authority_root,
+            )
+        )
+    assert run_started is False
+
+    authority["source_generation_enabled"] = False
+    authority_path.write_text(json.dumps(authority) + "\n", encoding="utf-8")
+    task_state = authority_root / authority["tasks"][0]["state_dir"]
+    (task_state / "registry_manifest.json").write_text("{}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="hash mismatch"):
+        run_sage_with_registry(
+            SageRunConfig(
+                agent="gpt-4o-mini",
+                user="gpt-4o-mini",
+                scenario_names=("toy_birth",),
+                output_dir=tmp_path / "replay_output",
+                registry_dir=tmp_path / "replay_registry",
+                actor_selection_mode="auto",
+                inventory_authority_replay_dir=authority_root,
+            )
+        )
+    assert run_started is False
+
+
+def test_inventory_authority_mismatch_uses_fail_closed_abort(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    matched_authority_context: None,
+) -> None:
+    del matched_authority_context
+    donor_store = _registry_with_canonicalizer(tmp_path / "donor_registry")
+    authority_root = tmp_path / "inventory_authority"
+
+    def one_scenario_sequence(
+        _config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / "run"
+        output_dir.mkdir(exist_ok=True)
+        monkeypatch.setenv("SAGE_TS_SCENARIO_ORDER_INDEX", "0")
+        scenario_transform(
+            "toy_birth",
+            Scenario(
+                starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+            ),
+            output_dir,
+        )
+        return output_dir
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        one_scenario_sequence,
+    )
+    run_sage_with_registry(
+        SageRunConfig(
+            agent="gpt-4o-mini",
+            user="gpt-4o-mini",
+            scenario_names=("toy_birth",),
+            output_dir=tmp_path / "capture_output",
+            registry_dir=donor_store.root,
+            inventory_authority_capture_dir=authority_root,
+        )
+    )
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.route_registry_entries",
+        lambda *_args, **_kwargs: ([], {}),
+    )
+    assert issubclass(InventoryAuthorityError, RuntimeError)
+    assert InventoryAuthorityError.fail_closed_scenario_transform is True
+    with pytest.raises(
+        InventoryAuthorityError, match="diverged before actor inference"
+    ):
+        run_sage_with_registry(
+            SageRunConfig(
+                agent="gpt-4o-mini",
+                user="gpt-4o-mini",
+                scenario_names=("toy_birth",),
+                output_dir=tmp_path / "replay_output",
+                registry_dir=tmp_path / "replay_registry",
+                actor_selection_mode="auto",
+                inventory_authority_replay_dir=authority_root,
+            )
+        )
 
 
 def test_sage_runner_logs_frozen_registry_reuse_without_mutating_manifest(

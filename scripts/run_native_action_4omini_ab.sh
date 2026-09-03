@@ -7,12 +7,29 @@ cd "$ROOT_DIR"
 SIZE="${1:-full}"
 DASHBOARD_PORT="${2:-63105}"
 EXECUTION_MODE="${3:-native-only}"
-if [[ "$SIZE" != "full" ]]; then
-  echo "Only the complete 1,032-task publication cohort is supported." >&2
+if [[ "$SIZE" != "full" && "$SIZE" != "pilot" ]]; then
+  echo "Size must be full or pilot." >&2
   exit 2
 fi
 if [[ "$EXECUTION_MODE" != "native-only" && "$EXECUTION_MODE" != "frozen-only" ]]; then
   echo "Execution mode must be native-only or frozen-only." >&2
+  exit 2
+fi
+AUTO_SELECTION_EXPERIMENT="${SAGE_AUTO_SELECTION_EXPERIMENT:-0}"
+if [[ "$AUTO_SELECTION_EXPERIMENT" != "0" && "$AUTO_SELECTION_EXPERIMENT" != "1" ]]; then
+  echo "SAGE_AUTO_SELECTION_EXPERIMENT must be 0 or 1." >&2
+  exit 2
+fi
+if [[ "$SIZE" == "pilot" ]]; then
+  AUTO_SELECTION_EXPERIMENT="1"
+  AUTO_SELECTION_STAGE="pilot"
+elif [[ "$AUTO_SELECTION_EXPERIMENT" == "1" ]]; then
+  AUTO_SELECTION_STAGE="full"
+else
+  AUTO_SELECTION_STAGE="off"
+fi
+if [[ "$AUTO_SELECTION_EXPERIMENT" == "1" && "$EXECUTION_MODE" != "native-only" ]]; then
+  echo "The matched auto-selection experiment requires native-only execution." >&2
   exit 2
 fi
 if [[ -n "${RESUME_RUN_ROOT:-}" || -n "${RESUME_COMPLETED_LIMIT:-}" ]]; then
@@ -150,7 +167,8 @@ pin_publication_env SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS "600"
 export TOOLSANDBOX_RAPID_CACHE_MODE="read_only"
 export TOOLSANDBOX_RAPID_CACHE_PATH="${TOOLSANDBOX_RAPID_CACHE_PATH:-artifacts/publication_cleanup_20260901/fixtures/rapid_api_cache.sanitized.json}"
 PINNED_RAPID_FIXTURE_SHA256="eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
-PINNED_BENCHMARK_SHA256="21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec"
+PINNED_FULL_BENCHMARK_SHA256="21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec"
+PINNED_PILOT_BENCHMARK_SHA256="378b681dbe86e0f27c911c485c6257075c9fe377f7c993f8083cba35a2fdda90"
 export CONTROL_CACHE="off"
 unset CONTROL_CACHE_ROOT
 unset SAGE_SELF_EVOLVING_CONTROL_CACHE_ROOT
@@ -169,7 +187,53 @@ fi
 RUN_STAMP="${SAGE_RUN_STAMP:-publication_fresh_$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${SAGE_OUTPUT_ROOT:-outputs/publication_validation/$RUN_STAMP}"
 ARTIFACT_ROOT="${SAGE_ARTIFACT_ROOT:-artifacts/publication_validation/$RUN_STAMP}"
-MANIFEST="${SAGE_BENCHMARK_MANIFEST:-docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json}"
+ROOT_LABELS=(output artifact)
+ROOT_PATHS=("$OUTPUT_ROOT" "$ARTIFACT_ROOT")
+for root_index in 0 1; do
+  root_label="${ROOT_LABELS[$root_index]}"
+  root_path="${ROOT_PATHS[$root_index]}"
+  if [[ -e "$root_path" || -L "$root_path" ]]; then
+    echo "Publication $root_label root must not already exist: $root_path" >&2
+    exit 1
+  fi
+done
+OUTPUT_ROOT_RESOLVED="$("$PYTHON_EXECUTABLE" -c 'import pathlib, sys; print(pathlib.Path(sys.argv[1]).resolve())' "$OUTPUT_ROOT")"
+ARTIFACT_ROOT_RESOLVED="$("$PYTHON_EXECUTABLE" -c 'import pathlib, sys; print(pathlib.Path(sys.argv[1]).resolve())' "$ARTIFACT_ROOT")"
+if [[ "$OUTPUT_ROOT_RESOLVED" == "$ARTIFACT_ROOT_RESOLVED" ]]; then
+  echo "Publication output and artifact roots must be different paths." >&2
+  exit 1
+fi
+
+SELECTOR_PILOT_EVIDENCE_PATH=""
+SELECTOR_PILOT_EVIDENCE_SHA256=""
+if [[ "$AUTO_SELECTION_STAGE" == "full" ]]; then
+  SELECTOR_PILOT_EVIDENCE_RAW="${SAGE_AUTO_SELECTION_PILOT_EVIDENCE:-}"
+  if [[ -z "$SELECTOR_PILOT_EVIDENCE_RAW" ]]; then
+    echo "A full selector experiment requires SAGE_AUTO_SELECTION_PILOT_EVIDENCE." >&2
+    exit 1
+  fi
+  SELECTOR_PILOT_EVIDENCE_PATH="$("$PYTHON_EXECUTABLE" -c 'import pathlib, sys; print(pathlib.Path(sys.argv[1]).resolve())' "$SELECTOR_PILOT_EVIDENCE_RAW")"
+  if [[ ! -f "$SELECTOR_PILOT_EVIDENCE_PATH" ]]; then
+    echo "Selector pilot evidence is missing: $SELECTOR_PILOT_EVIDENCE_PATH" >&2
+    exit 1
+  fi
+  if ! SELECTOR_PILOT_VERIFICATION="$("$PYTHON_EXECUTABLE" scripts/verify_publication_run.py \
+    --selector-pilot-evidence "$SELECTOR_PILOT_EVIDENCE_PATH" 2>&1)"; then
+    echo "$SELECTOR_PILOT_VERIFICATION" >&2
+    exit 1
+  fi
+  echo "$SELECTOR_PILOT_VERIFICATION"
+  SELECTOR_PILOT_EVIDENCE_SHA256="$("$PYTHON_EXECUTABLE" -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$SELECTOR_PILOT_EVIDENCE_PATH")"
+fi
+
+if [[ "$SIZE" == "pilot" ]]; then
+  DEFAULT_MANIFEST="docs/sage_protocol/manifests/sage_auto_selection_pilot_30.json"
+  PINNED_BENCHMARK_SHA256="$PINNED_PILOT_BENCHMARK_SHA256"
+else
+  DEFAULT_MANIFEST="docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json"
+  PINNED_BENCHMARK_SHA256="$PINNED_FULL_BENCHMARK_SHA256"
+fi
+MANIFEST="${SAGE_BENCHMARK_MANIFEST:-$DEFAULT_MANIFEST}"
 if [[ ! -f "$MANIFEST" ]]; then
   echo "Required publication benchmark is missing: $MANIFEST" >&2
   exit 1
@@ -179,6 +243,7 @@ if [[ "$MANIFEST_SHA256" != "$PINNED_BENCHMARK_SHA256" ]]; then
   echo "Publication benchmark hash mismatch: expected $PINNED_BENCHMARK_SHA256, observed $MANIFEST_SHA256" >&2
   exit 1
 fi
+MANIFEST_SCENARIO_ORDER_SHA256="$("$PYTHON_EXECUTABLE" -c 'import hashlib, json, pathlib, sys; rows=json.loads(pathlib.Path(sys.argv[1]).read_text())["splits"]["full_benchmark"]; names=[str(row["name"]) for row in rows]; print(hashlib.sha256(("\n".join(names)+"\n").encode()).hexdigest())' "$MANIFEST")"
 
 if [[ "$EXECUTION_MODE" == "native-only" ]]; then
   ARM="native_action"
@@ -226,6 +291,7 @@ CMD=(
   --agent gpt-4o-mini
   --user gpt-4o-mini
   --generation-model gpt-4o-mini
+  --actor-selection-mode policy
   --generation "$GENERATION"
   --control-cache off
   --require-fresh-control
@@ -236,16 +302,36 @@ CMD=(
   --output-root "$ARM_OUTPUT"
   --artifact-root "$ARM_ARTIFACTS"
 )
+SELECTOR_AUTHORITY_DIR="$ARTIFACT_ROOT/${ARM}_selector_authority"
+AUTO_SELECTION_REGISTRY_DIR="$ARTIFACT_ROOT/${ARM}_auto_selection_registry"
+if [[ "$AUTO_SELECTION_EXPERIMENT" == "1" ]]; then
+  if [[ -e "$SELECTOR_AUTHORITY_DIR" ]]; then
+    echo "Selector authority path must not already exist: $SELECTOR_AUTHORITY_DIR" >&2
+    exit 1
+  fi
+  if [[ -e "$AUTO_SELECTION_REGISTRY_DIR" ]]; then
+    echo "Auto-selection registry path must not already exist: $AUTO_SELECTION_REGISTRY_DIR" >&2
+    exit 1
+  fi
+  CMD+=(--inventory-authority-capture-dir "$SELECTOR_AUTHORITY_DIR")
+fi
 if [[ "${SAGE_BATCH_NO_DASHBOARD_OPEN:-0}" == "1" ]]; then
   CMD+=(--no-dashboard-open)
 fi
 {
-  echo "study_id=full_$RUN_STAMP"
+  echo "study_id=${SIZE}_$RUN_STAMP"
   echo "arm=$ARM"
   echo "generation=$GENERATION"
   echo "sage_policy=$SAGE_POLICY"
   echo "run_mode=$RUN_MODE"
   echo "model=gpt-4o-mini"
+  echo "actor_selection_mode=policy"
+  echo "auto_selection_experiment=$AUTO_SELECTION_EXPERIMENT"
+  echo "auto_selection_stage=$AUTO_SELECTION_STAGE"
+  echo "selector_authority_dir=$SELECTOR_AUTHORITY_DIR"
+  echo "auto_selection_registry_dir=$AUTO_SELECTION_REGISTRY_DIR"
+  echo "selector_pilot_evidence_path=$SELECTOR_PILOT_EVIDENCE_PATH"
+  echo "selector_pilot_evidence_sha256=$SELECTOR_PILOT_EVIDENCE_SHA256"
   echo "python_executable=$PYTHON_EXECUTABLE"
   echo "python_version=$PUBLICATION_PYTHON_VERSION"
   echo "python_prefix=$PUBLICATION_PYTHON_PREFIX"
@@ -262,6 +348,7 @@ fi
   echo "git_status=clean"
   echo "manifest=$MANIFEST"
   echo "manifest_sha256=$MANIFEST_SHA256"
+  echo "scenario_order_sha256=$MANIFEST_SCENARIO_ORDER_SHA256"
   echo "fixed_now=$TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"
   echo "control_cache=off"
   echo "fresh_control_required=true"
@@ -290,13 +377,40 @@ fi
 } > "$COMMAND_FILE"
 cp "$COMMAND_FILE" "$STUDY_FILE"
 
-echo "Starting strict fresh-control publication run: full_$RUN_STAMP"
+echo "Starting strict fresh-control publication run: ${SIZE}_$RUN_STAMP"
 echo "[$ARM] output: $ARM_OUTPUT"
 echo "[$ARM] log: $LOG_FILE"
 "${CMD[@]}" 2>&1 | tee "$LOG_FILE"
 
 "$PYTHON_EXECUTABLE" scripts/verify_publication_run.py \
   --search-root "$ARM_OUTPUT" \
-  --expected-tasks 1032 \
+  --cohort "$SIZE" \
   --expect-reflection "$REFLECTION_EXPECTATION" | tee -a "$LOG_FILE"
-echo "Strict fresh-control publication run complete: full_$RUN_STAMP"
+if [[ "$AUTO_SELECTION_EXPERIMENT" == "1" ]]; then
+  if [[ "$AUTO_SELECTION_STAGE" == "full" ]]; then
+    SELECTOR_PILOT_EVIDENCE_SHA256_AFTER_POLICY="$("$PYTHON_EXECUTABLE" -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$SELECTOR_PILOT_EVIDENCE_PATH")"
+    if [[ "$SELECTOR_PILOT_EVIDENCE_SHA256_AFTER_POLICY" != "$SELECTOR_PILOT_EVIDENCE_SHA256" ]]; then
+      echo "Selector pilot evidence changed during the policy run." >&2
+      exit 1
+    fi
+  fi
+  POLICY_RUN_ROOTS=()
+  while IFS= read -r policy_run_root; do
+    POLICY_RUN_ROOTS+=("$policy_run_root")
+  done < <(find "$ARM_OUTPUT" -mindepth 1 -maxdepth 1 -type d -name "${RUN_MODE}_*" -print)
+  if [[ "${#POLICY_RUN_ROOTS[@]}" -ne 1 ]]; then
+    echo "Expected one policy protocol root under $ARM_OUTPUT; found ${#POLICY_RUN_ROOTS[@]}." >&2
+    exit 1
+  fi
+  AUTO_REPLAY_CMD=(
+    "$PYTHON_EXECUTABLE" scripts/run_sage_auto_selection_replay.py
+    --policy-run-root "${POLICY_RUN_ROOTS[0]}"
+    --stage "$AUTO_SELECTION_STAGE"
+    --auto-registry-dir "$AUTO_SELECTION_REGISTRY_DIR"
+  )
+  if [[ "$AUTO_SELECTION_STAGE" == "full" ]]; then
+    AUTO_REPLAY_CMD+=(--pilot-evidence "$SELECTOR_PILOT_EVIDENCE_PATH")
+  fi
+  "${AUTO_REPLAY_CMD[@]}" | tee -a "$LOG_FILE"
+fi
+echo "Strict fresh-control publication run complete: ${SIZE}_$RUN_STAMP"

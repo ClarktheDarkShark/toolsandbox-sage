@@ -25,7 +25,10 @@ from openai.types.chat import (
 
 from sage_ts.config.models import reasoning_effort_kwargs, resolve_model_name
 from sage_ts.config.openai_client import build_robust_openai_client
-from sage_ts.evaluation.llm_usage import record_chat_completion_usage
+from sage_ts.evaluation.llm_usage import (
+    audit_actor_request,
+    record_chat_completion_usage,
+)
 from tool_sandbox.common.execution_context import get_current_context
 from tool_sandbox.common.utils import all_logging_disabled
 from tool_sandbox.roles.openai_api_agent import OpenAIAPIAgent
@@ -12378,8 +12381,65 @@ def _extract_send_message_contact_request(
     return None
 
 
+def _actor_request_schema_parts(
+    openai_tools: Union[Iterable[ChatCompletionToolParam], NotGiven],
+) -> tuple[
+    Union[list[ChatCompletionToolParam], NotGiven],
+    list[ChatCompletionToolParam],
+    list[ChatCompletionToolParam],
+    list[dict[str, object]],
+]:
+    if openai_tools is NOT_GIVEN or isinstance(openai_tools, NotGiven):
+        routed_tools: Union[list[ChatCompletionToolParam], NotGiven] = NOT_GIVEN
+        schema_list: list[ChatCompletionToolParam] = []
+    else:
+        schema_list = (
+            openai_tools if isinstance(openai_tools, list) else list(openai_tools)
+        )
+        routed_tools = schema_list
+    native_schemas: list[ChatCompletionToolParam] = []
+    generated_schemas: list[ChatCompletionToolParam] = []
+    schema_classification: list[dict[str, object]] = []
+    for index, schema in enumerate(schema_list):
+        function = cast(Mapping[str, Any], schema).get("function", {})
+        agent_facing_name = (
+            str(function.get("name") or "") if isinstance(function, Mapping) else ""
+        )
+        execution_name = _tool_schema_execution_name(cast(Mapping[str, Any], schema))
+        if execution_name in ORIGINAL_TOOLSANDBOX_TOOL_NAMES:
+            kind = "native"
+            native_schemas.append(schema)
+        else:
+            kind = "generated"
+            generated_schemas.append(schema)
+        schema_classification.append(
+            {
+                "schema_index": index,
+                "kind": kind,
+                "agent_facing_name": agent_facing_name,
+                "execution_facing_name": execution_name,
+            }
+        )
+    return (
+        routed_tools,
+        native_schemas,
+        generated_schemas,
+        schema_classification,
+    )
+
+
 class ConfigurableOpenAIAgent(OpenAIAPIAgent):
-    def __init__(self, model_name: str) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        actor_selection_mode: Literal["policy", "auto"] = "policy",
+    ) -> None:
+        if actor_selection_mode not in {"policy", "auto"}:
+            raise ValueError(
+                "actor_selection_mode must be either 'policy' or 'auto', got "
+                f"{actor_selection_mode!r}"
+            )
+        self.actor_selection_mode = actor_selection_mode
         self.requested_model_name = model_name
         self.model_name = resolve_model_name(model_name)
         super().__init__()
@@ -12419,6 +12479,47 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
         openai_tools: Union[Iterable[ChatCompletionToolParam], NotGiven],
     ) -> ChatCompletion:
         """Run inference, with opt-in diagnostic tool forcing for adoption tests."""
+        if getattr(self, "actor_selection_mode", "policy") == "auto":
+            (
+                routed_tools,
+                native_schemas,
+                generated_schemas,
+                schema_classification,
+            ) = _actor_request_schema_parts(openai_tools)
+            named_tool_choice: str | None = None
+            if named_tool_choice is not None:
+                raise AssertionError(
+                    "Auto actor inference must not use a named tool_choice"
+                )
+
+            def call_upstream_auto_selection() -> ChatCompletion:
+                with audit_actor_request(
+                    choice_mode="auto",
+                    model=self.model_name,
+                    messages=openai_messages,
+                    routed_schemas=routed_tools,
+                    routed_native_schemas=native_schemas,
+                    routed_generated_schemas=generated_schemas,
+                    routed_schema_classification=schema_classification,
+                    sent_schemas=routed_tools,
+                    sent_native_schemas=native_schemas,
+                    sent_generated_schemas=generated_schemas,
+                    sent_schema_classification=schema_classification,
+                    named_tool_choice=named_tool_choice,
+                ):
+                    return super(ConfigurableOpenAIAgent, self).model_inference(
+                        openai_messages,
+                        routed_tools,
+                    )
+
+            return _with_transient_openai_retries(call_upstream_auto_selection)
+        (
+            routed_tools,
+            routed_native_schemas,
+            routed_generated_schemas,
+            routed_schema_classification,
+        ) = _actor_request_schema_parts(openai_tools)
+        openai_tools = routed_tools
         prompted_messages = _with_selector_actor_policy(openai_messages, openai_tools)
         completion_tool_free_turn = _helper_answer_completion_tool_free_turn(
             openai_messages,
@@ -12487,23 +12588,46 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
                 retry_tool_choice
             ) not in _tool_names_execution_facing(prompt_openai_tools):
                 retry_tool_choice = None
+        (
+            prompt_openai_tools,
+            sent_native_schemas,
+            sent_generated_schemas,
+            sent_schema_classification,
+        ) = _actor_request_schema_parts(prompt_openai_tools)
         retry_tool_choice_used = False
 
         def call_with_optional_retry_tool_choice(
             messages: list[OpenAIMessage],
         ) -> ChatCompletion:
             nonlocal retry_tool_choice_used
+            named_tool_choice: str | None = None
             if retry_tool_choice and not retry_tool_choice_used:
                 retry_tool_choice_used = True
-                return self._model_inference_with_tool_choice(
+                named_tool_choice = retry_tool_choice
+            with audit_actor_request(
+                choice_mode="policy",
+                model=self.model_name,
+                messages=messages,
+                routed_schemas=routed_tools,
+                routed_native_schemas=routed_native_schemas,
+                routed_generated_schemas=routed_generated_schemas,
+                routed_schema_classification=routed_schema_classification,
+                sent_schemas=prompt_openai_tools,
+                sent_native_schemas=sent_native_schemas,
+                sent_generated_schemas=sent_generated_schemas,
+                sent_schema_classification=sent_schema_classification,
+                named_tool_choice=named_tool_choice,
+            ):
+                if named_tool_choice is not None:
+                    return self._model_inference_with_tool_choice(
+                        messages,
+                        prompt_openai_tools,
+                        named_tool_choice,
+                    )
+                return super(ConfigurableOpenAIAgent, self).model_inference(
                     messages,
                     prompt_openai_tools,
-                    retry_tool_choice,
                 )
-            return super(ConfigurableOpenAIAgent, self).model_inference(
-                messages,
-                prompt_openai_tools,
-            )
 
         return _with_transient_openai_retries(
             lambda: call_with_optional_retry_tool_choice(prompted_messages)

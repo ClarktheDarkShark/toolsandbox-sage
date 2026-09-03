@@ -1,0 +1,47 @@
+{
+  "manifest_type": "sage_auto_selection_representative_pilot_30",
+  "strategy": "Predeclared actor-selection pilot selected from the validated 1,032-task publication cohort. The cohort covers every generated tool observed as both routed and called in publication validation sample 03, native-only routing, insufficient-information cases, state dependencies, multi-turn tasks, and ToolSandbox schema/name perturbations.",
+  "source_manifest": "docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json",
+  "source_run": "outputs/publication_validation/publication_validation_20260902_strict_sample03/native_action/online_build_full_20260902_071820",
+  "selection_policy": {
+    "task_count": 30,
+    "generated_tools_covered_from_source_run": 29,
+    "requires_native_only_negative_control": true,
+    "requires_schema_perturbation_variants": true,
+    "requires_generated_tool_call_in_both_candidate_arms": true
+  },
+  "splits": {
+    "full_benchmark": [
+      {"name": "find_temperature_low_battery_mode_10_distraction_tools"},
+      {"name": "modify_reminder_with_recency_latest_10_distraction_tools"},
+      {"name": "update_contact_relationship_with_relationship_multiple_user_turn_10_distraction_tools"},
+      {"name": "add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_alt"},
+      {"name": "search_message_with_recency_latest_alt_3_distraction_tools_tool_name_scrambled"},
+      {"name": "search_reminder_with_recency_upcoming"},
+      {"name": "add_contact_with_name_and_phone_number_10_distraction_tools"},
+      {"name": "update_contact_with_id_and_phone_number"},
+      {"name": "add_reminder_content_and_weekday_delta_and_time"},
+      {"name": "convert_currency"},
+      {"name": "find_address_with_lat_lon"},
+      {"name": "find_days_till_holiday"},
+      {"name": "find_days_till_holiday_insufficient_information"},
+      {"name": "find_days_till_holiday_insufficient_information_alt_all_tools"},
+      {"name": "find_phone_number_with_location_name"},
+      {"name": "find_stock_symbol_with_company_name"},
+      {"name": "get_cellular"},
+      {"name": "modify_contact_with_message_recency"},
+      {"name": "remove_contact_with_id"},
+      {"name": "send_message_with_contact_content_cellular_off_alt"},
+      {"name": "cellular_off_3_distraction_tools_arg_description_scrambled"},
+      {"name": "find_distance_with_location_name_alt_3_distraction_tools_arg_type_scrambled"},
+      {"name": "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn_3_distraction_tools_tool_description_scrambled"},
+      {"name": "modify_contact_with_message_recency_multiple_user_turn_alt_3_distraction_tools_tool_name_scrambled"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"},
+      {"name": "search_name_with_relationship_3_distraction_tools_arg_type_scrambled"},
+      {"name": "search_reminder_with_recency_yesterday_3_distraction_tools_tool_description_scrambled"},
+      {"name": "send_message_with_phone_number_and_content_3_distraction_tools_tool_name_scrambled"},
+      {"name": "update_contact_relationship_with_relationship_alt_all_tools"},
+      {"name": "add_reminder_content_and_date_and_time_alt"}
+    ]
+  }
+}

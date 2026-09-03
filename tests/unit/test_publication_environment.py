@@ -335,6 +335,25 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
     assert "git status --porcelain --untracked-files=all" in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/run_sage_protocol.py' in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/verify_publication_run.py' in launcher
+    assert "--actor-selection-mode policy" in launcher
+    assert "--inventory-authority-capture-dir" in launcher
+    assert '"$PYTHON_EXECUTABLE" scripts/run_sage_auto_selection_replay.py' in launcher
+    assert '--cohort "$SIZE"' in launcher
+    assert "--expected-benchmark-sha256" not in launcher
+    assert "--expected-scenario-order-sha256" not in launcher
+    assert "SAGE_AUTO_SELECTION_PILOT_EVIDENCE" in launcher
+    assert "--selector-pilot-evidence" in launcher
+    assert (
+        'AUTO_REPLAY_CMD+=(--pilot-evidence "$SELECTOR_PILOT_EVIDENCE_PATH")'
+        in launcher
+    )
+    root_guard_index = launcher.index(
+        "Publication $root_label root must not already exist"
+    )
+    assert root_guard_index < launcher.index('mkdir -p "$ARM_ARTIFACTS"')
+    assert launcher.index("--selector-pilot-evidence") < launcher.index(
+        'mkdir -p "$ARM_ARTIFACTS"'
+    )
     for provenance_field in (
         "python_executable=",
         "python_version=",
@@ -376,6 +395,18 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
         "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_BASE_TOOL",
     ):
         assert env_name in launcher
+
+
+def test_publication_run_verifier_cli_uses_only_internal_cohort_pins() -> None:
+    verifier = (
+        environment_verifier.REPO_ROOT / "scripts/verify_publication_run.py"
+    ).read_text(encoding="utf-8")
+
+    assert '"--cohort"' in verifier
+    assert '"--selector-pilot-evidence"' in verifier
+    assert '"--expected-tasks"' not in verifier
+    assert '"--expected-benchmark-sha256"' not in verifier
+    assert '"--expected-scenario-order-sha256"' not in verifier
 
 
 def test_publication_bootstrap_does_not_install_development_extras() -> None:

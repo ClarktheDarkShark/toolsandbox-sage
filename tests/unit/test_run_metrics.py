@@ -7,6 +7,7 @@ import pytest
 import sage_ts.evaluation.run_metrics as run_metrics
 from sage_ts.evaluation.llm_usage import (
     _usage_payload,
+    audit_actor_request,
     record_chat_completion_usage,
     reset_llm_usage,
     summarize_events,
@@ -305,6 +306,102 @@ def test_llm_usage_artifact_schema_records_provider_prefix_cache(
     assert summary["llm_provider_cached_prompt_tokens"] == 128
     assert summary["llm_provider_cached_prompt_call_count"] == 1
     assert summary["llm_provider_cached_prompt_tokens_available_count"] == 1
+    reset_llm_usage()
+
+
+def test_expected_auto_actor_usage_without_request_audit_fails_closed(
+    tmp_path: Path,
+) -> None:
+    reset_llm_usage(
+        run_dir=tmp_path,
+        arm="sage_auto_selection",
+        expected_actor_selection_mode="auto",
+    )
+    record_chat_completion_usage(
+        source="toolsandbox_agent",
+        model="gpt-4o-mini",
+        messages=[],
+        response={"usage": {"prompt_tokens": 1, "completion_tokens": 1}},
+    )
+
+    with pytest.raises(AssertionError, match="does not cover agent inference"):
+        write_llm_usage_artifacts(finalize=False)
+
+    summary = json.loads(
+        (tmp_path / "actor_request_audit_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["expected_actor_selection_mode"] == "auto"
+    assert summary["coverage_verified"] is False
+    assert summary["agent_call_count"] == 1
+    assert summary["unlinked_agent_call_count"] == 1
+    reset_llm_usage()
+
+
+def test_expected_auto_actor_mode_rejects_linked_policy_audit(
+    tmp_path: Path,
+) -> None:
+    reset_llm_usage(
+        run_dir=tmp_path,
+        arm="sage_auto_selection",
+        expected_actor_selection_mode="auto",
+    )
+    with audit_actor_request(
+        choice_mode="policy",
+        model="gpt-4o-mini",
+        messages=[],
+        routed_schemas=[],
+        routed_native_schemas=[],
+        routed_generated_schemas=[],
+        routed_schema_classification=[],
+        sent_schemas=[],
+        sent_native_schemas=[],
+        sent_generated_schemas=[],
+        sent_schema_classification=[],
+        named_tool_choice=None,
+    ):
+        record_chat_completion_usage(
+            source="toolsandbox_agent",
+            model="gpt-4o-mini",
+            messages=[],
+            tools=[],
+            response={"usage": {"prompt_tokens": 1, "completion_tokens": 1}},
+        )
+
+    with pytest.raises(AssertionError, match="mode_mismatches"):
+        write_llm_usage_artifacts(finalize=True)
+
+    summary = json.loads(
+        (tmp_path / "actor_request_audit_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["coverage_verified"] is False
+    assert summary["mode_mismatch_request_ids"] == ["actor-request-000001"]
+    reset_llm_usage()
+
+
+def test_legacy_policy_actor_usage_without_request_audit_remains_supported(
+    tmp_path: Path,
+) -> None:
+    reset_llm_usage(
+        run_dir=tmp_path,
+        arm="legacy_policy",
+        expected_actor_selection_mode="policy",
+    )
+    record_chat_completion_usage(
+        source="toolsandbox_agent",
+        model="legacy-alias",
+        messages=[],
+        response={"usage": {"prompt_tokens": 1, "completion_tokens": 1}},
+    )
+
+    write_llm_usage_artifacts(finalize=True)
+
+    summary = json.loads(
+        (tmp_path / "actor_request_audit_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["expected_actor_selection_mode"] == "policy"
+    assert summary["coverage_verified"] is False
+    assert summary["agent_call_count"] == 1
+    assert summary["unlinked_agent_call_count"] == 1
     reset_llm_usage()
 
 

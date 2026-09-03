@@ -2,6 +2,9 @@
 import json
 from pathlib import Path
 
+import pytest
+
+import sage_ts.adapters.role_factory as role_factory
 from sage_ts.adapters.toolsandbox_adapter import (
     ToolSandboxRunConfig,
     run_scenario_sequence,
@@ -9,6 +12,37 @@ from sage_ts.adapters.toolsandbox_adapter import (
 )
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
+
+
+def test_make_agent_propagates_auto_selection_mode(monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_agent(model_name: str, *, actor_selection_mode: str):
+        captured.update(
+            model_name=model_name,
+            actor_selection_mode=actor_selection_mode,
+        )
+        return object()
+
+    monkeypatch.setattr(role_factory, "ConfigurableOpenAIAgent", fake_agent)
+
+    role_factory.make_agent("gpt-4o-mini", actor_selection_mode="auto")
+
+    assert captured == {
+        "model_name": "gpt-4o-mini",
+        "actor_selection_mode": "auto",
+    }
+
+
+def test_make_agent_rejects_auto_for_upstream_role_alias() -> None:
+    with pytest.raises(
+        ValueError,
+        match="ToolSandbox role alias 'GPT_4_o_2024_05_13'",
+    ):
+        role_factory.make_agent(
+            "GPT_4_o_2024_05_13",
+            actor_selection_mode="auto",
+        )
 
 
 def test_write_run_manifest(tmp_path: Path) -> None:
@@ -20,10 +54,25 @@ def test_write_run_manifest(tmp_path: Path) -> None:
     )
 
     path = write_run_manifest(config)
-    text = path.read_text(encoding="utf-8")
+    payload = json.loads(path.read_text(encoding="utf-8"))
 
-    assert "wifi_off" in text
-    assert "baseline" in text
+    assert payload["scenario_names"] == ["wifi_off"]
+    assert payload["run_type"] == "baseline"
+    assert payload["actor_selection_mode"] == "policy"
+
+
+def test_write_run_manifest_records_auto_actor_selection(tmp_path: Path) -> None:
+    config = ToolSandboxRunConfig(
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        scenario_names=("wifi_off",),
+        output_dir=tmp_path,
+        actor_selection_mode="auto",
+    )
+
+    payload = json.loads(write_run_manifest(config).read_text(encoding="utf-8"))
+
+    assert payload["actor_selection_mode"] == "auto"
 
 
 def test_run_scenario_sequence_continues_after_transform_failure(
@@ -57,10 +106,12 @@ def test_run_scenario_sequence_continues_after_transform_failure(
         *,
         agent: str,
         user: str,
+        actor_selection_mode: str,
         output_directory: Path,
     ) -> dict[str, object]:
         assert agent == "Unhelpful"
         assert user == "GPT_4_o_2024_05_13"
+        assert actor_selection_mode == "auto"
         assert str(output_directory).startswith(str(output_dir))
         assert output_directory.name.startswith(
             "baseline_agent_Unhelpful_user_GPT_4_o_2024_05_13"
@@ -96,6 +147,7 @@ def test_run_scenario_sequence_continues_after_transform_failure(
             user="GPT_4_o_2024_05_13",
             scenario_names=(scenario_name,),
             output_dir=output_dir,
+            actor_selection_mode="auto",
         ),
         scenario_transform=fake_transform,
         event_hook=fake_event_hook,
@@ -110,6 +162,56 @@ def test_run_scenario_sequence_continues_after_transform_failure(
         (output_directory / "result_summary.json").read_text(encoding="utf-8")
     )
     assert summary["per_scenario_results"][0]["name"] == scenario_name
+
+
+def test_run_scenario_sequence_reraises_fail_closed_transform_failure(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    scenario_name = "toy_birth"
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    class FailClosedTransformError(RuntimeError):
+        fail_closed_scenario_transform = True
+
+    events: list[str] = []
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.toolsandbox_adapter.resolve_scenarios",
+        lambda *_args, **_kwargs: {scenario_name: scenario},
+    )
+
+    def must_not_run(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise AssertionError("actor inference ran after a fail-closed transform error")
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.toolsandbox_adapter.run_one_scenario",
+        must_not_run,
+    )
+
+    def fail_closed_transform(
+        _name: str,
+        _base: Scenario,
+        _path: Path,
+    ) -> Scenario:
+        raise FailClosedTransformError("inventory mismatch")
+
+    with pytest.raises(FailClosedTransformError, match="inventory mismatch"):
+        run_scenario_sequence(
+            ToolSandboxRunConfig(
+                agent="Unhelpful",
+                user="GPT_4_o_2024_05_13",
+                scenario_names=(scenario_name,),
+                output_dir=tmp_path / "outputs",
+            ),
+            scenario_transform=fail_closed_transform,
+            event_hook=lambda event, _output_dir, _payload: events.append(event),
+        )
+
+    assert "scenario_transform_failed" in events
+    assert "scenario_finished" not in events
 
 
 def test_run_scenario_sequence_resume_completed_limit(
@@ -194,8 +296,10 @@ def test_run_scenario_sequence_resume_completed_limit(
         *,
         agent: str,
         user: str,
+        actor_selection_mode: str,
         output_directory: Path,
     ) -> dict[str, object]:
+        assert actor_selection_mode == "policy"
         calls.append(name)
         return {
             "name": name,

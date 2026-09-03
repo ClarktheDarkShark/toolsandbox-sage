@@ -19,7 +19,11 @@ from pathlib import Path
 from typing import Any, cast
 
 from sage_ts.adapters.openai_agent_adapter import OpenAIChatAdapter
-from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
+from sage_ts.adapters.sage_run_adapter import (
+    InventoryAuthorityError,
+    SageRunConfig,
+    run_sage_with_registry,
+)
 from sage_ts.adapters.toolsandbox_adapter import ToolSandboxRunConfig, run_toolsandbox
 from sage_ts.campaign.artifacts import (
     append_event,
@@ -85,6 +89,7 @@ SAGE_POLICIES = (
     SAGE_POLICY_NONE,
     SAGE_POLICY_SELF_EVOLVING_PRAXIS,
 )
+ACTOR_SELECTION_MODES = ("policy", "auto")
 SELF_EVOLVING_PRAXIS_ENV_DEFAULTS = {
     "SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS": "4",
     "SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS": "120",
@@ -106,6 +111,21 @@ PINNED_PUBLICATION_ENVIRONMENT_LOCK_SHA256 = (
     "5c3ea1802331bf45809fd3e3e31fd8352473449e709cd7a443d03d1975477d1f"
 )
 _PUBLICATION_LOCK_LINE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;]+)$")
+
+
+def _candidate_arm_name(actor_selection_mode: str) -> str:
+    return "sage_auto_selection" if actor_selection_mode == "auto" else "candidate"
+
+
+def _candidate_arm_root(run_root: Path, actor_selection_mode: str) -> Path:
+    return run_root / _candidate_arm_name(actor_selection_mode)
+
+
+def _candidate_generation_enabled(
+    generation_enabled: bool,
+    inventory_authority_replay_dir: Path | str | None,
+) -> bool:
+    return generation_enabled and inventory_authority_replay_dir is None
 
 
 def _apply_sage_policy_preset(policy: str) -> dict[str, dict[str, str]]:
@@ -672,16 +692,26 @@ def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str,
     """Snapshot registry state so failed gated runs cannot contaminate follow-ups."""
     gate_dir = run_root / "registry_gate"
     gate_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = registry_dir / "registry_manifest.json"
-    snapshot_path = gate_dir / "registry_manifest_before_run.json"
-    existed = manifest_path.exists()
-    if existed:
-        shutil.copy2(manifest_path, snapshot_path)
+    files: dict[str, dict[str, Any]] = {}
+    for filename in ("registry_manifest.json", "tool_lifecycle.json"):
+        source_path = registry_dir / filename
+        snapshot_path = gate_dir / f"{Path(filename).stem}_before_run.json"
+        existed = source_path.is_file()
+        if existed:
+            shutil.copy2(source_path, snapshot_path)
+        files[filename] = {
+            "existed_before_run": existed,
+            "snapshot_path": str(snapshot_path) if existed else None,
+            "digest_before_run": _digest_file(source_path) if existed else None,
+        }
+    manifest = files["registry_manifest.json"]
     metadata = {
         "registry_dir": str(registry_dir),
-        "manifest_existed_before_run": existed,
-        "snapshot_path": str(snapshot_path) if existed else None,
-        "manifest_digest_before_run": _digest_file(manifest_path) if existed else None,
+        "files": files,
+        # Compatibility aliases for historical consumers.
+        "manifest_existed_before_run": manifest["existed_before_run"],
+        "snapshot_path": manifest["snapshot_path"],
+        "manifest_digest_before_run": manifest["digest_before_run"],
     }
     (gate_dir / "registry_gate_snapshot.json").write_text(
         json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
@@ -695,30 +725,50 @@ def _restore_registry_after_failed_gate(
     registry_dir: Path,
     snapshot: dict[str, Any],
 ) -> dict[str, Any]:
-    """Preserve the failed registry, then restore the pre-run registry manifest."""
+    """Preserve failed registry state, then restore all pre-run state files."""
     gate_dir = run_root / "registry_gate"
     gate_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = registry_dir / "registry_manifest.json"
-    failed_snapshot_path = gate_dir / "registry_manifest_failed_gate.json"
-    if manifest_path.exists():
-        shutil.copy2(manifest_path, failed_snapshot_path)
+    raw_files = snapshot.get("files")
+    if not isinstance(raw_files, dict):
+        raw_files = {
+            "registry_manifest.json": {
+                "existed_before_run": snapshot.get("manifest_existed_before_run"),
+                "snapshot_path": snapshot.get("snapshot_path"),
+            }
+        }
+    restored_files: dict[str, dict[str, Any]] = {}
+    for filename in ("registry_manifest.json", "tool_lifecycle.json"):
+        current_path = registry_dir / filename
+        failed_snapshot_path = gate_dir / f"{Path(filename).stem}_failed_gate.json"
+        if current_path.is_file():
+            shutil.copy2(current_path, failed_snapshot_path)
+        file_snapshot = raw_files.get(filename, {})
+        if not isinstance(file_snapshot, dict):
+            file_snapshot = {}
+        prior_snapshot = file_snapshot.get("snapshot_path")
+        prior_exists = bool(file_snapshot.get("existed_before_run"))
+        if prior_exists and isinstance(prior_snapshot, str):
+            registry_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(Path(prior_snapshot), current_path)
+        elif current_path.is_file():
+            current_path.unlink()
+        restored_files[filename] = {
+            "existed_before_run": prior_exists,
+            "failed_snapshot_path": (
+                str(failed_snapshot_path) if failed_snapshot_path.is_file() else None
+            ),
+            "restored_snapshot_path": prior_snapshot if prior_exists else None,
+        }
 
-    prior_snapshot = snapshot.get("snapshot_path")
-    prior_exists = bool(snapshot.get("manifest_existed_before_run"))
-    if prior_exists and isinstance(prior_snapshot, str):
-        registry_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(Path(prior_snapshot), manifest_path)
-    elif manifest_path.exists():
-        manifest_path.unlink()
-
+    manifest = restored_files["registry_manifest.json"]
     result = {
         "registry_dir": str(registry_dir),
         "restored": True,
-        "manifest_existed_before_run": prior_exists,
-        "failed_snapshot_path": str(failed_snapshot_path)
-        if failed_snapshot_path.exists()
-        else None,
-        "restored_snapshot_path": prior_snapshot if prior_exists else None,
+        "files": restored_files,
+        # Compatibility aliases for historical consumers.
+        "manifest_existed_before_run": manifest["existed_before_run"],
+        "failed_snapshot_path": manifest["failed_snapshot_path"],
+        "restored_snapshot_path": manifest["restored_snapshot_path"],
     }
     (gate_dir / "registry_gate_restore.json").write_text(
         json.dumps(result, indent=2) + "\n", encoding="utf-8"
@@ -874,10 +924,19 @@ def _protocol_gate_decision(
     return not reasons, reasons
 
 
-def _resume_arm_dir(resume_run_root: Path | None, arm: str) -> Path | None:
+def _resume_arm_dir(
+    resume_run_root: Path | None,
+    arm: str,
+    *,
+    directory_name: str | None = None,
+) -> Path | None:
     if resume_run_root is None:
         return None
-    return _status_run_dir(resume_run_root, arm, resume_run_root / arm)
+    return _status_run_dir(
+        resume_run_root,
+        arm,
+        resume_run_root / (directory_name or arm),
+    )
 
 
 def _protocol_event(
@@ -949,6 +1008,7 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
                 processes=1,
                 run_type=f"{params['mode']}_control",
                 base_tool_policy=str(params["base_tool_policy"]),
+                actor_selection_mode="policy",
                 resume_from_dir=Path(params["control_resume_dir"])
                 if params.get("control_resume_dir")
                 else None,
@@ -998,6 +1058,10 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
     registry_dir = Path(params["registry_dir"])
     scenario_names = tuple(params["scenario_names"])
     generation_enabled = bool(params["generation_enabled"])
+    candidate_generation_enabled = _candidate_generation_enabled(
+        generation_enabled,
+        params.get("inventory_authority_replay_dir"),
+    )
     _write_arm_status(
         run_root,
         "candidate",
@@ -1010,7 +1074,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
             ToolGenerator(
                 completer=OpenAIChatAdapter(model=str(params["generation_model"]))
             )
-            if generation_enabled
+            if candidate_generation_enabled
             else None
         )
 
@@ -1046,14 +1110,31 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 scenario_names=scenario_names,
                 output_dir=candidate_root,
                 registry_dir=registry_dir,
-                run_type=f"{params['mode']}_candidate",
+                generation_model=str(params["generation_model"]),
+                run_type=f"{params['mode']}_{params['candidate_arm_name']}",
                 recurrence_threshold=int(params["recurrence_threshold"]),
                 base_tool_policy=str(params["base_tool_policy"]),
+                actor_selection_mode=str(params["actor_selection_mode"]),
+                inventory_authority_capture_dir=(
+                    Path(params["inventory_authority_capture_dir"])
+                    if params.get("inventory_authority_capture_dir")
+                    else None
+                ),
+                inventory_authority_replay_dir=(
+                    Path(params["inventory_authority_replay_dir"])
+                    if params.get("inventory_authority_replay_dir")
+                    else None
+                ),
                 resume_from_dir=Path(params["candidate_resume_dir"])
                 if params.get("candidate_resume_dir")
                 else None,
                 resume_completed_limit=params.get("resume_completed_limit"),
                 manifest_path=Path(params["manifest"]),
+                failure_memory_path=(
+                    None
+                    if params.get("inventory_authority_replay_dir")
+                    else Path("artifacts/summaries/failure_memory.json")
+                ),
             ),
             generator=generator,
             progress_hook=progress,
@@ -1073,7 +1154,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
             completed_count=completed_count,
             scenario_count=len(scenario_names),
         )
-    except Exception:
+    except (Exception, InventoryAuthorityError):
         error = traceback.format_exc()
         _write_arm_status(run_root, "candidate", status="failed", error=error)
         append_event(
@@ -1196,6 +1277,33 @@ def main() -> None:
     parser.add_argument("--generation-model", default=DEFAULT_MODEL)
     parser.add_argument("--recurrence-threshold", type=int, default=2)
     parser.add_argument(
+        "--actor-selection-mode",
+        choices=ACTOR_SELECTION_MODES,
+        default="policy",
+        help=(
+            "Candidate actor-selection behavior. 'policy' preserves the SAGE "
+            "selector cascade; 'auto' delegates selection directly to the "
+            "upstream model over the SAGE-routed tool inventory."
+        ),
+    )
+    authority_group = parser.add_mutually_exclusive_group()
+    authority_group.add_argument(
+        "--inventory-authority-capture-dir",
+        type=Path,
+        help=(
+            "Write the policy arm's exact pre-actor registry, lifecycle, and "
+            "routed-inventory state for matched replay."
+        ),
+    )
+    authority_group.add_argument(
+        "--inventory-authority-replay-dir",
+        type=Path,
+        help=(
+            "Replay and assert an exact policy-arm inventory authority before "
+            "each auto-selection task."
+        ),
+    )
+    parser.add_argument(
         "--sage-policy",
         choices=SAGE_POLICIES,
         default=os.environ.get("SAGE_POLICY_PRESET", SAGE_POLICY_AUTO),
@@ -1314,6 +1422,36 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if (
+        args.inventory_authority_capture_dir is not None
+        and args.actor_selection_mode != "policy"
+    ):
+        raise SystemExit(
+            "--inventory-authority-capture-dir requires --actor-selection-mode policy."
+        )
+    if (
+        args.inventory_authority_replay_dir is not None
+        and args.actor_selection_mode != "auto"
+    ):
+        raise SystemExit(
+            "--inventory-authority-replay-dir requires --actor-selection-mode auto."
+        )
+    if (
+        args.inventory_authority_capture_dir is not None
+        or args.inventory_authority_replay_dir is not None
+    ) and (args.resume_run_root is not None or args.resume_completed_limit is not None):
+        raise SystemExit(
+            "Matched-inventory capture/replay forbids --resume-run-root and "
+            "--resume-completed-limit."
+        )
+    matched_inventory_requested = (
+        args.inventory_authority_capture_dir is not None
+        or args.inventory_authority_replay_dir is not None
+    )
+    if matched_inventory_requested and not args.freeze_toolsandbox_clock:
+        raise SystemExit(
+            "Matched-inventory capture/replay requires --freeze-toolsandbox-clock."
+        )
     if args.require_fresh_control and args.control_cache != "off":
         raise SystemExit(
             "--require-fresh-control requires --control-cache off; cache lookup "
@@ -1351,7 +1489,11 @@ def main() -> None:
     if args.freeze_toolsandbox_clock and not os.environ.get(
         "TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"
     ):
-        os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = str(time.time())
+        os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = str(
+            PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP
+            if matched_inventory_requested
+            else time.time()
+        )
     toolsandbox_fixed_now = os.environ.get("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP")
     publication_provenance: dict[str, Any] | None = None
     if args.require_fresh_control:
@@ -1379,17 +1521,39 @@ def main() -> None:
         generation_model=args.generation_model,
         user_model=args.user,
     )
+    candidate_arm_name = _candidate_arm_name(args.actor_selection_mode)
+    inventory_authority_capture_dir = (
+        args.inventory_authority_capture_dir.resolve()
+        if args.inventory_authority_capture_dir is not None
+        else None
+    )
+    inventory_authority_replay_dir = (
+        args.inventory_authority_replay_dir.resolve()
+        if args.inventory_authority_replay_dir is not None
+        else None
+    )
+    inventory_authority_mode = (
+        "capture"
+        if inventory_authority_capture_dir is not None
+        else "replay"
+        if inventory_authority_replay_dir is not None
+        else "off"
+    )
     os.environ["SAGE_TS_MODEL"] = args.agent
     run_root = args.output_root / f"{args.mode}_{_timestamp()}"
     control_root = run_root / "control"
-    candidate_root = run_root / "candidate"
+    candidate_root = _candidate_arm_root(run_root, args.actor_selection_mode)
     registry_dir = args.registry_dir or (run_root / "registry")
     registry_gate_snapshot = _snapshot_registry_for_gate(run_root, registry_dir)
     control_dir: Path | None = None
     candidate_dir: Path | None = None
     fresh_control_dir: Path | None = None
     control_resume_dir = _resume_arm_dir(args.resume_run_root, "control")
-    candidate_resume_dir = _resume_arm_dir(args.resume_run_root, "candidate")
+    candidate_resume_dir = _resume_arm_dir(
+        args.resume_run_root,
+        "candidate",
+        directory_name=candidate_arm_name,
+    )
     resume_completed_limit = (
         max(0, args.resume_completed_limit)
         if args.resume_completed_limit is not None
@@ -1402,25 +1566,30 @@ def main() -> None:
         generation_enabled = False
     elif _is_frozen_transfer_mode(args.mode):
         generation_enabled = False
+    candidate_generation_enabled = _candidate_generation_enabled(
+        generation_enabled,
+        inventory_authority_replay_dir,
+    )
+    generation_requested = generation_enabled
     frozen_final_run = _is_frozen_transfer_mode(args.mode) and not generation_enabled
     effective_sage_policy = _resolve_sage_policy_preset(
         args.sage_policy,
-        generation_enabled=generation_enabled,
+        generation_enabled=candidate_generation_enabled,
     )
     sage_policy_env: dict[str, dict[str, str]] = {}
     if effective_sage_policy != SAGE_POLICY_NONE:
-        if not generation_enabled:
+        if not candidate_generation_enabled:
             raise SystemExit(
                 "--sage-policy self-evolving-praxis requires generation-enabled "
                 "mechanism/online-build execution. Do not use it for frozen "
-                "registry validation arms."
+                "registry validation or matched-inventory replay arms."
             )
         sage_policy_env = _apply_sage_policy_preset(effective_sage_policy)
     _preflight_openai_api_key(
         agent_model=args.agent,
         user_model=args.user,
         generation_model=args.generation_model,
-        generation_enabled=generation_enabled,
+        generation_enabled=candidate_generation_enabled,
     )
     if _is_frozen_transfer_mode(args.mode) and args.generation == "on":
         raise SystemExit(
@@ -1491,7 +1660,7 @@ def main() -> None:
     cohort_preflight = _write_cohort_preflight(
         run_root,
         scenario_names=scenario_names,
-        generation_enabled=generation_enabled,
+        generation_enabled=candidate_generation_enabled,
         registry_dir=registry_dir,
     )
     initialize_campaign(root=args.artifact_root, phase=args.mode)
@@ -1514,6 +1683,18 @@ def main() -> None:
             "sage_policy": effective_sage_policy,
             "sage_policy_requested": args.sage_policy,
             "sage_policy_env": sage_policy_env,
+            "actor_selection_mode": args.actor_selection_mode,
+            "candidate_arm_name": candidate_arm_name,
+            "generation_enabled": candidate_generation_enabled,
+            "generation_requested": generation_requested,
+            "candidate_generation_enabled": candidate_generation_enabled,
+            "inventory_authority_mode": inventory_authority_mode,
+            "inventory_authority_capture_dir": str(inventory_authority_capture_dir)
+            if inventory_authority_capture_dir
+            else None,
+            "inventory_authority_replay_dir": str(inventory_authority_replay_dir)
+            if inventory_authority_replay_dir
+            else None,
             "toolsandbox_clock_policy": "frozen"
             if args.freeze_toolsandbox_clock
             else "wall_clock",
@@ -1606,7 +1787,8 @@ def main() -> None:
             "status": "running",
             "agent": args.agent,
             "model_metadata": model_metadata,
-            "generation_enabled": generation_enabled,
+            "generation_enabled": candidate_generation_enabled,
+            "generation_requested": generation_requested,
             "base_tool_policy": UPSTREAM_POLICY,
             "scenario_count": len(scenario_names),
             "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
@@ -1615,6 +1797,16 @@ def main() -> None:
             "external_fixture": external_fixture,
             "sage_policy": effective_sage_policy,
             "sage_policy_requested": args.sage_policy,
+            "actor_selection_mode": args.actor_selection_mode,
+            "candidate_arm_name": candidate_arm_name,
+            "candidate_generation_enabled": candidate_generation_enabled,
+            "inventory_authority_mode": inventory_authority_mode,
+            "inventory_authority_capture_dir": str(inventory_authority_capture_dir)
+            if inventory_authority_capture_dir
+            else None,
+            "inventory_authority_replay_dir": str(inventory_authority_replay_dir)
+            if inventory_authority_replay_dir
+            else None,
         },
         root=args.artifact_root,
     )
@@ -1626,7 +1818,7 @@ def main() -> None:
         agent=args.agent,
         user=args.user,
         model_metadata=model_metadata,
-        generation_enabled=generation_enabled,
+        generation_enabled=candidate_generation_enabled,
         base_tool_policy=UPSTREAM_POLICY,
         scenario_count=len(scenario_names),
         registry_dir=registry_dir,
@@ -1675,7 +1867,7 @@ def main() -> None:
             agent=args.agent,
             user=args.user,
             model_metadata=model_metadata,
-            generation_enabled=generation_enabled,
+            generation_enabled=candidate_generation_enabled,
             base_tool_policy=UPSTREAM_POLICY,
             scenario_count=len(scenario_names),
             control_dir=control_dir,
@@ -1731,6 +1923,14 @@ def main() -> None:
             if candidate_resume_dir
             else None,
             "resume_completed_limit": resume_completed_limit,
+            "actor_selection_mode": args.actor_selection_mode,
+            "candidate_arm_name": candidate_arm_name,
+            "inventory_authority_capture_dir": str(inventory_authority_capture_dir)
+            if inventory_authority_capture_dir
+            else None,
+            "inventory_authority_replay_dir": str(inventory_authority_replay_dir)
+            if inventory_authority_replay_dir
+            else None,
         }
         ctx = get_context("spawn")
         control_process = ctx.Process(
@@ -1749,7 +1949,7 @@ def main() -> None:
                 {
                     **base_params,
                     "candidate_root": str(candidate_root),
-                    "generation_enabled": generation_enabled,
+                    "generation_enabled": generation_requested,
                 },
             ),
             name="sage_ts_candidate_arm",
@@ -1815,6 +2015,7 @@ def main() -> None:
                     processes=1,
                     run_type=f"{args.mode}_control",
                     base_tool_policy=UPSTREAM_POLICY,
+                    actor_selection_mode="policy",
                 ),
                 manifest_path=args.manifest,
             )
@@ -1850,6 +2051,7 @@ def main() -> None:
                     processes=1,
                     run_type=f"{args.mode}_control",
                     base_tool_policy=UPSTREAM_POLICY,
+                    actor_selection_mode="policy",
                     resume_from_dir=control_resume_dir
                     if fresh_control_scenarios == scenario_names
                     else None,
@@ -1876,6 +2078,7 @@ def main() -> None:
                         processes=1,
                         run_type=f"{args.mode}_control",
                         base_tool_policy=UPSTREAM_POLICY,
+                        actor_selection_mode="policy",
                     ),
                     manifest_path=args.manifest,
                 )
@@ -1929,7 +2132,7 @@ def main() -> None:
 
         generator = (
             ToolGenerator(completer=OpenAIChatAdapter(model=args.generation_model))
-            if generation_enabled
+            if candidate_generation_enabled
             else None
         )
 
@@ -1950,22 +2153,28 @@ def main() -> None:
                 scenario_names=scenario_names,
                 output_dir=candidate_root,
                 registry_dir=registry_dir,
-                run_type=f"{args.mode}_candidate",
+                generation_model=args.generation_model,
+                run_type=f"{args.mode}_{candidate_arm_name}",
                 recurrence_threshold=args.recurrence_threshold,
                 base_tool_policy=UPSTREAM_POLICY,
+                actor_selection_mode=args.actor_selection_mode,
+                inventory_authority_capture_dir=inventory_authority_capture_dir,
+                inventory_authority_replay_dir=inventory_authority_replay_dir,
                 resume_from_dir=candidate_resume_dir,
                 resume_completed_limit=resume_completed_limit,
                 manifest_path=args.manifest,
                 reflection_control_rows=reflection_control_rows,
                 require_fresh_reflection_control=(
-                    args.require_fresh_control and generation_enabled
+                    args.require_fresh_control and candidate_generation_enabled
                 ),
                 # Publication runs must not inherit conclusions from earlier
                 # campaigns. Non-publication runs retain the historical
                 # failure-memory behavior through SageRunConfig's default.
-                failure_memory_path=None
-                if args.require_fresh_control
-                else Path("artifacts/summaries/failure_memory.json"),
+                failure_memory_path=(
+                    Path("artifacts/summaries/failure_memory.json")
+                    if candidate_generation_enabled and not args.require_fresh_control
+                    else None
+                ),
             ),
             generator=generator,
             progress_hook=candidate_progress,
@@ -2081,6 +2290,32 @@ def main() -> None:
             _assert_publication_source_unchanged(publication_provenance)
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
+    inventory_authority_dir = (
+        inventory_authority_capture_dir or inventory_authority_replay_dir
+    )
+    inventory_authority_manifest_path = (
+        inventory_authority_dir / "inventory_authority.json"
+        if inventory_authority_dir is not None
+        else None
+    )
+    inventory_authority_manifest_sha256 = (
+        _digest_file(inventory_authority_manifest_path)
+        if inventory_authority_manifest_path is not None
+        else None
+    )
+    if (
+        inventory_authority_manifest_path is not None
+        and inventory_authority_manifest_sha256 is None
+    ):
+        raise SystemExit(
+            "Matched-inventory run did not produce or preserve a complete "
+            f"authority manifest: {inventory_authority_manifest_path}"
+        )
+    inventory_authority_manifest = (
+        _read_metrics(inventory_authority_manifest_path)
+        if inventory_authority_manifest_path is not None
+        else {}
+    )
     manifest = {
         "mode": args.mode,
         "manifest_split": split_name,
@@ -2090,11 +2325,45 @@ def main() -> None:
         "generation_model": args.generation_model,
         "model_metadata": model_metadata,
         "comparison_model_key": model_metadata["comparison_key"],
-        "generation_enabled": generation_enabled,
+        "generation_enabled": candidate_generation_enabled,
+        "generation_requested": generation_requested,
         "base_tool_policy": UPSTREAM_POLICY,
         "sage_policy": effective_sage_policy,
         "sage_policy_requested": args.sage_policy,
         "sage_policy_env": sage_policy_env,
+        "actor_selection_mode": args.actor_selection_mode,
+        "control_actor_selection_mode": "policy",
+        "candidate_actor_selection_mode": args.actor_selection_mode,
+        "candidate_arm_name": candidate_arm_name,
+        "candidate_generation_enabled": candidate_generation_enabled,
+        "candidate_evolution_source": (
+            "matched_inventory_authority"
+            if inventory_authority_replay_dir is not None
+            else "live_candidate"
+        ),
+        "inventory_authority_mode": inventory_authority_mode,
+        "inventory_authority_capture_dir": str(inventory_authority_capture_dir)
+        if inventory_authority_capture_dir
+        else None,
+        "inventory_authority_replay_dir": str(inventory_authority_replay_dir)
+        if inventory_authority_replay_dir
+        else None,
+        "inventory_authority_manifest_path": str(inventory_authority_manifest_path)
+        if inventory_authority_manifest_path
+        else None,
+        "inventory_authority_manifest_sha256": (inventory_authority_manifest_sha256),
+        "inventory_authority_source_actor_selection_mode": (
+            inventory_authority_manifest.get("source_actor_selection_mode")
+        ),
+        "inventory_authority_source_generation_enabled": (
+            inventory_authority_manifest.get("source_generation_enabled")
+        ),
+        "inventory_authority_task_count": inventory_authority_manifest.get(
+            "task_count"
+        ),
+        "inventory_authority_tasks_sha256": inventory_authority_manifest.get(
+            "tasks_sha256"
+        ),
         "scenario_count": len(scenario_names),
         "benchmark_manifest_path": str(benchmark_manifest_path),
         "benchmark_manifest_sha256": benchmark_manifest_sha256,
@@ -2128,17 +2397,21 @@ def main() -> None:
         "control_cache_report_path": str(control_cache_report_path),
         "control_cache_manifest_hash": control_cache_report.get("cache_manifest_hash"),
         "fresh_control_required": args.require_fresh_control,
-        "cross_run_failure_memory_enabled": not args.require_fresh_control,
+        "cross_run_failure_memory_enabled": (
+            candidate_generation_enabled and not args.require_fresh_control
+        ),
         "cross_run_failure_memory_path": (
-            None
-            if args.require_fresh_control
-            else "artifacts/summaries/failure_memory.json"
+            "artifacts/summaries/failure_memory.json"
+            if candidate_generation_enabled and not args.require_fresh_control
+            else None
         ),
         "reflection_control_source": (
-            "same_run_fresh"
-            if args.require_fresh_control and generation_enabled
+            "inventory_authority_replay"
+            if inventory_authority_replay_dir is not None
+            else "same_run_fresh"
+            if args.require_fresh_control and candidate_generation_enabled
             else "not_applicable"
-            if not generation_enabled
+            if not candidate_generation_enabled
             else "legacy_control_cache"
         ),
         "publication_performance_endpoint": (
@@ -2176,7 +2449,7 @@ def main() -> None:
         "dashboard_task_focus_url": dashboard_task_focus_url,
         "dashboard_task_compare_url": dashboard_task_compare_url,
         "parallel_arms": args.parallel_arms,
-        "model_authored_generation_enabled": True,
+        "model_authored_generation_enabled": candidate_generation_enabled,
         "native_action_tools_enabled": True,
         "scenario_name_birth_enabled": False,
         "scenario_name_routing_enabled": False,
@@ -2201,8 +2474,44 @@ def main() -> None:
             "agent": args.agent,
             "model_metadata": model_metadata,
             "comparison_model_key": model_metadata["comparison_key"],
-            "generation_enabled": generation_enabled,
+            "generation_enabled": candidate_generation_enabled,
+            "generation_requested": generation_requested,
             "base_tool_policy": UPSTREAM_POLICY,
+            "actor_selection_mode": args.actor_selection_mode,
+            "control_actor_selection_mode": "policy",
+            "candidate_actor_selection_mode": args.actor_selection_mode,
+            "candidate_arm_name": candidate_arm_name,
+            "candidate_generation_enabled": candidate_generation_enabled,
+            "candidate_evolution_source": (
+                "matched_inventory_authority"
+                if inventory_authority_replay_dir is not None
+                else "live_candidate"
+            ),
+            "inventory_authority_mode": inventory_authority_mode,
+            "inventory_authority_capture_dir": str(inventory_authority_capture_dir)
+            if inventory_authority_capture_dir
+            else None,
+            "inventory_authority_replay_dir": str(inventory_authority_replay_dir)
+            if inventory_authority_replay_dir
+            else None,
+            "inventory_authority_manifest_path": str(inventory_authority_manifest_path)
+            if inventory_authority_manifest_path
+            else None,
+            "inventory_authority_manifest_sha256": (
+                inventory_authority_manifest_sha256
+            ),
+            "inventory_authority_source_actor_selection_mode": (
+                inventory_authority_manifest.get("source_actor_selection_mode")
+            ),
+            "inventory_authority_source_generation_enabled": (
+                inventory_authority_manifest.get("source_generation_enabled")
+            ),
+            "inventory_authority_task_count": inventory_authority_manifest.get(
+                "task_count"
+            ),
+            "inventory_authority_tasks_sha256": inventory_authority_manifest.get(
+                "tasks_sha256"
+            ),
             "scenario_count": len(scenario_names),
             "control_dir": str(control_dir),
             "candidate_dir": str(candidate_dir),

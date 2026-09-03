@@ -14,11 +14,21 @@ from tool_sandbox.cli.utils import (
 from tool_sandbox.roles.base_role import BaseRole
 
 
-def make_agent(agent: str) -> BaseRole:
+def make_agent(agent: str, *, actor_selection_mode: str = "policy") -> BaseRole:
     try:
-        return AGENT_TYPE_TO_FACTORY[RoleImplType(agent)]()
+        role_impl = RoleImplType(agent)
     except ValueError:
-        return ConfigurableOpenAIAgent(agent)
+        return ConfigurableOpenAIAgent(
+            agent,
+            actor_selection_mode=actor_selection_mode,
+        )
+    if actor_selection_mode != "policy":
+        raise ValueError(
+            "actor_selection_mode='auto' requires a configurable OpenAI model "
+            f"name; ToolSandbox role alias {agent!r} does not expose the audited "
+            "auto-selection path."
+        )
+    return AGENT_TYPE_TO_FACTORY[role_impl]()
 
 
 def make_user(user: str) -> BaseRole:

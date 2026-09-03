@@ -10,6 +10,7 @@ from sage_ts.evaluation.control_baseline_cache import (
     build_control_cache_report,
     initial_state_checksum,
     scenario_checksum,
+    write_synthetic_control_run,
 )
 from sage_ts.evaluation.task_strata import cohort_policy_report
 
@@ -71,6 +72,29 @@ def _add(cache: ControlBaselineCache, ctx: dict, row: dict, tmp_path: Path):
     return cache.add_record(
         context=ctx, result_row=row, run_dir=run, manifest_path=manifest
     )
+
+
+def test_synthetic_control_manifest_records_policy_actor_selection(
+    tmp_path: Path,
+) -> None:
+    output_root = tmp_path / "synthetic"
+    run_dir = write_synthetic_control_run(
+        output_root=output_root,
+        run_type="test",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        scenario_names=("task",),
+        cached_rows_by_name={"task": _row()},
+        fresh_run_dir=None,
+        cache_report={"control_source": "cached", "cache_manifest_hash": "abc"},
+    )
+
+    for manifest_path in (
+        output_root / "sage_ts_run_manifest.json",
+        run_dir / "sage_ts_run_manifest.json",
+    ):
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert payload["actor_selection_mode"] == "policy"
 
 
 def test_record_creation_writes_manifest_index_and_record(tmp_path: Path) -> None:

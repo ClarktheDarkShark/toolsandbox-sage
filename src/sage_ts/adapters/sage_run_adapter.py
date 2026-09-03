@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
+import platform
 import re
 import shutil
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,6 +19,7 @@ from sage_ts.adapters.toolsandbox_adapter import (
     EventHook,
     ProgressHook,
     ToolSandboxRunConfig,
+    git_sha,
     run_scenario_sequence,
 )
 from sage_ts.adequacy.inadequacy_classifier import (
@@ -39,6 +44,53 @@ from sage_ts.runtime.toolsandbox_integration import (
     with_registry_tools,
 )
 from tool_sandbox.common.scenario import Scenario
+
+INVENTORY_AUTHORITY_SCHEMA_VERSION = 2
+INVENTORY_AUTHORITY_ARTIFACT = "sage_matched_inventory_authority"
+INVENTORY_AUTHORITY_SHARED_ENV_NAMES = (
+    "OPENAI_BASE_URL",
+    "OPENAI_ORG_ID",
+    "OPENAI_PROJECT",
+    "SAGE_DIAGNOSTIC_EXPOSE_TOOL_NAME",
+    "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_BASE_TOOL",
+    "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_ERROR",
+    "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME",
+    "SAGE_DISABLE_SCENARIO_NAME_BIRTH",
+    "SAGE_DISABLE_SCENARIO_NAME_ROUTING",
+    "SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS",
+    "SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS",
+    "SAGE_GPT5_REASONING_EFFORT",
+    "SAGE_GPT5_USER_SIM_REASONING_EFFORT",
+    "SAGE_OPENAI_MAX_RETRIES",
+    "SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS",
+    "SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS",
+    "SAGE_POLICY_PRESET",
+    "SAGE_PRAXIS_BRIDGE_POLICY",
+    "SAGE_PUBLICATION_GIT_COMMIT",
+    "SAGE_PUBLICATION_GIT_TREE",
+    "SAGE_SELF_EVOLVING_CONTROL_CACHE_ROOT",
+    "SAGE_TS_FREEZE_TOOLSANDBOX_CLOCK",
+    "SAGE_TS_GENERATION_SETTINGS_DIGEST",
+    "SAGE_TS_MODEL",
+    "SAGE_TS_PROMPT_POLICY_DIGEST",
+    "SAGE_TS_RUNTIME_DIGEST",
+    "SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS",
+    "TOOLSANDBOX_RAPID_CACHE_MODE",
+    "TZ",
+)
+
+
+class InventoryAuthorityError(RuntimeError):
+    """Abort before inference when a matched-inventory assertion fails.
+
+    ``run_scenario_sequence`` intentionally catches ordinary transform exceptions and
+    falls back to the untransformed scenario. That behavior is useful for exploratory
+    adapters but unsafe for a causal inventory replay: silently falling back would send
+    a different tool set to the actor. The transform boundary explicitly re-raises
+    exceptions carrying this marker instead of entering that fallback path.
+    """
+
+    fail_closed_scenario_transform = True
 
 
 def _reuse_log_tools(output_directory: Path, scenario_name: str) -> list[str]:
@@ -234,6 +286,533 @@ def _snapshot_registry_checkpoint(
         encoding="utf-8",
     )
     return checkpoint_dir
+
+
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _sha256_file(path: Path) -> str | None:
+    return _sha256_bytes(path.read_bytes()) if path.is_file() else None
+
+
+def _canonical_json_sha256(payload: object) -> str:
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return _sha256_bytes(encoded)
+
+
+def _scenario_order_sha256(scenario_names: tuple[str, ...]) -> str:
+    return _sha256_bytes(("\n".join(scenario_names) + "\n").encode("utf-8"))
+
+
+def _tracked_source_state(repository_root: Path) -> dict[str, object]:
+    """Hash every tracked worktree/index change relative to the bound commit."""
+
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repository_root),
+                "diff",
+                "--binary",
+                "--no-ext-diff",
+                "HEAD",
+                "--",
+            ],
+            check=False,
+            capture_output=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(
+            "Cannot inspect matched-inventory tracked source state."
+        ) from exc
+    if completed.returncode != 0:
+        detail = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(
+            "Cannot inspect matched-inventory tracked source state: "
+            f"{detail or completed.returncode}."
+        )
+    return {
+        "tracked_changes_present": bool(completed.stdout),
+        "tracked_diff_sha256": _sha256_bytes(completed.stdout),
+    }
+
+
+def _inventory_authority_shared_context(config: "SageRunConfig") -> dict[str, object]:
+    """Return non-treatment execution context that must match across arms."""
+
+    fixed_toolsandbox_timestamp = os.environ.get("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP")
+    if not fixed_toolsandbox_timestamp:
+        raise ValueError(
+            "Matched-inventory capture/replay requires a fixed ToolSandbox timestamp."
+        )
+    source_git_commit = git_sha()
+    if not source_git_commit:
+        raise ValueError(
+            "Matched-inventory capture/replay requires a resolvable source Git commit."
+        )
+    benchmark_manifest = Path(config.manifest_path)
+    benchmark_manifest_present = benchmark_manifest.is_file()
+    repository_root = Path(__file__).resolve().parents[3]
+    configured_environment_lock = os.environ.get("SAGE_PUBLICATION_ENVIRONMENT_LOCK")
+    environment_lock = (
+        Path(configured_environment_lock)
+        if configured_environment_lock
+        else repository_root / "requirements-publication-lock.txt"
+    )
+    configured_rapid_fixture = os.environ.get("TOOLSANDBOX_RAPID_CACHE_PATH")
+    rapid_fixture = Path(configured_rapid_fixture) if configured_rapid_fixture else None
+    behavior_environment = {
+        name: os.environ.get(name) for name in INVENTORY_AUTHORITY_SHARED_ENV_NAMES
+    }
+    return {
+        "agent": config.agent,
+        "user": config.user,
+        "generation_model": config.generation_model,
+        "benchmark_manifest_present": benchmark_manifest_present,
+        "benchmark_manifest_sha256": (
+            _sha256_file(benchmark_manifest) if benchmark_manifest_present else None
+        ),
+        "base_tool_policy": config.base_tool_policy,
+        "recurrence_threshold": config.recurrence_threshold,
+        "fixed_toolsandbox_timestamp": fixed_toolsandbox_timestamp,
+        "source_git_commit": source_git_commit,
+        "tracked_source_state": _tracked_source_state(repository_root),
+        "runtime_environment": {
+            "python_executable": str(Path(sys.executable).resolve()),
+            "python_version": platform.python_version(),
+            "python_implementation": platform.python_implementation(),
+            "platform_system": platform.system(),
+            "platform_machine": platform.machine(),
+            "environment_lock_present": environment_lock.is_file(),
+            "environment_lock_sha256": _sha256_file(environment_lock),
+        },
+        "behavior_environment": behavior_environment,
+        "rapidapi_fixture": {
+            "configured": rapid_fixture is not None,
+            "present": rapid_fixture.is_file() if rapid_fixture is not None else False,
+            "sha256": _sha256_file(rapid_fixture)
+            if rapid_fixture is not None
+            else None,
+        },
+    }
+
+
+def _shared_context_mismatch_fields(
+    expected: dict[str, object],
+    observed: dict[str, object],
+) -> list[str]:
+    return sorted(
+        key
+        for key in set(expected) | set(observed)
+        if expected.get(key) != observed.get(key)
+    )
+
+
+def _authority_task_directory_name(order_index: int, scenario_name: str) -> str:
+    return f"{order_index + 1:04d}_{_safe_checkpoint_name(scenario_name)}"
+
+
+def _active_authority_order_index(
+    scenario_name: str,
+    scenario_names: tuple[str, ...],
+) -> int:
+    raw_index = os.environ.get("SAGE_TS_SCENARIO_ORDER_INDEX")
+    try:
+        order_index = int(raw_index) if raw_index is not None else -1
+    except ValueError as exc:
+        raise InventoryAuthorityError(
+            f"Invalid SAGE_TS_SCENARIO_ORDER_INDEX: {raw_index!r}."
+        ) from exc
+    if not 0 <= order_index < len(scenario_names):
+        raise InventoryAuthorityError(
+            "Matched-inventory execution requires a valid scenario-order index; "
+            f"observed {order_index}."
+        )
+    if scenario_names[order_index] != scenario_name:
+        raise InventoryAuthorityError(
+            "Matched-inventory scenario order diverged: expected "
+            f"{scenario_names[order_index]!r}, observed {scenario_name!r}."
+        )
+    return order_index
+
+
+def _assert_separate_authority_and_registry_roots(
+    authority_root: Path,
+    registry_root: Path,
+) -> None:
+    authority = authority_root.resolve()
+    registry = registry_root.resolve()
+    if (
+        authority == registry
+        or authority.is_relative_to(registry)
+        or registry.is_relative_to(authority)
+    ):
+        raise ValueError(
+            "Inventory authority and mutable registry roots must be separate: "
+            f"authority={authority}, registry={registry}."
+        )
+
+
+def _prepare_inventory_authority_capture(
+    authority_root: Path,
+    *,
+    registry_root: Path,
+) -> None:
+    _assert_separate_authority_and_registry_roots(authority_root, registry_root)
+    if authority_root.exists() and any(authority_root.iterdir()):
+        raise ValueError(
+            "Inventory authority capture refuses to overwrite a non-empty root: "
+            f"{authority_root}"
+        )
+    (authority_root / "tasks").mkdir(parents=True, exist_ok=True)
+
+
+def _authority_state_record(
+    *,
+    authority_root: Path,
+    registry_root: Path,
+    order_index: int,
+    scenario_name: str,
+) -> dict[str, object]:
+    """Copy the exact actor-ready registry/lifecycle bytes for one donor task."""
+
+    relative_state_dir = Path("tasks") / _authority_task_directory_name(
+        order_index, scenario_name
+    )
+    state_dir = authority_root / relative_state_dir
+    if state_dir.exists():
+        raise InventoryAuthorityError(
+            f"Inventory authority task state already exists: {state_dir}"
+        )
+    state_dir.mkdir(parents=True)
+    state: dict[str, object] = {
+        "state_dir": relative_state_dir.as_posix(),
+    }
+    for filename, prefix in (
+        ("registry_manifest.json", "registry_manifest"),
+        ("tool_lifecycle.json", "tool_lifecycle"),
+    ):
+        source = registry_root / filename
+        present = source.is_file()
+        state[f"{prefix}_present"] = present
+        state[f"{prefix}_sha256"] = _sha256_file(source) if present else None
+        if present:
+            shutil.copy2(source, state_dir / filename)
+    return state
+
+
+def _authority_manifest_payload(
+    *,
+    scenario_names: tuple[str, ...],
+    shared_context: dict[str, object],
+    source_actor_selection_mode: str,
+    source_generation_enabled: bool,
+    tasks: list[dict[str, object]],
+    complete: bool,
+) -> dict[str, object]:
+    common: dict[str, object] = {
+        "artifact_type": INVENTORY_AUTHORITY_ARTIFACT,
+        "schema_version": INVENTORY_AUTHORITY_SCHEMA_VERSION,
+        "complete": complete,
+        "shared_context": shared_context,
+        "shared_context_sha256": _canonical_json_sha256(shared_context),
+        "source_actor_selection_mode": source_actor_selection_mode,
+        "source_generation_enabled": source_generation_enabled,
+        "scenario_order_sha256": _scenario_order_sha256(scenario_names),
+        "expected_task_count": len(scenario_names),
+        "task_count": len(tasks),
+    }
+    if complete:
+        return {
+            **common,
+            "scenario_names": list(scenario_names),
+            "tasks_sha256": _canonical_json_sha256(tasks),
+            "tasks": tasks,
+        }
+    last_task = tasks[-1] if tasks else None
+    return {
+        **common,
+        "last_task": (
+            {
+                key: last_task.get(key)
+                for key in (
+                    "order_index",
+                    "scenario",
+                    "state_dir",
+                    "registry_manifest_sha256",
+                    "tool_lifecycle_sha256",
+                    "routed_generated_tool_names",
+                    "routed_inventory_sha256",
+                )
+            }
+            if last_task is not None
+            else None
+        ),
+        "crash_recovery_note": (
+            "Exact completed task records and registry states are stored under tasks/."
+        ),
+    }
+
+
+def _write_inventory_authority_manifest(
+    authority_root: Path,
+    *,
+    scenario_names: tuple[str, ...],
+    shared_context: dict[str, object],
+    source_actor_selection_mode: str,
+    source_generation_enabled: bool,
+    tasks: list[dict[str, object]],
+    complete: bool,
+) -> Path:
+    filename = (
+        "inventory_authority.json" if complete else "inventory_authority.partial.json"
+    )
+    path = authority_root / filename
+    payload = _authority_manifest_payload(
+        scenario_names=scenario_names,
+        shared_context=shared_context,
+        source_actor_selection_mode=source_actor_selection_mode,
+        source_generation_enabled=source_generation_enabled,
+        tasks=tasks,
+        complete=complete,
+    )
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    if complete:
+        partial = authority_root / "inventory_authority.partial.json"
+        if partial.exists():
+            partial.unlink()
+    return path
+
+
+def _authority_state_dir(authority_root: Path, task: dict[str, object]) -> Path:
+    relative = task.get("state_dir")
+    if not isinstance(relative, str) or not relative:
+        raise ValueError("Inventory authority task has no state_dir.")
+    root = authority_root.resolve()
+    state_dir = (authority_root / relative).resolve()
+    if not state_dir.is_relative_to(root):
+        raise ValueError(
+            f"Inventory authority task state escapes the authority root: {relative!r}."
+        )
+    return state_dir
+
+
+def _validate_authority_state_files(
+    authority_root: Path,
+    task: dict[str, object],
+) -> None:
+    state_dir = _authority_state_dir(authority_root, task)
+    if not state_dir.is_dir():
+        raise ValueError(f"Inventory authority state directory is missing: {state_dir}")
+    for filename, prefix in (
+        ("registry_manifest.json", "registry_manifest"),
+        ("tool_lifecycle.json", "tool_lifecycle"),
+    ):
+        path = state_dir / filename
+        expected_present = task.get(f"{prefix}_present")
+        if not isinstance(expected_present, bool):
+            raise ValueError(
+                f"Inventory authority task has invalid {prefix}_present metadata."
+            )
+        if path.is_file() != expected_present:
+            raise ValueError(
+                f"Inventory authority {filename} presence mismatch in {state_dir}."
+            )
+        expected_digest = task.get(f"{prefix}_sha256")
+        observed_digest = _sha256_file(path)
+        if observed_digest != expected_digest:
+            raise ValueError(
+                f"Inventory authority {filename} hash mismatch in {state_dir}: "
+                f"expected {expected_digest!r}, observed {observed_digest!r}."
+            )
+
+
+def _load_inventory_authority(
+    authority_root: Path,
+    *,
+    registry_root: Path,
+    scenario_names: tuple[str, ...],
+    shared_context: dict[str, object],
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    """Load and fully validate a complete donor authority before any actor call."""
+
+    _assert_separate_authority_and_registry_roots(authority_root, registry_root)
+    manifest_path = authority_root / "inventory_authority.json"
+    if not manifest_path.is_file():
+        raise ValueError(f"Complete inventory authority is missing: {manifest_path}")
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read inventory authority: {manifest_path}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("Inventory authority root must be a JSON object.")
+    if payload.get("artifact_type") != INVENTORY_AUTHORITY_ARTIFACT:
+        raise ValueError("Inventory authority artifact_type is invalid.")
+    if payload.get("schema_version") != INVENTORY_AUTHORITY_SCHEMA_VERSION:
+        raise ValueError("Inventory authority schema_version is unsupported.")
+    if payload.get("complete") is not True:
+        raise ValueError("Inventory authority is incomplete.")
+    stored_shared_context = payload.get("shared_context")
+    if not isinstance(stored_shared_context, dict):
+        raise ValueError("Inventory authority shared_context must be a JSON object.")
+    if payload.get("shared_context_sha256") != _canonical_json_sha256(
+        stored_shared_context
+    ):
+        raise ValueError("Inventory authority shared-context hash is invalid.")
+    if stored_shared_context != shared_context:
+        mismatches = _shared_context_mismatch_fields(
+            stored_shared_context,
+            shared_context,
+        )
+        raise ValueError(
+            "Inventory authority shared execution context mismatch: "
+            + ", ".join(mismatches)
+        )
+    if payload.get("source_actor_selection_mode") != "policy":
+        raise ValueError(
+            "Inventory authority replay requires a policy-selection source arm."
+        )
+    if not isinstance(payload.get("source_generation_enabled"), bool):
+        raise ValueError(
+            "Inventory authority source_generation_enabled must be a boolean."
+        )
+    expected_names = list(scenario_names)
+    if payload.get("scenario_names") != expected_names:
+        raise ValueError("Inventory authority scenario order does not match the run.")
+    if payload.get("scenario_order_sha256") != _scenario_order_sha256(scenario_names):
+        raise ValueError("Inventory authority scenario-order hash is invalid.")
+    if payload.get("expected_task_count") != len(scenario_names):
+        raise ValueError("Inventory authority expected task count is invalid.")
+    raw_tasks = payload.get("tasks")
+    if not isinstance(raw_tasks, list) or not all(
+        isinstance(task, dict) for task in raw_tasks
+    ):
+        raise ValueError("Inventory authority tasks must be a list of objects.")
+    tasks = [dict(task) for task in raw_tasks]
+    if payload.get("task_count") != len(scenario_names) or len(tasks) != len(
+        scenario_names
+    ):
+        raise ValueError("Inventory authority task count is incomplete.")
+    if payload.get("tasks_sha256") != _canonical_json_sha256(tasks):
+        raise ValueError("Inventory authority task-record hash is invalid.")
+    for index, (scenario_name, task) in enumerate(zip(scenario_names, tasks)):
+        if task.get("order_index") != index or task.get("scenario") != scenario_name:
+            raise ValueError(
+                "Inventory authority task identity mismatch at index "
+                f"{index}: expected {scenario_name!r}."
+            )
+        _validate_authority_state_files(authority_root, task)
+    return payload, tasks
+
+
+def _restore_authority_state(
+    *,
+    authority_root: Path,
+    registry_root: Path,
+    task: dict[str, object],
+) -> None:
+    """Force the mutable exposure registry to the donor's exact pre-task bytes."""
+
+    state_dir = _authority_state_dir(authority_root, task)
+    for filename, prefix in (
+        ("registry_manifest.json", "registry_manifest"),
+        ("tool_lifecycle.json", "tool_lifecycle"),
+    ):
+        target = registry_root / filename
+        if task[f"{prefix}_present"]:
+            shutil.copy2(state_dir / filename, target)
+        elif target.exists():
+            target.unlink()
+        observed_digest = _sha256_file(target)
+        expected_digest = task[f"{prefix}_sha256"]
+        if observed_digest != expected_digest:
+            raise InventoryAuthorityError(
+                f"Restored inventory authority {filename} hash mismatch: "
+                f"expected {expected_digest!r}, observed {observed_digest!r}."
+            )
+
+
+def _routed_inventory_record(
+    *,
+    order_index: int,
+    scenario_name: str,
+    state: dict[str, object],
+    original_tool_order: list[str],
+    original_tool_allow_list: list[str] | None,
+    routed_entries: list[Any],
+    routing_decisions: dict[str, Any],
+    enhanced_tool_order: list[str],
+    enhanced_tool_allow_list: list[str] | None,
+) -> dict[str, object]:
+    routed_entry_payloads = [entry.to_json() for entry in routed_entries]
+    routed_names = [entry.tool.spec.tool_name for entry in routed_entries]
+    decision_payload = {
+        tool_name: decision.to_json()
+        for tool_name, decision in sorted(routing_decisions.items())
+    }
+    inventory_material = {
+        "registry_manifest_sha256": state["registry_manifest_sha256"],
+        "tool_lifecycle_sha256": state["tool_lifecycle_sha256"],
+        "original_tool_order": original_tool_order,
+        "original_tool_allow_list": original_tool_allow_list,
+        "routed_generated_entries": routed_entry_payloads,
+        "routing_decisions": decision_payload,
+        "enhanced_tool_order": enhanced_tool_order,
+        "enhanced_tool_allow_list": enhanced_tool_allow_list,
+    }
+    return {
+        "order_index": order_index,
+        "scenario": scenario_name,
+        **state,
+        "original_tool_order": original_tool_order,
+        "original_tool_allow_list": original_tool_allow_list,
+        "routed_generated_tool_names": routed_names,
+        "routed_generated_entries_sha256": _canonical_json_sha256(
+            routed_entry_payloads
+        ),
+        "routing_decisions": decision_payload,
+        "enhanced_tool_order": enhanced_tool_order,
+        "enhanced_tool_allow_list": enhanced_tool_allow_list,
+        "routed_inventory_sha256": _canonical_json_sha256(inventory_material),
+    }
+
+
+def _assert_replayed_inventory(
+    expected: dict[str, object],
+    observed: dict[str, object],
+) -> None:
+    fields = (
+        "order_index",
+        "scenario",
+        "registry_manifest_present",
+        "registry_manifest_sha256",
+        "tool_lifecycle_present",
+        "tool_lifecycle_sha256",
+        "original_tool_order",
+        "original_tool_allow_list",
+        "routed_generated_tool_names",
+        "routed_generated_entries_sha256",
+        "routing_decisions",
+        "enhanced_tool_order",
+        "enhanced_tool_allow_list",
+        "routed_inventory_sha256",
+    )
+    mismatches = [
+        field for field in fields if expected.get(field) != observed.get(field)
+    ]
+    if mismatches:
+        raise InventoryAuthorityError(
+            "Matched-inventory replay diverged before actor inference for "
+            f"{observed.get('scenario')!r}: {', '.join(mismatches)}."
+        )
 
 
 def _parse_tool_message_content(raw_content: object) -> object:
@@ -733,9 +1312,13 @@ class SageRunConfig:
     scenario_names: tuple[str, ...]
     output_dir: Path
     registry_dir: Path
+    generation_model: str | None = None
     run_type: str = "sage_online"
     recurrence_threshold: int = 2
     base_tool_policy: str = UPSTREAM_POLICY
+    actor_selection_mode: str = "policy"
+    inventory_authority_capture_dir: Path | None = None
+    inventory_authority_replay_dir: Path | None = None
     resume_from_dir: Path | None = None
     resume_completed_limit: int | None = None
     manifest_path: Path = Path("")
@@ -753,7 +1336,78 @@ def run_sage_with_registry(
     event_hook: EventHook | None = None,
 ) -> Path:
     """Run ToolSandbox scenarios with accepted generated tools available."""
+    if (
+        config.inventory_authority_capture_dir is not None
+        and config.inventory_authority_replay_dir is not None
+    ):
+        raise ValueError(
+            "Inventory authority capture and replay are mutually exclusive."
+        )
+    if (
+        config.inventory_authority_capture_dir is not None
+        and config.actor_selection_mode != "policy"
+    ):
+        raise ValueError(
+            "Inventory authority capture requires actor_selection_mode='policy'."
+        )
+    if (
+        config.inventory_authority_replay_dir is not None
+        and config.actor_selection_mode != "auto"
+    ):
+        raise ValueError(
+            "Inventory authority replay requires actor_selection_mode='auto'."
+        )
+    if (
+        config.inventory_authority_capture_dir is not None
+        or config.inventory_authority_replay_dir is not None
+    ) and (
+        config.resume_from_dir is not None or config.resume_completed_limit is not None
+    ):
+        raise ValueError(
+            "Matched-inventory capture/replay requires a fresh complete task sequence."
+        )
+    if config.inventory_authority_replay_dir is not None and generator is not None:
+        raise ValueError(
+            "Inventory authority replay requires generator=None. The replay arm "
+            "consumes the donor's validated actor-ready registry state and must not "
+            "run arm-specific birth or lifecycle updates."
+        )
     store = RegistryStore(config.registry_dir)
+    capture_root = config.inventory_authority_capture_dir
+    replay_root = config.inventory_authority_replay_dir
+    if replay_root is not None:
+        existing_registry_paths = sorted(path.name for path in store.root.iterdir())
+        if existing_registry_paths:
+            raise ValueError(
+                "Inventory authority replay requires an empty registry directory; "
+                "found pre-existing state: " + ", ".join(existing_registry_paths)
+            )
+    capture_tasks: list[dict[str, object]] = []
+    replay_manifest: dict[str, object] | None = None
+    replay_tasks: list[dict[str, object]] = []
+    replayed_scenarios: list[str] = []
+    authority_shared_context: dict[str, object] | None = None
+    if capture_root is not None or replay_root is not None:
+        authority_shared_context = _inventory_authority_shared_context(config)
+    authority_shared_context_sha256 = (
+        _canonical_json_sha256(authority_shared_context)
+        if authority_shared_context is not None
+        else None
+    )
+    if capture_root is not None:
+        _prepare_inventory_authority_capture(
+            capture_root,
+            registry_root=store.root,
+        )
+    if replay_root is not None:
+        if authority_shared_context is None:
+            raise AssertionError("Inventory replay shared context was not captured.")
+        replay_manifest, replay_tasks = _load_inventory_authority(
+            replay_root,
+            registry_root=store.root,
+            scenario_names=config.scenario_names,
+            shared_context=authority_shared_context,
+        )
     registry_tools = sorted(store.load_entries())
     visible_generated_by_scenario: dict[str, list[str]] = {}
     called_generated_by_scenario: dict[str, list[str]] = {}
@@ -767,6 +1421,7 @@ def run_sage_with_registry(
 
     def transform(name: str, scenario: Scenario, output_directory: Path) -> Scenario:
         nonlocal birth_controller, registry_load_logged, reflection_controller
+        nonlocal registry_tools
         if generator is not None and birth_controller is None:
 
             def birth_event_hook(event: str, payload: dict[str, object]) -> None:
@@ -796,7 +1451,64 @@ def run_sage_with_registry(
         routing_context_text = visible_task_context.routing_text()
         routing_context_label = visible_task_context.generation_label()
         routing_family_key = visible_task_context.primary_family_key
-        if birth_controller is not None:
+        authority_order_index: int | None = None
+        authority_state: dict[str, object] | None = None
+        expected_authority_task: dict[str, object] | None = None
+        if capture_root is not None or replay_root is not None:
+            authority_order_index = _active_authority_order_index(
+                name,
+                config.scenario_names,
+            )
+            completed_authority_tasks = (
+                len(capture_tasks)
+                if capture_root is not None
+                else len(replayed_scenarios)
+            )
+            if authority_order_index != completed_authority_tasks:
+                raise InventoryAuthorityError(
+                    "Matched-inventory tasks must be transformed exactly once in order: "
+                    f"expected index {completed_authority_tasks}, observed "
+                    f"{authority_order_index}."
+                )
+        if replay_root is not None:
+            if authority_order_index is None:
+                raise InventoryAuthorityError(
+                    "Inventory replay has no active scenario-order index."
+                )
+            expected_authority_task = replay_tasks[authority_order_index]
+            _restore_authority_state(
+                authority_root=replay_root,
+                registry_root=store.root,
+                task=expected_authority_task,
+            )
+            if not registry_load_logged:
+                # The replay registry may begin empty or contain unrelated state.
+                # Report the donor's first actor-ready state, not that disposable
+                # bootstrap state, as the replay's loaded inventory.
+                registry_tools = sorted(store.load_entries())
+            authority_state = {
+                key: expected_authority_task[key]
+                for key in (
+                    "state_dir",
+                    "registry_manifest_present",
+                    "registry_manifest_sha256",
+                    "tool_lifecycle_present",
+                    "tool_lifecycle_sha256",
+                )
+            }
+            append_jsonl(
+                output_directory / "sage_run_events.jsonl",
+                {
+                    "event": "inventory_authority_state_restored",
+                    "scenario": name,
+                    "order_index": authority_order_index,
+                    "authority_root": str(replay_root),
+                    "routed_inventory_sha256": expected_authority_task.get(
+                        "routed_inventory_sha256"
+                    ),
+                },
+            )
+        elif birth_controller is not None:
             accepted_tools = birth_controller.prime_before_scenario(name, scenario)
             if accepted_tools:
                 append_jsonl(
@@ -818,6 +1530,17 @@ def run_sage_with_registry(
                             "registry_dir": str(config.registry_dir),
                         },
                     )
+        if capture_root is not None:
+            if authority_order_index is None:
+                raise InventoryAuthorityError(
+                    "Inventory capture has no active scenario-order index."
+                )
+            authority_state = _authority_state_record(
+                authority_root=capture_root,
+                registry_root=store.root,
+                order_index=authority_order_index,
+                scenario_name=name,
+            )
         if not registry_load_logged:
             append_jsonl(
                 output_directory / "sage_run_events.jsonl",
@@ -906,6 +1629,11 @@ def run_sage_with_registry(
             for tool_name in filtered_out_generated_tools
         }
         original_tool_order = list(scenario.starting_context.name_to_tool)
+        original_tool_allow_list = (
+            None
+            if scenario.starting_context.tool_allow_list is None
+            else list(scenario.starting_context.tool_allow_list)
+        )
         enhanced = with_registry_tools(
             scenario,
             store,
@@ -915,6 +1643,78 @@ def run_sage_with_registry(
             task_family_key=routing_family_key,
         )
         enhanced_tool_order = list(enhanced.starting_context.name_to_tool)
+        enhanced_tool_allow_list = (
+            None
+            if enhanced.starting_context.tool_allow_list is None
+            else list(enhanced.starting_context.tool_allow_list)
+        )
+        if authority_state is not None and authority_order_index is not None:
+            observed_authority_task = _routed_inventory_record(
+                order_index=authority_order_index,
+                scenario_name=name,
+                state=authority_state,
+                original_tool_order=original_tool_order,
+                original_tool_allow_list=original_tool_allow_list,
+                routed_entries=_routed_entries,
+                routing_decisions=routing_decisions,
+                enhanced_tool_order=enhanced_tool_order,
+                enhanced_tool_allow_list=enhanced_tool_allow_list,
+            )
+            if capture_root is not None:
+                state_dir = _authority_state_dir(
+                    capture_root,
+                    observed_authority_task,
+                )
+                (state_dir / "inventory_task.json").write_text(
+                    json.dumps(observed_authority_task, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                capture_tasks.append(observed_authority_task)
+                _write_inventory_authority_manifest(
+                    capture_root,
+                    scenario_names=config.scenario_names,
+                    shared_context=authority_shared_context or {},
+                    source_actor_selection_mode=config.actor_selection_mode,
+                    source_generation_enabled=generator is not None,
+                    tasks=capture_tasks,
+                    complete=False,
+                )
+                append_jsonl(
+                    output_directory / "sage_run_events.jsonl",
+                    {
+                        "event": "inventory_authority_task_captured",
+                        "scenario": name,
+                        "order_index": authority_order_index,
+                        "authority_root": str(capture_root),
+                        "routed_generated_tool_names": observed_authority_task[
+                            "routed_generated_tool_names"
+                        ],
+                        "routed_inventory_sha256": observed_authority_task[
+                            "routed_inventory_sha256"
+                        ],
+                    },
+                )
+            elif expected_authority_task is not None:
+                _assert_replayed_inventory(
+                    expected_authority_task,
+                    observed_authority_task,
+                )
+                replayed_scenarios.append(name)
+                append_jsonl(
+                    output_directory / "sage_run_events.jsonl",
+                    {
+                        "event": "inventory_authority_task_matched",
+                        "scenario": name,
+                        "order_index": authority_order_index,
+                        "authority_root": str(replay_root),
+                        "routed_generated_tool_names": observed_authority_task[
+                            "routed_generated_tool_names"
+                        ],
+                        "routed_inventory_sha256": observed_authority_task[
+                            "routed_inventory_sha256"
+                        ],
+                    },
+                )
         available_tools = set(
             enhanced.starting_context.get_available_tools(scrambling_allowed=False)
         )
@@ -1236,6 +2036,12 @@ def run_sage_with_registry(
             )
         return result
 
+    if replay_root is not None:
+        # Any replay-transform error must abort before actor inference. This also
+        # covers unexpected I/O or parse errors after the initial authority
+        # preflight, not only explicit inventory-mismatch exceptions.
+        setattr(transform, "fail_closed_scenario_transform", True)
+
     output_directory = run_scenario_sequence(
         ToolSandboxRunConfig(
             agent=config.agent,
@@ -1245,6 +2051,7 @@ def run_sage_with_registry(
             processes=1,
             run_type=config.run_type,
             base_tool_policy=config.base_tool_policy,
+            actor_selection_mode=config.actor_selection_mode,
             resume_from_dir=config.resume_from_dir,
             resume_completed_limit=config.resume_completed_limit,
         ),
@@ -1254,6 +2061,83 @@ def run_sage_with_registry(
         progress_hook=progress_hook,
         event_hook=event_hook,
     )
+    if authority_shared_context is not None:
+        final_shared_context = _inventory_authority_shared_context(config)
+        context_drift = _shared_context_mismatch_fields(
+            authority_shared_context,
+            final_shared_context,
+        )
+        if context_drift:
+            raise InventoryAuthorityError(
+                "Matched-inventory shared execution context changed during the run: "
+                + ", ".join(context_drift)
+            )
+    authority_mode = "off"
+    authority_root: Path | None = None
+    authority_tasks_sha256: str | None = None
+    authority_source_actor_selection_mode: str | None = None
+    authority_source_generation_enabled: bool | None = None
+    if capture_root is not None:
+        authority_mode = "capture"
+        authority_root = capture_root
+        captured_names = [str(task.get("scenario") or "") for task in capture_tasks]
+        if captured_names != list(config.scenario_names):
+            raise InventoryAuthorityError(
+                "Inventory authority capture did not cover the exact task sequence."
+            )
+        authority_path = _write_inventory_authority_manifest(
+            capture_root,
+            scenario_names=config.scenario_names,
+            shared_context=authority_shared_context or {},
+            source_actor_selection_mode=config.actor_selection_mode,
+            source_generation_enabled=generator is not None,
+            tasks=capture_tasks,
+            complete=True,
+        )
+        authority_tasks_sha256 = _canonical_json_sha256(capture_tasks)
+        authority_source_actor_selection_mode = config.actor_selection_mode
+        authority_source_generation_enabled = generator is not None
+        append_jsonl(
+            output_directory / "sage_run_events.jsonl",
+            {
+                "event": "inventory_authority_capture_completed",
+                "authority_path": str(authority_path),
+                "task_count": len(capture_tasks),
+                "tasks_sha256": authority_tasks_sha256,
+                "shared_context_sha256": authority_shared_context_sha256,
+                "source_actor_selection_mode": config.actor_selection_mode,
+                "source_generation_enabled": generator is not None,
+            },
+        )
+    elif replay_root is not None:
+        authority_mode = "replay"
+        authority_root = replay_root
+        if replayed_scenarios != list(config.scenario_names):
+            raise InventoryAuthorityError(
+                "Inventory authority replay did not match the exact task sequence."
+            )
+        authority_tasks_sha256 = str((replay_manifest or {}).get("tasks_sha256") or "")
+        authority_source_actor_selection_mode = str(
+            (replay_manifest or {}).get("source_actor_selection_mode") or ""
+        )
+        authority_source_generation_enabled = bool(
+            (replay_manifest or {})["source_generation_enabled"]
+        )
+        append_jsonl(
+            output_directory / "sage_run_events.jsonl",
+            {
+                "event": "inventory_authority_replay_completed",
+                "authority_path": str(replay_root / "inventory_authority.json"),
+                "task_count": len(replayed_scenarios),
+                "tasks_sha256": authority_tasks_sha256,
+                "shared_context_sha256": authority_shared_context_sha256,
+                "source_actor_selection_mode": (authority_source_actor_selection_mode),
+                "source_generation_enabled": authority_source_generation_enabled,
+                "replay_generation_enabled": False,
+                "replay_actor_selection_mode": config.actor_selection_mode,
+                "later_exposure_control": "donor_state_restored_before_every_task",
+            },
+        )
     if reflection_controller is not None:
         reflection_controller.assert_fresh_control_complete(config.scenario_names)
     final_registry_tools = sorted(store.load_entries())
@@ -1271,6 +2155,23 @@ def run_sage_with_registry(
     selection_summary = {
         "scenario_count": len(config.scenario_names),
         "registry_dir": str(config.registry_dir),
+        "generation_enabled": generator is not None,
+        "generation_model": config.generation_model,
+        "actor_selection_mode": config.actor_selection_mode,
+        "inventory_authority_mode": authority_mode,
+        "inventory_authority_root": str(authority_root) if authority_root else None,
+        "inventory_authority_task_count": (
+            len(capture_tasks) if capture_root is not None else len(replayed_scenarios)
+        ),
+        "inventory_authority_tasks_sha256": authority_tasks_sha256,
+        "inventory_authority_shared_context_sha256": (authority_shared_context_sha256),
+        "inventory_authority_source_actor_selection_mode": (
+            authority_source_actor_selection_mode
+        ),
+        "inventory_authority_source_generation_enabled": (
+            authority_source_generation_enabled
+        ),
+        "inventory_authority_controls_later_exposure": replay_root is not None,
         "registry_tools": registry_tools,
         "final_registry_tools": final_registry_tools,
         "generated_tool_visible_scenarios": sum(

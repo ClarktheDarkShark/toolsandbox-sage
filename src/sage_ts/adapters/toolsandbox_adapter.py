@@ -54,6 +54,7 @@ class ToolSandboxRunConfig:
     processes: int = 1
     run_type: str = "baseline"
     base_tool_policy: str = UPSTREAM_POLICY
+    actor_selection_mode: str = "policy"
     resume_from_dir: Path | None = None
     resume_completed_limit: int | None = None
 
@@ -274,6 +275,7 @@ def run_one_scenario(
     *,
     agent: str,
     user: str,
+    actor_selection_mode: str = "policy",
     output_directory: Path,
 ) -> dict[str, Any]:
     max_attempts = _transient_scenario_retry_attempts()
@@ -282,7 +284,10 @@ def run_one_scenario(
         roles: dict[RoleType, BaseRole] = {
             RoleType("USER"): make_user(user),
             RoleType("EXECUTION_ENVIRONMENT"): ExecutionEnvironment(),
-            RoleType("AGENT"): make_agent(agent),
+            RoleType("AGENT"): make_agent(
+                agent,
+                actor_selection_mode=actor_selection_mode,
+            ),
         }
         try:
             result = scenario.play_and_evaluate(
@@ -375,7 +380,11 @@ def run_scenario_sequence(
     output_directory = _output_directory(config)
     output_directory.mkdir(parents=True, exist_ok=True)
     install_llm_usage_tracking()
-    reset_llm_usage(run_dir=output_directory, arm=config.run_type)
+    reset_llm_usage(
+        run_dir=output_directory,
+        arm=config.run_type,
+        expected_actor_selection_mode=config.actor_selection_mode,
+    )
     _copy_resume_artifacts(
         config.resume_from_dir,
         output_directory,
@@ -459,7 +468,7 @@ def run_scenario_sequence(
                     base_scenario,
                     output_directory,
                 )
-            except Exception:
+            except Exception as exc:
                 if event_hook is not None:
                     event_hook(
                         "scenario_transform_failed",
@@ -469,11 +478,18 @@ def run_scenario_sequence(
                             "error": traceback.format_exc(),
                         },
                     )
+                if getattr(exc, "fail_closed_scenario_transform", False) or getattr(
+                    scenario_transform,
+                    "fail_closed_scenario_transform",
+                    False,
+                ):
+                    raise
         result = run_one_scenario(
             name,
             active_scenario,
             agent=config.agent,
             user=config.user,
+            actor_selection_mode=config.actor_selection_mode,
             output_directory=output_directory,
         )
         _p = output_directory / "currently_running.json"
@@ -506,7 +522,7 @@ def run_scenario_sequence(
             status="running",
             scenario_count=len(config.scenario_names),
         )
-        write_llm_usage_artifacts(output_directory)
+        write_llm_usage_artifacts(output_directory, finalize=False)
         if progress_hook is not None:
             progress_hook(
                 output_directory,
@@ -525,7 +541,7 @@ def run_scenario_sequence(
         status=final_status,
         scenario_count=len(config.scenario_names),
     )
-    write_llm_usage_artifacts(output_directory)
+    write_llm_usage_artifacts(output_directory, finalize=True)
     if progress_hook is not None:
         progress_hook(
             output_directory,

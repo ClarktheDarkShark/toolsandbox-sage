@@ -832,6 +832,7 @@ def write_synthetic_control_run(
         "run_type": f"{run_type}_control_cached",
         "agent": agent,
         "user": user,
+        "actor_selection_mode": "policy",
         "output_dir": str(output_root),
         "scenario_names": list(scenario_names),
         "control_cache_source": cache_report.get("control_source"),

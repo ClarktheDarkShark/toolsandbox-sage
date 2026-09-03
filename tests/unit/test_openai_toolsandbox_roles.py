@@ -40,6 +40,11 @@ from sage_ts.adapters.openai_toolsandbox_roles import (
     _tool_names_execution_facing,
     _visible_location_phrase_from_user_request,
 )
+from sage_ts.evaluation.llm_usage import (
+    record_chat_completion_usage,
+    reset_llm_usage,
+    write_llm_usage_artifacts,
+)
 
 
 def _first_tool_call(completion):
@@ -65,8 +70,323 @@ def test_selector_actor_policy_supports_non_native_tool_bundle() -> None:
     )
 
 
+def test_auto_actor_selection_uses_original_request_and_exact_routed_schemas(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("policy selection path must not run in auto mode")
+
+    for name in (
+        "_with_selector_actor_policy",
+        "_helper_answer_completion_tool_free_turn",
+        "_dynamic_generated_tool_schema_filter",
+        "_hide_wrapped_native_action_schemas",
+    ):
+        monkeypatch.setattr(toolsandbox_roles, name, forbidden)
+    monkeypatch.setattr(
+        toolsandbox_roles.ConfigurableOpenAIAgent,
+        "_model_inference_with_tool_choice",
+        forbidden,
+    )
+
+    messages = [{"role": "user", "content": "Add Taylor as a contact."}]
+    native_schema = {
+        "type": "function",
+        "function": {
+            "name": "scrambled_add_contact",
+            "description": "Add one contact.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    }
+    generated_schema = {
+        "type": "function",
+        "function": {
+            "name": "prepare_direct_contact_action_args",
+            "description": "Prepare exact arguments.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    }
+    routed_schemas = [native_schema, generated_schema]
+    monkeypatch.setattr(
+        toolsandbox_roles,
+        "get_current_context",
+        lambda: SimpleNamespace(
+            get_execution_facing_tool_name=lambda name: (
+                "add_contact" if name == "scrambled_add_contact" else name
+            )
+        ),
+    )
+    captured: dict[str, object] = {}
+    completion = SimpleNamespace(usage=None)
+
+    def upstream_model_inference(self, openai_messages, openai_tools):
+        captured["self"] = self
+        captured["messages"] = openai_messages
+        captured["tools"] = openai_tools
+        record_chat_completion_usage(
+            source="toolsandbox_agent",
+            model=self.model_name,
+            messages=openai_messages,
+            tools=openai_tools,
+            response=completion,
+        )
+        return completion
+
+    monkeypatch.setattr(
+        toolsandbox_roles.OpenAIAPIAgent,
+        "model_inference",
+        upstream_model_inference,
+    )
+    agent = object.__new__(toolsandbox_roles.ConfigurableOpenAIAgent)
+    agent.model_name = "gpt-4o-mini"
+    agent.actor_selection_mode = "auto"
+    reset_llm_usage(
+        run_dir=tmp_path,
+        arm="sage_auto_selection",
+        expected_actor_selection_mode="auto",
+    )
+
+    result = agent.model_inference(messages, iter(routed_schemas))
+    write_llm_usage_artifacts(finalize=False)
+    assert (
+        len(
+            (tmp_path / "actor_request_audit.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        == 1
+    )
+    assert (
+        len(
+            (tmp_path / "actor_schema_catalog.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        == 1
+    )
+    assert not (tmp_path / "actor_schema_catalog.json").exists()
+    write_llm_usage_artifacts(finalize=False)
+    assert (
+        len(
+            (tmp_path / "actor_request_audit.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        == 1
+    )
+    second_result = agent.model_inference(messages, iter(routed_schemas))
+    write_llm_usage_artifacts(finalize=False)
+    assert (
+        len(
+            (tmp_path / "actor_request_audit.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        == 2
+    )
+    assert (
+        len(
+            (tmp_path / "actor_schema_catalog.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        == 1
+    )
+    write_llm_usage_artifacts(finalize=True)
+
+    assert result is completion
+    assert second_result is completion
+    assert captured["self"] is agent
+    assert captured["messages"] is messages
+    assert captured["tools"] == routed_schemas
+    audit_rows = [
+        json.loads(line)
+        for line in (tmp_path / "actor_request_audit.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert len(audit_rows) == 2
+    audit = audit_rows[0]
+    assert audit["choice_mode"] == "auto"
+    assert audit["tool_choice"] is None
+    assert audit["named_tool_choice"] is None
+    assert audit["named_tool_choice_absent"] is True
+    assert audit["schemas_exact"] is True
+    assert audit["messages_unchanged"] is True
+    assert audit["sent_schemas_unchanged"] is True
+    assert audit["native_schema_count"] == 1
+    assert audit["generated_schema_count"] == 1
+    assert audit["ordered_agent_facing_tool_names"] == [
+        "scrambled_add_contact",
+        "prepare_direct_contact_action_args",
+    ]
+    assert audit["ordered_execution_facing_tool_names"] == [
+        "add_contact",
+        "prepare_direct_contact_action_args",
+    ]
+    assert audit["native_agent_facing_tool_names"] == ["scrambled_add_contact"]
+    assert audit["native_execution_facing_tool_names"] == ["add_contact"]
+    assert audit["generated_agent_facing_tool_names"] == [
+        "prepare_direct_contact_action_args"
+    ]
+    catalog = json.loads(
+        (tmp_path / "actor_schema_catalog.json").read_text(encoding="utf-8")
+    )
+    bundle = catalog["bundles"][audit["schema_catalog_sha256"]]
+    assert bundle["ordered_schemas"] == routed_schemas
+    assert bundle["native_schemas"] == [native_schema]
+    assert bundle["generated_schemas"] == [generated_schema]
+    assert bundle["schema_classification"] == [
+        {
+            "schema_index": 0,
+            "kind": "native",
+            "agent_facing_name": "scrambled_add_contact",
+            "execution_facing_name": "add_contact",
+        },
+        {
+            "schema_index": 1,
+            "kind": "generated",
+            "agent_facing_name": "prepare_direct_contact_action_args",
+            "execution_facing_name": "prepare_direct_contact_action_args",
+        },
+    ]
+    summary = json.loads(
+        (tmp_path / "actor_request_audit_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["coverage_verified"] is True
+    assert summary["finalized"] is True
+    assert summary["auto_request_count"] == 2
+    assert summary["linked_agent_call_count"] == 2
+    assert summary["persisted_event_count"] == 2
+    assert summary["schema_catalog_entry_count"] == 1
+    assert summary["persisted_schema_catalog_entry_count"] == 1
+    reset_llm_usage()
+
+
+def test_auto_actor_selection_fails_closed_if_upstream_mutates_messages(
+    monkeypatch,
+) -> None:
+    def mutating_upstream(_self, openai_messages, _openai_tools):
+        openai_messages.append({"role": "system", "content": "mutated"})
+        return SimpleNamespace(usage=None)
+
+    monkeypatch.setattr(
+        toolsandbox_roles.OpenAIAPIAgent,
+        "model_inference",
+        mutating_upstream,
+    )
+    agent = object.__new__(toolsandbox_roles.ConfigurableOpenAIAgent)
+    agent.model_name = "gpt-4o-mini"
+    agent.actor_selection_mode = "auto"
+
+    try:
+        agent.model_inference([{"role": "user", "content": "hello"}], [])
+    except AssertionError as exc:
+        assert "mutated the original messages" in str(exc)
+    else:
+        raise AssertionError("auto mode accepted mutated original messages")
+    reset_llm_usage()
+
+
+def test_auto_actor_selection_audits_each_transient_attempt(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    class TransientTestError(Exception):
+        pass
+
+    attempts = 0
+    completion = SimpleNamespace(usage=None)
+
+    def flaky_upstream(self, openai_messages, openai_tools):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise TransientTestError("retry once")
+        record_chat_completion_usage(
+            source="toolsandbox_agent",
+            model=self.model_name,
+            messages=openai_messages,
+            tools=openai_tools,
+            response=completion,
+        )
+        return completion
+
+    monkeypatch.setattr(
+        toolsandbox_roles,
+        "TRANSIENT_OPENAI_EXCEPTIONS",
+        (TransientTestError,),
+    )
+    monkeypatch.setattr(
+        toolsandbox_roles,
+        "_transient_openai_retry_delays",
+        lambda: (0.0,),
+    )
+    monkeypatch.setattr(
+        toolsandbox_roles.OpenAIAPIAgent,
+        "model_inference",
+        flaky_upstream,
+    )
+    agent = object.__new__(toolsandbox_roles.ConfigurableOpenAIAgent)
+    agent.model_name = "gpt-4o-mini"
+    agent.actor_selection_mode = "auto"
+    reset_llm_usage(
+        run_dir=tmp_path,
+        arm="sage_auto_selection",
+        expected_actor_selection_mode="auto",
+    )
+
+    result = agent.model_inference(
+        [{"role": "user", "content": "Use the routed tools."}],
+        [{"type": "function", "function": {"name": "end_conversation"}}],
+    )
+    write_llm_usage_artifacts(finalize=True)
+
+    assert result is completion
+    assert attempts == 2
+    audit_rows = [
+        json.loads(line)
+        for line in (tmp_path / "actor_request_audit.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert [row["status"] for row in audit_rows] == ["failed", "complete"]
+    usage_rows = [
+        json.loads(line)
+        for line in (tmp_path / "llm_usage_events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert [row["actor_request_id"] for row in usage_rows] == [
+        audit_rows[1]["request_id"]
+    ]
+    summary = json.loads(
+        (tmp_path / "actor_request_audit_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["request_count"] == 2
+    assert summary["complete_request_count"] == 1
+    assert summary["failed_request_count"] == 1
+    assert summary["linked_agent_call_count"] == 1
+    assert summary["coverage_verified"] is True
+    reset_llm_usage()
+
+
+def test_configurable_agent_rejects_unknown_actor_selection_mode() -> None:
+    try:
+        toolsandbox_roles.ConfigurableOpenAIAgent(
+            "gpt-4o-mini",
+            actor_selection_mode="forced",  # type: ignore[arg-type]
+        )
+    except ValueError as exc:
+        assert "actor_selection_mode" in str(exc)
+    else:
+        raise AssertionError("unknown actor selection mode was accepted")
+
+
 def test_visible_record_continuation_precedes_generic_generated_tool_choice(
     monkeypatch,
+    tmp_path,
 ) -> None:
     """A matching record consumer should run before a generic ready tool."""
 
@@ -113,7 +433,7 @@ def test_visible_record_continuation_precedes_generic_generated_tool_choice(
     monkeypatch.setattr(
         toolsandbox_roles,
         "_dynamic_generated_tool_schema_filter",
-        lambda _messages, tools, **_kwargs: tools,
+        lambda _messages, tools, **_kwargs: list(tools)[:1],
     )
     monkeypatch.setattr(
         toolsandbox_roles,
@@ -127,7 +447,15 @@ def test_visible_record_continuation_precedes_generic_generated_tool_choice(
 
     def capture_choice(_messages, _tools, tool_name):
         selected.append(tool_name)
-        return SimpleNamespace()
+        completion = SimpleNamespace(usage=None)
+        record_chat_completion_usage(
+            source="toolsandbox_agent",
+            model=agent.model_name,
+            messages=_messages,
+            tools=_tools,
+            response=completion,
+        )
+        return completion
 
     monkeypatch.setattr(agent, "_model_inference_with_tool_choice", capture_choice)
     tools = [
@@ -135,9 +463,34 @@ def test_visible_record_continuation_precedes_generic_generated_tool_choice(
         {"type": "function", "function": {"name": "generic_ready_tool"}},
     ]
 
+    reset_llm_usage(
+        run_dir=tmp_path,
+        arm="sage_policy_selection",
+        expected_actor_selection_mode="policy",
+    )
     agent.model_inference([{"role": "user", "content": "Use the records."}], tools)
+    write_llm_usage_artifacts()
 
     assert selected == ["record_consumer"]
+    audit = json.loads(
+        (tmp_path / "actor_request_audit.jsonl").read_text(encoding="utf-8")
+    )
+    assert audit["choice_mode"] == "policy"
+    assert audit["named_tool_choice"] == "record_consumer"
+    assert audit["tool_choice"] == {
+        "type": "function",
+        "function": {"name": "record_consumer"},
+    }
+    assert audit["schemas_exact"] is False
+    assert audit["routed_schema_count"] == 2
+    assert audit["sent_schema_count"] == 1
+    assert audit["routed_schema_catalog_sha256"] != audit["sent_schema_catalog_sha256"]
+    summary = json.loads(
+        (tmp_path / "actor_request_audit_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["coverage_verified"] is True
+    assert summary["policy_request_count"] == 1
+    reset_llm_usage()
 
 
 def test_native_device_action_requires_visible_device_state_need(monkeypatch) -> None:
