@@ -23,12 +23,16 @@ def test_diagnostic_force_env_detection() -> None:
 
     active = preflight.active_diagnostic_force_env(
         {
+            "SAGE_DIAGNOSTIC_EXPOSE_TOOL_NAME": "exposed_tool",
             "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME": "tool",
             "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_ERROR": "",
         }
     )
 
-    assert active == {"SAGE_DIAGNOSTIC_FORCE_TOOL_NAME": "tool"}
+    assert active == {
+        "SAGE_DIAGNOSTIC_EXPOSE_TOOL_NAME": "exposed_tool",
+        "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME": "tool",
+    }
 
 
 def test_run_affecting_sage_env_redacts_secret_like_keys() -> None:

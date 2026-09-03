@@ -1,6 +1,6 @@
 {
   "schema_version": "sage_protocol_heuristics_v1",
-  "purpose": "Versioned documentation of methodology-critical heuristics used by current final evidence. This file makes implementation-defined rules auditable without changing protected evidence.",
+  "purpose": "Versioned documentation of methodology-critical heuristics used by historical evidence and the planned replacement protocol. No current final inferential evidence is claimed.",
   "task_strata": {
     "implementation": "src/sage_ts/evaluation/task_strata.py",
     "description": "Scenario-name and category based task-family classification used for cohort quality, expected helper fit, and gap reports.",
@@ -23,19 +23,23 @@
   },
   "protocol_gate_vs_final_claim": {
     "old_protocol_gate": "Absolute +0.08 outcome/canonical-style gate used in earlier campaign automation.",
-    "final_claim_criteria": "Outcome/task-completion is primary; relative task-completion lift and paired comparisons are reported, canonical/reference similarity is secondary, and safety must remain clean."
+    "final_claim_criteria": "Outcome/task-completion is the sole performance endpoint; relative task-completion lift and paired comparisons are reported, canonical/reference similarity is descriptive route-compatibility output only, and safety must remain clean."
   },
   "generated_tool_adoption": {
     "interpretation": "Accepted-but-uncalled, visible-not-called, or force-call-only tools are blocker diagnoses. They must not be collapsed into no-value conclusions without routing, schema, affordance, callability, safety, and value evidence."
   },
   "bridge_policy": {
-    "implementation": "src/sage_ts/adapters/openai_toolsandbox_roles.py and src/sage_ts/adapters/sage_run_adapter.py",
-    "activation": "Feature-flagged Praxis combined treatment uses SAGE_PRAXIS_BRIDGE_POLICY=combined.",
-    "scope": "General actor/checker policy that improves natural adoption of retained helpers, preserves final answers after helper calls, clarifies safe scalar arguments, treats original state-setter None returns as success, and audits helper side-effect preservation using trace and conversation-visible tool calls.",
-    "integrity_boundary": "Bridge policy is part of the tested SAGE treatment when enabled. It must be documented as a registry plus actor/checker bridge-policy treatment, not as registry-only value. It does not force tool calls, inspect labels, use expected answers, or select scenarios."
+    "implementation": "not active in the current SAGE evidence boundary",
+    "activation": "disabled",
+    "scope": "Synthetic bridge completions and route-around behavior are excluded from current SAGE evidence. Actor-facing guidance may explain visible generated-tool schemas and outputs, but it must not complete tasks from code-based benchmark knowledge.",
+    "integrity_boundary": "Current SAGE claims must be attributed to generated tools, validation/repair, registry retention, visible-context routing, natural generated-tool use, lifecycle feedback, and contribution accounting."
   },
   "cache_policy": {
-    "openai_response_cache": "Provider response cache controlled separately by scripts/run_sage_protocol.py --cache-mode.",
-    "task_level_control_cache": "Control arm may reuse eligible task-level baseline records with >=3 compatible completed controls; cached controls are score-complete, but synthetic rows may be trace-incomplete unless historical trajectories are available."
+    "openai_response_cache": "Legacy name for repository-level replay of complete model responses. It is disabled in strict publication runs and is distinct from OpenAI-managed prompt-prefix computation.",
+    "task_level_control_cache": "Legacy and nonpublication runs may reuse eligible task-level baseline records with >=3 compatible completed controls. Strict publication runs prohibit construction or lookup and execute every control task live.",
+    "candidate_task_result_cache": "Disabled in strict publication runs.",
+    "persistent_generated_output_replay": "Disabled in strict publication runs.",
+    "generator_contract_and_repair_analysis_memoization": "Validated nonpersistent reuse is retained only within one generator lifetime and never loads data from another run.",
+    "openai_provider_prompt_prefix_cache": "Automatic provider-side computation reuse is distinct from response replay. Strict runs require its usage metadata for every model call and reconcile raw events with task and arm totals."
   }
 }

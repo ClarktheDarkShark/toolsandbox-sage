@@ -599,16 +599,6 @@ def fig_lifecycle() -> tuple[str, str]:
         body.append(
             f'<text class="moduleText" x="{x + 62}" y="{y + 67}">{esc(sub)}</text>'
         )
-    arrows = [
-        (535, 260, 625, 195),
-        (870, 194, 1010, 194),
-        (1255, 195, 1345, 260),
-        (1468, 328, 1468, 620),
-        (1345, 680, 1255, 760),
-        (1010, 790, 870, 790),
-        (625, 790, 535, 680),
-        (290, 620, 245, 500, 245, 328),
-    ]
     body.append(line(535, 260, 625, 195, color="line"))
     body.append(line(870, 194, 1010, 194, color="line"))
     body.append(line(1255, 195, 1345, 260, color="line"))
@@ -699,7 +689,8 @@ def fig_evidence_boundary() -> tuple[str, str]:
             160,
             710,
             "Fresh SAGE arm",
-            "SAGE task cache off and response cache disabled for evidence runs.",
+            "SAGE task cache and whole-response replay are off; provider-prefix "
+            "reuse is distinct and recorded in strict runs.",
             "blue",
         ),
         (
@@ -927,18 +918,19 @@ def lift_bar(
 
 def fig_lift_evidence() -> tuple[str, str]:
     body = []
-    body.append(panel_label(95, 95, "A", "Broad 500-Task Evidence", "green"))
+    body.append(panel_label(95, 95, "A", "Broad 500-Task Outcome Evidence", "green"))
     body.append(
         rect(120, 145, 1510, 330, fill="#fbfdff", stroke=COLORS["light_line"], rx=10)
     )
     body.append(
         lift_bar(
-            170, 245, "Canonical score", 0.656799, 0.854188, "+30.05%", color="green"
-        )
-    )
-    body.append(
-        lift_bar(
-            170, 365, "Outcome score", 0.494746, 0.880845, "+78.04%", color="green"
+            170,
+            305,
+            "Outcome score",
+            0.494746,
+            0.880845,
+            "+78.04%",
+            color="green",
         )
     )
     body.append('<text class="moduleTitle" x="1140" y="220">v71 broad500</text>')
@@ -968,15 +960,15 @@ def fig_lift_evidence() -> tuple[str, str]:
     body.append(
         '<text class="moduleTitle" x="155" y="655">v70 broad500 safety reference</text>'
     )
+    body.append('<text class="moduleText" x="155" y="695">Outcome lift: +76.41%</text>')
     body.append(
-        '<text class="moduleText" x="155" y="695">Canonical lift: +25.99%</text>'
+        '<text class="moduleText" x="155" y="730">Natural generated-tool calls: 295 scenarios</text>'
     )
-    body.append('<text class="moduleText" x="155" y="730">Outcome lift: +76.41%</text>')
     body.append(
         '<text class="moduleText" x="155" y="765">Runtime/tool incidents: 0 / 0</text>'
     )
     body.append(
-        '<text class="moduleText" x="155" y="800">Use as clean safety-reference until final claim promotion.</text>'
+        '<text class="moduleText" x="155" y="800">Clean safety reference for the outcome comparison.</text>'
     )
 
     body.append(
@@ -988,16 +980,16 @@ def fig_lift_evidence() -> tuple[str, str]:
         '<text class="moduleTitle" x="935" y="655">40-task frozen-registry reuse</text>'
     )
     body.append(
-        '<text class="moduleText" x="935" y="695">Online build score lift: +48.43%</text>'
+        '<text class="moduleText" x="935" y="695">Online build outcome lift: +124.11%</text>'
     )
     body.append(
-        '<text class="moduleText" x="935" y="730">Frozen reuse score lift: +46.82%</text>'
+        '<text class="moduleText" x="935" y="730">Frozen reuse outcome lift: +119.76%</text>'
     )
     body.append(
-        '<text class="moduleText" x="935" y="765">Online build outcome lift: +124.11%</text>'
+        '<text class="moduleText" x="935" y="765">Generated-tool calls: 57 in 29 scenarios</text>'
     )
     body.append(
-        '<text class="moduleText" x="935" y="800">Frozen reuse outcome lift: +119.76%</text>'
+        '<text class="moduleText" x="935" y="800">Generation and repair disabled</text>'
     )
     body.append(
         rect(
@@ -1005,7 +997,7 @@ def fig_lift_evidence() -> tuple[str, str]:
         )
     )
     body.append(
-        f'<text class="metric" x="1280" y="926" text-anchor="middle" fill="{COLORS["green"]}">accuracy lift preserved after generation was disabled</text>'
+        f'<text class="metric" x="1280" y="926" text-anchor="middle" fill="{COLORS["green"]}">outcome lift preserved after generation was disabled</text>'
     )
     return "SAGE_Lift_Evidence", svg("SAGE Lift Evidence", "".join(body))
 

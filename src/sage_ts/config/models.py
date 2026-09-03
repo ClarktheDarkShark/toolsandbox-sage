@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
+
+_VALID_REASONING_EFFORTS = {"minimal", "low", "medium", "high"}
 
 DEFAULT_MODEL = "gpt-4o-mini"
 LEGACY_MODEL = "gpt-5-mini"
@@ -91,3 +94,47 @@ def supports_temperature(model: str | None) -> bool:
     if metadata is not None:
         return bool(metadata.get("temperature_supported"))
     return not resolved.startswith("gpt-5")
+
+
+def _is_gpt5_family(model: str | None) -> bool:
+    resolved = resolve_model_name(model)
+    metadata = MODEL_METADATA.get(resolved)
+    if metadata is not None:
+        return metadata.get("family") == "gpt-5"
+    return resolved.startswith("gpt-5")
+
+
+def reasoning_effort(model: str | None) -> str | None:
+    """Reasoning effort to pass to gpt-5 family Chat Completions calls.
+
+    Opt-in and gpt-5 only: returns ``None`` (field omitted, API default) unless
+    the model is a gpt-5 family model AND ``SAGE_GPT5_REASONING_EFFORT`` is set to
+    one of minimal/low/medium/high. This keeps default behavior and every
+    non-gpt-5 (e.g. gpt-4o-mini) path unchanged.
+    """
+    if not _is_gpt5_family(model):
+        return None
+    value = os.environ.get("SAGE_GPT5_REASONING_EFFORT", "").strip().lower()
+    return value if value in _VALID_REASONING_EFFORTS else None
+
+
+def reasoning_effort_kwargs(model: str | None) -> dict[str, str]:
+    """``{"reasoning_effort": <effort>}`` when set for this model, else ``{}``."""
+    effort = reasoning_effort(model)
+    return {"reasoning_effort": effort} if effort else {}
+
+
+def user_simulator_reasoning_effort_kwargs(model: str | None) -> dict[str, str]:
+    """Reasoning effort for the gpt-5 user-simulator role.
+
+    The user simulator is benchmark infrastructure that must faithfully drive
+    multi-turn scenarios; at low effort gpt-5-mini ends conversations early and
+    tanks state-dependency tasks. So the user role reads its OWN env
+    ``SAGE_GPT5_USER_SIM_REASONING_EFFORT`` and, when unset, keeps the API
+    default (medium) even if the agent/generation effort is lowered. gpt-5 only,
+    so non-gpt-5 (e.g. gpt-4o-mini) is unaffected.
+    """
+    if not _is_gpt5_family(model):
+        return {}
+    value = os.environ.get("SAGE_GPT5_USER_SIM_REASONING_EFFORT", "").strip().lower()
+    return {"reasoning_effort": value} if value in _VALID_REASONING_EFFORTS else {}

@@ -1,0 +1,35 @@
+# Resolved direct dependency set for clean publication installs on Python 3.12.
+# The later cleanup-host snapshot is preserved separately in the content-hashed
+# provenance bundle. This dependency-valid release set is not asserted to
+# reconstruct that 533-package host or the uncaptured July campaign runtime.
+anthropic==0.26.1
+ccy==2.0.0
+decorator==5.1.1
+dill==0.4.1
+geopy==2.4.1
+google-cloud-aiplatform==1.149.0
+holidays==0.95
+httpx==0.28.1
+huggingface-hub==1.10.1
+jsonschema==4.23.0
+langchain-core==0.2.43
+matplotlib==3.10.9
+networkx==3.3
+numpy==1.26.4
+openai==2.37.0
+phonenumbers==9.0.29
+Pillow==11.3.0
+pint==0.25.3
+polars==0.20.31
+pydantic==2.13.4
+pyyaml==6.0.3
+rapidfuzz==3.13.0
+requests==2.33.1
+rouge-score==0.1.2
+scipy==1.13.1
+sentencepiece==0.2.1
+StrEnum==0.4.15
+tenacity==8.5.0
+tqdm==4.67.3
+transformers==5.7.0
+typing-extensions==4.15.0

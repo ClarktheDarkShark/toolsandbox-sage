@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sage_ts.adequacy.failure_memory import gate_failure_memory_reasons
-from sage_ts.experiments.v2_flags import GRADING_ACCOUNTING, feature_enabled
+from sage_ts.generation.complete_tools import native_action_spec_enabled
 from sage_ts.generation.tool_spec import (
     ToolFamily,
     ToolSpec,
@@ -58,7 +58,6 @@ STATE_ALLOWED_TOOL_NAMES = frozenset(
         "set_low_battery_mode_status",
     }
 )
-CANONICAL_SUBSTITUTION_RISK_LEVELS = frozenset({"none", "low", "medium", "high"})
 SINGLE_BASE_TOOL_REPLACEMENT_PHRASES = (
     "replace a single existing base tool",
     "replace one existing base tool",
@@ -119,30 +118,15 @@ class GateDecision:
 
 def grading_accounting_classification(spec: ToolSpec) -> str:
     """Classify whether a helper preserves or substitutes canonical route evidence."""
-    if not feature_enabled(GRADING_ACCOUNTING):
-        if (
-            spec.family
-            in {
-                ToolFamily.STATE_PRECONDITION_HELPER,
-                ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-            }
-            and not spec.preserves_side_effect_tools
-        ):
-            return "side_effect_unsafe"
-        return "canonical_preserving"
-    risk = spec.canonical_route_substitution_risk.strip().lower()
-    replaces = bool(spec.expected_milestone_calls_replaced)
-    has_final_state_plan = len(spec.final_state_preservation_plan.strip()) >= 20
-    side_effect_family = spec.family in {
-        ToolFamily.STATE_PRECONDITION_HELPER,
-        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-    }
-    if side_effect_family and not spec.preserves_side_effect_tools:
+    if (
+        spec.family
+        in {
+            ToolFamily.STATE_PRECONDITION_HELPER,
+            ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        }
+        and not spec.preserves_side_effect_tools
+    ):
         return "side_effect_unsafe"
-    if (risk and risk != "none") or replaces:
-        if has_final_state_plan:
-            return "outcome_preserving_but_canonical_substituting"
-        return "true_task_risky"
     return "canonical_preserving"
 
 
@@ -217,29 +201,6 @@ def evaluate_candidate_gate(
         return GateDecision(
             False, f"unsupported_family:{spec.family}", grading_classification
         )
-    risk = spec.canonical_route_substitution_risk.strip().lower()
-    if feature_enabled(GRADING_ACCOUNTING):
-        if risk not in CANONICAL_SUBSTITUTION_RISK_LEVELS:
-            return GateDecision(
-                False,
-                "invalid_canonical_route_substitution_risk",
-                grading_classification,
-            )
-        if risk != "none" and not spec.grading_accounting_note.strip():
-            return GateDecision(
-                False,
-                "missing_grading_accounting_note",
-                grading_classification,
-            )
-        if (
-            spec.expected_milestone_calls_replaced
-            and not spec.final_state_preservation_plan.strip()
-        ):
-            return GateDecision(
-                False,
-                "missing_final_state_preservation_plan",
-                grading_classification,
-            )
     if not spec.inputs:
         return GateDecision(False, "missing_inputs", grading_classification)
     if len(spec.generalization_rationale.strip()) < 20:
@@ -282,7 +243,7 @@ def evaluate_candidate_gate(
             return GateDecision(
                 False, "cross_task_applicability_below_2", grading_classification
             )
-        if len(spec.applicable_task_families) < 2:
+        if not spec.applicable_task_families:
             return GateDecision(
                 False, "insufficient_applicable_task_families", grading_classification
             )
@@ -442,6 +403,7 @@ def evaluate_candidate_gate(
                 False, "state_helper_emitted_tools_not_required", grading_classification
             )
     if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
+        native_action = native_action_spec_enabled(spec)
         text = " ".join([spec.tool_name, spec.description]).lower()
         if not any(token in text for token in SEARCH_FILTER_ACTIONABLE_TOKENS):
             return GateDecision(
@@ -457,13 +419,13 @@ def evaluate_candidate_gate(
                 False, "search_filter_missing_candidate_inputs", grading_classification
             )
         props = _output_schema_properties(spec)
-        if not (
+        if not native_action and not (
             {"selected_record", "selected_id"} & set(props) or spec.abstain_behavior
         ):
             return GateDecision(
                 False, "search_filter_missing_output_contract", grading_classification
             )
-        if "downstream_tool_name" in props:
+        if not native_action and "downstream_tool_name" in props:
             required_action_props = {
                 "downstream_tool_kwargs",
                 "should_call_tool",
@@ -512,7 +474,9 @@ def evaluate_candidate_gate(
                 grading_classification,
             )
         props = _output_schema_properties(spec)
-        if not any(str(key).endswith("_kwargs") for key in props):
+        if not native_action_spec_enabled(spec) and not any(
+            str(key).endswith("_kwargs") for key in props
+        ):
             return GateDecision(
                 False,
                 "composite_helper_missing_prepared_kwargs_output",

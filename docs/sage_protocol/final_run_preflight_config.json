@@ -39,11 +39,7 @@
     "promotion_250",
     "full_benchmark"
   ],
-  "required_control_cache_mode": "use-if-eligible",
-  "allowed_final_routing_evidence_modes": [
-    "disabled",
-    "pinned"
-  ],
+  "required_control_cache_mode": "off",
   "diagnostic_force_env_vars": [
     "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME",
     "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_ERROR",

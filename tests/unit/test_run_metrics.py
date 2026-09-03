@@ -4,7 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from sage_ts.evaluation.llm_usage import summarize_events
+import sage_ts.evaluation.run_metrics as run_metrics
+from sage_ts.evaluation.llm_usage import (
+    _usage_payload,
+    record_chat_completion_usage,
+    reset_llm_usage,
+    summarize_events,
+    write_llm_usage_artifacts,
+)
 from sage_ts.evaluation.run_metrics import compare_runs, summarize_run
 
 
@@ -106,6 +113,9 @@ def test_summarize_run_aggregates_llm_usage_fields(tmp_path: Path) -> None:
                 "llm_live_call_count": 2,
                 "llm_cached_call_count": 0,
                 "llm_prompt_tokens": 100,
+                "llm_provider_cached_prompt_tokens": 64,
+                "llm_provider_cached_prompt_call_count": 1,
+                "llm_provider_cached_prompt_tokens_available_count": 2,
                 "llm_completion_tokens": 30,
                 "llm_total_tokens": 130,
                 "llm_usage_available_count": 2,
@@ -119,6 +129,9 @@ def test_summarize_run_aggregates_llm_usage_fields(tmp_path: Path) -> None:
                 "llm_live_call_count": 0,
                 "llm_cached_call_count": 1,
                 "llm_prompt_tokens": 40,
+                "llm_provider_cached_prompt_tokens": 0,
+                "llm_provider_cached_prompt_call_count": 0,
+                "llm_provider_cached_prompt_tokens_available_count": 1,
                 "llm_completion_tokens": 10,
                 "llm_total_tokens": 50,
                 "llm_usage_available_count": 1,
@@ -133,6 +146,9 @@ def test_summarize_run_aggregates_llm_usage_fields(tmp_path: Path) -> None:
     assert metrics["llm_live_call_count"] == 2
     assert metrics["llm_cached_call_count"] == 1
     assert metrics["llm_prompt_tokens"] == 140
+    assert metrics["llm_provider_cached_prompt_tokens"] == 64
+    assert metrics["llm_provider_cached_prompt_call_count"] == 1
+    assert metrics["llm_provider_cached_prompt_tokens_available_count"] == 3
     assert metrics["llm_completion_tokens"] == 40
     assert metrics["llm_total_tokens"] == 180
     assert metrics["llm_usage_available_count"] == 3
@@ -238,8 +254,346 @@ def test_empty_llm_usage_snapshot_exports_explicit_zero_counts() -> None:
     assert summary["llm_live_call_count"] == 0
     assert summary["llm_cached_call_count"] == 0
     assert summary["llm_prompt_tokens"] == 0
+    assert summary["llm_provider_cached_prompt_tokens"] == 0
+    assert summary["llm_provider_cached_prompt_call_count"] == 0
+    assert summary["llm_provider_cached_prompt_tokens_available_count"] == 0
     assert summary["llm_completion_tokens"] == 0
     assert summary["llm_total_tokens"] == 0
+
+
+def test_usage_payload_separates_provider_prefix_cache_from_response_replay() -> None:
+    payload = _usage_payload(
+        {
+            "usage": {
+                "prompt_tokens": 256,
+                "completion_tokens": 12,
+                "total_tokens": 268,
+                "prompt_tokens_details": {"cached_tokens": 128},
+            }
+        }
+    )
+
+    assert payload["provider_cached_prompt_tokens"] == 128
+    assert payload["prompt_tokens"] == 256
+
+
+def test_llm_usage_artifact_schema_records_provider_prefix_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_TS_CURRENT_SCENARIO", "task_a")
+    reset_llm_usage(run_dir=tmp_path, arm="control")
+    record_chat_completion_usage(
+        source="toolsandbox_agent",
+        model="gpt-4o-mini",
+        messages=[],
+        response={
+            "usage": {
+                "prompt_tokens": 256,
+                "completion_tokens": 12,
+                "total_tokens": 268,
+                "prompt_tokens_details": {"cached_tokens": 128},
+            }
+        },
+    )
+    write_llm_usage_artifacts()
+    summary = json.loads(
+        (tmp_path / "llm_usage_summary.json").read_text(encoding="utf-8")
+    )
+
+    assert summary["schema_version"] == 2
+    assert summary["llm_provider_cached_prompt_tokens"] == 128
+    assert summary["llm_provider_cached_prompt_call_count"] == 1
+    assert summary["llm_provider_cached_prompt_tokens_available_count"] == 1
+    reset_llm_usage()
+
+
+def test_llm_usage_summary_exposes_partial_provider_metadata() -> None:
+    summary = summarize_events(
+        [
+            {
+                "response_cache_status": "live",
+                "prompt_tokens": 100,
+                "provider_cached_prompt_tokens": 64,
+                "completion_tokens": 10,
+                "total_tokens": 110,
+                "usage_available": True,
+            },
+            {
+                "response_cache_status": "live",
+                "prompt_tokens": 50,
+                "provider_cached_prompt_tokens": None,
+                "completion_tokens": 5,
+                "total_tokens": 55,
+                "usage_available": True,
+            },
+        ]
+    )
+
+    assert summary["llm_call_count"] == 2
+    assert summary["llm_provider_cached_prompt_tokens"] == 64
+    assert summary["llm_provider_cached_prompt_call_count"] == 1
+    assert summary["llm_provider_cached_prompt_tokens_available_count"] == 1
+
+
+def test_nonempty_usage_without_provider_metadata_reports_unavailable() -> None:
+    summary = summarize_events(
+        [
+            {
+                "source": "toolsandbox_agent",
+                "response_cache_status": "live",
+                "prompt_tokens": 50,
+                "completion_tokens": 5,
+                "total_tokens": 55,
+                "usage_available": True,
+            }
+        ]
+    )
+
+    assert summary["llm_provider_cached_prompt_tokens"] is None
+    assert summary["llm_provider_cached_prompt_call_count"] is None
+    assert summary["llm_provider_cached_prompt_tokens_available_count"] == 0
+    source = summary["llm_usage_by_source"]["toolsandbox_agent"]
+    assert source["llm_provider_cached_prompt_tokens"] is None
+    assert source["llm_provider_cached_prompt_call_count"] is None
+    assert source["llm_provider_cached_prompt_tokens_available_count"] == 0
+
+
+def test_summarize_run_backfills_legacy_provider_metadata_from_raw_events(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "legacy_run"
+    _write_summary(
+        run_dir,
+        [
+            {
+                "name": "task_a",
+                "similarity": 1.0,
+                "turn_count": 2,
+                "llm_usage_recorded": True,
+                "llm_call_count": 1,
+                "llm_live_call_count": 1,
+                "llm_cached_call_count": 0,
+                "llm_prompt_tokens": 256,
+                "llm_completion_tokens": 12,
+                "llm_total_tokens": 268,
+                "llm_usage_available_count": 1,
+            }
+        ],
+    )
+    (run_dir / "llm_usage_events.jsonl").write_text(
+        json.dumps(
+            {
+                "scenario": "task_a",
+                "source": "toolsandbox_agent",
+                "response_cache_status": "live",
+                "prompt_tokens": 256,
+                "completion_tokens": 12,
+                "total_tokens": 268,
+                "usage_available": True,
+                "raw_usage": {
+                    "prompt_tokens": 256,
+                    "completion_tokens": 12,
+                    "total_tokens": 268,
+                    "prompt_tokens_details": {"cached_tokens": 128},
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    metrics = summarize_run(run_dir)
+
+    assert metrics["llm_provider_cached_prompt_tokens"] == 128
+    assert metrics["llm_provider_cached_prompt_call_count"] == 1
+    assert metrics["llm_provider_cached_prompt_tokens_available_count"] == 1
+
+
+def test_legacy_source_summary_is_replaced_by_reconciled_event_summary(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "legacy_source_run"
+    rows = [
+        {
+            "name": "task_a",
+            "similarity": 1.0,
+            "llm_usage_recorded": True,
+            "llm_call_count": 1,
+            "llm_live_call_count": 1,
+            "llm_cached_call_count": 0,
+            "llm_prompt_tokens": 100,
+            "llm_provider_cached_prompt_tokens": 64,
+            "llm_provider_cached_prompt_call_count": 1,
+            "llm_provider_cached_prompt_tokens_available_count": 1,
+            "llm_completion_tokens": 10,
+            "llm_total_tokens": 110,
+            "llm_usage_available_count": 1,
+        }
+    ]
+    _write_summary(run_dir, rows)
+    (run_dir / "llm_usage_summary.json").write_text(
+        json.dumps(
+            {
+                "llm_usage_by_source": {
+                    "toolsandbox_agent": {
+                        "llm_call_count": 1,
+                        "llm_prompt_tokens": 100,
+                        "llm_provider_cached_prompt_tokens": None,
+                        "llm_provider_cached_prompt_call_count": None,
+                        "llm_provider_cached_prompt_tokens_available_count": 0,
+                    }
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (run_dir / "llm_usage_events.jsonl").write_text(
+        json.dumps(
+            {
+                "scenario": "task_a",
+                "source": "toolsandbox_agent",
+                "response_cache_status": "live",
+                "prompt_tokens": 100,
+                "provider_cached_prompt_tokens": 64,
+                "completion_tokens": 10,
+                "total_tokens": 110,
+                "usage_available": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    summary = run_metrics._llm_usage_summary(rows, run_dir)
+
+    source = summary["llm_usage_by_source"]["toolsandbox_agent"]
+    assert source["llm_provider_cached_prompt_tokens"] == 64
+    assert source["llm_provider_cached_prompt_call_count"] == 1
+    assert source["llm_provider_cached_prompt_tokens_available_count"] == 1
+
+
+def test_legacy_source_backfill_never_downgrades_known_provider_values(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "legacy_richer_source_run"
+    rows = [
+        {
+            "name": "task_a",
+            "llm_usage_recorded": True,
+            "llm_call_count": 1,
+            "llm_live_call_count": 1,
+            "llm_cached_call_count": 0,
+            "llm_prompt_tokens": 100,
+            "llm_provider_cached_prompt_tokens": 64,
+            "llm_provider_cached_prompt_call_count": 1,
+            "llm_provider_cached_prompt_tokens_available_count": 1,
+            "llm_completion_tokens": 10,
+            "llm_total_tokens": 110,
+            "llm_usage_available_count": 1,
+        }
+    ]
+    _write_summary(run_dir, rows)
+    (run_dir / "llm_usage_summary.json").write_text(
+        json.dumps(
+            {
+                "llm_usage_by_source": {
+                    "toolsandbox_agent": {
+                        "llm_call_count": 1,
+                        "llm_provider_cached_prompt_tokens": 64,
+                        "llm_provider_cached_prompt_call_count": 1,
+                        "llm_provider_cached_prompt_tokens_available_count": 1,
+                    }
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (run_dir / "llm_usage_events.jsonl").write_text(
+        json.dumps(
+            {
+                "scenario": "task_a",
+                "source": "toolsandbox_agent",
+                "response_cache_status": "live",
+                "prompt_tokens": 100,
+                "completion_tokens": 10,
+                "total_tokens": 110,
+                "usage_available": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    summary = run_metrics._llm_usage_summary(rows, run_dir)
+
+    source = summary["llm_usage_by_source"]["toolsandbox_agent"]
+    assert source["llm_provider_cached_prompt_tokens"] == 64
+    assert source["llm_provider_cached_prompt_call_count"] == 1
+    assert source["llm_provider_cached_prompt_tokens_available_count"] == 1
+
+
+def test_missing_event_backfill_never_downgrades_known_provider_values(
+    tmp_path: Path,
+) -> None:
+    summary = run_metrics._llm_usage_summary(
+        [
+            {
+                "name": "task_a",
+                "llm_usage_recorded": True,
+                "llm_call_count": 1,
+                "llm_live_call_count": 1,
+                "llm_cached_call_count": 0,
+                "llm_prompt_tokens": 100,
+                "llm_provider_cached_prompt_tokens": 64,
+                "llm_provider_cached_prompt_call_count": 1,
+                "llm_provider_cached_prompt_tokens_available_count": 0,
+                "llm_completion_tokens": 10,
+                "llm_total_tokens": 110,
+                "llm_usage_available_count": 1,
+            }
+        ],
+        tmp_path,
+    )
+
+    assert summary["llm_provider_cached_prompt_tokens"] == 64
+    assert summary["llm_provider_cached_prompt_call_count"] == 1
+    assert summary["llm_provider_cached_prompt_tokens_available_count"] == 0
+
+
+def test_current_provider_fields_do_not_parse_cumulative_usage_events(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_read(_path: Path) -> list[dict[str, object]]:
+        raise AssertionError(
+            "current provider fields must not trigger event-log parsing"
+        )
+
+    monkeypatch.setattr(run_metrics, "_read_jsonl", fail_if_read)
+    summary = run_metrics._llm_usage_summary(
+        [
+            {
+                "name": "task_a",
+                "llm_usage_recorded": True,
+                "llm_call_count": 1,
+                "llm_live_call_count": 1,
+                "llm_cached_call_count": 0,
+                "llm_prompt_tokens": 100,
+                "llm_provider_cached_prompt_tokens": 64,
+                "llm_provider_cached_prompt_call_count": 1,
+                "llm_provider_cached_prompt_tokens_available_count": 1,
+                "llm_completion_tokens": 10,
+                "llm_total_tokens": 110,
+                "llm_usage_available_count": 1,
+            }
+        ],
+        tmp_path,
+    )
+
+    assert summary["llm_provider_cached_prompt_tokens"] == 64
 
 
 def test_compare_runs_reports_gain_and_regression(tmp_path: Path) -> None:

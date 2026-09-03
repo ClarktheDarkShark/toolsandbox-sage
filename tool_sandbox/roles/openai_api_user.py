@@ -136,11 +136,14 @@ class OpenAIAPIUser(BaseRole):
         Returns:
             OpenAI API chat completion object
         """
+        from sage_ts.config.models import user_simulator_reasoning_effort_kwargs
+
         with all_logging_disabled():
             return self.openai_client.chat.completions.create(
                 model=self.model_name,
                 messages=cast(list[ChatCompletionMessageParam], openai_messages),
                 tools=openai_tools,
+                **user_simulator_reasoning_effort_kwargs(self.model_name),
             )
 
     @staticmethod

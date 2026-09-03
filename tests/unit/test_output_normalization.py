@@ -9,6 +9,118 @@ from sage_ts.validation.output_normalization import normalize_generated_tool_out
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 
 
+def _state_sequence_tool() -> GeneratedTool:
+    return GeneratedTool(
+        spec=ToolSpec(
+            tool_name="plan_device_state_action_sequence_v3",
+            family=ToolFamily.STATE_PRECONDITION_HELPER,
+            description="Plan native setter calls from visible structured state.",
+            inputs=(
+                ToolInput("target_service", "str", "Visible service target."),
+                ToolInput("desired_on", "bool", "Visible requested state."),
+            ),
+            output_annotation="dict",
+        ),
+        code="def plan_device_state_action_sequence_v3(**kwargs):\n    return {}\n",
+    )
+
+
+def test_structured_state_sequence_normalizes_control_fields() -> None:
+    tool = _state_sequence_tool()
+    raw = {
+        "tool_name": "set_low_battery_mode_status",
+        "arguments": {"on": False},
+        "should_call": True,
+        "reason": "clear_low_battery_before_enabling_service",
+        "action_sequence": [
+            {
+                "tool_name": "set_low_battery_mode_status",
+                "arguments": {"on": False},
+                "reason": "clear_low_battery_before_enabling_service",
+            },
+            {
+                "tool_name": "set_cellular_service_status",
+                "arguments": {"on": True},
+                "reason": "set_cellular_on",
+            },
+        ],
+        "final_response_recommendation": "Cellular has been turned on.",
+        "continue_original_task_after_sequence": False,
+        "abstain_reason": "",
+    }
+
+    normalized = normalize_generated_tool_output(
+        tool,
+        raw,
+        inputs={
+            "target_service": "cellular",
+            "desired_on": True,
+            "resume_original_task": True,
+        },
+    )
+
+    assert normalized["action_sequence"] == raw["action_sequence"]
+    assert normalized["final_response_recommendation"] == "continue_original_task"
+    assert normalized["continue_original_task_after_sequence"] is True
+
+
+def test_derived_value_abstention_does_not_synthesize_visible_fallback() -> None:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="extract_visible_temperature",
+            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+            description="Extract one requested visible temperature field.",
+            inputs=(
+                ToolInput("service_payload", "dict", "Visible weather payload."),
+                ToolInput("requested_metric", "str", "Requested field selector."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "answer_value": {"type": "string"},
+                    "answer_kind": {"type": "string"},
+                    "answer_unit": {"type": "string"},
+                    "should_call_downstream_tool": {"type": "boolean"},
+                    "downstream_tool_name": {"type": "string"},
+                    "downstream_tool_kwargs": {"type": "object"},
+                    "exact_final_answer": {"type": "string"},
+                    "final_answer_recommendation": {"type": "string"},
+                    "copy_exactly": {"type": "boolean"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+        ),
+        code="def extract_visible_temperature(**kwargs):\n    return {}\n",
+    )
+    raw = {
+        "answer_value": "",
+        "answer_kind": "",
+        "answer_unit": "",
+        "should_call_downstream_tool": False,
+        "downstream_tool_name": "",
+        "downstream_tool_kwargs": {},
+        "exact_final_answer": "",
+        "final_answer_recommendation": "",
+        "copy_exactly": False,
+        "abstain_reason": "no_supported_answer_field",
+    }
+
+    normalized = normalize_generated_tool_output(
+        tool,
+        raw,
+        inputs={
+            "service_payload": {
+                "current_temperature": 15.1,
+                "min_temperature": 8.9,
+            },
+            "requested_metric": "unsupported_alias",
+        },
+    )
+
+    assert normalized == raw
+
+
 def _flawed_selector_tool() -> GeneratedTool:
     spec = ToolSpec(
         tool_name="select_visible_record_by_constraints",

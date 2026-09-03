@@ -1,12 +1,17 @@
 import json
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
+import sage_ts.runtime.toolsandbox_integration as toolsandbox_integration
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.toolsandbox_integration import (
+    _with_chained_visible_payload_arguments,
     compile_toolsandbox_tool,
     inject_registry_tools_into_context,
+    route_registry_entries,
     with_registry_tools,
 )
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
@@ -21,6 +26,96 @@ from tool_sandbox.common.message_conversion import Message
 from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_conversion import convert_to_openai_tool
 from tool_sandbox.roles.execution_environment import respond_to_single_message
+
+
+def test_chained_payload_expands_only_an_exact_visible_subset(monkeypatch) -> None:
+    spec = ToolSpec(
+        tool_name="extract_visible_value",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description="Extract a value from a declared producer payload.",
+        inputs=(ToolInput("service_payload", "dict", "Visible producer result."),),
+        output_annotation="dict",
+        required_original_tool_calls=("search_weather_around_lat_lon",),
+    )
+    entry = SimpleNamespace(tool=SimpleNamespace(spec=spec))
+    full_payload = {
+        "current_temperature": 12.3,
+        "temperature_unit": "Celsius",
+    }
+    monkeypatch.setattr(
+        toolsandbox_integration,
+        "_latest_original_tool_payload",
+        lambda _names: full_payload,
+    )
+
+    expanded = _with_chained_visible_payload_arguments(
+        entry,
+        {"service_payload": {"current_temperature": 12.3}},
+    )
+    assert expanded["service_payload"] == full_payload
+
+    mismatched = _with_chained_visible_payload_arguments(
+        entry,
+        {"service_payload": {"current_temperature": 99}},
+    )
+    assert mismatched["service_payload"] == {"current_temperature": 99}
+
+
+def test_derived_tool_openai_schema_exposes_declared_producer() -> None:
+    spec = ToolSpec(
+        tool_name="extract_visible_temperature",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        description="Extract the requested temperature from a weather payload.",
+        inputs=(ToolInput("service_payload", "dict", "Visible weather payload."),),
+        output_annotation="dict",
+        required_original_tool_calls=("search_weather_around_lat_lon",),
+        generalization_rationale=(
+            "Weather tasks repeatedly need a deterministic extraction after the "
+            "same visible producer payload becomes available."
+        ),
+        inadequacy_evidence=(
+            "The original weather lookup exposes raw fields but does not provide "
+            "a reusable answer-ready field selector."
+        ),
+    )
+    tool = GeneratedTool(
+        spec=spec,
+        code=(
+            "def extract_visible_temperature(service_payload: dict) -> dict:\n"
+            "    return {'value': service_payload.get('current_temperature')}\n"
+        ),
+    )
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample(
+                {"service_payload": {"current_temperature": 12.3}},
+                {"value": 12.3},
+            ),
+            ToolExample(
+                {"service_payload": {"current_temperature": 8.4}},
+                {"value": 8.4},
+                held_out=True,
+            ),
+            ToolExample(
+                {"service_payload": {}},
+                {"value": None},
+                negative_applicability=True,
+            ),
+        ),
+    )
+    assert validation.accepted
+    entry = RegistryEntry.accepted(tool, validation, birth_scenario="visible request")
+
+    openai_tool = convert_to_openai_tool(
+        compile_toolsandbox_tool(entry), spec.tool_name
+    )
+    function = openai_tool["function"]
+    assert function["description"] == spec.description
+    assert (
+        function["parameters"]["properties"]["service_payload"]["description"]
+        == "Visible weather payload. Visible keys: current_temperature."
+    )
 
 
 def canonicalizer_tool() -> GeneratedTool:
@@ -1407,47 +1502,58 @@ def test_registry_tool_injection_skips_name_collision(tmp_path: Path) -> None:
     assert enhanced.starting_context.tool_allow_list == ["end_conversation"]
 
 
-def test_state_helpers_are_only_exposed_on_relevant_state_scenarios(
+def test_location_recovery_tool_requires_visible_location_context(
     tmp_path: Path,
 ) -> None:
-    store = _registry_with_state_helper(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    state_entry = next(
+        iter(_registry_with_state_helper(tmp_path).load_entries().values())
+    )
+    location_tool = replace(
+        state_entry.tool,
+        spec=replace(
+            state_entry.tool.spec,
+            tool_name="plan_device_state_action_sequence_location_recovery",
+        ),
+    )
+    location_entry = RegistryEntry.accepted(
+        location_tool,
+        state_entry.validation,
+        birth_scenario="visible task context",
+    )
+    available_tools = set(state_entry.tool.spec.required_original_tool_calls)
+
+    wifi_routed, wifi_decisions = route_registry_entries(
+        {location_tool.spec.tool_name: location_entry},
+        scenario_name="redacted",
+        available_base_tools=available_tools,
+        task_context_text=(
+            "request=Turn on Wi-Fi tools=set_wifi_status "
+            "signals=direct_device_state_action device_state_action "
+            "state_precondition_possible family=device_state_action"
+        ),
+        task_family_key="device_state_action",
+    )
+    location_routed, location_decisions = route_registry_entries(
+        {location_tool.spec.tool_name: location_entry},
+        scenario_name="redacted",
+        available_base_tools=available_tools,
+        task_context_text=(
+            "request=Find a nearby grocery store tools=search_location_around_lat_lon "
+            "signals=location_phrase external_lookup state_precondition_possible "
+            "family=external_lookup"
+        ),
+        task_family_key="external_lookup",
     )
 
-    unrelated = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="modify_reminder_with_recency_latest",
+    assert wifi_routed == []
+    assert wifi_decisions[location_tool.spec.tool_name].reason == (
+        "visible_context_required_signal_missing"
     )
-    wifi_state = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="turn_on_wifi_low_battery_mode",
-    )
-    direct_state = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="turn_on_location_low_battery_mode",
-    )
-    downstream_state = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="find_temperature_low_battery_mode",
-    )
-    insufficient_information = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="find_current_city_low_battery_mode_insufficient_information",
-    )
-
-    assert "next_service_tool_call" not in unrelated.starting_context.name_to_tool
-    assert "next_service_tool_call" in wifi_state.starting_context.name_to_tool
-    assert "next_service_tool_call" in direct_state.starting_context.name_to_tool
-    assert "next_service_tool_call" in downstream_state.starting_context.name_to_tool
-    assert (
-        "next_service_tool_call"
-        not in insufficient_information.starting_context.name_to_tool
+    assert [entry.tool.spec.tool_name for entry in location_routed] == [
+        location_tool.spec.tool_name
+    ]
+    assert location_decisions[location_tool.spec.tool_name].reason == (
+        "visible_context_signal_match"
     )
 
 
@@ -1461,7 +1567,13 @@ def test_state_helper_openai_description_includes_single_target_guidance(
     enhanced = with_registry_tools(
         scenario,
         store,
-        scenario_name="turn_on_wifi_low_battery_mode",
+        scenario_name="redacted",
+        task_context_text=(
+            "request=Turn on Wi-Fi tools=set_wifi_status "
+            "signals=direct_device_state_action device_state_action "
+            "state_precondition_possible family=device_state_action"
+        ),
+        task_family_key="device_state_action",
     )
 
     openai_tool = convert_to_openai_tool(
@@ -1470,49 +1582,10 @@ def test_state_helper_openai_description_includes_single_target_guidance(
     )
     description = openai_tool["function"]["description"]
 
-    assert "Use only for the single service you are actively trying to change." in (
-        description
-    )
     assert (
-        "Do not call this helper for multiple alternative services in parallel."
-        in description
+        description
+        == "Return the exact next ToolSandbox tool call and readiness predicate."
     )
-
-
-def test_latest_selector_only_exposed_on_latest_record_scenarios(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_latest_selector(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
-    )
-
-    unrelated = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_sender_phone_number_with_content",
-    )
-    latest = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_message_with_recency_latest_10_distraction_tools",
-    )
-    modify_contact = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="modify_contact_with_message_recency_10_distraction_tools",
-    )
-
-    tool_name = "select_latest_record_by_timestamp"
-    assert tool_name not in unrelated.starting_context.name_to_tool
-    assert tool_name not in latest.starting_context.name_to_tool
-    assert tool_name in modify_contact.starting_context.name_to_tool
-
-    openai_tool = convert_to_openai_tool(
-        modify_contact.starting_context.name_to_tool[tool_name], tool_name
-    )
-    properties = openai_tool["function"]["parameters"]["properties"]
-    assert properties["records_payload"]["type"] == "object"
 
 
 def test_latest_selector_hidden_on_insufficient_information_scenarios(
@@ -1533,67 +1606,6 @@ def test_latest_selector_hidden_on_insufficient_information_scenarios(
         "select_latest_record_by_timestamp"
         not in insufficient.starting_context.name_to_tool
     )
-
-
-def test_timestamp_extreme_selector_exposed_on_message_ranking_scenarios(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_timestamp_extreme_selector(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
-    )
-
-    unrelated = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_reminder_with_recency_yesterday",
-    )
-    oldest = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_message_with_recency_oldest_10_distraction_tools",
-    )
-    reminder_latest = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="modify_reminder_with_recency_latest_10_distraction_tools",
-    )
-    modify_contact = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="modify_contact_with_message_recency_10_distraction_tools",
-    )
-    multi_turn = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_message_with_recency_oldest_multiple_user_turn",
-    )
-    alt_variant = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_message_with_recency_oldest_alt",
-    )
-    latest_message = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_message_with_recency_latest_10_distraction_tools",
-    )
-
-    tool_name = "select_record_by_timestamp_extreme"
-    assert tool_name not in unrelated.starting_context.name_to_tool
-    assert tool_name in oldest.starting_context.name_to_tool
-    assert tool_name not in reminder_latest.starting_context.name_to_tool
-    assert tool_name in modify_contact.starting_context.name_to_tool
-    assert tool_name in multi_turn.starting_context.name_to_tool
-    assert tool_name in alt_variant.starting_context.name_to_tool
-    assert tool_name in latest_message.starting_context.name_to_tool
-
-    openai_tool = convert_to_openai_tool(
-        latest_message.starting_context.name_to_tool[tool_name], tool_name
-    )
-    properties = openai_tool["function"]["parameters"]["properties"]
-    assert properties["records"]["type"] == "array"
-    assert properties["records"]["items"] == {}
 
 
 def test_message_search_window_suppressed_as_bounds_only_low_value(
@@ -1632,83 +1644,6 @@ def test_message_search_window_suppressed_as_bounds_only_low_value(
     assert properties["lookback_days"]["type"] == "integer"
 
 
-def test_reminder_creation_args_only_exposed_on_add_reminder_creation_tasks(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_reminder_creation_args(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(
-            tool_allow_list=["add_reminder", "end_conversation"]
-        )
-    )
-
-    unrelated_search = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_reminder_with_creation_recency_yesterday",
-    )
-    suppressed_relative_no_location = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="add_reminder_content_and_week_delta_and_time_3_distraction_tools",
-    )
-    absolute_date_time = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="add_reminder_content_and_date_and_time_3_distraction_tools",
-    )
-    weekday_relative = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="add_reminder_content_and_weekday_delta_and_time_3_distraction_tools",
-    )
-    insufficient = with_registry_tools(
-        scenario,
-        store,
-        scenario_name=(
-            "add_reminder_content_and_week_delta_and_time_and_location_insufficient_information"
-        ),
-    )
-    modify = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="modify_reminder_with_recency_latest_alt",
-    )
-    service_precondition = with_registry_tools(
-        scenario,
-        store,
-        scenario_name=(
-            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode_multiple_user_turn_alt"
-        ),
-    )
-    applicable = with_registry_tools(
-        scenario,
-        store,
-        scenario_name=(
-            "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools"
-        ),
-    )
-
-    tool_name = "prepare_reminder_creation_args"
-    assert tool_name not in unrelated_search.starting_context.name_to_tool
-    assert tool_name in suppressed_relative_no_location.starting_context.name_to_tool
-    assert tool_name in absolute_date_time.starting_context.name_to_tool
-    assert tool_name in weekday_relative.starting_context.name_to_tool
-    assert tool_name not in insufficient.starting_context.name_to_tool
-    assert tool_name not in modify.starting_context.name_to_tool
-    assert tool_name in service_precondition.starting_context.name_to_tool
-    assert tool_name in applicable.starting_context.name_to_tool
-    reminder_helper = applicable.starting_context.name_to_tool[tool_name]
-    assert "LAST prep step immediately before" in (reminder_helper.__doc__ or "")
-    assert "add_reminder_kwargs" in (reminder_helper.__doc__ or "")
-    assert "timezone" in (reminder_helper.__doc__ or "")
-    assert "tomorrow at 5 PM" in (reminder_helper.__doc__ or "")
-    assert "should_call_add_reminder" in (reminder_helper.__doc__ or "")
-    # General call-path convention: helper replaces manual sequence
-    assert "datetime_info_to_timestamp" in (reminder_helper.__doc__ or "")
-    assert "add_reminder(**result" in (reminder_helper.__doc__ or "")
-
-
 def test_reminder_creation_args_routing_hides_on_modify_scenario(
     tmp_path: Path,
 ) -> None:
@@ -1741,57 +1676,6 @@ def test_reminder_creation_args_routing_hides_on_search_scenario(
         scenario_name="search_reminder_by_content",
     )
     assert "prepare_reminder_creation_args" not in result.starting_context.name_to_tool
-
-
-def test_reminder_creation_args_routing_shows_on_add_reminder_scenario(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_reminder_creation_args(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(
-            tool_allow_list=["add_reminder", "end_conversation"]
-        )
-    )
-    result = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="add_reminder_content_and_date_and_time_3_distraction_tools",
-    )
-    assert "prepare_reminder_creation_args" in result.starting_context.name_to_tool
-
-
-def test_reminder_creation_args_routing_shows_on_relative_no_location_scenario(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_reminder_creation_args(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(
-            tool_allow_list=["add_reminder", "end_conversation"]
-        )
-    )
-    result = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="add_reminder_content_and_week_delta_and_time_3_distraction_tools",
-    )
-    assert "prepare_reminder_creation_args" in result.starting_context.name_to_tool
-
-
-def test_reminder_creation_args_routing_shows_on_create_reminder_scenario(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_reminder_creation_args(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(
-            tool_allow_list=["add_reminder", "end_conversation"]
-        )
-    )
-    result = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="create_reminder_with_location_5_distraction_tools",
-    )
-    assert "prepare_reminder_creation_args" in result.starting_context.name_to_tool
 
 
 def test_reminder_creation_args_optional_mentioned_location_not_required(
@@ -1875,7 +1759,7 @@ def test_reminder_creation_args_required_unresolved_definitively_abstains(
     )
     assert result["should_call_add_reminder"] is False
     assert result["abstain_reason"] == "required_location_unresolved"
-    assert result["location_status"] == "required_but_missing"
+    assert result["location_status"] == "required_missing"
     assert result["should_retry_location_lookup"] is False
 
 
@@ -1904,7 +1788,7 @@ def test_reminder_creation_args_required_pending_abstains(
     )
     assert result["should_call_add_reminder"] is False
     assert result["should_retry_location_lookup"] is False
-    assert result["location_status"] == "required_but_missing"
+    assert result["location_status"] == "required_missing"
     assert result["abstain_reason"] == "required_location_unresolved"
 
 
@@ -1954,134 +1838,6 @@ def test_timestamp_extreme_selector_hidden_on_insufficient_information_scenarios
     )
 
 
-def test_relative_time_helper_only_exposed_on_relative_datetime_scenarios(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_relative_time_helper(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
-    )
-
-    unrelated = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_message_with_recency_oldest_all_tools",
-    )
-    relative = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="modify_reminder_with_recency_latest_10_distraction_tools",
-    )
-    whole_week_delta = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="add_reminder_content_and_week_delta_and_time",
-    )
-
-    tool_name = "relative_day_time_to_timestamp"
-    assert tool_name not in unrelated.starting_context.name_to_tool
-    assert tool_name in relative.starting_context.name_to_tool
-    assert tool_name in whole_week_delta.starting_context.name_to_tool
-
-
-def test_recency_bounds_helper_only_exposed_on_creation_recency_tasks(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_recency_bounds(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
-    )
-
-    due_recency = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_reminder_with_recency_yesterday",
-    )
-    creation_recency = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_reminder_with_creation_recency_yesterday",
-    )
-    insufficient = with_registry_tools(
-        scenario,
-        store,
-        scenario_name=(
-            "search_reminder_with_creation_recency_yesterday_insufficient_information"
-        ),
-    )
-
-    tool_name = "recency_to_timestamp_bounds"
-    assert tool_name not in due_recency.starting_context.name_to_tool
-    assert tool_name in creation_recency.starting_context.name_to_tool
-    assert tool_name not in insufficient.starting_context.name_to_tool
-
-
-def test_resolve_search_window_helper_exposed_only_on_bounded_search_tasks(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_resolve_search_window(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
-    )
-
-    message_recency = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_message_with_recency_latest",
-    )
-    reminder_recency = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_reminder_with_creation_recency_yesterday",
-    )
-    reminder_action = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="remove_reminder_with_recency_latest",
-    )
-    reminder_creation = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="add_reminder_content_and_time",
-    )
-    insufficient = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_reminder_with_recency_upcoming_insufficient_information",
-    )
-
-    tool_name = "resolve_search_window_or_bounds"
-    assert tool_name in message_recency.starting_context.name_to_tool
-    assert tool_name in reminder_recency.starting_context.name_to_tool
-    assert tool_name in reminder_action.starting_context.name_to_tool
-    assert tool_name not in reminder_creation.starting_context.name_to_tool
-    assert tool_name not in insufficient.starting_context.name_to_tool
-
-
-def test_calendar_distance_helper_only_exposed_on_holiday_scenarios(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_days_between_helper(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
-    )
-
-    unrelated = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_reminder_with_recency_yesterday",
-    )
-    holiday = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="find_days_till_holiday_3_distraction_tools",
-    )
-
-    tool_name = "days_between_timestamps"
-    assert tool_name not in unrelated.starting_context.name_to_tool
-    assert tool_name in holiday.starting_context.name_to_tool
-
-
 def test_lifecycle_hides_negative_called_subset_family(
     tmp_path: Path,
 ) -> None:
@@ -2095,8 +1851,8 @@ def test_lifecycle_hides_negative_called_subset_family(
                         "decision": "needs_route_repair",
                         "harmful_called_count": 2,
                         "harmful_called_scenarios": [
-                            "add_reminder_content_and_week_delta_and_time",
-                            "add_reminder_content_and_week_delta_and_time_alt",
+                            "reminder_create",
+                            "reminder_create_alt",
                         ],
                     }
                 },
@@ -2114,7 +1870,12 @@ def test_lifecycle_hides_negative_called_subset_family(
     result = with_registry_tools(
         scenario,
         store,
-        scenario_name="add_reminder_content_and_week_delta_and_time_3_distraction_tools",
+        scenario_name="redacted",
+        task_context_text=(
+            "request=Remind me tomorrow at 9 AM tools=add_reminder "
+            "signals=reminder_create relative_datetime family=reminder_create"
+        ),
+        task_family_key="reminder_create",
     )
 
     assert "prepare_reminder_creation_args" not in result.starting_context.name_to_tool
@@ -2155,7 +1916,12 @@ def test_lifecycle_keeps_mixed_positive_route_repair_visible(
     result = with_registry_tools(
         scenario,
         store,
-        scenario_name="add_reminder_content_and_week_delta_and_time_3_distraction_tools",
+        scenario_name="redacted",
+        task_context_text=(
+            "request=Remind me tomorrow at 9 AM tools=add_reminder "
+            "signals=reminder_create relative_datetime family=reminder_create"
+        ),
+        task_family_key="reminder_create",
     )
 
     assert "prepare_reminder_creation_args" in result.starting_context.name_to_tool
@@ -2165,7 +1931,6 @@ def test_contact_constraint_helper_is_suppressed_after_low_adoption(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    monkeypatch.delenv("SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE", raising=False)
     monkeypatch.delenv("SAGE_DIAGNOSTIC_FORCE_TOOL_NAME", raising=False)
     store = _registry_with_contact_constraint_helper(tmp_path)
     scenario = Scenario(
@@ -2206,6 +1971,29 @@ def test_contact_constraint_helper_is_suppressed_after_low_adoption(
     assert tool_name not in ambiguous.starting_context.name_to_tool
 
 
+def test_retired_diagnostic_exposure_flag_does_not_override_relevance(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    tool_name = "select_contact_field_by_constraint"
+    monkeypatch.setenv("SAGE_DIAGNOSTIC_EXPOSE_TOOL_NAME", tool_name)
+    monkeypatch.delenv("SAGE_DIAGNOSTIC_FORCE_TOOL_NAME", raising=False)
+    store = _registry_with_contact_constraint_helper(tmp_path)
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+
+    result = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="unrelated_diagnostic_task",
+        task_context_text="request=hello signals=general_conversation",
+        task_family_key="general_conversation",
+    )
+
+    assert tool_name not in result.starting_context.name_to_tool
+
+
 def test_stock_symbol_helper_only_exposed_on_stock_lookup(
     tmp_path: Path,
 ) -> None:
@@ -2234,30 +2022,6 @@ def test_stock_symbol_helper_only_exposed_on_stock_lookup(
     tool_name = "extract_stock_symbol"
     assert tool_name not in unrelated.starting_context.name_to_tool
     assert tool_name in stock.starting_context.name_to_tool
-
-
-def test_unknown_helpers_are_only_provisional_for_birth_family(
-    tmp_path: Path,
-) -> None:
-    store = _registry_with_canonicalizer(tmp_path)
-    scenario = Scenario(
-        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
-    )
-
-    unrelated = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="search_reminder_with_recency_yesterday",
-    )
-    same_birth_family = with_registry_tools(
-        scenario,
-        store,
-        scenario_name="toy_birth_3_distraction_tools",
-    )
-
-    tool_name = "canonicalize_connectivity_label"
-    assert tool_name not in unrelated.starting_context.name_to_tool
-    assert tool_name in same_birth_family.starting_context.name_to_tool
 
 
 def test_registry_tools_execute_through_toolsandbox_console(tmp_path: Path) -> None:

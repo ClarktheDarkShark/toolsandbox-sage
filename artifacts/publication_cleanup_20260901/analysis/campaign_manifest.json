@@ -1,0 +1,488 @@
+{
+  "schema_version": 1,
+  "campaign_id": "chapter4_final_claim_10x_20260730",
+  "created_at": "2026-07-31T03:15:51.865345+00:00",
+  "updated_at": "2026-07-31T14:35:12.539747+00:00",
+  "status": "complete",
+  "model": "gpt-4o-mini",
+  "benchmark_label": "ToolSandbox complete 1,032-task benchmark",
+  "benchmark_manifest": "docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json",
+  "benchmark_sha256": "21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec",
+  "baseline_cache": "artifacts/baselines/control_task_baselines_v140_prefinal_full_uncached_gpt4omini",
+  "baseline_cache_policy": "strict task-level reuse of the preserved complete uncached gpt-4o-mini baseline",
+  "fixed_toolsandbox_timestamp": 1784832588,
+  "expected_online_runs": 10,
+  "expected_frozen_runs": 10,
+  "expected_tasks_per_run": 1032,
+  "maximum_parallel_runs": 10,
+  "execution_waves": [
+    {
+      "wave": 1,
+      "description": "New online-build replications and frozen reuse for preserved online-build registries.",
+      "maximum_parallel": 10
+    },
+    {
+      "wave": 2,
+      "description": "Frozen reuse for registries produced by wave 1.",
+      "maximum_parallel": 10
+    }
+  ],
+  "statistical_plan": {
+    "primary_measure": "outcome/task-completion similarity",
+    "hypothesis_1_threshold_percent": 80,
+    "hypothesis_2_threshold_percent": 10,
+    "hypothesis_3_threshold_percent": 30,
+    "bootstrap_iterations": 10000,
+    "randomization_iterations": 20000,
+    "seed": 20260730,
+    "run_level_replications": 10,
+    "matched_online_task_pairs": 10320,
+    "expected_outcome_scored_pairs": 8000,
+    "outcome_scored_tasks_per_run": 800
+  },
+  "claim_safeguards": {
+    "scenario_name_birth_disabled": true,
+    "scenario_name_routing_disabled": true,
+    "visible_task_context_only": true,
+    "synthetic_bridge_completions_disabled": true,
+    "diagnostic_force_calls_disabled": true,
+    "sage_task_cache": "off",
+    "openai_response_cache": "disabled",
+    "online_registry_start": "empty",
+    "frozen_generation": "off",
+    "frozen_candidate_repair": "off"
+  },
+  "configuration_identity": {
+    "runtime_digest": "d4b05b20911684dc0be559369686fa1bbd592074ac81d73091d077717885df0a",
+    "generation_settings_digest": "a90b629d8bf43dca4eb926abd639aca90d3f7513ab848c44dbeaac3eebd209b9",
+    "prompt_policy_digest": "sage_ts_protocol_v1"
+  },
+  "paths": {
+    "artifact_root": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730",
+    "output_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730",
+    "dashboard_dir": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/dashboard"
+  },
+  "run_pairs": [
+    {
+      "replication": 1,
+      "online": {
+        "source": "preserved_current_sage_replication",
+        "run_root": "outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep01/native_action/online_build_full_20260723_220055",
+        "search_root": "outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep01/native_action",
+        "registry_dir": "artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep01/native_action_registry",
+        "execution_status": "completed",
+        "return_code": 0,
+        "completed_at": "2026-07-31T14:34:57.988021+00:00",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      },
+      "frozen": {
+        "source": "paired_frozen_registry_reuse",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep01/frozen_registry/full_benchmark_20260730_231640",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep01/frozen_registry",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep01/frozen_registry_registry",
+        "source_registry_dir": "artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep01/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T03:16:26.143660+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T08:25:11.589314+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep01_frozen.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      }
+    },
+    {
+      "replication": 2,
+      "online": {
+        "source": "preserved_current_sage_replication",
+        "run_root": "outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep02/native_action/online_build_full_20260723_220055",
+        "search_root": "outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep02/native_action",
+        "registry_dir": "artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep02/native_action_registry",
+        "execution_status": "completed",
+        "return_code": 0,
+        "completed_at": "2026-07-31T14:34:57.988021+00:00",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      },
+      "frozen": {
+        "source": "paired_frozen_registry_reuse",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep02/frozen_registry/full_benchmark_20260730_231640",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep02/frozen_registry",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep02/frozen_registry_registry",
+        "source_registry_dir": "artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep02/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T03:16:26.143661+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T08:32:37.264860+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep02_frozen.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      }
+    },
+    {
+      "replication": 3,
+      "online": {
+        "source": "preserved_current_sage_replication",
+        "run_root": "outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep03/native_action/online_build_full_20260723_220055",
+        "search_root": "outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep03/native_action",
+        "registry_dir": "artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep03/native_action_registry",
+        "execution_status": "completed",
+        "return_code": 0,
+        "completed_at": "2026-07-31T14:34:57.988021+00:00",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      },
+      "frozen": {
+        "source": "paired_frozen_registry_reuse",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep03/frozen_registry/full_benchmark_20260730_231640",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep03/frozen_registry",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep03/frozen_registry_registry",
+        "source_registry_dir": "artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep03/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T03:16:26.143662+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T08:27:28.053852+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep03_frozen.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      }
+    },
+    {
+      "replication": 4,
+      "online": {
+        "source": "preserved_current_sage_replication",
+        "run_root": "outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep04/native_action/online_build_full_20260723_220055",
+        "search_root": "outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep04/native_action",
+        "registry_dir": "artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep04/native_action_registry",
+        "execution_status": "completed",
+        "return_code": 0,
+        "completed_at": "2026-07-31T14:34:57.988021+00:00",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      },
+      "frozen": {
+        "source": "paired_frozen_registry_reuse",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep04/frozen_registry/full_benchmark_20260730_231640",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep04/frozen_registry",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep04/frozen_registry_registry",
+        "source_registry_dir": "artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep04/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T03:16:26.143663+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T08:28:12.595440+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep04_frozen.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      }
+    },
+    {
+      "replication": 5,
+      "online": {
+        "source": "preserved_current_sage_replication",
+        "run_root": "outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep05/native_action/online_build_full_20260723_220055",
+        "search_root": "outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep05/native_action",
+        "registry_dir": "artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep05/native_action_registry",
+        "execution_status": "completed",
+        "return_code": 0,
+        "completed_at": "2026-07-31T14:34:57.988021+00:00",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      },
+      "frozen": {
+        "source": "paired_frozen_registry_reuse",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep05/frozen_registry/full_benchmark_20260730_231640",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep05/frozen_registry",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep05/frozen_registry_registry",
+        "source_registry_dir": "artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/rep05/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T03:16:26.143664+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T08:31:45.835229+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep05_frozen.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      }
+    },
+    {
+      "replication": 6,
+      "online": {
+        "source": "campaign_online_build",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep06/native_action/online_build_full_20260730_231640",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep06/native_action",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep06/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T03:16:26.143646+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T08:58:40.475645+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep06_online.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      },
+      "frozen": {
+        "source": "paired_frozen_registry_reuse",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep06/frozen_registry/full_benchmark_20260731_052727",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep06/frozen_registry",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep06/frozen_registry_registry",
+        "source_registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep06/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T09:27:09.624842+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T14:34:57.988021+00:00",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      }
+    },
+    {
+      "replication": 7,
+      "online": {
+        "source": "campaign_online_build",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep07/native_action/online_build_full_20260730_231640",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep07/native_action",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep07/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T03:16:26.143652+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T09:10:02.456954+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep07_online.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      },
+      "frozen": {
+        "source": "paired_frozen_registry_reuse",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep07/frozen_registry/full_benchmark_20260731_052727",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep07/frozen_registry",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep07/frozen_registry_registry",
+        "source_registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep07/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T09:27:09.624849+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T14:34:57.988021+00:00",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      }
+    },
+    {
+      "replication": 8,
+      "online": {
+        "source": "campaign_online_build",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep08/native_action/online_build_full_20260730_231640",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep08/native_action",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep08/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T03:16:26.143655+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T09:03:20.579827+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep08_online.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      },
+      "frozen": {
+        "source": "paired_frozen_registry_reuse",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep08/frozen_registry/full_benchmark_20260731_090513",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep08/frozen_registry",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep08/frozen_registry_registry",
+        "source_registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep08/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T09:27:09.624851+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T13:04:46.650734+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep08_frozen.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      }
+    },
+    {
+      "replication": 9,
+      "online": {
+        "source": "campaign_online_build",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep09/native_action/online_build_full_20260730_231640",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep09/native_action",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep09/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T03:16:26.143656+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T09:15:33.148356+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep09_online.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      },
+      "frozen": {
+        "source": "paired_frozen_registry_reuse",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep09/frozen_registry/full_benchmark_20260731_052727",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep09/frozen_registry",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep09/frozen_registry_registry",
+        "source_registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep09/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T09:27:09.624853+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T14:34:57.988021+00:00",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      }
+    },
+    {
+      "replication": 10,
+      "online": {
+        "source": "campaign_online_build",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep10/native_action/online_build_full_20260730_231640",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep10/native_action",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep10/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T03:16:26.143658+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T09:26:47.892118+00:00",
+        "log_path": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/launcher_logs/rep10_online.log",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      },
+      "frozen": {
+        "source": "paired_frozen_registry_reuse",
+        "run_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep10/frozen_registry/full_benchmark_20260731_052727",
+        "search_root": "outputs/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep10/frozen_registry",
+        "registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/frozen/rep10/frozen_registry_registry",
+        "source_registry_dir": "artifacts/chapter4_evidence/chapter4_final_claim_10x_20260730/online/rep10/native_action_registry",
+        "execution_status": "completed",
+        "started_at": "2026-07-31T09:27:09.624855+00:00",
+        "return_code": 0,
+        "completed_at": "2026-07-31T14:34:57.988021+00:00",
+        "status_reconciled_at": "2026-07-31T14:34:57.988021+00:00"
+      }
+    }
+  ],
+  "execution_events": [
+    {
+      "at": "2026-07-31T03:15:51.866442+00:00",
+      "event": "campaign_prepared",
+      "detail": "5 preserved online runs; 5 new online runs and 10 frozen runs queued."
+    },
+    {
+      "at": "2026-07-31T03:16:26.142441+00:00",
+      "event": "wave_1_started",
+      "jobs": [
+        {
+          "replication": 6,
+          "arm": "online"
+        },
+        {
+          "replication": 7,
+          "arm": "online"
+        },
+        {
+          "replication": 8,
+          "arm": "online"
+        },
+        {
+          "replication": 9,
+          "arm": "online"
+        },
+        {
+          "replication": 10,
+          "arm": "online"
+        },
+        {
+          "replication": 1,
+          "arm": "frozen"
+        },
+        {
+          "replication": 2,
+          "arm": "frozen"
+        },
+        {
+          "replication": 3,
+          "arm": "frozen"
+        },
+        {
+          "replication": 4,
+          "arm": "frozen"
+        },
+        {
+          "replication": 5,
+          "arm": "frozen"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-31T08:25:11.591487+00:00",
+      "event": "frozen_run_finished",
+      "replication": 1,
+      "return_code": 0
+    },
+    {
+      "at": "2026-07-31T08:27:28.054391+00:00",
+      "event": "frozen_run_finished",
+      "replication": 3,
+      "return_code": 0
+    },
+    {
+      "at": "2026-07-31T08:28:12.596479+00:00",
+      "event": "frozen_run_finished",
+      "replication": 4,
+      "return_code": 0
+    },
+    {
+      "at": "2026-07-31T08:31:45.835601+00:00",
+      "event": "frozen_run_finished",
+      "replication": 5,
+      "return_code": 0
+    },
+    {
+      "at": "2026-07-31T08:32:37.265233+00:00",
+      "event": "frozen_run_finished",
+      "replication": 2,
+      "return_code": 0
+    },
+    {
+      "at": "2026-07-31T08:58:40.476025+00:00",
+      "event": "online_run_finished",
+      "replication": 6,
+      "return_code": 0
+    },
+    {
+      "at": "2026-07-31T09:03:20.581007+00:00",
+      "event": "online_run_finished",
+      "replication": 8,
+      "return_code": 0
+    },
+    {
+      "at": "2026-07-31T09:10:02.457269+00:00",
+      "event": "online_run_finished",
+      "replication": 7,
+      "return_code": 0
+    },
+    {
+      "at": "2026-07-31T09:15:33.148828+00:00",
+      "event": "online_run_finished",
+      "replication": 9,
+      "return_code": 0
+    },
+    {
+      "at": "2026-07-31T09:26:47.892485+00:00",
+      "event": "online_run_finished",
+      "replication": 10,
+      "return_code": 0
+    },
+    {
+      "at": "2026-07-31T09:27:09.623161+00:00",
+      "event": "wave_2_started",
+      "jobs": [
+        {
+          "replication": 6,
+          "arm": "frozen"
+        },
+        {
+          "replication": 7,
+          "arm": "frozen"
+        },
+        {
+          "replication": 8,
+          "arm": "frozen"
+        },
+        {
+          "replication": 9,
+          "arm": "frozen"
+        },
+        {
+          "replication": 10,
+          "arm": "frozen"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-31T13:04:46.651070+00:00",
+      "event": "frozen_run_finished",
+      "replication": 8,
+      "return_code": 1
+    },
+    {
+      "at": "2026-07-31T14:34:57.983606+00:00",
+      "event": "wave_2_started",
+      "jobs": []
+    },
+    {
+      "at": "2026-07-31T14:35:12.539762+00:00",
+      "event": "campaign_execution_finished",
+      "complete": true
+    }
+  ]
+}

@@ -10,14 +10,14 @@ The methodological claim is narrower than open-ended agent learning: SAGE evolve
 
 The study uses a paired task-level comparison design. Each task is evaluated under a non-learning baseline condition and a SAGE condition. The baseline condition uses the original task environment and original tools without autonomous tool generation. The SAGE condition uses the same environment and original tools, but adds the SAGE lifecycle for generating, validating, registering, routing, and reusing generated tools.
 
-The primary endpoint is task-completion accuracy, measured through outcome score when outcome scoring is available. Canonical or reference similarity is reported as a secondary endpoint because it captures how closely the agent's route or intermediate behavior matches benchmark expectations. This distinction matters because a generated tool may produce the correct final state while bypassing an intermediate milestone that the canonical score expects.
+The sole performance endpoint is task-completion accuracy, measured through outcome score when outcome scoring is available. Canonical or reference similarity is retained only as a descriptive route-compatibility diagnostic because it captures how closely the agent's route or intermediate behavior matches benchmark expectations. It is never a hypothesis or release gate. This distinction matters because a generated tool may produce the correct final state while bypassing an intermediate milestone that the canonical score expects.
 
 The current evidence supports strong accuracy improvement and generated-tool reuse. Therefore, the methodology frames online-build SAGE as the discovery condition and frozen-registry SAGE as the reuse condition. The reuse condition tests whether accepted generated tools continue to preserve accuracy lift after new tool generation and repair are disabled.
 
 | Research question | Operational framing | Hypothesis used in this methodology |
 |---|---|---|
 | RQ1: Can SAGE build and reuse tools across tasks? | Reuse is evaluated in two phases: online-build discovery and frozen-registry reuse. The frozen-registry condition disables new tool generation and repair to test whether accepted generated tools retain value. | **H1:** A frozen SAGE registry can preserve at least 90% of the online-build accuracy lift after tool generation is disabled. |
-| RQ2: Can SAGE improve task accuracy over a non-learning agent? | Accuracy is measured through matched task-level outcome score, with canonical/reference score reported as a secondary metric. | **H2:** SAGE can improve task-completion accuracy by at least 10% over a non-learning baseline on matched benchmark tasks. |
+| RQ2: Can SAGE improve task accuracy over a non-learning agent? | Accuracy is measured through matched task-level outcome score; canonical/reference score is descriptive route-compatibility output only. | **H2:** SAGE can improve task-completion accuracy by at least 10% over a non-learning baseline on matched benchmark tasks. |
 | RQ3: Are SAGE gains attributable to autonomous generated-tool use? | Tool-attributed evidence requires generated tools to be visible, naturally called, safety-clean, and associated with paired task gains. Forced calls and synthetic completions are excluded. | **H3:** On tasks where generated tools are naturally called, SAGE can improve task-completion accuracy by at least 30% without answer leakage, forced tool calls, or code-based task completion shortcuts. |
 
 Table: Revised research questions and hypotheses aligned to the current SAGE evidence boundary.
@@ -100,7 +100,7 @@ The methodology separates discovery evidence from validation evidence and protec
 | Hidden-answer exclusion | Generated tools, routing, and repair logic must not use expected answers, hidden labels, scenario-specific answer strings, or prior SAGE traces. | Prevents benchmark leakage and preserves the validity of generated-tool claims. |
 | Candidate task cache off | SAGE evidence arms do not use task-answer caches. | Ensures SAGE results come from current task execution and generated-tool use. |
 | Baseline cache provenance | Eligible baseline controls may be cached, but cached/fresh counts and cache source are reported. | Avoids unnecessary reruns while keeping the comparison auditable. |
-| OpenAI response cache disabled | Evidence runs disable provider-response caching unless a run is explicitly marked as diagnostic. | Prevents repeated model outputs from becoming hidden reuse evidence. |
+| Persistent repository whole-response replay disabled | Evidence runs do not replay complete model responses stored by the repository. OpenAI-managed prompt-prefix computation is distinct and is recorded in new strict runs when exposed by API usage metadata; nonpersistent within-run generator contract-and-repair-analysis memoization is declared separately. | Prevents prior-run model outputs from becoming hidden reuse evidence without misclassifying provider KV-prefix or within-run analysis reuse as persistent output replay. |
 | Original side-effect tools preserved | Generated tools may prepare values or action arguments, but original environment tools execute state changes. | Prevents generated tools from bypassing the benchmark action model. |
 | No force-call promotion evidence | Diagnostic tool forcing may be used for debugging but is excluded from claims. | Ensures adoption evidence reflects natural actor use. |
 | Runtime and safety logging | Runtime exceptions, generated-tool failures, and side-effect incidents are reported. | Keeps accuracy claims tied to safe and reproducible behavior. |
@@ -116,9 +116,9 @@ The analysis uses paired task-level comparisons. Each task contributes a baselin
 | Metric | Definition | Interpretation |
 |---|---|---|
 | Outcome/task-completion score | Final-state or final-answer success score where outcome checks are available. | Primary accuracy endpoint. |
-| Canonical/reference score | Similarity to expected benchmark route, milestone, or reference behavior. | Secondary endpoint; may penalize correct deterministic shortcuts. |
-| Score lift | Relative improvement from baseline to SAGE on canonical/reference score. | Reported with absolute delta. |
-| Outcome lift | Relative improvement from baseline to SAGE on outcome score. | Primary lift statistic when outcome scoring is available. |
+| Canonical/reference score | Similarity to expected benchmark route, milestone, or reference behavior. | Descriptive route-compatibility diagnostic; never a hypothesis or release endpoint. |
+| Score lift | Relative movement from baseline to SAGE on canonical/reference score. | Descriptive audit output only. |
+| Outcome lift | Relative improvement from baseline to SAGE on outcome score. | Sole performance lift statistic. |
 | Generated-tool visibility | Number of tasks where a generated tool was exposed to the actor. | Measures routing coverage. |
 | Generated-tool calls | Number of tasks where the actor naturally called a generated tool. | Measures adoption and tool-attributed opportunity. |
 | Visible-not-called | Generated tool was visible but not used. | Diagnoses routing, affordance, or value mismatch. |
@@ -171,4 +171,4 @@ The study is also limited by compute budget. Most evidence uses smaller models, 
 
 Table: Non-claims and limitations that constrain the interpretation of SAGE results.
 
-In summary, this chapter defines SAGE as a self-evolving tool-use system evaluated through paired task-level comparisons. The methodology focuses on autonomous generated-tool creation, validation, registry retention, routing, natural reuse, safety controls, leakage prevention, and evidence attribution. The following empirical chapter should report SAGE results using the same boundaries: outcome/task completion as the primary endpoint, canonical/reference score as a secondary endpoint, and generated-tool contribution as a required attribution layer.
+In summary, this chapter defines SAGE as a self-evolving tool-use system evaluated through paired task-level comparisons. The methodology focuses on autonomous generated-tool creation, validation, registry retention, routing, natural reuse, safety controls, leakage prevention, and evidence attribution. The following empirical chapter should report SAGE results using the same boundaries: outcome/task completion as the sole performance endpoint, canonical/reference score as a descriptive route-compatibility diagnostic, and generated-tool contribution as a required attribution layer.

@@ -3,15 +3,27 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
+
+from sage_ts.evaluation.llm_usage import summarize_events
 
 
 def _read_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
-    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+    last_error: json.JSONDecodeError | None = None
+    for _ in range(30):
+        try:
+            return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+        except json.JSONDecodeError as exc:
+            last_error = exc
+            time.sleep(0.1)
+    if last_error is not None:
+        raise last_error
+    return {}
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -139,16 +151,152 @@ def _sum_optional_int(rows: list[dict[str, Any]], key: str) -> int | None:
     return sum(clean) if clean else None
 
 
+def _provider_backfill_needed(
+    summary: dict[str, Any],
+    provider_fields: tuple[str, ...],
+) -> bool:
+    if any(summary.get(field) is None for field in provider_fields):
+        return True
+    call_count = _optional_int(summary.get("llm_call_count"))
+    available_count = _optional_int(
+        summary.get("llm_provider_cached_prompt_tokens_available_count")
+    )
+    return call_count is not None and available_count != call_count
+
+
+def _source_provider_backfill_needed(
+    summary: dict[str, Any],
+    provider_fields: tuple[str, ...],
+) -> bool:
+    sources = summary.get("llm_usage_by_source")
+    if not isinstance(sources, dict) or not sources:
+        return False
+    return any(
+        not isinstance(source_summary, dict)
+        or any(field not in source_summary for field in provider_fields)
+        or (
+            _optional_int(source_summary.get("llm_call_count")) is not None
+            and _optional_int(
+                source_summary.get("llm_provider_cached_prompt_tokens_available_count")
+            )
+            != _optional_int(source_summary.get("llm_call_count"))
+        )
+        for source_summary in sources.values()
+    )
+
+
+def _event_totals_reconcile(
+    summary: dict[str, Any],
+    event_summary: dict[str, Any],
+) -> bool:
+    for field in (
+        "llm_call_count",
+        "llm_prompt_tokens",
+        "llm_completion_tokens",
+        "llm_total_tokens",
+    ):
+        expected = _optional_int(summary.get(field))
+        observed = _optional_int(event_summary.get(field))
+        if expected is None or observed != expected:
+            return False
+    return True
+
+
+def _event_provider_evidence_is_at_least_as_complete(
+    summary: dict[str, Any],
+    event_summary: dict[str, Any],
+) -> bool:
+    current_available = _optional_int(
+        summary.get("llm_provider_cached_prompt_tokens_available_count")
+    )
+    event_available = _optional_int(
+        event_summary.get("llm_provider_cached_prompt_tokens_available_count")
+    )
+    if event_available is None or event_available < (current_available or 0):
+        return False
+    for field in (
+        "llm_provider_cached_prompt_tokens",
+        "llm_provider_cached_prompt_call_count",
+    ):
+        if summary.get(field) is not None and event_summary.get(field) is None:
+            return False
+    return True
+
+
+def _backfill_provider_usage(
+    summary: dict[str, Any],
+    run_dir: Path,
+    provider_fields: tuple[str, ...],
+) -> dict[str, Any]:
+    provider_needed = _provider_backfill_needed(summary, provider_fields)
+    source_needed = _source_provider_backfill_needed(summary, provider_fields)
+    if not provider_needed and not source_needed:
+        return summary
+    usage_events = _read_jsonl(run_dir / "llm_usage_events.jsonl")
+    if not usage_events:
+        return summary
+    event_summary = summarize_events(usage_events)
+    if not _event_totals_reconcile(summary, event_summary):
+        return summary
+    if provider_needed and _event_provider_evidence_is_at_least_as_complete(
+        summary,
+        event_summary,
+    ):
+        for field in provider_fields:
+            summary[field] = event_summary.get(field)
+    event_sources = event_summary.get("llm_usage_by_source")
+    if (
+        isinstance(event_sources, dict)
+        and event_sources
+        and (source_needed or not summary.get("llm_usage_by_source"))
+    ):
+        current_sources = summary.get("llm_usage_by_source")
+        if not isinstance(current_sources, dict):
+            current_sources = {}
+        merged_sources: dict[str, Any] = {}
+        for source, event_source in event_sources.items():
+            if not isinstance(event_source, dict):
+                continue
+            merged_source = dict(event_source)
+            current_source = current_sources.get(source)
+            if isinstance(current_source, dict) and not (
+                _event_provider_evidence_is_at_least_as_complete(
+                    current_source,
+                    event_source,
+                )
+            ):
+                for field in provider_fields:
+                    if field in current_source:
+                        merged_source[field] = current_source[field]
+            merged_sources[str(source)] = merged_source
+        summary["llm_usage_by_source"] = dict(sorted(merged_sources.items()))
+    return summary
+
+
 def _llm_usage_summary(rows: list[dict[str, Any]], run_dir: Path) -> dict[str, Any]:
     recorded_rows = [row for row in rows if row.get("llm_usage_recorded")]
     artifact_summary = _read_json(run_dir / "llm_usage_summary.json")
+    provider_fields = (
+        "llm_provider_cached_prompt_tokens",
+        "llm_provider_cached_prompt_call_count",
+        "llm_provider_cached_prompt_tokens_available_count",
+    )
     if not recorded_rows and artifact_summary:
-        return {
+        summary = {
             "llm_usage_recorded": bool(artifact_summary.get("llm_usage_recorded")),
             "llm_call_count": artifact_summary.get("llm_call_count"),
             "llm_live_call_count": artifact_summary.get("llm_live_call_count"),
             "llm_cached_call_count": artifact_summary.get("llm_cached_call_count"),
             "llm_prompt_tokens": artifact_summary.get("llm_prompt_tokens"),
+            "llm_provider_cached_prompt_tokens": artifact_summary.get(
+                "llm_provider_cached_prompt_tokens"
+            ),
+            "llm_provider_cached_prompt_call_count": artifact_summary.get(
+                "llm_provider_cached_prompt_call_count"
+            ),
+            "llm_provider_cached_prompt_tokens_available_count": artifact_summary.get(
+                "llm_provider_cached_prompt_tokens_available_count"
+            ),
             "llm_completion_tokens": artifact_summary.get("llm_completion_tokens"),
             "llm_total_tokens": artifact_summary.get("llm_total_tokens"),
             "llm_usage_available_count": artifact_summary.get(
@@ -156,7 +304,8 @@ def _llm_usage_summary(rows: list[dict[str, Any]], run_dir: Path) -> dict[str, A
             ),
             "llm_usage_by_source": artifact_summary.get("llm_usage_by_source", {}),
         }
-    return {
+        return _backfill_provider_usage(summary, run_dir, provider_fields)
+    summary = {
         "llm_usage_recorded": bool(recorded_rows),
         "llm_call_count": _sum_optional_int(recorded_rows, "llm_call_count"),
         "llm_live_call_count": _sum_optional_int(recorded_rows, "llm_live_call_count"),
@@ -164,6 +313,15 @@ def _llm_usage_summary(rows: list[dict[str, Any]], run_dir: Path) -> dict[str, A
             recorded_rows, "llm_cached_call_count"
         ),
         "llm_prompt_tokens": _sum_optional_int(recorded_rows, "llm_prompt_tokens"),
+        "llm_provider_cached_prompt_tokens": _sum_optional_int(
+            recorded_rows, "llm_provider_cached_prompt_tokens"
+        ),
+        "llm_provider_cached_prompt_call_count": _sum_optional_int(
+            recorded_rows, "llm_provider_cached_prompt_call_count"
+        ),
+        "llm_provider_cached_prompt_tokens_available_count": _sum_optional_int(
+            recorded_rows, "llm_provider_cached_prompt_tokens_available_count"
+        ),
         "llm_completion_tokens": _sum_optional_int(
             recorded_rows, "llm_completion_tokens"
         ),
@@ -173,6 +331,10 @@ def _llm_usage_summary(rows: list[dict[str, Any]], run_dir: Path) -> dict[str, A
         ),
         "llm_usage_by_source": {},
     }
+    artifact_sources = artifact_summary.get("llm_usage_by_source")
+    if isinstance(artifact_sources, dict) and artifact_sources:
+        summary["llm_usage_by_source"] = artifact_sources
+    return _backfill_provider_usage(summary, run_dir, provider_fields)
 
 
 def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, Any]:
@@ -185,10 +347,6 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
     run_events = _read_jsonl(run_dir / "sage_run_events.jsonl")
     visibility = _read_jsonl(run_dir / "scenario_tool_visibility.jsonl")
     selection = _read_jsonl(run_dir / "scenario_tool_selection.jsonl")
-    prompt_cache_metrics = _read_json(run_dir / "prompt_cache_metrics.json")
-    openai_response_cache_metrics = _read_json(
-        run_dir / "openai_response_cache_metrics.json"
-    )
     live_summary = _read_json(run_dir / "live_result_summary.json")
     registry_manifest = (
         _read_json(registry_dir / "registry_manifest.json") if registry_dir else {}
@@ -316,10 +474,6 @@ def summarize_run(run_dir: Path, registry_dir: Path | None = None) -> dict[str, 
             if event.get("failure_after_outcome_selection")
             and event.get("selection_status") != "no_visible_generated_tools"
         ],
-        "cache_metrics": {
-            "prompt_cache": prompt_cache_metrics,
-            "openai_response_cache": openai_response_cache_metrics,
-        },
         "failures": [
             {
                 "scenario": row.get("name"),

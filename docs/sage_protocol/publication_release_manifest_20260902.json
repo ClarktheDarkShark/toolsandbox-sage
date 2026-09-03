@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "manifest_type": "publication_release_input_chain",
+  "created_at": "2026-09-02",
+  "purpose": "Content-address the immutable P0 input manifest, corrected publication-policy amendment, and active outcome-only validation thresholds.",
+  "base_input_manifest": {
+    "path": "docs/sage_protocol/publication_input_manifest_20260901.json",
+    "sha256": "3a54888be13143b3bac9dac1b8b542220812d40424c97395e5e3d3448a261fbb"
+  },
+  "checkpoint_policy_amendment": {
+    "path": "docs/sage_protocol/publication_checkpoint_amendment_20260902.json",
+    "sha256": "bac8d45e2d75984a187e5b0dbb9ed59dd07d91eec965ad1440ba4ec898729dab"
+  },
+  "active_validation_thresholds": {
+    "path": "docs/sage_protocol/publication_validation_thresholds_v2.json",
+    "sha256": "911594684433c4ff748e02d099977a318d3a23c70ed33e70ae2826e5a1e94f15"
+  }
+}

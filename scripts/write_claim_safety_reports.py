@@ -148,7 +148,6 @@ def build_validation_policy_report(repo_root: Path) -> dict[str, Any]:
         "registry_manifest": repo_root / "src/sage_ts/registry/manifest.py",
         "toolsandbox_integration": repo_root
         / "src/sage_ts/runtime/toolsandbox_integration.py",
-        "tool_invoker": repo_root / "src/sage_ts/runtime/tool_invoker.py",
         "sandbox_validator": repo_root / "src/sage_ts/validation/sandbox_validator.py",
         "schema_check": repo_root / "src/sage_ts/validation/schema_check.py",
         "protocol_runner": repo_root / "scripts/run_sage_protocol.py",

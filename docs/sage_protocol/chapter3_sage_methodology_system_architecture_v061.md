@@ -61,7 +61,7 @@ The experimental treatment is SAGE itself.
 
 ## 3. Research Questions and Hypotheses
 
-The current hypotheses should be phrased around the measured SAGE mechanism and the two score families used in the study. The final-task/outcome score is the primary task-completion measure. The canonical/reference score is retained as a secondary compatibility and milestone measure.
+The current hypotheses should be phrased around the measured SAGE mechanism. The final-task/outcome score is the sole performance endpoint. The canonical/reference score is retained only as a descriptive compatibility and milestone diagnostic and never determines a hypothesis or release decision.
 
 ### RQ1: Frozen Registry Reuse
 
@@ -87,7 +87,7 @@ online_build_outcome_delta = 0.7572667814756449 - 0.45425082649352005
                                = 0.24241276398569986
 ```
 
-Therefore, a matching frozen-registry run must achieve an outcome delta of at least 0.242413 to satisfy H1 on the primary measure. If the secondary canonical measure is also reported, the v061 online-build canonical delta is 0.06797136278269156, so an 80 percent canonical retention threshold would be 0.05437709022615325.
+Therefore, a matching frozen-registry run must achieve an outcome delta of at least 0.242413 to satisfy H1. The v061 online-build canonical delta of 0.06797136278269156 may be reported descriptively, but no canonical retention threshold is used for H1 or release decisions.
 
 Current v061 status for H1: not yet decided by this online-build run alone. H1 requires a generation-off frozen-registry reuse run on the matched task set and configuration.
 
@@ -113,7 +113,7 @@ sage_mean_outcome    = 0.7572667814756449
 relative lift        = 66.71%
 ```
 
-Current v061 status for H2: supported on the primary final-task/outcome measure. The secondary canonical/reference score improves by +9.27%, which is positive but below a strict 10 percent threshold if that threshold is applied to canonical score. Therefore the praxis should state H2 as a task-completion or outcome hypothesis, not as a canonical-score hypothesis.
+Current v061 status for H2: supported on the final-task/outcome measure. Canonical/reference similarity improved by +9.27% and is retained only as descriptive route evidence; the 10 percent H2 threshold applies exclusively to task-completion outcome.
 
 ### RQ3: Tool-Called Subset and Non-Leakage
 
@@ -198,7 +198,7 @@ The current v061 evidence line uses:
 | Base tool policy | `upstream` |
 | ToolSandbox clock policy | frozen |
 | Fixed timestamp | `1781397250.09937` |
-| OpenAI response cache | disabled |
+| Repository whole-response replay cache | disabled; provider prompt-prefix computation was not separately measured in this historical run |
 | Routing evidence mode | disabled |
 | Diagnostic force flags | disabled |
 | Praxis bridge policy | disabled |
@@ -214,24 +214,19 @@ SAGE_DISABLE_SCENARIO_NAME_ROUTING=1
 SAGE_ENABLE_SAFE_ABSTAIN_BIRTH=1
 SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY=1
 SAGE_GENERATED_TOOL_CONTINUATION_CHOICE=1
-SAGE_GENERATED_TOOL_CONTRACT_RETRY_ATTEMPTS=0
 SAGE_GENERATED_TOOL_DOCSTRING_MODE=compact
 SAGE_GENERATED_TOOL_FIRST_ATTEMPT_CHOICE=1
 SAGE_GENERATED_TOOL_GUIDANCE_MODE=minimal
-SAGE_GENERATED_TOOL_SYNTHETIC_REPAIR=0
 SAGE_MAX_RUNTIME_GENERATED_TOOL_BUNDLE_SIZE=4
 SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS=120
 SAGE_PRAXIS_BRIDGE_POLICY=disabled
 SAGE_ROUTING_EVIDENCE_MODE=disabled
 SAGE_SCENARIO_METADATA_POLICY=visible_context
-SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE=0
 SAGE_SELF_EVOLVING_MIN_PULSE_TASKS=8
 SAGE_SELF_EVOLVING_PROACTIVE_BIRTH=1
 SAGE_SELF_EVOLVING_PROACTIVE_SCOPE=just_in_time
 SAGE_SELF_EVOLVING_PULSE_INTERVAL=4
 SAGE_SELF_EVOLVING_REFLECTION=1
-SAGE_SELF_EVOLVING_VISIBLE_NOT_CALLED_RETRY=0
-SAGE_SIDE_EFFECT_FAIR_CHANCE_EXTRA_TURNS=0
 SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS=4
 SAGE_V2_EXPERIMENT_FEATURES=contract_synthesis,candidate_repair,dependency_logic,medium_grain_skills
 ```
@@ -290,11 +285,11 @@ Editable or renderable figures already exist for this chapter and should be used
 
 | Figure | Path |
 |---|---|
-| System overview | `docs/sage_protocol/figures/sage_toolsandbox_system_overview.svg` and `.png` |
-| Internal components zoom | `docs/sage_protocol/figures/sage_internal_components_zoom.svg` and `.png` |
+| SAGE self-evolution flow | `docs/sage_protocol/figures/sage_self_evolution_flow_v061.svg` and `.png` |
+| SAGE self-evolution publication loop | `docs/sage_protocol/figures/sage_self_evolution_loop_publication.svg`, `.png`, and `.html` |
 | Tool generation, validation, and repair loop | `docs/sage_protocol/figures/sage_tool_generation_validation_repair_loop.svg` and `.png` |
 | Peer-review methodology figure | `docs/sage_protocol/figures/sage_peer_review_methodology_figure.svg` and `.png` |
-| One-page infographic | `docs/sage_protocol/figures/sage_one_page_infographic.svg`, `.png`, and `.html` |
+| SAGE design loop | `docs/sage_protocol/figures/sage_self_evolution_loop_design.html`, `.png`, and `.pdf` |
 
 ## 6. SAGE Treatment Components
 
@@ -335,8 +330,6 @@ Current v061 controls:
 ```text
 SAGE_SELF_EVOLVING_PROACTIVE_BIRTH=1
 SAGE_SELF_EVOLVING_PROACTIVE_SCOPE=just_in_time
-SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE=0
-SAGE_SELF_EVOLVING_VISIBLE_NOT_CALLED_RETRY=0
 ```
 
 Inputs:
@@ -422,8 +415,6 @@ Current v061 generation controls:
 ```text
 SAGE_GENERATED_TOOL_GUIDANCE_MODE=minimal
 SAGE_GENERATED_TOOL_DOCSTRING_MODE=compact
-SAGE_GENERATED_TOOL_CONTRACT_RETRY_ATTEMPTS=0
-SAGE_GENERATED_TOOL_SYNTHETIC_REPAIR=0
 SAGE_V2_EXPERIMENT_FEATURES=contract_synthesis,candidate_repair,dependency_logic,medium_grain_skills
 ```
 
@@ -780,9 +771,9 @@ Primary dependent variable:
 
 - final-task/outcome score, when outcome scoring is available.
 
-Secondary dependent variable:
+Descriptive compatibility diagnostic:
 
-- canonical/reference similarity score.
+- canonical/reference similarity score (not a hypothesis or release endpoint).
 
 Primary treatment variables:
 
@@ -881,7 +872,8 @@ Internal validity controls:
 - same model family across agent, user, and generation roles;
 - control cache limited to the control arm;
 - SAGE candidate arm executed fresh;
-- response cache disabled;
+- repository whole-response replay disabled; OpenAI-managed prompt-prefix
+  computation was a separate, then-unmeasured mechanism;
 - frozen clock;
 - diagnostic force disabled.
 
@@ -906,8 +898,6 @@ Ecological validity controls:
 
 - generated tools are exposed as normal callable tools;
 - actor must naturally choose whether to call them;
-- no visible-not-called retry is used in v061;
-- no side-effect fair-chance extra turns are used in v061;
 - generated tools must preserve original side-effect tools.
 
 Trustworthiness controls:
@@ -965,7 +955,7 @@ Additional paired metrics:
 | Generated-tool failed scenarios | 3 |
 | Side-effect preservation incidents | 1 |
 | Candidate LLM call count | 11155 |
-| Candidate cached LLM call count | 0 |
+| Candidate repository whole-response replay call count | 0 |
 | Candidate LLM total tokens | 17245671 |
 | Candidate wall time seconds | 14153.863965 |
 | Candidate wall-time resume offset seconds | 8782.538233 |
@@ -1028,12 +1018,7 @@ The current clean methodology includes the following controls:
 | Praxis bridge policy | disabled |
 | Synthetic bridge completions | absent from clean policy |
 | Diagnostic force flags | disabled |
-| Visible-not-called retry turns | disabled |
-| Side-effect fair-chance extra turns | disabled |
-| Birth scenario fair chance | disabled |
-| Contract retry attempts | 0 |
-| Synthetic repair | disabled |
-| OpenAI response cache | disabled |
+| Repository whole-response replay cache | disabled; provider prompt-prefix computation not separately measured |
 | SAGE candidate arm cache | none |
 | Control cache | control only |
 | Frozen clock | enabled |
@@ -1108,7 +1093,8 @@ Minimum verification checks:
 4. Confirm bridge policy is disabled.
 5. Confirm scenario-name birth and routing are disabled.
 6. Confirm visible-context metadata policy is enabled.
-7. Confirm OpenAI response cache is disabled.
+7. Confirm repository whole-response replay is disabled; do not infer from this
+   historical record that OpenAI-managed prompt-prefix computation was absent.
 8. Confirm control cache applies only to the control arm.
 9. Confirm paired scenario count is 1032 and outcome-scenario count is 800.
 10. Confirm canonical score is 0.7332144560228993 -> 0.8011858188055907.

@@ -25,7 +25,9 @@ SAFE_BUILTINS: dict[str, Any] = {
     "list": list,
     "max": max,
     "min": min,
+    "next": next,
     "range": range,
+    "reversed": reversed,
     "round": round,
     "set": set,
     "sorted": sorted,
@@ -79,7 +81,11 @@ def _annotation_compatible(actual: object, expected: str) -> bool:
     return False
 
 
-def compile_generated_tool(tool: GeneratedTool) -> SchemaResult:
+def compile_generated_tool(
+    tool: GeneratedTool,
+    *,
+    native_tool_overrides: dict[str, Any] | None = None,
+) -> SchemaResult:
     try:
         parsed = ast.parse(tool.code, filename=f"<generated:{tool.spec.tool_name}>")
     except SyntaxError as exc:
@@ -108,6 +114,26 @@ def compile_generated_tool(tool: GeneratedTool) -> SchemaResult:
         )
 
     namespace: dict[str, Any] = {"__builtins__": SAFE_BUILTINS}
+    # Native-action tools expose approved ToolSandbox state-changing callables.
+    # ToolSandbox side-effect tools by bare name so generated code can call e.g.
+    # add_reminder(...) directly. Default OFF leaves the namespace untouched.
+    from sage_ts.generation.complete_tools import (
+        native_action_names_for_tool,
+        native_action_tool_enabled,
+        native_side_effect_tools,
+    )
+
+    injected_native_names: set[str] = set()
+    if native_action_tool_enabled(tool):
+        native_tools = native_tool_overrides or native_side_effect_tools()
+        declared_names = set(native_action_names_for_tool(tool))
+        native_tools = {
+            name: function
+            for name, function in native_tools.items()
+            if name in declared_names
+        }
+        namespace.update(native_tools)
+        injected_native_names = set(native_tools)
     errors: list[str] = []
     try:
         exec(
@@ -117,7 +143,9 @@ def compile_generated_tool(tool: GeneratedTool) -> SchemaResult:
         return SchemaResult(False, (f"compile_error:{type(exc).__name__}:{exc}",), None)
 
     compiled_functions = [
-        value for value in namespace.values() if isinstance(value, FunctionType)
+        value
+        for name, value in namespace.items()
+        if isinstance(value, FunctionType) and name not in injected_native_names
     ]
     if len(compiled_functions) != 1:
         return SchemaResult(

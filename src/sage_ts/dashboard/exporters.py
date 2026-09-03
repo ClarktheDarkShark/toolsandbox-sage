@@ -398,22 +398,6 @@ def _compact_row(
     return prefix + ", ".join(parts)
 
 
-def _extract_tool_names_from_trace(trace: Any) -> list[str]:
-    try:
-        parsed = json.loads(trace) if isinstance(trace, str) else trace
-        if isinstance(parsed, list):
-            return [
-                c["tool_name"]
-                for c in parsed
-                if isinstance(c, dict) and c.get("tool_name")
-            ]
-        if isinstance(parsed, dict) and parsed.get("tool_name"):
-            return [parsed["tool_name"]]
-    except Exception:
-        pass
-    return []
-
-
 def _tool_trace_lines(trace: Any) -> list[str]:
     try:
         parsed = json.loads(trace) if isinstance(trace, str) else trace
@@ -1308,6 +1292,15 @@ def _task_focus_rows(
                 "llm_prompt_tokens": None
                 if result is None
                 else result.get("llm_prompt_tokens"),
+                "llm_provider_cached_prompt_tokens": None
+                if result is None
+                else result.get("llm_provider_cached_prompt_tokens"),
+                "llm_provider_cached_prompt_call_count": None
+                if result is None
+                else result.get("llm_provider_cached_prompt_call_count"),
+                "llm_provider_cached_prompt_tokens_available_count": None
+                if result is None
+                else result.get("llm_provider_cached_prompt_tokens_available_count"),
                 "llm_completion_tokens": None
                 if result is None
                 else result.get("llm_completion_tokens"),
@@ -1503,6 +1496,7 @@ def _write_task_focus_dashboard(
         data.get("scenario_count"),
     )
     payload = {
+        "started_at": data.get("started_at"),
         "updated_at": data.get("updated_at"),
         "run_root": str(run_root),
         "mode": data.get("mode"),
@@ -1532,6 +1526,15 @@ def _write_task_focus_dashboard(
             "control_llm_prompt_tokens": data.get("control", {}).get(
                 "llm_prompt_tokens"
             ),
+            "control_llm_provider_cached_prompt_tokens": data.get("control", {}).get(
+                "llm_provider_cached_prompt_tokens"
+            ),
+            "control_llm_provider_cached_prompt_call_count": data.get(
+                "control", {}
+            ).get("llm_provider_cached_prompt_call_count"),
+            "control_llm_provider_cached_prompt_tokens_available_count": data.get(
+                "control", {}
+            ).get("llm_provider_cached_prompt_tokens_available_count"),
             "control_llm_completion_tokens": data.get("control", {}).get(
                 "llm_completion_tokens"
             ),
@@ -1565,6 +1568,15 @@ def _write_task_focus_dashboard(
             "candidate_llm_prompt_tokens": data.get("candidate", {}).get(
                 "llm_prompt_tokens"
             ),
+            "candidate_llm_provider_cached_prompt_tokens": data.get(
+                "candidate", {}
+            ).get("llm_provider_cached_prompt_tokens"),
+            "candidate_llm_provider_cached_prompt_call_count": data.get(
+                "candidate", {}
+            ).get("llm_provider_cached_prompt_call_count"),
+            "candidate_llm_provider_cached_prompt_tokens_available_count": data.get(
+                "candidate", {}
+            ).get("llm_provider_cached_prompt_tokens_available_count"),
             "candidate_llm_completion_tokens": data.get("candidate", {}).get(
                 "llm_completion_tokens"
             ),
@@ -2241,6 +2253,12 @@ def write_protocol_dashboard(
     candidate_dir = _resolve_run_dir(candidate_dir)
     dashboard_dir = run_root / "dashboard"
     dashboard_dir.mkdir(parents=True, exist_ok=True)
+    started_at_path = run_root / "dashboard_started_at.txt"
+    if started_at_path.exists():
+        started_at = started_at_path.read_text(encoding="utf-8").strip()
+    else:
+        started_at = datetime.now(timezone.utc).isoformat()
+        started_at_path.write_text(started_at + "\n", encoding="utf-8")
     comparison = _partial_comparison(control_dir, candidate_dir, registry_dir)
     data = {
         "mode": mode,
@@ -2255,6 +2273,7 @@ def write_protocol_dashboard(
         "scenario_count": scenario_count,
         "cohort_preflight": _read_json(run_root / "cohort_preflight_report.json"),
         "control_cache": _read_json(run_root / "control_cache_report.json"),
+        "started_at": started_at,
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "control": comparison.get("control", {}),
         "candidate": comparison.get("candidate", {}),
@@ -2323,27 +2342,59 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
-def dashboard_url(index_path: Path, *, port: int = 5520) -> str:
-    rel = index_path.resolve().relative_to(_repo_root())
+def dashboard_url(
+    index_path: Path,
+    *,
+    port: int = 5520,
+    server_root: Path | None = None,
+) -> str:
+    resolved_index = index_path.resolve()
+    if server_root is None:
+        repo_root = _repo_root().resolve()
+        try:
+            resolved_index.relative_to(repo_root)
+            root = repo_root
+        except ValueError:
+            root = resolved_index.parent
+    else:
+        root = server_root.resolve()
+    rel = resolved_index.relative_to(root)
     return f"http://127.0.0.1:{port}/{quote(str(rel))}"
 
 
-def ensure_dashboard_server(*, port: int = 5520) -> None:
-    """Start a repo-root static file server if the dashboard port is unused."""
+def ensure_dashboard_server(
+    *,
+    port: int = 5520,
+    server_root: Path | None = None,
+) -> None:
+    """Start a static file server for the dashboard output root."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.settimeout(0.2)
         if probe.connect_ex(("127.0.0.1", port)) == 0:
             return
+    repo_root = _repo_root().resolve()
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = os.pathsep.join(
+        [
+            str(repo_root / "src"),
+            str(repo_root),
+            environment.get("PYTHONPATH", ""),
+        ]
+    ).rstrip(os.pathsep)
     subprocess.Popen(
         [
             sys.executable,
             "-m",
-            "http.server",
+            "sage_ts.dashboard.server",
+            "--port",
             str(port),
-            "--bind",
+            "--host",
             "127.0.0.1",
+            "--root",
+            str((server_root or repo_root).resolve()),
         ],
-        cwd=_repo_root(),
+        cwd=repo_root,
+        env=environment,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
@@ -2351,9 +2402,16 @@ def ensure_dashboard_server(*, port: int = 5520) -> None:
 
 
 def open_dashboard(index_path: Path, *, port: int = 5520) -> str:
-    ensure_dashboard_server(port=port)
-    url = dashboard_url(index_path, port=port)
-    opened = webbrowser.open_new_tab(url)
+    resolved_index = index_path.resolve()
+    repo_root = _repo_root().resolve()
+    try:
+        resolved_index.relative_to(repo_root)
+        server_root = repo_root
+    except ValueError:
+        server_root = resolved_index.parent
+    ensure_dashboard_server(port=port, server_root=server_root)
+    url = dashboard_url(index_path, port=port, server_root=server_root)
+    webbrowser.open_new_tab(url)
     # In non-interactive benchmark shells, webbrowser can return True even when
     # no visible browser tab is surfaced. On macOS, also hand the URL to the OS
     # opener so run dashboards reliably appear during campaign runs.

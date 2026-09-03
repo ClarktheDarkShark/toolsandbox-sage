@@ -25,6 +25,9 @@ USAGE_FIELDS = (
     "llm_live_call_count",
     "llm_cached_call_count",
     "llm_prompt_tokens",
+    "llm_provider_cached_prompt_tokens",
+    "llm_provider_cached_prompt_call_count",
+    "llm_provider_cached_prompt_tokens_available_count",
     "llm_completion_tokens",
     "llm_total_tokens",
     "llm_usage_available_count",
@@ -40,6 +43,9 @@ CURRENT_RUN_USAGE_FIELDS = (
     "llm_live_call_count",
     "llm_cached_call_count",
     "llm_prompt_tokens",
+    "llm_provider_cached_prompt_tokens",
+    "llm_provider_cached_prompt_call_count",
+    "llm_provider_cached_prompt_tokens_available_count",
     "llm_completion_tokens",
     "llm_total_tokens",
     "llm_usage_available_count",
@@ -132,12 +138,59 @@ def _sum_int(rows: list[dict[str, Any]], key: str) -> int:
     return total
 
 
+def _sum_optional_int(rows: list[dict[str, Any]], key: str) -> int | None:
+    values: list[int] = []
+    for row in rows:
+        value = row.get(key)
+        if isinstance(value, bool) or value is None:
+            continue
+        try:
+            values.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return sum(values) if values else None
+
+
+def _provider_cached_prompt_tokens(event: dict[str, Any]) -> int | None:
+    value = event.get("provider_cached_prompt_tokens")
+    if value is None:
+        raw_usage = event.get("raw_usage")
+        if isinstance(raw_usage, dict):
+            details = raw_usage.get("prompt_tokens_details")
+            if isinstance(details, dict):
+                value = details.get("cached_tokens")
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _provider_cache_summary(
+    events: list[dict[str, Any]],
+) -> tuple[int | None, int | None, int]:
+    values = [
+        value
+        for event in events
+        if (value := _provider_cached_prompt_tokens(event)) is not None
+    ]
+    if not values:
+        return None, None, 0
+    return sum(values), sum(1 for value in values if value > 0), len(values)
+
+
 def _event_summary(events: list[dict[str, Any]]) -> dict[str, Any]:
     by_source: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for event in events:
         by_source[str(event.get("source") or "unknown")].append(event)
-    source_summary = {
-        source: {
+    source_summary: dict[str, dict[str, Any]] = {}
+    for source, rows in sorted(by_source.items()):
+        provider_tokens, provider_calls, provider_available = _provider_cache_summary(
+            rows
+        )
+        source_summary[source] = {
             "llm_call_count": len(rows),
             "llm_live_call_count": sum(
                 1 for row in rows if row.get("response_cache_status") != "hit"
@@ -146,14 +199,18 @@ def _event_summary(events: list[dict[str, Any]]) -> dict[str, Any]:
                 1 for row in rows if row.get("response_cache_status") == "hit"
             ),
             "llm_prompt_tokens": _sum_int(rows, "prompt_tokens"),
+            "llm_provider_cached_prompt_tokens": provider_tokens,
+            "llm_provider_cached_prompt_call_count": provider_calls,
+            "llm_provider_cached_prompt_tokens_available_count": provider_available,
             "llm_completion_tokens": _sum_int(rows, "completion_tokens"),
             "llm_total_tokens": _sum_int(rows, "total_tokens"),
             "models": sorted(
                 {str(row.get("model")) for row in rows if row.get("model")}
             ),
         }
-        for source, rows in sorted(by_source.items())
-    }
+    provider_tokens, provider_calls, provider_available = _provider_cache_summary(
+        events
+    )
     return {
         "llm_usage_recorded": bool(events),
         "llm_call_count": len(events),
@@ -164,6 +221,9 @@ def _event_summary(events: list[dict[str, Any]]) -> dict[str, Any]:
             1 for event in events if event.get("response_cache_status") == "hit"
         ),
         "llm_prompt_tokens": _sum_int(events, "prompt_tokens"),
+        "llm_provider_cached_prompt_tokens": provider_tokens,
+        "llm_provider_cached_prompt_call_count": provider_calls,
+        "llm_provider_cached_prompt_tokens_available_count": provider_available,
         "llm_completion_tokens": _sum_int(events, "completion_tokens"),
         "llm_total_tokens": _sum_int(events, "total_tokens"),
         "llm_usage_available_count": sum(
@@ -245,6 +305,9 @@ def _baseline_cache_usage(control_cache: Any) -> dict[str, Any]:
         "llm_live_call_count",
         "llm_cached_call_count",
         "llm_prompt_tokens",
+        "llm_provider_cached_prompt_tokens",
+        "llm_provider_cached_prompt_call_count",
+        "llm_provider_cached_prompt_tokens_available_count",
         "llm_completion_tokens",
         "llm_total_tokens",
         "llm_usage_available_count",
@@ -316,10 +379,83 @@ def _usage_from_row(
         usage.setdefault("llm_live_call_count", 0)
         usage.setdefault("llm_cached_call_count", 0)
         usage.setdefault("llm_prompt_tokens", 0)
+        provider_fields = (
+            "llm_provider_cached_prompt_tokens",
+            "llm_provider_cached_prompt_call_count",
+            "llm_provider_cached_prompt_tokens_available_count",
+        )
+        fallback_reconciles = all(
+            _sum_optional_int([row], field) is not None
+            and _sum_optional_int([row], field) == _sum_optional_int([fallback], field)
+            for field in (
+                "llm_call_count",
+                "llm_prompt_tokens",
+                "llm_completion_tokens",
+                "llm_total_tokens",
+            )
+        )
+        current_available = _sum_optional_int(
+            [usage],
+            "llm_provider_cached_prompt_tokens_available_count",
+        )
+        fallback_available = _sum_optional_int(
+            [fallback],
+            "llm_provider_cached_prompt_tokens_available_count",
+        )
+        fallback_is_at_least_as_complete = (
+            fallback_available is not None
+            and fallback_available >= (current_available or 0)
+            and all(
+                usage.get(field) is None or fallback.get(field) is not None
+                for field in provider_fields[:2]
+            )
+        )
+        if fallback_reconciles and fallback_is_at_least_as_complete:
+            for field in provider_fields:
+                usage[field] = fallback.get(field)
+        else:
+            for field in provider_fields:
+                usage.setdefault(field, fallback.get(field))
         usage.setdefault("llm_completion_tokens", 0)
         usage.setdefault("llm_total_tokens", 0)
         usage.setdefault("llm_usage_available_count", 0)
-        usage.setdefault("llm_usage_by_source", {})
+        fallback_sources = fallback.get("llm_usage_by_source")
+        if fallback_reconciles and isinstance(fallback_sources, dict):
+            current_sources = usage.get("llm_usage_by_source")
+            if not isinstance(current_sources, dict):
+                current_sources = {}
+            merged_sources: dict[str, Any] = {}
+            for source, fallback_source in fallback_sources.items():
+                if not isinstance(fallback_source, dict):
+                    continue
+                merged_source = dict(fallback_source)
+                current_source = current_sources.get(source)
+                if isinstance(current_source, dict):
+                    current_source_available = _sum_optional_int(
+                        [current_source],
+                        "llm_provider_cached_prompt_tokens_available_count",
+                    )
+                    fallback_source_available = _sum_optional_int(
+                        [fallback_source],
+                        "llm_provider_cached_prompt_tokens_available_count",
+                    )
+                    fallback_source_is_at_least_as_complete = (
+                        fallback_source_available is not None
+                        and fallback_source_available >= (current_source_available or 0)
+                        and all(
+                            current_source.get(field) is None
+                            or fallback_source.get(field) is not None
+                            for field in provider_fields[:2]
+                        )
+                    )
+                    if not fallback_source_is_at_least_as_complete:
+                        for field in provider_fields:
+                            if field in current_source:
+                                merged_source[field] = current_source[field]
+                merged_sources[str(source)] = merged_source
+            usage["llm_usage_by_source"] = dict(sorted(merged_sources.items()))
+        else:
+            usage.setdefault("llm_usage_by_source", {})
         usage["usage_cache_source"] = (
             "control_task_baseline_result_summary"
             if cached_control_row
@@ -383,14 +519,26 @@ def _arm_cache(run_root: Path, arm: str) -> dict[str, Any]:
         "llm_live_call_count",
         "llm_cached_call_count",
         "llm_prompt_tokens",
+        "llm_provider_cached_prompt_tokens",
+        "llm_provider_cached_prompt_call_count",
+        "llm_provider_cached_prompt_tokens_available_count",
         "llm_completion_tokens",
         "llm_total_tokens",
         "llm_usage_available_count",
     ):
-        totals[field] = _sum_int(tasks, field)
+        totals[field] = (
+            _sum_optional_int(tasks, field)
+            if field.startswith("llm_provider_cached")
+            else _sum_int(tasks, field)
+        )
     totals["llm_usage_recorded"] = any(task.get("llm_usage_recorded") for task in tasks)
     for field in CURRENT_RUN_USAGE_FIELDS:
-        totals[f"current_run_{field}"] = _sum_int(tasks, f"current_run_{field}")
+        current_field = f"current_run_{field}"
+        totals[current_field] = (
+            _sum_optional_int(tasks, current_field)
+            if field.startswith("llm_provider_cached")
+            else _sum_int(tasks, current_field)
+        )
     totals["current_run_llm_usage_recorded"] = any(
         task.get("current_run_llm_usage_recorded") for task in tasks
     )
@@ -423,16 +571,28 @@ def build_cache(run_root: Path) -> dict[str, Any]:
         "llm_live_call_count",
         "llm_cached_call_count",
         "llm_prompt_tokens",
+        "llm_provider_cached_prompt_tokens",
+        "llm_provider_cached_prompt_call_count",
+        "llm_provider_cached_prompt_tokens_available_count",
         "llm_completion_tokens",
         "llm_total_tokens",
         "llm_usage_available_count",
     ):
-        totals[field] = _sum_int(all_tasks, field)
+        totals[field] = (
+            _sum_optional_int(all_tasks, field)
+            if field.startswith("llm_provider_cached")
+            else _sum_int(all_tasks, field)
+        )
     totals["llm_usage_recorded"] = any(
         task.get("llm_usage_recorded") for task in all_tasks
     )
     for field in CURRENT_RUN_USAGE_FIELDS:
-        totals[f"current_run_{field}"] = _sum_int(all_tasks, f"current_run_{field}")
+        current_field = f"current_run_{field}"
+        totals[current_field] = (
+            _sum_optional_int(all_tasks, current_field)
+            if field.startswith("llm_provider_cached")
+            else _sum_int(all_tasks, current_field)
+        )
     totals["current_run_llm_usage_recorded"] = any(
         task.get("current_run_llm_usage_recorded") for task in all_tasks
     )
@@ -440,7 +600,7 @@ def build_cache(run_root: Path) -> dict[str, Any]:
         1 for task in all_tasks if task.get("llm_usage_recorded")
     )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "cache_type": "llm_usage_by_task",
         "cache_policy": "write_completed_tasks_immediately_no_minimum_count",
         "token_source": "openai_chat_completion_usage",

@@ -17,7 +17,7 @@ The methodological claim is narrower than open-ended agent learning: SAGE evolve
 
 The study uses a paired task-level comparison design. Each task is evaluated under a non-learning baseline condition and a SAGE condition. The baseline condition uses the original task environment and original tools without autonomous tool generation. The SAGE condition uses the same environment and original tools, but adds the SAGE lifecycle for generating, validating, registering, routing, and reusing generated tools.
 
-The primary endpoint is task-completion accuracy, measured through outcome score when outcome scoring is available. Canonical or reference similarity is reported as a secondary endpoint because it captures how closely the agent's route or intermediate behavior matches benchmark expectations. This distinction matters because a generated tool may produce the correct final state while bypassing an intermediate milestone that the canonical score expects.
+The sole performance endpoint is task-completion accuracy, measured through outcome score when outcome scoring is available. Canonical or reference similarity is retained only as a descriptive route-compatibility diagnostic because it captures how closely the agent's route or intermediate behavior matches benchmark expectations. It is never a hypothesis or release gate. This distinction matters because a generated tool may produce the correct final state while bypassing an intermediate milestone that the canonical score expects.
 
 The current evidence supports strong accuracy improvement and generated-tool reuse. Therefore, the methodology frames online-build SAGE as the discovery condition and frozen-registry SAGE as the reuse condition. The reuse condition tests whether accepted generated tools continue to preserve accuracy lift after new tool generation and repair are disabled.
 
@@ -30,7 +30,7 @@ The current evidence supports strong accuracy improvement and generated-tool reu
 \midrule
 RQ1: Can SAGE build and reuse tools across tasks? & Reuse is evaluated in two phases: online-build discovery and frozen-registry reuse. The frozen-registry condition disables new tool generation and repair to test whether accepted generated tools retain value. & \textbf{H1:} A frozen SAGE registry can preserve at least 90\% of the online-build accuracy lift after tool generation is disabled. \\
 \addlinespace
-RQ2: Can SAGE improve task accuracy over a non-learning agent? & Accuracy is measured through matched task-level outcome score, with canonical/reference score reported as a secondary metric. & \textbf{H2:} SAGE can improve task-completion accuracy by at least 10\% over a non-learning baseline on matched benchmark tasks. \\
+RQ2: Can SAGE improve task accuracy over a non-learning agent? & Accuracy is measured through matched task-level outcome score; canonical/reference score is descriptive route-compatibility output only. & \textbf{H2:} SAGE can improve task-completion accuracy by at least 10\% over a non-learning baseline on matched benchmark tasks. \\
 \addlinespace
 RQ3: Are SAGE gains attributable to autonomous generated-tool use? & Tool-attributed evidence requires generated tools to be visible, naturally called, safety-clean, and associated with paired task gains. Forced calls and synthetic completions are excluded. & \textbf{H3:} On tasks where generated tools are naturally called, SAGE can improve task-completion accuracy by at least 30\% without answer leakage, forced tool calls, or code-based task completion shortcuts. \\
 \bottomrule
@@ -185,7 +185,7 @@ Candidate task cache off & SAGE evidence arms do not use task-answer caches. & E
 \addlinespace
 Baseline cache provenance & Eligible baseline controls may be cached, but cached/fresh counts and cache source are reported. & Avoids unnecessary reruns while keeping the comparison auditable. \\
 \addlinespace
-OpenAI response cache disabled & Evidence runs disable provider-response caching unless a run is explicitly marked as diagnostic. & Prevents repeated model outputs from becoming hidden reuse evidence. \\
+Persistent repository whole-response replay disabled & Evidence runs do not replay complete model responses stored by the repository. OpenAI-managed prompt-prefix computation is distinct and is recorded in new strict runs when exposed by API usage metadata; nonpersistent within-run generator contract-and-repair-analysis memoization is declared separately. & Prevents prior-run model outputs from becoming hidden reuse evidence without misclassifying provider KV-prefix or within-run analysis reuse as persistent output replay. \\
 \addlinespace
 Original side-effect tools preserved & Generated tools may prepare values or action arguments, but original environment tools execute state changes. & Prevents generated tools from bypassing the benchmark action model. \\
 \addlinespace
@@ -219,11 +219,11 @@ The analysis uses paired task-level comparisons. Each task contributes a baselin
 \midrule
 Outcome/task-completion score & Final-state or final-answer success score where outcome checks are available. & Primary accuracy endpoint. \\
 \addlinespace
-Canonical/reference score & Similarity to expected benchmark route, milestone, or reference behavior. & Secondary endpoint; may penalize correct deterministic shortcuts. \\
+Canonical/reference score & Similarity to expected benchmark route, milestone, or reference behavior. & Descriptive route-compatibility diagnostic; never a hypothesis or release endpoint. \\
 \addlinespace
-Score lift & Relative improvement from baseline to SAGE on canonical/reference score. & Reported with absolute delta. \\
+Score lift & Relative movement from baseline to SAGE on canonical/reference score. & Descriptive audit output only. \\
 \addlinespace
-Outcome lift & Relative improvement from baseline to SAGE on outcome score. & Primary lift statistic when outcome scoring is available. \\
+Outcome lift & Relative improvement from baseline to SAGE on outcome score. & Sole performance lift statistic. \\
 \addlinespace
 Generated-tool visibility & Number of tasks where a generated tool was exposed to the actor. & Measures routing coverage. \\
 \addlinespace
@@ -326,4 +326,4 @@ Broad portability is not yet proven. & Portability work in other environments is
 \label{tab:sage_nonclaims}
 \end{table}
 
-In summary, this chapter defines SAGE as a self-evolving tool-use system evaluated through paired task-level comparisons. The methodology focuses on autonomous generated-tool creation, validation, registry retention, routing, natural reuse, safety controls, leakage prevention, and evidence attribution. The following empirical chapter should report SAGE results using the same boundaries: outcome/task completion as the primary endpoint, canonical/reference score as a secondary endpoint, and generated-tool contribution as a required attribution layer.
+In summary, this chapter defines SAGE as a self-evolving tool-use system evaluated through paired task-level comparisons. The methodology focuses on autonomous generated-tool creation, validation, registry retention, routing, natural reuse, safety controls, leakage prevention, and evidence attribution. The following empirical chapter should report SAGE results using the same boundaries: outcome/task completion as the sole performance endpoint, canonical/reference score as a descriptive route-compatibility diagnostic, and generated-tool contribution as a required attribution layer.

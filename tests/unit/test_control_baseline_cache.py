@@ -36,7 +36,7 @@ def _context(
         "scorer_version": scorer,
         "toolsandbox_version": "sandbox",
         "manifest_checksum": "manifest",
-        "base_tool_policy": "recency_reduced",
+        "base_tool_policy": "upstream",
     }
 
 
@@ -119,7 +119,9 @@ def test_checksums_ignore_tool_allow_list_order() -> None:
     assert initial_state_checksum(first) == initial_state_checksum(second)
 
 
-def test_eligibility_requires_three_compatible_completed_runs(tmp_path: Path) -> None:
+def test_multiple_compatible_controls_fail_closed_without_averaging(
+    tmp_path: Path,
+) -> None:
     cache = ControlBaselineCache(tmp_path / "cache")
     ctx = _context()
     for _ in range(2):
@@ -129,23 +131,19 @@ def test_eligibility_requires_three_compatible_completed_runs(tmp_path: Path) ->
     _add(cache, ctx, _row(similarity=0.5, outcome=0.25), tmp_path)
     lookup = cache.lookup(ctx)
 
-    assert lookup.eligible
-    assert lookup.row is not None
-    assert lookup.row["similarity"] == pytest.approx((1 + 1 + 0.5) / 3)
-    assert lookup.stats is not None
-    assert lookup.stats["compatible_count"] == 3
-    assert lookup.stats["canonical_variance"] > 0
+    assert not lookup.eligible
+    assert lookup.row is None
+    assert lookup.reason == "ambiguous_multiple_compatible_controls"
+    assert len(lookup.compatible_record_ids) == 3
 
 
-def test_min_compatible_runs_can_be_overridden_for_recovery_runs(
+def test_single_compatible_control_is_eligible_without_averaging(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     cache = ControlBaselineCache(tmp_path / "cache")
     ctx = _context()
     _add(cache, ctx, _row(similarity=0.75, outcome=0.5), tmp_path)
 
-    assert not cache.lookup(ctx).eligible
-    monkeypatch.setenv("SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS", "1")
     lookup = cache.lookup(ctx)
 
     assert lookup.eligible
@@ -157,14 +155,17 @@ def test_min_compatible_runs_can_be_overridden_for_recovery_runs(
         "task_name_agent_user_base_tool_policy_min1"
     )
 
+    monkeypatch.setenv("SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS", "3")
+    assert not cache.lookup(ctx).eligible
+
 
 def test_task_level_cache_ignores_state_runner_scorer_and_sandbox_changes(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     cache = ControlBaselineCache(tmp_path / "cache")
     ctx = _context()
-    for _ in range(3):
-        _add(cache, ctx, _row(), tmp_path)
+    _add(cache, ctx, _row(), tmp_path)
+    monkeypatch.setenv("SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS", "1")
 
     changed = {
         **ctx,
@@ -184,17 +185,17 @@ def test_task_level_cache_ignores_state_runner_scorer_and_sandbox_changes(
     assert lookup.eligible
     assert lookup.stats is not None
     assert lookup.stats["cache_match_policy"] == (
-        "task_name_agent_user_base_tool_policy_min3"
+        "task_name_agent_user_base_tool_policy_min1"
     )
 
 
 def test_task_level_cache_still_separates_model_user_policy_and_task(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     cache = ControlBaselineCache(tmp_path / "cache")
     ctx = _context()
-    for _ in range(3):
-        _add(cache, ctx, _row(), tmp_path)
+    _add(cache, ctx, _row(), tmp_path)
+    monkeypatch.setenv("SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS", "1")
 
     assert not cache.lookup(_context(model="different-model")).eligible
     assert not cache.lookup({**ctx, "user_model": "different-user"}).eligible
@@ -207,10 +208,10 @@ def test_experimental_task_only_cache_can_bypass_model_and_user(
 ) -> None:
     cache = ControlBaselineCache(tmp_path / "cache")
     ctx = _context()
-    for _ in range(3):
-        _add(cache, ctx, _row(), tmp_path)
+    _add(cache, ctx, _row(), tmp_path)
 
     monkeypatch.setenv("SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY", "1")
+    monkeypatch.setenv("SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS", "1")
     lookup = cache.lookup(
         {
             **ctx,
@@ -222,7 +223,7 @@ def test_experimental_task_only_cache_can_bypass_model_and_user(
     assert lookup.eligible
     assert lookup.stats is not None
     assert lookup.stats["cache_match_policy"] == (
-        "experimental_task_name_base_tool_policy_min3_model_user_bypassed"
+        "experimental_task_name_base_tool_policy_min1_model_user_bypassed"
     )
     assert lookup.stats["task_level_fields"] == ["scenario_key", "base_tool_policy"]
     assert lookup.stats["experimental_model_user_bypass"] is True
@@ -231,12 +232,12 @@ def test_experimental_task_only_cache_can_bypass_model_and_user(
 
 
 def test_manifest_checksum_change_does_not_reset_task_level_eligibility(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     cache = ControlBaselineCache(tmp_path / "cache")
     ctx = _context()
-    for _ in range(3):
-        _add(cache, ctx, _row(), tmp_path)
+    _add(cache, ctx, _row(), tmp_path)
+    monkeypatch.setenv("SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS", "1")
 
     changed_manifest = {**ctx, "manifest_checksum": "different-manifest"}
 
@@ -252,11 +253,13 @@ def test_runtime_exception_records_are_ineligible(tmp_path: Path) -> None:
     assert not cache.lookup(ctx).eligible
 
 
-def test_build_control_cache_report_reports_mixed_sources(tmp_path: Path) -> None:
+def test_build_control_cache_report_reports_mixed_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     cache = ControlBaselineCache(tmp_path / "cache")
     ctx = _context("cached")
-    for _ in range(3):
-        _add(cache, ctx, _row("cached"), tmp_path)
+    _add(cache, ctx, _row("cached"), tmp_path)
+    monkeypatch.setenv("SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS", "1")
     lookup = cache.lookup(ctx)
 
     report = build_control_cache_report(
@@ -274,6 +277,36 @@ def test_build_control_cache_report_reports_mixed_sources(tmp_path: Path) -> Non
     assert report["fresh_control_tasks"] == 1
     assert report["cache_manifest_hash"]
     assert report["confidence_intervals_account_for_cached_control_variance"] is True
+
+
+def test_one_record_is_exact_but_three_records_are_ambiguous(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = ControlBaselineCache(tmp_path / "cache")
+    one_context = _context("one_record_task")
+    three_context = _context("three_record_task")
+    _add(cache, one_context, _row("one_record_task", similarity=0.25), tmp_path)
+    for score in (0.5, 1.0, 1.0):
+        _add(
+            cache,
+            three_context,
+            _row("three_record_task", similarity=score),
+            tmp_path,
+        )
+    monkeypatch.setenv("SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS", "1")
+
+    single = cache.lookup(one_context)
+    duplicate = cache.lookup(three_context)
+
+    assert single.eligible
+    assert single.row is not None
+    assert single.row["similarity"] == 0.25
+    assert single.stats is not None
+    assert single.stats["compatible_count"] == 1
+    assert not duplicate.eligible
+    assert duplicate.row is None
+    assert duplicate.reason == "ambiguous_multiple_compatible_controls"
+    assert len(duplicate.compatible_record_ids) == 3
 
 
 def test_cohort_quality_gate_still_blocks_near_duplicate_cached_manifest() -> None:

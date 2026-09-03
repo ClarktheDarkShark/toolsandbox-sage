@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-import os
+import ast
+import json
+import re
+import time
 from collections import Counter
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -12,23 +15,18 @@ from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate
 from sage_ts.adequacy.failure_memory import generation_failure_memory_context
 from sage_ts.adequacy.inadequacy_classifier import (
     CapabilityObservation,
-    classify_planned_scenario_observations,
     classify_visible_task_observations,
 )
 from sage_ts.evaluation.task_strata import base_task_family, expected_helper_fit
-from sage_ts.experiments.v2_flags import (
-    CANDIDATE_REPAIR,
-    DEPENDENCY_LOGIC,
-    LIVE_VALIDATION,
-    MEDIUM_GRAIN_SKILLS,
-    feature_enabled,
-)
+from sage_ts.generation.complete_tools import COMPLETE_TOOLS_NATIVE_NAMES
 from sage_ts.generation.tool_generator import ToolGenerationRequest
-from sage_ts.generation.tool_spec import GeneratedTool
+from sage_ts.generation.tool_spec import (
+    GeneratedTool,
+    ToolFamily,
+)
 from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
-from sage_ts.validation.live_candidate_check import run_lightweight_live_candidate_check
 from sage_ts.validation.sandbox_validator import (
     ToolExample,
     ValidationResult,
@@ -38,15 +36,6 @@ from sage_ts.validation.sandbox_validator import (
 
 class GeneratedToolFactory(Protocol):
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool: ...
-
-
-class GeneratedToolRepairFactory(GeneratedToolFactory, Protocol):
-    def repair(
-        self,
-        request: ToolGenerationRequest,
-        rejected_tool: GeneratedTool,
-        errors: tuple[str, ...],
-    ) -> GeneratedTool: ...
 
 
 CampaignEventHook = Callable[[str, dict[str, Any]], None]
@@ -63,19 +52,15 @@ def suggested_tool_name(canonical_key: str) -> str | None:
         return "resolve_search_window_or_bounds"
     if suffix == "relative_day_time_timestamp":
         return "relative_day_time_to_timestamp"
+    if suffix == "location_service_recovery_sequence":
+        return "plan_device_state_action_sequence_location_recovery"
     if suffix in {"device_state_action_sequence", "plan_device_state_action_sequence"}:
         return "plan_device_state_action_sequence_v3"
     if suffix in {"service_next_action", "next_service_tool_call"}:
         return "next_service_tool_call"
-    if (
-        feature_enabled(DEPENDENCY_LOGIC)
-        and suffix == "dependency_precondition_tool_call"
-    ):
+    if suffix == "dependency_precondition_tool_call":
         return "next_dependency_precondition_call"
-    if (
-        feature_enabled(MEDIUM_GRAIN_SKILLS)
-        and suffix == "constraint_to_action_planner"
-    ):
+    if suffix == "constraint_to_action_planner":
         return "constraint_to_action_planner"
     if suffix == "prepare_direct_contact_action_args":
         return "prepare_direct_contact_action_args"
@@ -95,14 +80,66 @@ BROADER_HELPER_OVERLAPS = {
 
 
 PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
-DEFAULT_CANDIDATE_REPAIR_ATTEMPTS = 2
-PROACTIVE_BIRTH_ENV = "SAGE_SELF_EVOLVING_PROACTIVE_BIRTH"
-PROACTIVE_BIRTH_SCOPE_ENV = "SAGE_SELF_EVOLVING_PROACTIVE_SCOPE"
-SCENARIO_METADATA_POLICY_ENV = "SAGE_SCENARIO_METADATA_POLICY"
-DISABLE_SCENARIO_NAME_BIRTH_ENV = "SAGE_DISABLE_SCENARIO_NAME_BIRTH"
-DISABLE_SCENARIO_NAME_ROUTING_ENV = "SAGE_DISABLE_SCENARIO_NAME_ROUTING"
-PROACTIVE_SCOPE_MANIFEST = "manifest"
-PROACTIVE_SCOPE_JUST_IN_TIME = "just_in_time"
+CANDIDATE_REPAIR_ATTEMPTS = 7
+MAX_REJECTIONS_PER_TOOL_KEY = 2
+
+
+def _native_action_observation_priority(
+    observation: CapabilityObservation,
+) -> int:
+    """Put executable action contracts before preparatory contracts when enabled."""
+
+    eligible_families = {
+        str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),
+        str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),
+    }
+    if not eligible_families.intersection(observation.allowed_families):
+        return 1
+    allowed_actions = set(COMPLETE_TOOLS_NATIVE_NAMES)
+    for example in observation.validation_examples:
+        if example.negative_applicability or not isinstance(example.expected, dict):
+            continue
+        action_name = str(example.expected.get("downstream_tool_name") or "")
+        action_arguments = example.expected.get("downstream_tool_kwargs")
+        if action_name in allowed_actions and isinstance(action_arguments, dict):
+            return 0
+    return 1
+
+
+def _complements_validated_native_action(
+    observation: CapabilityObservation,
+) -> bool:
+    """Allow non-mutating producers needed before an action tool can run."""
+
+    input_producing_families = {
+        str(ToolFamily.CANONICALIZER),
+        str(ToolFamily.DERIVED_VALUE_CALCULATOR),
+        str(ToolFamily.STATE_PRECONDITION_HELPER),
+    }
+    if input_producing_families.intersection(observation.allowed_families):
+        return True
+
+    if str(ToolFamily.COMPOSITE_WORKFLOW_HELPER) not in observation.allowed_families:
+        return False
+
+    downstream_tools = tuple(
+        str(example.expected.get("downstream_tool_name") or "")
+        for example in observation.validation_examples
+        if not example.negative_applicability
+        and isinstance(example.expected, dict)
+        and example.expected.get("downstream_tool_name")
+    )
+    if not downstream_tools:
+        return False
+
+    read_only_prefixes = ("search_", "get_", "find_")
+    native_actions = set(COMPLETE_TOOLS_NATIVE_NAMES)
+    return all(
+        tool_name.startswith(read_only_prefixes) and tool_name not in native_actions
+        for tool_name in downstream_tools
+    )
+
+
 FIRST_OBSERVATION_BIRTH_KEYS = frozenset(
     {
         "canonicalizer:next_weekday_time_to_timestamp",
@@ -116,16 +153,26 @@ FIRST_OBSERVATION_BIRTH_KEYS = frozenset(
         "composite:prepare_holiday_search_args",
         "composite:prepare_add_contact_args",
         "composite:prepare_location_search_args",
+        "composite:prepare_specific_location_search_args",
         "composite:prepare_reminder_creation_args",
         "composite:select_message_counterparty_for_contact_update",
         "derived_value:days_between_timestamps",
+        "derived_value:extract_address_result",
+        "derived_value:extract_converted_amount_result",
+        "derived_value:extract_distance_result",
+        "derived_value:extract_phone_number_result",
         "derived_value:extract_service_answer_field",
         "derived_value:extract_stock_symbol",
+        "derived_value:extract_temperature_result",
         "derived_value:plan_device_status_lookup",
+        "derived_value:prepare_message_recency_search_args",
+        "derived_value:prepare_past_reminder_recency_search_args",
+        "derived_value:prepare_upcoming_reminder_search_args",
         "derived_value:resolve_search_window_or_bounds",
         "search_filter:select_action_target_by_recency",
         "search_filter:select_message_content_by_recency",
         "search_filter:select_record_by_timestamp_extreme",
+        "state_precondition:location_service_recovery_sequence",
         "state_precondition:plan_device_state_action_sequence",
         "validation:prepare_safe_action_or_abstain",
     }
@@ -149,6 +196,12 @@ CHAIN_ROUTING_FAMILIES_BY_KEY = {
     "composite:plan_send_message_contact_lookup": (
         "send_message_with_contact_content",
         "send_message_with_contact_content_cellular_off",
+    ),
+    "state_precondition:location_service_recovery_sequence": (
+        "turn_on_location_low_battery_mode",
+        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
+        "weather_lookup",
+        "find_distance",
     ),
     "state_precondition:plan_device_state_action_sequence": (
         "cellular_off",
@@ -218,6 +271,16 @@ VISIBLE_ROUTING_FAMILIES_BY_KEY = {
         "reminder_create",
         "external_lookup",
     ),
+    "composite:prepare_specific_location_search_args": (
+        "location_phrase",
+        "reminder_create",
+        "external_lookup",
+    ),
+    "composite:prepare_broad_location_search_args": (
+        "location_phrase",
+        "reminder_create",
+        "external_lookup",
+    ),
     "composite:prepare_reminder_creation_args": (
         "reminder_create",
         "relative_time",
@@ -249,6 +312,17 @@ VISIBLE_ROUTING_FAMILIES_BY_KEY = {
         "reminder_recency",
         "recency_action",
     ),
+    "derived_value:prepare_upcoming_reminder_search_args": (
+        "upcoming_reminder_search",
+    ),
+    "derived_value:prepare_message_recency_search_args": (
+        "message_recency_search",
+        "message_recency",
+        "message_counterparty_update",
+    ),
+    "derived_value:prepare_past_reminder_recency_search_args": (
+        "past_reminder_recency_search",
+    ),
     "search_filter:select_record_by_timestamp_extreme": (
         "recency_search",
         "message_recency",
@@ -261,7 +335,6 @@ VISIBLE_ROUTING_FAMILIES_BY_KEY = {
     ),
     "search_filter:select_action_target_by_recency": (
         "recency_action",
-        "modify_contact",
         "modify_reminder",
         "remove_reminder",
     ),
@@ -277,12 +350,45 @@ VISIBLE_ROUTING_FAMILIES_BY_KEY = {
         "weather_lookup",
         "temperature_lookup",
     ),
+    "derived_value:extract_address_result": (
+        "service_answer_extraction",
+        "external_lookup",
+        "find_address",
+    ),
+    "derived_value:extract_converted_amount_result": (
+        "service_answer_extraction",
+        "currency_lookup",
+        "convert_currency",
+    ),
+    "derived_value:extract_phone_number_result": (
+        "service_answer_extraction",
+        "external_lookup",
+        "find_phone_number",
+    ),
+    "derived_value:extract_distance_result": (
+        "service_answer_extraction",
+        "external_lookup",
+        "find_distance",
+    ),
+    "derived_value:extract_temperature_result": (
+        "service_answer_extraction",
+        "external_lookup",
+        "weather_lookup",
+        "temperature_lookup",
+    ),
     "derived_value:plan_device_status_lookup": (
         "device_status_read",
         "wifi_status",
         "cellular_status",
         "location_status",
         "battery_status",
+    ),
+    "state_precondition:location_service_recovery_sequence": (
+        "device_state_action",
+        "state_precondition_possible",
+        "location_phrase",
+        "external_lookup",
+        "location_service",
     ),
     "state_precondition:plan_device_state_action_sequence": (
         "device_state_action",
@@ -316,23 +422,95 @@ def _dedupe_nonempty(items: tuple[str, ...] | list[str]) -> tuple[str, ...]:
     return tuple(kept)
 
 
-def visible_context_metadata_enabled() -> bool:
-    raw = os.environ.get(SCENARIO_METADATA_POLICY_ENV, "").strip().lower()
-    disable_birth = os.environ.get(DISABLE_SCENARIO_NAME_BIRTH_ENV, "").strip().lower()
-    disable_routing = (
-        os.environ.get(DISABLE_SCENARIO_NAME_ROUTING_ENV, "").strip().lower()
-    )
-    if disable_birth in {"1", "true", "yes", "on", "enabled"}:
-        return True
-    if disable_routing in {"1", "true", "yes", "on", "enabled"}:
-        return True
-    return raw in {
-        "visible_context",
-        "visible-context",
-        "visible",
-        "no_scenario_names",
-        "no-scenario-names",
+_VALIDATION_CASE_LABEL_PATTERN = re.compile(r"^((?:source|held_out|negative)_\d+)_")
+
+
+def _validation_error_case_labels(errors: tuple[str, ...]) -> set[str]:
+    """Return public contract cases implicated by validator errors."""
+
+    return {
+        match.group(1)
+        for error in errors
+        if (match := _VALIDATION_CASE_LABEL_PATTERN.match(error))
     }
+
+
+def _advances_repair_case_frontier(
+    previous_errors: tuple[str, ...],
+    repaired_errors: tuple[str, ...],
+) -> bool:
+    """Detect a repair that fixed every prior case but exposed different cases."""
+
+    previous_cases = _validation_error_case_labels(previous_errors)
+    repaired_cases = _validation_error_case_labels(repaired_errors)
+    return bool(
+        previous_cases and repaired_cases and previous_cases.isdisjoint(repaired_cases)
+    )
+
+
+def _validation_failure_score(validation: ValidationResult) -> int:
+    if validation.accepted:
+        return 0
+    if not validation.errors:
+        return 1000
+    return sum(_validation_error_distance(error) for error in validation.errors)
+
+
+def _validation_error_distance(error: str) -> int:
+    if error.startswith(
+        (
+            "syntax_error:",
+            "missing_generated_code",
+            "expected_exactly_one_function",
+            "function_count_mismatch:",
+            "compiled_function_count_mismatch:",
+            "function_name_mismatch:",
+            "missing_expected_function",
+            "compile_error:",
+            "denied_node:",
+            "denied_call:",
+            "denied_attribute_call:",
+        )
+    ):
+        return 10_000
+    mismatch_tokens = ("_mismatch:", "_native_action_arguments:")
+    mismatch_token = next((token for token in mismatch_tokens if token in error), "")
+    if not mismatch_token or "!=" not in error:
+        if "_native_action_count:" in error:
+            return 50
+        if "_native_action_execution_error:" in error:
+            return 100
+        return 20
+    try:
+        _, rest = error.split(mismatch_token, 1)
+        actual_text, expected_text = rest.split("!=", 1)
+        actual = ast.literal_eval(_literalize_validation_sentinels(actual_text))
+        expected = ast.literal_eval(_literalize_validation_sentinels(expected_text))
+    except Exception:
+        return 10
+    return _value_distance(actual, expected)
+
+
+def _literalize_validation_sentinels(value: str) -> str:
+    return value.replace("NOT_GIVEN", "'__NOT_GIVEN__'")
+
+
+def _value_distance(actual: Any, expected: Any) -> int:
+    if actual == expected:
+        return 0
+    if isinstance(actual, dict) and isinstance(expected, dict):
+        keys = set(actual) | set(expected)
+        return sum(_value_distance(actual.get(key), expected.get(key)) for key in keys)
+    if isinstance(actual, (list, tuple)) and isinstance(expected, (list, tuple)):
+        length = max(len(actual), len(expected))
+        return sum(
+            _value_distance(
+                actual[index] if index < len(actual) else None,
+                expected[index] if index < len(expected) else None,
+            )
+            for index in range(length)
+        )
+    return 1
 
 
 def _observation_family_key(observation: CapabilityObservation) -> str:
@@ -550,6 +728,29 @@ def _resolve_window_validation_examples() -> tuple[ToolExample, ...]:
         ToolExample(
             {
                 "current_timestamp": 1700000000.0,
+                "phrase": "next reminder",
+                "target_domain": "reminder",
+                "timestamp_intent": "reminder",
+                "direction": "latest",
+                "content_keyword": "",
+                "lookback_days": 0,
+                "timezone_offset": 0.0,
+            },
+            {
+                "target_tool_name": "search_reminder",
+                "search_kwargs": {
+                    "reminder_timestamp_lowerbound": 1700000000.0,
+                },
+                "should_call_search": True,
+                "abstain_reason": "",
+                "interpretation": "upcoming",
+                "bounds_source": "resolved_direction",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "current_timestamp": 1700000000.0,
                 "phrase": "latest",
                 "target_domain": "message",
                 "timestamp_intent": "message_creation",
@@ -586,6 +787,29 @@ def _resolve_window_validation_examples() -> tuple[ToolExample, ...]:
                 "target_tool_name": "search_reminder",
                 "search_kwargs": {
                     "creation_timestamp_lowerbound": 1699395200.0,
+                    "creation_timestamp_upperbound": 1700000000.0,
+                },
+                "should_call_search": True,
+                "abstain_reason": "",
+                "interpretation": "latest",
+                "bounds_source": "resolved_direction",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "current_timestamp": 1700000000.0,
+                "phrase": "latest",
+                "target_domain": "reminder",
+                "timestamp_intent": "creation",
+                "direction": "latest",
+                "content_keyword": "",
+                "lookback_days": 0,
+                "timezone_offset": 0.0,
+            },
+            {
+                "target_tool_name": "search_reminder",
+                "search_kwargs": {
                     "creation_timestamp_upperbound": 1700000000.0,
                 },
                 "should_call_search": True,
@@ -726,7 +950,11 @@ def _validation_examples_for_tool(
     observation: CapabilityObservation,
 ) -> tuple[ToolExample, ...]:
     if (
-        observation.canonical_key == "derived_value:recency_timestamp_bounds"
+        observation.canonical_key
+        in {
+            "derived_value:recency_timestamp_bounds",
+            "derived_value:resolve_search_window_or_bounds",
+        }
         and tool.spec.tool_name == "resolve_search_window_or_bounds"
     ):
         return _resolve_window_validation_examples()
@@ -736,23 +964,6 @@ def _validation_examples_for_tool(
     ):
         return _prepare_location_validation_examples()
     return observation.validation_examples
-
-
-def _proactive_birth_enabled() -> bool:
-    return os.environ.get(PROACTIVE_BIRTH_ENV, "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-
-
-def _proactive_birth_scope() -> str:
-    scope = os.environ.get(PROACTIVE_BIRTH_SCOPE_ENV, PROACTIVE_SCOPE_MANIFEST)
-    normalized = scope.strip().lower().replace("-", "_")
-    if normalized in {"jit", "justintime", "just_in_time", "per_task"}:
-        return PROACTIVE_SCOPE_JUST_IN_TIME
-    return PROACTIVE_SCOPE_MANIFEST
 
 
 def _original_tool_contract_errors(
@@ -802,61 +1013,51 @@ class OnlineBirthController:
     base_families_by_key: dict[str, set[str]] = field(default_factory=dict)
     generated_keys: set[str] = field(default_factory=set)
     rejected_counts: Counter[str] = field(default_factory=Counter)
-    max_rejections_per_key: int = 2
+    max_rejections_per_key: int = MAX_REJECTIONS_PER_TOOL_KEY
     failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
-    proactive_manifest_primed: bool = False
+    pre_scenario_visible_observations: set[str] = field(default_factory=set)
 
-    def _event(self, event: str, payload: dict[str, Any]) -> None:
-        if self.event_hook is not None:
-            self.event_hook(event, payload)
-
-    def prime_from_scenario_names(self, scenario_names: tuple[str, ...]) -> None:
-        """Birth early tools from unlabeled manifest task-family text when enabled."""
-        if visible_context_metadata_enabled():
-            self.proactive_manifest_primed = True
-            self._event(
-                "proactive_manifest_reflection_skipped",
+    def _write_generation_status(self, event: str, payload: dict[str, Any]) -> None:
+        status_path = self.output_dir / "tool_generation_status.json"
+        try:
+            status_path.write_text(
+                json.dumps(
+                    {
+                        "event": event,
+                        "timestamp": time.time(),
+                        **payload,
+                    },
+                    indent=2,
+                    default=str,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            append_jsonl(
+                self.output_dir / "sage_run_events.jsonl",
                 {
-                    "scenario_count": len(scenario_names),
-                    "metadata_policy": "visible_context",
-                    "reason": "scenario_names_not_allowed_for_tool_birth",
+                    "event": "tool_generation_status_write_failed",
+                    "attempted_event": event,
+                    "error": f"{type(exc).__name__}:{exc}",
                 },
             )
-            return
-        if (
-            not _proactive_birth_enabled()
-            or _proactive_birth_scope() != PROACTIVE_SCOPE_MANIFEST
-            or self.proactive_manifest_primed
-        ):
-            return
-        self.proactive_manifest_primed = True
-        observation_count = 0
-        keys_before = set(self.generated_keys)
-        for scenario_name in scenario_names:
-            for observation in classify_planned_scenario_observations(scenario_name):
-                if not observation.generation_allowed:
-                    continue
-                observation_count += 1
-                self._event(
-                    "proactive_inadequacy_detected",
+
+    def _event(self, event: str, payload: dict[str, Any]) -> None:
+        self._write_generation_status(event, payload)
+        if self.event_hook is not None:
+            try:
+                self.event_hook(event, payload)
+            except Exception as exc:
+                append_jsonl(
+                    self.output_dir / "sage_run_events.jsonl",
                     {
-                        "scenario_name": scenario_name,
-                        "canonical_key": observation.canonical_key,
-                        "evidence_source": observation.evidence_source,
-                        "reason": observation.reason,
+                        "event": "campaign_event_hook_failed",
+                        "attempted_event": event,
+                        "error": f"{type(exc).__name__}:{exc}",
+                        **payload,
                     },
                 )
-                self.observe(observation)
-        born_keys = sorted(set(self.generated_keys) - keys_before)
-        self._event(
-            "proactive_manifest_reflection_completed",
-            {
-                "scenario_count": len(scenario_names),
-                "observation_count": observation_count,
-                "born_or_suppressed_keys": born_keys,
-                "registry_dir": str(self.store.root),
-            },
-        )
 
     def prime_before_scenario(
         self, scenario_name: str, scenario: Any | None = None
@@ -870,21 +1071,34 @@ class OnlineBirthController:
         the task.
         """
 
-        if (
-            not _proactive_birth_enabled()
-            or _proactive_birth_scope() != PROACTIVE_SCOPE_JUST_IN_TIME
-        ):
+        if scenario is None:
             return []
         accepted: list[str] = []
         observation_count = 0
         keys_before = set(self.generated_keys)
-        if visible_context_metadata_enabled():
-            if scenario is None:
-                return []
-            observations = classify_visible_task_observations(scenario_name, scenario)
-        else:
-            observations = classify_planned_scenario_observations(scenario_name)
-        for observation in observations:
+        observations = classify_visible_task_observations(scenario_name, scenario)
+        self.pre_scenario_visible_observations.add(scenario_name)
+        observations = tuple(
+            sorted(observations, key=_native_action_observation_priority)
+        )
+        validated_action_tool_name = ""
+        for observation_index, observation in enumerate(observations):
+            if validated_action_tool_name and not _complements_validated_native_action(
+                observation
+            ):
+                self._event(
+                    "jit_proactive_birth_stopped_after_action_tool",
+                    {
+                        **_observation_public_context(observation),
+                        "canonical_key": observation.canonical_key,
+                        "tool_name": validated_action_tool_name,
+                        "remaining_observation_count": (
+                            len(observations) - observation_index
+                        ),
+                        "reason": "non_dependency_observations_suppressed",
+                    },
+                )
+                break
             if not observation.generation_allowed:
                 continue
             observation_count += 1
@@ -900,6 +1114,37 @@ class OnlineBirthController:
             tool_name = self.observe(observation)
             if tool_name:
                 accepted.append(tool_name)
+            resolved_tool_name = tool_name or suggested_tool_name(
+                observation.canonical_key
+            )
+            entry = (
+                self.store.get(resolved_tool_name)
+                if resolved_tool_name is not None
+                else None
+            )
+            if (
+                entry is not None
+                and not bool(getattr(entry, "retired", False))
+                and (bool(tool_name) or has_current_validation_proof(entry))
+                and entry.tool.spec.native_action_delegation
+            ):
+                validated_action_tool_name = resolved_tool_name
+                self._event(
+                    "jit_proactive_action_tool_ready",
+                    {
+                        **_observation_public_context(observation),
+                        "canonical_key": observation.canonical_key,
+                        "tool_name": resolved_tool_name,
+                        "remaining_observation_count": (
+                            len(observations) - observation_index - 1
+                        ),
+                        "reason": (
+                            "validated_action_gap_satisfied"
+                            if tool_name
+                            else "existing_validated_action_gap_satisfied"
+                        ),
+                    },
+                )
         born_keys = sorted(set(self.generated_keys) - keys_before)
         if observation_count or born_keys:
             task_context = ""
@@ -983,8 +1228,7 @@ class OnlineBirthController:
         )
         required_families = (
             3
-            if feature_enabled(MEDIUM_GRAIN_SKILLS)
-            and observation.canonical_key == "composite:constraint_to_action_planner"
+            if observation.canonical_key == "composite:constraint_to_action_planner"
             else 2
         )
         non_diagnostic = (
@@ -1050,6 +1294,28 @@ class OnlineBirthController:
         if not observation.generation_allowed:
             return None
         if observation.canonical_key in self.generated_keys:
+            return None
+        if observation.canonical_key == "composite:plan_message_counterparty_search":
+            append_jsonl(
+                self.output_dir / "sage_run_events.jsonl",
+                {
+                    "event": "tool_birth_skipped_decomposed_complex_contract",
+                    "canonical_key": observation.canonical_key,
+                    "scenario": observation.scenario_name,
+                    "replacement_strategy": (
+                        "birth smaller generated tools for current-user lookup, "
+                        "message search/window selection, and contact-update target "
+                        "selection instead of one large message-counterparty planner"
+                    ),
+                },
+            )
+            self._event(
+                "tool_birth_skipped_decomposed_complex_contract",
+                {
+                    "canonical_key": observation.canonical_key,
+                    "scenario": observation.scenario_name,
+                },
+            )
             return None
         if (
             self.rejected_counts[observation.canonical_key]
@@ -1129,6 +1395,20 @@ class OnlineBirthController:
             self._event("tool_birth_skipped_existing_broader_helper", payload)
             return None
 
+        generation_examples = observation.validation_examples
+        if (
+            suggested_name == "resolve_search_window_or_bounds"
+            and observation.canonical_key
+            in {
+                "derived_value:recency_timestamp_bounds",
+                "derived_value:resolve_search_window_or_bounds",
+            }
+        ):
+            # Generation and deterministic validation must see the same public
+            # broad contract. Otherwise a narrow source observation can produce
+            # code that is judged against capabilities never shown to the model.
+            generation_examples = _resolve_window_validation_examples()
+
         request = ToolGenerationRequest(
             scenario_name=observation.task_context_label or observation.scenario_name,
             observation=observation.observation,
@@ -1140,7 +1420,7 @@ class OnlineBirthController:
                     "held_out": item.held_out,
                     "negative_applicability": item.negative_applicability,
                 }
-                for item in observation.validation_examples
+                for item in generation_examples
             ),
             suggested_tool_name=suggested_name,
             inadequacy_evidence=observation.to_inadequacy_evidence().to_json(),
@@ -1160,7 +1440,26 @@ class OnlineBirthController:
             },
         )
         try:
+            generation_started = time.monotonic()
             tool = self.generator.generate(request)
+            generation_elapsed = time.monotonic() - generation_started
+            self._event(
+                "tool_generation_completed",
+                {
+                    "canonical_key": observation.canonical_key,
+                    "scenario": observation.scenario_name,
+                    "tool_name": tool.spec.tool_name,
+                    "elapsed_seconds": round(generation_elapsed, 3),
+                    "code_chars": len(tool.code),
+                    "code": tool.code,
+                    "estimated_step_compression": (
+                        tool.spec.estimated_step_compression
+                    ),
+                    "cross_task_applicability_count": (
+                        tool.spec.cross_task_applicability_count
+                    ),
+                },
+            )
             cluster_context = self._cluster_context(observation)
             tool = _normalize_live_birth_routing_metadata(
                 tool,
@@ -1188,6 +1487,7 @@ class OnlineBirthController:
                     "canonical_key": observation.canonical_key,
                     "tool_name": tool.spec.tool_name,
                     "scenario": observation.scenario_name,
+                    "code": tool.code,
                 },
             )
             memory_gate, live_check, validation = self._gate_and_validate(
@@ -1199,26 +1499,127 @@ class OnlineBirthController:
             repair_errors: tuple[str, ...] = ()
             repair_history: list[dict[str, Any]] = []
             repair_method = getattr(self.generator, "repair", None)
-            if (
-                not validation.accepted
-                and feature_enabled(CANDIDATE_REPAIR)
-                and callable(repair_method)
-            ):
+            repair_candidates_method = getattr(
+                self.generator, "repair_candidates", None
+            )
+            best_tool = tool
+            best_memory_gate = memory_gate
+            best_live_check = live_check
+            best_validation = validation
+            best_validation_score = _validation_failure_score(validation)
+            repair_seed_tool = tool
+            repair_seed_validation = validation
+            repair_error_history = list(validation.errors)
+            if not validation.accepted and callable(repair_method):
                 repair_errors = tuple(validation.errors)
-                for attempt in range(1, DEFAULT_CANDIDATE_REPAIR_ATTEMPTS + 1):
+                for attempt in range(1, CANDIDATE_REPAIR_ATTEMPTS + 1):
                     if validation.accepted:
                         break
                     repair_attempted = True
                     repair_attempt_count = attempt
-                    current_errors = tuple(validation.errors)
-                    repaired_tool = repair_method(request, tool, current_errors)
-                    repaired_tool = _normalize_live_birth_routing_metadata(
-                        repaired_tool,
-                        observation,
-                        tuple(self._cluster_context(observation)["base_task_families"]),
+                    current_errors = tuple(
+                        dict.fromkeys(
+                            (
+                                *repair_error_history,
+                                *repair_seed_validation.errors,
+                            )
+                        )
                     )
-                    repaired_gate, repaired_live_check, repaired_validation = (
-                        self._gate_and_validate(repaired_tool, observation)
+                    if repair_seed_tool.spec.native_action_delegation:
+                        # Repair the best candidate's remaining failures only. Old
+                        # errors describe branches that candidate already fixed and
+                        # can make model repair reintroduce those failures.
+                        current_errors = tuple(repair_seed_validation.errors)
+                    self._event(
+                        "tool_repair_started",
+                        {
+                            "canonical_key": observation.canonical_key,
+                            "tool_name": repair_seed_tool.spec.tool_name,
+                            "attempt": attempt,
+                            "input_errors": list(current_errors),
+                            "best_validation_score": best_validation_score,
+                        },
+                    )
+                    repair_started = time.monotonic()
+                    # Repeating an identical model prompt tends to reproduce the
+                    # same failed implementation. Vary the repair strategy for
+                    # every generated-tool family while keeping the public
+                    # contract and validation errors unchanged.
+                    repair_input_errors = (
+                        *current_errors,
+                        f"repair_strategy:{attempt}",
+                    )
+                    if callable(repair_candidates_method):
+                        repaired_candidates = tuple(
+                            repair_candidates_method(
+                                request,
+                                repair_seed_tool,
+                                repair_input_errors,
+                            )
+                        )
+                    else:
+                        repaired_candidates = (
+                            repair_method(
+                                request,
+                                repair_seed_tool,
+                                repair_input_errors,
+                            ),
+                        )
+                    if not repaired_candidates:
+                        raise ValueError("tool repair returned no candidates")
+                    repair_elapsed = time.monotonic() - repair_started
+                    candidate_results: list[
+                        tuple[GeneratedTool, Any, Any, ValidationResult, int]
+                    ] = []
+                    for candidate in repaired_candidates:
+                        normalized_candidate = _normalize_live_birth_routing_metadata(
+                            candidate,
+                            observation,
+                            tuple(
+                                self._cluster_context(observation)["base_task_families"]
+                            ),
+                        )
+                        candidate_gate, candidate_live_check, candidate_validation = (
+                            self._gate_and_validate(normalized_candidate, observation)
+                        )
+                        candidate_results.append(
+                            (
+                                normalized_candidate,
+                                candidate_gate,
+                                candidate_live_check,
+                                candidate_validation,
+                                _validation_failure_score(candidate_validation),
+                            )
+                        )
+                    selected_candidate_index = min(
+                        range(len(candidate_results)),
+                        key=lambda index: (
+                            not candidate_results[index][3].accepted,
+                            candidate_results[index][4],
+                            index,
+                        ),
+                    )
+                    (
+                        repaired_tool,
+                        repaired_gate,
+                        repaired_live_check,
+                        repaired_validation,
+                        repaired_score,
+                    ) = candidate_results[selected_candidate_index]
+                    advanced_case_frontier = (
+                        repair_seed_tool.spec.native_action_delegation
+                        and _advances_repair_case_frontier(
+                            tuple(repair_seed_validation.errors),
+                            tuple(repaired_validation.errors),
+                        )
+                    )
+                    repair_error_history.extend(
+                        error
+                        for error in repaired_validation.errors
+                        if error not in repair_error_history
+                    )
+                    improved = repaired_validation.accepted or (
+                        repaired_score < best_validation_score
                     )
                     repair_record = {
                         "attempt": attempt,
@@ -1226,6 +1627,29 @@ class OnlineBirthController:
                         "repaired_errors": list(repaired_validation.errors),
                         "accepted": repaired_validation.accepted,
                         "repaired_tool_name": repaired_tool.spec.tool_name,
+                        "elapsed_seconds": round(repair_elapsed, 3),
+                        "code_chars": len(repaired_tool.code),
+                        "code": repaired_tool.code,
+                        "validation_score": repaired_score,
+                        "improved_best": improved,
+                        "advanced_case_frontier": advanced_case_frontier,
+                        "repair_candidate_count": len(candidate_results),
+                        "selected_candidate_index": selected_candidate_index,
+                        "repair_candidate_validations": [
+                            {
+                                "candidate_index": index,
+                                "accepted": candidate_validation.accepted,
+                                "validation_score": candidate_score,
+                                "errors": list(candidate_validation.errors),
+                            }
+                            for index, (
+                                _candidate,
+                                _candidate_gate,
+                                _candidate_live_check,
+                                candidate_validation,
+                                candidate_score,
+                            ) in enumerate(candidate_results)
+                        ],
                     }
                     repair_history.append(repair_record)
                     self._event(
@@ -1236,17 +1660,43 @@ class OnlineBirthController:
                             **repair_record,
                         },
                     )
-                    tool = repaired_tool
-                    memory_gate = repaired_gate
-                    live_check = repaired_live_check
-                    validation = repaired_validation
+                    if improved:
+                        best_tool = repaired_tool
+                        best_memory_gate = repaired_gate
+                        best_live_check = repaired_live_check
+                        best_validation = repaired_validation
+                        best_validation_score = repaired_score
+                    # A native-action candidate can temporarily score worse while it
+                    # fixes every previously failing case and exposes a different
+                    # branch. Continue from that complementary candidate so the next
+                    # repair can combine both behaviors; otherwise return to the best
+                    # proved candidate instead of drifting through arbitrary failures.
+                    if (
+                        best_tool.spec.native_action_delegation
+                        and not improved
+                        and not advanced_case_frontier
+                    ):
+                        repair_seed_tool = best_tool
+                        repair_seed_validation = best_validation
+                    else:
+                        repair_seed_tool = repaired_tool
+                        repair_seed_validation = repaired_validation
+                    tool = best_tool
+                    memory_gate = best_memory_gate
+                    live_check = best_live_check
+                    validation = best_validation
         except Exception as exc:
+            if "generation_started" in locals():
+                elapsed_seconds = round(time.monotonic() - generation_started, 3)
+            else:
+                elapsed_seconds = None
             append_jsonl(
                 self.output_dir / "tool_birth_events.jsonl",
                 {
                     "canonical_key": observation.canonical_key,
                     "accepted": False,
                     "errors": [f"generation_error:{type(exc).__name__}:{exc}"],
+                    "elapsed_seconds": elapsed_seconds,
                 },
             )
             self.rejected_counts[observation.canonical_key] += 1
@@ -1256,6 +1706,7 @@ class OnlineBirthController:
                     "canonical_key": observation.canonical_key,
                     **_observation_public_context(observation),
                     "error": f"{type(exc).__name__}:{exc}",
+                    "elapsed_seconds": elapsed_seconds,
                     "rejection_count": self.rejected_counts[observation.canonical_key],
                 },
             )
@@ -1324,6 +1775,7 @@ class OnlineBirthController:
                 ),
                 "repair_attempted": repair_attempted,
                 "repair_attempt_count": repair_attempt_count,
+                "code": tool.code,
             },
         )
         if validation.accepted:
@@ -1359,6 +1811,7 @@ class OnlineBirthController:
                     **_observation_public_context(observation),
                     "family": tool.spec.family.value,
                     "snapshot_path": str(snapshot_path),
+                    "code": tool.code,
                 },
             )
             self._event(
@@ -1379,6 +1832,7 @@ class OnlineBirthController:
                     "tool_name": tool.spec.tool_name,
                     **_observation_public_context(observation),
                     "errors": list(validation.errors),
+                    "code": tool.code,
                     "rejection_count": self.rejected_counts[observation.canonical_key],
                 },
             )
@@ -1407,19 +1861,7 @@ class OnlineBirthController:
                 None,
                 ValidationResult(False, original_contract_errors),
             )
-        if feature_enabled(LIVE_VALIDATION):
-            live_check = run_lightweight_live_candidate_check(
-                tool,
-                examples,
-            )
-            if not live_check.accepted:
-                return (
-                    memory_gate,
-                    live_check,
-                    ValidationResult(False, live_check.errors),
-                )
-        else:
-            live_check = None
+        live_check = None
         return (
             memory_gate,
             live_check,

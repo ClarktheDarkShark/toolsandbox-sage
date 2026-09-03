@@ -1,14 +1,15 @@
 # mypy: ignore-errors
+import json
 import os
+import sys
 
 import pytest
 
 from scripts.run_sage_protocol import (
+    DIAGNOSTIC_FORCE_ENV_VARS,
     SAGE_POLICY_AUTO,
     SAGE_POLICY_NONE,
     SAGE_POLICY_SELF_EVOLVING_PRAXIS,
-    SAGE_POLICY_SELF_EVOLVING_PRAXIS_COMBINED,
-    SELF_EVOLVING_PRAXIS_COMBINED_ENV_DEFAULTS,
     SELF_EVOLVING_PRAXIS_ENV_DEFAULTS,
     _apply_sage_policy_preset,
     _generation_enabled_by_default,
@@ -17,12 +18,16 @@ from scripts.run_sage_protocol import (
     _restore_registry_after_failed_gate,
     _route_mismatch_qualified,
     _snapshot_registry_for_gate,
+    _validate_uncached_result_rows,
+)
+from scripts.run_sage_protocol import (
+    main as run_protocol_main,
 )
 
 
 @pytest.fixture(autouse=True)
 def _restore_sage_environment() -> None:
-    tracked_keys = set(SELF_EVOLVING_PRAXIS_COMBINED_ENV_DEFAULTS)
+    tracked_keys = set(SELF_EVOLVING_PRAXIS_ENV_DEFAULTS)
     before = {key: os.environ.get(key) for key in tracked_keys}
     try:
         yield
@@ -81,42 +86,18 @@ def test_self_evolving_praxis_policy_sets_tool_generation_runtime_defaults(
     assert applied
     for key, expected in SELF_EVOLVING_PRAXIS_ENV_DEFAULTS.items():
         assert applied[key] == {"value": expected, "source": "preset_default"}
-    assert applied["SAGE_PRAXIS_BRIDGE_POLICY"]["value"] == "disabled"
 
 
 def test_self_evolving_praxis_policy_preserves_explicit_environment(
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "disabled")
+    monkeypatch.setenv("SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS", "240")
 
     applied = _apply_sage_policy_preset(SAGE_POLICY_SELF_EVOLVING_PRAXIS)
 
-    assert applied["SAGE_PRAXIS_BRIDGE_POLICY"] == {
-        "value": "disabled",
+    assert applied["SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS"] == {
+        "value": "240",
         "source": "preexisting_environment",
-    }
-
-
-def test_self_evolving_praxis_policy_rejects_enabled_bridge_environment(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("SAGE_PRAXIS_BRIDGE_POLICY", "combined")
-
-    with pytest.raises(ValueError, match="autonomous tool-generation policy"):
-        _apply_sage_policy_preset(SAGE_POLICY_SELF_EVOLVING_PRAXIS)
-
-
-def test_combined_praxis_policy_keeps_bridge_as_explicit_ablation(
-    monkeypatch,
-) -> None:
-    for key in SELF_EVOLVING_PRAXIS_COMBINED_ENV_DEFAULTS:
-        monkeypatch.delenv(key, raising=False)
-
-    applied = _apply_sage_policy_preset(SAGE_POLICY_SELF_EVOLVING_PRAXIS_COMBINED)
-
-    assert applied["SAGE_PRAXIS_BRIDGE_POLICY"] == {
-        "value": "combined",
-        "source": "preset_default",
     }
 
 
@@ -162,6 +143,59 @@ def test_protocol_gate_accepts_outcome_success_with_canonical_route_mismatch() -
     assert _route_mismatch_qualified(comparison) is True
     assert passed is True
     assert reasons == []
+
+
+def test_strict_publication_gate_ignores_canonical_and_exact_metrics() -> None:
+    comparison = {
+        "mean_similarity_delta": -1.0,
+        "mean_outcome_similarity_delta": 0.20,
+        "exact_success_delta": -100,
+        "gain_count": 0,
+        "regression_count": 100,
+        "outcome_gain_count": 20,
+        "outcome_regression_count": 1,
+        "runtime_exception_count": 0,
+        "candidate": {
+            "accepted_tool_count": 1,
+            "generated_tool_called_scenarios": 20,
+        },
+    }
+
+    passed, reasons = _protocol_gate_decision(
+        comparison,
+        scenario_count=40,
+        outcome_only=True,
+    )
+
+    assert passed is True
+    assert reasons == []
+
+
+def test_strict_publication_gate_fails_when_outcome_is_unavailable() -> None:
+    comparison = {
+        "mean_similarity_delta": 1.0,
+        "mean_outcome_similarity_delta": None,
+        "exact_success_delta": 100,
+        "gain_count": 100,
+        "regression_count": 0,
+        "outcome_gain_count": 0,
+        "outcome_regression_count": 0,
+        "runtime_exception_count": 0,
+        "candidate": {
+            "accepted_tool_count": 10,
+            "generated_tool_called_scenarios": 40,
+        },
+    }
+
+    passed, reasons = _protocol_gate_decision(
+        comparison,
+        scenario_count=40,
+        outcome_only=True,
+    )
+
+    assert passed is False
+    assert "outcome_score_unavailable" in reasons
+    assert all("canonical" not in reason for reason in reasons)
 
 
 def test_protocol_gate_accepts_outcome_success_with_exact_canonical_accounting_loss() -> (
@@ -291,3 +325,131 @@ def test_failed_gate_removes_new_registry_manifest_when_none_existed(tmp_path) -
     assert result["restored"] is True
     assert not manifest.exists()
     assert (run_root / "registry_gate" / "registry_manifest_failed_gate.json").exists()
+
+
+def test_strict_fresh_rows_require_exact_uncached_task_mapping(tmp_path) -> None:
+    run_dir = tmp_path / "control"
+    run_dir.mkdir()
+    rows = [
+        {
+            "name": "task_a",
+            "similarity": 0.25,
+            "outcome_similarity": 0.5,
+            "llm_cached_call_count": 0,
+        },
+        {
+            "name": "task_b",
+            "similarity": 1.0,
+            "outcome_similarity": 1.0,
+            "llm_cached_call_count": 0,
+        },
+    ]
+    (run_dir / "result_summary.json").write_text(
+        json.dumps({"per_scenario_results": rows}) + "\n",
+        encoding="utf-8",
+    )
+
+    mapped = _validate_uncached_result_rows(
+        run_dir,
+        expected_scenarios=("task_a", "task_b"),
+        arm="control",
+        require_complete=True,
+    )
+
+    assert list(mapped) == ["task_a", "task_b"]
+    assert mapped["task_a"]["outcome_similarity"] == 0.5
+
+
+def test_strict_publication_mode_rejects_every_partial_resume(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_sage_protocol.py",
+            "--mode",
+            "full_benchmark",
+            "--manifest",
+            "unused.json",
+            "--require-fresh-control",
+            "--resume-run-root",
+            "old-run",
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="forbids --resume-run-root"):
+        run_protocol_main()
+
+
+@pytest.mark.parametrize("force_name", DIAGNOSTIC_FORCE_ENV_VARS)
+def test_strict_publication_mode_rejects_diagnostic_force_environment(
+    monkeypatch,
+    force_name,
+) -> None:
+    monkeypatch.setenv(force_name, "forced_tool")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_sage_protocol.py",
+            "--mode",
+            "online_build_full",
+            "--manifest",
+            "unused.json",
+            "--require-fresh-control",
+            "--diagnostic-force-allowed",
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="forbidden during a strict publication"):
+        run_protocol_main()
+
+
+@pytest.mark.parametrize(
+    ("mutation", "match"),
+    [
+        ({"name": "task_a"}, "Duplicate control result"),
+        (
+            {
+                "name": "task_b",
+                "control_cache_source": "cached",
+            },
+            "cache sourced",
+        ),
+        (
+            {"name": "task_b", "llm_cached_call_count": 1},
+            "repository whole-response replay",
+        ),
+    ],
+)
+def test_strict_fresh_rows_reject_cache_or_duplicates(
+    tmp_path,
+    mutation,
+    match,
+) -> None:
+    run_dir = tmp_path / "control"
+    run_dir.mkdir()
+    first = {
+        "name": "task_a",
+        "similarity": 0.0,
+        "llm_cached_call_count": 0,
+    }
+    second = {
+        "name": "task_b",
+        "similarity": 1.0,
+        "llm_cached_call_count": 0,
+    }
+    second.update(mutation)
+    (run_dir / "result_summary.json").write_text(
+        json.dumps({"per_scenario_results": [first, second]}) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=match):
+        _validate_uncached_result_rows(
+            run_dir,
+            expected_scenarios=("task_a", "task_b"),
+            arm="control",
+            require_complete=True,
+        )

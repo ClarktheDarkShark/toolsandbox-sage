@@ -18,6 +18,20 @@ def test_duplicate_birth_skip_is_valid_campaign_event(tmp_path: Path) -> None:
     )
 
 
+def test_native_action_birth_stop_is_valid_campaign_event(tmp_path: Path) -> None:
+    row = append_event(
+        "jit_proactive_birth_stopped_after_action_tool",
+        {"tool_name": "complete_action"},
+        root=tmp_path,
+    )
+
+    assert row["event"] == "jit_proactive_birth_stopped_after_action_tool"
+    latest = tmp_path / "events" / "latest.jsonl"
+    assert json.loads(latest.read_text(encoding="utf-8"))["tool_name"] == (
+        "complete_action"
+    )
+
+
 def test_tool_repair_attempt_is_valid_campaign_event(tmp_path: Path) -> None:
     row = append_event(
         "tool_repair_attempted",

@@ -326,7 +326,6 @@ def emit_phase_a_reports(protocol_root: Path, output_dir: Path) -> dict[str, Any
     control_rows = _scenario_map(_scenario_rows(control_dir))
     candidate_rows = _scenario_map(_scenario_rows(candidate_dir))
     deltas = list(comparison.get("deltas", []))
-    delta_map = {row["scenario"]: row for row in deltas if isinstance(row, dict)}
     selection_rows = _read_jsonl(
         candidate_dir / "scenario_tool_selection.jsonl"
         if candidate_dir is not None

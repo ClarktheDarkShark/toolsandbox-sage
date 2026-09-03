@@ -24,7 +24,7 @@ Current repo context:
 - Current figure inventory: `docs/sage_protocol/chapter3_methodology_figures.md`
 - Current figure assets: `docs/sage_protocol/figures/`
 - Current regeneration command in README: `python scripts/render_chapter3_sage_figures.py`
-- Additional methodology diagram renderer noted in the figure inventory: `python3 scripts/render_sage_methodology_diagrams.py`
+- Current publication-loop renderer: `python3 scripts/render_sage_self_evolution_loop_publication.py`
 
 ## Source Base Surveyed
 

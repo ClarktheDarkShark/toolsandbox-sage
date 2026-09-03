@@ -98,12 +98,14 @@ def test_open_dashboard_falls_back_to_macos_open(tmp_path: Path, monkeypatch) ->
     monkeypatch.setattr(
         exporters,
         "ensure_dashboard_server",
-        lambda *, port: calls.append(("server", port)),
+        lambda *, port, server_root: calls.append(("server", port)),
     )
     monkeypatch.setattr(
         exporters,
         "dashboard_url",
-        lambda index_path, *, port: f"http://127.0.0.1:{port}/dashboard/index.html",
+        lambda index_path, *, port, server_root: (
+            f"http://127.0.0.1:{port}/dashboard/index.html"
+        ),
     )
     monkeypatch.setattr(exporters.webbrowser, "open_new_tab", lambda url: False)
     monkeypatch.setattr(exporters.sys, "platform", "darwin")
@@ -126,12 +128,14 @@ def test_open_dashboard_always_uses_macos_open(tmp_path: Path, monkeypatch) -> N
     monkeypatch.setattr(
         exporters,
         "ensure_dashboard_server",
-        lambda *, port: calls.append(("server", port)),
+        lambda *, port, server_root: calls.append(("server", port)),
     )
     monkeypatch.setattr(
         exporters,
         "dashboard_url",
-        lambda index_path, *, port: f"http://127.0.0.1:{port}/dashboard/index.html",
+        lambda index_path, *, port, server_root: (
+            f"http://127.0.0.1:{port}/dashboard/index.html"
+        ),
     )
     monkeypatch.setattr(exporters.webbrowser, "open_new_tab", lambda url: True)
     monkeypatch.setattr(exporters.sys, "platform", "darwin")
@@ -145,6 +149,19 @@ def test_open_dashboard_always_uses_macos_open(tmp_path: Path, monkeypatch) -> N
 
     assert url == "http://127.0.0.1:5520/dashboard/index.html"
     assert ("open", ["open", url]) in calls
+
+
+def test_dashboard_url_supports_output_outside_repo(tmp_path: Path) -> None:
+    dashboard_dir = tmp_path / "external_run" / "dashboard"
+    index_path = dashboard_dir / "task_compare.html"
+
+    assert (
+        exporters.dashboard_url(
+            index_path,
+            port=62000,
+        )
+        == "http://127.0.0.1:62000/task_compare.html"
+    )
 
 
 def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
@@ -173,6 +190,9 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
                 "llm_usage_recorded": True,
                 "llm_call_count": 2,
                 "llm_prompt_tokens": 120,
+                "llm_provider_cached_prompt_tokens": 64,
+                "llm_provider_cached_prompt_call_count": 1,
+                "llm_provider_cached_prompt_tokens_available_count": 2,
                 "llm_completion_tokens": 30,
                 "llm_total_tokens": 150,
                 "llm_live_call_count": 2,
@@ -204,6 +224,9 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
                 "llm_usage_recorded": True,
                 "llm_call_count": 3,
                 "llm_prompt_tokens": 210,
+                "llm_provider_cached_prompt_tokens": 128,
+                "llm_provider_cached_prompt_call_count": 2,
+                "llm_provider_cached_prompt_tokens_available_count": 3,
                 "llm_completion_tokens": 45,
                 "llm_total_tokens": 255,
                 "llm_live_call_count": 3,
@@ -273,6 +296,14 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
     assert task_focus["tasks"][0]["control_cache_source"] == "cached"
     assert task_focus["summary"]["control_llm_call_count"] == 2
     assert task_focus["summary"]["candidate_llm_total_tokens"] == 255
+    assert task_focus["summary"]["control_llm_provider_cached_prompt_tokens"] == 64
+    assert task_focus["summary"]["candidate_llm_provider_cached_prompt_call_count"] == 2
+    assert (
+        task_focus["summary"][
+            "candidate_llm_provider_cached_prompt_tokens_available_count"
+        ]
+        == 3
+    )
     assert task_focus["pairs"][0]["control"]["llm_call_count"] == 2
     assert task_focus["pairs"][0]["candidate"]["llm_total_tokens"] == 255
     task_compare = json.loads(
@@ -280,14 +311,35 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
     )
     assert task_compare["summary"]["control_llm_total_tokens"] == 150
     assert task_compare["summary"]["candidate_llm_call_count"] == 3
+    assert task_compare["summary"]["control_llm_provider_cached_prompt_tokens"] == 64
+    assert (
+        task_compare["summary"][
+            "control_llm_provider_cached_prompt_tokens_available_count"
+        ]
+        == 2
+    )
     assert task_compare["summary"]["control_wall_time_seconds"] == pytest.approx(120.0)
     assert task_compare["summary"]["candidate_wall_time_seconds"] == pytest.approx(
         240.0
     )
     task_compare_html = (index.parent / "task_compare.html").read_text(encoding="utf-8")
+    overview_html = index.read_text(encoding="utf-8")
+    task_focus_html = (index.parent / "task_focus.html").read_text(encoding="utf-8")
+    assert "Outcome Difference" in overview_html
+    assert "Canonical Audit Movement" in overview_html
+    assert "Score Lift" not in overview_html
+    assert "Baseline Outcome" in task_focus_html
+    assert "Canonical Audit" in task_focus_html
+    assert "Baseline Score" not in task_focus_html
     assert "Total Time B / S" in task_compare_html
     assert "LLM Calls B / S" in task_compare_html
     assert "Tokens B / S" in task_compare_html
+    assert "provider-prefix cached" in task_compare_html
+    assert "Baseline Outcome" in task_compare_html
+    assert "Canonical Audit Movement" in task_compare_html
+    assert "Score Lift" not in task_compare_html
+    assert "Score Contribution" not in task_compare_html
+    assert not (index.parent / "custom_task.html").exists()
     assert "control source: cached" in (index.parent / "index.html").read_text(
         encoding="utf-8"
     )

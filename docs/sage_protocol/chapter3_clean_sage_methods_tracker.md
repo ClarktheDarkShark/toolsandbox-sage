@@ -51,10 +51,6 @@ The current clean method boundary remains:
 - `SAGE_PRAXIS_BRIDGE_POLICY=disabled`;
 - no synthetic bridge completions;
 - no scenario-name tool birth or scenario-name tool routing;
-- no same-task fair-chance retry turns;
-- no visible-not-called retry turns;
-- no generated-tool contract retry attempts;
-- no generated-tool synthetic repair;
 - all LLM roles use `gpt-4o-mini`.
 
 Two framework-level improvements were added after the v147 diagnostic:
@@ -308,11 +304,6 @@ Clean visible-context settings:
 ```text
 SAGE_SCENARIO_METADATA_POLICY=visible_context
 SAGE_PRAXIS_BRIDGE_POLICY=disabled
-SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE=0
-SAGE_SELF_EVOLVING_VISIBLE_NOT_CALLED_RETRY=0
-SAGE_SIDE_EFFECT_FAIR_CHANCE_EXTRA_TURNS=0
-SAGE_GENERATED_TOOL_CONTRACT_RETRY_ATTEMPTS=0
-SAGE_GENERATED_TOOL_SYNTHETIC_REPAIR=0
 SAGE_GENERATED_TOOL_GUIDANCE_MODE=minimal
 SAGE_GENERATED_TOOL_DOCSTRING_MODE=compact
 SAGE_ENABLE_SAFE_ABSTAIN_BIRTH=0
@@ -4931,7 +4922,7 @@ Validation:
 
 ### Run Card - 2026-06-10 18:56 ET - v105 Visible Context Sanitized Clean 60
 
-- implementation: scenario-name-free visible-context birth/routing with bridge disabled and no unfair extra-turn retry settings;
+- implementation: scenario-name-free visible-context birth/routing with bridge disabled and ordinary task interaction;
 - run path: `outputs/chapter3_clean_fair_primary/v105_visible_context_sanitized_clean_60/mechanism_60_20260610_185623`;
 - dashboard: `http://127.0.0.1:62624/outputs/chapter3_clean_fair_primary/v105_visible_context_sanitized_clean_60/mechanism_60_20260610_185623/dashboard/task_compare.html`;
 - manifest: `artifacts/chapter3_clean_fair_primary/toolsandbox_60_standard_order.json`;
@@ -4941,7 +4932,7 @@ Validation:
 - SAGE task cache: off;
 - scenario metadata policy: `visible_context`;
 - bridge policy: disabled;
-- fair-chance/extra-turn settings: `SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE=0`, `SAGE_SELF_EVOLVING_VISIBLE_NOT_CALLED_RETRY=0`, `SAGE_SIDE_EFFECT_FAIR_CHANCE_EXTRA_TURNS=0`, `SAGE_GENERATED_TOOL_CONTRACT_RETRY_ATTEMPTS=0`, `SAGE_GENERATED_TOOL_SYNTHETIC_REPAIR=0`;
+- interaction policy: generated tools are exposed through the normal tool list and used inside the ordinary task trajectory;
 - score: 0.668374 baseline to 0.747799 SAGE;
 - score delta/lift: +0.079426 / +11.88%;
 - outcome: 0.509726 baseline to 0.809788 SAGE;
@@ -4964,7 +4955,7 @@ Validation:
 - allowed method boundary: this is generated-tool-use guidance, not a synthetic completion, not an extra turn, not scenario-name routing, not label leakage, and not a hard-coded answer path. The original environment tool still performs every state-changing action;
 - negative gate: recency searches, message searches, reminder/todo tasks, ambiguous requests, and insufficient-information cases do not receive the direct-action nudge;
 - validation: focused unit tests for direct phone-message action, direct contact phone update, and recency-search exclusion passed; nearby regression tests for prior direct-contact completion and visible-context state routing also passed;
-- next validation plan: rerun 60 and then 250 using `SAGE_SCENARIO_METADATA_POLICY=visible_context`, bridge disabled, and all unfair extra-turn retries disabled.
+- next validation plan: rerun 60 and then 250 using `SAGE_SCENARIO_METADATA_POLICY=visible_context` with bridge disabled.
 
 ### Run Card - 2026-06-10 19:37 ET - v107 Direct Action Guidance 60
 
@@ -4978,7 +4969,7 @@ Validation:
 - SAGE task cache: off;
 - scenario metadata policy: `visible_context`;
 - bridge policy: disabled;
-- fair-chance/extra-turn settings: birth scenario fair chance off, visible-not-called retry off, side-effect fair-chance extra turns off, generated-tool contract retry attempts 0, synthetic repair off;
+- interaction policy: generated tools are exposed through the normal tool list and used inside the ordinary task trajectory;
 - score: 0.668374 baseline to 0.790615 SAGE;
 - score delta/lift: +0.122241 / +18.29%;
 - outcome: 0.509726 baseline to 0.799850 SAGE;
@@ -5005,7 +4996,7 @@ Validation:
 
 ### Run Card - 2026-06-10 20:48 ET - v109 Visible-Context No Scenario Names 500
 
-- implementation: scenario-name-free visible-context tool birth and routing; bridge disabled; no birth fair-chance extra turn; no visible-not-called retry; no side-effect fair-chance extra turns; no generated-tool contract retry; no synthetic generated-tool repair; online reflection enabled as allowed feedback;
+- implementation: scenario-name-free visible-context tool birth and routing; bridge disabled; ordinary task interaction; online reflection enabled as allowed feedback;
 - run path: `outputs/chapter3_clean_fair_primary/v109_visible_context_no_scenario_names_500/online_build_500_20260610_204836`;
 - dashboard: `http://127.0.0.1:62624/outputs/chapter3_clean_fair_primary/v109_visible_context_no_scenario_names_500/online_build_500_20260610_204836/dashboard/task_compare.html`;
 - models: gpt-4o-mini actor, user, and generation;
@@ -5616,3 +5607,108 @@ Validation:
   composite tools that reduce actor turns while preserving the same visible
   evidence and downstream original-tool calls, then validated against the same
   60/250/full gates.
+
+## Full Native-Action Candidate - 2026-07-21
+
+The resumed standard-order full-dataset run completed `1,032/1,032` tasks at:
+
+`outputs/native_action_4omini_ab/full_20260721_091909/native_action/online_build_full_20260721_091916`
+
+The run used `gpt-4o-mini` for actor, user, generation, and repair; strict
+cached controls (`1,032 / 0` cached/fresh); a fresh SAGE execution from the
+task-794 registry checkpoint; disabled OpenAI response caching; disabled
+bridge behavior; disabled scenario-name birth/routing; no force calls; and no
+extra SAGE-only actor turns. The task order and frozen timestamp were preserved
+across the checkpoint resume.
+
+Score improved `0.733488 -> 0.806969` (`+10.02%`). Composite outcome improved
+`0.457342 -> 0.786036` (`+71.87%`). The called-generated-tool subset was
+decisive: `734` called rows improved from control outcome `0.370593` to SAGE
+outcome `0.804165` (`+116.99%`), with `421 / 60 / 134` outcome
+gains/regressions/preserved. This supports attribution to generated-tool use,
+not an unexplained SAGE-arm effect.
+
+The benchmark composite masks stronger environment completion. Included state
+checks averaged `0.925000` (`666/720` exact), while answer checks averaged
+`0.680738`. Correct native state changes sometimes consumed the final allowed
+turn, leaving no final confirmation text. The method must not add a SAGE-only
+turn to recover that answer credit.
+
+The resumed segment generated 11 candidates and accepted three model-authored
+tools after validation/repair. The final registry contained 27 tools and every
+accepted tool was called. Runtime exceptions were zero. No new
+side-effect-preservation flag appeared after task 553; 21 inherited pre-fix
+audit flags from tasks 151-519 remain for explicit adjudication.
+
+The highest-value general follow-up is to derive complete one-action Boolean
+setter coverage from visible native schemas. The current generated device tool
+supports Wi-Fi, cellular, and location state but omitted low-battery-mode state,
+which prevented recovery when that visible precondition blocked a requested
+action. This must remain schema-derived and model-authored, never task-name or
+answer specific.
+
+## Full Native-Action Record - 2026-07-23
+
+The clean standard-order full-dataset run completed all `1,032` tasks at:
+
+`outputs/native_action_4omini_ab/full_outcome80_finite_domain_full_20260723_114932/native_action/online_build_full_20260723_114954`
+
+The run used `gpt-4o-mini` for actor, user, generation, and repair. It started
+without a registry manifest, generated tools during the run, used strict cached
+controls (`1,032 / 0` cached/fresh), kept the SAGE task cache off, disabled the
+OpenAI response cache and bridge behavior, disabled scenario-name birth and
+routing, and used no diagnostic force calls or SAGE-only actor turns. The
+manifest hash was
+`21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec`;
+the code-tree hash was
+`d6aad9bc350a3e6ba7389298d7ed66deaacdff54064fa4f4db5c15fd1463a928`.
+
+The framework change under test preserved model-authored code while exposing
+finite string domains declared by a generated tool's own rejection guards as
+call-schema enums. It also projected a generated action sequence onto the
+native tools actually visible in the current task. This prevents free-form
+arguments such as `location service` when the generated code accepts only
+`location`, and avoids routing an unavailable prerequisite action. The method
+uses generated source and the visible native schema; it does not encode task
+names, answer strings, or family-specific outputs.
+
+Before the full run, the change was checked from empty registries on:
+
+- a 12-task temperature/device cohort, where outcome improved from the prior
+  `0.465646` to `0.769971` against a `0.590136` baseline; and
+- a 20-task mixed-action cohort, where outcome was `0.832989` against a
+  `0.575921` baseline, with zero tool failures or runtime exceptions.
+
+Full-run score improved `0.733488 -> 0.797695`, delta `+0.064207`, lift
+`+8.75%`. Composite outcome improved `0.457342 -> 0.800043`, delta
+`+0.342702`, lift `+74.93%`. This exceeds the prior completed full-run outcome
+record of `0.786036` by `+0.014008`. Exact outcome successes increased
+`161 -> 441`; included state checks improved `0.712231 -> 0.906944`
+(`510 -> 653` exact), and answer checks improved `0.405415 -> 0.706502`
+(`134 -> 297` exact).
+
+The run accepted 29 live-born tools, naturally called 28 of them, recorded
+1,864 reuse events, and called generated tools in 771 scenarios. The
+generated-tool-called bucket improved outcome `0.373165 -> 0.809496`, delta
+`+0.436331`, lift `+116.93%`. The no-visible-generated-tool bucket was
+effectively tied with baseline (`-0.18%` outcome lift), while the
+visible-not-called bucket regressed. This is the central attribution result:
+the aggregate gain is concentrated where generated tools were actually called.
+
+There were zero runtime exceptions and zero tool runtime incidents. Forty-three
+failed tool-call attempts were recorded: 42 for
+`apply_single_device_state_action` and one for `extract_distance_result`.
+One side-effect-preservation contract flag occurred for
+`plan_device_state_action_sequence_v3` on
+`find_temperature_low_battery_mode_alt_3_distraction_tools_arg_description_scrambled`.
+The transcript shows no prohibited mutation: low-battery mode, location, and
+Wi-Fi were changed to valid target states. The flag records incomplete
+preservation because a final planned cellular action was not executed before
+the turn limit. It must be reported as a contract incident, not described as an
+unsafe state mutation.
+
+Decision: this is the current leading full-dataset, outcome-focused SAGE run.
+The remaining production priorities are to reduce failed calls from the
+single-device action tool and eliminate the one incomplete action-sequence
+handoff without adding turns, bridge completions, task-specific rules, or
+hidden benchmark information.

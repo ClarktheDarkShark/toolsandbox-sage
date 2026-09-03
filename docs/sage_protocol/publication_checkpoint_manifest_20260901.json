@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-01",
+  "purpose": "Recover the validated pre-P0/R1 publication-cleanup state without modifying preserved run artifacts.",
+  "git_checkpoint": {
+    "branch": "codex/publication-cleanup",
+    "commit": "f07e4bd09a2e0377189141431d1d36945fd0a537",
+    "tree": "e7d6abf8c1757c16bb35d7e6b85e75c76c9693dc",
+    "message": "Checkpoint validated pre-publication cleanup state",
+    "note": "The commit includes formatting performed by the repository hooks. The source archive below preserves the exact pre-hook working state."
+  },
+  "local_recovery_artifacts": [
+    {
+      "path": "artifacts/publication_cleanup_20260901/checkpoints/pre_p0_r1_tracked.patch",
+      "bytes": 3763661,
+      "sha256": "5429500da0fcb1262a00cd1385bad687a643c5a1e0a2b6fa272f4e57eb6a09a0"
+    },
+    {
+      "path": "artifacts/publication_cleanup_20260901/checkpoints/pre_p0_r1_untracked_files.txt",
+      "bytes": 6271,
+      "sha256": "31b8366e688de4117ec72d794e97f4a921459896a761fe32ca0d81e9e7033b2a"
+    },
+    {
+      "path": "artifacts/publication_cleanup_20260901/checkpoints/pre_p0_r1_source.tar.gz",
+      "bytes": 13769821,
+      "sha256": "573496bf9b287ebc8828cfc1c26ed8bd4e078fcf2c9059463221605f450453a8"
+    }
+  ],
+  "publication_policy": {
+    "prior_artifacts_are_append_only": true,
+    "legacy_registry_lock_is_untouched": true,
+    "behavioral_reductions_deferred": [
+      "actor",
+      "classifier",
+      "generator",
+      "online_birth",
+      "routing",
+      "normalization",
+      "validation"
+    ],
+    "strict_publication_provenance_exceptions": [
+      "Generator analysis-response memoization is removed so every model-authored analysis is live.",
+      "Cross-run failure-memory input is disabled only in --require-fresh-control runs; non-publication defaults remain unchanged."
+    ]
+  }
+}

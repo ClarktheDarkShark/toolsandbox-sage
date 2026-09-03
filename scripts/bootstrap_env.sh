@@ -1,22 +1,51 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_NAME="${1:-toolsandbox-sage}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 
-if ! command -v conda >/dev/null 2>&1; then
-  echo "conda is required but was not found on PATH" >&2
+ENV_DIR="${1:-$ROOT_DIR/.venv-publication}"
+PYTHON_VERSION="3.12.7"
+LOCK_FILE="$ROOT_DIR/requirements-publication-lock.txt"
+
+BOOTSTRAP_PYTHON="$(command -v python3.12 || true)"
+if [[ -z "$BOOTSTRAP_PYTHON" ]]; then
+  echo "python3.12 is required but was not found on PATH" >&2
+  exit 1
+fi
+if [[ ! -f "$LOCK_FILE" ]]; then
+  echo "Publication environment lock is missing: $LOCK_FILE" >&2
   exit 1
 fi
 
-if conda env list | awk '{print $1}' | grep -qx "${ENV_NAME}"; then
-  echo "Using existing conda env: ${ENV_NAME}"
-else
-  conda create -n "${ENV_NAME}" python=3.9 -y
+BOOTSTRAP_VERSION="$("$BOOTSTRAP_PYTHON" -c 'import platform; print(platform.python_version())')"
+if [[ "$BOOTSTRAP_VERSION" != "$PYTHON_VERSION" ]]; then
+  echo "python3.12 resolves to ${BOOTSTRAP_VERSION}; Python ${PYTHON_VERSION} is required." >&2
+  exit 1
 fi
 
-conda run -n "${ENV_NAME}" python -m pip install --upgrade pip
-conda run -n "${ENV_NAME}" python -m pip install -e ".[dev]"
-conda run -n "${ENV_NAME}" pre-commit install
-conda run -n "${ENV_NAME}" tool_sandbox --help >/dev/null
+if [[ -e "$ENV_DIR" ]]; then
+  if [[ ! -x "$ENV_DIR/bin/python" ]]; then
+    echo "Existing environment path has no Python executable: $ENV_DIR" >&2
+    exit 1
+  fi
+  OBSERVED_VERSION="$("$ENV_DIR/bin/python" -c 'import platform; print(platform.python_version())')"
+  if [[ "$OBSERVED_VERSION" != "$PYTHON_VERSION" ]]; then
+    echo "Existing environment uses Python ${OBSERVED_VERSION}; Python ${PYTHON_VERSION} is required." >&2
+    echo "Choose a new path or remove the incompatible environment explicitly." >&2
+    exit 1
+  fi
+  echo "Using existing virtual environment: $ENV_DIR"
+else
+  "$BOOTSTRAP_PYTHON" -m venv "$ENV_DIR"
+fi
 
-echo "Environment ready: ${ENV_NAME}"
+ENV_PYTHON="$ENV_DIR/bin/python"
+"$ENV_PYTHON" -m pip install --requirement "$LOCK_FILE"
+"$ENV_PYTHON" -m pip install --no-deps --editable "$ROOT_DIR"
+"$ENV_PYTHON" -m pip check
+"$ENV_PYTHON" "$ROOT_DIR/scripts/verify_publication_environment.py" \
+  --lock "$LOCK_FILE"
+
+echo "Publication environment ready: $ENV_DIR"
+echo "Activate with: source '$ENV_DIR/bin/activate'"

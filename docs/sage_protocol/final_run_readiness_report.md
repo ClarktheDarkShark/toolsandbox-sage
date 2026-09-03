@@ -1,6 +1,12 @@
 # Final-Run Readiness Report
 
-Decision label: `should fix before final runs completed; final preflight ready`
+Decision label: `ARCHIVAL_READINESS_RECORD; superseded by strict fresh-control publication protocol`
+
+> Historical note (updated 2026-09-01): this report records the earlier
+> hardening stage. Current publication runs use `--control-cache off`, reject
+> partial resumes, and no longer accept routing-evidence CLI options. See the
+> publication cleanup and Chapter 4 rerun-readiness documents for the current
+> protocol.
 
 ## Executive Summary
 
@@ -28,7 +34,7 @@ Readiness status:
 - `docs/sage_protocol/final_run_preflight_config.json`
 - `docs/sage_protocol/protocol_heuristics_v1.json`
 - `docs/sage_protocol/final_statistical_analysis_report.md`
-- `docs/sage_protocol/chapter3_methodology_prep.md`
+- `docs/sage_protocol/chapter3_sage_methodology_system_architecture_v061.md`
 - `docs/sage_protocol/v2_6_feedback_packet_schema.md`
 - `docs/sage_protocol/current_state.md`
 - `docs/sage_protocol/run_ledger.md`
@@ -47,8 +53,7 @@ PYTHONPATH=src:. python scripts/preflight_final_run.py \
   --registry-dir artifacts/registry_frozen_best3_claim \
   --output-root outputs/<future_run_root> \
   --generation off \
-  --control-cache use-if-eligible \
-  --routing-evidence-mode disabled
+  --control-cache off
 ```
 
 The preflight fails fast on:
@@ -58,8 +63,6 @@ The preflight fails fast on:
 - unlisted or ambiguous registry selection
 - frozen final mode with generation enabled
 - diagnostic force-call environment variables unless `--diagnostic-mode` is selected
-- routing evidence left as auto/latest for final runs
-- missing pinned routing evidence path when `--routing-evidence-mode pinned`
 - low-quality cohort override
 - missing required manifest fields or missing split
 - missing output-root parent path
@@ -74,8 +77,7 @@ PYTHONPATH=src:. python scripts/preflight_final_run.py \
   --registry-dir artifacts/registry_frozen_best3_claim \
   --output-root outputs/final_preflight_probe \
   --generation off \
-  --control-cache use-if-eligible \
-  --routing-evidence-mode disabled \
+  --control-cache off \
   --allow-dirty \
   --report /tmp/sage_final_preflight_dev.json
 ```
@@ -84,12 +86,9 @@ Result: PASS. The only reason `--allow-dirty` was needed was that this readiness
 
 ## Routing Evidence Policy
 
-Before this hardening pass, runtime routing could consult the latest `helper_contribution_summary.json` under `artifacts/summaries` by filesystem mtime. That behavior remains available for diagnostics/discovery as `auto`, but final frozen runs must now use one of:
-
-- `--routing-evidence-mode disabled`
-- `--routing-evidence-mode pinned --routing-evidence-path <helper_contribution_summary.json>`
-
-The resolved routing evidence mode and path/digest are recorded in `protocol_manifest.json`.
+The former auto/latest and pinned routing-evidence CLI path described by this
+historical report was removed during publication cleanup. Current execution
+does not consult mtime-selected helper-contribution artifacts.
 
 ## Diagnostic Force-Call Guardrail
 

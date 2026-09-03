@@ -630,7 +630,7 @@ def render_overview() -> None:
         "Scenario scorer",
         [
             "Canonical/reference milestones",
-            "Primary outcome checks",
+            "Performance outcome checks",
             "Exact success and state deltas",
         ],
         fill=PAL.sandbox_fill,
@@ -646,7 +646,7 @@ def render_overview() -> None:
         "Paired score table",
         [
             "Baseline vs SAGE per scenario",
-            "Outcome primary, canonical secondary",
+            "Outcome performance, canonical descriptive",
             "Gains, regressions, preserved counts",
         ],
         fill=PAL.evidence_fill,
@@ -1259,7 +1259,7 @@ def render_paper_diagram() -> None:
     d.text(
         70,
         95,
-        "Single-figure methodology view for peer review: experimental contract, self-evolution mechanism, safety/leakage controls, and statistical endpoint hierarchy.",
+        "Single-figure methodology view for peer review: experimental contract, self-evolution mechanism, safety/leakage controls, and evidence roles.",
         20,
         PAL.muted,
         max_width=1940,
@@ -1285,7 +1285,7 @@ def render_paper_diagram() -> None:
         250,
         180,
         "Baseline",
-        ["Base tools", "Eligible cached controls", "Same model policy"],
+        ["Base tools", "Fresh same-run controls", "Same model policy"],
         fill=PAL.paper,
         stroke=PAL.dark_line,
         accent=PAL.control,
@@ -1326,8 +1326,8 @@ def render_paper_diagram() -> None:
         1115, 190, "B. Statistical and reproducibility outputs", 24, PAL.ink, bold=True
     )
     outputs = [
-        ("Primary endpoint", "Outcome/task completion delta, paired by scenario."),
-        ("Secondary endpoint", "Canonical/reference similarity and exact success."),
+        ("Performance endpoint", "Outcome/task completion delta, paired by scenario."),
+        ("Descriptive audit", "Canonical/reference route compatibility."),
         ("Uncertainty", "Paired bootstrap CI and paired randomization test."),
         (
             "Trace evidence",
@@ -1395,7 +1395,7 @@ def render_paper_diagram() -> None:
         ),
         (
             "Cache",
-            "Controls may use transparent task cache; SAGE/candidate task evidence remains fresh.",
+            "No task/result or stored-response replay; provider prefix reuse is recorded separately.",
         ),
         (
             "Side effects",
@@ -1421,7 +1421,7 @@ def render_paper_diagram() -> None:
     d.text(
         80,
         1390,
-        "Caption draft: SAGE is evaluated as a matched ToolSandbox treatment with a sealed manifest, transparent control caching, fresh SAGE/candidate arms, bounded generated-tool routing, safety/leakage gates, and paired statistical analysis. Outcome/task completion is primary; canonical/reference similarity is secondary.",
+        "Caption draft: SAGE is evaluated as a matched ToolSandbox treatment with a sealed manifest, fresh same-run control and SAGE arms, bounded generated-tool routing, safety/leakage gates, and paired statistical analysis. Outcome/task completion is the sole performance endpoint; canonical/reference similarity is descriptive only.",
         18,
         PAL.ink,
         max_width=2040,
@@ -2021,12 +2021,12 @@ def write_sage_one_page_infographic_html() -> None:
             <p>Observe capability gaps, generate safe helper tools, validate them, remember what works, and reuse them on future tasks.</p>
           </article>
           <aside class="endpoint-stack" data-section="endpoint-summary" aria-label="Endpoint summary">
-            <div class="endpoint-card" data-section="primary-endpoint">
-              <span class="eyebrow">Primary endpoint</span>
+            <div class="endpoint-card" data-section="performance-endpoint">
+              <span class="eyebrow">Performance endpoint</span>
               <span class="endpoint-value">task outcome</span>
             </div>
-            <div class="endpoint-card secondary" data-section="secondary-endpoint">
-              <span class="eyebrow">Secondary endpoint</span>
+            <div class="endpoint-card secondary" data-section="descriptive-audit">
+              <span class="eyebrow">Descriptive audit</span>
               <span class="endpoint-value">route match</span>
             </div>
           </aside>
@@ -2203,10 +2203,10 @@ def render_sage_one_page_infographic() -> None:
         line_height=32,
     )
     d.rect(1190, 88, 300, 96, "#102b3f", stroke=cyan, radius=28, width=2)
-    d.text(1230, 108, "Primary endpoint", 19, muted, bold=True, max_width=230)
+    d.text(1230, 108, "Performance endpoint", 19, muted, bold=True, max_width=230)
     d.text(1230, 144, "task outcome", 30, green, bold=True, max_width=230)
     d.rect(1190, 205, 300, 96, "#2c2035", stroke=purple, radius=28, width=2)
-    d.text(1230, 225, "Secondary endpoint", 19, muted, bold=True, max_width=230)
+    d.text(1230, 225, "Descriptive audit", 19, muted, bold=True, max_width=230)
     d.text(1230, 261, "route match", 30, purple, bold=True, max_width=230)
 
     d.rect(70, 360, 1460, 1015, "#0a1728", stroke=line, radius=36, width=2)

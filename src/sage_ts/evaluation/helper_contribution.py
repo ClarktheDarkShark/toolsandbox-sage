@@ -235,8 +235,6 @@ def build_helper_contribution_summary(
     side_effect_rows = _read_jsonl(
         candidate_dir / "side_effect_preservation_report.jsonl"
     )
-    candidate_metrics = _read_json(candidate_dir / "openai_response_cache_metrics.json")
-    prompt_metrics = _read_json(candidate_dir / "prompt_cache_metrics.json")
     registry_tools = set(_registry_tool_names(registry_dir))
     accepted_tools = {
         str(event.get("tool_name"))
@@ -342,10 +340,6 @@ def build_helper_contribution_summary(
         "newly_generated_helper_called_tools": newly_generated_called,
         "registry_size": len(registry_tools),
         "runtime_bundle_size": _runtime_bundle_sizes(candidate_dir),
-        "compute_cache_token_metrics": {
-            "candidate_openai_response_cache": candidate_metrics,
-            "candidate_prompt_cache": prompt_metrics,
-        },
         "selection_attribution_buckets": _selection_attribution_buckets(
             selection, deltas_by_scenario
         ),

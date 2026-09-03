@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SAGE Generated-Tool Self-Evolution Loop</title>
+<script>
+  if (new URLSearchParams(window.location.search).has("export")) {
+    document.documentElement.classList.add("export");
+  }
+</script>
+<style>
+  :root {
+    --ink: #111827;
+    --muted: #586579;
+    --bg: #f5f8fb;
+    --paper: #ffffff;
+    --panel: #fbfdff;
+    --line: #9aa7b7;
+    --light-line: #d9e2ec;
+    --blue: #2563eb;
+    --blue-soft: #eaf3ff;
+    --green: #059669;
+    --green-soft: #e8f8f1;
+    --amber: #d97706;
+    --amber-soft: #fff4de;
+    --violet: #7c3aed;
+    --violet-soft: #f2edff;
+    --red: #dc2626;
+    --red-soft: #fff1f1;
+    --slate: #64748b;
+    --slate-soft: #f1f5f9;
+    --fit-scale: 0.35;
+  }
+
+  * { box-sizing: border-box; }
+
+  html,
+  body {
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: auto;
+    background: var(--bg);
+    font-family: Arial, Helvetica, sans-serif;
+    color: var(--ink);
+  }
+
+  body {
+    display: grid;
+    place-items: center;
+    padding: 16px;
+  }
+
+  .stage {
+    position: relative;
+    width: calc(2400px * var(--fit-scale));
+    height: calc(1500px * var(--fit-scale));
+  }
+
+  .figure {
+    position: relative;
+    width: 2400px;
+    height: 1500px;
+    background: var(--bg);
+    transform: scale(var(--fit-scale));
+    transform-origin: top left;
+  }
+
+  .export body {
+    display: block;
+    width: 2400px;
+    height: 1500px;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .export .stage {
+    width: 2400px;
+    height: 1500px;
+  }
+
+  .export .figure {
+    transform: none;
+  }
+
+  .page {
+    position: absolute;
+    inset: 44px 60px 56px 60px;
+    background: var(--paper);
+    border: 1.5px solid var(--light-line);
+    border-radius: 26px;
+    z-index: 0;
+  }
+
+  .title {
+    position: absolute;
+    left: 110px;
+    top: 70px;
+    margin: 0;
+    font-size: 42px;
+    line-height: 1.05;
+    font-weight: 800;
+    letter-spacing: 0;
+    z-index: 5;
+  }
+
+  .subtitle {
+    position: absolute;
+    left: 110px;
+    top: 126px;
+    width: 1280px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 21px;
+    line-height: 1.28;
+    letter-spacing: 0;
+    z-index: 5;
+  }
+
+  .runtime {
+    position: absolute;
+    left: 100px;
+    top: 205px;
+    width: 2200px;
+    height: 770px;
+    border: 2px dashed #b8c4d2;
+    border-radius: 24px;
+    background: var(--panel);
+    z-index: 1;
+  }
+
+  .runtime-label,
+  .proof-label {
+    position: absolute;
+    height: 38px;
+    border-radius: 19px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 28px;
+    background: var(--paper);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    z-index: 5;
+  }
+
+  .runtime-label {
+    left: 132px;
+    top: 188px;
+    width: 330px;
+    border: 1.3px solid var(--line);
+  }
+
+  .proof-label {
+    left: 1400px;
+    top: 188px;
+    width: 520px;
+    color: var(--green);
+    border: 1.3px solid #34b892;
+    background: var(--green-soft);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .ring {
+    position: absolute;
+    left: 350px;
+    top: 255px;
+    width: 1500px;
+    height: 630px;
+    border: 24px solid #e3edf5;
+    border-radius: 50%;
+    opacity: 0.9;
+    z-index: 1;
+  }
+
+  .arrow-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2400px;
+    height: 1500px;
+    pointer-events: auto;
+    z-index: 2;
+  }
+
+  .arrow-layer .connector {
+    pointer-events: stroke;
+    cursor: default;
+  }
+
+  .node,
+  .hub,
+  .native-card,
+  .govern-card,
+  .govern-pill,
+  .badge,
+  .footer {
+    position: absolute;
+    z-index: 3;
+  }
+
+  .node {
+    width: 380px;
+    min-height: 162px;
+    background: var(--paper);
+    border: 2px solid var(--accent);
+    border-radius: 16px;
+    box-shadow: 0 12px 22px rgba(31, 45, 61, 0.12);
+    overflow: hidden;
+  }
+
+  .node::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    background: var(--accent);
+  }
+
+  .node-header {
+    height: 54px;
+    background: var(--soft);
+  }
+
+  .node-number {
+    position: absolute;
+    left: 30px;
+    top: 27px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .node-kicker {
+    position: absolute;
+    left: 92px;
+    top: 20px;
+    color: var(--accent);
+    font-size: 15px;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: 0.9px;
+  }
+
+  .node-title {
+    position: absolute;
+    left: 92px;
+    top: 45px;
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.08;
+    font-weight: 800;
+  }
+
+  .node-body {
+    margin: 0;
+    padding: 42px 28px 24px 32px;
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1.28;
+  }
+
+  .node.observe {
+    --accent: var(--blue);
+    --soft: var(--blue-soft);
+    left: 170px;
+    top: 525px;
+  }
+
+  .node.birth {
+    --accent: var(--green);
+    --soft: var(--green-soft);
+    left: 580px;
+    top: 300px;
+  }
+
+  .node.validate {
+    --accent: var(--amber);
+    --soft: var(--amber-soft);
+    left: 1315px;
+    top: 300px;
+  }
+
+  .node.route {
+    --accent: var(--violet);
+    --soft: var(--violet-soft);
+    left: 1740px;
+    top: 525px;
+  }
+
+  .node.use {
+    --accent: var(--red);
+    --soft: var(--red-soft);
+    left: 980px;
+    top: 780px;
+    width: 440px;
+  }
+
+  .hub {
+    left: 815px;
+    top: 525px;
+    width: 720px;
+    height: 230px;
+    border: 2.5px solid var(--green);
+    border-radius: 28px;
+    background: var(--paper);
+    box-shadow: 0 18px 36px rgba(5, 150, 105, 0.16);
+  }
+
+  .hub-inner {
+    position: absolute;
+    inset: 28px;
+    border: 1.5px solid #30ad88;
+    border-radius: 20px;
+    background: var(--green-soft);
+  }
+
+  .hub-icon {
+    position: absolute;
+    left: 56px;
+    top: 74px;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: var(--green);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: 800;
+  }
+
+  .hub-title {
+    position: absolute;
+    left: 190px;
+    top: 70px;
+    margin: 0;
+    font-size: 32px;
+    line-height: 1.1;
+    font-weight: 800;
+  }
+
+  .hub-body {
+    position: absolute;
+    left: 190px;
+    top: 118px;
+    width: 440px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1.3;
+  }
+
+  .native-card {
+    --accent: var(--slate);
+    left: 1740px;
+    top: 390px;
+    width: 380px;
+    height: 116px;
+    border: 2px solid var(--accent);
+    border-radius: 14px;
+    background: var(--slate-soft);
+    box-shadow: 0 10px 20px rgba(31, 45, 61, 0.1);
+    overflow: hidden;
+  }
+
+  .native-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    background: var(--accent);
+  }
+
+  .native-kicker {
+    position: absolute;
+    left: 28px;
+    top: 16px;
+    color: var(--accent);
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+  }
+
+  .native-title {
+    position: absolute;
+    left: 28px;
+    top: 38px;
+    margin: 0;
+    font-size: 21px;
+    line-height: 1.08;
+    font-weight: 800;
+  }
+
+  .native-body {
+    position: absolute;
+    left: 28px;
+    top: 66px;
+    width: 316px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.25;
+  }
+
+  .badge {
+    height: 38px;
+    min-width: 190px;
+    padding: 0 22px;
+    border-radius: 19px;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    background: var(--soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .badge.visible {
+    --accent: var(--blue);
+    --soft: var(--blue-soft);
+    left: 210px;
+    top: 720px;
+  }
+
+  .badge.birth-rule {
+    --accent: var(--green);
+    --soft: var(--green-soft);
+    left: 640px;
+    top: 205px;
+  }
+
+  .badge.proof {
+    --accent: var(--amber);
+    --soft: var(--amber-soft);
+    left: 1420px;
+    top: 205px;
+  }
+
+  .badge.route-rule {
+    --accent: var(--violet);
+    --soft: var(--violet-soft);
+    left: 1800px;
+    top: 720px;
+  }
+
+  .badge.audit {
+    --accent: var(--red);
+    --soft: var(--red-soft);
+    left: 1070px;
+    top: 982px;
+  }
+
+  .badge.state-write {
+    --accent: var(--slate);
+    --soft: var(--slate-soft);
+    left: 1420px;
+    top: 1004px;
+    min-width: 250px;
+  }
+
+  .badge.hub-proof {
+    --accent: var(--green);
+    --soft: var(--green-soft);
+    left: 985px;
+    top: 704px;
+    min-width: 240px;
+  }
+
+  .badge.repair-reject {
+    --accent: var(--amber);
+    --soft: var(--amber-soft);
+    left: 1098px;
+    top: 458px;
+    min-width: 196px;
+  }
+
+  .govern {
+    position: absolute;
+    left: 100px;
+    top: 1035px;
+    width: 2200px;
+    height: 305px;
+    border: 1.5px solid var(--light-line);
+    border-radius: 24px;
+    background: var(--slate-soft);
+    z-index: 1;
+  }
+
+  .govern-label {
+    position: absolute;
+    left: 138px;
+    top: 1076px;
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    z-index: 3;
+  }
+
+  .govern-card {
+    background: var(--paper);
+    border: 2px solid var(--accent);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .govern-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    background: var(--accent);
+  }
+
+  .govern-card h3 {
+    margin: 0;
+    padding: 24px 28px 0 34px;
+    font-size: 24px;
+    line-height: 1.1;
+  }
+
+  .govern-card p {
+    margin: 10px 0 0;
+    padding: 0 28px 24px 34px;
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1.28;
+  }
+
+  .reflection {
+    --accent: var(--red);
+    left: 150px;
+    top: 1165px;
+    width: 360px;
+    height: 112px;
+  }
+
+  .maintain {
+    --accent: var(--green);
+    left: 900px;
+    top: 1090px;
+    width: 430px;
+    height: 96px;
+  }
+
+  .repair {
+    --accent: var(--amber);
+    left: 900px;
+    top: 1200px;
+    width: 430px;
+    height: 92px;
+    background: var(--amber-soft);
+  }
+
+  .suppress {
+    --accent: var(--red);
+    left: 1540px;
+    top: 1200px;
+    width: 430px;
+    height: 116px;
+    background: var(--red-soft);
+  }
+
+  .govern-pill {
+    width: 150px;
+    height: 38px;
+    border-radius: 19px;
+    border: 1.5px solid var(--accent);
+    background: var(--soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .retain-pill {
+    --accent: var(--green);
+    --soft: var(--green-soft);
+    left: 610px;
+    top: 1108px;
+  }
+
+  .repair-pill {
+    --accent: var(--amber);
+    --soft: var(--amber-soft);
+    left: 610px;
+    top: 1186px;
+  }
+
+  .retire-pill {
+    --accent: var(--red);
+    --soft: var(--red-soft);
+    left: 610px;
+    top: 1264px;
+  }
+
+  .legend {
+    position: absolute;
+    left: 905px;
+    top: 1344px;
+    display: flex;
+    gap: 26px;
+  }
+
+  .legend .badge {
+    position: static;
+    min-width: 220px;
+  }
+
+  .footer {
+    left: 100px;
+    top: 1382px;
+    width: 2200px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--ink);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    padding: 0 34px;
+    font-size: 16px;
+    z-index: 5;
+  }
+
+  .footer strong {
+    margin-right: 8px;
+    font-weight: 800;
+  }
+
+  .footer span {
+    color: #dbe7f1;
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+<main class="figure" aria-labelledby="fig-title">
+  <div class="page"></div>
+  <h1 class="title" id="fig-title">SAGE Generated-Tool Self-Evolution Loop</h1>
+  <p class="subtitle">A governed flywheel: visible task context reveals an inadequacy, SAGE births and validates a generated tool, routes accepted tools for natural actor use, and updates lifecycle state from reuse evidence.</p>
+
+  <section class="runtime" aria-label="Claim-counted runtime path"></section>
+  <div class="runtime-label">Claim-counted runtime</div>
+  <div class="proof-label">Generated tools route only after current validation proof</div>
+  <div class="ring" aria-hidden="true"></div>
+
+  <svg class="arrow-layer" viewBox="0 0 2400 1500" aria-hidden="true">
+    <defs>
+      <marker id="arrow-blue" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0,0 L16,8 L0,16 Z" fill="#2563eb" />
+      </marker>
+      <marker id="arrow-green" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0,0 L16,8 L0,16 Z" fill="#059669" />
+      </marker>
+      <marker id="arrow-amber" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0,0 L16,8 L0,16 Z" fill="#d97706" />
+      </marker>
+      <marker id="arrow-violet" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0,0 L16,8 L0,16 Z" fill="#7c3aed" />
+      </marker>
+      <marker id="arrow-red" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0,0 L16,8 L0,16 Z" fill="#dc2626" />
+      </marker>
+      <marker id="arrow-slate" markerWidth="16" markerHeight="16" refX="13" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0,0 L16,8 L0,16 Z" fill="#64748b" />
+      </marker>
+    </defs>
+
+    <!-- Runtime flywheel -->
+    <path class="connector" tabindex="0" aria-label="Visible gap to candidate tool" d="M 360 525 C 400 460 485 395 580 382" fill="none" stroke="#059669" stroke-width="5" stroke-linecap="round" marker-end="url(#arrow-green)" />
+    <path class="connector" tabindex="0" aria-label="Candidate tool to validation gate" d="M 960 382 C 1068 306 1206 306 1315 382" fill="none" stroke="#059669" stroke-width="5" stroke-linecap="round" marker-end="url(#arrow-green)" />
+    <path class="connector" tabindex="0" aria-label="Runtime router to natural actor use" d="M 1914 690 C 1772 854 1524 914 1424 858" fill="none" stroke="#dc2626" stroke-width="5" stroke-linecap="round" marker-end="url(#arrow-red)" />
+    <path class="connector" tabindex="0" aria-label="Actor use reveals the next visible gap" d="M 980 860 C 730 990 370 900 158 632" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round" marker-end="url(#arrow-blue)" />
+
+    <!-- Inventory interactions -->
+    <path class="connector" tabindex="0" aria-label="Validation proof admits tool to inventory" d="M 1498 462 C 1488 490 1448 512 1398 518" fill="none" stroke="#059669" stroke-width="3.4" stroke-linecap="round" marker-end="url(#arrow-green)" />
+    <path class="connector" tabindex="0" aria-label="Validated SAGE inventory feeds router" d="M 1535 640 C 1630 632 1710 612 1738 600" fill="none" stroke="#7c3aed" stroke-width="3.4" stroke-linecap="round" marker-end="url(#arrow-violet)" />
+    <path class="connector" tabindex="0" aria-label="Native ToolSandbox tools feed router" d="M 1930 506 L 1930 524" fill="none" stroke="#64748b" stroke-width="3.2" stroke-linecap="round" marker-end="url(#arrow-slate)" />
+    <path class="connector" tabindex="0" aria-label="Use evidence updates inventory records" d="M 1142 780 C 1134 754 1138 736 1168 725" fill="none" stroke="#dc2626" stroke-width="3.2" stroke-linecap="round" marker-end="url(#arrow-red)" />
+
+    <!-- Candidate repair path -->
+    <path class="connector" tabindex="0" aria-label="Validation failure returns candidate for repair or rejection" d="M 1315 452 C 1206 528 1068 528 980 452" fill="none" stroke="#d97706" stroke-width="2.8" stroke-linecap="round" stroke-dasharray="9 8" marker-end="url(#arrow-amber)" />
+
+    <!-- Use evidence to governance -->
+    <path class="connector" tabindex="0" aria-label="Reuse and side-effect evidence enters lifecycle reflection" d="M 1200 950 L 1200 1018 H 120 V 1220 H 145" fill="none" stroke="#dc2626" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 8" marker-end="url(#arrow-red)" />
+    <path class="connector" tabindex="0" aria-label="Lifecycle governance writes state back to inventory" d="M 1510 1035 C 1640 930 1640 820 1535 735" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" stroke-dasharray="9 8" marker-end="url(#arrow-slate)" />
+
+    <!-- Governance branch -->
+    <path class="connector" tabindex="0" aria-label="Reflection chooses retain" d="M 510 1221 L 610 1127" fill="none" stroke="#64748b" stroke-width="2.8" stroke-linecap="round" marker-end="url(#arrow-slate)" />
+    <path class="connector" tabindex="0" aria-label="Reflection chooses repair" d="M 510 1221 L 610 1205" fill="none" stroke="#64748b" stroke-width="2.8" stroke-linecap="round" marker-end="url(#arrow-slate)" />
+    <path class="connector" tabindex="0" aria-label="Reflection chooses retire" d="M 510 1221 L 610 1283" fill="none" stroke="#64748b" stroke-width="2.8" stroke-linecap="round" marker-end="url(#arrow-slate)" />
+    <path class="connector" tabindex="0" aria-label="Retained tools remain active" d="M 760 1127 L 900 1138" fill="none" stroke="#059669" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-green)" />
+    <path class="connector" tabindex="0" aria-label="Repair updates candidate before reuse" d="M 760 1205 L 900 1244" fill="none" stroke="#d97706" stroke-width="3" stroke-linecap="round" stroke-dasharray="9 8" marker-end="url(#arrow-amber)" />
+    <path class="connector" tabindex="0" aria-label="Retired tools are suppressed from routing" d="M 760 1283 H 840 V 1320 H 1450 V 1248 H 1540" fill="none" stroke="#dc2626" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="9 8" marker-end="url(#arrow-red)" />
+  </svg>
+
+  <article class="node observe">
+    <div class="node-header"></div>
+    <div class="node-number">1</div>
+    <div class="node-kicker">OBSERVE</div>
+    <h2 class="node-title">Visible gap</h2>
+    <p class="node-body">Task context, traces, and native tool affordances reveal a reusable inadequacy.</p>
+  </article>
+
+  <article class="node birth">
+    <div class="node-header"></div>
+    <div class="node-number">2</div>
+    <div class="node-kicker">BIRTH</div>
+    <h2 class="node-title">Candidate tool</h2>
+    <p class="node-body">SAGE decides whether to generate helper code, schema, triggers, and abstention logic.</p>
+  </article>
+
+  <article class="node validate">
+    <div class="node-header"></div>
+    <div class="node-number">3</div>
+    <div class="node-kicker">VALIDATE</div>
+    <h2 class="node-title">Gate before use</h2>
+    <p class="node-body">Contract, static safety, callability, negative cases, and smoke traces must pass.</p>
+  </article>
+
+  <article class="native-card" aria-label="Native ToolSandbox tools">
+    <div class="native-kicker">FIXED SUBSTRATE</div>
+    <h2 class="native-title">Native ToolSandbox tools</h2>
+    <p class="native-body">Existing affordances route alongside validated SAGE tools.</p>
+  </article>
+
+  <article class="node route">
+    <div class="node-header"></div>
+    <div class="node-number">4</div>
+    <div class="node-kicker">ROUTE</div>
+    <h2 class="node-title">Runtime routing</h2>
+    <p class="node-body">Builds a task-bounded tool set from native tools plus validated SAGE tools.</p>
+  </article>
+
+  <article class="node use">
+    <div class="node-header"></div>
+    <div class="node-number">5</div>
+    <div class="node-kicker">USE + LEARN</div>
+    <h2 class="node-title">Natural actor use</h2>
+    <p class="node-body">The actor may call routed tools; SAGE logs calls, failures, outcomes, and side effects.</p>
+  </article>
+
+  <section class="hub" aria-label="Validated tool inventory">
+    <div class="hub-inner"></div>
+    <div class="hub-icon">+</div>
+    <h2 class="hub-title">Validated tool inventory</h2>
+    <p class="hub-body">Accepted tools persist with proof, code hash, triggers, and lifecycle state.</p>
+  </section>
+
+  <div class="badge visible">visible evidence only</div>
+  <div class="badge birth-rule">birth is conditional</div>
+  <div class="badge route-rule">task-bounded set</div>
+  <div class="badge audit">reuse + side-effect logs</div>
+  <div class="badge hub-proof">current proof required</div>
+  <div class="badge repair-reject">repair or reject</div>
+  <div class="badge state-write">writes lifecycle state</div>
+
+  <section class="govern" aria-label="Lifecycle governance"></section>
+  <div class="govern-label">LIFECYCLE GOVERNANCE: REUSE EVIDENCE TO INVENTORY STATE</div>
+
+  <article class="govern-card reflection">
+    <h3>Lifecycle reflection</h3>
+    <p>Consumes reuse logs, regressions, utility, and side effects.</p>
+  </article>
+  <div class="govern-pill retain-pill">retain</div>
+  <div class="govern-pill repair-pill">repair</div>
+  <div class="govern-pill retire-pill">retire</div>
+  <article class="govern-card maintain">
+    <h3>Maintain</h3>
+    <p>Active tools remain available for future routing.</p>
+  </article>
+  <article class="govern-card repair">
+    <h3>Repair loop</h3>
+    <p>Edit, then revalidate before future routing.</p>
+  </article>
+  <article class="govern-card suppress">
+    <h3>Suppress</h3>
+    <p>Inventory state becomes hidden, parked, or retired.</p>
+  </article>
+
+  <footer class="footer">
+    <strong>Paper boundary:</strong>
+    <span>generated tools use visible context, pass validation before routing, preserve native side-effect tools, and remain subject to lifecycle repair or retirement.</span>
+  </footer>
+</main>
+</div>
+<script>
+  function fitFigure() {
+    if (document.documentElement.classList.contains("export")) return;
+    const margin = 32;
+    const scale = Math.min(
+      (window.innerWidth - margin) / 2400,
+      (window.innerHeight - margin) / 1500,
+      1
+    );
+    document.documentElement.style.setProperty("--fit-scale", String(Math.max(scale, 0.12)));
+  }
+  window.addEventListener("resize", fitFigure);
+  fitFigure();
+</script>
+</body>
+</html>

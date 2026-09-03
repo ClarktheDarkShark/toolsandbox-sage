@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "attempt_id": "publication_validation_20260901_strict_sample01",
+  "status": "preflight_failed_no_experiment_run",
+  "failure_stage": "publication_environment_verification",
+  "failure_summary": "The publication environment pip dependency check failed before output artifacts or model requests were created.",
+  "model_requests_started": false,
+  "output_file_count": 0,
+  "local_log": {
+    "path": "artifacts/publication_validation/publication_validation_20260901_strict_sample01/native_action.log",
+    "sha256": "52d78e82b08b5ad6e304a20fcf77620a9dcca2e75706fe98cf0b31c791f5052c",
+    "bytes": 1971,
+    "availability": "local_only_ignored_artifact"
+  }
+}

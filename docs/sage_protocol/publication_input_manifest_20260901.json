@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "bundle_id": "publication_cleanup_20260901",
+  "public_verification": {
+    "command": "PYTHONPATH=src:. python scripts/verify_publication_inputs.py",
+    "requires_local_recovery_bundle": false
+  },
+  "authoritative_local_manifest": {
+    "path": "artifacts/publication_cleanup_20260901/publication_manifest.json",
+    "sha256": "9a7c53fb9c305279dd2eedf5bf5af93e98c37f91b71d028eb065524ec381a8b2",
+    "verification_command": "PYTHONPATH=src:. python scripts/build_publication_freeze.py verify"
+  },
+  "checkpoint": {
+    "manifest_path": "docs/sage_protocol/publication_checkpoint_manifest_20260901.json",
+    "manifest_sha256": "d521af0f5759b0313a3b42f69c7bb3ffae47a65cf6192b59916b460c8b309b42",
+    "commit": "f07e4bd09a2e0377189141431d1d36945fd0a537",
+    "tree": "e7d6abf8c1757c16bb35d7e6b85e75c76c9693dc"
+  },
+  "benchmark": {
+    "path": "docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json",
+    "task_count": 1032,
+    "sha256": "21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec",
+    "ordered_task_names_sha256": "fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176"
+  },
+  "historical_original_v140_reference": {
+    "usage": "historical_sensitivity_reference_only",
+    "eligible_for_new_experiment_runs": false,
+    "record_count": 1032,
+    "outcome_scored_record_count": 800,
+    "canonical_score_mean": 0.7331747170709797,
+    "outcome_score_mean": 0.4528026204750015,
+    "snapshot_path": "artifacts/publication_cleanup_20260901/baseline/original_v140_reference_records.jsonl",
+    "snapshot_sha256": "4f9db0f186a25a247a31fe6a934c3e87785bc80c65b455f20e677d6315638c88",
+    "expanded_legacy_cache_record_count": 1182,
+    "expanded_legacy_cache_sha256": "f572cc3f82a343bd561e0ffc63936564ab533c689b088cffbfca32175e2a55d0"
+  },
+  "paired_registry_manifest_sha256": {
+    "rep01": "19a287f7a5e11fae21c6a9c8d25092dc9770a883bca21a982c6c88f17365acf1",
+    "rep02": "b60cad9cad2b3886db63cd6fc2272330f075a8d8282c1b5794c146ca7eac5cab",
+    "rep03": "1c0bb7f1e473e586beaa2d5257627249d9449f017cf277d95d992125601f56dc",
+    "rep04": "e519021f613573b2cea2fabf48e15cac5ea6d579975a0a453f1d0ceb119fb69a",
+    "rep05": "59051915ab4a3aeab0eaef11ca77cf092c55229ab5a8791fee6120e74e796393",
+    "rep06": "55c9b9241065d4665098d67ea8831c14663dd619fe607e81fd8d98f44dc22f37",
+    "rep07": "89f9e4676e933bede9eaf2dbd0159fd22d0becba9ceeb92ab4da539cba241ca0",
+    "rep08": "8128d96e058dbc5dc19234b79f25603c739bed46a0635069cdbf4722aac3cb64",
+    "rep09": "f565fbabf184862bd15de199a01e05f8f6589613a8ed26d97c865e60668ee36a",
+    "rep10": "a3b4ca48f0b22ab42d39bb6fda74ebe6cf52a4ed273adca7328e4672df41bb47"
+  },
+  "registry_inventory": {
+    "path": "artifacts/publication_cleanup_20260901/registries/registry_inventory.json",
+    "sha256": "888d85e614ea32cd6bbe8fbf8f67cc8bf92f2db605a853fc35751b799835fdfd",
+    "note": "The local inventory hashes every file in both the online source and completed frozen registry directory for all ten pairs."
+  },
+  "rapidapi_fixture": {
+    "usage": "read_only_benchmark_input",
+    "entry_count": 85,
+    "contains_api_credentials": false,
+    "source_sha256": "4b3a8eca43fe8908330c7fc891597a8a418d3e109ff435726ec94e1177b2b05b",
+    "sanitized_path": "artifacts/publication_cleanup_20260901/fixtures/rapid_api_cache.sanitized.json",
+    "sanitized_sha256": "eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
+  },
+  "environment": {
+    "capture_scope": "current cleanup host, not the uncaptured historical campaign host",
+    "python": "3.12.7",
+    "environment_sha256": "eaccc36c0769a6e957fe1635b22a15837781dfd49e4c618d076bbef4abb7213c",
+    "python_packages_sha256": "5ebed9c46130dbf13b8b473c00e39f44a09d7f3e630c2133523c404bd626df54",
+    "conda_explicit_sha256": "37c8125cba0b8fdf148f2d9ed642f0da0184955a3e53e7071abf4bec67a46d38"
+  },
+  "publication_runtime": {
+    "python_version": "3.12.7",
+    "python_implementation": "CPython",
+    "platform_system": "Darwin",
+    "platform_machine": "arm64",
+    "isolated_virtual_environment_required": true,
+    "lock_path": "requirements-publication-lock.txt",
+    "lock_sha256": "5c3ea1802331bf45809fd3e3e31fd8352473449e709cd7a443d03d1975477d1f",
+    "external_distribution_count": 108,
+    "external_distribution_sha256": "006191cd1efca9e244c6b5d6fb6a8c91fb95c279959cc91c9eada316f904fc9d"
+  },
+  "analysis": {
+    "completed_run_count": 20,
+    "inventory_path": "artifacts/publication_cleanup_20260901/analysis/publication_analysis_inputs_inventory.json",
+    "inventory_sha256": "5e9c277b6a2c6bc6c5199e8611e8bb875d03a09e2c9a44ee6a75bb3780e51a6a",
+    "public_campaign_manifest_path": "artifacts/publication_cleanup_20260901/analysis/campaign_manifest.json",
+    "campaign_manifest_sha256": "6ec114f15fd5d53283ce9afad12bcf0523217b07325183762d61666e860dd532",
+    "public_evidence_data_path": "artifacts/publication_cleanup_20260901/analysis/chapter4_evidence_data.json",
+    "evidence_data_sha256": "590522b8413dd20a67e2db08037cf4339928571292960b0a402e495cfff1d42b"
+  },
+  "validation_thresholds": {
+    "path": "docs/sage_protocol/publication_validation_thresholds.json",
+    "sha256": "b6f0fcb6332ca3b0aa02d6023e72e9410a0b6c653079dbc3c11a1ec596ea2e3b",
+    "usage": "predeclared_single_sample_engineering_gate"
+  },
+  "limitations": [
+    "Historical live gpt-4o-mini calls were unseeded and cannot be reproduced bit-for-bit.",
+    "The original campaign did not capture its exact dirty trees, launcher, environment lock, or RapidAPI fixture hash.",
+    "Large registries and task-level analysis inputs are content-inventoried in place rather than duplicated into Git."
+  ]
+}

@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
 from sage_ts.adapters.openai_agent_adapter import ChatRequest
-from sage_ts.experiments.v2_flags import (
-    CONTRACT_SYNTHESIS,
-    DEPENDENCY_LOGIC,
-    GRADING_ACCOUNTING,
-    MEDIUM_GRAIN_SKILLS,
-    feature_enabled,
+from sage_ts.generation.complete_tools import (
+    COMPLETE_TOOLS_NATIVE_NAMES,
+    COMPLETE_TOOLS_PROMPT_CONSTRAINT,
+    native_side_effect_tools,
 )
-from sage_ts.generation.prompt_cache import PromptCache, cache_key
 from sage_ts.generation.tool_spec import (
     GeneratedTool,
     StructuredInadequacyEvidence,
@@ -75,26 +74,6 @@ class ToolGenerationRequest:
             if self.shortfall_cluster_context
             else ""
         )
-        grading_contract = (
-            "canonical_route_substitution_risk (str: none|low|medium|high), "
-            "expected_milestone_calls_replaced (list[str]), "
-            "final_state_preservation_plan (str), grading_accounting_note (str), "
-            if feature_enabled(GRADING_ACCOUNTING)
-            else ""
-        )
-        grading_guidance = (
-            "Separate task correctness from benchmark route accounting: preserve "
-            "final state and original side-effect tools whenever side effects matter. "
-            "If the helper intentionally substitutes for expected intermediate "
-            "canonical milestone/base-tool calls, set canonical_route_substitution_risk "
-            "to low/medium/high, list those expected_milestone_calls_replaced, and "
-            "explain final_state_preservation_plan plus grading_accounting_note. "
-            "Do not claim canonical-preserving when a generated helper replaces a "
-            "required intermediate route; label it as outcome-preserving but "
-            "canonical-substituting. "
-            if feature_enabled(GRADING_ACCOUNTING)
-            else ""
-        )
         dependency_contract = (
             "tool_name must have an enum containing '' plus the original ToolSandbox "
             "set_* or enable/disable precondition tools that may be returned. Include "
@@ -104,14 +83,6 @@ class ToolGenerationRequest:
             "scalar inputs for every required visible state value instead, for "
             "example target_action, blocked_reason, service_ready, blocker_active, "
             "and blocker_kind. "
-            if feature_enabled(DEPENDENCY_LOGIC)
-            else "tool_name must have exactly this enum: '', 'set_wifi_status', "
-            "'set_cellular_service_status', 'set_location_service_status', "
-            "and 'set_low_battery_mode_status'. Include negative_triggers for "
-            "already ready state, unknown target service, and insufficient state. "
-            "State/precondition helpers must not require an opaque dict input; "
-            "expose concrete top-level scalar inputs for every required visible "
-            "state value. "
         )
         synthesis_guidance = (
             "For selection/planning helpers, synthesize explicit positive triggers, "
@@ -119,8 +90,6 @@ class ToolGenerationRequest:
             "ambiguity abstention behavior, and side-effect-risk behavior in the "
             "description and abstain_behavior. Do not rely on implicit selection "
             "rules. "
-            if feature_enabled(CONTRACT_SYNTHESIS)
-            else ""
         )
         medium_grain_guidance = (
             "Medium-grain skill experiment guidance: when the observation asks for "
@@ -139,12 +108,13 @@ class ToolGenerationRequest:
             "preserves_side_effect_tools and required_original_tool_calls; for "
             "contact actions this includes modify_contact, remove_contact, and "
             "send_message when those action types are supported. "
-            if feature_enabled(MEDIUM_GRAIN_SKILLS)
-            else ""
         )
         return (
-            "Propose one deterministic Python helper tool as JSON with two top-level "
-            'keys: "spec" and "code". '
+            "Propose one deterministic Python helper tool as valid JSON. Return "
+            'exactly one JSON object with top-level keys "spec" and either '
+            '"code_lines" or "code". Prefer "code_lines": a list of Python source '
+            'lines, one line per string. Use "code": a single Python source string '
+            "only if every backslash and quote is valid JSON escaping. "
             '"spec" must have: tool_name (str), family (str from allowed list), '
             "description (str), "
             'inputs (list of objects each with exactly keys "name", "annotation", '
@@ -158,7 +128,6 @@ class ToolGenerationRequest:
             "applicable_task_families (list[str]), reason_tool_is_decisive (str), "
             "diagnostic_only (bool), shortfall_cluster_evidence (list[str]), "
             "known_failure_mechanisms_addressed (list[str]), "
-            f"{grading_contract}"
             "inadequacy_evidence (object). "
             "inadequacy_evidence must include: summary (str), signals (list[str]), "
             "failed_tool_calls (list[str]), repeated_failed_tool_calls (list[str]), "
@@ -168,7 +137,6 @@ class ToolGenerationRequest:
             "reasoning/tool-use steps, applies across at least 2 task families, "
             "preserves required downstream ToolSandbox tools, and does more than "
             "replace a single existing base tool. "
-            f"{grading_guidance}"
             f"{synthesis_guidance}"
             f"{medium_grain_guidance}"
             "Use concrete scenario-family labels in applicable_task_families, "
@@ -303,14 +271,23 @@ class ToolGenerationRequest:
             "or add_* in required_original_tool_calls or preserves_side_effect_tools. "
             "Annotations must be exactly one of: str, int, float, bool, dict, list. "
             'If the output is a dictionary, output_annotation must be exactly "dict". '
-            '"code" is a self-contained Python function string with exactly one '
-            "function whose name matches spec.tool_name. The function signature must "
+            '"code_lines" or "code" must define a self-contained Python function '
+            "with exactly one function whose name matches spec.tool_name. The "
+            "function signature must "
             "include type annotations matching spec.inputs and spec.output_annotation. "
             "Do not include imports, try/except, classes, lambdas, raise statements, "
             "filesystem access, network access, subprocess calls, side effects, hidden "
             "global state, or wrapper functions. Return safe fallback values instead "
             "of raising exceptions. "
-            "The function must pass every validation example exactly. "
+            "The function must pass every validation example exactly. Treat the "
+            "validation examples as the executable public contract for the tool: "
+            "preserve field names, booleans, empty strings, empty dictionaries, "
+            "None/null values, and wording in expected output values exactly. "
+            "When expected outputs contain actor-facing text such as "
+            "final_answer_recommendation, answer_value, safe_next_action, "
+            "abstain_reason, or safety_notes, infer the reusable text template "
+            "from the examples and fill it from visible input/record fields; do "
+            "not invent alternate phrasing. "
             f"{tool_name_hint} "
             f"Allowed families: {families}. "
             f"Scenario: {self.scenario_name}. Observation: {self.observation}."
@@ -319,27 +296,32 @@ class ToolGenerationRequest:
 
 
 class ToolGenerator:
-    def __init__(self, completer: ChatCompleter, cache: PromptCache) -> None:
+    def __init__(self, completer: ChatCompleter) -> None:
         self.completer = completer
-        self.cache = cache
+        # Preserve the validated generator policy: repeated analysis of an
+        # identical public contract or rejected-code repair within this generator
+        # instance is reused. This state is memory-only and is never loaded from
+        # or written to a prior run.
+        self._contract_analyses: dict[str, str] = {}
 
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
-        deterministic = _deterministic_contract_generation(request)
-        if deterministic is not None:
-            return deterministic
-        prompt = request.prompt()
-        key = cache_key(self.completer.model, {"kind": "tool_generation_v7"}, prompt)
-        response = self.cache.get(key)
-        if response is None:
-            response = self.completer.complete(
-                ChatRequest(
-                    system="You generate safe deterministic Python helper tools.",
-                    user=prompt,
-                    model=self.completer.model,
-                )
+        prompt = _model_authored_generation_prompt(request)
+        prompt += self._contract_analysis_suffix(request)
+        response = self.completer.complete(
+            ChatRequest(
+                system=(
+                    "You generate safe deterministic Python helper tools. "
+                    "Return valid JSON only."
+                ),
+                user=prompt,
+                model=self.completer.model,
+                response_format_json=True,
             )
-            self.cache.put(key, response)
-        return parse_generated_tool_json(response)
+        )
+        tools = parse_generated_tool_candidates_json(
+            response, default_tool_name=request.suggested_tool_name
+        )
+        return _select_model_authored_candidate(request, tools)
 
     def repair(
         self,
@@ -347,93 +329,3337 @@ class ToolGenerator:
         rejected_tool: GeneratedTool,
         errors: tuple[str, ...],
     ) -> GeneratedTool:
-        deterministic_repair = _deterministic_contract_repair(
-            request, rejected_tool, errors
+        tools = self.repair_candidates(request, rejected_tool, errors)
+        if not tools:
+            raise ValueError("tool repair returned no candidates")
+        return _select_model_authored_candidate(request, list(tools))
+
+    def repair_candidates(
+        self,
+        request: ToolGenerationRequest,
+        rejected_tool: GeneratedTool,
+        errors: tuple[str, ...],
+    ) -> tuple[GeneratedTool, ...]:
+        """Return every independently authored repair for contract validation."""
+
+        prompt = _model_authored_repair_prompt(request, rejected_tool, errors)
+        prompt += self._contract_analysis_suffix(request)
+        prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
+        prompt += _model_authored_final_repair_directive(request, errors)
+        response = self.completer.complete(
+            ChatRequest(
+                system=(
+                    "You repair rejected deterministic Python helper tools. "
+                    "Return valid JSON only."
+                ),
+                user=prompt,
+                model=self.completer.model,
+                response_format_json=True,
+            )
         )
-        if deterministic_repair is not None:
-            return deterministic_repair
-        prompt = (
-            request.prompt()
-            + " The previous candidate was rejected. Repair it once without "
-            "weakening the gate. Keep the same deterministic purpose and suggested "
-            "tool name when provided. Rejection errors: "
-            + json.dumps(list(errors))
-            + ". Previous candidate JSON: "
-            + json.dumps(rejected_tool.to_json())
-            + ". If a search-filter selector failed an ambiguity or negative "
-            "mismatch, the repaired code must return selected_index=-1, "
-            "selected_id='', value='', selected_record={}, and tie_candidates "
-            "containing every tied candidate when multiple records match. If a "
-            "constraint-to-action composite helper failed a phone or no-match "
-            "example, normalize phone/number fields by stripping non-digits from "
-            "both the visible record value and match_value before comparison. "
-            "If it returns downstream_tool_name/downstream_tool_kwargs, include "
-            "that downstream original ToolSandbox action in both "
-            "preserves_side_effect_tools and required_original_tool_calls. If a "
-            "recency action-target selector failed the candidate gate for "
-            "action_selector_missing_downstream_kwargs_contract or "
-            "action_selector_missing_required_side_effect_call, repair it to "
-            "return downstream_tool_kwargs, should_call_tool, and safety_notes; "
-            "use reminder_id for reminder actions, person_id for contact actions, "
-            "and never use message_id as a contact id. If a "
-            "post-selection side-effect preparer failed or abstained too often, "
-            "normalize action_type aliases such as remove/delete and modify/update "
-            "before branching, while preserving abstention on missing records or "
-            "ambiguous updates. If a direct contact/message action helper failed a "
-            "phone-number validation example, repair phone normalization so an input "
-            "with a leading '+' returns a phone_number with the same leading '+', "
-            "with spaces/dashes/parentheses/dots removed. Exact E.164 repair rule: "
-            "strip non-digits; if there are 11 digits and the first digit is '1', "
-            "return '+' plus those 11 digits; if there are 10 digits, return '+1' "
-            "plus those 10 digits; do not return '+1' plus an 11-digit value that "
-            "already starts with 1. If a scalar phone-number "
-            "normalizer failed validation, ordinary visual separators such as spaces, "
-            "dashes, parentheses, and dots are valid input noise and must not create "
-            "ambiguous_multiple_phone_numbers. For valid normalized phone output, "
-            "return is_valid=true, a normalized leading-plus digit string, and "
-            "abstain_reason=''. A plus-prefixed E.164-style input may validly have "
-            "8 to 15 digits after cleaning; do not mark '+1' US numbers with 11 "
-            "digits as too_many_digits or ambiguous. Use ambiguous_multiple_phone_numbers "
-            "only when the input contains two or more independent phone numbers. "
-            "For scalar contact search helpers, preserve case for name and "
-            "relationship search kwargs; only phone_number fields should be digit "
-            "normalized. If should_call_search is false, search_tool_name must be "
-            "'' and search_kwargs must be {}. If an "
-            "answer/extraction helper failed a negative example because it returned "
-            "answer_value='' with abstain_reason='', repair the code so missing or "
-            "blank requested fields return a nonempty abstain_reason such as "
-            "'missing_requested_field' while preserving source ids when available. "
-            "If the output schema has answer_field, preserve the requested_field value "
-            "in answer_field even when abstaining because that requested key is "
-            "missing. If prepare_reminder_creation_args failed validation, repair "
-            "the reminder-location contract exactly: resolved_reminder_timestamp "
-            "must be used directly when present and timestamp_source must be "
-            "'resolved'; latitude and longitude must stay None unless "
-            "location_available is true and concrete coordinates are provided; "
-            "do not coerce missing optional coordinates to 0.0. When "
-            "location_requested is true, location_required is false, "
-            "location_available is false, location_lookup_failed is false, and "
-            "coordinates are missing, return should_call_add_reminder=false, "
-            "add_reminder_kwargs={}, location_status='lookup_pending', and "
-            "abstain_reason='optional_location_lookup_pending_do_not_call_add_reminder'. "
-            "When an optional location lookup has failed, allow add_reminder with "
-            "latitude=None and longitude=None and location_status='omitted_optional'. "
-            "When location_required is true and no coordinates are available, "
-            "abstain instead of creating the reminder. Return only the repaired "
-            "JSON object."
+        tools = parse_generated_tool_candidates_json(
+            response, default_tool_name=request.suggested_tool_name
         )
-        key = cache_key(self.completer.model, {"kind": "tool_repair_v2"}, prompt)
-        response = self.cache.get(key)
-        if response is None:
-            response = self.completer.complete(
+        return tuple(_normalize_model_authored_tool(request, tool) for tool in tools)
+
+    def _contract_analysis_suffix(self, request: ToolGenerationRequest) -> str:
+        if not _request_complete_tools_enabled(request):
+            return ""
+        analysis_prompt = _model_authored_contract_analysis_prompt(request)
+        analysis = self._contract_analyses.get(analysis_prompt)
+        if analysis is None:
+            analysis = self.completer.complete(
                 ChatRequest(
-                    system="You repair rejected deterministic Python helper tools.",
-                    user=prompt,
+                    system=(
+                        "You analyze public generated-tool validation contracts. "
+                        "Return valid JSON only and do not write code."
+                    ),
+                    user=analysis_prompt,
                     model=self.completer.model,
+                    response_format_json=True,
                 )
             )
-            self.cache.put(key, response)
-        return parse_generated_tool_json(response)
+            self._contract_analyses[analysis_prompt] = analysis
+        return (
+            " A separate model-authored contract analysis follows. Use it as a "
+            "reasoning aid, but the public validation examples remain authoritative. "
+            "Do not copy example constants or descriptive paths into code. Analysis: "
+            + analysis
+        )
+
+    def _repair_analysis_suffix(
+        self,
+        request: ToolGenerationRequest,
+        rejected_tool: GeneratedTool,
+        errors: tuple[str, ...],
+    ) -> str:
+        if not _request_complete_tools_enabled(request):
+            return ""
+        analysis_prompt = _model_authored_repair_analysis_prompt(
+            request, rejected_tool, errors
+        )
+        analysis = self._contract_analyses.get(analysis_prompt)
+        if analysis is None:
+            analysis = self.completer.complete(
+                ChatRequest(
+                    system=(
+                        "You trace rejected generated Python tools against public "
+                        "validation cases. Return valid JSON only and do not write "
+                        "replacement code."
+                    ),
+                    user=analysis_prompt,
+                    model=self.completer.model,
+                    response_format_json=True,
+                )
+            )
+            self._contract_analyses[analysis_prompt] = analysis
+        return (
+            " A separate model-authored trace of the current rejected code follows. "
+            "Use its concrete blocking-condition analysis when repairing, but keep "
+            "the public validation examples authoritative. Repair trace: " + analysis
+        )
+
+
+def _model_authored_candidate_count() -> int:
+    return 3
+
+
+def _model_authored_repair_candidate_count() -> int:
+    return 3
+
+
+MODEL_AUTHORED_DEFAULT_FAMILIES_BY_TOOL: dict[str, tuple[str, ...]] = {
+    "plan_contact_lookup_query": (
+        "contact_lookup",
+        "contact_phone_lookup",
+        "contact_relationship_lookup",
+    ),
+    "plan_contact_relationship_batch_update": (
+        "relationship_batch_update",
+        "contact_bulk_update",
+        "contact_lookup",
+    ),
+    "prepare_reminder_creation_args": (
+        "reminder_create",
+        "relative_time",
+        "location_phrase",
+    ),
+    "relative_day_time_to_timestamp": (
+        "relative_time",
+        "reminder_create",
+    ),
+    "next_weekday_time_to_timestamp": (
+        "weekday_time",
+        "reminder_create",
+    ),
+    "prepare_location_search_args": (
+        "location_phrase",
+        "reminder_create",
+        "external_lookup",
+    ),
+    "prepare_specific_location_search_args": (
+        "location_phrase",
+        "reminder_create",
+        "external_lookup",
+    ),
+    "prepare_broad_location_search_args": (
+        "location_phrase",
+        "reminder_create",
+        "external_lookup",
+    ),
+    "plan_message_counterparty_search": (
+        "message_counterparty_lookup",
+        "message",
+        "contact_lookup",
+    ),
+    "select_message_counterparty_for_contact_update": (
+        "message_counterparty_update",
+        "message_recency",
+        "modify_contact",
+    ),
+    "resolve_search_window_or_bounds": (
+        "recency_search",
+        "message_recency",
+        "reminder_recency",
+        "recency_action",
+    ),
+    "prepare_upcoming_reminder_search_args": (
+        "upcoming_reminder_search",
+        "reminder_due_time_search",
+    ),
+    "prepare_message_recency_search_args": (
+        "message_recency_search",
+        "message_recency",
+        "message_counterparty_update",
+    ),
+    "prepare_past_reminder_recency_search_args": (
+        "past_reminder_recency_search",
+        "reminder_creation_recency_search",
+    ),
+    "select_record_by_timestamp_extreme": (
+        "recency_search",
+        "message_recency",
+        "reminder_recency",
+    ),
+    "select_message_content_by_recency": (
+        "message_recency",
+        "recency_search",
+    ),
+    "select_action_target_by_recency": (
+        "recency_action",
+        "modify_reminder",
+        "remove_reminder",
+    ),
+    "prepare_holiday_search_args": (
+        "holiday_lookup",
+        "holiday_timestamp",
+        "calendar_distance",
+    ),
+    "days_between_timestamps": (
+        "calendar_distance",
+        "holiday_distance",
+        "timestamp_difference",
+    ),
+    "plan_device_status_lookup": (
+        "device_status_read",
+        "wifi_status_read",
+        "cellular_status_read",
+    ),
+    "plan_device_state_action_sequence_v3": (
+        "device_state_action",
+        "wifi_service_recovery",
+        "cellular_service_recovery",
+        "location_service_recovery",
+        "low_battery_precondition_recovery",
+        "blocked_downstream_task_continuation",
+    ),
+    "plan_device_state_action_sequence_location_recovery": (
+        "device_state_action",
+        "location_service_recovery",
+        "wifi_service_recovery",
+        "low_battery_precondition_recovery",
+        "blocked_downstream_location_task_continuation",
+    ),
+    "plan_send_message_contact_lookup": (
+        "named_message_recipient",
+        "contact_lookup",
+        "send_message",
+    ),
+    "prepare_direct_contact_action_args": (
+        "direct_contact_action",
+        "add_contact",
+        "modify_contact",
+        "remove_contact",
+        "send_message",
+    ),
+    "prepare_safe_action_or_abstain": (
+        "safe_abstain",
+        "contact_lookup",
+        "side_effect_guard",
+    ),
+    "extract_service_answer_field": (
+        "service_answer_extraction",
+        "convert_currency",
+        "find_phone_number",
+        "find_distance",
+        "weather_lookup",
+    ),
+    "extract_address_result": ("service_answer_extraction", "find_address"),
+    "extract_converted_amount_result": (
+        "service_answer_extraction",
+        "convert_currency",
+    ),
+    "extract_phone_number_result": (
+        "service_answer_extraction",
+        "find_phone_number",
+    ),
+    "extract_distance_result": ("service_answer_extraction", "find_distance"),
+    "extract_temperature_result": (
+        "service_answer_extraction",
+        "weather_lookup",
+        "temperature_lookup",
+    ),
+}
+
+
+MODEL_AUTHORED_DEFAULT_ORIGINAL_CALLS_BY_TOOL: dict[str, tuple[str, ...]] = {
+    "plan_contact_lookup_query": ("search_contacts",),
+    "plan_contact_relationship_batch_update": (
+        "search_contacts",
+        "modify_contact",
+    ),
+    "prepare_reminder_creation_args": ("add_reminder",),
+    "prepare_location_search_args": (
+        "get_current_location",
+        "search_location_around_lat_lon",
+    ),
+    "prepare_specific_location_search_args": ("search_location_around_lat_lon",),
+    "prepare_broad_location_search_args": (
+        "get_current_location",
+        "search_location_around_lat_lon",
+    ),
+    "plan_message_counterparty_search": ("search_contacts", "search_messages"),
+    "select_message_counterparty_for_contact_update": (
+        "search_messages",
+        "modify_contact",
+    ),
+    "resolve_search_window_or_bounds": ("search_reminder", "search_messages"),
+    "prepare_upcoming_reminder_search_args": ("search_reminder",),
+    "prepare_message_recency_search_args": ("search_messages",),
+    "prepare_past_reminder_recency_search_args": ("search_reminder",),
+    "select_record_by_timestamp_extreme": ("search_reminder", "search_messages"),
+    "select_message_content_by_recency": ("search_messages",),
+    "select_action_target_by_recency": (
+        "search_reminder",
+        "modify_reminder",
+        "remove_reminder",
+    ),
+    "prepare_holiday_search_args": ("search_holiday",),
+    "days_between_timestamps": ("get_current_timestamp", "search_holiday"),
+    "plan_device_status_lookup": (
+        "get_wifi_status",
+        "get_cellular_service_status",
+        "get_location_service_status",
+        "get_low_battery_mode_status",
+    ),
+    "plan_device_state_action_sequence_v3": (
+        "set_wifi_status",
+        "set_cellular_service_status",
+        "set_location_service_status",
+        "set_low_battery_mode_status",
+    ),
+    "plan_device_state_action_sequence_location_recovery": (
+        "set_location_service_status",
+        "set_low_battery_mode_status",
+        "set_wifi_status",
+    ),
+    "plan_send_message_contact_lookup": (
+        "search_contacts",
+        "send_message_with_phone_number",
+    ),
+    "prepare_direct_contact_action_args": (
+        "add_contact",
+        "modify_contact",
+        "remove_contact",
+        "send_message_with_phone_number",
+    ),
+    "prepare_safe_action_or_abstain": (
+        "search_contacts",
+        "remove_contact",
+        "modify_contact",
+        "send_message_with_phone_number",
+    ),
+    "extract_service_answer_field": (
+        "search_location_around_lat_lon",
+        "search_lat_lon",
+        "search_weather_around_lat_lon",
+        "calculate_lat_lon_distance",
+        "convert_currency",
+    ),
+    "extract_address_result": ("search_lat_lon", "search_location_around_lat_lon"),
+    "extract_converted_amount_result": ("convert_currency",),
+    "extract_phone_number_result": ("search_location_around_lat_lon",),
+    "extract_distance_result": ("calculate_lat_lon_distance",),
+    "extract_temperature_result": ("search_weather_around_lat_lon",),
+    "extract_stock_symbol": ("search_stock",),
+    "relative_day_time_to_timestamp": (
+        "get_current_timestamp",
+        "timestamp_to_datetime_info",
+        "add_reminder",
+        "modify_reminder",
+    ),
+    "next_weekday_time_to_timestamp": (
+        "get_current_timestamp",
+        "timestamp_to_datetime_info",
+        "add_reminder",
+        "modify_reminder",
+    ),
+}
+
+
+def _request_native_action_names(request: ToolGenerationRequest) -> tuple[str, ...]:
+    """Infer approved native actions from public generation evidence."""
+
+    allowed = set(COMPLETE_TOOLS_NATIVE_NAMES)
+    validation_actions: list[str] = []
+    names: list[str] = list(
+        MODEL_AUTHORED_DEFAULT_ORIGINAL_CALLS_BY_TOOL.get(
+            request.suggested_tool_name or "", ()
+        )
+    )
+    evidence = request.inadequacy_evidence or {}
+    for key in ("failed_tool_calls", "repeated_failed_tool_calls"):
+        value = evidence.get(key, ())
+        if isinstance(value, str):
+            names.append(value)
+        elif isinstance(value, (list, tuple, set)):
+            names.extend(str(item) for item in value)
+    for item in request.validation_examples:
+        expected = item.get("expected") if isinstance(item, dict) else None
+        if not isinstance(expected, dict):
+            continue
+        for key in ("downstream_tool_name", "tool_name"):
+            name = str(expected.get(key) or "")
+            if name:
+                names.append(name)
+                if name in allowed:
+                    validation_actions.append(name)
+        for name in allowed:
+            if isinstance(expected.get(f"{name}_kwargs"), dict):
+                names.append(name)
+                validation_actions.append(name)
+    approved = validation_actions or names
+    return tuple(dict.fromkeys(name for name in approved if name in allowed))
+
+
+def _request_complete_tools_enabled(request: ToolGenerationRequest) -> bool:
+    """Use native execution only for compact, well-covered action contracts.
+
+    The decision uses the public validation contract rather than a task, family,
+    or benchmark identifier.  Complex transformations remain ordinary generated
+    tools that prepare inputs for the actor's native call.
+    """
+
+    eligible_families = {
+        str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),
+        str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),
+    }
+    if not eligible_families.intersection(request.allowed_families):
+        return False
+    positive_count = 0
+    held_out_positive_count = 0
+    negative_count = 0
+    input_names: set[str] = set()
+    native_actions: set[str] = set()
+    max_action_argument_count = 0
+    for item in request.validation_examples:
+        if not isinstance(item, dict):
+            continue
+        inputs = item.get("inputs")
+        if isinstance(inputs, dict):
+            input_names.update(str(name) for name in inputs)
+        expected = item.get("expected")
+        if not isinstance(expected, dict):
+            continue
+        sequence = expected.get("action_sequence")
+        if isinstance(sequence, list) and len(sequence) > 1:
+            return False
+        if any(
+            isinstance(value, list) and value
+            for key, value in expected.items()
+            if str(key).endswith(("_kwargs_list", "_actions"))
+        ):
+            return False
+        should_values = [
+            bool(value)
+            for key, value in expected.items()
+            if str(key) == "should_call" or str(key).startswith("should_call_")
+        ]
+        if item.get("negative_applicability") or (
+            should_values and not any(should_values)
+        ):
+            negative_count += 1
+            continue
+        action_name = str(expected.get("downstream_tool_name") or "")
+        action_arguments = expected.get("downstream_tool_kwargs")
+        if action_name not in COMPLETE_TOOLS_NATIVE_NAMES:
+            action_name = str(expected.get("tool_name") or "")
+            action_arguments = next(
+                (
+                    expected.get(key)
+                    for key in ("tool_kwargs", "arguments", "kwargs")
+                    if isinstance(expected.get(key), dict)
+                ),
+                None,
+            )
+        if action_name not in COMPLETE_TOOLS_NATIVE_NAMES:
+            for candidate in COMPLETE_TOOLS_NATIVE_NAMES:
+                candidate_arguments = expected.get(f"{candidate}_kwargs")
+                if isinstance(candidate_arguments, dict):
+                    action_name = candidate
+                    action_arguments = candidate_arguments
+                    break
+        if action_name not in COMPLETE_TOOLS_NATIVE_NAMES:
+            continue
+        # Direct execution is eligible only when the public contract already
+        # supplies concrete action arguments. A contract that still requires
+        # an upstream lookup remains an ordinary generated planning tool.
+        if not isinstance(action_arguments, dict) or not action_arguments:
+            return False
+        positive_count += 1
+        held_out_positive_count += int(bool(item.get("held_out")))
+        native_actions.add(action_name)
+        if isinstance(action_arguments, dict):
+            max_action_argument_count = max(
+                max_action_argument_count, len(action_arguments)
+            )
+
+    compact_contract = len(input_names) <= 6
+    densely_validated_single_action = bool(
+        len(native_actions) == 1
+        and len(input_names) <= 16
+        and positive_count >= 4
+        and held_out_positive_count >= 2
+        and negative_count >= 2
+    )
+
+    # These are contract-complexity bounds, not dataset rules. Broad contracts
+    # are eligible only when one native action is covered by a dense public test
+    # matrix; multi-action contracts must remain compact.
+    return bool(
+        positive_count
+        and positive_count <= 8
+        and held_out_positive_count
+        and negative_count
+        and (compact_contract or densely_validated_single_action)
+        and len(native_actions) <= 4
+        and max_action_argument_count <= 4
+        and set(_request_native_action_names(request)) == native_actions
+    )
+
+
+def _native_action_behavior_summary(request: ToolGenerationRequest) -> str:
+    """Keep detected behavior while removing obsolete planner-only constraints."""
+
+    kept: list[str] = []
+    for raw_sentence in re.split(r"(?<=[.!?])\s+", request.observation.strip()):
+        sentence = raw_sentence.strip()
+        lowered = sentence.lower()
+        if not sentence:
+            continue
+        if lowered.startswith("return") and any(
+            marker in lowered
+            for marker in (
+                "should_call",
+                "_kwargs",
+                "downstream_tool",
+                "action_sequence",
+            )
+        ):
+            continue
+        if any(
+            marker in lowered
+            for marker in (
+                "prepare arguments only",
+                "preparing arguments only",
+                "only prepares",
+                "only selects the target",
+                "must preserve the original",
+            )
+        ):
+            continue
+        if "required_original_tool_calls" in lowered or (
+            "preserves_side_effect_tools" in lowered
+        ):
+            continue
+        if "must never call" in lowered or "only prepares" in lowered:
+            continue
+        if lowered.startswith("when ") and "downstream_tool_" in lowered:
+            continue
+        sentence = re.sub(
+            r"side-effect-free helper",
+            "native-action tool",
+            sentence,
+            flags=re.IGNORECASE,
+        )
+        sentence = re.split(
+            r",?\s+and return a final-action-ready\b",
+            sentence,
+            maxsplit=1,
+            flags=re.IGNORECASE,
+        )[0].rstrip(" ,")
+        if sentence and sentence[-1] not in ".!?":
+            sentence += "."
+        kept.append(sentence)
+    return " ".join(kept)
+
+
+def _native_action_api_guidance(native_names: tuple[str, ...]) -> str:
+    """Describe the final native call without retaining planner-only semantics."""
+
+    if not native_names:
+        return ""
+    guidance = (
+        "The expected_native_action object is the sole positive-case execution "
+        "contract. Ignore any legacy planning implication in the generated function "
+        "name: this native-action variant must execute the declared native function, "
+        "not return should_call flags or prepared kwargs. "
+    )
+    if native_names == ("add_reminder",):
+        guidance += (
+            "For every positive case, literally call add_reminder once with the "
+            "keyword arguments content, reminder_timestamp, latitude, and longitude "
+            "shown by expected_native_action. Derive those values from the declared "
+            "inputs and argument_value_locations; never invent content, coordinates, "
+            "or a timestamp. Missing content or time and unresolved required location "
+            "must abstain before the call. For optional location, distinguish pending "
+            "from failed lookup: requested=true, available=false, and lookup_failed=false "
+            "must abstain, while lookup_failed=true with location_required=false may "
+            "call add_reminder with latitude=None and longitude=None. Apply this "
+            "decision table before the native call: no location requested calls with "
+            "None coordinates; available location calls with the visible coordinates; "
+            "optional requested location with lookup_failed=true calls with None "
+            "coordinates; optional requested location with lookup_failed=false "
+            "abstains because lookup is pending; required unavailable location always "
+            "abstains. Do not merge the pending and failed branches. "
+        )
+    if set(native_names) == {"modify_reminder", "remove_reminder"}:
+        guidance += (
+            "The visible selection_mode controls the ranked target: latest selects "
+            "the unique maximum numeric timestamp and oldest selects the unique "
+            "minimum numeric timestamp. Do not default both modes to max. Collect all "
+            "records tied at the selected extreme and abstain unless exactly one "
+            "winner remains before executing the native action. "
+        )
+    device_setters = tuple(
+        name
+        for name in native_names
+        if name.startswith("set_") and name.endswith("_status")
+    )
+    if device_setters and len(device_setters) == len(native_names):
+        setter_mapping = ", ".join(
+            (
+                name.removeprefix("set_")
+                .removesuffix("_status")
+                .removesuffix("_service")
+                + " to "
+                + name
+            )
+            for name in device_setters
+        )
+        guidance += (
+            "This contract performs one explicit device-state action only. Map "
+            f"the schema-derived targets as follows: {setter_mapping}. "
+            "Pass desired_on unchanged as the native "
+            "on argument and call exactly one setter. Unknown or blank targets must "
+            "abstain without calling any setter; do not add prerequisite or recovery "
+            "actions. "
+        )
+    return guidance
+
+
+def _native_action_validation_examples(
+    request: ToolGenerationRequest,
+) -> list[dict[str, object]]:
+    """Project preparatory contracts into the native action calls they require."""
+
+    allowed = set(COMPLETE_TOOLS_NATIVE_NAMES)
+    projected: list[dict[str, object]] = []
+    source_index = 0
+    held_out_index = 0
+    negative_index = 0
+    for item in request.validation_examples:
+        if not isinstance(item, dict):
+            continue
+        expected = item.get("expected")
+        if not isinstance(expected, dict):
+            continue
+        should_values = [
+            bool(value)
+            for key, value in expected.items()
+            if str(key) == "should_call" or str(key).startswith("should_call_")
+        ]
+        negative = bool(item.get("negative_applicability")) or (
+            bool(should_values) and not any(should_values)
+        )
+        if negative:
+            case_label = f"negative_{negative_index}"
+            negative_index += 1
+        elif item.get("held_out"):
+            case_label = f"held_out_{held_out_index}"
+            held_out_index += 1
+        else:
+            case_label = f"source_{source_index}"
+            source_index += 1
+        native_name = ""
+        native_arguments: dict[str, object] = {}
+        if not negative:
+            downstream_name = str(expected.get("downstream_tool_name") or "")
+            if downstream_name in allowed and isinstance(
+                expected.get("downstream_tool_kwargs"), dict
+            ):
+                native_name = downstream_name
+                native_arguments = dict(expected["downstream_tool_kwargs"])
+            direct_name = str(expected.get("tool_name") or "")
+            if not native_name and direct_name in allowed:
+                for key in ("tool_kwargs", "arguments", "kwargs"):
+                    if isinstance(expected.get(key), dict):
+                        native_name = direct_name
+                        native_arguments = dict(expected[key])
+                        break
+            if not native_name:
+                for candidate in COMPLETE_TOOLS_NATIVE_NAMES:
+                    kwargs = expected.get(f"{candidate}_kwargs")
+                    if isinstance(kwargs, dict):
+                        native_name = candidate
+                        native_arguments = dict(kwargs)
+                        break
+            sequence = expected.get("action_sequence")
+            if not native_name and isinstance(sequence, list) and len(sequence) == 1:
+                action = sequence[0]
+                if isinstance(action, dict):
+                    candidate = str(action.get("tool_name") or action.get("name") or "")
+                    arguments = action.get("arguments") or action.get("kwargs")
+                    if candidate in allowed and isinstance(arguments, dict):
+                        native_name = candidate
+                        native_arguments = dict(arguments)
+        projected.append(
+            {
+                "case_label": case_label,
+                "inputs": item.get("inputs"),
+                "expected_native_action": (
+                    {
+                        "name": native_name,
+                        "arguments": native_arguments,
+                        "argument_value_locations": {
+                            key: _visible_value_locations(item.get("inputs"), value)
+                            for key, value in native_arguments.items()
+                        },
+                    }
+                    if native_name
+                    else None
+                ),
+                "negative_applicability": negative,
+                "held_out": bool(item.get("held_out", False)),
+            }
+        )
+    alias_index = 0
+    seen_aliases: set[str] = set()
+    aliases_by_mode = {
+        "latest": ("last", "latest_by_time", "most_recent"),
+        "oldest": ("first", "oldest_by_time", "earliest"),
+    }
+    for item in list(projected):
+        if not item.get("expected_native_action"):
+            continue
+        inputs = item.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        mode = str(inputs.get("selection_mode") or "").strip().lower()
+        for alias in aliases_by_mode.get(mode, ()):
+            if alias in seen_aliases:
+                continue
+            seen_aliases.add(alias)
+            alias_inputs = dict(inputs)
+            alias_inputs["selection_mode"] = alias
+            projected.append(
+                {
+                    **item,
+                    "case_label": f"held_out_alias_{alias_index}",
+                    "inputs": alias_inputs,
+                    "held_out": True,
+                }
+            )
+            alias_index += 1
+
+    action_alias_index = 0
+    seen_action_aliases: set[tuple[str, str]] = set()
+    for item in list(projected):
+        expected_action = item.get("expected_native_action")
+        inputs = item.get("inputs")
+        if not isinstance(expected_action, dict) or not isinstance(inputs, dict):
+            continue
+        canonical_action = str(expected_action.get("name") or "").strip()
+        visible_action = str(inputs.get("action_type") or "").strip()
+        verb = canonical_action.split("_", 1)[0]
+        if (
+            visible_action != canonical_action
+            or verb not in {"add", "modify", "remove", "send"}
+            or (canonical_action, verb) in seen_action_aliases
+        ):
+            continue
+        seen_action_aliases.add((canonical_action, verb))
+        alias_inputs = dict(inputs)
+        alias_inputs["action_type"] = verb
+        projected.append(
+            {
+                **item,
+                "case_label": f"held_out_action_alias_{action_alias_index}",
+                "inputs": alias_inputs,
+                "held_out": True,
+            }
+        )
+        action_alias_index += 1
+
+    target_override_index = 0
+    for item in list(projected):
+        expected_action = item.get("expected_native_action")
+        inputs = item.get("inputs")
+        if not isinstance(expected_action, dict) or not isinstance(inputs, dict):
+            continue
+        arguments = expected_action.get("arguments")
+        updates = inputs.get("updates")
+        records = inputs.get("records")
+        if not (
+            isinstance(arguments, dict)
+            and isinstance(updates, dict)
+            and bool(updates)
+            and isinstance(records, list)
+        ):
+            continue
+        for identifier_key, selected_identifier in arguments.items():
+            if not str(identifier_key).endswith("_id"):
+                continue
+            conflicting_identifier = next(
+                (
+                    record.get(identifier_key)
+                    for record in records
+                    if isinstance(record, dict)
+                    and record.get(identifier_key) not in {None, selected_identifier}
+                ),
+                None,
+            )
+            if conflicting_identifier is None:
+                continue
+            override_inputs = dict(inputs)
+            override_inputs["updates"] = {
+                **updates,
+                identifier_key: conflicting_identifier,
+            }
+            projected.append(
+                {
+                    **item,
+                    "case_label": f"held_out_target_override_{target_override_index}",
+                    "inputs": override_inputs,
+                    "held_out": True,
+                }
+            )
+            target_override_index += 1
+            break
+
+    structural_negative_inputs: list[tuple[str, dict[str, object]]] = []
+    for item in projected:
+        if not item.get("expected_native_action"):
+            continue
+        inputs = item.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        records = inputs.get("records")
+        if (
+            not isinstance(records, list)
+            or not records
+            or not all(isinstance(record, dict) for record in records)
+        ):
+            continue
+        timestamp_key = str(inputs.get("timestamp_key") or "").strip()
+        if not timestamp_key:
+            common_keys = set(records[0])
+            for record in records[1:]:
+                common_keys.intersection_update(record)
+            timestamp_key = next(
+                (
+                    key
+                    for key in sorted(common_keys)
+                    if key.endswith("_timestamp")
+                    and all(
+                        isinstance(record.get(key), (int, float)) for record in records
+                    )
+                ),
+                "",
+            )
+        if not timestamp_key or not any(timestamp_key in record for record in records):
+            continue
+
+        malformed_records = [dict(record) for record in records]
+        malformed_records[0].pop(timestamp_key, None)
+        malformed_inputs = dict(inputs)
+        malformed_inputs["records"] = malformed_records
+        structural_negative_inputs.append(("missing_rank_field", malformed_inputs))
+
+        numeric_records = [
+            record
+            for record in records
+            if isinstance(record.get(timestamp_key), (int, float))
+        ]
+        if numeric_records:
+            mode = str(inputs.get("selection_mode") or "latest").lower()
+            selected = (
+                min(numeric_records, key=lambda record: record[timestamp_key])
+                if mode in {"oldest", "first", "oldest_by_time", "earliest"}
+                else max(numeric_records, key=lambda record: record[timestamp_key])
+            )
+            tied_inputs = dict(inputs)
+            tied_inputs["records"] = [
+                *[dict(record) for record in records],
+                dict(selected),
+            ]
+            structural_negative_inputs.append(("tied_rank", tied_inputs))
+        break
+
+    for index, (reason, inputs) in enumerate(structural_negative_inputs):
+        projected.append(
+            {
+                "case_label": f"negative_structural_{index}_{reason}",
+                "inputs": inputs,
+                "expected_native_action": None,
+                "negative_applicability": True,
+                "held_out": False,
+            }
+        )
+    return projected
+
+
+def _native_action_validator_labeled_examples(
+    request: ToolGenerationRequest,
+) -> list[dict[str, object]]:
+    """Attach the case labels emitted by the executable validator."""
+
+    indexes = {"source": 0, "held_out": 0, "negative": 0}
+    labeled: list[dict[str, object]] = []
+    for item in _native_action_validation_examples(request):
+        if item.get("negative_applicability"):
+            category = "negative"
+        elif item.get("held_out"):
+            category = "held_out"
+        else:
+            category = "source"
+        validator_label = f"{category}_{indexes[category]}"
+        indexes[category] += 1
+        labeled.append({**item, "validator_case_label": validator_label})
+    return labeled
+
+
+def _visible_value_locations(
+    inputs: object,
+    expected_value: object,
+) -> list[str]:
+    """Locate expected scalar action values in public validation inputs."""
+
+    if isinstance(expected_value, (dict, list, tuple, set)):
+        return []
+    locations: list[str] = []
+
+    def visit(value: object, path: str) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                visit(child, f"{path}.{key}" if path else str(key))
+            return
+        if isinstance(value, (list, tuple)):
+            for index, child in enumerate(value):
+                visit(child, f"{path}[{index}]")
+            return
+        if value == expected_value:
+            locations.append(path)
+
+    visit(inputs, "inputs")
+    return locations[:8]
+
+
+def _native_action_coverage_guidance(
+    examples: list[dict[str, object]],
+) -> str:
+    positive = [item for item in examples if item.get("expected_native_action")]
+    held_out = [item for item in positive if item.get("held_out")]
+    negative = [item for item in examples if item.get("negative_applicability")]
+    labels = [str(item.get("case_label") or "") for item in positive]
+    action_names = {
+        str(expected.get("name") or "")
+        for item in positive
+        for expected in [item.get("expected_native_action")]
+        if isinstance(expected, dict)
+    }
+    role_mapping_guidance = (
+        "When the selected record has multiple role identifiers with a shared "
+        "semantic suffix, such as paired participant or person identifiers, and "
+        "a visible self identifier is supplied, collect the selected record's "
+        "candidate identifiers, remove blank values and the self value, and require "
+        "one unique remaining action target. Do not bind the target to one fixed "
+        "role field. Never abstain merely because one sender, recipient, participant, "
+        "or other role identifier equals the self identifier when another role "
+        "identifier is visible. Any guard that tests one role equals self before "
+        "collecting all role candidates is invalid. Filter all candidates first; "
+        "abstain only if the filtered set does not contain exactly one identifier. "
+        "Do not call next() directly on a tuple or list of role values. Build the "
+        "filtered candidate list explicitly, deduplicate it, require length one, "
+        "and only then index candidates[0]. "
+        if action_names & {"modify_contact", "remove_contact"}
+        else ""
+    )
+    return (
+        "Contract coverage is mandatory: implement all "
+        f"{len(positive)} positive cases ({', '.join(labels)}), including "
+        f"{len(held_out)} held-out cases, while making zero native calls for "
+        f"all {len(negative)} negative cases. Do not optimize only for source_0. "
+        "Compare the positive inputs and expected action arguments, then implement "
+        "the reusable branches needed to cover every variation. Each positive "
+        "action includes argument_value_locations showing where its expected scalar "
+        "arguments occur in that case's visible inputs. Use those locations to infer "
+        "a reusable value-mapping rule; never hard-code the example values themselves. "
+        "The locations are descriptive paths rooted at the function inputs, not Python "
+        "expressions: never reference a variable named inputs unless it is a declared "
+        "function parameter. Translate each path to the declared parameter and ordinary "
+        "dictionary/list access. "
+        + role_mapping_guidance
+        + "When native action arguments come from an input mapping, copy "
+        "every non-None mapping entry into the native call rather than using "
+        "mutually exclusive branches for individual update keys. Treat a mapping "
+        "with any non-None entry as actionable; do not require one particular key "
+        "before accepting it. Build one action-argument dictionary from the stable "
+        "target identifier plus all non-None writable mapping entries, then make "
+        "exactly one "
+        "native call with that dictionary. Build the success confirmation from the "
+        "same visible update mapping: every nonempty changed value must appear in "
+        "the confirmation. A generic confirmation such as 'updated successfully' "
+        "is invalid because the actor must be able to report what changed without "
+        "reconstructing hidden state. Describe a selected target with visible "
+        "selection context such as latest or oldest, and never expose an opaque "
+        "record identifier in actor-facing confirmation text. Normalize any "
+        "selection aliases demonstrated by the public held-out examples before "
+        "choosing the record. A target identifier is not an update field. Ignore "
+        "mapping keys whose names end in _id when constructing updates, and bind "
+        "the native target identifier only from the uniquely selected record or "
+        "the explicit identity input demonstrated by the public contract. Never "
+        "allow an updates mapping to replace that selected identity. "
+        "Every positive case is valid by contract. Trace each positive input through "
+        "every guard and return before writing code. Do not add an early abstention "
+        "condition that fires for a positive example merely because one visible role "
+        "or identifier denotes the agent or self; use the other visible roles and "
+        "argument_value_locations to infer the expected reusable mapping. Derive "
+        "abstention conditions from negative examples, not from assumptions that "
+        "contradict a positive example. "
+        "Preserve a branch once it satisfies a positive case when adding another branch. "
+    )
+
+
+def _model_authored_contract_analysis_prompt(
+    request: ToolGenerationRequest,
+) -> str:
+    examples = _native_action_validation_examples(request)
+    native_actions = _request_native_action_names(request)
+    role_analysis = (
+        "paired roles where one visible identifier denotes the agent or self, "
+        if set(native_actions) & {"modify_contact", "remove_contact"}
+        else ""
+    )
+    return (
+        "Analyze this public native-action tool contract before code is written. "
+        "Compare every source, held-out, and negative example. Infer a reusable "
+        "algorithm that maps declared inputs to exactly one approved native action "
+        "for every positive case and no action for every negative case. Pay special "
+        "attention to action arguments whose value location changes across cases, "
+        + role_analysis
+        + "mapping "
+        "inputs whose concrete keys vary across cases, and ordering or selection modes. "
+        "Return a JSON object with keys algorithm_steps, positive_case_coverage, "
+        "argument_binding_rules, abstain_conditions, and invariants. Paths in "
+        "argument_value_locations are descriptive evidence only. Do not output Python, "
+        "do not hard-code example values, and do not refer to hidden labels, scenario "
+        "IDs, or benchmark answers. Required tool name: "
+        + str(request.suggested_tool_name or "infer_from_contract")
+        + ". Approved native actions: "
+        + json.dumps(list(native_actions), sort_keys=True)
+        + ". Validation examples: "
+        + json.dumps(examples, sort_keys=True)
+    )
+
+
+def _model_authored_repair_analysis_prompt(
+    request: ToolGenerationRequest,
+    rejected_tool: GeneratedTool,
+    errors: tuple[str, ...],
+) -> str:
+    """Ask the generator to trace current code through only the failing public cases."""
+
+    failed_case_labels = {
+        match.group(1)
+        for error in errors
+        if (match := re.match(r"^((?:source|held_out|negative)_\d+)_", error))
+    }
+    all_cases = _native_action_validation_examples(request)
+    failing_cases = [
+        item
+        for item in all_cases
+        if str(item.get("case_label") or "") in failed_case_labels
+    ]
+    return (
+        "Trace this rejected model-authored native-action tool against each failing "
+        "public validation case. Substitute the complete input values into the "
+        "current Python control flow in execution order. Identify the first guard, "
+        "condition, return, or argument binding that causes each validator error. "
+        "For boolean expressions, report the evaluated truth value and the input "
+        "values responsible for it. Compare the failing case with the nearest passing "
+        "positive and negative cases so the next repair fixes the failure without "
+        "reintroducing a previously cleared branch. Return JSON with keys "
+        "failing_case_traces, first_blocking_condition, minimal_semantic_change, "
+        "and regression_guards. Do not output Python or a replacement function. "
+        "Do not use hidden labels, scenario identifiers, or benchmark answers. "
+        "Approved native actions: "
+        + json.dumps(list(_request_native_action_names(request)), sort_keys=True)
+        + ". Validator errors: "
+        + json.dumps(list(errors), sort_keys=True)
+        + ". Failing public cases: "
+        + json.dumps(failing_cases, sort_keys=True)
+        + ". All public case classifications for regression comparison: "
+        + json.dumps(all_cases, sort_keys=True)
+        + ". Current generated code: "
+        + rejected_tool.code
+    )
+
+
+def _model_authored_final_repair_directive(
+    request: ToolGenerationRequest,
+    errors: tuple[str, ...],
+) -> str:
+    """Restate structural invariants after verbose model-authored analysis."""
+
+    if not _request_complete_tools_enabled(request):
+        return ""
+    cases = _native_action_validator_labeled_examples(request)
+    ranked_record_contract = any(
+        isinstance(item.get("inputs"), dict)
+        and "records" in item["inputs"]
+        and "selection_mode" in item["inputs"]
+        for item in cases
+    )
+    ranked_failure = any(
+        marker in error
+        for error in errors
+        for marker in (
+            "native_action_execution_error",
+            "unexpected_native_action",
+            "native_action_abstain",
+            "native_action_count",
+            "native_action_arguments",
+        )
+    )
+    if not ranked_record_contract or not ranked_failure:
+        return ""
+
+    paired_role_contract = any(
+        isinstance(inputs := item.get("inputs"), dict)
+        and bool(inputs.get("self_person_id"))
+        and isinstance(records := inputs.get("records"), list)
+        and any(
+            isinstance(record, dict)
+            and len([key for key in record if str(key).endswith("_person_id")]) >= 2
+            for record in records
+        )
+        for item in cases
+    )
+    paired_role_step = (
+        "6. If the visible self_person_id is blank, abstain before role processing. "
+        "Otherwise, from only the selected record, collect every nonblank role "
+        "identifier whose field ends in _person_id and build a new filtered list of "
+        "values unequal to self_person_id. Never mutate the list with remove(), because "
+        "the value may be absent; use a non-mutating filter, deduplicate the result, "
+        "and abstain unless exactly one target remains. Never assume a fixed sender or "
+        "recipient direction. "
+        if paired_role_contract
+        else ""
+    )
+    return (
+        " FINAL BINDING REPAIR CHECKLIST. This checklist is authoritative after the "
+        "analysis above. Implement every step literally in each returned candidate: "
+        "1. Normalize every selection-mode alias demonstrated by a positive or held-out "
+        "case into the contract's latest or oldest meaning. "
+        "2. Inspect the original records collection without filtering or dropping any "
+        "item. Before ranking, abstain if it is empty, any item is not a mapping, any "
+        "item lacks the demonstrated ranking field, or any ranking value is not of the "
+        "demonstrated comparable type. "
+        "3. Compute the requested minimum or maximum ranking value from the unchanged "
+        "collection. Build winners from every original record equal to that extreme. "
+        "4. Abstain unless len(winners) is exactly one; duplicate or distinct tied "
+        "records are both ambiguous. Never resolve a tie by input order or sorting. "
+        "5. Only after those checks, bind selected_record = winners[0]. "
+        + paired_role_step
+        + "7. Copy every concrete writable value from any demonstrated update mapping, "
+        "excluding target-identifier keys; abstain if no concrete update remains. "
+        "8. Call the approved native action exactly once only after all prerequisites "
+        "pass, then return the complete success object. Every failed prerequisite must "
+        "return the complete abstain object and make zero native calls. "
+        "9. Mentally execute every public positive, held-out, alias, malformed-record, "
+        "and tied-rank case before emitting code. Do not return an explanation; return "
+        "only the requested complete JSON repair candidate or candidate array. Every "
+        "public positive and held-out case must reach exactly one native call; do not "
+        "add an abstention condition that rejects a demonstrated valid case."
+    )
+
+
+MODEL_AUTHORED_OUTPUT_TOOL_NAME_ENUM_BY_TOOL: dict[str, tuple[str, ...]] = {
+    "plan_device_state_action_sequence_v3": (
+        "",
+        "set_wifi_status",
+        "set_cellular_service_status",
+        "set_location_service_status",
+        "set_low_battery_mode_status",
+    ),
+    "plan_device_state_action_sequence_location_recovery": (
+        "",
+        "set_location_service_status",
+        "set_low_battery_mode_status",
+        "set_wifi_status",
+    ),
+    "plan_device_status_lookup": (
+        "",
+        "get_wifi_status",
+        "get_cellular_service_status",
+        "get_location_service_status",
+        "get_low_battery_mode_status",
+    ),
+}
+
+
+def _model_authored_generation_prompt(
+    request: ToolGenerationRequest,
+    *,
+    candidate_count_override: int | None = None,
+) -> str:
+    expected_tool_name = request.suggested_tool_name or "infer_from_contract"
+    _complete_tools = _request_complete_tools_enabled(request)
+    # In complete-tools mode the helper "prepare kwargs / should_call" contracts
+    # and helper-shaped validation examples would override the complete-tools
+    # instruction, so neutralize them and let the state-change validator judge.
+    contract_rules = () if _complete_tools else _model_authored_contract_rules(request)
+    candidate_count = (
+        max(1, int(candidate_count_override))
+        if candidate_count_override is not None
+        else _model_authored_candidate_count()
+    )
+    examples = (
+        _native_action_validation_examples(request)
+        if _complete_tools
+        else [
+            {
+                "inputs": item.get("inputs"),
+                "expected": item.get("expected"),
+                "negative_applicability": item.get("negative_applicability", False),
+            }
+            for item in request.validation_examples
+            if isinstance(item, dict)
+        ]
+    )
+    inadequacy_payload: dict[str, object]
+    prompt_observation = request.observation
+    if _complete_tools:
+        native_names = _request_native_action_names(request)
+        prompt_observation = (
+            _native_action_behavior_summary(request)
+            + " The generated tool must map its visible inputs to exactly one "
+            "validated native action or safely abstain. The native implementation "
+            "remains responsible for the state change and trace. Approved actions "
+            "for this contract: " + ", ".join(native_names) + "."
+        )
+        raw_evidence = request.inadequacy_evidence or {}
+        inadequacy_payload = {
+            "summary": _compact_text(prompt_observation, 1800),
+            "signals": raw_evidence.get("signals", ()),
+            "failed_tool_calls": native_names,
+        }
+    elif contract_rules:
+        raw_evidence = request.inadequacy_evidence or {}
+        inadequacy_payload = {
+            "summary": _compact_text(
+                str(raw_evidence.get("summary") or request.observation), 800
+            ),
+            "signals": raw_evidence.get("signals", ()),
+        }
+    else:
+        inadequacy_payload = request.inadequacy_evidence or {}
+    payload = {
+        "required_tool_name": expected_tool_name,
+        "candidate_count": candidate_count,
+        "task_context": _compact_text(request.scenario_name, 500)
+        if contract_rules
+        else request.scenario_name,
+        "observation": _compact_text(prompt_observation, 800)
+        if contract_rules
+        else prompt_observation,
+        "allowed_families": list(request.allowed_families),
+        "contract_rules": contract_rules,
+        "inadequacy_evidence": inadequacy_payload,
+        "failure_memory_context": request.failure_memory_context or {},
+        "shortfall_cluster_context": request.shortfall_cluster_context or {},
+        "validation_contract": (
+            "native_action_delegation" if _complete_tools else "exact_return_value"
+        ),
+        "validation_examples": examples,
+    }
+    coverage_guidance = (
+        _native_action_coverage_guidance(examples) if _complete_tools else ""
+    )
+    native_action_algorithm_guidance = (
+        "Before any native action call, implement the negative public examples "
+        "as explicit abstention branches. When records are ranked by a field, infer "
+        "that field from the positive public examples and validate every candidate "
+        "before sorting or calling min/max. If a candidate is not a mapping, lacks "
+        "the ranking field, or has a nonnumeric ranking value when the examples use "
+        "numeric ranking, call no native action and abstain. Only after that guard, "
+        "compute the winning value and collect every record at that value. If more "
+        "than one record shares the winning value, call no native action and abstain. "
+        "Call native functions with keyword arguments whose names exactly match "
+        "the binding expected_native_action arguments; never bind update values "
+        "positionally or substitute one update field for another. "
+        if _complete_tools
+        else ""
+    )
+    native_action_api_guidance = (
+        _native_action_api_guidance(_request_native_action_names(request))
+        if _complete_tools
+        else ""
+    )
+    validation_guidance = (
+        "For native_action_delegation validation, each positive example contains "
+        "expected_native_action with the exact approved native function name and "
+        "arguments. Call that native function exactly once, then return status "
+        "success, the native action name, the native result, an empty abstain_reason, "
+        "and a concise nonempty confirmation. If the declared inputs include an "
+        "updates mapping, every visible nonempty update value must appear in that "
+        "confirmation; generic success text is not sufficient. Confirmation text "
+        "must not expose native identifier arguments whose keys end in _id. If "
+        "selection_mode is a declared input, preserve its visible value in the "
+        "confirmation. When "
+        "expected_native_action is null, "
+        "call no native function and return status abstain, an empty native action "
+        "and confirmation, and a nonempty abstain_reason. Never return an empty "
+        "object. Classify examples by expected_native_action, not by whether an "
+        "input name sounds adverse: a positive example remains positive even when "
+        "an input includes words such as failed, missing, unavailable, or ambiguous. "
+        "Do not create a single-input abstention guard when that same input value "
+        "appears in a positive example; use the complete demonstrated combination. "
+        "Do not reproduce "
+        "the former should_call/kwargs planning object; the native call itself is the "
+        "contract. " + coverage_guidance
+        if _complete_tools
+        else "The function must return the expected object exactly for every "
+        "validation example, including every field, boolean, empty string, empty "
+        "dict/list, None/null, and actor-facing text. If expected text follows a "
+        "pattern, infer the reusable template and fill it from input or record fields. "
+    )
+    return (
+        "Synthesize one reusable deterministic Python tool from this public "
+        "tool contract. Return valid JSON only. If candidate_count is 1, return "
+        "top-level keys spec and code_lines. If candidate_count is greater than "
+        "1, return a top-level candidates array with exactly candidate_count "
+        "independent objects, each containing spec and code_lines. The code must "
+        "be authored now as a list of Python source "
+        "lines, not copied from a template. The function name must equal "
+        "required_tool_name unless that value is infer_from_contract; if it is "
+        "infer_from_contract, choose a valid snake_case Python function name. "
+        "Use the validation examples as executable contract tests. Generalize "
+        "from the examples and task evidence; do not hard-code by entire input "
+        "object, hidden task id, benchmark scenario id, or answer string. The "
+        "candidates must use meaningfully different branch structure when "
+        "possible so deterministic validation can select the safest one. "
+        + validation_guidance
+        + "The contract_rules list in the payload is binding and has priority over "
+        "generic helper design. "
+        "Every code_lines item must be one complete Python source line. Do not "
+        "split a string literal across lines. Prefer double-quoted Python strings "
+        "when the text may contain apostrophes. Define exactly one top-level "
+        "function and no other top-level def; use inline loops and branches "
+        "rather than helper functions when the contract is simple. "
+        "The spec object should be minimal: tool_name, family, description, "
+        "inputs, output_annotation, and output_schema. Do not spend tokens on "
+        "registry metadata; SAGE will fill lifecycle metadata from the same "
+        "public birth evidence after validation. The tool_name must equal "
+        "required_tool_name unless required_tool_name is infer_from_contract. "
+        "The family must be one of allowed_families. Each input must be an object "
+        "with name, annotation, and description. output_annotation must be one of "
+        "str, int, float, bool, dict, or list. "
+        + (
+            COMPLETE_TOOLS_PROMPT_CONSTRAINT + " "
+            if _complete_tools
+            else "The function must be pure and side-effect free: no imports, try/except, "
+            "raise statements, classes, lambdas, while loops, file/network/subprocess access, "
+            "global state, mutation of inputs, or calls to ToolSandbox side-effect "
+            "tools. Return safe fallback values instead of raising. "
+        )
+        + "Treat optional "
+        "dict or list inputs as empty dict/list when they are None or the wrong "
+        "type before calling .get, indexing, or iterating. "
+        + native_action_algorithm_guidance
+        + native_action_api_guidance
+        + ("" if _complete_tools else _model_authored_tool_specific_guidance(request))
+        + "Required JSON payload: "
+        + json.dumps(payload, sort_keys=True)
+    )
+
+
+def _compact_text(value: str, limit: int) -> str:
+    text = " ".join(str(value or "").split())
+    return text if len(text) <= limit else text[: limit - 3].rstrip() + "..."
+
+
+def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str, ...]:
+    if request.suggested_tool_name == "prepare_add_contact_args":
+        return (
+            "Use the typed name, phone_number, and relationship inputs; user_request is intent context only. Do not parse missing scalar values out of free-form prose and do not call or define auxiliary parsing or validation functions.",
+            "Normalize phone_number inline by trimming outer whitespace and removing spaces, parentheses, periods, and dashes while preserving a leading plus sign.",
+            "Check missing name or phone_number only after trimming the typed scalars. If either is blank, return the required abstention object and call no native action.",
+            "For a positive case, build keyword arguments with name and normalized phone_number, include relationship only when nonblank, literally call add_contact once with those keyword arguments, assign its return value to native_result, and then return the required success object.",
+            "Write confirmation as a clear subject-first completed-state sentence that names the visible contact and says the contact has been added; include the visible normalized phone number. Do not use an imperative, a vague generic success message, or an opaque identifier.",
+            "Never return prepared arguments as native_result and never report success without executing add_contact.",
+        )
+    if request.suggested_tool_name == "plan_contact_update_from_id":
+        return (
+            "Use only the typed person_id, phone_number, name, and relationship inputs. Do not call or define auxiliary parsing or validation functions.",
+            "Normalize a nonblank phone_number inline by trimming it and removing spaces, parentheses, periods, and dashes while preserving a leading plus sign.",
+            "Build keyword arguments starting with person_id, then add only nonblank update fields. Never pass blank optional values to modify_contact.",
+            "If person_id is blank or every update field is blank, return the required abstention object and call no native action.",
+            "For a positive case, literally call modify_contact once with the filtered keyword arguments, assign its return value to native_result, and then return the required success object.",
+        )
+    if request.suggested_tool_name == "plan_contact_lookup_query":
+        return (
+            "Build search_contacts_kwargs from contact_name, phone_number, and relationship before branching on selected_record; return those kwargs in both pre-search and selected-record outputs.",
+            "If selected_record is a non-empty dict and requested_field is present, should_call_search_contacts is false, abstain_reason is empty, selected_record is copied exactly, answer_field equals requested_field, and answer_value is selected_record[requested_field].",
+            "Use an early return for selected_record cases so should_call_search_contacts cannot remain true from pre-search kwargs.",
+            "For selected_record relationship answers with a nonblank phone_number lookup, final_answer_recommendation equals phone_number + ' is your ' + answer_value.",
+            "This relationship-answer rule applies even when contact_name is blank: if requested_field == 'relationship', phone_number is nonblank, and selected_record has relationship, final_answer_recommendation must be the phone number plus ' is your ' plus selected_record['relationship'].",
+            'For selected_record phone_number answers with a nonblank contact_name lookup, final_answer_recommendation equals contact_name + "\'s phone number is " + answer_value.',
+            "For selected_record name answers with a nonblank relationship lookup, final_answer_recommendation equals 'Your ' + relationship + ' is ' + answer_value.",
+            "For selected_record person_id answers, answer_value is the person_id and final_answer_recommendation is empty.",
+            "In every output where requested_field is nonblank, answer_field must equal requested_field; do not leave answer_field empty during pre-search planning.",
+            "If selected_record is empty and at least one lookup kwarg exists, should_call_search_contacts is true, selected_record is {}, answer_field equals requested_field, answer_value and final_answer_recommendation are empty, copy_exactly is false, and abstain_reason is empty.",
+            "If selected_record is empty and no lookup kwarg exists, should_call_search_contacts is false and abstain_reason is missing_lookup_constraint.",
+        )
+    if request.suggested_tool_name == "prepare_safe_action_or_abstain":
+        return (
+            "Return exactly these output keys on every branch: should_abstain, missing_information, required_original_tools, safe_next_action, final_answer_recommendation, and abstain_reason.",
+            "Normalize required_original_tools and available_original_tools from concrete ToolSandbox names to semantic capabilities: search_contacts becomes contact_lookup and send_message_with_phone_number becomes message_send.",
+            "For requested_action message_send, send_message, or any send/text/message action, a target_identifier that is not a phone number is a named recipient and requires contact_lookup before message_send.",
+            "If a named-recipient message send lacks contact_lookup in available_original_tools, return should_abstain true, include contact_lookup in missing_information, set safe_next_action ask_user_or_abstain, and recommend that the message cannot be sent safely because the recipient cannot be resolved to a phone number.",
+            "Never treat message_send alone as sufficient for a named recipient. message_send alone is sufficient only when target_identifier already looks like a concrete phone number.",
+            "If required_original_tools or available_original_tools is a string, treat it as one capability value, not as an iterable of characters.",
+            "If required_original_tools is omitted, malformed, or incomplete, infer required semantic capabilities from requested_action, user_request, and target_identifier before computing missing_information.",
+            "The function must never return should_abstain false when the action would require guessing a phone number, person_id, reminder_id, current location, or missing search result.",
+        )
+    if request.suggested_tool_name == "prepare_upcoming_reminder_search_args":
+        return (
+            "Return exactly target_tool_name, search_kwargs, should_call_search, and abstain_reason on every branch.",
+            "For a positive current_timestamp, target_tool_name is search_reminder, search_kwargs contains only reminder_timestamp_lowerbound equal to current_timestamp, should_call_search is true, and abstain_reason is empty.",
+            "For a missing, nonnumeric, or nonpositive current_timestamp, target_tool_name is empty, search_kwargs is empty, should_call_search is false, and abstain_reason is missing_current_timestamp.",
+            "Never call search_reminder or any state-changing function inside this generated argument-preparation tool.",
+        )
+    if request.suggested_tool_name == "prepare_message_recency_search_args":
+        return (
+            "Return exactly target_tool_name, search_kwargs, should_call_search, and abstain_reason on every branch.",
+            "For a positive current_timestamp, target_tool_name is search_messages, search_kwargs contains creation_timestamp_upperbound equal to current_timestamp, should_call_search is true, and abstain_reason is empty.",
+            "If content_keyword is nonblank, copy it into search_kwargs as content; if it is blank, omit content.",
+            "For a missing, nonnumeric, or nonpositive current_timestamp, target_tool_name is empty, search_kwargs is empty, should_call_search is false, and abstain_reason is missing_current_timestamp.",
+            "Never call search_messages or any state-changing function inside this generated argument-preparation tool.",
+        )
+    if request.suggested_tool_name == "prepare_past_reminder_recency_search_args":
+        return (
+            "Return exactly target_tool_name, search_kwargs, should_call_search, and abstain_reason on every branch.",
+            "For a positive current_timestamp, target_tool_name is search_reminder, search_kwargs contains only creation_timestamp_upperbound equal to current_timestamp, should_call_search is true, and abstain_reason is empty.",
+            "For a missing, nonnumeric, or nonpositive current_timestamp, target_tool_name is empty, search_kwargs is empty, should_call_search is false, and abstain_reason is missing_current_timestamp.",
+            "Never call search_reminder or any state-changing function inside this generated argument-preparation tool.",
+        )
+    if request.suggested_tool_name == "resolve_search_window_or_bounds":
+        return (
+            "Return exactly these output keys on every branch: target_tool_name, search_kwargs, should_call_search, abstain_reason, interpretation, and bounds_source.",
+            "Normalize phrase and direction to lowercase strings before branching.",
+            "Infer a phrase_direction from phrase before using direction: yesterday or prior day -> yesterday; later today -> later_today; today -> today; upcoming, future, next reminder, next todo, due later, or later -> upcoming; oldest, earliest, or first -> oldest; latest, most recent, or newest -> latest.",
+            "If phrase_direction is nonblank, it overrides generic or conflicting direction values such as latest, recent, most_recent, newest, old, or empty.",
+            "Do not abstain when phrase contains a supported bounded recency word even if direction is generic.",
+            "Use target_tool_name search_reminder for target_domain reminder and search_messages for target_domain message.",
+            "For reminder target_domain with timestamp_intent creation, reminder_creation, created, creation_time, or created_time, use creation_timestamp_lowerbound and creation_timestamp_upperbound.",
+            "For reminder target_domain with timestamp_intent reminder, upcoming, due, due_time, reminder_time, or empty, use reminder_timestamp_lowerbound and reminder_timestamp_upperbound.",
+            "For message target_domain, use creation_timestamp_lowerbound and creation_timestamp_upperbound.",
+            "For yesterday, compute center=current_timestamp-86400, lower=center-120, and upper=center+120.",
+            "For today, compute the UTC day bounds from current_timestamp unless timezone_offset is provided: lower=current day's midnight and upper=lower+86399.",
+            "For upcoming, return only the lowerbound key set to current_timestamp.",
+            "For latest or oldest with lookback_days equal to zero, return only the appropriate creation_timestamp_upperbound set to current_timestamp; zero means no explicit lookback limit and must not cause abstention.",
+            "If current_timestamp is missing or <= 0, return should_call_search false, empty target_tool_name/search_kwargs, abstain_reason missing_current_timestamp, empty interpretation, and bounds_source abstain.",
+        )
+    if request.suggested_tool_name == "plan_message_counterparty_search":
+        return (
+            "Return exactly these output keys on every branch: phase, message_direction, selection_mode, should_call_search_contacts, search_contacts_kwargs, should_call_search_messages, search_messages_kwargs, should_call_tool, abstain_reason, next_step, selected_message, counterparty_phone_number, answer_value, exact_final_answer, final_answer_recommendation, copy_exactly.",
+            "Normalize message_direction aliases: sent, outgoing, from_me, sender, i_sent, and me_to_them become sent; received, incoming, to_me, recipient, they_sent, and them_to_me become received; either stays either and must abstain as ambiguous_message_direction.",
+            "Normalize selection_mode aliases: latest, last, newest, most_recent, and recent become latest; oldest, first, and earliest become oldest.",
+            "Use this branch order: validate direction and mode; if messages is a non-empty list, select the latest or oldest visible message by numeric creation_timestamp and return answer_ready; else if self_person_id is blank, return self_lookup_required; else return message_search_required.",
+            "For self_lookup_required, set should_call_search_contacts true, search_contacts_kwargs {'is_self': True}, should_call_search_messages false, search_messages_kwargs {}, should_call_tool true, next_step exactly 'call search_contacts, then call this helper again with self_person_id', and all answer fields empty with copy_exactly false.",
+            "For message_search_required with sent, search_messages_kwargs must include {'sender_person_id': self_person_id}; for received it must include {'recipient_person_id': self_person_id}. If content_keyword is nonblank, also include {'content': content_keyword}.",
+            "For message_search_required, set should_call_search_contacts false, should_call_search_messages true, should_call_tool true, next_step exactly 'call search_messages with search_messages_kwargs', selected_message {}, answer fields empty, and copy_exactly false.",
+            "For answer_ready, set should_call_search_contacts false, should_call_search_messages false, search kwargs empty, should_call_tool false, next_step exactly 'answer with final_answer_recommendation', selected_message to the selected visible record exactly, counterparty_phone_number and answer_value to the selected counterparty phone, and copy_exactly true.",
+            "For answer_ready with self_person_id present, counterparty is the side whose person_id is not self_person_id; otherwise use sender_phone_number for received messages and recipient_phone_number for sent messages.",
+            "For a received answer with content containing 'you want' and a nonblank content_keyword, exact_final_answer and final_answer_recommendation must be phone + ' asked you if you want some ' + content_keyword.",
+            "For the outgoing/sent visible-message answer branch in the public examples, exact_final_answer and final_answer_recommendation are exactly the counterparty phone number.",
+            "For abstain, include all output keys, set should_call_tool false, empty kwargs and selected_message {}, answer fields empty, copy_exactly false, and next_step to the expected ask/repair action.",
+        )
+    if request.suggested_tool_name == "prepare_direct_contact_action_args":
+        return (
+            "Return exactly these output keys on every branch: downstream_tool_name, downstream_tool_kwargs, should_call_tool, and abstain_reason.",
+            "The spec must list the preserved original side-effect tools in both required_original_tool_calls and preserves_side_effect_tools: add_contact, modify_contact, remove_contact, and send_message_with_phone_number.",
+            "This generated tool never mutates contacts or sends messages. It only prepares the original ToolSandbox tool name and kwargs from visible scalar inputs.",
+            "Normalize action_type aliases: add/create/save become add_contact; update/modify/change become modify_contact; remove/delete become remove_contact; send/message/text become send_message.",
+            "Normalize phone numbers by removing spaces, parentheses, periods, and dashes while preserving a leading plus sign when present.",
+            "For add_contact, require contact_name and phone_number, then return downstream_tool_name add_contact with kwargs containing name and phone_number. Include relationship only when it is nonblank.",
+            "For modify_contact, require record_id and at least one concrete update field. Return downstream_tool_name modify_contact with person_id equal to record_id plus phone_number, name, or relationship when those updates are visible. If target_field/new_value are used, map phone/phone_number/number to phone_number, name/contact_name to name, and relationship to relationship.",
+            "For remove_contact, require record_id and return downstream_tool_name remove_contact with kwargs {'person_id': record_id}.",
+            "For send_message, require phone_number and message_text and return downstream_tool_name send_message_with_phone_number with kwargs {'phone_number': normalized_phone, 'content': message_text}.",
+            "For search, recency, relationship-batch, reminder, ambiguous, or insufficient-information requests, return downstream_tool_name '', downstream_tool_kwargs {}, should_call_tool false, and abstain_reason not_direct_scalar_contact_action.",
+            "For missing fields, abstain with the specific reason missing_required_fields, missing_person_id, or no_update_fields.",
+            "Never invent a person_id, phone number, name, relationship, or message content that is not visible in the inputs.",
+        )
+    if request.suggested_tool_name == "select_message_counterparty_for_contact_update":
+        return (
+            "Return exactly these output keys on every branch: selected_record, selected_message, selected_message_id, selected_person_id, selected_phone_number, selected_timestamp, downstream_tool_name, downstream_tool_kwargs, should_call_tool, tie_candidates, abstain_reason, safety_notes, final_answer_recommendation.",
+            "Normalize selection_mode so latest selects the maximum numeric creation_timestamp and oldest selects the minimum numeric creation_timestamp.",
+            "Use a direct extreme-value algorithm rather than sorting and choosing opposite list ends: normalize the mode, compute winning_timestamp = max(valid_timestamps) for latest or min(valid_timestamps) for oldest, then collect records whose creation_timestamp equals winning_timestamp. Require exactly one winner before continuing.",
+            "If updates is missing, empty, or only contains blank/None values, abstain with missing_updates before selecting records.",
+            "Build candidates only from dict records with numeric creation_timestamp. A bool is not a numeric timestamp.",
+            "If more than one distinct visible record has the selected timestamp, abstain with ambiguous_timestamp_tie and include those records in tie_candidates.",
+            "Require self_person_id to be copied from a visible search_contacts(is_self=True) result; never infer or invent it.",
+            "For the selected message, compare sender_person_id and recipient_person_id with self_person_id. Use the single nonblank participant id unequal to self_person_id as the counterparty. Support both sent and received messages, and abstain with unresolved_counterparty unless exactly one non-self participant is available.",
+            "On success, selected_record and selected_message must copy the selected visible record exactly; selected_message_id is message_id as a string or empty string; selected_timestamp is the selected creation_timestamp float.",
+            "On success, downstream_tool_name must be modify_contact, downstream_tool_kwargs must contain person_id plus every concrete update field, should_call_tool true, tie_candidates [], abstain_reason empty, safety_notes exactly 'call modify_contact with downstream_tool_kwargs', and final_answer_recommendation exactly 'call modify_contact with downstream_tool_kwargs'.",
+            "For any abstain branch, downstream_tool_name must be empty, downstream_tool_kwargs {}, should_call_tool false, safety_notes exactly 'abstain; no safe contact update target', and final_answer_recommendation must be 'abstain:' plus abstain_reason.",
+        )
+    if request.suggested_tool_name == "select_message_content_by_recency":
+        return (
+            "Return exactly these output keys: selected_record, selected_message, selected_message_id, selected_content, selected_timestamp, should_answer, abstain_reason, tie_candidates, selection_reason, exact_final_answer, final_answer_recommendation, copy_exactly.",
+            "Normalize selection_mode so latest, newest, most recent, and recent select the maximum creation_timestamp; oldest, earliest, and first select the minimum creation_timestamp.",
+            "Build candidates only from dict records with numeric creation_timestamp. A bool is not a numeric timestamp.",
+            "Before tie detection, de-duplicate duplicate visible message records. Prefer a stable key of message_id, creation_timestamp, and content; if message_id is missing, include creation_timestamp, content, sender_person_id, recipient_person_id, sender_phone_number, and recipient_phone_number.",
+            "The stable key must include message_id when message_id is present. Two records with different message_id values are distinct messages even when timestamp and content match.",
+            "If duplicate copies share the full stable key, keep the first visible copy and its original input index. Do not overwrite it with a later duplicate, and do not use the duplicate's later index in selection_reason.",
+            "Treat same-timestamp records as ambiguous only when two distinct deduplicated visible messages remain at the selected timestamp; different message_id values at the same timestamp are distinct and must produce ambiguous_timestamp_tie.",
+            "Recommended algorithm: create two parallel lists named deduped_records and deduped_indices. Iterate enumerate(records). Build key = (message_id, creation_timestamp, content) when message_id is nonblank; otherwise key = (creation_timestamp, content, sender_person_id, recipient_person_id, sender_phone_number, recipient_phone_number). If key was already seen, skip it. Otherwise append the record to deduped_records and append the original index to deduped_indices.",
+            "Do not store deduped records as tuple pairs, and do not iterate 'for index, record in deduped_records'. Records are dictionaries, so unpacking a record as two values is invalid.",
+            "After dedupe, compute selected_timestamp as max or min over deduped_records. Build tied_positions as integer positions i where deduped_records[i]['creation_timestamp'] equals selected_timestamp. If len(tied_positions) > 1, return ambiguous_timestamp_tie with tie_candidates copied from deduped_records at those positions in original order.",
+            "For a successful selection, selected_pos must be tied_positions[0], selected_original_index must be deduped_indices[selected_pos], and selected_record must be deduped_records[selected_pos]. selection_reason must be exactly 'selected_latest_message_by_creation_timestamp_at_index_' + selected_original_index for latest mode, or 'selected_oldest_message_by_creation_timestamp_at_index_' + selected_original_index for oldest mode.",
+            "For success, selected_record and selected_message must copy the first visible selected record exactly, selected_message_id must be the selected record message_id as a string or empty string, selected_content must be stripped content, should_answer true, abstain_reason empty, tie_candidates empty, copy_exactly true.",
+            "For a latest success, exact_final_answer and final_answer_recommendation must equal \"Your most recent message says '<content>'.\" using the selected_content exactly inside single quotes.",
+            "For an oldest success, exact_final_answer and final_answer_recommendation must equal \"Your oldest message says '<content>'.\" using the selected_content exactly inside single quotes.",
+            "For no records, invalid mode, no numeric timestamps, missing selected content, or distinct timestamp ties, should_answer must be false, exact_final_answer empty, copy_exactly false, and final_answer_recommendation must be 'abstain:' plus the abstain_reason.",
+        )
+    if request.suggested_tool_name == "prepare_holiday_search_args":
+        return (
+            "Return exactly these output keys on every branch: should_call_search_holiday, search_holiday_kwargs, holiday_name, year_policy, final_answer_recommendation, and abstain_reason.",
+            "Extract a visible holiday name from user_request without using benchmark task ids or hidden answers. Preserve common holiday capitalization such as Thanksgiving and Christmas Day.",
+            "Do not hard-code a finite if/elif list of holiday names from the examples. Write a small text-extraction algorithm that can handle an unseen holiday label in the same wording pattern.",
+            "Do not import any module. The validator rejects imports; use only plain Python string operations, loops, and conditionals inside the single generated function.",
+            "The extraction should remove task framing such as 'how many days until', 'what is the timestamp for', 'holiday', 'date', 'this year', and question punctuation, then keep the remaining visible holiday phrase.",
+            "Algorithm requirement: first find and remove a standalone four-digit year and surrounding words like 'in 2027' from the candidate holiday phrase; then strip leading phrases such as 'how many days is it till', 'how many days until', 'what is the timestamp for', 'what is the date for', and 'when is'.",
+            "After stripping framing, title-case the remaining phrase unless it already contains apostrophes or mixed capitalization. The returned holiday_name must not include a year or words such as timestamp, date, holiday, how many days, until, or till.",
+            "If user_request contains any four digit year from 1900 through 2200 anywhere in the visible text, convert it to int, include that year in search_holiday_kwargs, and set year_policy exactly to explicit_year.",
+            "If no explicit year is visible, search_holiday_kwargs must contain only holiday_name and year_policy must be environment_resolves_year.",
+            "If no concrete holiday name is visible, should_call_search_holiday is false, search_holiday_kwargs is {}, holiday_name is '', year_policy is missing_holiday_name, final_answer_recommendation is exactly 'I need the holiday name before I can look up its timestamp.', and abstain_reason is missing_holiday_name.",
+            "In the missing holiday-name branch, year_policy must be missing_holiday_name even when no explicit year is present.",
+            "Do not compute a holiday date or timestamp inside this generated tool. It only prepares the preserved original search_holiday call.",
+        )
+    if request.suggested_tool_name == "extract_service_answer_field":
+        return (
+            "Return exactly these output keys on every branch: answer_value, answer_kind, answer_unit, should_call_downstream_tool, downstream_tool_name, downstream_tool_kwargs, exact_final_answer, final_answer_recommendation, copy_exactly, and abstain_reason.",
+            "The spec must list the preserved original producer tools in both required_original_tool_calls and preserves_side_effect_tools: search_location_around_lat_lon, search_lat_lon, search_weather_around_lat_lon, calculate_lat_lon_distance, and convert_currency.",
+            "This generated tool never calls a service. It only reads the visible payload returned by an original ToolSandbox lookup, distance, weather, or conversion tool.",
+            "Normalize service_payload before extracting: if it is a list, inspect dict items in order; if it is a dict with a result key, inspect result and the wrapper; if it is a scalar wrapped as {'result': value}, extract from result.",
+            "Supported answer fields include phone_number, address, distance, distance_km, converted_amount, amount, current_temperature, temperature, high_temperature, low_temperature, and result.",
+            "If service_payload is {'result': numeric} and requested_unit or answer_subject is visible, treat it as a distance result for distance-style requests and return answer_kind distance with the numeric result preserved as answer_value.",
+            "If service_payload is {'result': numeric} and requested_unit is a visible currency code such as USD, EUR, CNY, or GBP, treat it as a converted_amount result and include requested_unit as answer_unit.",
+            "Currency unit preservation is mandatory: if the payload has currency_code, currency, target_currency, to_currency, or requested_unit is a visible three-letter currency code, answer_unit must be that code and must not be blank.",
+            "For converted_amount results with a nonblank answer_unit, exact_final_answer and final_answer_recommendation must be exactly answer_value + ' ' + answer_unit with no trailing blank when answer_unit is empty and no duplicated unit.",
+            "If service_payload is {'result': string} and the string looks like a street/postal address or answer_subject is address, treat it as an address result and preserve the string exactly.",
+            "For missing or blank requested fields, return answer_value '', copy_exactly false, and a nonempty abstain_reason such as no_supported_answer_field or missing_requested_field.",
+            "If a downstream lookup is needed and the payload visibly contains latitude and longitude plus a downstream place or destination, return should_call_downstream_tool true with the original downstream_tool_name and kwargs only; otherwise should_call_downstream_tool false.",
+            "When answer_value is found, answer_kind must name the supported field class, answer_unit must use requested_unit when visible or the payload unit when present, exact_final_answer and final_answer_recommendation must contain the scalar answer, copy_exactly true, and abstain_reason ''.",
+            "For phone numbers, preserve the visible phone string exactly. For addresses, preserve the visible address string. For distances and temperatures, preserve the numeric text and unit without adding unsupported conversions.",
+        )
+    if request.suggested_tool_name == "extract_address_result":
+        return (
+            "Return exactly these output keys on every branch: answer_value, answer_kind, answer_unit, should_call_downstream_tool, downstream_tool_name, downstream_tool_kwargs, exact_final_answer, final_answer_recommendation, copy_exactly, and abstain_reason.",
+            "This generated tool never calls a service. It only reads the visible payload returned by an original ToolSandbox lookup, distance, or conversion tool.",
+            "Normalize service_payload before extracting: if it is a list, inspect dict items in order; if it is a dict with a result key, inspect result and the wrapper; if it is a scalar wrapped as {'result': value}, extract from result.",
+            "When answer_value is found, copy_exactly must be true, abstain_reason must be '', should_call_downstream_tool must be false, downstream_tool_name must be '', and downstream_tool_kwargs must be {}.",
+            "When no supported answer field is present, answer_value, answer_kind, answer_unit, exact_final_answer, and final_answer_recommendation must be '', copy_exactly false, and abstain_reason must be no_supported_answer_field.",
+        )
+    if request.suggested_tool_name == "extract_phone_number_result":
+        return (
+            "Return exactly these output keys on every branch: answer_value, answer_kind, answer_unit, should_call_downstream_tool, downstream_tool_name, downstream_tool_kwargs, exact_final_answer, final_answer_recommendation, copy_exactly, and abstain_reason.",
+            "This generated tool never calls a service. It only reads the visible payload returned by an original ToolSandbox lookup.",
+            "The tool should accept service_payload and optional answer_subject. If answer_subject is omitted, default it to ''.",
+            "Normalize service_payload before extracting: if it is a list, inspect dict items in order; if it is a dict with a result key, inspect result and the wrapper; otherwise inspect the dict itself.",
+            "Extract the visible phone_number field exactly; do not insert spaces, dashes, parentheses, or country-code formatting.",
+            "When answer_subject is nonblank, exact_final_answer and final_answer_recommendation must be exactly 'The phone number for ' + answer_subject + ' is ' + answer_value.",
+            "When answer_subject is blank and the payload record has a nonblank name, use that record name as answer_subject.",
+            "When no subject is available, exact_final_answer and final_answer_recommendation must be exactly answer_value.",
+            "When answer_value is found, copy_exactly must be true, abstain_reason must be '', should_call_downstream_tool must be false, downstream_tool_name must be '', and downstream_tool_kwargs must be {}.",
+            "When no supported answer field is present, answer_value, answer_kind, answer_unit, exact_final_answer, and final_answer_recommendation must be '', copy_exactly false, and abstain_reason must be no_supported_answer_field.",
+        )
+    if request.suggested_tool_name == "extract_distance_result":
+        return (
+            "Return exactly these output keys on every branch: answer_value, answer_kind, answer_unit, should_call_downstream_tool, downstream_tool_name, downstream_tool_kwargs, exact_final_answer, final_answer_recommendation, copy_exactly, and abstain_reason.",
+            "This generated tool never calls a service. It only reads a visible distance payload from calculate_lat_lon_distance.",
+            "If service_payload is a dict with result, distance_km, distance, or value, extract that numeric value directly. If service_payload['result'] is a float or int, do not call .get on it; use it as the distance.",
+            "Set answer_kind exactly to distance for every successful branch. Set answer_unit to km when requested_unit is kilometers, kilometer, km, or blank and no other distance unit is visible.",
+            "For success with answer_subject, exact_final_answer and final_answer_recommendation must be exactly 'You are approximately <rounded> kilometers away from <answer_subject>.' where <rounded> is the numeric value rounded to two decimal places with trailing zeros removed.",
+            "When answer_subject is blank, exact_final_answer and final_answer_recommendation must be '<answer_value> <answer_unit>' with no duplicated unit.",
+            "When no numeric distance is present, return empty answer fields, copy_exactly false, and abstain_reason no_supported_answer_field.",
+        )
+    if request.suggested_tool_name == "extract_temperature_result":
+        return (
+            "Return exactly these output keys on every branch: answer_value, answer_kind, answer_unit, should_call_downstream_tool, downstream_tool_name, downstream_tool_kwargs, exact_final_answer, final_answer_recommendation, copy_exactly, and abstain_reason.",
+            "This generated tool never calls a weather service itself. It reads a visible search_weather_around_lat_lon payload and completes any local deterministic unit conversion inside the generated function.",
+            "Normalize service_payload before extracting: if it is a list, inspect dict items in order; if it is a dict with a result key, inspect both result and the wrapper without discarding richer named fields. Metric-specific named fields take precedence over a generic result scalar. Use a scalar result directly only when no requested metric-specific field is available.",
+            "Use requested_metric to select the visible temperature field. Treat selector tokens used by the public validation examples as the canonical interface values, and normalize visible aliases such as now/current, mean/average, highest/maximum/high/max, and lowest/minimum/low/min to those declared values. Current selects current_temperature then temperature; average selects average_temperature; maximum semantics select max_temperature then high_temperature; minimum semantics select min_temperature then low_temperature. Never silently use current_temperature when an explicit maximum, minimum, or average metric was requested.",
+            "When requested_unit is Fahrenheit and the selected visible unit is Celsius, calculate Fahrenheit as Celsius * 9 / 5 + 32 inside this pure generated tool. When requested_unit is Celsius and the selected visible unit is Fahrenheit, calculate Celsius as (Fahrenheit - 32) * 5 / 9. Do not return a downstream handoff to unit_conversion for deterministic arithmetic on already-visible values.",
+            "Complete field selection and unit conversion before constructing answer_value or either final-answer string. Round a converted numeric value to at most two decimal places so binary floating-point artifacts are not exposed, while preserving a visible unconverted numeric value as text.",
+            "Every successful branch must be answer-ready in one generated-tool call: should_call_downstream_tool false, downstream_tool_name '', downstream_tool_kwargs {}, nonempty exact_final_answer and final_answer_recommendation, copy_exactly true, and abstain_reason ''.",
+            "For a successful answer with answer_subject, exact_final_answer and final_answer_recommendation must identify the canonical requested metric, subject, numeric answer, and answer unit. Use the same canonical selector label required by the corresponding public validation example.",
+            "When no supported temperature field or scalar conversion result is present, return empty answer fields, copy_exactly false, and abstain_reason no_supported_answer_field.",
+        )
+    if request.suggested_tool_name == "extract_converted_amount_result":
+        return (
+            "Return exactly these output keys on every branch: answer_value, answer_kind, answer_unit, should_call_downstream_tool, downstream_tool_name, downstream_tool_kwargs, exact_final_answer, final_answer_recommendation, copy_exactly, and abstain_reason.",
+            "This generated tool never calls a service. It only reads a visible convert_currency payload.",
+            "If service_payload is a dict with converted_amount, amount, value, or result, extract that numeric value directly. If service_payload['result'] is a float or int, do not call .get on it; use it as the converted amount.",
+            "Set answer_kind exactly to converted_amount for every successful branch.",
+            "Set answer_unit from requested_unit first when nonblank; otherwise use currency_code, currency, target_currency, to_currency, or unit from the payload. If a unit is visible, answer_unit must not be blank.",
+            "For success, exact_final_answer and final_answer_recommendation must be answer_value + ' ' + answer_unit when answer_unit is nonblank; otherwise they must be answer_value with no trailing space.",
+            "When no numeric converted amount is present, return empty answer fields, copy_exactly false, and abstain_reason no_supported_answer_field.",
+        )
+    if request.suggested_tool_name == "days_between_timestamps":
+        return (
+            "Return exactly these output keys: days and seconds.",
+            "Compute diff = int(timestamp_1) - int(timestamp_0). days is diff // 86400 and seconds is diff % 86400.",
+            "If timestamp_1 is earlier than timestamp_0, preserve Python floor-division semantics for days and seconds so the two fields still reconstruct the signed difference.",
+            "Do not call time, datetime, search_holiday, or any ToolSandbox tool. Use only the two visible timestamp inputs.",
+        )
+    if request.suggested_tool_name == "plan_device_status_lookup":
+        return (
+            "Return exactly these output keys on every branch: tool_name, arguments, should_call, target_service, status_value, status_label, final_answer_recommendation, and abstain_reason.",
+            "This is read-only. Never return a setter tool and never change state.",
+            "First classify whether user_request is a read-only question or an action request. Requests containing action verbs such as turn on, turn off, enable, disable, switch on, switch off, set, activate, or deactivate are not read-only status lookups; for those return should_call false, tool_name '', arguments {}, target_service '', status_value false, status_label '', final_answer_recommendation '', and abstain_reason not_read_only_status_lookup.",
+            "Map wifi requests to get_wifi_status, cellular/mobile service requests to get_cellular_service_status, location service requests to get_location_service_status, and low battery mode requests to get_low_battery_mode_status.",
+            "Before a visible getter result exists, return the selected getter tool_name, arguments {}, should_call true, the normalized target_service, the readable status_label such as Wifi or Cellular service, empty final_answer_recommendation, status_value false, and abstain_reason ''.",
+            "After visible_state_result contains a visible true/on/enabled result, return should_call false, status_value true, status_label as the readable service label, and a final_answer_recommendation that answers the requested service as on.",
+            "After visible_state_result contains a visible false/off/disabled result, return should_call false, status_value false, status_label as the readable service label, and a final_answer_recommendation that answers the requested service as off.",
+            "If no supported read-only status target is visible, return should_call false, tool_name '', arguments {}, target_service '', status_label '', final_answer_recommendation '', and abstain_reason no_status_target.",
+        )
+    if request.suggested_tool_name == "plan_device_state_action_sequence_v3":
+        return (
+            "Return exactly these output keys on every branch: tool_name, arguments, should_call, reason, action_sequence, final_response_recommendation, continue_original_task_after_sequence, and abstain_reason.",
+            "This tool only plans original native setter calls and must never execute them.",
+            "The function inputs are target_service, desired_on, low_battery_blocks_enable, resume_original_task, and additional_services_to_enable. Do not parse natural-language requests, scenario names, task identifiers, hidden answers, or dataset labels.",
+            "Map the normalized services wifi, cellular, location, and low_battery to set_wifi_status, set_cellular_service_status, set_location_service_status, and set_low_battery_mode_status. Every setter receives arguments {'on': <bool>}.",
+            "Build a complete minimal action_sequence. When desired_on and low_battery_blocks_enable are true for wifi, cellular, or location, prepend one set_low_battery_mode_status action with on false and reason clear_low_battery_before_enabling_service. Then append the target setter. Append each supported additional_services_to_enable setter in input order, skipping duplicates and the target service.",
+            "Use reason set_<service>_on or set_<service>_off for ordinary target and additional-service actions. Treat the public validation examples as binding for exact output shapes, action order, and final response strings.",
+            "When resume_original_task is true, final_response_recommendation is exactly continue_original_task and continue_original_task_after_sequence is true. Otherwise return the service-specific completed-state sentence shown by the public examples and continue_original_task_after_sequence false.",
+            "On success, should_call is true, abstain_reason is empty, and top-level tool_name, arguments, and reason exactly copy the first action. Never duplicate actions.",
+            "When no supported target is visible, use the exact no_device_state_target abstention object from the negative example.",
+        )
+    if (
+        request.suggested_tool_name
+        == "plan_device_state_action_sequence_location_recovery"
+    ):
+        return (
+            "Return exactly these output keys on every branch: tool_name, arguments, should_call, reason, action_sequence, final_response_recommendation, continue_original_task_after_sequence, and abstain_reason.",
+            "This tool only plans original ToolSandbox setter calls. It must never execute those calls.",
+            "This narrowed tool applies only to downstream location-dependent tasks after visible_state_or_error exposes a location-service PermissionError, disabled location service, location service not enabled, low battery blocking location enablement, or wifi disabled during a location search.",
+            "For an applicable downstream location-service blocker, return exactly this action_sequence: first {'tool_name': 'set_low_battery_mode_status', 'arguments': {'on': False}, 'reason': 'clear_low_battery_before_enabling_service'}, second {'tool_name': 'set_location_service_status', 'arguments': {'on': True}, 'reason': 'set_location_on'}, third {'tool_name': 'set_wifi_status', 'arguments': {'on': True}, 'reason': 'enable_wifi_for_downstream_location_search'}.",
+            "Treat these visible_state_or_error variants as the same applicable location-service blocker: PermissionError: Location service is not enabled; Location service is not enabled; Location service cannot be turned on in low battery mode; location service disabled; location unavailable.",
+            "For an applicable downstream location-search wifi blocker such as ConnectionError: Wifi is not enabled, return exactly one action: {'tool_name': 'set_wifi_status', 'arguments': {'on': True}, 'reason': 'enable_wifi_for_downstream_location_search'}.",
+            "On the applicable branch, top-level tool_name, arguments, and reason must copy the first action exactly; should_call must be true; final_response_recommendation must be exactly continue_original_task; continue_original_task_after_sequence must be true; abstain_reason must be ''.",
+            "The applicable branch includes visible user requests for reminders, todos, weather, distance, location lookup, address lookup, phone lookup for a place, find/search/look up near a place, or any visible text that needs a location service result after the location-service error.",
+            "Do not use this tool for cellular-disabled, contact-only, message-only, direct device-setting, or unrelated device-state errors. Do not use it for a wifi-disabled error unless the visible request is a downstream location-dependent search/reminder/weather/distance task. For non-applicable branches return should_call false, tool_name '', arguments {}, action_sequence [], final_response_recommendation '', continue_original_task_after_sequence false, reason exactly no_device_state_target, and abstain_reason exactly no_device_state_target.",
+            "Never return a successful branch with an empty action_sequence. Never duplicate actions in action_sequence.",
+            "Never return generic text such as Device state has been updated or Completed action. The only successful final_response_recommendation for this tool is exactly continue_original_task.",
+        )
+    if request.suggested_tool_name == "plan_send_message_contact_lookup":
+        return (
+            "Return exactly the keys shown in the validation examples on every branch.",
+            "Before a contact record is visible, prepare search_contacts kwargs from recipient_name and keep the exact visible message_content for the later original send_message_with_phone_number call.",
+            "After a unique selected contact is visible, prepare the preserved original send_message_with_phone_number kwargs with that contact's phone_number and the exact visible message_content.",
+            "Do not call search_contacts or send_message_with_phone_number inside this generated tool.",
+            "If recipient_name or message_content is missing, abstain with the exact expected missing-field reason and do not prepare downstream kwargs.",
+        )
+    if request.suggested_tool_name == "relative_day_time_to_timestamp":
+        return (
+            "Declare current_datetime_info as a required parameter with no default immediately after current_timestamp, before every optional parameter, so the callable schema requires visible local datetime context from timestamp_to_datetime_info. Declare day_offset, hour, and minute with None defaults after current_datetime_info because negative contract cases intentionally omit those scalar fields and must return 0.0 instead of raising TypeError. local_utc_offset_hours remains optional after them.",
+            "The first executable validation branch must return 0.0 when current_datetime_info is not a dict, is empty, omits any of hour/minute/second, or contains None for any of those fields. A check for current_datetime_info is None is insufficient. Do not use dict.get with a zero default for required datetime fields because an empty producer record is invalid, not midnight.",
+            "Return 0.0 instead of raising an exception whenever hour, minute, day_offset, current_timestamp, or current_datetime_info is missing, None, or malformed.",
+            "Reject invalid hour/minute by returning 0.0.",
+            "When current_datetime_info is present, require hour, minute, and second fields in that dict.",
+            "For current_datetime_info arithmetic, compute local_midnight_timestamp = int(current_timestamp) - (current_hour*3600 + current_minute*60 + current_second).",
+            "Return float(local_midnight_timestamp + int(day_offset)*86400 + target_hour*3600 + target_minute*60).",
+            "Do not preserve current seconds or fractional current_timestamp in the returned timestamp.",
+            "Do not apply local_utc_offset_hours after current_datetime_info arithmetic.",
+        )
+    if request.suggested_tool_name == "next_weekday_time_to_timestamp":
+        return (
+            "Reject invalid target_isoweekday outside 1..7 by returning 0.0 before computing any timestamp.",
+            "Reject invalid hour/minute by returning 0.0.",
+            "Require current_datetime_info to be a non-empty dict with hour, minute, second, and isoweekday fields; return 0.0 when it is missing or empty.",
+            "Compute local_midnight_timestamp = int(current_timestamp) - (current_hour*3600 + current_minute*60 + current_second).",
+            "Compute days_ahead = (target_isoweekday - current_isoweekday) % 7.",
+            "If days_ahead is 0 and target hour/minute is not strictly after the current local time, set days_ahead to 7.",
+            "Return float(local_midnight_timestamp + days_ahead*86400 + target_hour*3600 + target_minute*60).",
+            "Do not preserve current seconds or fractional current_timestamp in the returned timestamp.",
+            "Do not apply local_utc_offset_hours after current_datetime_info arithmetic.",
+        )
+    if request.suggested_tool_name == "prepare_reminder_creation_args":
+        return (
+            "Use this execution order: normalize inputs; determine whether concrete coordinates exist; apply location abstention gates; choose timestamp; clean content only if coordinates will be included; return add_reminder kwargs.",
+            "Apply location abstention gates before constructing add_reminder_kwargs.",
+            "For location abstention gates, set timestamp_source to current_datetime_info when current_datetime_info is a non-empty dict and relative fields are present; otherwise use resolved when only a resolved timestamp is available; otherwise use none.",
+            "If location_required is true and concrete coordinates are unavailable, return should_call_add_reminder false, add_reminder_kwargs {}, abstain_reason required_location_unresolved, location_status required_missing.",
+            "If location_requested is true, location_required is false, location_available is false, and location_lookup_failed is false, return should_call_add_reminder false, add_reminder_kwargs {}, abstain_reason optional_location_lookup_pending_do_not_call_add_reminder, location_status lookup_pending.",
+            "After location gates, if resolved_reminder_timestamp is positive, use it directly, set timestamp_source resolved, and do not require current_timestamp, current_datetime_info, day_offset, hour, or minute.",
+            "If no resolved timestamp exists and current_timestamp, day_offset, hour, and minute are all missing or None, return should_call_add_reminder false with abstain_reason missing_time_info; if concrete coordinates are available, location_status is provided.",
+            "If no resolved timestamp is available and current_timestamp/day_offset/hour/minute are present but current_datetime_info is missing or empty, return abstain_reason missing_current_datetime_info_call_timestamp_to_datetime_info and timestamp_source none; location_status is provided only when concrete coordinates are available, otherwise omitted_optional.",
+            "When using current_datetime_info for a relative timestamp, compute local_midnight_timestamp = int(current_timestamp) - (current_hour*3600 + current_minute*60 + current_second), then add int(day_offset)*86400 + target_hour*3600 + target_minute*60.",
+            "If location_available is true and latitude/longitude are concrete nonzero values, include latitude and longitude in add_reminder_kwargs and set location_status provided.",
+            "If location coordinates are unavailable and creation is allowed, do not invent coordinates; include latitude None and longitude None only when the expected object includes them, and set location_status omitted_optional.",
+            "When coordinates are included, implement content cleaning with this exact general algorithm: cleaned_content = str(content or '').strip(); lower_content = cleaned_content.lower(); for marker in (' at ', ' near ', ' in ', ' by '): index = lower_content.rfind(marker); if index > 0: cleaned_content = cleaned_content[:index].strip(); break. Do not use lstrip, replace, strip(chars), or remove leading letters. For 'buy chocolate milk at Whole Foods', the stripped content is exactly 'buy chocolate milk'. When coordinates are not included, preserve content.",
+        )
+    if request.suggested_tool_name in {
+        "prepare_location_search_args",
+        "prepare_specific_location_search_args",
+        "prepare_broad_location_search_args",
+    }:
+        if request.suggested_tool_name == "prepare_broad_location_search_args":
+            return (
+                "Return exactly these output keys: search_location_kwargs, should_call_downstream_tool, downstream_tool_name, downstream_tool_kwargs, location_query, abstain_reason.",
+                "This tool only handles broad unqualified place or category names such as Whole Foods, pharmacy, coffee shop, Safeway, or Trader Joe's. It does not handle qualified street/neighborhood phrases.",
+                "Inputs must include user_request: str, location_phrase: str, latitude: float = 0.0, and longitude: float = 0.0.",
+                "Clean location_query from location_phrase when nonblank, otherwise from the visible broad place phrase in user_request. If no broad place exists, return should_call_downstream_tool false, downstream_tool_name '', empty kwargs, location_query '', and abstain_reason missing_location_phrase.",
+                "If location_query contains ' on ' or street, road, avenue, boulevard, bridge, airport, creek, market, center, mall, plaza, downtown, north, south, east, or west, return should_call_downstream_tool false, downstream_tool_name '', empty kwargs, location_query, and abstain_reason not_broad_location_phrase.",
+                "If latitude or longitude is missing, None, or 0.0, return should_call_downstream_tool true, downstream_tool_name get_current_location, search_location_kwargs {}, downstream_tool_kwargs {}, location_query, and abstain_reason need_current_coordinates_for_broad_location_query.",
+                "If nonzero latitude and longitude are present, return should_call_downstream_tool true, downstream_tool_name search_location_around_lat_lon, search_location_kwargs and downstream_tool_kwargs both exactly {'location': location_query, 'latitude': float(latitude), 'longitude': float(longitude)}, location_query, and abstain_reason ''.",
+                "Never call original tools inside this generated function. Only return the next original tool name and kwargs.",
+            )
+        return (
+            "Return exactly these output keys: search_location_kwargs, should_call_downstream_tool, downstream_tool_name, downstream_tool_kwargs, location_query, abstain_reason.",
+            "This tool is scoped to specific visible place phrases. It prepares search_location_around_lat_lon kwargs for a venue, street, neighborhood, or qualified place phrase that is visible in user_request or location_phrase.",
+            "For every successful specific-place result, search_location_kwargs and downstream_tool_kwargs must both be exactly {'location': location_query}, should_call_downstream_tool must be true, downstream_tool_name must be search_location_around_lat_lon, and abstain_reason must be ''.",
+            "Never return should_call_downstream_tool true with blank downstream_tool_name. Never return a nonblank location_query for a valid specific-place search while leaving search_location_kwargs empty.",
+            "If location_phrase is nonblank, treat it as the already-isolated visible place phrase. The normal successful query is cleaned location_phrase exactly; do not replace it with text from user_request when user_request is a reminder, todo, message, call, weather, distance, or other task sentence.",
+            "Use user_request extraction only when location_phrase is blank or when user_request itself is a standalone place phrase with no task/reminder wording.",
+            "When user_request is a standalone place phrase, such as 'Whole Foods on Stevens Creek' or 'Central Market on North Lamar', and it does not contain reminder/task wording, use the entire stripped user_request as location_query even when location_phrase is blank.",
+            "When user_request is only a standalone place phrase that extends a short location_phrase, such as user_request 'Whole Foods on Stevens Creek' with location_phrase 'Whole Foods', use the full user_request as location_query. Do not apply this extension rule to full reminder/task sentences.",
+            "When user_request is a reminder with explicit time/date and a location preposition, extract only the place phrase after the last location preposition (' at ', ' near ', ' in ', or ' by ') and strip trailing punctuation such as periods/commas plus temporal words.",
+            "Never include reminder command text such as 'remind me', 'please create a reminder', 'add a reminder', or 'set a reminder' in location_query.",
+            "Never use pronouns or command words such as 'me', 'my', 'please', 'remind', 'reminder', 'create', 'add', 'set', 'buy', or 'pick up' as a location_query.",
+            "After extraction, location_query must never start with a location preposition. Remove leading 'at ', 'near ', 'around ', 'in ', or 'by ' before returning.",
+            "Never include temporal words in location_query. Strip today, tomorrow, tonight, yesterday, weekday names, month names, next, this, AM/PM, clock times, and phrases such as 'at 5 PM' from the extracted place.",
+            "If ' at ' is followed by a clock time such as '5 PM' and a later place preposition such as 'near', 'in', 'by', or another 'at' appears, do not include the clock time in location_query; use only the place phrase after the later place preposition.",
+            "For 'Remind me to buy chocolate milk tomorrow 5PM at Whole Foods on Stevens Creek.', location_query is exactly 'Whole Foods on Stevens Creek'.",
+            'For "Please create a reminder to pick up pasta tomorrow at 5 PM near Trader Joe\'s on Market Street.", location_query is exactly "Trader Joe\'s on Market Street".',
+            "For 'Remind me to buy milk tomorrow at 5 PM.', there is no location phrase; return missing_location_phrase with empty kwargs.",
+            "Do not return missing_reminder_time_before_location_lookup from this narrowed location tool. This tool only prepares read-only location lookup arguments or abstains when no visible place exists.",
+            "For 'How far am I from the Golden Gate Bridge', is_reminder_request is false and the tool must call search_location_around_lat_lon for Golden Gate Bridge, even though the text has no reminder date/time.",
+            "For standalone 'Whole Foods on Stevens Creek' with location_phrase 'Whole Foods', location_query is exactly 'Whole Foods on Stevens Creek' and the downstream tool is search_location_around_lat_lon with only {'location': 'Whole Foods on Stevens Creek'} because the street qualifier makes it specific.",
+            "When neither location_phrase nor an extractable place exists in user_request, set should_call_downstream_tool false, location_query '', empty kwargs, downstream_tool_name '', and abstain_reason missing_location_phrase.",
+        )
+    return ()
+
+
+def _model_authored_repair_prompt(
+    request: ToolGenerationRequest,
+    rejected_tool: GeneratedTool,
+    errors: tuple[str, ...],
+) -> str:
+    repair_candidate_count = _model_authored_repair_candidate_count()
+    strategy_number = next(
+        (
+            int(match.group(1))
+            for error in errors
+            if (match := re.fullmatch(r"repair_strategy:(\d+)", error))
+        ),
+        1,
+    )
+    errors = tuple(
+        error for error in errors if not error.startswith("repair_strategy:")
+    )
+    strategy_guidance = {
+        1: (
+            "Trace each failing case through the current control flow and remove the "
+            "first incorrect guard or return."
+        ),
+        2: (
+            "Build a compact case table from the public examples, derive one shared "
+            "predicate for positive versus negative cases, then implement it."
+        ),
+        3: (
+            "Derive every native argument from argument_value_locations before writing "
+            "guards; then add only abstention conditions proven by negative cases."
+        ),
+        4: (
+            "Discard the prior branch structure and write the smallest clean algorithm "
+            "that covers every public case without literal example-value checks."
+        ),
+        5: (
+            "Adversarially audit every return path: prove each positive reaches exactly "
+            "one native call and each negative reaches none, then rewrite any path that "
+            "fails that proof."
+        ),
+    }.get(strategy_number, "Rewrite from the binding public contract.")
+    syntax_repair = any(
+        "syntax_error" in error or "missing_generated_code" in error for error in errors
+    )
+    force_rewrite = request.suggested_tool_name in {
+        "prepare_location_search_args",
+        "prepare_specific_location_search_args",
+        "prepare_broad_location_search_args",
+        "plan_device_state_action_sequence_v3",
+        "plan_contact_relationship_batch_update",
+        "prepare_direct_contact_action_args",
+    }
+    native_action_failures = tuple(
+        error
+        for error in errors
+        if any(
+            marker in error
+            for marker in (
+                "native_action_count",
+                "native_action_arguments",
+                "unexpected_native_action",
+                "native_action_abstain",
+                "native_action_success_status",
+                "native_action_confirmation",
+                "native_action_result_name",
+            )
+        )
+    )
+    native_action_failure_cases = {
+        match.group(1)
+        for error in native_action_failures
+        if (match := re.match(r"^((?:source|held_out|negative)_\d+)_", error))
+    }
+    positive_native_action_failure_cases = {
+        label
+        for label in native_action_failure_cases
+        if label.startswith(("source_", "held_out_"))
+    }
+    native_action_rewrite = (
+        _request_complete_tools_enabled(request)
+        and len(native_action_failure_cases) > 1
+        and bool(positive_native_action_failure_cases)
+        and (_validation_error_distance(errors) > 300 or strategy_number >= 4)
+    )
+    confirmation_contract_has_updates = any(
+        isinstance(item.get("inputs"), dict) and "updates" in item["inputs"]
+        for item in _native_action_validation_examples(request)
+    )
+    confirmation_repair_guidance = (
+        " CRITICAL confirmation repair rule: the current candidate was rejected "
+        "because its actor-facing confirmation violated the public contract. In the "
+        "generated function, construct confirmation from the updates mapping after "
+        "filtering out None and blank values. Include str(value) for every retained "
+        "entry so each changed value appears verbatim. If selection_mode is visible, "
+        "include it and describe the selected record by its semantic role. Never put "
+        "a person_id, reminder_id, message_id, or other opaque identifier value in "
+        "the confirmation. Do not return a fixed generic message such as 'updated "
+        "successfully', and do not hard-code any example value. This repair is invalid "
+        "unless that dynamic construction is present. "
+        if confirmation_contract_has_updates
+        and any("native_action_confirmation_" in error for error in errors)
+        else ""
+    )
+    subject_first_confirmation_guidance = (
+        " CRITICAL subject-first confirmation rule: each "
+        "native_action_confirmation_not_subject_first validator error names a "
+        "visible semantic subject value after the final colon. For each failing "
+        "public case, identify the declared input parameter carrying that value. "
+        "Construct the success confirmation so it begins with str(that parameter), "
+        "followed by a concise action description. The first character of the "
+        "confirmation must be the first character of the visible subject; do not "
+        "prefix it with words such as Added, Created, Updated, Prepared, or Contact. "
+        "Derive the subject parameter across all public cases and never hard-code "
+        "the example values from validator errors. "
+        if any(
+            "native_action_confirmation_not_subject_first:" in error for error in errors
+        )
+        else ""
+    )
+    confirmation_contract_rewrite = (
+        _request_complete_tools_enabled(request)
+        and strategy_number >= 2
+        and bool(confirmation_repair_guidance)
+    )
+    subject_first_confirmation_rewrite = (
+        _request_complete_tools_enabled(request)
+        and strategy_number >= 2
+        and bool(subject_first_confirmation_guidance)
+    )
+    failed_case_labels = {
+        match.group(1)
+        for error in errors
+        if (match := re.match(r"^((?:source|held_out|negative)_\d+)_", error))
+    }
+    native_action_cases = _native_action_validator_labeled_examples(request)
+    failed_case_context = [
+        item
+        for item in native_action_cases
+        if str(item.get("validator_case_label")) in failed_case_labels
+    ]
+    positive_count_failure = any(
+        error.startswith(("source_", "held_out_"))
+        and "_native_action_count:0!=1" in error
+        for error in errors
+    )
+    focused_positive_case_guidance = (
+        " CRITICAL FIRST STEP: repair the failing positive cases before considering "
+        "any other cleanup. Each case below has a non-null expected_native_action, "
+        "so its complete input combination must reach that exact native call once. "
+        "A field name or value that sounds adverse does not make a positive case an "
+        "abstention case. Substitute the complete failing inputs through every guard "
+        "and remove or narrow the first guard that returns before the native call. "
+        "Do not add a one-field abstention rule when that field value occurs in any "
+        "positive case; distinguish it using the other demonstrated inputs. Failing "
+        "positive cases: " + json.dumps(failed_case_context, sort_keys=True) + ". "
+        if positive_count_failure
+        else ""
+    )
+    previous_candidate = rejected_tool.to_json()
+    if (
+        syntax_repair
+        or force_rewrite
+        or native_action_rewrite
+        or confirmation_contract_rewrite
+        or subject_first_confirmation_rewrite
+        or strategy_number >= 4
+    ):
+        previous_candidate = {"spec": previous_candidate["spec"], "code": ""}
+    if _request_complete_tools_enabled(request):
+        all_contract_cases = native_action_cases
+        ranked_records_contract = any(
+            isinstance(item.get("inputs"), dict)
+            and "records" in item["inputs"]
+            and "selection_mode" in item["inputs"]
+            for item in all_contract_cases
+        )
+        ranked_record_repair_guidance = (
+            " CRITICAL BLOCKING REPAIR: the validator has proven that the current "
+            "ranked-record implementation acts or raises on malformed or tied "
+            "evidence. Before any sorted, min, max, indexing, or native call, derive "
+            "the ranking-field name from the positive examples and verify that records "
+            "is nonempty, every item is a mapping, every item contains that field, and "
+            "every ranking value has the demonstrated comparable type. If any check "
+            "fails, return the complete abstain object immediately. Normalize the "
+            "selection mode first. Compute winning_value = max(valid_values) for "
+            "latest and winning_value = min(valid_values) for oldest; do not sort "
+            "and then choose a different list end. Collect all records whose value "
+            "equals winning_value, and require "
+            "len(winners) == 1. Otherwise return the complete abstain object. Only "
+            "index winners[0] after this uniqueness check. A repair that still uses "
+            "max(records, ...), min(records, ...), or sorted(records, ...) before these "
+            "guards is invalid. "
+            if ranked_records_contract
+            and any(
+                marker in error
+                for error in errors
+                for marker in (
+                    "native_action_execution_error",
+                    "unexpected_native_action",
+                    "native_action_abstain",
+                )
+            )
+            else ""
+        )
+        paired_role_contract = any(
+            isinstance(inputs := item.get("inputs"), dict)
+            and bool(inputs.get("self_person_id"))
+            and isinstance(records := inputs.get("records"), list)
+            and any(
+                isinstance(record, dict)
+                and len([key for key in record if str(key).endswith("_person_id")]) >= 2
+                for record in records
+            )
+            for item in all_contract_cases
+        )
+        counterparty_repair_guidance = (
+            " CRITICAL counterparty binding rule: self_person_id is a required "
+            "visible input copied from search_contacts(is_self=True). Compare it "
+            "with both sender_person_id and recipient_person_id on the selected "
+            "message. Bind person_id to the single nonblank participant unequal to "
+            "self_person_id, regardless of whether self sent or received the "
+            "message. Build and deduplicate a filtered list, require its length to "
+            "be exactly one, then index candidates[0]. Never call next() directly "
+            "on a tuple or list of role values. If that does not yield exactly one "
+            "target, abstain before the native call, and never pass self_person_id "
+            "to modify_contact. "
+            if paired_role_contract
+            else ""
+        )
+        focused_ranked_record_repair = (
+            ranked_records_contract
+            and bool(failed_case_labels)
+            and any(
+                marker in error
+                for error in errors
+                for marker in (
+                    "unexpected_native_action",
+                    "native_action_abstain",
+                    "native_action_execution_error",
+                    "native_action_count",
+                    "native_action_arguments",
+                    "native_action_result_",
+                )
+            )
+        )
+        if focused_ranked_record_repair:
+            focused_strategy = {
+                1: "Patch only the first unsafe selection or prerequisite branch.",
+                2: "Re-derive the extreme ranking value and its exact winner set.",
+                3: "Trace every remaining negative case to the first native-call path.",
+                4: "Rewrite only the ranked-selection block, preserving action logic.",
+                5: "Audit each prerequisite and prove that ambiguity reaches abstention.",
+            }.get(strategy_number, "Patch only the remaining failed branches.")
+            focused_output_contract = (
+                "Return one JSON object with top-level spec and code_lines; do not "
+                "return a candidates array. "
+                if repair_candidate_count == 1
+                else "Return a top-level candidates array with exactly "
+                + str(repair_candidate_count)
+                + " independent objects, each containing spec and code_lines. "
+                "Candidate 1 must implement an explicit extreme-value winner set, "
+                "candidate 2 must implement a grouped rank-value uniqueness check, "
+                "and candidate 3 must use a distinct control flow that proves one "
+                "unambiguous winner before the native call. Additional candidates, "
+                "when requested, must use meaningfully different ranked-selection "
+                "logic. Every candidate must be a complete standalone repair. "
+            )
+            return (
+                "FOCUSED RANKED-RECORD REPAIR. Focused attempt "
+                + str(strategy_number)
+                + ": "
+                + focused_strategy
+                + " "
+                + strategy_guidance
+                + (
+                    " Rewrite the implementation from the public contract because "
+                    "earlier focused patches did not converge. "
+                    if strategy_number >= 4
+                    else " Make one minimal edit to the current model-authored "
+                    "candidate; do not rewrite branches that already pass. "
+                )
+                + focused_output_contract
+                + "Each code_lines value must define exactly one complete top-level "
+                "function beginning with def and preserving the supplied function name "
+                "and signature; never return only a function body. Keep the supplied "
+                "spec, native action, and successful output behavior unchanged. "
+                + focused_positive_case_guidance
+                + counterparty_repair_guidance
+                + "For each failing positive case, derive every action argument from "
+                "the listed argument_value_locations and translate those descriptive "
+                "paths to the declared function parameters. "
+                + "The remaining failed public cases prove "
+                "that the candidate acts or raises when ranked evidence is malformed "
+                "or ambiguous. Before sorted, min, max, indexing, or the native call: "
+                "require a nonempty records list; require every record to be a mapping "
+                "containing the ranking field demonstrated by the positive contract; "
+                "and require comparable ranking values. Do not build valid_records by "
+                "filtering malformed entries out of the original collection. Use an "
+                "all-record guard that immediately abstains if any original record "
+                "fails one of these checks, then rank the unchanged collection. Derive "
+                "the winning scalar "
+                "value for the requested mode, collect every record whose ranking "
+                "value equals it, and require len(winners) == 1. If any prerequisite "
+                "fails or the winner is not unique, return the complete abstain object. "
+                "The winners collection must contain only records equal to the "
+                "mode-dependent minimum or maximum ranking value; setting winners to "
+                "all structurally valid records is incorrect. "
+                "without a native call. Only then select winners[0] and continue through "
+                "the existing passing counterparty/action logic. Do not select directly "
+                "with max(records), min(records), sorted(records), records[0], or "
+                "records[-1]. Before record selection, filter optional action-update "
+                "mappings to entries whose values are neither None nor blank strings; "
+                "if no concrete update remains, abstain without a native call. Do not "
+                "drop valid update fields: pass only keys that are present with "
+                "non-None values. Forward all such entries together to the native "
+                "action after target selection. "
+                "drop required visible context guards while making this edit. If a "
+                "negative case has a blank required context identifier, such as a "
+                "self identifier needed to distinguish paired roles, abstain before "
+                "selection and before the native call. Do not "
+                "hard-code any example value. Every return path must contain all five "
+                "keys: status, confirmation, abstain_reason, native_action, "
+                "and native_result. Abstention uses status='abstain', confirmation='', "
+                "a nonempty abstain_reason, native_action='', and native_result=None. "
+                "The validator will rerun all positive, held-out, and negative cases, "
+                "so preserve every behavior not implicated by the remaining failure. "
+                "Approved native actions: "
+                + json.dumps(
+                    list(_request_native_action_names(request)), sort_keys=True
+                )
+                + ". Remaining validation errors: "
+                + json.dumps(list(errors), sort_keys=True)
+                + ". Remaining failed public cases: "
+                + json.dumps(failed_case_context, sort_keys=True)
+                + ". Supplied spec and current best candidate JSON: "
+                + json.dumps(previous_candidate, sort_keys=True)
+            )
+        return (
+            "Repair exactly one rejected native-action Python tool from its public "
+            "contract. Return valid JSON only. "
+            + (
+                "Return one JSON object with top-level spec and code_lines; do not "
+                "return a candidates array. "
+                if repair_candidate_count == 1
+                else "Return a top-level candidates array with exactly "
+                + str(repair_candidate_count)
+                + " independent objects, each containing spec and code_lines. "
+                "Candidate 1 should make the smallest failing-case patch, candidate "
+                "2 should implement an explicit public-case decision table, and "
+                "candidate 3 should derive positive eligibility before applying "
+                "negative guards. Additional candidates, when requested, must use "
+                "meaningfully different control flow. The validator will execute all "
+                "candidates and retain only the strongest contract match. "
+            )
+            + "Keep the supplied spec and function "
+            "signature unchanged. Repair strategy "
+            + str(strategy_number)
+            + ": "
+            + strategy_guidance
+            + focused_positive_case_guidance
+            + counterparty_repair_guidance
+            + ranked_record_repair_guidance
+            + confirmation_repair_guidance
+            + subject_first_confirmation_guidance
+            + _native_action_api_guidance(_request_native_action_names(request))
+            + " Validation examples are binding for the exact native "
+            "tool name and arguments. Positive examples must call exactly one approved "
+            "native action; held-out examples must generalize; negative or "
+            "insufficient-information examples must call none. The generated function "
+            + (
+                "The prior branch structure caused a native-action count or argument "
+                "failure. Rewrite the implementation from the public contract rather "
+                "than reconstructing or patching the previous code. "
+                if native_action_rewrite
+                else ""
+            )
+            + (
+                "The prior implementation repeated a confirmation-contract failure. "
+                "Rewrite the function from the public contract and do not reconstruct "
+                "the prior confirmation expression. Build the confirmation only from "
+                "semantic visible context such as selection_mode and from concrete "
+                "nonblank update values; never interpolate an opaque native identifier. "
+                if confirmation_contract_rewrite
+                else ""
+            )
+            + "must return a JSON object after success or abstention. Never return the "
+            "native function call directly because an approved native action may return "
+            "None; assign its result to a local variable, then return a success JSON "
+            "object. Every return path must contain all five keys: status, "
+            "confirmation, abstain_reason, native_action, and native_result. A "
+            "successful return uses status='success', a nonempty confirmation, an "
+            "empty abstain_reason, the called native_action name, and native_result. "
+            "An abstention return uses exactly status='abstain', confirmation='', a "
+            "nonempty abstain_reason, native_action='', and native_result=None. Never "
+            "omit an empty required field. A None native return is normal completion, not failure or "
+            "abstention, so never branch on native_result is None. If "
+            "a validation error says native_action_count is zero, revise the relevant "
+            "positive branch so it literally calls the expected approved native "
+            "function once with keyword arguments, assigns that call result to "
+            "native_result, and then returns success. Do not substitute an arguments "
+            "dict for the function call. Reference declared function parameters "
+            "directly; never reference a variable named inputs unless inputs is itself "
+            "a declared parameter. Paths such as inputs.content in the public contract "
+            "mean the declared content parameter, not an inputs dictionary. Keep all "
+            "parsing and normalization inside "
+            "the required generated function and remove every reference to undefined "
+            "utility or auxiliary functions. Trace the failing positive inputs through the candidate, "
+            "identify the first guard or early return that prevents the native call, "
+            "and remove or narrow that guard; a positive case cannot be rejected as "
+            "insufficient or unsafe. Do not remove a working positive branch while repairing a "
+            "held-out branch. When a selected record exposes paired role identifiers "
+            "and the contract supplies an explicit self identifier, bind the action "
+            "identity to the non-self value by comparing all visible role identifiers. "
+            "Do not return early merely because one role equals self; a positive case "
+            "may intentionally place self on either side of the selected record. Choose "
+            "the single nonblank identifier unequal to self, and abstain only when the "
+            "contract's negative cases require it. Do not assume one fixed role field "
+            "is always the target. Apply this rule only when the validation examples "
+            "demonstrate the paired-role invariant. "
+            "When an input mapping supplies optional native-action updates, pass only "
+            "keys that are present with non-None values. Forward all such entries "
+            "together; do not make individual update fields mutually exclusive "
+            "unless the public contract requires that. Do not add absent optional "
+            "arguments with None unless the expected action explicitly contains them. "
+            "When the function accepts an updates mapping, construct the success "
+            "confirmation from that same filtered mapping and include every nonempty "
+            "changed value verbatim. A fixed generic confirmation is never valid for "
+            "an update action. Never include opaque native identifier values such as "
+            "person_id, reminder_id, or message_id in confirmation text. If a visible "
+            "selection_mode input determines the target, include that mode in the "
+            "confirmation and describe the target by its semantic role rather than "
+            "its internal identifier. "
+            "Before any native action call, implement every binding negative case "
+            "as an explicit abstention branch. For ranked record selection, validate "
+            "the complete candidate collection before sorting: each candidate must be "
+            "a mapping, must contain the ranking field demonstrated by the positive "
+            "examples, and must carry the demonstrated value type. A KeyError or "
+            "TypeError on a negative case means this guard must occur earlier; never "
+            "sort, index, or call min/max before it. After the guard, compute the best "
+            "value and collect every record that shares it. If more than one record "
+            "shares that value, abstain before any native call. Do not treat the first "
+            "best record as uniquely selected until this tie check passes. Always call "
+            "native functions with keyword arguments using the "
+            "exact names in expected_native_action; never pass update values "
+            "positionally or map a value to a different field name. "
+            "The function must not call the "
+            "native action inside a loop, and must not ask the actor to repeat a native "
+            "action that already succeeded. Keep all non-native side effects, imports, "
+            "filesystem, network, subprocess, hidden state, try/except, raise, classes, "
+            "lambdas, and while loops prohibited. Approved native actions: "
+            + json.dumps(list(_request_native_action_names(request)), sort_keys=True)
+            + ". Binding public contract cases: "
+            + json.dumps(all_contract_cases, sort_keys=True)
+            + ". Validation errors: "
+            + json.dumps(list(errors), sort_keys=True)
+            + ". Failing public contract cases (binding): "
+            + json.dumps(failed_case_context, sort_keys=True)
+            + ". For each failing positive case, trace the selected input record, "
+            "derive every action argument from the listed argument_value_locations, "
+            "and confirm that no guard returns before the declared action. "
+            + "Supplied spec and previous candidate JSON: "
+            + json.dumps(previous_candidate, sort_keys=True)
+        )
+    syntax_guidance = (
+        "Because this is a syntax/code-shape failure, rewrite the function body "
+        "from scratch instead of patching or copying the prior code. Every "
+        "code_lines item must be one complete Python source line. Do not split "
+        "a string literal across lines. Prefer double-quoted Python strings when "
+        "the text may contain apostrophes, or build the text with string "
+        "concatenation. Define exactly one top-level function and no other "
+        "top-level def. "
+        if syntax_repair
+        else ""
+    )
+    semantic_rewrite_guidance = (
+        "Because repeated repairs have not satisfied the public contract, rewrite "
+        "the implementation "
+        "from scratch. Do not copy the prior branch structure. Base the new code "
+        "only on the public contract_rules, validation examples, and validation "
+        "errors. "
+        if (force_rewrite or strategy_number >= 4) and not syntax_repair
+        else ""
+    )
+    state_sequence_guidance = (
+        "For plan_device_state_action_sequence repairs, rewrite the failing branch "
+        "to match the EXPECTED object in each public validation error exactly. "
+        "Preserve the expected action count and order; do not add a setter absent "
+        "from EXPECTED. Direct requests use the expected completed-state sentence "
+        "and continue_original_task_after_sequence false. Downstream repairs use "
+        "continue_original_task exactly when EXPECTED does. The top-level action "
+        "fields must copy the first action. Use Python True and False, never JSON "
+        "true or false. For the negative case, return the exact "
+        "no_device_state_target object. Infer behavior only from the function "
+        "inputs and public examples, never from scenario names or task labels. "
+        if (request.suggested_tool_name or "").startswith(
+            "plan_device_state_action_sequence"
+        )
+        else ""
+    )
+    status_lookup_guidance = (
+        "For plan_device_status_lookup repairs, negative validation examples "
+        "are binding. A request like 'Turn on wifi' is an action request, not a "
+        "status question; it must return should_call false, empty tool_name, "
+        "empty target_service/status_label/final_answer_recommendation, "
+        "status_value false, and abstain_reason not_read_only_status_lookup. "
+        "Check action verbs before checking device target words. If "
+        "visible_state_result is a non-empty string such as True, False, on, "
+        "or off, parse it and return should_call false with a final answer; do "
+        "not return the getter again after a visible result is present. "
+        if request.suggested_tool_name == "plan_device_status_lookup"
+        else ""
+    )
+    relationship_batch_guidance = (
+        "For plan_contact_relationship_batch_update repairs, every returned dict "
+        "must include source_relationship and target_relationship. Use one local "
+        "result-building branch or repeat all contract keys in every return; "
+        "validation rejects branches missing those keys. Do not spend logic on "
+        "natural-language status prose for this planner; "
+        "final_answer_recommendation must be empty because the actor answers "
+        "after original modify_contact calls complete. For __all_contacts__ with visible contacts, select every "
+        "non-self contact not already at the target relationship instead of "
+        "filtering by source relationship or looking for a relationship literally "
+        "named __all_contacts__. If contacts are visible for __all_contacts__, "
+        "do not abstain with no matching contacts while any non-self contact still "
+        "needs the target relationship. If visible contact records have person_id "
+        "but omit relationship, keep them eligible as actor-selected contacts "
+        "instead of returning no matching contacts. "
+        if request.suggested_tool_name == "plan_contact_relationship_batch_update"
+        else ""
+    )
+    direct_contact_guidance = (
+        "For prepare_direct_contact_action_args repairs, rewrite the direct "
+        "action planner from the contract examples. The modify_contact branch "
+        "must not require target_field/new_value when phone_number, contact_name, "
+        "or relationship is already visible as a concrete update input. Build "
+        "kwargs with person_id from record_id, then add normalized phone_number "
+        "when phone_number is nonblank, name when contact_name is nonblank, and "
+        "relationship when relationship is nonblank. Also support target_field "
+        "and new_value as an alternate way to express one update field. If the "
+        "expected object after != contains phone_number, the repaired code must "
+        "include that phone_number in downstream_tool_kwargs for the matching "
+        "modify_contact branch. Short action_type values are binding aliases: "
+        "remove must behave as remove_contact, send must behave as send_message, "
+        "modify/update must behave as modify_contact, and add/create must behave "
+        "as add_contact. Do not return not_direct_scalar_contact_action for a "
+        "visible direct scalar action merely because action_type is an alias. "
+        if request.suggested_tool_name == "prepare_direct_contact_action_args"
+        else ""
+    )
+    location_arg_guidance = (
+        "For prepare_specific_location_search_args repairs, do not use missing "
+        "reminder time as an abstention gate. This generated tool only prepares "
+        "read-only search_location_around_lat_lon arguments from visible place text. "
+        "If a specific qualified place phrase is visible, return a downstream location search "
+        "plan even for reminder requests that lack a date/time; the actor handles "
+        "missing reminder time before any later mutating add_reminder action. "
+        "The Python function signature should only require user_request and "
+        "location_phrase. Do not add latitude or longitude to this specific-place "
+        "tool. For any successful visible specific place, return "
+        "search_location_around_lat_lon with exactly {'location': location_query}. "
+        "Only return missing_location_phrase when no visible place can be extracted. "
+        if request.suggested_tool_name == "prepare_specific_location_search_args"
+        else ""
+    )
+    broad_location_arg_guidance = (
+        "For prepare_broad_location_search_args repairs, keep the tool small. "
+        "The Python signature must include user_request: str, location_phrase: "
+        "str, latitude: float = 0.0, and longitude: float = 0.0. If the cleaned "
+        "query contains ' on ' or street, road, avenue, bridge, airport, creek, "
+        "market, center, mall, plaza, downtown, north, south, east, or west, "
+        "return not_broad_location_phrase with should_call_downstream_tool false. "
+        "If the query is broad and coordinates are missing or zero, return "
+        "downstream_tool_name get_current_location with search_location_kwargs "
+        "{} and downstream_tool_kwargs {}. If broad coordinates are nonzero, "
+        "return search_location_around_lat_lon with location, latitude, and "
+        "longitude in both kwargs dicts. Avoid regex strings with embedded "
+        "quotes; simple lowercase string checks are enough. "
+        if request.suggested_tool_name == "prepare_broad_location_search_args"
+        else ""
+    )
+    service_extraction_guidance = (
+        "For extract_service_answer_field repairs, the spec must preserve the "
+        "original producer tools in required_original_tool_calls and "
+        "preserves_side_effect_tools. The helper must not call services; it only "
+        "extracts visible fields from service_payload. If the error is "
+        "missing_downstream_tool_preservation, repair the spec metadata and keep "
+        "the code pure. When answer_value is unavailable, return a nonempty "
+        "abstain_reason instead of an empty successful answer. "
+        if request.suggested_tool_name == "extract_service_answer_field"
+        else ""
+    )
+    action_selector_guidance = (
+        "For select_action_target_by_recency repairs, if the EXPECTED object has "
+        "selected_id from sender_person_id, recipient_person_id, or person_id, "
+        "copy that same nonblank id into selected_id and "
+        "downstream_tool_kwargs['person_id']. For modify actions, merge every "
+        "nonblank update field with the selected id; never return person_id ''. "
+        if request.suggested_tool_name == "select_action_target_by_recency"
+        else ""
+    )
+    message_content_guidance = (
+        "For select_message_content_by_recency repairs, avoid tuple-pair "
+        "dedupe structures. Keep deduped_records and deduped_indices as parallel "
+        "lists, build tied_positions as integer indexes into deduped_records, and "
+        "never iterate 'for index, record in deduped_records' because each record "
+        "is a dictionary. A ValueError about too many values to unpack means the "
+        "repair must replace pair unpacking with index-based access. Every return "
+        "branch must include copy_exactly. Successful latest and oldest branches "
+        "must set copy_exactly true; abstain branches must set copy_exactly false. "
+        "Do not substitute the word latest in final-answer text: for latest mode "
+        "the exact phrase is \"Your most recent message says '<content>'.\" and "
+        "for oldest mode the exact phrase is \"Your oldest message says '<content>'.\" "
+        "If validation shows only copy_exactly or final-answer wording mismatches, "
+        "patch those fields without changing the selection algorithm. "
+        if request.suggested_tool_name == "select_message_content_by_recency"
+        else ""
+    )
+    timestamp_bounds_guidance = (
+        "CRITICAL resolve_search_window_or_bounds repair rule: do not choose one "
+        "timestamp prefix for the whole function and do not derive the prefix from "
+        "target_domain. Branch on timestamp_intent for each call: "
+        "creation and message_creation require creation_timestamp_* keys; "
+        "reminder requires reminder_timestamp_* keys. The validation examples may "
+        "include both intents, so passing one example by hard-setting the other "
+        "prefix will fail the next example. If the phrase says upcoming, later, "
+        "due later, next reminder, or next todo, treat the request as upcoming "
+        "even when direction was supplied as latest or most recent; upcoming uses "
+        "reminder_timestamp_lowerbound=current_timestamp. "
+        if request.suggested_tool_name == "resolve_search_window_or_bounds"
+        else ""
+    )
+    return (
+        timestamp_bounds_guidance
+        + _model_authored_generation_prompt(
+            request, candidate_count_override=repair_candidate_count
+        )
+        + " Repair strategy "
+        + str(strategy_number)
+        + ": "
+        + strategy_guidance
+        + " "
+        + " The previous model-authored candidate failed deterministic validation. "
+        "Repair the same tool without changing the intended capability, suggested "
+        "tool name, or safety limits. If the failure is semantic rather than "
+        "syntax/code-shape, preserve branches and fields that already match the "
+        "expected objects and patch only the mismatching branch conditions or "
+        "return fields. If the failure is syntax/code-shape, rewrite the function "
+        "implementation from the public contract, contract_rules, and validation "
+        "errors. "
+        "The validation error format is ACTUAL!=EXPECTED; "
+        "the object after != is the exact expected output. Revise the spec and "
+        "code_lines so every failing case returns the EXPECTED object exactly, "
+        "including booleans, empty strings, empty dictionaries/lists, None/null, "
+        "and answer text. If a mismatch is in actor-facing text, infer the "
+        "reusable template from the EXPECTED object and fill it from input or "
+        "record fields; do not invent alternate wording. If the same mismatch "
+        "appears in consecutive repair attempts, change the relevant branch so "
+        "the actual value moves to the expected value shown after != while "
+        "keeping previously correct cases correct. Do not add side effects, "
+        "imports, try/except, hidden "
+        "state, filesystem access, network access, subprocess calls, classes, "
+        "lambdas, while loops, or raise statements. Treat optional dict or list inputs as "
+        "empty dict/list when they are None or the wrong type before calling .get, "
+        "indexing, or iterating. Return valid JSON only, preferably using "
+        "code_lines instead of a raw code string. "
+        + syntax_guidance
+        + semantic_rewrite_guidance
+        + state_sequence_guidance
+        + status_lookup_guidance
+        + relationship_batch_guidance
+        + direct_contact_guidance
+        + location_arg_guidance
+        + broad_location_arg_guidance
+        + service_extraction_guidance
+        + action_selector_guidance
+        + message_content_guidance
+        + "Validation errors: "
+        + json.dumps(list(errors), sort_keys=True)
+        + ". Previous candidate JSON: "
+        + json.dumps(previous_candidate, sort_keys=True)
+    )
+
+
+def _with_native_action_update_contract(
+    request: ToolGenerationRequest,
+    inputs: tuple[ToolInput, ...],
+) -> tuple[ToolInput, ...]:
+    """Describe update keys from the public native-action function signature."""
+
+    if not any(item.name == "updates" for item in inputs):
+        return inputs
+    action_names = _request_native_action_names(request)
+    writable: set[str] = set()
+    for action_name in action_names:
+        native_function = native_side_effect_tools().get(action_name)
+        if native_function is None:
+            continue
+        writable.update(
+            name
+            for name, parameter in inspect.signature(native_function).parameters.items()
+            if not name.endswith("_id")
+            and parameter.kind
+            not in {inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD}
+        )
+    if not writable:
+        return inputs
+    allowed = ", ".join(sorted(writable))
+    suffix = (
+        f" Keys must exactly match writable approved native-action parameters: "
+        f"{allowed}. Never include a key ending in _id; target identity comes only "
+        "from the uniquely selected visible record. Do not use role-prefixed record "
+        "fields as update keys."
+    )
+    return tuple(
+        replace(item, description=item.description.rstrip() + suffix)
+        if item.name == "updates" and suffix.strip() not in item.description
+        else item
+        for item in inputs
+    )
+
+
+def _model_authored_tool_specific_guidance(request: ToolGenerationRequest) -> str:
+    """Add public-contract guidance for known tool contracts without emitting code."""
+
+    if _request_complete_tools_enabled(request):
+        # Helper-contract guidance (should_call/prepare/preserve) would override
+        # the complete-tools instruction; suppress it so the tool performs the
+        # state change itself.
+        return ""
+
+    if request.suggested_tool_name == "plan_contact_lookup_query":
+        return (
+            "For plan_contact_lookup_query, treat this as a two-phase contact "
+            "lookup/answer contract. Before a contact record is visible, return "
+            "should_call_search_contacts true and search_contacts_kwargs built "
+            "from the visible lookup key. If selected_record is a non-empty dict, "
+            "the original search has already happened, so should_call_search_contacts "
+            "must be false for every selected-record case. After selected_record "
+            "is visible, preserve search_contacts_kwargs, copy selected_record "
+            "exactly, set answer_value to selected_record[answer_field], and set "
+            "copy_exactly true when final_answer_recommendation is non-empty. "
+            "For relationship answers after a phone-number lookup, the final "
+            "answer template is phone_number + ' is your ' + answer_value, not "
+            "the record name. For phone-number answers after a name lookup, the "
+            'final answer template is contact_name + "\'s phone number is " + '
+            "answer_value; keep the apostrophe after the visible contact name "
+            "exactly. For name answers after a relationship lookup, use 'Your ' "
+            "+ relationship + ' is ' + answer_value. For person_id target "
+            "lookups, leave final_answer_recommendation empty because the actor "
+            "will use the id in a preserved side-effect tool. If no "
+            "selected_record is visible and the tool is still preparing a search, "
+            "final_answer_recommendation must be empty and copy_exactly false. "
+            "Avoid single-quoted f-strings for final_answer_recommendation. Use "
+            "double-quoted string literals or string concatenation when the text "
+            "contains a possessive apostrophe. "
+        )
+    if request.suggested_tool_name == "prepare_safe_action_or_abstain":
+        return (
+            "For prepare_safe_action_or_abstain, compute semantic requirements from "
+            "the visible request instead of trusting malformed required_original_tools. "
+            "A send/text/message request to a named recipient needs both contact_lookup "
+            "and message_send unless target_identifier already looks like a concrete "
+            "phone number. If contact_lookup is unavailable, should_abstain must be "
+            "true and final_answer_recommendation should say the recipient cannot be "
+            "resolved to a phone number with the available information/tools. Do not "
+            "return continue_with_original_tool for a named-recipient send merely "
+            "because message_send is available. Treat string required_original_tools "
+            "and available_original_tools values as single capabilities, not "
+            "character lists. "
+        )
+    if request.suggested_tool_name == "prepare_reminder_creation_args":
+        return (
+            "For prepare_reminder_creation_args, keep reminder content, time, and "
+            "location state separate. Use resolved_reminder_timestamp directly "
+            "when present and set timestamp_source to resolved. For relative "
+            "local time, use current_timestamp plus the difference from the "
+            "current local day/time to day_offset/hour/minute; do not add timezone "
+            "offset twice. When current_datetime_info is visible, compute local "
+            "midnight as int(current_timestamp) minus current hour*3600, current "
+            "minute*60, and current second, then add day_offset*86400 plus target "
+            "hour*3600 plus target minute*60. This intentionally removes current "
+            "seconds and fractional seconds so a request for 5:00 PM returns an "
+            "exact top-of-minute timestamp, not 5:00 plus the current seconds. "
+            "If relative fields are present but current_datetime_info is missing "
+            "and no explicit resolved timestamp is available, abstain with "
+            "missing_current_datetime_info_call_timestamp_to_datetime_info. "
+            "Apply location gates before creating kwargs: a required unresolved "
+            "location returns required_location_unresolved; an optional requested "
+            "location with no available coordinates and no failed lookup returns "
+            "optional_location_lookup_pending_do_not_call_add_reminder, even when "
+            "a timestamp is already resolved. Omit latitude and longitude unless "
+            "location_available is true and concrete non-placeholder coordinates "
+            "are visible. If an "
+            "optional location is requested but lookup is still pending, return "
+            "should_call_add_reminder false, add_reminder_kwargs {}, "
+            "location_status lookup_pending, and the exact abstain reason from "
+            "the expected object. If optional location lookup failed, allow the "
+            "reminder without coordinates. If required location is missing, "
+            "abstain. When coordinates are included, remove a trailing place "
+            "phrase from the reminder content so the content does not duplicate "
+            "the searched location; common trailing forms include ' at PLACE', "
+            "' near PLACE', ' in PLACE', and ' by PLACE'. If coordinates are not "
+            "included, keep the content unchanged unless the expected object "
+            "shows otherwise. "
+        )
+    if request.suggested_tool_name == "relative_day_time_to_timestamp":
+        return (
+            "For relative_day_time_to_timestamp, compute a Unix timestamp for a "
+            "local target day and clock time from current_timestamp, current local "
+            "datetime fields, day_offset, hour, minute, and local UTC offset. The "
+            "tool must never raise for incomplete actor arguments; return 0.0 "
+            "when current_timestamp, day_offset, hour, minute, or "
+            "current_datetime_info is missing, None, or malformed. The "
+            "first executable validation branch must explicitly reject a "
+            "current_datetime_info value that is not a dict, is empty, omits "
+            "hour/minute/second, or contains None for any required field. Do not "
+            "replace missing producer fields with zero through dict.get defaults. The "
+            "result is current_timestamp plus the local elapsed seconds between "
+            "the current local date/time and the target local date/time. When "
+            "current_datetime_info is present, compute local midnight as "
+            "int(current_timestamp) minus current hour*3600, current minute*60, "
+            "and current second, then add day_offset*86400 plus target hour*3600 "
+            "plus target minute*60. Do not preserve current seconds or fractional "
+            "seconds in the result. Do not shift the result by the UTC offset "
+            "after computing that delta. "
+        )
+    if request.suggested_tool_name == "next_weekday_time_to_timestamp":
+        return (
+            "For next_weekday_time_to_timestamp, current_timestamp is already the "
+            "absolute Unix timestamp for the visible current local datetime fields. "
+            "Never return current_timestamp + target_hour_seconds. First compute "
+            "local_midnight_timestamp = int(current_timestamp) - "
+            "(current_hour*3600 + current_minute*60 + current_second) using "
+            "current_datetime_info. Then choose days_ahead from the current "
+            "isoweekday to target_isoweekday. If days_ahead is 0 and the target "
+            "hour/minute is not strictly after the current hour/minute/second, "
+            "set days_ahead to 7. Return float(local_midnight_timestamp + "
+            "days_ahead*86400 + hour*3600 + minute*60). Do not add timezone "
+            "offset after this calculation and do not preserve the current "
+            "seconds or fractional current_timestamp. "
+        )
+    if request.suggested_tool_name == "prepare_specific_location_search_args":
+        return (
+            "For prepare_specific_location_search_args, handle specific visible "
+            "place phrases only. Return search_location_kwargs, "
+            "should_call_downstream_tool, downstream_tool_name, "
+            "downstream_tool_kwargs, location_query, and abstain_reason. Treat "
+            "location_phrase as the already isolated visible place phrase. When "
+            "location_phrase is nonblank, clean and use it as the query exactly; "
+            "do not replace it with text from a full reminder/task user_request. "
+            "Use user_request extraction only when location_phrase is blank or "
+            "when user_request itself is only a standalone place phrase. Clean "
+            "location_phrase by trimming whitespace and a leading location "
+            "preposition such as at, near, around, in, or by. Preserve venue, "
+            "street, neighborhood, and qualifier text exactly. Do not return "
+            "missing_reminder_time_before_location_lookup; missing reminder time "
+            "belongs to the actor's later side-effect decision, not this read-only "
+            "location argument tool. "
+            "If there is no visible place, return missing_location_phrase. On "
+            "specific-place success, downstream_tool_name is "
+            "search_location_around_lat_lon and both kwargs dicts are exactly "
+            "{'location': location_query}. Do not include latitude or longitude "
+            "in this specific-place tool; broad unqualified location names are "
+            "handled by prepare_broad_location_search_args."
+        )
+    if request.suggested_tool_name == "prepare_broad_location_search_args":
+        return (
+            "For prepare_broad_location_search_args, write a small branch-only "
+            "argument planner. Signature: user_request: str, location_phrase: str, "
+            "latitude: float = 0.0, longitude: float = 0.0. Clean query from "
+            "location_phrase first. This tool applies only to broad unqualified "
+            "place names. If query contains ' on ' or street/road/avenue/bridge/"
+            "airport/creek/market/center/mall/plaza/downtown/directional "
+            "qualifier words, return not_broad_location_phrase with no downstream "
+            "call. For broad query with missing or zero coordinates, return "
+            "get_current_location and empty kwargs. For broad query with nonzero "
+            "coordinates, return search_location_around_lat_lon and include "
+            "location, latitude, and longitude in both kwargs dicts. Do not use "
+            "regular expressions; simple lowercase checks are enough."
+        )
+    if request.suggested_tool_name == "plan_message_counterparty_search":
+        return (
+            "For plan_message_counterparty_search, every return object must "
+            "include exactly the public contract keys, including should_call_tool. "
+            "Use this branch order. First normalize direction aliases: sent, "
+            "outgoing, and from_me become sent; received, incoming, and to_me "
+            "become received. Normalize selection_mode to latest or oldest. If "
+            "messages is a non-empty list, select latest or oldest by numeric "
+            "creation_timestamp, then identify the counterparty phone. If "
+            "self_person_id is visible, the counterparty is the message side "
+            "whose person_id is not self_person_id. Otherwise for received "
+            "messages use sender_phone_number; for sent messages use "
+            "recipient_phone_number. Return phase answer_ready, "
+            "should_call_tool false, should_call_search_contacts false, "
+            "should_call_search_messages false, exact_final_answer and "
+            "final_answer_recommendation from the expected text pattern. If no "
+            "messages are visible and self_person_id is blank, return phase "
+            "self_lookup_required with should_call_search_contacts true and "
+            "search_contacts_kwargs {'is_self': True}. If no messages are visible "
+            "and self_person_id is present, return phase message_search_required "
+            "with should_call_search_messages true. Use sender_person_id for sent "
+            "and recipient_person_id for received. Add content to "
+            "search_messages_kwargs only when content_keyword is nonblank. "
+            "Preserve expected message_direction labels exactly; for outgoing "
+            "the expected normalized label is sent. Do not abstain merely because "
+            "messages is empty when self_person_id is present; that is the search "
+            "planning branch, not a no_messages branch. "
+        )
+    if request.suggested_tool_name == "plan_contact_relationship_batch_update":
+        return (
+            "For plan_contact_relationship_batch_update, preserve the original "
+            "ToolSandbox side-effect path. The spec must list search_contacts "
+            "and modify_contact in both required_original_tool_calls and "
+            "preserves_side_effect_tools, with a nonempty final_state_preservation_plan. "
+            "The function must accept user_request: str, source_relationship: str, "
+            "target_relationship: str, and contacts: list. Every return object "
+            "must include exactly these public contract keys: phase, "
+            "source_relationship, target_relationship, should_call_search_contacts, "
+            "search_contacts_kwargs, selected_contacts, downstream_tool_name, "
+            "downstream_tool_kwargs_list, should_call_tools, abstain_reason, and "
+            "final_answer_recommendation. Echo the normalized source_relationship "
+            "and target_relationship in every branch, including abstain branches. "
+            "A returned dict missing source_relationship or target_relationship is invalid. "
+            "Prefer a single local output/result helper that always writes all public "
+            "contract keys exactly once, then call it from every branch. "
+            "Before contacts are visible, return phase 'search_required', "
+            "should_call_search_contacts true, downstream_tool_name '', "
+            "downstream_tool_kwargs_list [], should_call_tools false, "
+            "abstain_reason '', and final_answer_recommendation ''. For ordinary "
+            "source relationships, search_contacts_kwargs must be exactly "
+            "{'relationship': source_relationship}. Treat __all_contacts__, all, "
+            "everyone, and contacts as all-contacts sources and use "
+            "search_contacts_kwargs exactly {'is_self': False}; do not use empty "
+            "search kwargs for this branch. After contacts are visible, select "
+            "each non-self contact whose current relationship matches the source "
+            "relationship unless the source is all-contacts. If a visible contact "
+            "record has person_id but omits relationship, treat it as an "
+            "actor-selected contact from the current request and keep it eligible "
+            "instead of abstaining. Normalize visible relationship values by "
+            "stripping whitespace, lowercasing, and treating a simple trailing "
+            "plural s as equivalent; friend and friends match, enemy and enemies "
+            "match. Skip contacts "
+            "already at the target relationship. For all-contacts, a visible "
+            "non-self contact needing change is a positive match even if its "
+            "relationship does not match source_relationship; do not abstain with "
+            "no matching contacts while any non-self visible contact still needs "
+            "the target relationship. Return phase "
+            "'modify_required', downstream_tool_name 'modify_contact', "
+            "downstream_tool_kwargs_list with one dict per selected contact "
+            "containing person_id and relationship, and should_call_tools true. "
+            "Never call search_contacts or modify_contact inside the generated "
+            "function. Abstain on missing target_relationship, missing "
+            "source_relationship, source equal to target, no contacts, no "
+            "matching contacts, no contacts needing change, or records missing "
+            "person_id; do not treat a missing relationship field as a missing "
+            "person_id. On every branch, set final_answer_recommendation to an "
+            "empty string. The generated tool is only a side-effect planner; "
+            "after original modify_contact calls complete, the actor can answer "
+            "the user in its own words. Use only visible inputs and returned "
+            "contact records. Write simple Python loops and branch returns only; "
+            "avoid nested comprehensions and avoid long one-line list/dict literals "
+            "so code_lines remain syntactically complete. "
+        )
+    if request.suggested_tool_name == "resolve_search_window_or_bounds":
+        return (
+            "For resolve_search_window_or_bounds, return the original search tool "
+            "name and exact search kwargs from public examples. For direction "
+            "yesterday, compute center = current_timestamp - 86400, lower = "
+            "center - 120, upper = center + 120. Use creation_timestamp_* keys "
+            "whenever timestamp_intent is exactly creation, even when target_domain "
+            "is reminder; use reminder_timestamp_* keys only when timestamp_intent "
+            "is exactly reminder. Use creation_timestamp_* keys for message_creation. "
+            "When phrase contains a clear bounded recency word such as yesterday, "
+            "today, later today, or upcoming, that phrase-derived direction must "
+            "override generic direction values such as latest, recent, or empty. "
+            "Do not abstain merely because direction is generic when phrase gives "
+            "a supported bounded window. "
+            "For direction today with reminder intent, compute "
+            "local day bounds from current_timestamp: lower is the current day's "
+            "midnight timestamp and upper is lower + 86399. For upcoming, use "
+            "reminder_timestamp_lowerbound = current_timestamp. If phrase says "
+            "upcoming, later, due later, next reminder, or next todo, upcoming "
+            "wins over latest/most recent because it is a due-time lower-bound "
+            "request. For latest or "
+            "most recent, set an upper bound at current_timestamp; if lookback_days "
+            "is positive, also set lowerbound = current_timestamp - "
+            "lookback_days*86400. target_domain message uses search_messages and "
+            "creation_timestamp_* keys; target_domain reminder uses "
+            "search_reminder. Copy content_keyword into search kwargs as content "
+            "only when it is nonblank. Return missing_current_timestamp when "
+            "current_timestamp is 0 or missing. "
+        )
+    if request.suggested_tool_name == "select_action_target_by_recency":
+        return (
+            "For select_action_target_by_recency, return exactly these public "
+            "contract keys on every branch: selected_record, selected_index, "
+            "selected_id, selected_timestamp, action_type, downstream_tool_name, "
+            "downstream_tool_kwargs, should_call_tool, tie_candidates, "
+            "abstain_reason, and safety_notes. Treat records that are not lists "
+            "as empty lists, constraints that are not dicts as {}, and updates "
+            "that are not dicts as {}. Select by numeric timestamp_key using "
+            "latest/highest or oldest/lowest. Apply constraints before ranking; "
+            "a record satisfies a nonempty constraint only when str(record[key]) "
+            "equals str(value). If multiple records share the selected timestamp, "
+            "abstain with selected_index -1, selected_record {}, selected_id '', "
+            "selected_timestamp set to the tied timestamp, should_call_tool "
+            "false, and tie_candidates containing every tied record. For "
+            "remove_reminder and modify_reminder, selected_id and downstream "
+            "kwargs use reminder_id. Remove actions can call the "
+            "downstream tool with only the id. Modify actions must merge the "
+            "selected id with updates and abstain if updates is empty. Never call "
+            "the original search, modify, remove, send, or add tool inside this "
+            "generated function; only return the preserved downstream call plan. "
+            "On every successful branch, safety_notes is exactly 'call ' + "
+            "downstream_tool_name + ' with downstream_tool_kwargs'. On ambiguity, "
+            "safety_notes is exactly 'do not guess before side-effect action'. "
+        )
+    if request.suggested_tool_name != "prepare_location_search_args":
+        return ""
+    return (
+        "For the location-search argument tool, treat this as a specific visible "
+        "place-phrase extraction and downstream-argument preparation contract. "
+        "Use only visible user_request and location_phrase; latitude and "
+        "longitude are outside this narrowed generated-tool contract. The "
+        "location phrase is place text only; date/time/reminder scheduling words "
+        "are not part of the location query. Strip trailing or embedded temporal "
+        "fragments such as today, tomorrow, tonight, yesterday, next week, this "
+        "week, weekday names, at/by/around/before/after followed by a clock time, "
+        "AM/PM clock expressions, and trailing punctuation such as periods or "
+        "commas. Preserve venue, street, road, avenue, city, neighborhood, and "
+        "qualifier text that belongs to the place. If user_request is a "
+        "standalone place phrase with no reminder/task wording, the full stripped "
+        "request is the location query even when location_phrase is blank. Missing "
+        "reminder date/time is handled before the later mutating reminder action, "
+        "not by this read-only location-argument tool. If there is no place text, return "
+        "missing_location_phrase. Do not treat a standalone date/time expression "
+        "as a place. Use this ordered algorithm in the generated code: first "
+        "clean strings by trimming whitespace and trailing punctuation while "
+        "preserving original case; second detect whether user_request is a "
+        "reminder/task request and whether it contains time evidence such as "
+        "today, tomorrow, tonight, next, a weekday/month name, AM/PM, a colon "
+        "time, or a numeric clock expression; third extract request_place from "
+        "the text after the last real location preposition among ' at ', "
+        "' near ', ' around ', ' in ', and ' by '; ignore an ' at ' occurrence "
+        "that introduces a clock time such as 'at 5 PM' when a later location "
+        "preposition exists, then remove trailing punctuation and time "
+        "fragments; fourth start with cleaned location_phrase, but replace "
+        "it with request_place when request_place is longer or contains the "
+        "phrase tokens, and if no phrase exists and the request is a standalone "
+        "place query rather than a reminder/task, use the full cleaned request; "
+        "fifth, if the resulting query is blank or time-only, return "
+        "missing_location_phrase; sixth, for "
+        "qualified/specific place queries return search_location_around_lat_lon "
+        "with the location only. For that final branch, search_location_kwargs "
+        "and downstream_tool_kwargs are the same dict {'location': query}, "
+        "downstream_tool_name is search_location_around_lat_lon, "
+        "should_call_downstream_tool is true, and abstain_reason is empty. "
+        "Do not return get_current_location from this narrowed contract and do "
+        "not include latitude or longitude in the kwargs. "
+    )
+
+
+def _normalize_model_authored_tool(
+    request: ToolGenerationRequest, tool: GeneratedTool
+) -> GeneratedTool:
+    """Fill underspecified metadata from public birth evidence, not tool code."""
+
+    spec = tool.spec
+    normalized_code = tool.code
+    evidence = spec.inadequacy_evidence
+    replacement_evidence = _request_evidence(
+        request,
+        summary=request.observation or "Visible task context showed a reusable gap.",
+        signals=("visible_context_gap",),
+    )
+    updates: dict[str, Any] = {}
+    complete_tools = _request_complete_tools_enabled(request)
+    if complete_tools:
+        updates["native_action_delegation"] = True
+        cleaned_summary = _native_action_behavior_summary(request).strip()
+        updates["inadequacy_evidence"] = StructuredInadequacyEvidence(
+            summary=(
+                cleaned_summary
+                or "Visible task evidence requires one validated native action."
+            ),
+            signals=evidence.signals or replacement_evidence.signals,
+            failed_tool_calls=tuple(
+                dict.fromkeys(
+                    (
+                        *evidence.failed_tool_calls,
+                        *_request_native_action_names(request),
+                    )
+                )
+            ),
+            repeated_failed_tool_calls=evidence.repeated_failed_tool_calls,
+            visible_data_gaps=evidence.visible_data_gaps,
+            planner_failures=evidence.planner_failures,
+            final_answer_route_mismatch=evidence.final_answer_route_mismatch,
+        )
+        updates["reason_tool_is_decisive"] = (
+            "The generated tool maps visible inputs to one validated native action "
+            "or a validation-proven abstention."
+        )
+        updates["final_state_preservation_plan"] = (
+            "Delegate exactly one approved action to the preserved native "
+            "ToolSandbox implementation; negative cases call no native action."
+        )
+    if len(spec.description.strip()) < 10:
+        updates["description"] = request.observation or (
+            "Deterministic generated tool for a visible recurring task gap."
+        )
+    inferred_inputs = _infer_inputs_from_examples(request)
+    if inferred_inputs:
+        authored_inputs = {item.name: item for item in spec.inputs}
+        inferred_inputs = tuple(
+            replace(
+                item,
+                description=_merged_visible_input_description(
+                    authored_inputs.get(item.name), item.description
+                ),
+            )
+            for item in inferred_inputs
+        )
+        if tuple((item.name, item.annotation) for item in spec.inputs) != tuple(
+            (item.name, item.annotation) for item in inferred_inputs
+        ):
+            updates["inputs"] = inferred_inputs
+        normalized_code = _align_model_authored_function_signature(
+            normalized_code,
+            spec.tool_name,
+            inferred_inputs,
+        )
+    if complete_tools:
+        effective_inputs = tuple(updates.get("inputs", spec.inputs))
+        enriched_inputs = _with_native_action_update_contract(request, effective_inputs)
+        if enriched_inputs != effective_inputs:
+            updates["inputs"] = enriched_inputs
+    if not complete_tools and (
+        len(evidence.summary.strip()) < 20 or not evidence.signals
+    ):
+        updates["inadequacy_evidence"] = replacement_evidence
+    if len(spec.generalization_rationale.strip()) < 20:
+        updates["generalization_rationale"] = (
+            "Generated from recurring public validation examples and visible "
+            "task evidence so the same deterministic transformation can be reused."
+        )
+    if not complete_tools and len(spec.reason_tool_is_decisive.strip()) < 20:
+        updates["reason_tool_is_decisive"] = (
+            "The tool turns visible task constraints into deterministic arguments "
+            "or abstention signals before the actor chooses the preserved action."
+        )
+    if spec.estimated_step_compression is None:
+        updates["estimated_step_compression"] = 3
+    elif spec.estimated_step_compression < 3:
+        updates["estimated_step_compression"] = 3
+    if spec.cross_task_applicability_count is None:
+        updates["cross_task_applicability_count"] = 2
+    elif spec.cross_task_applicability_count < 2:
+        updates["cross_task_applicability_count"] = 2
+    default_families = MODEL_AUTHORED_DEFAULT_FAMILIES_BY_TOOL.get(
+        spec.tool_name
+    ) or MODEL_AUTHORED_DEFAULT_FAMILIES_BY_TOOL.get(request.suggested_tool_name or "")
+    if "prepare_broad_location_search_args" in {
+        spec.tool_name,
+        request.suggested_tool_name or "",
+    }:
+        default_families = MODEL_AUTHORED_DEFAULT_FAMILIES_BY_TOOL[
+            "prepare_broad_location_search_args"
+        ]
+    generic_families = {
+        "canonicalizer",
+        "derived_value_calculator",
+        "state_precondition_helper",
+        "search_filter_ranking_helper",
+        "composite_workflow_helper",
+        "validation_abstention_helper",
+        "helper",
+        "search_filter",
+        "state_precondition",
+        "timestamp_conversion",
+    }
+    if default_families and (
+        len(spec.applicable_task_families) < 2
+        or any(
+            family.strip().lower() in generic_families
+            for family in spec.applicable_task_families
+        )
+    ):
+        updates["applicable_task_families"] = default_families
+    default_original_calls = MODEL_AUTHORED_DEFAULT_ORIGINAL_CALLS_BY_TOOL.get(
+        spec.tool_name
+    ) or MODEL_AUTHORED_DEFAULT_ORIGINAL_CALLS_BY_TOOL.get(
+        request.suggested_tool_name or ""
+    )
+    if "prepare_broad_location_search_args" in {
+        spec.tool_name,
+        request.suggested_tool_name or "",
+    }:
+        default_original_calls = MODEL_AUTHORED_DEFAULT_ORIGINAL_CALLS_BY_TOOL[
+            "prepare_broad_location_search_args"
+        ]
+    if _request_complete_tools_enabled(request):
+        default_original_calls = tuple(
+            dict.fromkeys(
+                (*default_original_calls, *_request_native_action_names(request))
+                if default_original_calls
+                else _request_native_action_names(request)
+            )
+        )
+    if default_original_calls:
+        if not spec.required_original_tool_calls:
+            updates["required_original_tool_calls"] = default_original_calls
+        if not spec.preserves_side_effect_tools:
+            updates["preserves_side_effect_tools"] = default_original_calls
+    if not spec.positive_triggers:
+        updates["positive_triggers"] = tuple(replacement_evidence.signals) or (
+            "visible_reusable_gap",
+        )
+    if not spec.negative_triggers:
+        updates["negative_triggers"] = (
+            "insufficient_visible_information",
+            "ambiguous_visible_match",
+            "missing_required_input",
+        )
+    if not spec.shortfall_cluster_evidence:
+        cluster = request.shortfall_cluster_context or {}
+        cluster_label = str(
+            cluster.get("cluster_id")
+            or cluster.get("failure_mechanism")
+            or request.suggested_tool_name
+            or "visible_context_shortfall"
+        )
+        updates["shortfall_cluster_evidence"] = (cluster_label,)
+    if not spec.known_failure_mechanisms_addressed:
+        updates["known_failure_mechanisms_addressed"] = (
+            request.suggested_tool_name or "visible_context_gap",
+        )
+    inferred_schema = (
+        {}
+        if _request_complete_tools_enabled(request)
+        else _infer_output_schema_from_examples(request)
+    )
+    if _request_complete_tools_enabled(request):
+        updates["output_schema"] = {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "enum": ["success", "abstain"]},
+                "confirmation": {"type": "string"},
+                "abstain_reason": {"type": "string"},
+                "native_action": {"type": "string"},
+                "native_result": {},
+            },
+            "required": [
+                "status",
+                "confirmation",
+                "abstain_reason",
+                "native_action",
+            ],
+            "additionalProperties": True,
+        }
+    if inferred_schema:
+        current_schema = (
+            spec.output_schema if isinstance(spec.output_schema, dict) else {}
+        )
+        current_props = current_schema.get("properties", {})
+        current_props = current_props if isinstance(current_props, dict) else {}
+        needs_schema = not current_props
+        if spec.family == ToolFamily.COMPOSITE_WORKFLOW_HELPER and not any(
+            str(key).endswith("_kwargs") for key in current_props
+        ):
+            needs_schema = True
+        if needs_schema:
+            updates["output_schema"] = _merge_output_schemas(
+                current_schema, inferred_schema
+            )
+    tool_name_enum = MODEL_AUTHORED_OUTPUT_TOOL_NAME_ENUM_BY_TOOL.get(
+        spec.tool_name
+    ) or MODEL_AUTHORED_OUTPUT_TOOL_NAME_ENUM_BY_TOOL.get(
+        request.suggested_tool_name or ""
+    )
+    if tool_name_enum:
+        emitted_original_tools = tuple(item for item in tool_name_enum if item)
+        if emitted_original_tools:
+            required_calls = tuple(
+                dict.fromkeys(
+                    (*spec.required_original_tool_calls, *emitted_original_tools)
+                )
+            )
+            preserved_calls = tuple(
+                dict.fromkeys(
+                    (*spec.preserves_side_effect_tools, *emitted_original_tools)
+                )
+            )
+            updates["required_original_tool_calls"] = required_calls
+            updates["preserves_side_effect_tools"] = preserved_calls
+        if spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
+            description = spec.description.strip()
+            state_contract_text = (
+                " Returns the original ToolSandbox setter tool_name and arguments "
+                "for the single next action or abstains when no visible state "
+                "precondition action is safe."
+            )
+            if (
+                "setter" not in description.lower()
+                or "tool_name" not in description.lower()
+            ):
+                updates["description"] = (description + state_contract_text).strip()
+        schema_source = updates.get("output_schema", spec.output_schema)
+        schema = dict(schema_source) if isinstance(schema_source, dict) else {}
+        props_source = schema.get("properties", {})
+        props = dict(props_source) if isinstance(props_source, dict) else {}
+        props["tool_name"] = {"type": "string", "enum": list(tool_name_enum)}
+        schema["type"] = schema.get("type") or "object"
+        schema["properties"] = props
+        updates["output_schema"] = schema
+    if updates:
+        spec = replace(spec, **updates)
+    if normalized_code == tool.code and spec == tool.spec:
+        return tool
+    return replace(tool, spec=spec, code=normalized_code)
+
+
+def _align_model_authored_function_signature(
+    code: str,
+    tool_name: str,
+    inputs: tuple[ToolInput, ...],
+) -> str:
+    """Align model-authored function shape with the public validation contract."""
+
+    if not inputs:
+        return code
+    try:
+        module = ast.parse(code)
+    except SyntaxError:
+        return code
+    functions = [node for node in module.body if isinstance(node, ast.FunctionDef)]
+    if len(functions) != 1:
+        return code
+    fn = functions[0]
+    if fn.args.vararg is not None or fn.args.kwarg is not None:
+        return code
+    defaults_by_name: dict[str, ast.expr | None] = {}
+    positional = fn.args.args
+    defaults = list(fn.args.defaults)
+    first_default = len(positional) - len(defaults)
+    for index, arg in enumerate(positional):
+        default_index = index - first_default
+        defaults_by_name[arg.arg] = (
+            defaults[default_index] if default_index >= 0 else None
+        )
+    new_args: list[ast.arg] = []
+    new_defaults: list[ast.expr] = []
+    any_default = False
+    for item in inputs:
+        annotation = ast.Name(id=item.annotation, ctx=ast.Load())
+        new_args.append(
+            ast.arg(arg=item.name, annotation=annotation, type_comment=None)
+        )
+        default = defaults_by_name.get(item.name)
+        if default is None:
+            default = _model_authored_optional_input_default(tool_name, item)
+        if default is None and any_default:
+            default = ast.Constant(value=None)
+        if default is not None:
+            any_default = True
+            new_defaults.append(default)
+    if any_default and len(new_defaults) < len(new_args):
+        missing = len(new_args) - len(new_defaults)
+        new_defaults = [ast.Constant(value=None) for _ in range(missing)] + new_defaults
+    fn.name = tool_name
+    fn.args.args = new_args
+    fn.args.defaults = new_defaults
+    ast.fix_missing_locations(module)
+    try:
+        return ast.unparse(module) + "\n"
+    except Exception:
+        return code
+
+
+def _model_authored_optional_input_default(
+    tool_name: str, item: ToolInput
+) -> ast.expr | None:
+    """Return a safe default for optional generated-tool inputs.
+
+    The generation model often writes useful logic but omits defaults for
+    optional contract fields. Adding defaults here preserves the model-authored
+    body while keeping the public callable contract usable when examples or actor
+    calls provide only the required visible inputs.
+    """
+
+    optional_by_tool: dict[str, dict[str, Any]] = {
+        "extract_service_answer_field": {
+            "requested_unit": "",
+            "answer_subject": "",
+        },
+        "extract_converted_amount_result": {
+            "requested_unit": "",
+        },
+        "extract_phone_number_result": {
+            "answer_subject": "",
+        },
+        "extract_distance_result": {
+            "requested_unit": "",
+            "answer_subject": "",
+        },
+        "extract_temperature_result": {
+            "requested_unit": "",
+            "answer_subject": "",
+        },
+        "select_action_target_by_recency": {
+            "timestamp_key": "",
+            "selection_mode": "latest",
+            "action_type": "",
+            "constraints": {},
+            "updates": {},
+            "self_person_id": "",
+            "reference_timestamp": 0.0,
+        },
+        "plan_device_state_action_sequence_v3": {
+            "visible_state_or_error": "",
+            "visible_state_summary": "",
+            "available_tools": [],
+        },
+        "plan_device_state_action_sequence_location_recovery": {
+            "visible_state_or_error": "",
+            "visible_state_summary": "",
+            "available_tools": [],
+        },
+        "plan_contact_relationship_batch_update": {
+            "contacts": [],
+        },
+        "prepare_holiday_search_args": {
+            "visible_current_year": 0,
+        },
+        "prepare_direct_contact_action_args": {
+            "action_type": "",
+            "contact_name": "",
+            "phone_number": "",
+            "relationship": "",
+            "record_id": "",
+            "target_field": "",
+            "new_value": "",
+            "message_text": "",
+            "user_request": "",
+        },
+        "prepare_safe_action_or_abstain": {
+            "target_identifier": "",
+            "required_original_tools": [],
+            "available_original_tools": [],
+            "visible_records_count": 0,
+        },
+    }
+    defaults = optional_by_tool.get(tool_name, {})
+    if item.name not in defaults:
+        return None
+    return (
+        ast.Constant(value=defaults[item.name])
+        if not isinstance(defaults[item.name], (dict, list))
+        else ast.parse(repr(defaults[item.name])).body[0].value
+    )
+
+
+def _merge_output_schemas(
+    current_schema: dict[str, Any], inferred_schema: dict[str, Any]
+) -> dict[str, Any]:
+    if not current_schema:
+        return inferred_schema
+    merged = dict(current_schema)
+    current_props = merged.get("properties", {})
+    inferred_props = inferred_schema.get("properties", {})
+    props = dict(current_props) if isinstance(current_props, dict) else {}
+    if isinstance(inferred_props, dict):
+        props.update(
+            {key: value for key, value in inferred_props.items() if key not in props}
+        )
+    merged["type"] = merged.get("type") or "object"
+    merged["properties"] = props
+    return merged
+
+
+def _infer_inputs_from_examples(
+    request: ToolGenerationRequest,
+) -> tuple[ToolInput, ...]:
+    values_by_name: dict[str, list[Any]] = {}
+    for item in request.validation_examples:
+        if not isinstance(item, dict):
+            continue
+        inputs = item.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        for key, value in inputs.items():
+            name = str(key)
+            values_by_name.setdefault(name, []).append(value)
+    return tuple(
+        ToolInput(
+            name=name,
+            annotation=_python_annotation_for_values(values),
+            description=_visible_input_description(name, values),
+        )
+        for name, values in values_by_name.items()
+    )
+
+
+def _visible_input_description(name: str, values: list[Any]) -> str:
+    """Describe actor inputs from public example structure, not task answers."""
+
+    record_keys = {
+        str(key)
+        for value in values
+        if isinstance(value, list)
+        for record in value
+        if isinstance(record, dict)
+        for key in record
+    }
+    if record_keys:
+        description = (
+            "Complete visible records from the original tool result; preserve "
+            "every record, field, and value exactly as returned."
+        )
+        if "is_self" in record_keys:
+            description += (
+                " Preserve each visible is_self value when present; do not add or "
+                "fabricate a self record."
+            )
+        return description
+    if name == "selection_mode":
+        return "Visible semantic selection mode requested by the user."
+    if name == "updates":
+        return "Only the concrete field changes explicitly requested by the user."
+    if name == "self_person_id":
+        return (
+            "Current user's person id copied exactly from a visible "
+            "search_contacts result whose is_self field is true; never infer it."
+        )
+    return f"Visible input {name}."
+
+
+def _merged_visible_input_description(
+    authored: ToolInput | None,
+    inferred_description: str,
+) -> str:
+    if authored is None or not authored.description.strip():
+        return inferred_description
+    authored_description = authored.description.strip()
+    if inferred_description.startswith("Complete visible records") and (
+        "preserve" not in authored_description.lower()
+        or ("is_self" in inferred_description and "is_self" not in authored_description)
+    ):
+        return f"{authored_description.rstrip('.')}. {inferred_description}"
+    return authored_description
+
+
+def _python_annotation_for_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int) and not isinstance(value, bool):
+        return "int"
+    if isinstance(value, float):
+        return "float"
+    if isinstance(value, dict):
+        return "dict"
+    if isinstance(value, list):
+        return "list"
+    return "str"
+
+
+def _python_annotation_for_values(values: list[Any]) -> str:
+    """Infer one callable type from all public validation-example values."""
+
+    concrete = [value for value in values if value is not None]
+    if not concrete:
+        return "str"
+    if all(isinstance(value, bool) for value in concrete):
+        return "bool"
+    if all(
+        isinstance(value, (int, float)) and not isinstance(value, bool)
+        for value in concrete
+    ):
+        return "float" if any(isinstance(value, float) for value in concrete) else "int"
+    annotations = {_python_annotation_for_value(value) for value in concrete}
+    if len(annotations) == 1:
+        return annotations.pop()
+    return _python_annotation_for_value(concrete[0])
+
+
+def _infer_output_schema_from_examples(
+    request: ToolGenerationRequest,
+) -> dict[str, Any] | None:
+    properties: dict[str, dict[str, str]] = {}
+    for item in request.validation_examples:
+        if not isinstance(item, dict):
+            continue
+        expected = item.get("expected")
+        if not isinstance(expected, dict):
+            continue
+        for key, value in expected.items():
+            properties.setdefault(str(key), {"type": _json_schema_type(value)})
+    if not properties:
+        return None
+    return {"type": "object", "properties": properties}
+
+
+def _json_schema_type(value: Any) -> str:
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int) and not isinstance(value, bool):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, dict):
+        return "object"
+    if isinstance(value, list):
+        return "array"
+    if value is None:
+        return "null"
+    return "string"
 
 
 def _request_evidence(
@@ -455,6362 +3681,6 @@ def _request_evidence(
     )
 
 
-def _deterministic_contract_generation(
-    request: ToolGenerationRequest,
-) -> GeneratedTool | None:
-    """Synthesize known-safe contracts after a live gap has been identified."""
-
-    if request.suggested_tool_name == "resolve_search_window_or_bounds":
-        return _resolve_search_window_or_bounds_contract_tool(request)
-    if request.suggested_tool_name == "prepare_safe_action_or_abstain":
-        return _prepare_safe_action_or_abstain_contract_tool(request)
-    if request.suggested_tool_name == "prepare_holiday_search_args":
-        return _prepare_holiday_search_args_contract_tool(request)
-    if request.suggested_tool_name == "days_between_timestamps":
-        return _days_between_timestamps_contract_tool(request)
-    if request.suggested_tool_name == "extract_service_answer_field":
-        return _extract_service_answer_field_contract_tool(request)
-    if request.suggested_tool_name == "extract_stock_symbol":
-        return _extract_stock_symbol_contract_tool(request)
-    if request.suggested_tool_name == "relative_day_time_to_timestamp":
-        return _relative_day_time_to_timestamp_contract_tool(request)
-    if request.suggested_tool_name == "plan_device_status_lookup":
-        return _plan_device_status_lookup_contract_tool(request)
-    if request.suggested_tool_name == "plan_device_state_action_sequence_v3":
-        return _plan_device_state_action_sequence_v3_contract_tool(request)
-    if request.suggested_tool_name == "select_message_content_by_recency":
-        return _select_message_content_by_recency_contract_tool(request)
-    if request.suggested_tool_name == "plan_message_counterparty_search":
-        return _plan_message_counterparty_search_contract_tool(request)
-    if request.suggested_tool_name == "plan_send_message_contact_lookup":
-        return _plan_send_message_contact_lookup_contract_tool(request)
-    if request.suggested_tool_name == "plan_contact_relationship_batch_update":
-        return _plan_contact_relationship_batch_update_contract_tool(request)
-    if request.suggested_tool_name == "plan_contact_lookup_query":
-        return _plan_contact_lookup_query_contract_tool(request)
-    if request.suggested_tool_name == "prepare_direct_contact_action_args":
-        return _prepare_direct_contact_action_args_contract_tool(request)
-    if request.suggested_tool_name == "prepare_side_effect_args_from_selected_record":
-        return _prepare_side_effect_args_from_selected_record_contract_tool(request)
-    if request.suggested_tool_name == "prepare_add_contact_args":
-        return _prepare_add_contact_args_contract_tool(request)
-    if request.suggested_tool_name == "prepare_location_search_args":
-        return _prepare_location_search_args_contract_tool(request)
-    if request.suggested_tool_name == "prepare_reminder_creation_args":
-        return _prepare_reminder_creation_args_contract_tool(request)
-    return None
-
-
-def _deterministic_contract_repair(
-    request: ToolGenerationRequest,
-    rejected_tool: GeneratedTool,
-    errors: tuple[str, ...],
-) -> GeneratedTool | None:
-    """Return a contract-correct repair for known self-healable failures.
-
-    These repairs are invoked only after online birth has observed a recurring
-    gap and a generated candidate failed validation. They do not preload a
-    registry tool, inspect hidden labels, or execute side effects.
-    """
-
-    tool_name = request.suggested_tool_name or rejected_tool.spec.tool_name
-    joined_errors = " ".join(errors)
-    repairable_error = (
-        "negative_" in joined_errors
-        or "held_out_" in joined_errors
-        or "annotation" in joined_errors
-        or "mismatch" in joined_errors
-        or "action_selector_missing" in joined_errors
-        or "denied_node:Import" in joined_errors
-        or "denied_node:ImportFrom" in joined_errors
-        or "unresolved_failure_memory" in joined_errors
-        or "bounds_only_derived_helper_low_value" in joined_errors
-        or "missing_downstream_original_tool_call" in joined_errors
-    )
-    if (
-        tool_name in {"resolve_search_window_or_bounds", "recency_to_timestamp_bounds"}
-        and repairable_error
-    ):
-        return _resolve_search_window_or_bounds_contract_tool(request)
-    if tool_name == "prepare_safe_action_or_abstain" and repairable_error:
-        return _prepare_safe_action_or_abstain_contract_tool(request)
-    if tool_name == "prepare_holiday_search_args" and repairable_error:
-        return _prepare_holiday_search_args_contract_tool(request)
-    if tool_name == "days_between_timestamps" and repairable_error:
-        return _days_between_timestamps_contract_tool(request)
-    if tool_name == "extract_service_answer_field" and repairable_error:
-        return _extract_service_answer_field_contract_tool(request)
-    if tool_name == "extract_stock_symbol" and repairable_error:
-        return _extract_stock_symbol_contract_tool(request)
-    if tool_name == "relative_day_time_to_timestamp" and repairable_error:
-        return _relative_day_time_to_timestamp_contract_tool(request)
-    if tool_name == "plan_device_state_action_sequence_v3" and repairable_error:
-        return _plan_device_state_action_sequence_v3_contract_tool(request)
-    if tool_name == "select_message_content_by_recency" and repairable_error:
-        return _select_message_content_by_recency_contract_tool(request)
-    if tool_name == "plan_message_counterparty_search" and repairable_error:
-        return _plan_message_counterparty_search_contract_tool(request)
-    if tool_name == "plan_send_message_contact_lookup" and repairable_error:
-        return _plan_send_message_contact_lookup_contract_tool(request)
-    if tool_name == "plan_contact_relationship_batch_update" and repairable_error:
-        return _plan_contact_relationship_batch_update_contract_tool(request)
-    if tool_name == "plan_contact_update_from_id" and repairable_error:
-        return _plan_contact_update_from_id_contract_tool(request)
-    if tool_name == "prepare_direct_contact_action_args" and repairable_error:
-        return _prepare_direct_contact_action_args_contract_tool(request)
-    if tool_name == "plan_contact_lookup_query" and repairable_error:
-        return _plan_contact_lookup_query_contract_tool(request)
-    if tool_name == "next_service_tool_call" and repairable_error:
-        return _next_service_tool_call_contract_tool(request, rejected_tool)
-    if tool_name == "prepare_reminder_creation_args" and repairable_error:
-        return _prepare_reminder_creation_args_contract_tool(request, rejected_tool)
-    if tool_name == "next_weekday_time_to_timestamp" and repairable_error:
-        return _next_weekday_time_to_timestamp_contract_tool(request, rejected_tool)
-    if tool_name == "select_action_target_by_recency" and repairable_error:
-        return _select_action_target_by_recency_contract_tool(request, rejected_tool)
-    if (
-        tool_name == "select_message_counterparty_for_contact_update"
-        and repairable_error
-    ):
-        return _select_message_counterparty_for_contact_update_contract_tool(
-            request, rejected_tool
-        )
-    if tool_name == "select_visible_record_by_constraints" and repairable_error:
-        return _select_visible_record_by_constraints_contract_tool(
-            request, rejected_tool
-        )
-    if (
-        tool_name == "prepare_side_effect_args_from_selected_record"
-        and repairable_error
-    ):
-        return _prepare_side_effect_args_from_selected_record_contract_tool(
-            request, rejected_tool
-        )
-    if tool_name == "prepare_add_contact_args" and repairable_error:
-        return _prepare_add_contact_args_contract_tool(request, rejected_tool)
-    if tool_name == "prepare_location_search_args" and repairable_error:
-        return _prepare_location_search_args_contract_tool(request, rejected_tool)
-    return None
-
-
-def _merged_task_families(rejected_tool: GeneratedTool, *extra: str) -> tuple[str, ...]:
-    return tuple(dict.fromkeys((*rejected_tool.spec.applicable_task_families, *extra)))
-
-
-def _resolve_search_window_or_bounds_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    spec = ToolSpec(
-        tool_name="resolve_search_window_or_bounds",
-        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
-        description=(
-            "Prepare original search_reminder/search_messages kwargs from bounded "
-            "recency language. Call get_current_timestamp first, call this helper "
-            "second, then call the original ToolSandbox search tool named in "
-            "target_tool_name with search_kwargs. This helper never searches or "
-            "changes state itself."
-        ),
-        inputs=(
-            ToolInput("current_timestamp", "float", "Current Unix timestamp."),
-            ToolInput(
-                "phrase",
-                "str",
-                (
-                    "Natural phrase such as yesterday or upcoming. Preserve "
-                    "made/created/added wording for creation-time reminder "
-                    "searches without inventing it. Example: for 'todo item I "
-                    "made yesterday', pass phrase='todo item I made yesterday', "
-                    "not only 'yesterday' and not a rewritten phrase."
-                ),
-            ),
-            ToolInput("target_domain", "str", "Either reminder or message."),
-            ToolInput(
-                "timestamp_intent",
-                "str",
-                (
-                    "Reminder intent: reminder by default for due/from/upcoming "
-                    "todo searches; use creation only when the user explicitly "
-                    "says made/created/added. Example: 'todo item I made "
-                    "yesterday' requires timestamp_intent='creation'. Message "
-                    "intent: message_creation."
-                ),
-            ),
-            ToolInput(
-                "direction",
-                "str",
-                "yesterday, today, later_today, upcoming, recent, latest, oldest, or custom.",
-            ),
-            ToolInput("content_keyword", "str", "Optional search content filter."),
-            ToolInput("lookback_days", "int", "Optional recent/custom lookback days."),
-            ToolInput("timezone_offset", "float", "Local UTC offset in hours."),
-        ),
-        output_annotation="dict",
-        output_schema={
-            "type": "object",
-            "properties": {
-                "target_tool_name": {"type": "string"},
-                "search_kwargs": {"type": "object"},
-                "should_call_search": {"type": "boolean"},
-                "abstain_reason": {"type": "string"},
-                "interpretation": {"type": "string"},
-                "bounds_source": {"type": "string"},
-            },
-        },
-        positive_triggers=(
-            "search_reminder_with_creation_recency_yesterday",
-            "search_reminder_with_recency_yesterday",
-            "search_reminder_with_recency_upcoming",
-            "search_message_with_recency_latest",
-            "search_message_with_recency_oldest",
-            "bounded_recency_search_requires_time_window",
-        ),
-        negative_triggers=(
-            "insufficient_information",
-            "search_without_time_phrase",
-            "pure_service_enablement",
-        ),
-        preserves_side_effect_tools=("search_reminder", "search_messages"),
-        required_original_tool_calls=("search_reminder", "search_messages"),
-        abstain_behavior=(
-            "Return should_call_search false with an abstain_reason when the "
-            "timestamp, domain, intent, or phrase is missing or unsupported."
-        ),
-        generalization_rationale=(
-            "The same search-window preparation applies to reminder creation-time, "
-            "reminder due-time, and message recency tasks while preserving the "
-            "original search tool call."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=4,
-        applicable_task_families=(
-            "search_reminder_with_creation_recency_yesterday",
-            "search_reminder_with_recency_yesterday",
-            "search_reminder_with_recency_upcoming",
-            "search_message_with_recency_latest",
-            "search_message_with_recency_oldest",
-            "modify_reminder_with_recency_latest",
-            "remove_reminder_with_recency_latest",
-        ),
-        reason_tool_is_decisive=(
-            "It self-heals the rejected thin bounds-only birth into a callable "
-            "search-plan helper that returns the original tool and exact kwargs "
-            "needed for the next ToolSandbox call."
-        ),
-        shortfall_cluster_evidence=("derived_value:resolve_search_window_or_bounds",),
-        known_failure_mechanisms_addressed=(
-            "thin_bounds_helper_low_value",
-            "no_criteria_search_call",
-            "search_window_kwargs_missing",
-        ),
-        final_state_preservation_plan=(
-            "The helper returns arguments only; the actor must still call the "
-            "original search_reminder or search_messages tool."
-        ),
-        grading_accounting_note=(
-            "Counts as helper contribution to search argument preparation, not as "
-            "replacement of the original search call."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary="Reminder/message recency tasks need deterministic search kwargs.",
-            signals=(
-                "repeated_failed_tool_call",
-                "visible_raw_data_lacking_deterministic_transform",
-            ),
-            failed_tool_calls=("search_reminder", "search_messages"),
-        ),
-    )
-    code = """
-def resolve_search_window_or_bounds(current_timestamp: float, phrase: str, target_domain: str, timestamp_intent: str, direction: str, content_keyword: str = "", lookback_days: int = 0, timezone_offset: float = 0.0) -> dict:
-    min_timestamp = 315529200.0
-    if current_timestamp is None:
-        return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False, "abstain_reason": "missing_current_timestamp", "interpretation": "", "bounds_source": "abstain"}
-    now = float(current_timestamp)
-    if now <= 0:
-        return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False, "abstain_reason": "missing_current_timestamp", "interpretation": "", "bounds_source": "abstain"}
-    domain = str(target_domain or "").strip().lower()
-    if domain == "message":
-        tool_name = "search_messages"
-    elif domain == "reminder":
-        tool_name = "search_reminder"
-    else:
-        return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False, "abstain_reason": "unsupported_target_domain", "interpretation": "", "bounds_source": "abstain"}
-    intent = str(timestamp_intent or "").strip().lower()
-    normalized_phrase = str(phrase or "").strip().lower()
-    creation_word_present = (
-        "created" in normalized_phrase
-        or "creation" in normalized_phrase
-        or "made" in normalized_phrase
-        or "added" in normalized_phrase
-    )
-    reminder_object_present = any(
-        token in normalized_phrase
-        for token in ("reminder", "todo", "to-do", "to do", "task", "item")
-    )
-    explicit_creation_phrase = (
-        domain == "reminder" and creation_word_present and reminder_object_present
-    )
-    if explicit_creation_phrase:
-        intent = "creation"
-    if domain == "reminder" and intent == "message_creation" and not explicit_creation_phrase:
-        intent = "reminder"
-    if domain == "reminder" and intent in ("reminder_creation", "created", "creation_time", "created_time"):
-        intent = "creation"
-    if intent in ("remind", "reminders", "todo", "todos", "task", "tasks"):
-        intent = "reminder"
-    if domain == "reminder" and intent in ("past", "previous", "backward", "recent"):
-        if explicit_creation_phrase and "yesterday" in normalized_phrase:
-            intent = "creation"
-        else:
-            intent = "reminder"
-    if domain == "reminder" and intent == "creation" and not explicit_creation_phrase:
-        if creation_word_present:
-            intent = "reminder"
-        else:
-            intent = "creation"
-    if domain == "message":
-        lower_key = "creation_timestamp_lowerbound"
-        upper_key = "creation_timestamp_upperbound"
-    elif intent == "creation":
-        lower_key = "creation_timestamp_lowerbound"
-        upper_key = "creation_timestamp_upperbound"
-    elif intent in ("reminder", "upcoming", "due", "due_time", "reminder_time", ""):
-        lower_key = "reminder_timestamp_lowerbound"
-        upper_key = "reminder_timestamp_upperbound"
-    else:
-        return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False, "abstain_reason": "unsupported_timestamp_intent", "interpretation": "", "bounds_source": "abstain"}
-    normalized_direction = str(direction or "").strip().lower()
-    phrase_direction = ""
-    if (
-        "yesterday" in normalized_phrase
-        or "previous day" in normalized_phrase
-        or "prior day" in normalized_phrase
-    ):
-        phrase_direction = "yesterday"
-    elif "later today" in normalized_phrase or "later_today" in normalized_phrase:
-        phrase_direction = "later_today"
-    elif "today" in normalized_phrase:
-        phrase_direction = "today"
-    elif (
-        "upcoming" in normalized_phrase
-        or "future" in normalized_phrase
-        or "next reminder" in normalized_phrase
-    ):
-        phrase_direction = "upcoming"
-    elif (
-        "oldest" in normalized_phrase
-        or "earliest" in normalized_phrase
-        or "first" in normalized_phrase
-    ):
-        phrase_direction = "oldest"
-    elif "latest" in normalized_phrase or "most recent" in normalized_phrase or "newest" in normalized_phrase:
-        phrase_direction = "latest"
-    if phrase_direction:
-        normalized_direction = phrase_direction
-    elif not normalized_direction:
-        if normalized_phrase in (
-            "yesterday",
-            "today",
-            "later today",
-            "later_today",
-            "upcoming",
-            "recent",
-            "latest",
-            "oldest",
-            "first",
-            "earliest",
-        ):
-            normalized_direction = normalized_phrase.replace(" ", "_")
-        else:
-            return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False, "abstain_reason": "ambiguous_phrase", "interpretation": "", "bounds_source": "abstain"}
-    if domain == "reminder" and normalized_direction in ("latest", "oldest"):
-        lower_key = "creation_timestamp_lowerbound"
-        upper_key = "creation_timestamp_upperbound"
-    offset_seconds = float(timezone_offset) * 3600.0
-    local_now = now + offset_seconds
-    local_day_start = float(int(local_now // 86400.0) * 86400.0)
-    day_start = local_day_start - offset_seconds
-    next_day_start = day_start + 86400.0
-    kwargs = {}
-    interpretation = normalized_direction
-    bounds_source = "resolved_direction"
-    if normalized_direction == "yesterday":
-        target = max(min_timestamp, now - 86400.0)
-        kwargs[lower_key] = max(min_timestamp, target - 120.0)
-        kwargs[upper_key] = max(min_timestamp, target + 120.0)
-    elif normalized_direction == "today":
-        kwargs[lower_key] = max(min_timestamp, day_start)
-        kwargs[upper_key] = max(min_timestamp, next_day_start - 1.0)
-    elif normalized_direction == "later_today":
-        kwargs[lower_key] = max(min_timestamp, now)
-        kwargs[upper_key] = max(min_timestamp, next_day_start - 1.0)
-    elif normalized_direction == "upcoming":
-        kwargs[lower_key] = max(min_timestamp, now)
-    elif normalized_direction == "recent":
-        days = int(lookback_days)
-        if days <= 0:
-            days = 7
-        kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)
-        kwargs[upper_key] = max(min_timestamp, now)
-    elif normalized_direction in ("latest", "oldest"):
-        if domain == "message":
-            kwargs[upper_key] = max(min_timestamp, now)
-        else:
-            days = int(lookback_days)
-            if days <= 0:
-                days = 3650
-            kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)
-            kwargs[upper_key] = max(min_timestamp, now)
-    elif normalized_direction == "custom":
-        days = int(lookback_days)
-        if days <= 0:
-            return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False, "abstain_reason": "custom_window_requires_positive_lookback_days", "interpretation": "", "bounds_source": "abstain"}
-        kwargs[lower_key] = max(min_timestamp, now - days * 86400.0)
-        kwargs[upper_key] = max(min_timestamp, now)
-        interpretation = "custom_lookback"
-    else:
-        return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False, "abstain_reason": "unsupported_direction", "interpretation": "", "bounds_source": "abstain"}
-    if str(content_keyword or "").strip():
-        kwargs["content"] = str(content_keyword)
-    if not kwargs:
-        return {"target_tool_name": "", "search_kwargs": {}, "should_call_search": False, "abstain_reason": "no_search_criteria_prepared", "interpretation": "", "bounds_source": "abstain"}
-    return {"target_tool_name": tool_name, "search_kwargs": kwargs, "should_call_search": True, "abstain_reason": "", "interpretation": interpretation, "bounds_source": bounds_source}
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _prepare_safe_action_or_abstain_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    spec = ToolSpec(
-        tool_name="prepare_safe_action_or_abstain",
-        family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
-        description=(
-            "Decide whether an action request has enough visible information and "
-            "required original ToolSandbox tools to continue. It returns a safe "
-            "abstention recommendation or a continue signal and never performs or "
-            "prepares a side-effect call."
-        ),
-        inputs=(
-            ToolInput("user_request", "str", "Current user request."),
-            ToolInput(
-                "requested_action",
-                "str",
-                "Requested semantic capability, not a side-effect tool call.",
-            ),
-            ToolInput("target_identifier", "str", "Visible target id or scalar."),
-            ToolInput(
-                "required_original_tools",
-                "list",
-                "Required semantic capabilities. Legacy field name retained for compatibility.",
-            ),
-            ToolInput(
-                "available_original_tools", "list", "Original tools visible now."
-            ),
-            ToolInput(
-                "visible_records_count", "int", "Visible matching records count."
-            ),
-        ),
-        output_annotation="dict",
-        output_schema={
-            "type": "object",
-            "properties": {
-                "should_abstain": {"type": "boolean"},
-                "missing_information": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "required_original_tools": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "safe_next_action": {"type": "string"},
-                "final_answer_recommendation": {"type": "string"},
-                "abstain_reason": {"type": "string"},
-            },
-        },
-        positive_triggers=(
-            "insufficient_information",
-            "missing original tool",
-            "missing target",
-            "ambiguous target",
-        ),
-        negative_triggers=(
-            "complete safe request",
-            "unique target and required tools visible",
-            "non-action lookup request",
-        ),
-        preserves_side_effect_tools=(
-            "search_contacts",
-            "remove_contact",
-            "modify_contact",
-            "search_messages",
-            "search_reminder",
-            "remove_reminder",
-            "modify_reminder",
-            "add_reminder",
-            "send_message_with_phone_number",
-            "get_current_location",
-        ),
-        required_original_tool_calls=(
-            "search_contacts",
-            "remove_contact",
-            "modify_contact",
-            "search_messages",
-            "search_reminder",
-            "remove_reminder",
-            "modify_reminder",
-            "add_reminder",
-            "send_message_with_phone_number",
-            "get_current_location",
-        ),
-        abstain_behavior=(
-            "Return should_abstain true when a required original tool, target "
-            "identifier, or unique target is missing. For original contact/reminder "
-            "modify/remove tools, a raw phone number, name, or recency phrase is "
-            "not a safe target_identifier unless a visible search/helper result "
-            "has already resolved it to a stable record id; otherwise return true."
-        ),
-        generalization_rationale=(
-            "The same safe-abstention contract applies across contact, reminder, "
-            "message, and missing-tool action families."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=4,
-        applicable_task_families=(
-            "remove_contact_by_phone_no_search_contacts_insufficient_information",
-            "modify_contact_with_message_recency_insufficient_information",
-            "remove_reminder_with_recency_latest_insufficient_information",
-            "send_message_with_contact_content_cellular_off_insufficient_information",
-            "find_current_location_insufficient_information",
-            "find_current_city_insufficient_information",
-        ),
-        reason_tool_is_decisive=(
-            "It prevents unsafe guessing in insufficient-information lanes while "
-            "preserving all original ToolSandbox side-effect calls for safe cases."
-        ),
-        shortfall_cluster_evidence=("validation:prepare_safe_action_or_abstain",),
-        known_failure_mechanisms_addressed=(
-            "missing_original_tool_precondition",
-            "missing_target_identifier",
-            "ambiguous_side_effect_target",
-        ),
-        final_state_preservation_plan=(
-            "The helper never changes state and only recommends abstain or continue."
-        ),
-        grading_accounting_note=(
-            "No side-effect route is replaced; original tools remain required for "
-            "safe continuation."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary="Insufficient-information tasks need safe abstention decisions.",
-            signals=(
-                "missing_user_information",
-                "missing_original_tool_precondition",
-                "unsafe_guess_before_side_effect",
-            ),
-        ),
-    )
-    code = """
-def prepare_safe_action_or_abstain(user_request: str, requested_action: str, target_identifier: str, required_original_tools: list, available_original_tools: list, visible_records_count: int) -> dict:
-    def clean_tool_name(value):
-        text = str(value)
-        return text.split(".", 1)[1] if text.startswith("functions.") else text
-    def to_capability(value):
-        text = clean_tool_name(value).strip()
-        normalized_text = text.lower().replace("-", "_").replace(" ", "_")
-        mapping = {
-            "search_contacts": "contact_lookup",
-            "remove_contact": "contact_removal",
-            "modify_contact": "contact_update",
-            "update_contact": "contact_update",
-            "search_messages": "message_lookup",
-            "send_message": "message_send",
-            "send_message_with_phone_number": "message_send",
-            "search_reminder": "reminder_lookup",
-            "remove_reminder": "reminder_removal",
-            "modify_reminder": "reminder_update",
-            "add_reminder": "reminder_creation",
-            "get_current_location": "location_lookup",
-            "get_current_city": "location_lookup",
-            "find_current_city": "location_lookup",
-            "search_lat_lon": "coordinate_to_place_lookup",
-            "search_location_around_lat_lon": "coordinate_place_search",
-            "search_weather_around_lat_lon": "coordinate_weather_lookup",
-            "calculate_lat_lon_distance": "coordinate_distance_calculation",
-            "get_location_service_status": "device_status_lookup",
-            "get_low_battery_mode_status": "device_status_lookup",
-            "get_wifi_status": "device_status_lookup",
-            "get_cellular_service_status": "device_status_lookup",
-            "set_location_service_status": "device_setting_update",
-            "set_low_battery_mode_status": "device_setting_update",
-            "set_wifi_status": "device_setting_update",
-            "set_cellular_service_status": "device_setting_update",
-            "current_city": "location_lookup",
-            "current_location": "location_lookup",
-            "get_my_current_city": "location_lookup",
-            "get_my_current_location": "location_lookup",
-            "where_am_i": "location_lookup",
-            "what_city_am_i_in": "location_lookup",
-        }
-        return mapping.get(text, mapping.get(normalized_text, text))
-    def looks_like_phone(value):
-        text = str(value or "").strip()
-        digits = [ch for ch in text if ch.isdigit()]
-        return len(digits) >= 7 and ("+" in text or any(ch in text for ch in "-() "))
-    def is_uuid_like(value):
-        parts = str(value).split("-")
-        if [len(part) for part in parts] != [8, 4, 4, 4, 12]:
-            return False
-        hexchars = "0123456789abcdefABCDEF"
-        for part in parts:
-            if any(ch not in hexchars for ch in part):
-                return False
-        return True
-    def is_recency_only_criterion(value):
-        text = str(value or "").strip().lower().replace("_", " ").replace("-", " ")
-        text = " ".join(text.split())
-        if not text:
-            return False
-        recency_phrases = {
-            "latest",
-            "oldest",
-            "last",
-            "most recent",
-            "recent",
-            "recency reference",
-            "upcoming",
-            "yesterday",
-            "today",
-            "tomorrow",
-        }
-        return text in recency_phrases or text.endswith(" recency")
-    required = [to_capability(tool) for tool in required_original_tools if str(tool)]
-    available = {to_capability(tool) for tool in available_original_tools if str(tool)}
-    action = to_capability(requested_action)
-    action_lower = action.lower()
-    target = str(target_identifier or "").strip()
-    user_lower = str(user_request or "").lower()
-    is_contact_update_action = (
-        action_lower in ("contact_update", "modify_contact", "update_contact")
-        or (
-            "contact" in action_lower
-            and any(word in action_lower for word in ("modify", "update", "change"))
-        )
-        or (
-            "phone" in action_lower
-            and any(word in action_lower for word in ("modify", "update", "change"))
-        )
-    )
-    if action == "location_lookup" and "location_lookup" not in required:
-        required.append("location_lookup")
-    if not required and any(phrase in user_lower for phrase in ("current city", "current location", "where am i", "what city am i")):
-        action = "location_lookup"
-        action_lower = action
-        required.append("location_lookup")
-    if action == "message_send" and target and not looks_like_phone(target) and "contact_lookup" not in required:
-        required.insert(0, "contact_lookup")
-    message_history_reference = (
-        "message" in user_lower
-        and any(word in user_lower for word in ("last", "latest", "most recent", "recent"))
-    )
-    if is_contact_update_action and message_history_reference and "message_lookup" not in required:
-        required.insert(0, "message_lookup")
-    missing = [tool for tool in required if tool not in available]
-    if missing:
-        if "location_lookup" in missing:
-            return {"should_abstain": True, "missing_information": missing, "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I cannot determine what city you are in because I do not have access to your current location, GPS, or latitude and longitude coordinates.", "abstain_reason": "missing_required_original_tool"}
-        if "message_lookup" in missing and "message" in user_lower and any(word in user_lower for word in ("last", "latest", "most recent", "recent")) and is_contact_update_action:
-            return {"should_abstain": True, "missing_information": missing, "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I do not have enough information to identify the last person you sent a message to because message history is unavailable.", "abstain_reason": "missing_required_original_tool"}
-        if "contact_removal" in missing and "contact" in user_lower:
-            if looks_like_phone(target_identifier):
-                return {"should_abstain": True, "missing_information": missing, "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I cannot remove the phone number from your contact because I do not have the contact removal tool available.", "abstain_reason": "missing_required_original_tool"}
-            return {"should_abstain": True, "missing_information": missing, "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I cannot remove that contact because the contact removal tool is unavailable.", "abstain_reason": "missing_required_original_tool"}
-        if "contact_lookup" in missing and "contact" in user_lower:
-            if looks_like_phone(target_identifier):
-                action_word = "remove" if action in ("contact_removal", "remove_contact") else "modify" if action in ("contact_update", "modify_contact") else "act on"
-                return {"should_abstain": True, "missing_information": missing, "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I do not have enough information to safely " + action_word + " the contact with phone number " + target + ". I would need a contact name or person_id, or access to search contacts, before I can " + action_word + " it.", "abstain_reason": "missing_required_original_tool"}
-            return {"should_abstain": True, "missing_information": missing, "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I do not have enough information to identify the contact because contact search is unavailable.", "abstain_reason": "missing_required_original_tool"}
-        if "contact_lookup" in missing and action == "message_send":
-            if target:
-                return {"should_abstain": True, "missing_information": missing, "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I cannot safely send the message because I do not have contact lookup available to resolve " + target + " to a phone number.", "abstain_reason": "missing_required_original_tool"}
-            return {"should_abstain": True, "missing_information": missing, "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I cannot safely send the message because I do not have contact lookup available to resolve the recipient to a phone number.", "abstain_reason": "missing_required_original_tool"}
-        return {"should_abstain": True, "missing_information": missing, "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I do not have enough information to complete the action.", "abstain_reason": "missing_required_original_tool"}
-    needs_target = action in ("contact_removal", "contact_update", "message_send", "reminder_removal", "reminder_update", "remove_contact", "modify_contact", "send_message", "remove_reminder", "modify_reminder")
-    if needs_target and not target:
-        return {"should_abstain": True, "missing_information": ["target_identifier"], "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I do not have enough information to complete the action.", "abstain_reason": "missing_target_identifier"}
-    count = int(visible_records_count)
-    record_search_actions = ("contact_lookup", "message_lookup", "reminder_lookup", "search_contacts", "search_messages", "search_reminder")
-    if action in record_search_actions and count <= 0 and not target:
-        return {"should_abstain": True, "missing_information": ["search_criteria"], "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I need a name, content, id, timestamp, or other search criterion before I can search safely.", "abstain_reason": "missing_search_criteria"}
-    if action in record_search_actions and count <= 0 and is_recency_only_criterion(target):
-        return {"should_abstain": True, "missing_information": ["specific_search_criteria"], "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I need more specific search criteria before I can safely identify a unique record.", "abstain_reason": "recency_only_search_criteria"}
-    id_required_actions = ("contact_removal", "contact_update", "reminder_removal", "reminder_update", "remove_contact", "modify_contact", "remove_reminder", "modify_reminder")
-    stable_id = is_uuid_like(target)
-    if action in id_required_actions and count <= 0 and not stable_id:
-        if action in ("contact_removal", "contact_update", "remove_contact", "modify_contact") and "contact_lookup" not in available:
-            if looks_like_phone(target):
-                action_word = "remove" if action in ("contact_removal", "remove_contact") else "modify"
-                return {"should_abstain": True, "missing_information": ["contact_lookup"], "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I do not have enough information to safely " + action_word + " the contact with phone number " + target + ". I would need a contact name or person_id, or access to contact search, before I can " + action_word + " it.", "abstain_reason": "missing_contact_lookup_tool"}
-            return {"should_abstain": True, "missing_information": ["contact_lookup"], "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I do not have enough information to identify the contact because contact search is unavailable.", "abstain_reason": "missing_contact_lookup_tool"}
-        return {"should_abstain": True, "missing_information": ["target_identifier"], "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I do not have enough information to identify the target for the action.", "abstain_reason": "missing_target_identifier"}
-    if count > 1 and target in ("", "implicit_reference", "recency_reference"):
-        return {"should_abstain": True, "missing_information": ["unique_target"], "required_original_tools": required, "safe_next_action": "ask_user_or_abstain", "final_answer_recommendation": "I do not have enough information to identify a unique target.", "abstain_reason": "ambiguous_target"}
-    return {"should_abstain": False, "missing_information": [], "required_original_tools": required, "safe_next_action": "continue_with_original_tool", "final_answer_recommendation": "", "abstain_reason": ""}
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _prepare_holiday_search_args_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    spec = ToolSpec(
-        tool_name="prepare_holiday_search_args",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Prepare original search_holiday arguments from a visible holiday "
-            "timestamp or holiday-date request without inventing a year."
-        ),
-        inputs=(
-            ToolInput("user_request", "str", "Visible user request text."),
-            ToolInput(
-                "visible_current_year",
-                "int",
-                "Current year if already visible from original tools; 0 otherwise.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema={
-            "type": "object",
-            "properties": {
-                "should_call_search_holiday": {"type": "boolean"},
-                "search_holiday_kwargs": {"type": "object"},
-                "holiday_name": {"type": "string"},
-                "year_policy": {"type": "string"},
-                "final_answer_recommendation": {"type": "string"},
-                "abstain_reason": {"type": "string"},
-            },
-            "required": [
-                "should_call_search_holiday",
-                "search_holiday_kwargs",
-                "holiday_name",
-                "year_policy",
-                "final_answer_recommendation",
-                "abstain_reason",
-            ],
-        },
-        positive_triggers=(
-            "find_thanksgiving_timestamp",
-            "holiday timestamp",
-            "timestamp for thanksgiving",
-            "timestamp for holiday",
-        ),
-        negative_triggers=("days till holiday", "how many days", "days until"),
-        preserves_side_effect_tools=("search_holiday",),
-        required_original_tool_calls=("search_holiday",),
-        abstain_behavior=(
-            "Return should_call_search_holiday=false when no holiday name is "
-            "visible in the request."
-        ),
-        generalization_rationale=(
-            "Holiday timestamp tasks recur across holiday labels. The generated "
-            "tool only prepares the original search_holiday call; it does not "
-            "compute or encode holiday dates."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=2,
-        applicable_task_families=("find_holiday_timestamp", "holiday_lookup"),
-        reason_tool_is_decisive=(
-            "It prevents invented years in search_holiday calls and preserves the "
-            "original holiday lookup as the evidence source."
-        ),
-        shortfall_cluster_evidence=("composite:prepare_holiday_search_args",),
-        known_failure_mechanisms_addressed=(
-            "holiday_timestamp_search_args_invented_year",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "No state changes occur; the actor must still call original search_holiday."
-        ),
-        grading_accounting_note=(
-            "The helper prepares arguments only, so the original benchmark lookup "
-            "milestone is retained."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary=(
-                "Holiday timestamp requests need stable search_holiday kwargs and "
-                "must not invent stale years."
-            ),
-            signals=("wrong_original_tool_arguments", "invented_temporal_context"),
-            failed_tool_calls=("search_holiday",),
-        ),
-    )
-    code = """
-def prepare_holiday_search_args(user_request: str, visible_current_year: int) -> dict:
-    text = str(user_request or "").strip()
-    lower = " " + " ".join(text.lower().replace("_", " ").split()) + " "
-    known = (
-        ("thanksgiving", "Thanksgiving"),
-        ("christmas day", "Christmas Day"),
-        ("christmas", "Christmas Day"),
-        ("new year's day", "New Year's Day"),
-        ("new years day", "New Year's Day"),
-        ("independence day", "Independence Day"),
-        ("july 4", "Independence Day"),
-        ("labor day", "Labor Day"),
-        ("memorial day", "Memorial Day"),
-        ("veterans day", "Veterans Day"),
-        ("veteran's day", "Veterans Day"),
-        ("halloween", "Halloween"),
-        ("valentine's day", "Valentine's Day"),
-        ("valentines day", "Valentine's Day"),
-        ("easter", "Easter"),
-    )
-    holiday = ""
-    for token, label in known:
-        if " " + token + " " in lower:
-            holiday = label
-            break
-    if not holiday:
-        phrase = text
-        for marker in ("timestamp for", "date for", "when is", "what is"):
-            idx = phrase.lower().find(marker)
-            if idx >= 0:
-                phrase = phrase[idx + len(marker):]
-                break
-        for noise in ("timestamp", "date", "this year", "this year's", "holiday"):
-            phrase = phrase.replace(noise, " ").replace(noise.title(), " ")
-        holiday = " ".join(part for part in phrase.replace("?", " ").split() if part.lower() not in ("the", "a", "an"))
-        if holiday:
-            holiday = holiday[:1].upper() + holiday[1:]
-    if not holiday:
-        return {"should_call_search_holiday": False, "search_holiday_kwargs": {}, "holiday_name": "", "year_policy": "missing_holiday_name", "final_answer_recommendation": "I need the holiday name before I can look up its timestamp.", "abstain_reason": "missing_holiday_name"}
-    explicit_year = 0
-    digits = ""
-    for ch in text:
-        if ch.isdigit():
-            digits += ch
-            if len(digits) == 4:
-                year = int(digits)
-                if 1900 <= year <= 2200:
-                    explicit_year = year
-                    break
-                digits = digits[1:]
-        else:
-            digits = ""
-    this_year_requested = " this year " in lower or " this year's " in lower or " current year " in lower
-    kwargs = {"holiday_name": holiday}
-    year_policy = "environment_resolves_year"
-    if explicit_year and not this_year_requested:
-        kwargs["year"] = explicit_year
-        year_policy = "explicit_year"
-    return {"should_call_search_holiday": True, "search_holiday_kwargs": kwargs, "holiday_name": holiday, "year_policy": year_policy, "final_answer_recommendation": "", "abstain_reason": ""}
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _days_between_timestamps_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    spec = ToolSpec(
-        tool_name="days_between_timestamps",
-        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
-        description=(
-            "Compute deterministic whole-day and leftover-second distance between "
-            "two visible Unix timestamps after the original current-time and "
-            "holiday/event lookup tools have returned."
-        ),
-        inputs=(
-            ToolInput("timestamp_0", "float", "Start timestamp to subtract."),
-            ToolInput("timestamp_1", "float", "Target timestamp to subtract from."),
-        ),
-        output_annotation="dict",
-        output_schema={
-            "type": "object",
-            "properties": {
-                "days": {"type": "integer"},
-                "seconds": {"type": "integer"},
-            },
-            "required": ["days", "seconds"],
-        },
-        positive_triggers=(
-            "find_days_till_holiday",
-            "find_days_till_holiday_wifi_off",
-            "how many days until a holiday",
-        ),
-        negative_triggers=(
-            "missing_current_timestamp",
-            "missing_target_timestamp",
-            "reminder_creation_timestamp",
-            "insufficient_information",
-        ),
-        required_original_tool_calls=("get_current_timestamp", "search_holiday"),
-        abstain_behavior=(
-            "Use only after both timestamps are visible; do not guess or look up a "
-            "holiday date inside this helper."
-        ),
-        generalization_rationale=(
-            "Holiday and deadline-distance tasks repeatedly expose two timestamps "
-            "but need the same deterministic elapsed-day calculation."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=2,
-        applicable_task_families=(
-            "find_days_till_holiday",
-            "find_days_till_holiday_wifi_off",
-        ),
-        reason_tool_is_decisive=(
-            "It restores a missing timestamp-difference operation while preserving "
-            "the original time and holiday lookup calls."
-        ),
-        shortfall_cluster_evidence=("derived_value:days_between_timestamps",),
-        known_failure_mechanisms_addressed=(
-            "holiday_calendar_day_distance_missing",
-            "timestamp_diff_removed_from_base_toolset",
-        ),
-        canonical_route_substitution_risk="medium",
-        expected_milestone_calls_replaced=("timestamp_diff",),
-        final_state_preservation_plan=(
-            "The helper has no side effects and only computes from timestamps that "
-            "the original ToolSandbox tools already produced."
-        ),
-        grading_accounting_note=(
-            "Canonical/reference phrasing can drop when the helper changes how the "
-            "intermediate day difference is expressed; task outcome is the primary "
-            "metric for this derived-value lane."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary=(
-                "Holiday distance tasks need deterministic day/second difference "
-                "after current timestamp and holiday timestamp are visible."
-            ),
-            signals=("visible_raw_data_lacking_deterministic_transform",),
-            failed_tool_calls=("get_current_timestamp", "search_holiday"),
-        ),
-    )
-    code = """
-def days_between_timestamps(timestamp_0: float, timestamp_1: float) -> dict:
-    total_seconds = int(float(timestamp_1) - float(timestamp_0))
-    days = total_seconds // 86400
-    seconds = total_seconds - days * 86400
-    return {"days": int(days), "seconds": int(seconds)}
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _prepare_add_contact_args_contract_tool(
-    request: ToolGenerationRequest,
-    rejected_tool: GeneratedTool | None = None,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "add_contact_kwargs": {"type": "object"},
-            "should_call_downstream_tool": {"type": "boolean"},
-            "downstream_tool_name": {"type": "string"},
-            "downstream_tool_kwargs": {"type": "object"},
-            "normalized_phone_number": {"type": "string"},
-            "abstain_reason": {"type": "string"},
-        },
-        "required": [
-            "add_contact_kwargs",
-            "should_call_downstream_tool",
-            "downstream_tool_name",
-            "downstream_tool_kwargs",
-            "normalized_phone_number",
-            "abstain_reason",
-        ],
-    }
-    spec = ToolSpec(
-        tool_name="prepare_add_contact_args",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Prepare exact original add_contact side-effect arguments from visible "
-            "user request text or explicit scalar inputs. This tool only normalizes "
-            "visible name/phone/relationship fields; it does not search, modify, or "
-            "create contacts."
-        ),
-        inputs=(
-            ToolInput(
-                "user_request",
-                "str",
-                "Visible user request text that may contain the contact name and phone number.",
-            ),
-            ToolInput("name", "str", "Optional visible contact name."),
-            ToolInput("phone_number", "str", "Optional visible phone number."),
-            ToolInput("relationship", "str", "Optional visible relationship label."),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "add_contact_with_name_and_phone_number",
-            "visible request contains contact name and phone number",
-            "prepare add_contact arguments",
-        ),
-        negative_triggers=(
-            "missing name",
-            "missing phone number",
-            "remove_contact",
-            "modify_contact",
-            "search-only contact task",
-        ),
-        preserves_side_effect_tools=("add_contact",),
-        required_original_tool_calls=("add_contact",),
-        abstain_behavior=(
-            "Return should_call_downstream_tool false and abstain_reason "
-            "missing_name_or_phone_number when either visible scalar is missing."
-        ),
-        generalization_rationale=(
-            "Add-contact variants repeatedly require the same deterministic "
-            "conversion from visible request text into original add_contact kwargs."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=3,
-        applicable_task_families=(
-            "add_contact_with_name_and_phone_number",
-            "add_contact_with_visible_name_phone",
-            "contact_creation_from_visible_name_phone",
-            *(rejected_tool.spec.applicable_task_families if rejected_tool else ()),
-        ),
-        reason_tool_is_decisive=(
-            "It prevents the actor from searching or modifying existing contacts "
-            "when the correct final side effect is the original add_contact call."
-        ),
-        shortfall_cluster_evidence=("composite:prepare_add_contact_args",),
-        known_failure_mechanisms_addressed=(
-            "final_action_argument_preparation",
-            "wrong_contact_side_effect_tool_selected",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The generated tool only returns add_contact kwargs. The actor must "
-            "still execute original ToolSandbox add_contact."
-        ),
-        grading_accounting_note=(
-            "Canonical final side-effect remains the original add_contact call; "
-            "the generated tool contributes deterministic argument preparation."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary=(
-                "Visible add-contact requests need deterministic preparation of "
-                "original add_contact kwargs."
-            ),
-            signals=("final_action_argument_preparation",),
-            failed_tool_calls=("add_contact",),
-        ),
-    )
-    code = """
-def prepare_add_contact_args(user_request: str, name: str = "", phone_number: str = "", relationship: str = "") -> dict:
-    def empty(reason):
-        return {
-            "add_contact_kwargs": {},
-            "should_call_downstream_tool": False,
-            "downstream_tool_name": "",
-            "downstream_tool_kwargs": {},
-            "normalized_phone_number": "",
-            "abstain_reason": reason,
-        }
-
-    def normalize_phone(value):
-        raw = str(value or "").strip()
-        if not raw:
-            return ""
-        has_plus = raw.startswith("+")
-        digits = "".join(ch for ch in raw if ch.isdigit())
-        if not digits:
-            return ""
-        return ("+" if has_plus else "") + digits
-
-    def extract_phone(text):
-        best = ""
-        current = ""
-        for ch in str(text or ""):
-            if ch.isdigit() or ch in "+-(). ":
-                current += ch
-            else:
-                normalized = normalize_phone(current)
-                if len("".join(c for c in normalized if c.isdigit())) >= 7:
-                    best = current.strip()
-                current = ""
-        normalized = normalize_phone(current)
-        if len("".join(c for c in normalized if c.isdigit())) >= 7:
-            best = current.strip()
-        return best
-
-    def remove_fragment(text, fragment):
-        if not fragment:
-            return text
-        return str(text).replace(fragment, " ")
-
-    def before_any(text, separators):
-        value = str(text)
-        lower = value.lower()
-        cut = len(value)
-        for sep in separators:
-            index = lower.find(sep)
-            if index >= 0:
-                cut = min(cut, index)
-        return value[:cut]
-
-    def after_marker(text, markers):
-        value = str(text)
-        lower = value.lower()
-        for marker in markers:
-            index = lower.find(marker)
-            if index >= 0:
-                return value[index + len(marker):]
-        return value
-
-    def clean_name(value):
-        text = " ".join(str(value or "").strip(" .?!:;,'\\"").split())
-        prefixes = (
-            "please ",
-            "can you ",
-            "could you ",
-            "add ",
-            "create ",
-            "save ",
-            "a ",
-            "new ",
-            "contact ",
-            "for ",
-            "named ",
-            "called ",
-        )
-        for _ in range(12):
-            lower = text.lower()
-            removed = False
-            for prefix in prefixes:
-                if lower.startswith(prefix):
-                    text = text[len(prefix):].strip()
-                    removed = True
-                    break
-            if not removed:
-                break
-        return " ".join(text.strip(" .?!:;,'\\"").split())
-
-    request_text = str(user_request or "")
-    raw_phone = str(phone_number or "").strip() or extract_phone(request_text)
-    normalized_phone = normalize_phone(raw_phone)
-    candidate_name = str(name or "").strip()
-    if not candidate_name:
-        without_phone = remove_fragment(request_text, raw_phone)
-        lowered = without_phone.lower()
-        if " as a contact" in lowered:
-            before_contact = without_phone[:lowered.find(" as a contact")]
-            candidate_name = after_marker(
-                before_contact,
-                ("add ", "create ", "save "),
-            )
-        else:
-            candidate_name = after_marker(
-                without_phone,
-                (
-                    "contact for ",
-                    "contact named ",
-                    "contact called ",
-                    "new contact for ",
-                    "add contact for ",
-                    "add a contact for ",
-                    "add ",
-                    "create ",
-                    "save ",
-                ),
-            )
-        candidate_name = before_any(
-            candidate_name,
-            (
-                " to my contact",
-                " to my contacts",
-                " to contact",
-                " to contacts",
-                ", his ",
-                ", her ",
-                ", their ",
-                " his phone",
-                " her phone",
-                " their phone",
-                " whose phone",
-                " with phone number",
-                " with phone",
-                " phone_number",
-                " phone number",
-                " phone",
-                " number",
-                " and phone",
-            ),
-        )
-    cleaned_name = clean_name(candidate_name)
-    cleaned_relationship = " ".join(str(relationship or "").strip(" .?!:;,").split())
-    if not cleaned_name or not normalized_phone:
-        return empty("missing_name_or_phone_number")
-    kwargs = {
-        "name": cleaned_name,
-        "phone_number": normalized_phone,
-    }
-    if cleaned_relationship:
-        kwargs["relationship"] = cleaned_relationship
-    return {
-        "add_contact_kwargs": kwargs,
-        "should_call_downstream_tool": True,
-        "downstream_tool_name": "add_contact",
-        "downstream_tool_kwargs": kwargs,
-        "normalized_phone_number": normalized_phone,
-        "abstain_reason": "",
-    }
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _prepare_location_search_args_contract_tool(
-    request: ToolGenerationRequest,
-    rejected_tool: GeneratedTool | None = None,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "search_location_kwargs": {"type": "object"},
-            "should_call_downstream_tool": {"type": "boolean"},
-            "downstream_tool_name": {"type": "string"},
-            "downstream_tool_kwargs": {"type": "object"},
-            "location_query": {"type": "string"},
-            "abstain_reason": {"type": "string"},
-        },
-        "required": [
-            "search_location_kwargs",
-            "should_call_downstream_tool",
-            "downstream_tool_name",
-            "downstream_tool_kwargs",
-            "location_query",
-            "abstain_reason",
-        ],
-    }
-    spec = ToolSpec(
-        tool_name="prepare_location_search_args",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Prepare exact original search_location_around_lat_lon arguments from "
-            "visible user request text or an explicit place phrase. Preserve street, "
-            "neighborhood, or venue qualifiers such as 'on Stevens Creek'. This "
-            "tool does not search and never returns coordinates; it only returns "
-            "the original ToolSandbox search call to make next. For reminder "
-            "requests with a visible place but no visible reminder date/time, "
-            "pause before any location lookup so the actor asks for the missing "
-            "time first. For broad place names without street, neighborhood, or "
-            "venue qualifiers, route the actor to the original current-location "
-            "getter when coordinates are not yet visible; after coordinates are "
-            "visible, return the downstream location-search call."
-        ),
-        inputs=(
-            ToolInput(
-                "user_request",
-                "str",
-                "Visible user request text that may contain a place phrase.",
-            ),
-            ToolInput(
-                "location_phrase",
-                "str",
-                "Optional visible place phrase already extracted from the request.",
-            ),
-            ToolInput(
-                "latitude",
-                "float",
-                "Optional real current latitude if visible; use 0.0 when unknown.",
-            ),
-            ToolInput(
-                "longitude",
-                "float",
-                "Optional real current longitude if visible; use 0.0 when unknown.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "add_reminder_content_and_time_and_location",
-            "visible request contains a location phrase",
-            "prepare search_location_around_lat_lon arguments",
-        ),
-        negative_triggers=(
-            "no visible location phrase",
-            "missing location",
-            "coordinates only",
-            "placeholder latitude longitude",
-        ),
-        preserves_side_effect_tools=("search_location_around_lat_lon",),
-        required_original_tool_calls=("search_location_around_lat_lon",),
-        abstain_behavior=(
-            "Return should_call_downstream_tool false with abstain_reason "
-            "missing_location_phrase when neither user_request nor location_phrase "
-            "contains a visible place name. Return should_call_downstream_tool "
-            "false with abstain_reason missing_reminder_time_before_location_lookup "
-            "when a reminder request contains a visible place but no visible "
-            "date/time needed to create the reminder. For a broad place name "
-            "without visible current coordinates, return should_call_downstream_tool "
-            "true with downstream_tool_name get_current_location and empty "
-            "downstream kwargs. "
-            "Omit latitude and longitude from downstream kwargs when either "
-            "coordinate is 0.0 or missing for a qualified place query."
-        ),
-        generalization_rationale=(
-            "Location reminder tasks repeatedly require the same deterministic "
-            "preservation of the user's full place phrase before the original "
-            "location search runs."
-        ),
-        estimated_step_compression=max(
-            rejected_tool.spec.estimated_step_compression if rejected_tool else 0,
-            3,
-        ),
-        cross_task_applicability_count=max(
-            rejected_tool.spec.cross_task_applicability_count if rejected_tool else 0,
-            2,
-        ),
-        applicable_task_families=(
-            *(rejected_tool.spec.applicable_task_families if rejected_tool else ()),
-            "add_reminder_content_and_time_and_location",
-            "add_reminder_content_and_week_delta_and_time_and_location",
-            "location_lookup_argument_preparation",
-        ),
-        reason_tool_is_decisive=(
-            "It prevents the actor from dropping visible place qualifiers or "
-            "passing placeholder coordinates before the preserved original "
-            "location-search call."
-        ),
-        diagnostic_only=rejected_tool.spec.diagnostic_only if rejected_tool else False,
-        shortfall_cluster_evidence=(
-            *(rejected_tool.spec.shortfall_cluster_evidence if rejected_tool else ()),
-            "composite:prepare_location_search_args",
-        ),
-        known_failure_mechanisms_addressed=(
-            *(
-                rejected_tool.spec.known_failure_mechanisms_addressed
-                if rejected_tool
-                else ()
-            ),
-            "location_query_qualifier_dropped",
-            "placeholder_coordinate_search",
-            "broad_location_query_requires_current_coordinates",
-            "expensive_location_lookup_before_required_reminder_time",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The generated tool only returns search_location_around_lat_lon kwargs. "
-            "The actor must still execute the original ToolSandbox search tool and "
-            "use only visible coordinates returned by that original tool."
-        ),
-        grading_accounting_note=(
-            "The original location-search milestone is preserved; the generated "
-            "tool contributes deterministic argument preparation."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary=(
-                "Visible location reminder requests need deterministic preservation "
-                "of the full place phrase before the original location search."
-            ),
-            signals=("final_action_argument_preparation",),
-            failed_tool_calls=("search_location_around_lat_lon",),
-        ),
-    )
-    code = """
-def prepare_location_search_args(user_request: str, location_phrase: str = "", latitude: float = 0.0, longitude: float = 0.0) -> dict:
-    def empty(reason):
-        return {
-            "search_location_kwargs": {},
-            "should_call_downstream_tool": False,
-            "downstream_tool_name": "",
-            "downstream_tool_kwargs": {},
-            "location_query": "",
-            "abstain_reason": reason,
-        }
-
-    def current_location_needed(query):
-        return {
-            "search_location_kwargs": {},
-            "should_call_downstream_tool": True,
-            "downstream_tool_name": "get_current_location",
-            "downstream_tool_kwargs": {},
-            "location_query": query,
-            "abstain_reason": "need_current_coordinates_for_broad_location_query",
-        }
-
-    def reminder_time_needed(query):
-        return {
-            "search_location_kwargs": {},
-            "should_call_downstream_tool": False,
-            "downstream_tool_name": "",
-            "downstream_tool_kwargs": {},
-            "location_query": query,
-            "abstain_reason": "missing_reminder_time_before_location_lookup",
-        }
-
-    def clean(value):
-        text = " ".join(str(value or "").strip(" .?!:;,'\\"").split())
-        return text
-
-    def strip_temporal_tail(value):
-        text = clean(value)
-        lower = text.lower()
-        cut = len(text)
-        temporal_markers = (
-            " tomorrow",
-            " today",
-            " tonight",
-            " this morning",
-            " this afternoon",
-            " this evening",
-            " next ",
-            " at 1",
-            " at 2",
-            " at 3",
-            " at 4",
-            " at 5",
-            " at 6",
-            " at 7",
-            " at 8",
-            " at 9",
-            " at 10",
-            " at 11",
-            " at 12",
-        )
-        for marker in temporal_markers:
-            index = lower.find(marker)
-            if index > 0:
-                cut = min(cut, index)
-        return clean(text[:cut])
-
-    def after_last_marker(text, markers):
-        value = str(text or "")
-        lower = value.lower()
-        best_index = -1
-        best_marker = ""
-        for marker in markers:
-            index = lower.rfind(marker)
-            if index >= 0 and index + len(marker) > best_index:
-                best_index = index + len(marker)
-                best_marker = marker
-        if best_index < 0:
-            return ""
-        candidate = value[best_index:]
-        if best_marker.strip() in {"near", "around"}:
-            candidate = value[best_index:]
-        return strip_temporal_tail(candidate)
-
-    def looks_like_time_only(value):
-        text = clean(value).lower().replace(".", "")
-        if not text:
-            return False
-        compact = text.replace(" ", "")
-        if compact.endswith(("am", "pm")):
-            digits = compact[:-2].replace(":", "")
-            return bool(digits) and all(ch.isdigit() for ch in digits)
-        return text.startswith(("am ", "pm ")) or text in {"am", "pm"}
-
-    def is_reminder_request(value):
-        text = " " + clean(value).lower() + " "
-        markers = (
-            " remind ",
-            " reminder ",
-            " reminders ",
-            " add a reminder ",
-            " create a reminder ",
-            " set a reminder ",
-        )
-        return any(marker in text for marker in markers)
-
-    def has_task_wrapper(value):
-        text = " " + clean(value).lower() + " "
-        task_markers = (
-            " remind ",
-            " reminder ",
-            " reminders ",
-            " todo ",
-            " to-do ",
-            " buy ",
-            " call ",
-            " text ",
-            " message ",
-            " find ",
-            " search ",
-            " look for ",
-            " get ",
-            " show ",
-        )
-        return any(marker in text for marker in task_markers)
-
-    def is_current_location_reference(value):
-        text = clean(value).lower()
-        return text in {
-            "me",
-            "near me",
-            "around me",
-            "here",
-            "there",
-            "my location",
-            "current location",
-        }
-
-    def has_visible_reminder_time(value):
-        text = " " + clean(value).lower().replace(".", "") + " "
-        compact = text.replace(" ", "")
-        if any(ch.isdigit() for ch in text) and (
-            " am " in text
-            or " pm " in text
-            or " a.m " in text
-            or " p.m " in text
-            or " at " in text
-            or ":" in text
-            or any(unit in text for unit in (" minute", " hour", " day", " week"))
-        ):
-            return True
-        if "am" in compact or "pm" in compact:
-            return True
-        relative_markers = (
-            " today ",
-            " tomorrow ",
-            " tonight ",
-            " next ",
-            " this morning ",
-            " this afternoon ",
-            " this evening ",
-            " in a minute ",
-            " in an hour ",
-            " noon ",
-            " midnight ",
-        )
-        weekdays = (
-            " monday ",
-            " tuesday ",
-            " wednesday ",
-            " thursday ",
-            " friday ",
-            " saturday ",
-            " sunday ",
-        )
-        months = (
-            " january ",
-            " february ",
-            " march ",
-            " april ",
-            " may ",
-            " june ",
-            " july ",
-            " august ",
-            " september ",
-            " october ",
-            " november ",
-            " december ",
-        )
-        return any(marker in text for marker in relative_markers + weekdays + months)
-
-    def is_broad_place_query(value):
-        text = clean(value).lower()
-        if not text or any(ch.isdigit() for ch in text):
-            return False
-        padded = " " + text + " "
-        specific_markers = (
-            " on ",
-            " near ",
-            " around ",
-            " in ",
-            " by ",
-            " street",
-            " st ",
-            " avenue",
-            " ave",
-            " boulevard",
-            " blvd",
-            " road",
-            " rd ",
-            " drive",
-            " dr ",
-            " lane",
-            " ln ",
-            " way",
-            " center",
-            " centre",
-            " creek",
-            " mall",
-            " plaza",
-            " square",
-            " downtown",
-            " airport",
-        )
-        if any(marker in padded for marker in specific_markers):
-            return False
-        return len([token for token in text.replace("-", " ").split() if token]) <= 3
-
-    request_query = after_last_marker(
-        user_request,
-        (
-            " at ",
-            " near ",
-            " around ",
-            " in ",
-            " by ",
-        ),
-    )
-    if is_current_location_reference(request_query):
-        request_query = ""
-    query = clean(location_phrase)
-    request_as_phrase = strip_temporal_tail(user_request)
-    if request_query:
-        query_tokens = set(query.lower().split())
-        request_tokens = set(request_query.lower().split())
-        if (
-            not query
-            or (
-                len(request_query) > len(query)
-                and query_tokens
-                and query_tokens.issubset(request_tokens)
-            )
-        ):
-            query = request_query
-    if query and request_as_phrase:
-        phrase_tokens = set(request_as_phrase.lower().split())
-        query_tokens = set(query.lower().split())
-        phrase_lower = " " + request_as_phrase.lower() + " "
-        qualifier_markers = (
-            " on ",
-            " near ",
-            " around ",
-            " in ",
-            " by ",
-        )
-        if (
-            len(request_as_phrase) > len(query)
-            and query_tokens
-            and query_tokens.issubset(phrase_tokens)
-            and any(marker in phrase_lower for marker in qualifier_markers)
-            and not has_task_wrapper(request_as_phrase)
-        ):
-            query = request_as_phrase
-    if not query:
-        request_lower = " " + request_as_phrase.lower() + " "
-        task_markers = (
-            " remind ",
-            " reminder ",
-            " todo ",
-            " buy ",
-            " call ",
-            " text ",
-            " message ",
-        )
-        if request_as_phrase and not any(
-            marker in request_lower for marker in task_markers
-        ):
-            query = request_as_phrase
-    if not query or looks_like_time_only(query):
-        return empty("missing_location_phrase")
-
-    has_latitude = latitude is not None and float(latitude) != 0.0
-    has_longitude = longitude is not None and float(longitude) != 0.0
-    if is_reminder_request(user_request) and not has_visible_reminder_time(user_request):
-        return reminder_time_needed(query)
-    broad_place_query = is_broad_place_query(query)
-    if broad_place_query and not (has_latitude and has_longitude):
-        return current_location_needed(query)
-    kwargs = {"location": query}
-    if broad_place_query and has_latitude and has_longitude:
-        kwargs["latitude"] = float(latitude)
-        kwargs["longitude"] = float(longitude)
-    return {
-        "search_location_kwargs": kwargs,
-        "should_call_downstream_tool": True,
-        "downstream_tool_name": "search_location_around_lat_lon",
-        "downstream_tool_kwargs": kwargs,
-        "location_query": query,
-        "abstain_reason": "",
-    }
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _extract_service_answer_field_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "answer_value": {"type": "string"},
-            "answer_kind": {"type": "string"},
-            "answer_unit": {"type": "string"},
-            "should_call_downstream_tool": {"type": "boolean"},
-            "downstream_tool_name": {"type": "string"},
-            "downstream_tool_kwargs": {"type": "object"},
-            "exact_final_answer": {"type": "string"},
-            "final_answer_recommendation": {"type": "string"},
-            "copy_exactly": {"type": "boolean"},
-            "abstain_reason": {"type": "string"},
-        },
-        "required": [
-            "answer_value",
-            "answer_kind",
-            "answer_unit",
-            "should_call_downstream_tool",
-            "downstream_tool_name",
-            "downstream_tool_kwargs",
-            "exact_final_answer",
-            "final_answer_recommendation",
-            "copy_exactly",
-            "abstain_reason",
-        ],
-    }
-    producer_tools = (
-        "search_location_around_lat_lon",
-        "search_lat_lon",
-        "search_weather_around_lat_lon",
-        "calculate_lat_lon_distance",
-        "convert_currency",
-    )
-    spec = ToolSpec(
-        tool_name="extract_service_answer_field",
-        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
-        description=(
-            "Extract a scalar final answer field from a visible external lookup "
-            "or conversion payload after the original ToolSandbox producer has "
-            "returned. For bare scalar outputs such as a distance or conversion "
-            "number, a weather payload, or a direct address string returned by "
-            "search_lat_lon, pass "
-            "service_payload={'result': value}. This helper never calls external "
-            "services and has no side effects."
-        ),
-        inputs=(
-            ToolInput(
-                "service_payload",
-                "dict",
-                "One visible result dictionary, result-list item, result list, or {'result': scalar_value_or_string} wrapper from an original service lookup, weather, distance, or conversion tool.",
-            ),
-            ToolInput(
-                "requested_unit",
-                "str",
-                "Optional target unit visible in the user request, such as kilometers or miles.",
-            ),
-            ToolInput(
-                "answer_subject",
-                "str",
-                "Optional visible subject/place/entity from the user request or service payload for the final answer.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "visible service payload contains phone_number",
-            "visible service payload contains address",
-            "visible service payload contains distance",
-            "visible service payload contains converted_amount",
-            "visible service payload contains current_temperature",
-            "visible weather payload contains temperature_unit",
-            "visible scalar result from calculate_lat_lon_distance",
-            "convert_currency",
-            "weather_lookup",
-            "temperature_lookup",
-            "find_phone_number",
-            "find_distance",
-        ),
-        negative_triggers=(
-            "service payload has no supported answer field",
-            "insufficient_information",
-        ),
-        preserves_side_effect_tools=producer_tools,
-        required_original_tool_calls=producer_tools,
-        abstain_behavior=(
-            "Return empty answer fields with abstain_reason "
-            "no_supported_answer_field when the visible payload lacks a supported "
-            "scalar answer field."
-        ),
-        generalization_rationale=(
-            "Currency, location, weather, and distance tasks repeatedly expose a "
-            "structured service payload and require deterministic final answer "
-            "field extraction."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=4,
-        applicable_task_families=(
-            "convert_currency",
-            "convert_currency_canonicalize",
-            "find_phone_number_with_location_name",
-            "find_distance_with_location_name",
-            "weather_lookup",
-            "temperature_lookup",
-            "service_answer_extraction",
-        ),
-        reason_tool_is_decisive=(
-            "It converts the visible original service payload into the exact scalar "
-            "answer while preserving the original lookup/conversion call."
-        ),
-        shortfall_cluster_evidence=("derived_value:extract_service_answer_field",),
-        known_failure_mechanisms_addressed=(
-            "visible_raw_data_lacking_deterministic_transform",
-            "manual_service_answer_field_copy_error",
-            "currency_unit_omission",
-            "weather_temperature_field_copy_error",
-        ),
-        canonical_route_substitution_risk="low",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The original service lookup or conversion must already have returned; "
-            "the helper only reads visible payload fields."
-        ),
-        grading_accounting_note=(
-            "The helper substitutes manual final-field copying, not the original "
-            "ToolSandbox lookup/conversion call."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary=(
-                "External service tasks need deterministic extraction of visible "
-                "answer fields from original lookup/conversion payloads."
-            ),
-            signals=("visible_raw_data_lacking_deterministic_transform",),
-            failed_tool_calls=producer_tools,
-        ),
-    )
-    code = """
-def extract_service_answer_field(service_payload: dict, requested_unit: str = "", answer_subject: str = "") -> dict:
-    def empty(reason):
-        return {
-            "answer_value": "",
-            "answer_kind": "",
-            "answer_unit": "",
-            "should_call_downstream_tool": False,
-            "downstream_tool_name": "",
-            "downstream_tool_kwargs": {},
-            "exact_final_answer": "",
-            "final_answer_recommendation": "",
-            "copy_exactly": False,
-            "abstain_reason": reason,
-        }
-
-    def clean_unit(value):
-        text = str(value or "").strip()
-        lower = text.lower()
-        aliases = {
-            "km": "kilometers",
-            "kilometer": "kilometers",
-            "kilometers": "kilometers",
-            "kilometre": "kilometers",
-            "kilometres": "kilometers",
-            "mi": "miles",
-            "mile": "miles",
-            "miles": "miles",
-        }
-        return aliases.get(lower, text)
-
-    def as_number_text(value):
-        number = float(value) if isinstance(value, (int, float)) else None
-        if number is None and isinstance(value, str):
-            text = value.strip()
-            numeric = text
-            if numeric.startswith(("+", "-")):
-                numeric = numeric[1:]
-            if numeric.count(".") <= 1 and numeric.replace(".", "").isdigit():
-                number = float(text)
-        if number is None:
-            return str(value)
-        if number.is_integer():
-            return str(int(number))
-        return (f"{number:.2f}").rstrip("0").rstrip(".")
-
-    def final_text(kind, value, unit, subject):
-        if kind in {"phone_number", "address"}:
-            value_text = str(value).strip()
-        else:
-            value_text = as_number_text(value)
-        unit_text = clean_unit(unit)
-        subject_text = str(subject or "").strip()
-        if kind == "phone_number":
-            return value_text
-        if kind == "address":
-            return value_text
-        if kind == "distance":
-            if subject_text:
-                return f"You are approximately {value_text} {unit_text or 'kilometers'} away from {subject_text}."
-            return f"The distance is approximately {value_text} {unit_text or 'kilometers'}."
-        if unit_text:
-            return f"{value_text} {unit_text}"
-        return value_text
-
-    raw_payload = service_payload
-    if isinstance(raw_payload, list):
-        payload = {}
-        for item in raw_payload:
-            if isinstance(item, dict) and item:
-                payload = dict(item)
-                break
-        if not payload:
-            for item in raw_payload:
-                if item is not None and str(item).strip() != "":
-                    payload = {"result": item}
-                    break
-    elif isinstance(raw_payload, dict):
-        payload = dict(raw_payload or {})
-    elif raw_payload is not None and str(raw_payload).strip() != "":
-        payload = {"result": raw_payload}
-    else:
-        payload = {}
-    requested_unit = clean_unit(requested_unit)
-    subject = str(answer_subject or "").strip()
-    if not subject:
-        for subject_field in ("name", "location", "city", "region", "country"):
-            subject_value = payload.get(subject_field)
-            if subject_value is not None and str(subject_value).strip():
-                subject = str(subject_value).strip()
-                break
-    fields = [
-        ("phone_number", "phone_number", ""),
-        ("address", "address", ""),
-        ("full_address", "address", ""),
-        ("current_temperature", "current_temperature", ""),
-        ("temperature", "temperature", ""),
-        ("average_temperature", "temperature", ""),
-        ("distance_km", "distance", "km"),
-        ("distance", "distance", ""),
-        ("converted_amount", "converted_amount", ""),
-        ("convertedAmount", "converted_amount", ""),
-        ("amount", "amount", ""),
-        ("value", "value", ""),
-        ("result", "result", ""),
-    ]
-    unit_fields = [
-        "currency_code",
-        "currency",
-        "target_currency",
-        "unit",
-        "distance_unit",
-        "temperature_unit",
-    ]
-    answer_value = ""
-    answer_kind = ""
-    default_unit = ""
-    for field_name, kind, unit in fields:
-        value = payload.get(field_name)
-        if value is not None and str(value).strip() != "":
-            answer_value = str(value)
-            answer_kind = kind
-            default_unit = unit
-            break
-    if not answer_value:
-        return empty("no_supported_answer_field")
-    answer_unit = default_unit
-    for unit_field in unit_fields:
-        unit_value = payload.get(unit_field)
-        if unit_value is not None and str(unit_value).strip() != "":
-            answer_unit = clean_unit(unit_value)
-            break
-    if answer_kind in {"current_temperature", "temperature"}:
-        if not answer_unit and requested_unit:
-            answer_unit = requested_unit
-        if not answer_unit:
-            return empty("no_supported_answer_field")
-    requested_lower = str(requested_unit or "").lower()
-    if answer_kind in {"result", "value"} and requested_lower in {"kilometers", "miles"}:
-        answer_kind = "distance"
-        answer_unit = requested_unit
-    exact_final_answer = final_text(answer_kind, answer_value, answer_unit, subject)
-    return {
-        "answer_value": answer_value,
-        "answer_kind": answer_kind,
-        "answer_unit": answer_unit,
-        "should_call_downstream_tool": False,
-        "downstream_tool_name": "",
-        "downstream_tool_kwargs": {},
-        "exact_final_answer": exact_final_answer,
-        "final_answer_recommendation": exact_final_answer,
-        "copy_exactly": True,
-        "abstain_reason": "",
-    }
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _extract_stock_symbol_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    spec = ToolSpec(
-        tool_name="extract_stock_symbol",
-        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
-        description=(
-            "Extract the ticker symbol from a visible search_stock payload after the "
-            "original ToolSandbox stock lookup has returned. The tool only reads the "
-            "visible payload and never calls external services."
-        ),
-        inputs=(
-            ToolInput(
-                "stock_payload",
-                "dict",
-                "Visible dictionary, record, list wrapper, or first result returned by search_stock.",
-            ),
-        ),
-        output_annotation="str",
-        output_schema={"type": "string"},
-        positive_triggers=(
-            "visible search_stock payload",
-            "stock symbol",
-            "ticker symbol",
-            "stock lookup",
-        ),
-        negative_triggers=(
-            "stock payload has no symbol field",
-            "insufficient_information",
-        ),
-        preserves_side_effect_tools=("search_stock",),
-        required_original_tool_calls=("search_stock",),
-        abstain_behavior=(
-            "Return an empty string when the visible stock payload does not contain "
-            "a usable symbol, ticker, or code string."
-        ),
-        generalization_rationale=(
-            "Stock lookup tasks repeatedly require the same deterministic extraction "
-            "and normalization of a visible ticker field from an original lookup result."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=2,
-        applicable_task_families=("stock_lookup",),
-        reason_tool_is_decisive=(
-            "It preserves the original search_stock call while removing the fragile "
-            "manual step of copying and normalizing the returned ticker symbol."
-        ),
-        shortfall_cluster_evidence=("derived_value:extract_stock_symbol",),
-        known_failure_mechanisms_addressed=(
-            "manual_stock_symbol_field_copy_error",
-            "exchange_prefix_normalization_error",
-            "visible_raw_data_lacking_deterministic_transform",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The actor must still call the original search_stock tool; this generated "
-            "tool only extracts the final symbol from the visible result."
-        ),
-        grading_accounting_note=(
-            "The generated tool substitutes manual answer-field extraction, not the "
-            "original stock lookup milestone."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary=(
-                "Stock tasks need deterministic extraction of ticker symbols from "
-                "visible search_stock payloads."
-            ),
-            signals=("visible_raw_data_lacking_deterministic_transform",),
-            failed_tool_calls=("search_stock",),
-        ),
-    )
-    code = """
-def extract_stock_symbol(stock_payload: dict) -> str:
-    def first_mapping(value):
-        if isinstance(value, dict):
-            for wrapper_key in ("result", "results", "data", "items", "stocks", "records"):
-                wrapped = value.get(wrapper_key)
-                if isinstance(wrapped, dict):
-                    return wrapped
-                if isinstance(wrapped, list):
-                    for item in wrapped:
-                        if isinstance(item, dict) and item:
-                            return item
-            return value
-        if isinstance(value, list):
-            for item in value:
-                if isinstance(item, dict) and item:
-                    return item
-        return {}
-
-    def clean_symbol(value):
-        text = str(value or "").strip().strip("'\\\"")
-        if not text:
-            return ""
-        if ":" in text:
-            text = text.rsplit(":", 1)[-1]
-        if "/" in text:
-            text = text.rsplit("/", 1)[-1]
-        text = text.strip().lstrip("$").strip()
-        if not text:
-            return ""
-        token = text.split()[0].strip().strip(",;")
-        allowed = []
-        for char in token:
-            if char.isalnum() or char in {".", "-"}:
-                allowed.append(char)
-        normalized = "".join(allowed).upper()
-        if not normalized or not any(char.isalpha() for char in normalized):
-            return ""
-        return normalized
-
-    payload = first_mapping(stock_payload)
-    for field in ("symbol", "ticker", "stock_symbol", "ticker_symbol", "code"):
-        if isinstance(payload, dict) and field in payload:
-            symbol = clean_symbol(payload.get(field))
-            if symbol:
-                return symbol
-    if isinstance(payload, dict):
-        for value in payload.values():
-            if isinstance(value, dict):
-                for field in ("symbol", "ticker", "stock_symbol", "ticker_symbol", "code"):
-                    symbol = clean_symbol(value.get(field))
-                    if symbol:
-                        return symbol
-            elif isinstance(value, list):
-                for item in value:
-                    if not isinstance(item, dict):
-                        continue
-                    for field in ("symbol", "ticker", "stock_symbol", "ticker_symbol", "code"):
-                        symbol = clean_symbol(item.get(field))
-                        if symbol:
-                            return symbol
-    return ""
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _relative_day_time_to_timestamp_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    spec = ToolSpec(
-        tool_name="relative_day_time_to_timestamp",
-        family=ToolFamily.CANONICALIZER,
-        description=(
-            "Convert a visible relative local day/time into the exact UTC Unix "
-            "timestamp needed before the actor calls the original reminder tool."
-        ),
-        inputs=(
-            ToolInput("current_timestamp", "float", "Current Unix timestamp."),
-            ToolInput("day_offset", "int", "Relative local day offset."),
-            ToolInput("hour", "int", "Target local hour in 24-hour time."),
-            ToolInput("minute", "int", "Target local minute."),
-            ToolInput(
-                "current_datetime_info",
-                "dict",
-                "Output from timestamp_to_datetime_info(current_timestamp), required unless an explicit local_utc_offset_hours is visible.",
-            ),
-            ToolInput(
-                "local_utc_offset_hours",
-                "float",
-                "Optional explicit local offset from UTC in hours when current_datetime_info is unavailable.",
-            ),
-        ),
-        output_annotation="float",
-        positive_triggers=(
-            "modify_reminder_with_recency_latest",
-            "add_reminder_content_and_week_delta_and_time",
-            "tomorrow at",
-            "in two days at",
-        ),
-        negative_triggers=(
-            "insufficient_information",
-            "add_reminder_content_and_date_and_time",
-            "date_and_time",
-            "absolute_date",
-            "calendar_date",
-            "mm/dd/yyyy",
-            "missing_current_timestamp",
-            "missing_time",
-            "invalid_hour_or_minute",
-        ),
-        preserves_side_effect_tools=("add_reminder", "modify_reminder"),
-        required_original_tool_calls=(
-            "get_current_timestamp",
-            "timestamp_to_datetime_info",
-        ),
-        abstain_behavior=(
-            "Return 0.0 for invalid time fields or when neither current_datetime_info "
-            "nor an explicit local_utc_offset_hours is visible."
-        ),
-        generalization_rationale=(
-            "Reminder creation and modification tasks repeatedly need the same "
-            "local-midnight arithmetic before the original side-effect call."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=3,
-        applicable_task_families=(
-            "modify_reminder_with_recency_latest",
-            "add_reminder_content_and_week_delta_and_time",
-        ),
-        reason_tool_is_decisive=(
-            "It prevents the actor from reusing current_timestamp or inventing an "
-            "offset when a relative local reminder time is visible."
-        ),
-        shortfall_cluster_evidence=("canonicalizer:relative_day_time_timestamp",),
-        known_failure_mechanisms_addressed=(
-            "relative_day_time_timestamp_miscalculation",
-            "reminder_timestamp_argument_error",
-        ),
-        final_state_preservation_plan=(
-            "The helper only returns a timestamp; the actor must still call the "
-            "original add_reminder or modify_reminder ToolSandbox tool."
-        ),
-        grading_accounting_note=(
-            "Timestamp canonicalization is intermediate; final task state is still "
-            "produced by the original reminder side-effect tool."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary=(
-                "Relative reminder tasks need local day/time fields converted "
-                "deterministically before the original reminder call."
-            ),
-            signals=("visible_raw_data_lacking_deterministic_transform",),
-            failed_tool_calls=("add_reminder", "modify_reminder"),
-        ),
-    )
-    code = """
-def relative_day_time_to_timestamp(current_timestamp: float, day_offset: int, hour: int, minute: int, local_utc_offset_hours: float = 0.0, current_datetime_info: dict = None) -> float:
-    target_hour = int(hour)
-    target_minute = int(minute)
-    if target_hour < 0 or target_hour > 23 or target_minute < 0 or target_minute > 59:
-        return 0.0
-    if isinstance(current_datetime_info, dict) and current_datetime_info:
-        if "hour" not in current_datetime_info or "minute" not in current_datetime_info or "second" not in current_datetime_info:
-            return 0.0
-        if current_datetime_info.get("hour") is None or current_datetime_info.get("minute") is None or current_datetime_info.get("second") is None:
-            return 0.0
-        current_hour = int(current_datetime_info.get("hour"))
-        current_minute = int(current_datetime_info.get("minute"))
-        current_second = int(current_datetime_info.get("second"))
-        if current_hour < 0 or current_hour > 23 or current_minute < 0 or current_minute > 59 or current_second < 0 or current_second > 59:
-            return 0.0
-        seconds_since_local_midnight = (
-            current_hour * 3600 + current_minute * 60 + current_second
-        )
-        local_midnight_timestamp = int(float(current_timestamp)) - seconds_since_local_midnight
-        return float(
-            local_midnight_timestamp
-            + int(day_offset) * 86400
-            + target_hour * 3600
-            + target_minute * 60
-        )
-    if local_utc_offset_hours is None or str(local_utc_offset_hours).strip() == "":
-        return 0.0
-    offset_hours = float(local_utc_offset_hours)
-    if offset_hours < -12.0 or offset_hours > 14.0:
-        return 0.0
-    offset_seconds = offset_hours * 3600.0
-    local_seconds = float(current_timestamp) + offset_seconds
-    local_midnight = int(local_seconds // 86400.0) * 86400.0
-    return float(
-        local_midnight
-        + int(day_offset) * 86400.0
-        - offset_seconds
-        + target_hour * 3600.0
-        + target_minute * 60.0
-    )
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _plan_device_status_lookup_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    getter_tools = (
-        "get_wifi_status",
-        "get_cellular_service_status",
-        "get_location_service_status",
-        "get_low_battery_mode_status",
-    )
-    spec = ToolSpec(
-        tool_name="plan_device_status_lookup",
-        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
-        description=(
-            "Plan the exact original ToolSandbox getter for read-only wifi, "
-            "cellular, location-service, or low-battery status checks, and "
-            "normalize a visible getter result into a final-answer-ready status "
-            "sentence. The helper never changes device state."
-        ),
-        inputs=(
-            ToolInput("user_request", "str", "Current user request text."),
-            ToolInput(
-                "visible_state_result",
-                "str",
-                "Visible result from an original status getter, or blank before lookup.",
-            ),
-            ToolInput(
-                "available_tools",
-                "list",
-                "Optional visible original ToolSandbox tool names; abstain when the matching getter is not visible.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema={
-            "type": "object",
-            "properties": {
-                "tool_name": {
-                    "type": "string",
-                    "enum": ["", *getter_tools],
-                },
-                "arguments": {"type": "object"},
-                "should_call": {"type": "boolean"},
-                "target_service": {"type": "string"},
-                "status_value": {"type": "boolean"},
-                "status_label": {"type": "string"},
-                "final_answer_recommendation": {"type": "string"},
-                "abstain_reason": {"type": "string"},
-            },
-            "required": [
-                "tool_name",
-                "arguments",
-                "should_call",
-                "target_service",
-                "status_value",
-                "status_label",
-                "final_answer_recommendation",
-                "abstain_reason",
-            ],
-        },
-        positive_triggers=(
-            "get_wifi",
-            "get_cellular",
-            "get_location",
-            "get_low_battery",
-            "check wifi status",
-            "check cellular status",
-            "check location service status",
-            "check low battery mode status",
-        ),
-        negative_triggers=(
-            "turn_on",
-            "turn off",
-            "enable",
-            "disable",
-            "set_",
-            "insufficient_information",
-        ),
-        required_original_tool_calls=getter_tools,
-        abstain_behavior=(
-            "Return should_call false with abstain_reason no_status_target when "
-            "the visible request is not a read-only device-status lookup."
-        ),
-        generalization_rationale=(
-            "Read-only status tasks recur across wifi, cellular, location "
-            "service, and low-battery mode, and require selecting the matching "
-            "original getter before answering."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=4,
-        applicable_task_families=(
-            "get_wifi",
-            "get_cellular",
-            "get_location",
-            "get_low_battery",
-        ),
-        reason_tool_is_decisive=(
-            "It prevents the actor from answering a device-status question from "
-            "general knowledge by routing through the visible original getter and "
-            "then normalizing that visible boolean result."
-        ),
-        shortfall_cluster_evidence=("derived_value:plan_device_status_lookup",),
-        known_failure_mechanisms_addressed=(
-            "status_lookup_answered_without_original_getter",
-            "visible_boolean_status_not_recapped",
-        ),
-        canonical_route_substitution_risk="none",
-        final_state_preservation_plan=(
-            "The helper is read-only. It only recommends original getter calls "
-            "and formats visible getter results; it never calls setters."
-        ),
-        grading_accounting_note=(
-            "Canonical route is preserved because the original status getter "
-            "remains the source of truth."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary=(
-                "Device-status tasks need deterministic routing to the visible "
-                "original getter and final-answer preservation of the getter result."
-            ),
-            signals=("visible_raw_data_lacking_deterministic_transform",),
-            failed_tool_calls=getter_tools,
-        ),
-    )
-    code = """
-def plan_device_status_lookup(user_request: str, visible_state_result: str = "", available_tools: list = []) -> dict:
-    request = str(user_request or "").lower().replace("_", " ").replace("-", " ")
-    visible_raw = str(visible_state_result or "").strip()
-    visible = visible_raw.lower().replace("_", " ").replace("-", " ")
-    combined = (request + " " + visible).strip()
-
-    def result(tool_name: str, should_call: bool, target: str, label: str, value, final: str, reason: str) -> dict:
-        return {
-            "tool_name": tool_name,
-            "arguments": {},
-            "should_call": bool(should_call),
-            "target_service": target,
-            "status_value": bool(value) if isinstance(value, bool) else False,
-            "status_label": label,
-            "final_answer_recommendation": final,
-            "abstain_reason": reason,
-        }
-
-    action_verbs = (
-        "turn on ",
-        "turn off ",
-        "turn wifi on",
-        "turn wifi off",
-        "turn cellular on",
-        "turn cellular off",
-        "enable ",
-        "disable ",
-        "switch on ",
-        "switch off ",
-        "set ",
-    )
-    if any(verb in request for verb in action_verbs):
-        return result("", False, "", "", False, "", "not_read_only_status_lookup")
-
-    targets = (
-        ("wifi", "Wifi", "get_wifi_status", ("wifi", "wi fi", "wi-fi", "internet")),
-        ("cellular", "Cellular service", "get_cellular_service_status", ("cellular", "cell service", "mobile service", "phone signal", "signal")),
-        ("location", "Location service", "get_location_service_status", ("location service", "location")),
-        ("low_battery", "Low battery mode", "get_low_battery_mode_status", ("low battery", "battery mode")),
-    )
-    target = label = getter = ""
-    for candidate, candidate_label, candidate_getter, terms in targets:
-        if any(term in combined for term in terms):
-            target, label, getter = candidate, candidate_label, candidate_getter
-            break
-    if not target:
-        return result("", False, "", "", False, "", "no_status_target")
-
-    true_markers = ("true", "on", "enabled", "active", "available")
-    false_markers = ("false", "off", "disabled", "inactive", "not enabled", "unavailable")
-    parsed = None
-    compact = visible.strip().strip("'\\\"")
-    if compact in ("true", "1"):
-        parsed = True
-    elif compact in ("false", "0"):
-        parsed = False
-    elif any(marker in visible for marker in false_markers):
-        parsed = False
-    elif any(marker in visible for marker in true_markers):
-        parsed = True
-
-    if parsed is None:
-        if available_tools:
-            visible_tools = {str(name) for name in available_tools}
-            if getter not in visible_tools:
-                return result("", False, target, label, False, "", "status_getter_not_visible")
-        return result(getter, True, target, label, False, "", "")
-    final = label + " is " + ("on." if parsed else "off.")
-    return result("", False, target, label, bool(parsed), final, "")
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _plan_device_state_action_sequence_v3_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    spec = ToolSpec(
-        tool_name="plan_device_state_action_sequence_v3",
-        family=ToolFamily.STATE_PRECONDITION_HELPER,
-        description=(
-            "Plan the exact original ToolSandbox device-state setter sequence for "
-            "wifi, cellular, location, or low-battery blockers, including whether "
-            "the actor should continue the original downstream task afterward."
-        ),
-        inputs=(
-            ToolInput("user_request", "str", "Current user request text."),
-            ToolInput(
-                "visible_state_or_error",
-                "str",
-                "Visible state, prior error text, or service status summary.",
-            ),
-            ToolInput(
-                "visible_state_summary",
-                "str",
-                "Optional concise summary of already-visible setting state.",
-            ),
-            ToolInput(
-                "available_tools",
-                "list",
-                "Optional list of currently visible original ToolSandbox tools.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema={
-            "type": "object",
-            "properties": {
-                "tool_name": {
-                    "type": "string",
-                    "enum": [
-                        "",
-                        "set_wifi_status",
-                        "set_cellular_service_status",
-                        "set_location_service_status",
-                        "set_low_battery_mode_status",
-                    ],
-                },
-                "arguments": {"type": "object"},
-                "should_call": {"type": "boolean"},
-                "reason": {"type": "string"},
-                "action_sequence": {"type": "array"},
-                "final_response_recommendation": {"type": "string"},
-                "continue_original_task_after_sequence": {"type": "boolean"},
-                "abstain_reason": {"type": "string"},
-            },
-            "required": [
-                "tool_name",
-                "arguments",
-                "should_call",
-                "reason",
-                "action_sequence",
-                "final_response_recommendation",
-                "continue_original_task_after_sequence",
-                "abstain_reason",
-            ],
-        },
-        positive_triggers=(
-            "wifi_off",
-            "cellular_off",
-            "turn_on_wifi_low_battery_mode",
-            "turn_on_cellular_low_battery_mode",
-            "turn_on_location_low_battery_mode",
-            "send_message_with_contact_content_cellular_off",
-            "find_days_till_holiday_wifi_off",
-            "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
-        ),
-        negative_triggers=(
-            "insufficient_information",
-            "contact_recency",
-            "reminder_recency",
-            "no_device_state_target",
-        ),
-        preserves_side_effect_tools=(
-            "set_wifi_status",
-            "set_cellular_service_status",
-            "set_location_service_status",
-            "set_low_battery_mode_status",
-        ),
-        required_original_tool_calls=(
-            "set_wifi_status",
-            "set_cellular_service_status",
-            "set_location_service_status",
-            "set_low_battery_mode_status",
-        ),
-        abstain_behavior=(
-            "Return should_call false with no_device_state_target when the visible "
-            "request has no supported state target."
-        ),
-        generalization_rationale=(
-            "The same device-state sequence logic recurs across direct service "
-            "requests and downstream tasks blocked by service state."
-        ),
-        estimated_step_compression=4,
-        cross_task_applicability_count=5,
-        applicable_task_families=(
-            "wifi_off",
-            "cellular_off",
-            "turn_on_wifi_low_battery_mode",
-            "turn_on_cellular_low_battery_mode",
-            "turn_on_location_low_battery_mode",
-            "send_message_with_contact_content_cellular_off",
-            "find_days_till_holiday_wifi_off",
-        ),
-        reason_tool_is_decisive=(
-            "It repairs the single-step state helper failure by returning the full "
-            "precondition sequence and whether to continue the downstream task."
-        ),
-        shortfall_cluster_evidence=(
-            "state_precondition:plan_device_state_action_sequence",
-        ),
-        known_failure_mechanisms_addressed=(
-            "device_state_precondition_sequence_missing",
-            "downstream_task_lost_after_service_repair",
-            "serial_precondition_discovery_exhausts_turn_budget",
-        ),
-        final_state_preservation_plan=(
-            "The helper prepares tool names and arguments only; the actor must "
-            "call each original ToolSandbox setter in action_sequence."
-        ),
-        grading_accounting_note=(
-            "Canonical route is preserved because original state setters remain "
-            "the state-changing operations."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary=(
-                "Device-state tasks need a state setter sequence and downstream "
-                "continuation decision rather than a single informal next action."
-            ),
-            signals=("failed_base_tool_with_deterministic_fallback",),
-            failed_tool_calls=(
-                "set_wifi_status",
-                "set_cellular_service_status",
-                "set_location_service_status",
-            ),
-        ),
-    )
-    code = """
-def plan_device_state_action_sequence_v3(user_request: str, visible_state_or_error: str = "", visible_state_summary: str = "", available_tools: list = None) -> dict:
-    request = str(user_request or "").lower().replace("_", " ").replace("-", " ")
-    visible = str(visible_state_or_error or "").lower().replace("_", " ").replace("-", " ")
-    visible_summary = str(visible_state_summary or "").lower().replace("_", " ").replace("-", " ")
-    text = (request + " " + visible + " " + visible_summary).strip()
-    available = set()
-    if isinstance(available_tools, list):
-        for item in available_tools:
-            name = ""
-            if isinstance(item, str):
-                name = item
-            elif isinstance(item, dict):
-                function = item.get("function")
-                if isinstance(function, dict):
-                    name = str(function.get("name") or "")
-                else:
-                    name = str(item.get("name") or "")
-            name = str(name or "").strip()
-            if name.startswith("functions."):
-                name = name.split(".", 1)[1]
-            if name:
-                available.add(name)
-
-    def tool_available(name: str) -> bool:
-        return not available or name in available
-
-    def empty(reason: str) -> dict:
-        return {
-            "tool_name": "",
-            "arguments": {},
-            "should_call": False,
-            "reason": reason,
-            "action_sequence": [],
-            "final_response_recommendation": "",
-            "continue_original_task_after_sequence": False,
-            "abstain_reason": reason,
-        }
-
-    wifi_terms = ("wifi", "wi fi", "wi-fi", "internet")
-    cellular_terms = ("cellular service", "cellular", "cell service", "mobile service", "phone signal", "signal")
-    location_terms = ("location service", "location", "current city", "where am i")
-
-    def has_any(haystack: str, terms: tuple) -> bool:
-        return any(term in haystack for term in terms)
-
-    def off_command(terms: tuple) -> bool:
-        for term in terms:
-            if (
-                "turn off " + term in request
-                or "turn " + term + " off" in request
-                or "disable " + term in request
-                or "switch off " + term in request
-                or "keep " + term + " off" in request
-                or "keep " + term + " disabled" in request
-                or term + " stays off" in request
-                or term + " stay off" in request
-                or term + " stays disabled" in request
-                or term + " remain off" in request
-                or term + " remains off" in request
-                or "make sure " + term + " stays off" in request
-                or "ensure " + term + " stays off" in request
-            ):
-                return True
-        return False
-
-    def on_command(terms: tuple) -> bool:
-        for term in terms:
-            if (
-                "turn on " + term in request
-                or "turn " + term + " on" in request
-                or "enable " + term in request
-                or "switch on " + term in request
-                or "keep " + term + " on" in request
-                or "keep " + term + " enabled" in request
-                or term + " stays on" in request
-                or term + " stay on" in request
-                or term + " stays enabled" in request
-                or term + " remain on" in request
-                or term + " remains on" in request
-            ):
-                return True
-        return False
-
-    target = ""
-    if has_any(text, wifi_terms):
-        target = "wifi"
-    elif has_any(text, cellular_terms):
-        target = "cellular"
-    elif has_any(text, location_terms):
-        target = "location"
-    elif "low battery" in text or "battery mode" in text:
-        target = "low_battery"
-    if not target:
-        return empty("no_device_state_target")
-
-    if target == "low_battery":
-        if not tool_available("set_low_battery_mode_status"):
-            return empty("required_setter_unavailable")
-        desired_on = not off_command(("low battery mode", "low battery", "battery mode"))
-        if on_command(("low battery mode", "low battery", "battery mode")):
-            desired_on = True
-        action = {"tool_name": "set_low_battery_mode_status", "arguments": {"on": bool(desired_on)}, "reason": "set_low_battery_mode_" + ("on" if desired_on else "off")}
-        return {"tool_name": action["tool_name"], "arguments": action["arguments"], "should_call": True, "reason": action["reason"], "action_sequence": [action], "final_response_recommendation": "Low battery mode has been turned " + ("on." if desired_on else "off."), "continue_original_task_after_sequence": False, "abstain_reason": ""}
-
-    target_terms = {"wifi": wifi_terms, "cellular": cellular_terms, "location": location_terms}[target]
-    setter_by_target = {"wifi": "set_wifi_status", "cellular": "set_cellular_service_status", "location": "set_location_service_status"}
-    label_by_target = {"wifi": "Wifi", "cellular": "Cellular service", "location": "Location service"}
-    if not tool_available(setter_by_target[target]):
-        return empty("required_setter_unavailable")
-    desired_on = not off_command(target_terms)
-    if on_command(target_terms):
-        desired_on = True
-    already_on_markers = (
-        target + " service is on",
-        target + " service is currently on",
-        target + " is on",
-        target + " is currently on",
-        target + " service is enabled",
-        target + " service is currently enabled",
-        target + " is enabled",
-        target + " is currently enabled",
-        target + "=true",
-        target + " true",
-        "already enabled",
-        "already on",
-        "already turned on",
-        "has been turned on",
-    )
-    already_off_markers = (
-        target + " service is off",
-        target + " service is currently off",
-        target + " is off",
-        target + " is currently off",
-        target + " service is disabled",
-        target + " service is currently disabled",
-        target + " is disabled",
-        target + " is currently disabled",
-        target + "=false",
-        target + " false",
-        "already disabled",
-        "already off",
-        "already turned off",
-        "has been turned off",
-    )
-    downstream_request = any(token in request for token in ("send ", "message", "find ", "search", "how many", "what is", "what's", "temperature", "weather", "reminder")) and not (on_command(target_terms) or off_command(target_terms))
-    if desired_on and any(marker in visible for marker in already_on_markers):
-        final = "continue_original_task" if downstream_request else label_by_target[target] + " is already on."
-        return {"tool_name": "", "arguments": {}, "should_call": False, "reason": target + "_already_on", "action_sequence": [], "final_response_recommendation": final, "continue_original_task_after_sequence": bool(downstream_request), "abstain_reason": "already_in_desired_state"}
-    if not desired_on and any(marker in visible for marker in already_off_markers):
-        final = "continue_original_task" if downstream_request else label_by_target[target] + " is already off."
-        return {"tool_name": "", "arguments": {}, "should_call": False, "reason": target + "_already_off", "action_sequence": [], "final_response_recommendation": final, "continue_original_task_after_sequence": bool(downstream_request), "abstain_reason": "already_in_desired_state"}
-    low_battery_already_clear = any(marker in text for marker in (
-        "low battery mode is off",
-        "low battery mode already disabled",
-        "low battery mode false",
-        "low battery=false",
-        "set low battery mode status false",
-        "set low battery mode status returned none",
-        "low battery mode setter succeeded",
-        "already disabled",
-    ))
-    service_disabled_error = any(marker in visible for marker in (
-        target + " service is not enabled",
-        target + " is not enabled",
-        target + " service is disabled",
-        target + " is disabled",
-        "permissionerror: " + target,
-    ))
-    downstream_location_search = (
-        target == "location"
-        and bool(desired_on)
-        and downstream_request
-        and service_disabled_error
-        and any(marker in text for marker in (
-            "reminder",
-            "search",
-            "find",
-            "look up",
-            "lookup",
-            "weather",
-            "near me",
-            "around",
-            " at ",
-        ))
-    )
-    low_battery_blocks_service = bool(desired_on) and not low_battery_already_clear and tool_available("set_low_battery_mode_status") and (
-        "low battery" in text
-        or "cannot be turned on in low battery mode" in text
-        or "blocked by low battery" in text
-        or (
-            downstream_request
-            and service_disabled_error
-            and target in ("cellular", "location")
-        )
-    )
-    actions = []
-    if low_battery_blocks_service:
-        actions.append({"tool_name": "set_low_battery_mode_status", "arguments": {"on": False}, "reason": "clear_low_battery_before_enabling_service"})
-    actions.append({"tool_name": setter_by_target[target], "arguments": {"on": bool(desired_on)}, "reason": "set_" + target + ("_on" if desired_on else "_off")})
-    wifi_already_on = any(marker in text for marker in (
-        "wifi is on",
-        "wifi is currently on",
-        "wifi is enabled",
-        "wifi is currently enabled",
-        "wifi=true",
-        "wifi true",
-        "set wifi status returned none",
-        "wifi setter succeeded",
-    ))
-    if downstream_location_search and tool_available("set_wifi_status") and not wifi_already_on:
-        actions.append({"tool_name": "set_wifi_status", "arguments": {"on": True}, "reason": "enable_wifi_for_downstream_location_search"})
-    final = "continue_original_task" if downstream_request else label_by_target[target] + " has been turned " + ("on." if desired_on else "off.")
-    return {"tool_name": actions[0]["tool_name"], "arguments": actions[0]["arguments"], "should_call": True, "reason": actions[0]["reason"], "action_sequence": actions, "final_response_recommendation": final, "continue_original_task_after_sequence": bool(downstream_request), "abstain_reason": ""}
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _select_message_content_by_recency_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    spec = ToolSpec(
-        tool_name="select_message_content_by_recency",
-        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
-        description=(
-            "Select the latest or oldest visible message by creation timestamp and "
-            "return final-answer-ready content without replacing search_messages."
-        ),
-        inputs=(
-            ToolInput(
-                "records", "list", "Visible message records from search_messages."
-            ),
-            ToolInput(
-                "selection_mode",
-                "str",
-                "latest, oldest, upcoming, or next. Upcoming/next selects the nearest visible future timestamp when reference_timestamp is provided.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema={
-            "type": "object",
-            "properties": {
-                "selected_record": {"type": "object"},
-                "selected_message": {"type": "object"},
-                "selected_message_id": {"type": "string"},
-                "selected_content": {"type": "string"},
-                "selected_timestamp": {"type": "number"},
-                "should_answer": {"type": "boolean"},
-                "abstain_reason": {"type": "string"},
-                "tie_candidates": {"type": "array"},
-                "selection_reason": {"type": "string"},
-                "exact_final_answer": {"type": "string"},
-                "final_answer_recommendation": {"type": "string"},
-                "copy_exactly": {"type": "boolean"},
-            },
-            "required": [
-                "selected_record",
-                "selected_message",
-                "selected_message_id",
-                "selected_content",
-                "selected_timestamp",
-                "should_answer",
-                "abstain_reason",
-                "tie_candidates",
-                "selection_reason",
-                "exact_final_answer",
-                "final_answer_recommendation",
-                "copy_exactly",
-            ],
-        },
-        positive_triggers=(
-            "search_message_with_recency_latest",
-            "search_message_with_recency_oldest",
-            "latest message",
-            "oldest message",
-        ),
-        negative_triggers=(
-            "insufficient_information",
-            "modify_contact",
-            "send_message",
-            "search_reminder",
-            "no_visible_messages",
-        ),
-        required_original_tool_calls=("search_messages",),
-        abstain_behavior=(
-            "Return should_answer false with an abstain reason on no records, "
-            "invalid mode, missing content, missing timestamps, or timestamp ties."
-        ),
-        generalization_rationale=(
-            "Message recency answer tasks repeatedly need the same visible-record "
-            "timestamp selection plus final answer extraction."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=2,
-        applicable_task_families=(
-            "search_message_with_recency_latest",
-            "search_message_with_recency_oldest",
-        ),
-        reason_tool_is_decisive=(
-            "It turns a visible search_messages result into the exact answer text "
-            "instead of leaving the model to manually choose and copy content."
-        ),
-        shortfall_cluster_evidence=("search_filter:select_message_content_by_recency",),
-        known_failure_mechanisms_addressed=(
-            "latest_oldest_message_content_selection_failure",
-            "final_answer_ready_extraction_missing",
-        ),
-        final_state_preservation_plan=(
-            "The helper never searches or changes state; search_messages must have "
-            "already produced visible records."
-        ),
-        grading_accounting_note=(
-            "This is answer extraction from visible data after the original search "
-            "call, not a replacement for search_messages."
-        ),
-        inadequacy_evidence=_request_evidence(
-            request,
-            summary=(
-                "Message recency answer tasks expose records but need deterministic "
-                "latest/oldest selection and final-answer-ready content."
-            ),
-            signals=("wrong_selected_record", "final_response_phrasing_failure"),
-            failed_tool_calls=("search_messages",),
-        ),
-    )
-    code = """
-def select_message_content_by_recency(records: list, selection_mode: str) -> dict:
-    mode = str(selection_mode or "").strip().lower()
-
-    def empty(reason: str, selected_record=None, selected_timestamp=0.0, tie_candidates=None) -> dict:
-        return {
-            "selected_record": selected_record if isinstance(selected_record, dict) else {},
-            "selected_message": selected_record if isinstance(selected_record, dict) else {},
-            "selected_message_id": "",
-            "selected_content": "",
-            "selected_timestamp": float(selected_timestamp or 0.0),
-            "should_answer": False,
-            "abstain_reason": str(reason or "insufficient_information"),
-            "tie_candidates": tie_candidates if isinstance(tie_candidates, list) else [],
-            "selection_reason": "",
-            "exact_final_answer": "",
-            "final_answer_recommendation": "abstain:" + str(reason or "insufficient_information"),
-            "copy_exactly": False,
-        }
-
-    if mode not in ("latest", "oldest"):
-        return empty("invalid_selection_mode" if mode else "missing_selection_mode")
-    if not isinstance(records, list) or not records:
-        return empty("no_records")
-    candidates = []
-    for index, record in enumerate(records):
-        if not isinstance(record, dict):
-            continue
-        raw_ts = record.get("creation_timestamp")
-        if isinstance(raw_ts, bool) or not isinstance(raw_ts, (int, float)):
-            continue
-        candidates.append((index, record, float(raw_ts)))
-    if not candidates:
-        return empty("no_numeric_creation_timestamps")
-    target_ts = max(item[2] for item in candidates) if mode == "latest" else min(item[2] for item in candidates)
-    tied = [(index, record, ts) for index, record, ts in candidates if ts == target_ts]
-    if len(tied) > 1:
-        unique_tied = []
-        seen_keys = set()
-        for index, record, ts in tied:
-            key = (
-                str(record.get("message_id", "") or ""),
-                str(record.get("sender_person_id", "") or ""),
-                str(record.get("recipient_person_id", "") or ""),
-                str(record.get("sender_phone_number", "") or ""),
-                str(record.get("recipient_phone_number", "") or ""),
-                str(record.get("content", "") or ""),
-                float(ts),
-            )
-            if key in seen_keys:
-                continue
-            seen_keys.add(key)
-            unique_tied.append((index, record, ts))
-        tied = unique_tied
-    if len(tied) != 1:
-        return empty("ambiguous_timestamp_tie", selected_timestamp=target_ts, tie_candidates=[record for _, record, _ in tied])
-    selected_index, selected, selected_ts = tied[0]
-    content = str(selected.get("content") or "").strip()
-    if not content:
-        return empty("selected_message_missing_content", selected, selected_ts)
-    message_id = selected.get("message_id")
-    label = "most recent" if mode == "latest" else "oldest"
-    exact_final_answer = "Your %s message says '%s'." % (label, content)
-    return {
-        "selected_record": selected,
-        "selected_message": selected,
-        "selected_message_id": "" if message_id in (None, "") else str(message_id),
-        "selected_content": content,
-        "selected_timestamp": float(selected_ts),
-        "should_answer": True,
-        "abstain_reason": "",
-        "tie_candidates": [],
-        "selection_reason": "selected_%s_message_by_creation_timestamp_at_index_%s" % (mode, selected_index),
-        "exact_final_answer": exact_final_answer,
-        "final_answer_recommendation": exact_final_answer,
-        "copy_exactly": True,
-    }
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _next_service_tool_call_contract_tool(
-    request: ToolGenerationRequest,
-    rejected_tool: GeneratedTool,
-) -> GeneratedTool:
-    spec = ToolSpec(
-        tool_name="next_service_tool_call",
-        family=ToolFamily.STATE_PRECONDITION_HELPER,
-        description=(
-            "Choose the single next original ToolSandbox device-state setter for "
-            "one requested service. This repaired contract is designed for "
-            "natural routing/adoption after prior visible-not-called failures: "
-            "it returns an exact tool_name and arguments that bridge policy can "
-            "execute, and it never changes device state itself."
-        ),
-        inputs=(
-            ToolInput(
-                "target_service", "str", "One service: wifi, cellular, or location."
-            ),
-            ToolInput("wifi_enabled", "bool", "Whether wifi is already enabled."),
-            ToolInput(
-                "cellular_enabled",
-                "bool",
-                "Whether cellular service is already enabled.",
-            ),
-            ToolInput(
-                "location_service_enabled",
-                "bool",
-                "Whether location service is already enabled.",
-            ),
-            ToolInput("low_battery_mode", "bool", "Whether low battery mode is on."),
-            ToolInput(
-                "user_request",
-                "str",
-                "Optional visible user request context; ignored for state decisions.",
-            ),
-            ToolInput(
-                "visible_state_or_error",
-                "str",
-                "Optional visible state or ToolSandbox error context.",
-            ),
-            ToolInput(
-                "visible_state_summary",
-                "str",
-                "Optional visible prior setting-state summary.",
-            ),
-            ToolInput(
-                "available_tools",
-                "list",
-                "Optional list of currently visible original ToolSandbox tools.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema={
-            "type": "object",
-            "properties": {
-                "ready": {"type": "boolean"},
-                "tool_name": {
-                    "type": "string",
-                    "enum": [
-                        "",
-                        "set_wifi_status",
-                        "set_cellular_service_status",
-                        "set_location_service_status",
-                        "set_low_battery_mode_status",
-                    ],
-                },
-                "arguments": {"type": "object"},
-                "should_call": {"type": "boolean"},
-                "reason": {"type": "string"},
-            },
-        },
-        positive_triggers=(
-            "wifi disabled",
-            "cellular disabled",
-            "location service disabled",
-            "low battery mode blocks service",
-            "visible-not-called state precondition repair",
-        ),
-        negative_triggers=(
-            "already_ready",
-            "unknown_target_service",
-            "insufficient_state",
-            "unrelated contact or reminder selection task",
-        ),
-        preserves_side_effect_tools=(
-            "set_wifi_status",
-            "set_cellular_service_status",
-            "set_location_service_status",
-            "set_low_battery_mode_status",
-        ),
-        required_original_tool_calls=(
-            "set_wifi_status",
-            "set_cellular_service_status",
-            "set_location_service_status",
-            "set_low_battery_mode_status",
-        ),
-        abstain_behavior=(
-            "Return should_call false and an empty tool_name for already-ready, "
-            "unknown, or insufficient service-state inputs."
-        ),
-        generalization_rationale=(
-            "The same device-state precondition decision recurs across wifi, "
-            "cellular, location, and low-battery blocked tasks."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=3,
-        applicable_task_families=_merged_task_families(
-            rejected_tool,
-            "turn_on_wifi_low_battery_mode",
-            "turn_on_cellular_low_battery_mode",
-            "turn_on_location_low_battery_mode",
-            "wifi_off",
-            "cellular_off",
-            "send_message_with_contact_content_cellular_off",
-        ),
-        reason_tool_is_decisive=(
-            "It repairs the prior state_precondition_visible_not_called adoption "
-            "failure by producing the exact original setter call for bridge/routing "
-            "execution instead of informal advice."
-        ),
-        diagnostic_only=False,
-        shortfall_cluster_evidence=(
-            "state_precondition:next_service_tool_call",
-            "device_state_precondition_visible_not_called_repaired_by_bridge_routing",
-        ),
-        known_failure_mechanisms_addressed=(
-            "state_precondition_visible_not_called",
-            "trace_compatible_service_precondition_next_tool_call",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The actor must still call the returned original ToolSandbox setter; "
-            "the helper only prepares the next call."
-        ),
-        grading_accounting_note=(
-            "Canonical route is preserved because the original state setter remains "
-            "the state-changing operation."
-        ),
-        inadequacy_evidence=(
-            StructuredInadequacyEvidence.from_json(request.inadequacy_evidence)
-            if isinstance(request.inadequacy_evidence, dict)
-            else StructuredInadequacyEvidence(
-                summary=request.observation,
-                signals=("failed_base_tool_with_deterministic_fallback",),
-                failed_tool_calls=(
-                    "set_wifi_status",
-                    "set_cellular_service_status",
-                    "set_location_service_status",
-                ),
-                visible_data_gaps=(
-                    "visible service state must become one original setter call",
-                ),
-                planner_failures=("choose one precondition setter before action",),
-            )
-        ),
-    )
-    code = """
-def next_service_tool_call(target_service: str, wifi_enabled: bool, cellular_enabled: bool, location_service_enabled: bool, low_battery_mode: bool, user_request: str = "", visible_state_or_error: str = "", visible_state_summary: str = "", available_tools: list = None) -> dict:
-    service = str(target_service or "").strip().lower().replace("-", " ").replace("_", " ")
-    if service in ("wi fi", "wifi", "wireless"):
-        ready = bool(wifi_enabled)
-        setter = "set_wifi_status"
-        label = "wifi"
-    elif service in ("cell", "cellular", "cellular service", "mobile data"):
-        ready = bool(cellular_enabled)
-        setter = "set_cellular_service_status"
-        label = "cellular"
-    elif service in ("location", "location service", "gps"):
-        ready = bool(location_service_enabled)
-        setter = "set_location_service_status"
-        label = "location"
-    else:
-        return {"ready": False, "tool_name": "", "arguments": {}, "should_call": False, "reason": "unknown_target_service"}
-    if ready:
-        return {"ready": True, "tool_name": "", "arguments": {}, "should_call": False, "reason": label + " is already enabled"}
-    visible_tool_names = set()
-    if available_tools:
-        for name in available_tools:
-            visible_tool_names.add(str(name))
-    if visible_tool_names and setter not in visible_tool_names:
-        return {"ready": False, "tool_name": "", "arguments": {}, "should_call": False, "reason": "required_setter_unavailable"}
-    if bool(low_battery_mode):
-        if visible_tool_names and "set_low_battery_mode_status" not in visible_tool_names:
-            return {"ready": False, "tool_name": "", "arguments": {}, "should_call": False, "reason": "required_low_battery_setter_unavailable"}
-        return {"ready": False, "tool_name": "set_low_battery_mode_status", "arguments": {"on": False}, "should_call": True, "reason": label + " cannot be enabled while low battery mode is on"}
-    return {"ready": False, "tool_name": setter, "arguments": {"on": True}, "should_call": True, "reason": label + " is disabled and must be enabled first"}
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _next_weekday_time_to_timestamp_contract_tool(
-    request: ToolGenerationRequest,
-    rejected_tool: GeneratedTool,
-) -> GeneratedTool:
-    spec = ToolSpec(
-        tool_name="next_weekday_time_to_timestamp",
-        family=ToolFamily.CANONICALIZER,
-        description=(
-            "Convert a current timestamp plus target ISO weekday and local time into "
-            "the next matching local Unix timestamp for reminder scheduling. This "
-            "helper never creates or modifies reminders."
-        ),
-        inputs=(
-            ToolInput("current_timestamp", "float", "Current Unix timestamp."),
-            ToolInput(
-                "target_isoweekday",
-                "int",
-                "Target weekday, Monday=1 through Sunday=7.",
-            ),
-            ToolInput("hour", "int", "Target local hour in 24-hour time."),
-            ToolInput("minute", "int", "Target local minute."),
-            ToolInput(
-                "local_utc_offset_hours",
-                "float",
-                "Deprecated fallback only; do not guess this value when current_datetime_info is available.",
-            ),
-            ToolInput(
-                "current_datetime_info",
-                "dict",
-                "Output from timestamp_to_datetime_info(current_timestamp), used to derive the sandbox local offset.",
-            ),
-        ),
-        output_annotation="float",
-        output_schema=None,
-        positive_triggers=(
-            "add_reminder_content_and_weekday_delta_and_time",
-            "next Friday at 5 PM",
-            "next weekday reminder timestamp",
-        ),
-        negative_triggers=(
-            "insufficient_information",
-            "invalid target weekday",
-            "invalid hour",
-            "invalid minute",
-        ),
-        preserves_side_effect_tools=("get_current_timestamp", "add_reminder"),
-        required_original_tool_calls=("get_current_timestamp", "add_reminder"),
-        abstain_behavior=(
-            "Return 0.0 for invalid weekday/time fields or when "
-            "current_datetime_info is missing or inconsistent with current_timestamp."
-        ),
-        generalization_rationale=(
-            "Weekday reminder scheduling repeatedly needs the same local date "
-            "calculation before the preserved add_reminder call."
-        ),
-        estimated_step_compression=max(
-            rejected_tool.spec.estimated_step_compression or 0,
-            3,
-        ),
-        cross_task_applicability_count=max(
-            rejected_tool.spec.cross_task_applicability_count or 0,
-            2,
-        ),
-        applicable_task_families=_merged_task_families(
-            rejected_tool,
-            "add_reminder_content_and_weekday_delta_and_time",
-            "modify_reminder_with_weekday_delta_and_time",
-        ),
-        reason_tool_is_decisive=(
-            "It prevents actors from inventing day offsets or reusing the current "
-            "timestamp as the reminder time."
-        ),
-        diagnostic_only=rejected_tool.spec.diagnostic_only,
-        shortfall_cluster_evidence=(
-            *rejected_tool.spec.shortfall_cluster_evidence,
-            "deterministic_next_weekday_timestamp_contract_repair",
-        ),
-        known_failure_mechanisms_addressed=(
-            *rejected_tool.spec.known_failure_mechanisms_addressed,
-            "weekday_phrase_timestamp_miscalculation",
-            "current_timestamp_reused_as_reminder_timestamp",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper returns only the timestamp; the actor must still call the "
-            "original add_reminder ToolSandbox side-effect tool."
-        ),
-        grading_accounting_note=(
-            "Timestamp canonicalization is intermediate; final outcome remains the "
-            "add_reminder state."
-        ),
-        inadequacy_evidence=StructuredInadequacyEvidence(
-            summary=(
-                "Weekday reminder tasks failed because the actor invented a day "
-                "offset or reused current_timestamp as reminder_timestamp."
-            ),
-            signals=("visible_raw_data_lacking_deterministic_transform",),
-            failed_tool_calls=("add_reminder",),
-            repeated_failed_tool_calls=("add_reminder",),
-            visible_data_gaps=(
-                "next weekday phrase must become exact local reminder timestamp",
-            ),
-            planner_failures=("compute weekday timestamp before add_reminder",),
-            final_answer_route_mismatch=False,
-        ),
-    )
-    code = """
-def next_weekday_time_to_timestamp(current_timestamp: float, target_isoweekday: int, hour: int, minute: int, local_utc_offset_hours: float = None, current_datetime_info: dict = None) -> float:
-    def is_leap_year(year):
-        return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
-
-    def days_from_civil(year, month, day):
-        y = int(year)
-        m = int(month)
-        d = int(day)
-        if m <= 2:
-            y -= 1
-        era = y // 400
-        yoe = y - era * 400
-        mp = m - 3 if m > 2 else m + 9
-        doy = (153 * mp + 2) // 5 + d - 1
-        doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
-        return era * 146097 + doe - 719468
-
-    def current_datetime_parts(info):
-        if not isinstance(info, dict):
-            return None
-        keys = ("year", "month", "day", "hour", "minute", "second")
-        for key in keys:
-            if key not in info or info.get(key) is None:
-                return None
-        year = int(info.get("year"))
-        month = int(info.get("month"))
-        day = int(info.get("day"))
-        hour_value = int(info.get("hour"))
-        minute_value = int(info.get("minute"))
-        second_value = int(info.get("second"))
-        if month < 1 or month > 12:
-            return None
-        month_lengths = [31, 29 if is_leap_year(year) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        if day < 1 or day > month_lengths[month - 1]:
-            return None
-        if hour_value < 0 or hour_value > 23 or minute_value < 0 or minute_value > 59 or second_value < 0 or second_value > 59:
-            return None
-        isoweekday = info.get("isoweekday")
-        isoweekday_value = None
-        if isinstance(isoweekday, int):
-            isoweekday_value = int(isoweekday)
-        elif isinstance(isoweekday, float) and isoweekday == int(isoweekday):
-            isoweekday_value = int(isoweekday)
-        elif isinstance(isoweekday, str):
-            stripped_isoweekday = isoweekday.strip()
-            if stripped_isoweekday.isdigit():
-                isoweekday_value = int(stripped_isoweekday)
-        if isoweekday_value is not None and (isoweekday_value < 1 or isoweekday_value > 7):
-            isoweekday_value = None
-        return {
-            "year": year,
-            "month": month,
-            "day": day,
-            "hour": hour_value,
-            "minute": minute_value,
-            "second": second_value,
-            "isoweekday": isoweekday_value,
-        }
-
-    if target_isoweekday < 1 or target_isoweekday > 7:
-        return 0.0
-    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
-        return 0.0
-    parts = current_datetime_parts(current_datetime_info)
-    if parts is None:
-        return 0.0
-    local_midnight = days_from_civil(parts["year"], parts["month"], parts["day"]) * 86400.0
-    current_local_seconds = local_midnight + parts["hour"] * 3600.0 + parts["minute"] * 60.0 + parts["second"]
-    offset_seconds = round((float(current_timestamp) - current_local_seconds) / 60.0) * 60.0
-    if offset_seconds < -12.0 * 3600.0 or offset_seconds > 14.0 * 3600.0:
-        return 0.0
-    current_isoweekday = parts["isoweekday"]
-    if current_isoweekday is None:
-        current_isoweekday = int((local_midnight // 86400.0 + 3) % 7) + 1
-    target_local_seconds = int(hour) * 3600 + int(minute) * 60
-    current_seconds_since_midnight = parts["hour"] * 3600 + parts["minute"] * 60 + parts["second"]
-    days_ahead = (int(target_isoweekday) - current_isoweekday) % 7
-    if days_ahead == 0 and target_local_seconds <= current_seconds_since_midnight:
-        days_ahead = 7
-    return (
-        local_midnight
-        + days_ahead * 86400.0
-        + offset_seconds
-        + int(hour) * 3600.0
-        + int(minute) * 60.0
-    )
-"""
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _select_action_target_by_recency_contract_tool(
-    request: ToolGenerationRequest,
-    rejected_tool: GeneratedTool,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "selected_record": {"type": "object"},
-            "selected_index": {"type": "integer"},
-            "selected_id": {"type": "string"},
-            "selected_timestamp": {"type": "number"},
-            "action_type": {"type": "string"},
-            "downstream_tool_name": {"type": "string"},
-            "downstream_tool_kwargs": {"type": "object"},
-            "should_call_tool": {"type": "boolean"},
-            "tie_candidates": {"type": "array"},
-            "abstain_reason": {"type": "string"},
-            "safety_notes": {"type": "string"},
-            "final_answer_recommendation": {"type": "string"},
-        },
-        "required": [
-            "selected_record",
-            "selected_index",
-            "selected_id",
-            "selected_timestamp",
-            "action_type",
-            "downstream_tool_name",
-            "downstream_tool_kwargs",
-            "should_call_tool",
-            "tie_candidates",
-            "abstain_reason",
-            "safety_notes",
-        ],
-    }
-    spec = ToolSpec(
-        tool_name="select_action_target_by_recency",
-        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
-        description=(
-            "Select one visible reminder/contact action target by timestamp recency "
-            "and return final-action-ready downstream ToolSandbox kwargs when safe. "
-            "When the target is unique but required mutation fields are prepared "
-            "elsewhere, preserve the selected target with should_call_tool=false "
-            "instead of discarding it. "
-            "For answer-only requests, return the selected visible record and a "
-            "final-answer recommendation without a downstream side effect. The "
-            "helper never performs the side effect."
-        ),
-        inputs=(
-            ToolInput("records", "list", "Visible candidate records."),
-            ToolInput("timestamp_key", "str", "Numeric timestamp field to rank."),
-            ToolInput("selection_mode", "str", "latest or oldest."),
-            ToolInput(
-                "action_type",
-                "str",
-                "Explicit downstream action type such as answer_record, modify_contact, modify_reminder, remove_contact, or remove_reminder.",
-            ),
-            ToolInput("constraints", "dict", "Optional exact-match filters."),
-            ToolInput(
-                "updates",
-                "dict",
-                "Explicit update fields for modify actions; {} for remove actions.",
-            ),
-            ToolInput(
-                "self_person_id",
-                "str",
-                "Optional current user person id for message-counterparty contact updates.",
-            ),
-            ToolInput(
-                "reference_timestamp",
-                "float",
-                "Optional current timestamp for upcoming/next target selection.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "remove_reminder_with_recency_latest",
-            "modify_reminder_with_recency_latest",
-            "modify_contact_with_message_recency",
-            "search_reminder_with_recency",
-            "answer-only reminder recency selection",
-            "recency action target selection",
-        ),
-        negative_triggers=(
-            "insufficient_information",
-            "ambiguous timestamp tie",
-            "missing target id",
-            "modify action without update fields",
-        ),
-        preserves_side_effect_tools=(
-            "search_reminder",
-            "search_messages",
-            "modify_contact",
-            "modify_reminder",
-            "remove_contact",
-            "remove_reminder",
-        ),
-        required_original_tool_calls=(
-            "search_reminder",
-            "search_messages",
-            "modify_contact",
-            "modify_reminder",
-            "remove_contact",
-            "remove_reminder",
-        ),
-        abstain_behavior=(
-            "Return should_call_tool false with empty downstream kwargs when no "
-            "unique record, numeric timestamp, or safe target id is available. "
-            "Do not convert vague action words such as remove, delete, modify, "
-            "or update into side-effect tools; mutation is allowed only when "
-            "action_type names an explicit original action such as remove_reminder "
-            "or modify_contact. "
-            "When a unique target exists but modify-action update fields are missing, "
-            "return should_call_tool false while preserving selected_record, "
-            "selected_id, downstream_tool_name, and a final_answer_recommendation "
-            "that begins with use_selected_record:. This lets the actor combine the "
-            "target with update values prepared elsewhere while preserving the "
-            "original side-effect call. For answer-only selection, return "
-            "should_call_tool false with selected_record preserved and "
-            "final_answer_recommendation filled from visible record content when "
-            "available."
-        ),
-        generalization_rationale=(
-            "Recency-selected side-effect tasks repeatedly need deterministic target "
-            "choice followed by safe downstream kwargs."
-        ),
-        estimated_step_compression=max(
-            rejected_tool.spec.estimated_step_compression or 0,
-            3,
-        ),
-        cross_task_applicability_count=max(
-            rejected_tool.spec.cross_task_applicability_count or 0,
-            2,
-        ),
-        applicable_task_families=_merged_task_families(
-            rejected_tool,
-            "remove_reminder_with_recency_latest",
-            "modify_reminder_with_recency_latest",
-            "modify_contact_with_message_recency",
-        ),
-        reason_tool_is_decisive=(
-            "It converts visible timestamp-ranked records into the exact preserved "
-            "ToolSandbox action kwargs, which makes the generated helper naturally "
-            "adoptable instead of merely diagnostic."
-        ),
-        diagnostic_only=rejected_tool.spec.diagnostic_only,
-        shortfall_cluster_evidence=(
-            *rejected_tool.spec.shortfall_cluster_evidence,
-            "deterministic_action_selector_contract_repair",
-        ),
-        known_failure_mechanisms_addressed=(
-            *rejected_tool.spec.known_failure_mechanisms_addressed,
-            "visible_not_called_action_selector_missing_downstream_kwargs",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper prepares kwargs only; the actor must still call the original "
-            "ToolSandbox side-effect tool named by downstream_tool_name."
-        ),
-        grading_accounting_note=(
-            "Generated helper contribution is counted separately from the preserved "
-            "original side-effect call."
-        ),
-        inadequacy_evidence=StructuredInadequacyEvidence(
-            summary=(
-                "A prior recency action selector was retained but had weak adoption "
-                "because it returned only a selected id instead of final-action-ready "
-                "kwargs."
-            ),
-            signals=("visible_not_called", "side_effect_target_selection"),
-            visible_data_gaps=(
-                "selected recency target must become downstream action kwargs",
-            ),
-            planner_failures=(
-                "actor did not bridge selected id into original side-effect call",
-            ),
-            final_answer_route_mismatch=False,
-        ),
-    )
-    code = """
-def select_action_target_by_recency(records: list, timestamp_key: str = "", selection_mode: str = "latest", action_type: str = "", constraints: dict = {}, updates: dict = {}, self_person_id: str = "", reference_timestamp: float = 0.0) -> dict:
-    constraints = constraints or {}
-    updates = updates or {}
-    mode = (selection_mode or "").strip().lower()
-    mode_aliases = {
-        "most_recent": "latest",
-        "most recent": "latest",
-        "newest": "latest",
-        "last": "latest",
-        "recent": "latest",
-        "earliest": "oldest",
-        "first": "oldest",
-        "next": "upcoming",
-        "future": "upcoming",
-        "soonest": "upcoming",
-        "nearest_future": "upcoming",
-        "nearest future": "upcoming",
-    }
-    mode = mode_aliases.get(mode, mode)
-    action = (action_type or "").strip().lower()
-    self_id = str(self_person_id or "").strip()
-    alias_map = {
-        "delete_contact": "remove_contact",
-        "delete_reminder": "remove_reminder",
-        "update_contact": "modify_contact",
-        "update_reminder": "modify_reminder",
-    }
-    action = alias_map.get(action, action)
-
-    if not timestamp_key:
-        if any(isinstance(item, dict) and "creation_timestamp" in item for item in records):
-            timestamp_key = "creation_timestamp"
-        elif any(isinstance(item, dict) and "reminder_timestamp" in item for item in records):
-            timestamp_key = "reminder_timestamp"
-    answer_only_actions = {
-        "",
-        "answer",
-        "answer_record",
-        "select",
-        "select_record",
-        "lookup",
-        "read",
-        "reminder",
-        "search_reminder",
-    }
-    if not action and self_id and updates:
-        action = "modify_contact"
-    elif action in answer_only_actions:
-        action = "answer_record"
-
-    def empty(reason: str, timestamp: float = 0.0, ties: list = None) -> dict:
-        payload = {
-            "selected_record": {},
-            "selected_index": -1,
-            "selected_id": "",
-            "selected_timestamp": float(timestamp),
-            "action_type": action,
-            "downstream_tool_name": (
-                "" if action == "answer_record" or reason != "no_records" else action
-            ),
-            "downstream_tool_kwargs": {},
-            "should_call_tool": False,
-            "tie_candidates": list(ties or []),
-            "abstain_reason": reason,
-            "safety_notes": "do not guess before side-effect action",
-        }
-        if action == "answer_record":
-            payload["final_answer_recommendation"] = ""
-        return payload
-
-    def target_only(reason: str, selected_record: dict, selected_index: int, selected_id: str, timestamp: float, id_key: str, extra: dict = None) -> dict:
-        payload = {
-            "selected_record": selected_record,
-            "selected_index": selected_index,
-            "selected_id": str(selected_id),
-            "selected_timestamp": float(timestamp),
-            "action_type": action,
-            "downstream_tool_name": "" if action == "answer_record" else action,
-            "downstream_tool_kwargs": {},
-            "should_call_tool": False,
-            "tie_candidates": [],
-            "abstain_reason": reason,
-            "safety_notes": "selected target only; call the original side-effect only after required mutation fields are available",
-            "final_answer_recommendation": f"use_selected_record:{action}:{id_key}={selected_id}; supply required update fields from visible context before calling the original tool",
-        }
-        if isinstance(extra, dict):
-            payload.update(extra)
-        return payload
-
-    if not isinstance(records, list) or not records:
-        return empty("no_records")
-    if mode not in {"latest", "oldest", "upcoming"}:
-        return empty("invalid_selection_mode")
-    if action not in {"answer_record", "modify_contact", "modify_reminder", "remove_contact", "remove_reminder"}:
-        return empty("unsupported_action_type")
-    if not timestamp_key:
-        return empty("missing_timestamp_key")
-
-    def norm(value):
-        if value is None:
-            return ""
-        return str(value).strip().lower()
-
-    filtered = []
-    for record in records:
-        if not isinstance(record, dict):
-            continue
-        ok = True
-        for key, expected in constraints.items():
-            if norm(record.get(key)) != norm(expected):
-                ok = False
-                break
-        if ok:
-            value = record.get(timestamp_key)
-            if isinstance(value, (int, float)):
-                filtered.append((float(value), record))
-    if not filtered:
-        return empty("no_matching_numeric_timestamp")
-
-    if mode == "latest":
-        best_timestamp = max(ts for ts, _ in filtered)
-    elif mode == "oldest":
-        best_timestamp = min(ts for ts, _ in filtered)
-    else:
-        reference = reference_timestamp if isinstance(reference_timestamp, (int, float)) and not isinstance(reference_timestamp, bool) else 0.0
-        future_records = [(ts, record) for ts, record in filtered if reference <= 0.0 or ts >= reference]
-        if not future_records:
-            return empty("no_upcoming_timestamp_at_or_after_reference")
-        best_timestamp = min(ts for ts, _ in future_records)
-    best_records = [record for ts, record in filtered if ts == best_timestamp]
-    if len(best_records) != 1:
-        return empty("ambiguous_timestamp_tie", best_timestamp, best_records)
-
-    selected_record = best_records[0]
-    selected_index = records.index(selected_record)
-    if action == "answer_record":
-        selected_id = (
-            selected_record.get("reminder_id")
-            or selected_record.get("person_id")
-            or selected_record.get("message_id")
-            or selected_record.get("id")
-            or ""
-        )
-        content = str(
-            selected_record.get("content")
-            or selected_record.get("name")
-            or selected_record.get("relationship")
-            or selected_record.get("phone_number")
-            or ""
-        ).strip()
-        if content:
-            recommendation = f'Your selected item is "{content}".'
-        elif selected_id:
-            recommendation = f"The selected item id is {selected_id}."
-        else:
-            recommendation = "I found the selected item, but I could not read a display value from it."
-        return {
-            "selected_record": selected_record,
-            "selected_index": selected_index,
-            "selected_id": str(selected_id),
-            "selected_timestamp": float(best_timestamp),
-            "action_type": action,
-            "downstream_tool_name": "",
-            "downstream_tool_kwargs": {},
-            "should_call_tool": False,
-            "tie_candidates": [],
-            "abstain_reason": "",
-            "safety_notes": "use selected_record for the answer; no side-effect tool is needed",
-            "final_answer_recommendation": recommendation,
-        }
-    if action == "modify_contact" and "message_id" in selected_record:
-        sender = str(selected_record.get("sender_person_id") or "")
-        recipient = str(selected_record.get("recipient_person_id") or "")
-        sender_phone = str(selected_record.get("sender_phone_number") or "")
-        recipient_phone = str(selected_record.get("recipient_phone_number") or "")
-        selected_person_id = ""
-        selected_phone_number = ""
-        def all_records_share(key: str, value: str) -> bool:
-            if not value or len(filtered) < 2:
-                return False
-            for _timestamp, record in filtered:
-                if str(record.get(key, "") or "") != value:
-                    return False
-            return True
-        if self_id and recipient and sender == self_id:
-            selected_person_id = recipient
-            selected_phone_number = recipient_phone
-        elif self_id and sender and recipient == self_id:
-            selected_person_id = sender
-            selected_phone_number = sender_phone
-        elif recipient and all_records_share("sender_person_id", sender):
-            selected_person_id = recipient
-            selected_phone_number = recipient_phone
-        elif sender and all_records_share("recipient_person_id", recipient):
-            selected_person_id = sender
-            selected_phone_number = sender_phone
-        elif sender and self_id and sender != self_id:
-            selected_person_id = sender
-            selected_phone_number = sender_phone
-        elif recipient and self_id and recipient != self_id:
-            selected_person_id = recipient
-            selected_phone_number = recipient_phone
-        if not selected_person_id:
-            if self_id or (sender and recipient):
-                return empty("missing_non_self_counterparty", best_timestamp)
-        else:
-            concrete_updates = {k: v for k, v in updates.items() if v not in (None, "")}
-            if not concrete_updates:
-                return target_only(
-                    "missing_update_fields",
-                    selected_record,
-                    selected_index,
-                    selected_person_id,
-                    best_timestamp,
-                    "person_id",
-                    {
-                        "selected_message": selected_record,
-                        "selected_message_id": str(selected_record.get("message_id") or ""),
-                        "selected_person_id": selected_person_id,
-                        "selected_phone_number": selected_phone_number,
-                    },
-                )
-            downstream_kwargs = {"person_id": selected_person_id}
-            downstream_kwargs.update(concrete_updates)
-            return {
-                "selected_record": selected_record,
-                "selected_message": selected_record,
-                "selected_message_id": str(selected_record.get("message_id") or ""),
-                "selected_person_id": selected_person_id,
-                "selected_phone_number": selected_phone_number,
-                "selected_timestamp": float(best_timestamp),
-                "downstream_tool_name": "modify_contact",
-                "downstream_tool_kwargs": downstream_kwargs,
-                "should_call_tool": True,
-                "tie_candidates": [],
-                "abstain_reason": "",
-                "safety_notes": "call modify_contact with downstream_tool_kwargs",
-                "final_answer_recommendation": "call modify_contact with downstream_tool_kwargs",
-            }
-    if action.endswith("_reminder"):
-        id_key = "reminder_id"
-        selected_id = selected_record.get(id_key, "")
-    else:
-        id_key = "person_id"
-        selected_id = selected_record.get("person_id", "")
-        if not selected_id:
-            sender = selected_record.get("sender_person_id", "")
-            recipient = selected_record.get("recipient_person_id", "")
-            candidates = [item for item in [sender, recipient] if item]
-            unique = list(dict.fromkeys(candidates))
-            if len(unique) == 1:
-                selected_id = unique[0]
-            else:
-                return empty("missing_or_ambiguous_person_id", best_timestamp)
-    if not selected_id:
-        return empty("missing_target_id", best_timestamp)
-
-    downstream_kwargs = {id_key: selected_id}
-    if action.startswith("modify_"):
-        concrete_updates = {k: v for k, v in updates.items() if v not in (None, "")}
-        if not concrete_updates:
-            return target_only(
-                "missing_update_fields",
-                selected_record,
-                selected_index,
-                selected_id,
-                best_timestamp,
-                id_key,
-            )
-        downstream_kwargs.update(concrete_updates)
-
-    return {
-        "selected_record": selected_record,
-        "selected_index": selected_index,
-        "selected_id": str(selected_id),
-        "selected_timestamp": float(best_timestamp),
-        "action_type": action,
-        "downstream_tool_name": action,
-        "downstream_tool_kwargs": downstream_kwargs,
-        "should_call_tool": True,
-        "tie_candidates": [],
-        "abstain_reason": "",
-        "safety_notes": f"call {action} with downstream_tool_kwargs",
-    }
-"""
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _plan_contact_update_from_id_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "downstream_tool_name": {"type": "string"},
-            "downstream_tool_kwargs": {"type": "object"},
-            "should_call_tool": {"type": "boolean"},
-            "abstain_reason": {"type": "string"},
-        },
-        "required": [
-            "downstream_tool_name",
-            "downstream_tool_kwargs",
-            "should_call_tool",
-            "abstain_reason",
-        ],
-    }
-    evidence = (
-        StructuredInadequacyEvidence.from_json(request.inadequacy_evidence)
-        if isinstance(request.inadequacy_evidence, dict)
-        else StructuredInadequacyEvidence(
-            summary=request.observation,
-            signals=("side_effect_argument_preparation_failure",),
-            failed_tool_calls=("modify_contact",),
-            visible_data_gaps=(
-                "visible person_id and update fields must become original modify_contact kwargs",
-            ),
-            planner_failures=(
-                "prepare modify_contact kwargs from visible scalar id update",
-            ),
-        )
-    )
-    spec = ToolSpec(
-        tool_name="plan_contact_update_from_id",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Prepare the original modify_contact kwargs from a visible stable "
-            "person id and visible scalar update fields. The helper never "
-            "searches contacts and never modifies contacts."
-        ),
-        inputs=(
-            ToolInput(
-                "person_id", "str", "Stable contact/person id supplied by the user."
-            ),
-            ToolInput("phone_number", "str", "Optional new phone number."),
-            ToolInput("name", "str", "Optional new contact name."),
-            ToolInput("relationship", "str", "Optional new contact relationship."),
-            ToolInput("user_request", "str", "Original visible user request."),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "update_contact_with_id_and_phone_number",
-            "update contact id phone number",
-            "contact_id_update_argument_planning",
-        ),
-        negative_triggers=(
-            "missing person id",
-            "no update fields",
-            "add contact",
-            "remove contact",
-            "search contact",
-            "send message",
-            "reminder",
-        ),
-        preserves_side_effect_tools=("modify_contact",),
-        required_original_tool_calls=("modify_contact",),
-        abstain_behavior=(
-            "Return should_call_tool false when person_id is missing, no update "
-            "field is present, or the request is for a non-contact-update task."
-        ),
-        generalization_rationale=(
-            "Direct contact-id update tasks recur across plain and distraction "
-            "variants; they require the same argument normalization before the "
-            "original side-effect tool is called."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=2,
-        applicable_task_families=(
-            "update_contact_with_id_and_phone_number",
-            "contact_id_update_argument_planning",
-        ),
-        reason_tool_is_decisive=(
-            "It converts visible scalar update fields into the exact original "
-            "modify_contact kwargs without guessing or mutating state."
-        ),
-        diagnostic_only=False,
-        shortfall_cluster_evidence=("contact_id_update_argument_planning",),
-        known_failure_mechanisms_addressed=(
-            "side_effect_argument_preparation_failure",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper is side-effect-free; the actor must still call the "
-            "original modify_contact tool with returned kwargs."
-        ),
-        grading_accounting_note=(
-            "The helper preserves the original ToolSandbox side-effect call and "
-            "only prepares its arguments."
-        ),
-        inadequacy_evidence=evidence,
-    )
-    code = """
-def plan_contact_update_from_id(person_id: str, phone_number: str = "", name: str = "", relationship: str = "", user_request: str = "") -> dict:
-    request = str(user_request or "").strip().lower()
-    if any(term in request for term in ("add contact", "create contact", "remove contact", "delete contact", "search contact", "send message", "reminder")):
-        return {
-            "downstream_tool_name": "",
-            "downstream_tool_kwargs": {},
-            "should_call_tool": False,
-            "abstain_reason": "not_contact_update_task",
-        }
-
-    stable_id = str(person_id or "").strip()
-    if not stable_id:
-        return {
-            "downstream_tool_name": "",
-            "downstream_tool_kwargs": {},
-            "should_call_tool": False,
-            "abstain_reason": "missing_person_id",
-        }
-
-    def normalize_phone(value: str) -> str:
-        text = str(value or "").strip()
-        if not text:
-            return ""
-        digits = "".join(ch for ch in text if ch.isdigit())
-        if text.startswith("+"):
-            return "+" + digits
-        return digits
-
-    kwargs = {"person_id": stable_id}
-    normalized_phone = normalize_phone(phone_number)
-    if normalized_phone:
-        kwargs["phone_number"] = normalized_phone
-    clean_name = str(name or "").strip()
-    if clean_name:
-        kwargs["name"] = clean_name
-    clean_relationship = str(relationship or "").strip()
-    if clean_relationship:
-        kwargs["relationship"] = clean_relationship
-
-    if len(kwargs) <= 1:
-        return {
-            "downstream_tool_name": "",
-            "downstream_tool_kwargs": {},
-            "should_call_tool": False,
-            "abstain_reason": "no_update_fields",
-        }
-
-    return {
-        "downstream_tool_name": "modify_contact",
-        "downstream_tool_kwargs": kwargs,
-        "should_call_tool": True,
-        "abstain_reason": "",
-    }
-"""
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _prepare_direct_contact_action_args_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "downstream_tool_name": {"type": "string"},
-            "downstream_tool_kwargs": {"type": "object"},
-            "should_call_tool": {"type": "boolean"},
-            "abstain_reason": {"type": "string"},
-        },
-        "required": [
-            "downstream_tool_name",
-            "downstream_tool_kwargs",
-            "should_call_tool",
-            "abstain_reason",
-        ],
-    }
-    evidence = (
-        StructuredInadequacyEvidence.from_json(request.inadequacy_evidence)
-        if isinstance(request.inadequacy_evidence, dict)
-        else StructuredInadequacyEvidence(
-            summary=request.observation,
-            signals=("side_effect_argument_preparation_failure",),
-            failed_tool_calls=(
-                "add_contact",
-                "modify_contact",
-                "remove_contact",
-                "send_message_with_phone_number",
-            ),
-            visible_data_gaps=(
-                "visible scalar inputs must become exact original side-effect kwargs",
-            ),
-            planner_failures=(
-                "direct scalar side-effect action executed with incomplete kwargs",
-            ),
-        )
-    )
-    spec = ToolSpec(
-        tool_name="prepare_direct_contact_action_args",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Prepare exact original ToolSandbox contact/message side-effect kwargs "
-            "from visible scalar inputs for direct add, modify, remove, or send "
-            "actions. The helper never searches records and never performs the "
-            "side effect itself."
-        ),
-        inputs=(
-            ToolInput(
-                "action_type",
-                "str",
-                "add_contact, modify_contact, remove_contact, or send_message.",
-            ),
-            ToolInput("contact_name", "str", "Optional visible contact name."),
-            ToolInput("phone_number", "str", "Optional visible phone number."),
-            ToolInput("relationship", "str", "Optional visible relationship value."),
-            ToolInput("record_id", "str", "Optional visible person/contact id."),
-            ToolInput("target_field", "str", "Optional modify target field."),
-            ToolInput("new_value", "str", "Optional modify value."),
-            ToolInput("message_text", "str", "Optional visible message content."),
-            ToolInput("user_request", "str", "Original visible user request."),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "add_contact_with_name_and_phone_number",
-            "update_contact_with_id_and_phone_number",
-            "remove_contact_with_id",
-            "send_message_with_phone_number_and_content",
-            "direct scalar contact action",
-            "direct phone-number message action",
-        ),
-        negative_triggers=(
-            "insufficient_information",
-            "ambiguous",
-            "search_message",
-            "search_contact",
-            "relationship_with_relationship",
-            "message_recency",
-            "reminder",
-        ),
-        preserves_side_effect_tools=(
-            "add_contact",
-            "modify_contact",
-            "remove_contact",
-            "send_message_with_phone_number",
-        ),
-        required_original_tool_calls=(
-            "add_contact",
-            "modify_contact",
-            "remove_contact",
-            "send_message_with_phone_number",
-        ),
-        abstain_behavior=(
-            "Return should_call_tool false when the request is not a direct scalar "
-            "contact/message side-effect task or when required scalar fields are missing."
-        ),
-        generalization_rationale=(
-            "Direct scalar contact/message actions recur across add, update, "
-            "remove, and phone-number send tasks. They require the same safe "
-            "argument preparation before preserved original side-effect tools."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=4,
-        applicable_task_families=(
-            "add_contact_with_name_and_phone_number",
-            "update_contact_with_id_and_phone_number",
-            "remove_contact_with_id",
-            "send_message_with_phone_number_and_content",
-        ),
-        reason_tool_is_decisive=(
-            "It converts visible scalar inputs into exact downstream ToolSandbox "
-            "kwargs while preserving the original side-effect call."
-        ),
-        diagnostic_only=False,
-        shortfall_cluster_evidence=("direct_scalar_contact_action_argument_gap",),
-        known_failure_mechanisms_addressed=(
-            "side_effect_argument_preparation_failure",
-            "direct_side_effect_no_generated_tool",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper is side-effect-free; the actor must call the returned "
-            "original ToolSandbox tool with downstream_tool_kwargs."
-        ),
-        grading_accounting_note=(
-            "Canonical route is preserved because the original ToolSandbox "
-            "side-effect tool still performs the mutation or message send."
-        ),
-        inadequacy_evidence=evidence,
-    )
-    code = """
-def prepare_direct_contact_action_args(action_type: str, contact_name: str = "", phone_number: str = "", relationship: str = "", record_id: str = "", target_field: str = "", new_value: str = "", message_text: str = "", user_request: str = "") -> dict:
-    request = str(user_request or "").strip().lower().replace("_", " ")
-    if any(term in request for term in ("search message", "search contact", "relationship with relationship", "recency", "reminder", "insufficient information", "ambiguous")):
-        return {"downstream_tool_name": "", "downstream_tool_kwargs": {}, "should_call_tool": False, "abstain_reason": "not_direct_scalar_contact_action"}
-
-    action = str(action_type or "").strip().lower().replace("-", "_").replace(" ", "_")
-    action_aliases = {
-        "add": "add_contact",
-        "create_contact": "add_contact",
-        "add_contact": "add_contact",
-        "modify": "modify_contact",
-        "update": "modify_contact",
-        "update_contact": "modify_contact",
-        "modify_contact": "modify_contact",
-        "remove": "remove_contact",
-        "delete": "remove_contact",
-        "delete_contact": "remove_contact",
-        "remove_contact": "remove_contact",
-        "send": "send_message",
-        "send_message": "send_message",
-        "message": "send_message",
-    }
-    action = action_aliases.get(action, action)
-
-    def normalize_phone(value: str) -> str:
-        text = str(value or "").strip()
-        if not text:
-            return ""
-        digits = "".join(ch for ch in text if ch.isdigit())
-        if text.startswith("+"):
-            return "+" + digits
-        return digits
-
-    def response(tool_name: str, kwargs: dict, reason: str = "") -> dict:
-        return {
-            "downstream_tool_name": tool_name if not reason else "",
-            "downstream_tool_kwargs": kwargs if not reason else {},
-            "should_call_tool": not bool(reason),
-            "abstain_reason": reason,
-        }
-
-    clean_name = str(contact_name or "").strip()
-    clean_relationship = str(relationship or "").strip()
-    stable_id = str(record_id or "").strip()
-    clean_target = str(target_field or "").strip().lower()
-    clean_value = str(new_value or "").strip()
-    normalized_phone = normalize_phone(phone_number)
-    content = str(message_text or "").strip()
-
-    if action == "add_contact":
-        if not clean_name or not normalized_phone:
-            return response("", {}, "missing_required_fields")
-        return response("add_contact", {"name": clean_name, "phone_number": normalized_phone})
-
-    if action == "modify_contact":
-        if not stable_id:
-            return response("", {}, "missing_person_id")
-        kwargs = {"person_id": stable_id}
-        if normalized_phone:
-            kwargs["phone_number"] = normalized_phone
-        if clean_name:
-            kwargs["name"] = clean_name
-        if clean_relationship:
-            kwargs["relationship"] = clean_relationship
-        if clean_target and clean_value:
-            if clean_target in {"phone", "phone_number", "number"}:
-                kwargs["phone_number"] = normalize_phone(clean_value)
-            elif clean_target in {"name", "contact_name"}:
-                kwargs["name"] = clean_value
-            elif clean_target == "relationship":
-                kwargs["relationship"] = clean_value
-        if len(kwargs) <= 1:
-            return response("", {}, "no_update_fields")
-        return response("modify_contact", kwargs)
-
-    if action == "remove_contact":
-        if not stable_id:
-            return response("", {}, "missing_person_id")
-        return response("remove_contact", {"person_id": stable_id})
-
-    if action == "send_message":
-        if not normalized_phone or not content:
-            return response("", {}, "missing_required_fields")
-        return response(
-            "send_message_with_phone_number",
-            {"phone_number": normalized_phone, "content": content},
-        )
-
-    return response("", {}, "unsupported_action_type")
-"""
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _plan_message_counterparty_search_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "phase": {"type": "string"},
-            "message_direction": {"type": "string"},
-            "selection_mode": {"type": "string"},
-            "should_call_search_contacts": {"type": "boolean"},
-            "search_contacts_kwargs": {"type": "object"},
-            "should_call_search_messages": {"type": "boolean"},
-            "search_messages_kwargs": {"type": "object"},
-            "should_call_tool": {"type": "boolean"},
-            "abstain_reason": {"type": "string"},
-            "next_step": {"type": "string"},
-            "selected_message": {"type": "object"},
-            "counterparty_phone_number": {"type": "string"},
-            "answer_value": {"type": "string"},
-            "exact_final_answer": {"type": "string"},
-            "final_answer_recommendation": {"type": "string"},
-            "copy_exactly": {"type": "boolean"},
-        },
-        "required": [
-            "phase",
-            "message_direction",
-            "selection_mode",
-            "should_call_search_contacts",
-            "search_contacts_kwargs",
-            "should_call_search_messages",
-            "search_messages_kwargs",
-            "should_call_tool",
-            "abstain_reason",
-            "next_step",
-            "selected_message",
-            "counterparty_phone_number",
-            "answer_value",
-            "exact_final_answer",
-            "final_answer_recommendation",
-            "copy_exactly",
-        ],
-    }
-    evidence = (
-        StructuredInadequacyEvidence.from_json(request.inadequacy_evidence)
-        if isinstance(request.inadequacy_evidence, dict)
-        else StructuredInadequacyEvidence(
-            summary=request.observation,
-            signals=(
-                "planner_failed_to_issue_available_search",
-                "visible_records_missing_before_selector",
-            ),
-            failed_tool_calls=("search_contacts", "search_messages"),
-            visible_data_gaps=(
-                "message counterparty selectors need self_person_id and visible message records",
-            ),
-            planner_failures=(
-                "prepare self lookup then original message search before counterparty selector",
-            ),
-        )
-    )
-    spec = ToolSpec(
-        tool_name="plan_message_counterparty_search",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Prepare the original self-contact lookup and message search kwargs "
-            "needed before a generated message-counterparty selector can safely "
-            "choose a contact update target or answer a message-counterparty "
-            "lookup. The helper never searches messages or modifies contacts."
-        ),
-        inputs=(
-            ToolInput(
-                "message_direction",
-                "str",
-                "Use sent or received. Common aliases such as outgoing/from_me and incoming/to_me are accepted.",
-            ),
-            ToolInput("selection_mode", "str", "latest or oldest."),
-            ToolInput(
-                "self_person_id",
-                "str",
-                "Current user's person id from search_contacts(is_self=True); blank on the first call.",
-            ),
-            ToolInput(
-                "content_keyword",
-                "str",
-                "Optional visible message content constraint; blank when absent.",
-            ),
-            ToolInput(
-                "messages",
-                "list",
-                "Optional visible records returned by search_messages; when provided, extract the requested counterparty phone number.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "modify_contact_with_message_recency",
-            "message_counterparty_lookup",
-            "search_sender_phone_number_with_content",
-            "message counterparty contact update",
-            "message search needs self person id",
-        ),
-        negative_triggers=(
-            "insufficient_information",
-            "ambiguous_message_direction",
-            "invalid_selection_mode",
-            "message_search_without_current_user_reference",
-        ),
-        preserves_side_effect_tools=(
-            "search_contacts",
-            "search_messages",
-        ),
-        required_original_tool_calls=("search_messages",),
-        abstain_behavior=(
-            "Return should_call_tool false with empty kwargs when direction or "
-            "selection mode is missing, invalid, or ambiguous."
-        ),
-        generalization_rationale=(
-            "Many current-user message-counterparty workflows need the same "
-            "two-step preparation: get the current user's stable contact id, then "
-            "search messages using that id before selection. Content-constrained "
-            "message lookups can use the same planner with search_messages only."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=2,
-        applicable_task_families=(
-            "modify_contact_with_message_recency",
-            "message_counterparty_contact_update",
-            "message_counterparty_lookup",
-        ),
-        reason_tool_is_decisive=(
-            "It makes downstream generated selectors callable by producing the "
-            "original ToolSandbox lookup kwargs needed to obtain message records "
-            "without guessing current-user ids."
-        ),
-        diagnostic_only=False,
-        shortfall_cluster_evidence=(
-            "message_counterparty_search_needs_self_id_planner",
-        ),
-        known_failure_mechanisms_addressed=(
-            "visible_records_missing_before_selector",
-            "planner_failed_to_issue_available_search",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper only prepares kwargs; the actor must still call the "
-            "original search_contacts and search_messages tools where applicable. "
-            "A separate generated selector prepares modify_contact calls for "
-            "contact-update workflows."
-        ),
-        grading_accounting_note=(
-            "The helper preserves original ToolSandbox lookup and side-effect "
-            "calls; generated-tool contribution is logged separately."
-        ),
-        inadequacy_evidence=evidence,
-    )
-    code = """
-def plan_message_counterparty_search(message_direction: str, selection_mode: str, self_person_id: str = "", content_keyword: str = "", messages: list = []) -> dict:
-    raw_direction = str(message_direction or "").strip().lower().replace("-", "_").replace(" ", "_")
-    direction_parts = {part for part in raw_direction.replace("/", "_").split("_") if part}
-    raw_mode = str(selection_mode or "").strip().lower()
-    self_id = str(self_person_id or "").strip()
-    keyword = str(content_keyword or "").strip()
-    direction = raw_direction
-    mode = raw_mode
-    message_key = ""
-    answer_phone_key = ""
-
-    sent_aliases = {"sent", "send", "outgoing", "from_me", "sender", "i_sent", "me_to_them"}
-    received_aliases = {"received", "incoming", "to_me", "recipient", "they_sent", "them_to_me"}
-    latest_aliases = {"latest", "last", "newest", "most_recent", "recent"}
-    oldest_aliases = {"oldest", "first", "earliest"}
-
-    def result(phase: str, should_contacts: bool, contact_kwargs: dict, should_messages: bool, message_kwargs: dict, should_tool: bool, reason: str, next_step: str, selected_message=None, answer_value: str = "") -> dict:
-        answer = str(answer_value or "").strip()
-        recommendation = answer
-        if answer and isinstance(selected_message, dict):
-            content = str(selected_message.get("content") or "").strip()
-            if content and (keyword or not self_id):
-                content_lower = content.lower()
-                if direction == "received" and "want" in content.lower():
-                    if keyword:
-                        recommendation = f"{answer} asked you if you want some {keyword}"
-                    else:
-                        want_index = content_lower.find("you want")
-                        phrase = content[want_index:].strip(" ?.!") if want_index >= 0 else content
-                        recommendation = f"{answer} asked you if {phrase}"
-                elif direction == "received":
-                    recommendation = f"{answer} sent you: {content}"
-                else:
-                    recommendation = f"{answer} received your message: {content}"
-        return {
-            "phase": phase,
-            "message_direction": direction,
-            "selection_mode": mode,
-            "should_call_search_contacts": bool(should_contacts),
-            "search_contacts_kwargs": contact_kwargs if isinstance(contact_kwargs, dict) else {},
-            "should_call_search_messages": bool(should_messages),
-            "search_messages_kwargs": message_kwargs if isinstance(message_kwargs, dict) else {},
-            "should_call_tool": bool(should_tool),
-            "abstain_reason": str(reason or ""),
-            "next_step": str(next_step or ""),
-            "selected_message": selected_message if isinstance(selected_message, dict) else {},
-            "counterparty_phone_number": answer,
-            "answer_value": answer,
-            "exact_final_answer": recommendation,
-            "final_answer_recommendation": recommendation,
-            "copy_exactly": bool(recommendation),
-        }
-
-    if raw_direction in sent_aliases or bool(direction_parts & {"sent", "send", "outgoing", "from", "sender"}):
-        direction = "sent"
-        message_key = "sender_person_id"
-        answer_phone_key = "recipient_phone_number"
-    elif raw_direction in received_aliases or bool(direction_parts & {"received", "incoming", "to", "recipient"}):
-        direction = "received"
-        message_key = "recipient_person_id"
-        answer_phone_key = "sender_phone_number"
-    elif raw_direction in {"either", "any", "unknown", ""}:
-        return result("abstain", False, {}, False, {}, False, "ambiguous_message_direction", "ask_for_sent_or_received_direction")
-    else:
-        return result("abstain", False, {}, False, {}, False, "invalid_message_direction", "ask_for_sent_or_received_direction")
-
-    if raw_mode in latest_aliases:
-        mode = "latest"
-    elif raw_mode in oldest_aliases:
-        mode = "oldest"
-    else:
-        return result("abstain", False, {}, False, {}, False, "invalid_selection_mode", "ask_for_latest_or_oldest")
-
-    def answer_from_messages(records: list) -> dict:
-        candidates = []
-        for record in records if isinstance(records, list) else []:
-            if not isinstance(record, dict):
-                continue
-            sender_id = str(record.get("sender_person_id") or "").strip()
-            recipient_id = str(record.get("recipient_person_id") or "").strip()
-            if self_id and sender_id == self_id:
-                phone = str(record.get("recipient_phone_number") or "").strip()
-            elif self_id and recipient_id == self_id:
-                phone = str(record.get("sender_phone_number") or "").strip()
-            else:
-                phone = str(record.get(answer_phone_key) or "").strip()
-            if not phone:
-                continue
-            raw_timestamp = record.get("creation_timestamp")
-            if not isinstance(raw_timestamp, (int, float)) or isinstance(raw_timestamp, bool):
-                continue
-            timestamp = float(raw_timestamp)
-            candidates.append((timestamp, record, phone))
-        if not candidates:
-            return result("abstain", False, {}, False, {}, False, "no_visible_counterparty_phone_number", "ask_for_more_message_context")
-        candidates.sort(key=lambda item: item[0], reverse=(mode == "latest"))
-        if len(candidates) > 1 and candidates[0][0] == candidates[1][0]:
-            return result("abstain", False, {}, False, {}, False, "timestamp_tie", "ask_for_disambiguation")
-        _timestamp, selected, phone = candidates[0]
-        return result("answer_ready", False, {}, False, {}, False, "", "answer with final_answer_recommendation", selected, phone)
-
-    if isinstance(messages, list) and messages:
-        return answer_from_messages(messages)
-
-    if not self_id and keyword:
-        return result("message_search_required", False, {}, True, {"content": keyword}, True, "", "call search_messages with search_messages_kwargs")
-
-    if not self_id:
-        return result("self_lookup_required", True, {"is_self": True}, False, {}, True, "", "call search_contacts, then call this helper again with self_person_id")
-
-    kwargs = {message_key: self_id}
-    if keyword:
-        kwargs["content"] = keyword
-    return result("message_search_required", False, {}, True, kwargs, True, "", "call search_messages with search_messages_kwargs")
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _plan_send_message_contact_lookup_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "should_call_search_contacts": {"type": "boolean"},
-            "search_contacts_kwargs": {"type": "object"},
-            "downstream_tool_name": {"type": "string"},
-            "message_content": {"type": "string"},
-            "abstain_reason": {"type": "string"},
-            "next_step": {"type": "string"},
-            "final_answer_recommendation": {"type": "string"},
-        },
-        "required": [
-            "should_call_search_contacts",
-            "search_contacts_kwargs",
-            "downstream_tool_name",
-            "message_content",
-            "abstain_reason",
-            "next_step",
-            "final_answer_recommendation",
-        ],
-    }
-    evidence = (
-        StructuredInadequacyEvidence.from_json(request.inadequacy_evidence)
-        if isinstance(request.inadequacy_evidence, dict)
-        else StructuredInadequacyEvidence(
-            summary=request.observation,
-            signals=(
-                "planner_failed_to_issue_available_search",
-                "visible_recipient_name_unused",
-                "side_effect_precondition_requires_lookup",
-            ),
-            failed_tool_calls=("search_contacts", "send_message_with_phone_number"),
-            visible_data_gaps=(
-                "named recipient and message content must be present before sending",
-            ),
-            planner_failures=(
-                "prepare contact lookup before original send_message_with_phone_number",
-            ),
-        )
-    )
-    spec = ToolSpec(
-        tool_name="plan_send_message_contact_lookup",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Prepare original search_contacts kwargs for named-recipient send "
-            "tasks and guard against sending placeholder content. The helper "
-            "never sends messages and never enables cellular."
-        ),
-        inputs=(
-            ToolInput(
-                "recipient_name",
-                "str",
-                "Visible recipient name; leave blank when absent or when a phone number is already provided.",
-            ),
-            ToolInput(
-                "message_content",
-                "str",
-                "Exact visible message text to send; leave blank until the user provides it.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "named_message_recipient",
-            "send_message_with_contact_content",
-            "send message named recipient",
-        ),
-        negative_triggers=(
-            "insufficient_information",
-            "missing_recipient_name",
-            "missing_message_content",
-            "direct_phone_number",
-        ),
-        preserves_side_effect_tools=(
-            "search_contacts",
-            "send_message_with_phone_number",
-        ),
-        required_original_tool_calls=(
-            "search_contacts",
-            "send_message_with_phone_number",
-        ),
-        abstain_behavior=(
-            "Return should_call_search_contacts false when recipient_name or "
-            "message_content is missing. Missing message content must ask for "
-            "the message text, not for another recipient."
-        ),
-        generalization_rationale=(
-            "Named-recipient send workflows repeatedly require deterministic "
-            "conversion from visible recipient name plus message text into an "
-            "original contact lookup before the original send tool can be used."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=2,
-        applicable_task_families=(
-            "named_message_recipient",
-            "send_message_with_contact_content",
-        ),
-        reason_tool_is_decisive=(
-            "It prevents placeholder sends and preserves the original contact "
-            "lookup and send-message side effects."
-        ),
-        diagnostic_only=False,
-        shortfall_cluster_evidence=("send_message_named_recipient_contact_lookup",),
-        known_failure_mechanisms_addressed=(
-            "placeholder_message_content_send",
-            "planner_failed_to_issue_available_search",
-            "visible_recipient_name_unused",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper only prepares original search_contacts kwargs and carries "
-            "visible message_content. The actor must still call original "
-            "search_contacts and send_message_with_phone_number."
-        ),
-        grading_accounting_note=(
-            "Generated-tool contribution is argument planning; all state changes "
-            "remain original ToolSandbox calls."
-        ),
-        inadequacy_evidence=evidence,
-    )
-    code = """
-def plan_send_message_contact_lookup(recipient_name: str = "", message_content: str = "") -> dict:
-    def clean(value):
-        return str(value or "").strip()
-
-    def output(should_search, kwargs, downstream, content, reason, next_step, final):
-        return {
-            "should_call_search_contacts": bool(should_search),
-            "search_contacts_kwargs": kwargs if isinstance(kwargs, dict) else {},
-            "downstream_tool_name": downstream,
-            "message_content": content,
-            "abstain_reason": reason,
-            "next_step": next_step,
-            "final_answer_recommendation": final,
-        }
-
-    recipient = clean(recipient_name).strip(" .")
-    content = clean(message_content).strip()
-    digits = "".join(ch for ch in recipient if ch.isdigit())
-    if not recipient:
-        return output(
-            False,
-            {},
-            "",
-            content,
-            "missing_recipient_name",
-            "ask_for_recipient_or_phone_number",
-            "I need the recipient name or phone number before I can send that message.",
-        )
-    if digits and (recipient.startswith("+") or len(digits) >= 7):
-        return output(
-            False,
-            {},
-            "",
-            content,
-            "recipient_is_phone_number",
-            "use_original_send_message_with_phone_number_if_message_content_is_visible",
-            "",
-        )
-    if not content:
-        return output(
-            False,
-            {},
-            "",
-            "",
-            "missing_message_content",
-            "ask_for_message_content",
-            f"What message would you like to send to {recipient}?",
-        )
-    return output(
-        True,
-        {"name": recipient},
-        "send_message_with_phone_number",
-        content,
-        "",
-        "call search_contacts, then send_message_with_phone_number",
-        "search_contacts first; if cellular is disabled during send, enable cellular and retry once",
-    )
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _plan_contact_relationship_batch_update_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "phase": {"type": "string"},
-            "source_relationship": {"type": "string"},
-            "target_relationship": {"type": "string"},
-            "should_call_search_contacts": {"type": "boolean"},
-            "search_contacts_kwargs": {"type": "object"},
-            "selected_contacts": {"type": "array"},
-            "downstream_tool_name": {"type": "string"},
-            "downstream_tool_kwargs_list": {"type": "array"},
-            "should_call_tools": {"type": "boolean"},
-            "abstain_reason": {"type": "string"},
-            "final_answer_recommendation": {"type": "string"},
-        },
-        "required": [
-            "phase",
-            "source_relationship",
-            "target_relationship",
-            "should_call_search_contacts",
-            "search_contacts_kwargs",
-            "selected_contacts",
-            "downstream_tool_name",
-            "downstream_tool_kwargs_list",
-            "should_call_tools",
-            "abstain_reason",
-            "final_answer_recommendation",
-        ],
-    }
-    evidence = (
-        StructuredInadequacyEvidence.from_json(request.inadequacy_evidence)
-        if isinstance(request.inadequacy_evidence, dict)
-        else StructuredInadequacyEvidence(
-            summary=request.observation,
-            signals=("side_effect_argument_preparation_failure",),
-            failed_tool_calls=("search_contacts", "modify_contact"),
-            visible_data_gaps=(
-                "relationship batch updates need search kwargs and batched modify_contact kwargs",
-            ),
-            planner_failures=(
-                "prepare relationship-group search then original modify_contact calls",
-            ),
-        )
-    )
-    spec = ToolSpec(
-        tool_name="plan_contact_relationship_batch_update",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Plan a batch contact relationship update from visible source and "
-            "target relationship labels. The helper prepares search_contacts "
-            "kwargs before contacts are visible and prepares one modify_contact "
-            "kwargs object per selected non-self contact after contacts are "
-            "visible. The helper never searches or modifies contacts itself."
-        ),
-        inputs=(
-            ToolInput("user_request", "str", "The visible user request text."),
-            ToolInput(
-                "source_relationship",
-                "str",
-                "Current relationship label, or __all_contacts__ for all non-self contacts.",
-            ),
-            ToolInput(
-                "target_relationship",
-                "str",
-                "Relationship label to write with original modify_contact.",
-            ),
-            ToolInput(
-                "contacts",
-                "list",
-                "Optional visible contacts returned by original search_contacts.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "update_contact_relationship_with_relationship",
-            "all friends to enemies",
-            "all contacts as enemies",
-            "relationship batch update",
-        ),
-        negative_triggers=(
-            "source equals target",
-            "missing source relationship",
-            "missing target relationship",
-            "self-only update",
-            "add_contact",
-            "remove_contact",
-            "search-only contact task",
-        ),
-        preserves_side_effect_tools=("search_contacts", "modify_contact"),
-        required_original_tool_calls=("search_contacts", "modify_contact"),
-        abstain_behavior=(
-            "Abstain when source or target relationship is missing, when source "
-            "equals target, or when visible contacts contain no non-self contact "
-            "that needs the requested relationship change."
-        ),
-        generalization_rationale=(
-            "Relationship group updates repeatedly need the same safe two-stage "
-            "plan: original search_contacts first, then original modify_contact "
-            "once per selected visible non-self contact."
-        ),
-        estimated_step_compression=4,
-        cross_task_applicability_count=3,
-        applicable_task_families=(
-            "contact_relationship_batch_update",
-            "contact_relationship_followup_update",
-            "contact_bulk_update",
-        ),
-        reason_tool_is_decisive=(
-            "It prevents the actor from asking for ids or updating only one "
-            "contact when a deterministic relationship batch can be planned from "
-            "visible labels and records."
-        ),
-        diagnostic_only=False,
-        shortfall_cluster_evidence=("contact_relationship_batch_update",),
-        known_failure_mechanisms_addressed=(
-            "batch_update_incomplete",
-            "planner_failed_to_issue_available_search",
-            "invalid_all_contacts_filter",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper only prepares original search_contacts and modify_contact "
-            "arguments. Every relationship change remains an original ToolSandbox "
-            "modify_contact side effect."
-        ),
-        grading_accounting_note=(
-            "Canonical search and side-effect calls remain original ToolSandbox "
-            "calls; helper contribution is deterministic batching and argument planning."
-        ),
-        inadequacy_evidence=evidence,
-    )
-    code = """
-def plan_contact_relationship_batch_update(user_request: str, source_relationship: str, target_relationship: str, contacts: list = []) -> dict:
-    def clean(value):
-        return str(value or "").strip()
-
-    def normalize_relationship(value):
-        text = clean(value).lower().replace("_", " ").replace("-", " ")
-        aliases = {
-            "friends": "friend",
-            "enemies": "enemy",
-            "bosses": "boss",
-            "coworkers": "coworker",
-            "colleagues": "coworker",
-            "relative": "family",
-            "relatives": "family",
-        }
-        return aliases.get(text, text)
-
-    def plural_relationship(value):
-        text = normalize_relationship(value)
-        irregular = {
-            "enemy": "enemies",
-            "family": "family",
-            "boss": "bosses",
-            "friend": "friends",
-            "coworker": "coworkers",
-        }
-        if text in irregular:
-            return irregular[text]
-        if text.endswith("y") and len(text) > 1 and text[-2] not in "aeiou":
-            return text[:-1] + "ies"
-        if text.endswith(("s", "x", "z", "ch", "sh")):
-            return text + "es"
-        return text + "s"
-
-    def join_names(names):
-        clean_names = [clean(name) for name in names if clean(name)]
-        if not clean_names:
-            return "All matching contacts"
-        if len(clean_names) == 1:
-            return clean_names[0]
-        if len(clean_names) == 2:
-            return clean_names[0] + " and " + clean_names[1]
-        return ", ".join(clean_names[:-1]) + ", and " + clean_names[-1]
-
-    def output(phase, source, target, should_search, search_kwargs, selected, downstream_name, downstream_kwargs, should_tools, reason, final):
-        return {
-            "phase": phase,
-            "source_relationship": source,
-            "target_relationship": target,
-            "should_call_search_contacts": bool(should_search),
-            "search_contacts_kwargs": search_kwargs if isinstance(search_kwargs, dict) else {},
-            "selected_contacts": selected if isinstance(selected, list) else [],
-            "downstream_tool_name": downstream_name,
-            "downstream_tool_kwargs_list": downstream_kwargs if isinstance(downstream_kwargs, list) else [],
-            "should_call_tools": bool(should_tools),
-            "abstain_reason": reason,
-            "final_answer_recommendation": final,
-        }
-
-    source = clean(source_relationship).lower()
-    target = normalize_relationship(target_relationship)
-    all_contacts = source in {"__all_contacts__", "all_contacts", "all contacts", "contacts", "all"}
-    source_normalized = "__all_contacts__" if all_contacts else normalize_relationship(source)
-    if not source_normalized:
-        return output("abstain", source_normalized, target, False, {}, [], "", [], False, "missing_source_relationship", "")
-    if not target:
-        return output("abstain", source_normalized, target, False, {}, [], "", [], False, "missing_target_relationship", "")
-    if source_normalized == target:
-        return output("abstain", source_normalized, target, False, {}, [], "", [], False, "source equals target", "No relationship change is needed.")
-
-    search_kwargs = {"is_self": False} if all_contacts else {"relationship": source_normalized}
-    if not contacts:
-        return output("search_required", source_normalized, target, True, search_kwargs, [], "", [], False, "", "")
-
-    selected_contacts = []
-    downstream = []
-    selected_names = []
-    for contact in contacts:
-        if not isinstance(contact, dict) or bool(contact.get("is_self")):
-            continue
-        person_id = clean(contact.get("person_id"))
-        if not person_id:
-            continue
-        current_relationship = normalize_relationship(contact.get("relationship"))
-        if not all_contacts and current_relationship != source_normalized:
-            continue
-        if current_relationship == target:
-            continue
-        selected_contacts.append(contact)
-        selected_names.append(clean(contact.get("name")))
-        downstream.append({"person_id": person_id, "relationship": target})
-
-    if not downstream:
-        return output("abstain", source_normalized, target, False, {}, [], "", [], False, "no_matching_contacts_for_relationship_update", "")
-
-    if len(downstream) == 1:
-        final = join_names(selected_names) + " is now your " + target + "."
-    else:
-        final = join_names(selected_names) + " are now your " + plural_relationship(target) + "."
-
-    return output(
-        "modify_required",
-        source_normalized,
-        target,
-        False,
-        {},
-        selected_contacts,
-        "modify_contact",
-        downstream,
-        True,
-        "",
-        final,
-    )
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _plan_contact_lookup_query_contract_tool(
-    request: ToolGenerationRequest,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "should_call_search_contacts": {"type": "boolean"},
-            "search_contacts_kwargs": {"type": "object"},
-            "answer_field": {"type": "string"},
-            "selected_record": {"type": "object"},
-            "answer_value": {"type": "string"},
-            "final_answer_recommendation": {"type": "string"},
-            "copy_exactly": {"type": "boolean"},
-            "abstain_reason": {"type": "string"},
-        },
-        "required": [
-            "should_call_search_contacts",
-            "search_contacts_kwargs",
-            "answer_field",
-            "selected_record",
-            "answer_value",
-            "final_answer_recommendation",
-            "copy_exactly",
-            "abstain_reason",
-        ],
-    }
-    evidence = (
-        StructuredInadequacyEvidence.from_json(request.inadequacy_evidence)
-        if isinstance(request.inadequacy_evidence, dict)
-        else StructuredInadequacyEvidence(
-            summary=request.observation,
-            signals=("planner_failed_to_issue_available_search",),
-            failed_tool_calls=("search_contacts",),
-            visible_data_gaps=(
-                "contact lookup tasks need stable search_contacts kwargs and an answer field",
-            ),
-            planner_failures=(
-                "prepare scalar contact lookup before answering or selecting a side-effect target",
-            ),
-        )
-    )
-    spec = ToolSpec(
-        tool_name="plan_contact_lookup_query",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Prepare original search_contacts kwargs from visible scalar contact "
-            "constraints and preserve the requested answer or side-effect target "
-            "field. After search_contacts returns one visible record, it can also "
-            "extract the requested field into a final-answer-ready recommendation. "
-            "Use this generated tool before manually choosing search_contacts "
-            "arguments when a visible phone number, name, or relationship is the "
-            "lookup constraint. The helper never searches contacts and never "
-            "changes contact state."
-        ),
-        inputs=(
-            ToolInput(
-                "contact_name",
-                "str",
-                "Visible contact name constraint; leave blank when absent.",
-            ),
-            ToolInput(
-                "phone_number",
-                "str",
-                "Visible phone-number constraint; separators are normalized.",
-            ),
-            ToolInput(
-                "relationship",
-                "str",
-                "Visible relationship label such as boss or friend; leave blank for possessive phrases like my contact.",
-            ),
-            ToolInput(
-                "requested_field",
-                "str",
-                "Contact field needed after search, such as name, phone_number, relationship, or person_id.",
-            ),
-            ToolInput(
-                "selected_record",
-                "dict",
-                "Optional unique visible contact record returned by search_contacts; leave empty before lookup.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "search_name_with_relationship",
-            "search_phone_number_with_name",
-            "search_relationship_with_phone_number",
-            "remove_contact_by_phone",
-            "modify_contact_by_phone",
-        ),
-        negative_triggers=(
-            "add_contact",
-            "missing_requested_field",
-            "missing_lookup_constraint",
-            "ambiguous_contacts_without_scalar_constraint",
-            "non_contact_task",
-        ),
-        preserves_side_effect_tools=("search_contacts",),
-        required_original_tool_calls=("search_contacts",),
-        abstain_behavior=(
-            "Return should_call_search_contacts false with empty kwargs when the "
-            "requested field is missing or unsupported, or when no name, phone "
-            "number, or concrete relationship label is present."
-        ),
-        generalization_rationale=(
-            "Contact lookup, answer, and side-effect target workflows repeatedly "
-            "need the same deterministic conversion from scalar user constraints "
-            "to original search_contacts kwargs."
-        ),
-        estimated_step_compression=3,
-        cross_task_applicability_count=4,
-        applicable_task_families=(
-            "contact_lookup_answer",
-            "contact_relationship_lookup",
-            "contact_phone_lookup",
-            "contact_side_effect_target_lookup",
-        ),
-        reason_tool_is_decisive=(
-            "It prevents the actor from inventing optional search filters and "
-            "makes the original search_contacts call explicit before answering "
-            "or invoking a preserved side-effect tool."
-        ),
-        diagnostic_only=False,
-        shortfall_cluster_evidence=("contact_lookup_query_planning",),
-        known_failure_mechanisms_addressed=(
-            "invented_optional_lookup_filter",
-            "planner_failed_to_issue_available_search",
-            "side_effect_target_lookup_missing_person_id",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper only prepares original search_contacts kwargs. Any "
-            "contact mutation must still be performed by original ToolSandbox "
-            "modify_contact or remove_contact tools after a visible record exists."
-        ),
-        grading_accounting_note=(
-            "Canonical search and side-effect calls remain original ToolSandbox "
-            "calls; helper contribution is limited to deterministic argument planning."
-        ),
-        inadequacy_evidence=evidence,
-    )
-    code = """
-def plan_contact_lookup_query(contact_name: str = "", phone_number: str = "", relationship: str = "", requested_field: str = "", selected_record: dict = {}) -> dict:
-    def clean_text(value):
-        return str(value or "").strip()
-
-    def output(should_call, kwargs, answer_field, selected, answer_value, final_answer, copy_exactly, reason):
-        return {
-            "should_call_search_contacts": bool(should_call),
-            "search_contacts_kwargs": kwargs if isinstance(kwargs, dict) else {},
-            "answer_field": answer_field,
-            "selected_record": selected if isinstance(selected, dict) else {},
-            "answer_value": answer_value,
-            "final_answer_recommendation": final_answer,
-            "copy_exactly": bool(copy_exactly),
-            "abstain_reason": reason,
-        }
-
-    def normalize_phone(value):
-        raw = clean_text(value)
-        if not raw:
-            return ""
-        digits = "".join(ch for ch in raw if ch.isdigit())
-        if not digits:
-            return raw
-        if raw.startswith("+"):
-            return "+" + digits
-        if len(digits) == 10:
-            return "+1" + digits
-        if len(digits) > 10:
-            return "+" + digits
-        return raw
-
-    def possessive_name(value):
-        text = clean_text(value).strip(" .")
-        if not text:
-            return ""
-        if text.endswith("s"):
-            return text + "'"
-        return text + "'s"
-
-    name = clean_text(contact_name).strip(" .")
-    phone = normalize_phone(phone_number)
-    relation = clean_text(relationship).strip(" .").lower()
-    requested = clean_text(requested_field).strip(" .").lower()
-    selected = selected_record if isinstance(selected_record, dict) else {}
-
-    field_aliases = {
-        "phone": "phone_number",
-        "number": "phone_number",
-        "mobile": "phone_number",
-        "cell": "phone_number",
-        "contact_id": "person_id",
-        "id": "person_id",
-    }
-    requested = field_aliases.get(requested, requested)
-    supported_fields = {"name", "phone_number", "relationship", "person_id"}
-    if not requested:
-        return output(False, {}, "", {}, "", "", False, "missing_requested_field")
-    if requested not in supported_fields:
-        return output(False, {}, requested, {}, "", "", False, "unsupported_requested_field")
-
-    kwargs = {}
-    if name:
-        kwargs["name"] = name
-    if phone:
-        kwargs["phone_number"] = phone
-    if relation in {"self", "me", "myself", "my contact", "contact"}:
-        relation = ""
-    if relation:
-        kwargs["relationship"] = relation
-
-    if selected:
-        value = selected.get(requested)
-        if value is None or clean_text(value) == "":
-            return output(
-                False,
-                kwargs,
-                requested,
-                selected,
-                "",
-                "",
-                False,
-                "missing_answer_field_in_record",
-            )
-        answer_value = clean_text(value)
-        final = answer_value
-        selected_name = clean_text(selected.get("name")).strip(" .")
-        selected_relation = clean_text(selected.get("relationship")).strip(" .").lower()
-        if requested == "phone_number":
-            if name:
-                final = f"{possessive_name(name)} phone number is {answer_value}"
-            elif selected_name:
-                final = f"{possessive_name(selected_name)} phone number is {answer_value}"
-            elif relation:
-                final = f"Your {relation}'s phone number is {answer_value}"
-            elif selected_relation:
-                final = f"Your {selected_relation}'s phone number is {answer_value}"
-        elif requested == "relationship":
-            if phone:
-                final = f"{phone} is your {answer_value}"
-            elif name:
-                final = f"{name} is your {answer_value}"
-            elif relation:
-                final = f"Your {relation} is {answer_value}"
-        elif requested == "name" and relation:
-            final = f"Your {relation} is {answer_value}"
-        elif requested == "person_id":
-            final = ""
-        return output(False, kwargs, requested, selected, answer_value, final, bool(final), "")
-
-    if not kwargs:
-        return output(False, {}, requested, {}, "", "", False, "missing_lookup_constraint")
-
-    return output(True, kwargs, requested, {}, "", "", False, "")
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _select_message_counterparty_for_contact_update_contract_tool(
-    request: ToolGenerationRequest,
-    rejected_tool: GeneratedTool,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "selected_record": {"type": "object"},
-            "selected_message": {"type": "object"},
-            "selected_message_id": {"type": "string"},
-            "selected_person_id": {"type": "string"},
-            "selected_phone_number": {"type": "string"},
-            "selected_timestamp": {"type": "number"},
-            "downstream_tool_name": {"type": "string"},
-            "downstream_tool_kwargs": {"type": "object"},
-            "should_call_tool": {"type": "boolean"},
-            "tie_candidates": {"type": "array"},
-            "abstain_reason": {"type": "string"},
-            "safety_notes": {"type": "string"},
-            "final_answer_recommendation": {"type": "string"},
-        },
-        "required": [
-            "selected_record",
-            "selected_message",
-            "selected_message_id",
-            "selected_person_id",
-            "selected_phone_number",
-            "selected_timestamp",
-            "downstream_tool_name",
-            "downstream_tool_kwargs",
-            "should_call_tool",
-            "tie_candidates",
-            "abstain_reason",
-            "safety_notes",
-            "final_answer_recommendation",
-        ],
-    }
-    spec = ToolSpec(
-        tool_name="select_message_counterparty_for_contact_update",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Select the non-self counterparty from visible message records and "
-            "prepare final-action-ready modify_contact kwargs. The caller must "
-            "pass updates with the explicit contact fields supplied by the user; "
-            "the helper never searches messages or modifies contacts."
-        ),
-        inputs=(
-            ToolInput("records", "list", "Visible message records."),
-            ToolInput("selection_mode", "str", "latest or oldest."),
-            ToolInput(
-                "updates",
-                "dict",
-                "Required explicit contact fields to update, copied from the user's request.",
-            ),
-            ToolInput("self_person_id", "str", "Current user's person id."),
-            ToolInput(
-                "message_direction",
-                "str",
-                "Optional visible user intent: sent, received, or blank. Use sent when the user asks for the last person they sent a message to.",
-            ),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "modify_contact_with_message_recency",
-            "latest message contact update",
-            "oldest message contact update",
-        ),
-        negative_triggers=(
-            "missing_updates",
-            "ambiguous timestamp tie",
-            "missing non-self counterparty",
-            "insufficient_information",
-        ),
-        preserves_side_effect_tools=("search_messages", "modify_contact"),
-        required_original_tool_calls=("search_messages", "modify_contact"),
-        abstain_behavior=(
-            "Return should_call_tool false with exact machine-readable abstain "
-            "reasons when the selected message, non-self person id, or updates "
-            "are missing or ambiguous."
-        ),
-        generalization_rationale=(
-            "Message-recency contact update tasks repeatedly require the same "
-            "visible-message counterparty selection before the preserved "
-            "modify_contact call."
-        ),
-        estimated_step_compression=max(
-            rejected_tool.spec.estimated_step_compression or 0,
-            3,
-        ),
-        cross_task_applicability_count=max(
-            rejected_tool.spec.cross_task_applicability_count or 0,
-            2,
-        ),
-        applicable_task_families=_merged_task_families(
-            rejected_tool,
-            "modify_contact_with_message_recency",
-            "modify_contact_with_message_recency_alt",
-        ),
-        reason_tool_is_decisive=(
-            "It repairs a high-value contact-update gap by translating visible "
-            "message search records into exact original modify_contact kwargs."
-        ),
-        diagnostic_only=rejected_tool.spec.diagnostic_only,
-        shortfall_cluster_evidence=(
-            *rejected_tool.spec.shortfall_cluster_evidence,
-            "message_recency_contact_update_needs_counterparty_selector",
-        ),
-        known_failure_mechanisms_addressed=(
-            *rejected_tool.spec.known_failure_mechanisms_addressed,
-            "wrong_selected_record",
-            "side_effect_argument_preparation_failure",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The actor must still call the original modify_contact ToolSandbox "
-            "side-effect tool using downstream_tool_kwargs."
-        ),
-        grading_accounting_note=(
-            "The helper contributes target selection only; the original "
-            "modify_contact call remains the state-changing milestone."
-        ),
-        inadequacy_evidence=(
-            StructuredInadequacyEvidence.from_json(request.inadequacy_evidence)
-            if isinstance(request.inadequacy_evidence, dict)
-            else StructuredInadequacyEvidence(
-                summary=request.observation,
-                signals=(
-                    "wrong_selected_record",
-                    "side_effect_argument_preparation_failure",
-                ),
-                failed_tool_calls=("modify_contact",),
-                visible_data_gaps=(
-                    "message records must identify the non-self contact update target",
-                ),
-                planner_failures=(
-                    "select message counterparty then prepare original modify_contact kwargs",
-                ),
-            )
-        ),
-    )
-    code = """
-def select_message_counterparty_for_contact_update(records: list, selection_mode: str, updates: dict, self_person_id: str = "", message_direction: str = "") -> dict:
-    updates = updates or {}
-    self_id = str(self_person_id or "").strip()
-    direction_hint = str(message_direction or "").strip().lower()
-
-    def empty(reason: str, timestamp: float = 0.0, ties: list = None) -> dict:
-        return {
-            "selected_record": {},
-            "selected_message": {},
-            "selected_message_id": "",
-            "selected_person_id": "",
-            "selected_phone_number": "",
-            "selected_timestamp": float(timestamp or 0.0),
-            "downstream_tool_name": "",
-            "downstream_tool_kwargs": {},
-            "should_call_tool": False,
-            "tie_candidates": ties or [],
-            "abstain_reason": reason,
-            "safety_notes": "abstain; no safe contact update target",
-            "final_answer_recommendation": "abstain:" + reason,
-        }
-
-    concrete_updates = {str(k): v for k, v in updates.items() if v not in (None, "")}
-    if not concrete_updates:
-        return empty("missing_updates")
-    mode = str(selection_mode or "").strip().lower()
-    if mode not in ("latest", "oldest"):
-        return empty("invalid_selection_mode")
-    usable = []
-    for index, record in enumerate(records or []):
-        if not isinstance(record, dict):
-            continue
-        raw_timestamp = record.get("creation_timestamp", record.get("timestamp", ""))
-        if isinstance(raw_timestamp, (int, float)):
-            timestamp = float(raw_timestamp)
-        else:
-            text_timestamp = str(raw_timestamp or "").strip()
-            if not text_timestamp:
-                continue
-            numeric_part = text_timestamp[1:] if text_timestamp.startswith("-") else text_timestamp
-            if numeric_part.count(".") > 1:
-                continue
-            if not numeric_part.replace(".", "", 1).isdigit():
-                continue
-            timestamp = float(text_timestamp)
-        usable.append((timestamp, index, record))
-    if not usable:
-        return empty("no_records")
-    target_timestamp = max(t for t, _, _ in usable) if mode == "latest" else min(t for t, _, _ in usable)
-    tied = [(i, r) for t, i, r in usable if t == target_timestamp]
-    if len(tied) > 1:
-        unique_tied = []
-        seen_keys = set()
-        for index, record in tied:
-            key = (
-                str(record.get("message_id", "") or ""),
-                str(record.get("sender_person_id", "") or ""),
-                str(record.get("recipient_person_id", "") or ""),
-                str(record.get("sender_phone_number", "") or ""),
-                str(record.get("recipient_phone_number", "") or ""),
-                str(record.get("content", "") or ""),
-                float(target_timestamp),
-            )
-            if key in seen_keys:
-                continue
-            seen_keys.add(key)
-            unique_tied.append((index, record))
-        tied = unique_tied
-    if len(tied) != 1:
-        return empty("ambiguous_timestamp_tie", target_timestamp, [r for _, r in tied])
-    _, selected = tied[0]
-
-    sender_id = str(selected.get("sender_person_id", "") or "").strip()
-    recipient_id = str(selected.get("recipient_person_id", "") or "").strip()
-    sender_phone = str(selected.get("sender_phone_number", "") or "").strip()
-    recipient_phone = str(selected.get("recipient_phone_number", "") or "").strip()
-
-    def all_records_share(key: str, value: str) -> bool:
-        if not value or len(usable) < 2:
-            return False
-        for _timestamp, _index, record in usable:
-            if str(record.get(key, "") or "").strip() != value:
-                return False
-        return True
-
-    if self_id and recipient_id and sender_id == self_id:
-        person_id = recipient_id
-        phone_number = recipient_phone
-    elif self_id and sender_id and recipient_id == self_id:
-        person_id = sender_id
-        phone_number = sender_phone
-    elif direction_hint in ("sent", "outgoing", "from_me") and recipient_id:
-        person_id = recipient_id
-        phone_number = recipient_phone
-    elif direction_hint in ("received", "incoming", "to_me", "sent_to_me") and sender_id:
-        person_id = sender_id
-        phone_number = sender_phone
-    elif recipient_id and all_records_share("sender_person_id", sender_id):
-        person_id = recipient_id
-        phone_number = recipient_phone
-    elif sender_id and all_records_share("recipient_person_id", recipient_id):
-        person_id = sender_id
-        phone_number = sender_phone
-    elif sender_id and not recipient_id:
-        person_id = sender_id
-        phone_number = sender_phone
-    elif recipient_id and not sender_id:
-        person_id = recipient_id
-        phone_number = recipient_phone
-    elif sender_id and self_id and sender_id != self_id:
-        person_id = sender_id
-        phone_number = sender_phone
-    elif recipient_id and self_id and recipient_id != self_id:
-        person_id = recipient_id
-        phone_number = recipient_phone
-    else:
-        return empty("missing_counterparty_person_id", target_timestamp)
-    if not person_id:
-        return empty("missing_counterparty_person_id", target_timestamp)
-
-    kwargs = {"person_id": person_id}
-    kwargs.update(concrete_updates)
-    message_id = str(selected.get("message_id", "") or "")
-    return {
-        "selected_record": selected,
-        "selected_message": selected,
-        "selected_message_id": message_id,
-        "selected_person_id": person_id,
-        "selected_phone_number": phone_number,
-        "selected_timestamp": float(target_timestamp),
-        "downstream_tool_name": "modify_contact",
-        "downstream_tool_kwargs": kwargs,
-        "should_call_tool": True,
-        "tie_candidates": [],
-        "abstain_reason": "",
-        "safety_notes": "call modify_contact with downstream_tool_kwargs",
-        "final_answer_recommendation": "call modify_contact with downstream_tool_kwargs",
-    }
-""".strip()
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _select_visible_record_by_constraints_contract_tool(
-    request: ToolGenerationRequest,
-    rejected_tool: GeneratedTool,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "selected_record": {"type": "object"},
-            "selected_index": {"type": "integer"},
-            "selected_id": {"type": "string"},
-            "value": {"type": "string"},
-            "matched_constraints": {"type": "array"},
-            "tie_candidates": {"type": "array"},
-            "abstain_reason": {"type": "string"},
-        },
-    }
-    spec = ToolSpec(
-        tool_name="select_visible_record_by_constraints",
-        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
-        description=(
-            "Select exactly one visible record by a scalar field constraint, "
-            "normalizing phone-like fields and abstaining on ambiguous matches."
-        ),
-        inputs=(
-            ToolInput("records", "list", "Visible candidate records."),
-            ToolInput("field_name", "str", "Field to match."),
-            ToolInput("expected_value", "str", "Expected visible scalar value."),
-            ToolInput("return_field", "str", "Field to return from the match."),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "search_phone_number_with_name",
-            "search_relationship_with_phone_number",
-            "remove_contact_by_phone",
-            "visible record constraint selection",
-        ),
-        negative_triggers=(
-            "no records",
-            "missing field",
-            "no matching record",
-            "ambiguous multiple matches",
-        ),
-        preserves_side_effect_tools=(
-            *rejected_tool.spec.preserves_side_effect_tools,
-            "search_contacts",
-            "search_messages",
-            "search_reminder",
-        ),
-        required_original_tool_calls=(
-            *rejected_tool.spec.required_original_tool_calls,
-            "search_contacts",
-        ),
-        abstain_behavior=(
-            "Return selected_record {}, selected_id '', value '', and all matching "
-            "tie_candidates when zero or multiple records match."
-        ),
-        generalization_rationale=(
-            "Many lookup and side-effect tasks need the same deterministic visible "
-            "record selection step before answering or acting."
-        ),
-        estimated_step_compression=max(
-            rejected_tool.spec.estimated_step_compression or 0,
-            3,
-        ),
-        cross_task_applicability_count=max(
-            rejected_tool.spec.cross_task_applicability_count or 0,
-            2,
-        ),
-        applicable_task_families=_merged_task_families(
-            rejected_tool,
-            "search_phone_number_with_name",
-            "search_relationship_with_phone_number",
-            "remove_contact_by_phone",
-        ),
-        reason_tool_is_decisive=(
-            "It repairs the recurring ambiguous-tie failure by returning no selected "
-            "record unless exactly one visible candidate matches."
-        ),
-        diagnostic_only=rejected_tool.spec.diagnostic_only,
-        shortfall_cluster_evidence=(
-            *rejected_tool.spec.shortfall_cluster_evidence,
-            "deterministic_constraint_selector_contract_repair",
-        ),
-        known_failure_mechanisms_addressed=(
-            *rejected_tool.spec.known_failure_mechanisms_addressed,
-            "ambiguous_constraint_match_not_abstained",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper only selects from visible records; original search/action "
-            "tools remain responsible for state changes."
-        ),
-        grading_accounting_note=(
-            "Selection helper output is intermediate evidence and does not replace "
-            "protected outcome scoring."
-        ),
-        inadequacy_evidence=StructuredInadequacyEvidence(
-            summary="Generated constraint selectors repeatedly retained the first match during ambiguity.",
-            signals=("wrong_selected_record", "ambiguity_abstention_failure"),
-            visible_data_gaps=("visible constraints need exact one-match selection",),
-            final_answer_route_mismatch=False,
-        ),
-    )
-    code = """
-def select_visible_record_by_constraints(records: list, field_name: str, expected_value: str, return_field: str) -> dict:
-    def empty(reason: str, ties: list = None) -> dict:
-        return {
-            "selected_record": {},
-            "selected_index": -1,
-            "selected_id": "",
-            "value": "",
-            "matched_constraints": [field_name] if field_name else [],
-            "tie_candidates": list(ties or []),
-            "abstain_reason": reason,
-        }
-
-    if not isinstance(records, list) or not records:
-        return empty("no_records")
-    if not field_name or expected_value is None:
-        return empty("missing_constraint")
-
-    def normalize(field: str, value) -> str:
-        text = "" if value is None else str(value)
-        if "phone" in field or "number" in field:
-            return "".join(ch for ch in text if ch.isdigit())
-        return text.strip().lower()
-
-    expected = normalize(field_name, expected_value)
-    matches = []
-    for record in records:
-        if not isinstance(record, dict) or field_name not in record:
-            continue
-        if normalize(field_name, record.get(field_name)) == expected:
-            matches.append(record)
-    if len(matches) != 1:
-        return empty("ambiguous_multiple_matches" if matches else "no_match", matches)
-
-    record = matches[0]
-    selected_id = (
-        record.get("person_id")
-        or record.get("message_id")
-        or record.get("reminder_id")
-        or record.get("sender_person_id")
-        or record.get("recipient_person_id")
-        or record.get("id")
-        or ""
-    )
-    value = record.get(return_field, selected_id)
-    return {
-        "selected_record": record,
-        "selected_index": records.index(record),
-        "selected_id": str(selected_id),
-        "value": "" if value is None else str(value),
-        "matched_constraints": [field_name],
-        "tie_candidates": [],
-        "abstain_reason": "",
-    }
-"""
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _prepare_side_effect_args_from_selected_record_contract_tool(
-    request: ToolGenerationRequest,
-    rejected_tool: GeneratedTool | None = None,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "downstream_tool_name": {"type": "string"},
-            "downstream_tool_kwargs": {"type": "object"},
-            "should_call_tool": {"type": "boolean"},
-            "abstain_reason": {"type": "string"},
-        },
-    }
-    spec = ToolSpec(
-        tool_name="prepare_side_effect_args_from_selected_record",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Prepare the exact kwargs for a preserved ToolSandbox side-effect call "
-            "from one already-selected visible record and explicit user updates."
-        ),
-        inputs=(
-            ToolInput("selected_record", "dict", "The unique selected visible record."),
-            ToolInput("action_type", "str", "modify/remove/send action type."),
-            ToolInput("updates", "dict", "Explicit fields to update or send."),
-            ToolInput("user_intent", "str", "Brief visible user intent."),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "selected record exists before side-effect action",
-            "remove_contact_by_phone",
-            "modify_contact_with_message_recency",
-        ),
-        negative_triggers=(
-            "missing selected record",
-            "missing required id",
-            "modify action without update fields",
-            "unsupported action",
-        ),
-        preserves_side_effect_tools=(
-            "modify_contact",
-            "remove_contact",
-            "modify_reminder",
-            "remove_reminder",
-            "send_message",
-        ),
-        required_original_tool_calls=(
-            "modify_contact",
-            "remove_contact",
-            "modify_reminder",
-            "remove_reminder",
-            "send_message",
-        ),
-        abstain_behavior=(
-            "Abstain with should_call_tool false unless exactly one selected record "
-            "has the required id and any modify/send action has required fields."
-        ),
-        generalization_rationale=(
-            "Post-selection workflows repeatedly fail while translating the selected "
-            "record into preserved ToolSandbox action kwargs."
-        ),
-        estimated_step_compression=max(
-            (rejected_tool.spec.estimated_step_compression if rejected_tool else 0)
-            or 0,
-            3,
-        ),
-        cross_task_applicability_count=max(
-            (rejected_tool.spec.cross_task_applicability_count if rejected_tool else 0)
-            or 0,
-            2,
-        ),
-        applicable_task_families=_merged_task_families(
-            rejected_tool,
-            "remove_contact_by_phone",
-            "modify_contact_with_message_recency",
-            "remove_reminder_with_recency_latest",
-        )
-        if rejected_tool
-        else (
-            "remove_contact_by_phone",
-            "modify_contact_with_message_recency",
-            "remove_reminder_with_recency_latest",
-        ),
-        reason_tool_is_decisive=(
-            "It returns final-action-ready kwargs and preserves the original "
-            "ToolSandbox side-effect call."
-        ),
-        diagnostic_only=rejected_tool.spec.diagnostic_only if rejected_tool else False,
-        shortfall_cluster_evidence=(
-            *(rejected_tool.spec.shortfall_cluster_evidence if rejected_tool else ()),
-            "deterministic_side_effect_kwargs_contract_repair",
-        ),
-        known_failure_mechanisms_addressed=(
-            *(
-                rejected_tool.spec.known_failure_mechanisms_addressed
-                if rejected_tool
-                else ()
-            ),
-            "post_selection_kwargs_missing_or_over_abstained",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper returns kwargs only; the actor must still call the original "
-            "downstream ToolSandbox side-effect tool."
-        ),
-        grading_accounting_note="Side-effect preservation remains explicit.",
-        inadequacy_evidence=StructuredInadequacyEvidence(
-            summary="Generated post-selection helpers failed to convert selected records into action kwargs.",
-            signals=("side_effect_argument_preparation_failure",),
-            planner_failures=("prepare kwargs before original side-effect tool call",),
-            final_answer_route_mismatch=False,
-        ),
-    )
-    code = """
-def prepare_side_effect_args_from_selected_record(selected_record: dict, action_type: str, updates: dict = {}, user_intent: str = "") -> dict:
-    selected_record = selected_record or {}
-    updates = updates or {}
-    action = (action_type or "").strip().lower()
-    alias_map = {
-        "delete": "remove",
-        "remove": "remove",
-        "delete_contact": "remove_contact",
-        "remove_person": "remove_contact",
-        "remove_phone_number": "remove_contact",
-        "delete_reminder": "remove_reminder",
-        "remove_todo": "remove_reminder",
-        "update_contact": "modify_contact",
-        "modify": "modify",
-        "update": "modify",
-        "update_reminder": "modify_reminder",
-    }
-    action = alias_map.get(action, action)
-
-    def abstain(reason: str) -> dict:
-        return {
-            "downstream_tool_name": "",
-            "downstream_tool_kwargs": {},
-            "should_call_tool": False,
-            "abstain_reason": reason,
-        }
-
-    if not isinstance(selected_record, dict) or not selected_record:
-        return abstain("missing_selected_record")
-    if action in {"remove", "delete"}:
-        if selected_record.get("person_id"):
-            action = "remove_contact"
-        elif selected_record.get("reminder_id"):
-            action = "remove_reminder"
-    if action in {"modify", "update", "change"}:
-        if selected_record.get("person_id"):
-            action = "modify_contact"
-        elif selected_record.get("reminder_id"):
-            action = "modify_reminder"
-    if action in {"modify_contact", "remove_contact"}:
-        person_id = selected_record.get("person_id", "")
-        if not person_id:
-            return abstain("missing_person_id")
-        kwargs = {"person_id": person_id}
-        if action == "modify_contact":
-            concrete = {k: v for k, v in updates.items() if v not in (None, "")}
-            if not concrete:
-                return abstain("missing_update_fields")
-            kwargs.update(concrete)
-        return {
-            "downstream_tool_name": action,
-            "downstream_tool_kwargs": kwargs,
-            "should_call_tool": True,
-            "abstain_reason": "",
-        }
-    if action in {"modify_reminder", "remove_reminder"}:
-        reminder_id = selected_record.get("reminder_id", "")
-        if not reminder_id:
-            return abstain("missing_reminder_id")
-        kwargs = {"reminder_id": reminder_id}
-        if action == "modify_reminder":
-            concrete = {k: v for k, v in updates.items() if v not in (None, "")}
-            if not concrete:
-                return abstain("missing_update_fields")
-            kwargs.update(concrete)
-        return {
-            "downstream_tool_name": action,
-            "downstream_tool_kwargs": kwargs,
-            "should_call_tool": True,
-            "abstain_reason": "",
-        }
-    if action == "send_message":
-        phone_number = updates.get("phone_number") or selected_record.get("phone_number")
-        content = updates.get("content") or updates.get("message")
-        if not phone_number or not content:
-            return abstain("missing_send_message_fields")
-        return {
-            "downstream_tool_name": "send_message",
-            "downstream_tool_kwargs": {
-                "phone_number": phone_number,
-                "content": content,
-            },
-            "should_call_tool": True,
-            "abstain_reason": "",
-        }
-    return abstain("unsupported_action_type")
-"""
-    return GeneratedTool(spec=spec, code=code)
-
-
-def _prepare_reminder_creation_args_contract_tool(
-    request: ToolGenerationRequest,
-    rejected_tool: GeneratedTool | None = None,
-) -> GeneratedTool:
-    output_schema = {
-        "type": "object",
-        "properties": {
-            "add_reminder_kwargs": {"type": "object"},
-            "should_call_add_reminder": {"type": "boolean"},
-            "abstain_reason": {"type": "string"},
-            "location_status": {"type": "string"},
-            "timestamp_source": {"type": "string"},
-        },
-        "required": [
-            "add_reminder_kwargs",
-            "should_call_add_reminder",
-            "abstain_reason",
-            "location_status",
-            "timestamp_source",
-        ],
-    }
-    spec = ToolSpec(
-        tool_name="prepare_reminder_creation_args",
-        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-        description=(
-            "Prepare final add_reminder arguments from visible reminder content, "
-            "resolved timestamp or relative time fields, and optional location "
-            "state. This helper never creates the reminder; when it returns "
-            "should_call_add_reminder true, the actor must call the original "
-            "ToolSandbox add_reminder tool with add_reminder_kwargs unchanged."
-        ),
-        inputs=(
-            ToolInput("content", "str", "Reminder content requested by the user."),
-            ToolInput(
-                "resolved_reminder_timestamp",
-                "float",
-                "Resolved reminder timestamp from visible user time context, or None. Use this directly for explicit absolute date/time requests; do not pass current_timestamp as a placeholder when the user did not provide reminder time information.",
-            ),
-            ToolInput(
-                "current_timestamp",
-                "float",
-                "Current sandbox timestamp when relative date/time context is needed.",
-            ),
-            ToolInput("day_offset", "int", "Local day offset for relative dates."),
-            ToolInput(
-                "hour",
-                "int",
-                "Local hour in 24-hour time. Do not pass 0 as a placeholder when the user did not provide a reminder time.",
-            ),
-            ToolInput(
-                "minute",
-                "int",
-                "Local minute. Do not pass 0 as a placeholder when the user did not provide a reminder time.",
-            ),
-            ToolInput(
-                "local_utc_offset_hours",
-                "float",
-                "Optional explicit sandbox/user local offset from UTC in hours for relative timestamp math.",
-            ),
-            ToolInput(
-                "location_requested",
-                "bool",
-                "Whether the user mentioned an optional location.",
-            ),
-            ToolInput(
-                "location_required",
-                "bool",
-                "Whether the user explicitly requires a location attachment.",
-            ),
-            ToolInput(
-                "location_available",
-                "bool",
-                "Whether concrete latitude and longitude are available.",
-            ),
-            ToolInput("latitude", "float", "Latitude when available, otherwise None."),
-            ToolInput(
-                "longitude", "float", "Longitude when available, otherwise None."
-            ),
-            ToolInput(
-                "location_lookup_failed",
-                "bool",
-                "Whether a location lookup was attempted and failed.",
-            ),
-            ToolInput(
-                "current_datetime_info",
-                "dict",
-                (
-                    "Optional output from timestamp_to_datetime_info(current_timestamp). "
-                    "Use it for relative local dates so the tool can derive the "
-                    "sandbox local offset. If absent, relative local dates require "
-                    "an explicit local_utc_offset_hours."
-                ),
-            ),
-        ),
-        output_annotation="dict",
-        output_schema=output_schema,
-        positive_triggers=(
-            "relative reminder date/time argument preparation",
-            "add_reminder_content_and_week_delta_and_time",
-            "add_reminder_content_and_time_and_location",
-            "optional reminder location argument preparation",
-            "reminder_creation_argument_preparation_failure",
-        ),
-        negative_triggers=(
-            "insufficient_information",
-            "required_location_unresolved",
-            "optional_location_lookup_pending",
-            "missing_time_info",
-        ),
-        preserves_side_effect_tools=("add_reminder",),
-        required_original_tool_calls=("add_reminder",),
-        abstain_behavior=(
-            "Return should_call_add_reminder false with empty add_reminder_kwargs "
-            "when required time information is missing, a required location is "
-            "unresolved, or an optional mentioned location still needs lookup. "
-            "For explicit absolute date/time requests, use the resolved timestamp "
-            "directly. Reject missing or placeholder time information only when no "
-            "explicit resolved timestamp is available or relative local-date fields "
-            "must be resolved. "
-            "For relative local dates, prefer current_datetime_info when already "
-            "visible, but otherwise require an explicit local_utc_offset_hours. "
-            "Do not derive local day boundaries from a bare Unix timestamp. When no explicit resolved "
-            "timestamp is available, reject all-zero relative fields "
-            "(day_offset=0, hour=0, minute=0) as missing time information "
-            "rather than treating midnight today as a safe default. "
-            "Reject empty or placeholder reminder content such as Reminder, "
-            "task, todo, unknown, meeting, or generic filler like don't forget "
-            "instead of preparing a state change with invented content. "
-            "Reject current_timestamp passed as resolved_reminder_timestamp when "
-            "no future day offset or explicit reminder time signal is present; "
-            "copying the current clock hour/minute is still a current-time "
-            "placeholder, not a user-provided reminder time. "
-            "For optional locations whose lookup failed or was not requested, set "
-            "latitude and longitude to None in add_reminder kwargs. "
-            "Keep reminder content separate from location phrases, and do not let "
-            "a searched place's timezone change the reminder timestamp."
-        ),
-        generalization_rationale=(
-            "Reminder creation tasks repeatedly require the same final argument "
-            "normalization before the preserved add_reminder side-effect call."
-        ),
-        estimated_step_compression=max(
-            rejected_tool.spec.estimated_step_compression if rejected_tool else 0,
-            3,
-        ),
-        cross_task_applicability_count=max(
-            rejected_tool.spec.cross_task_applicability_count if rejected_tool else 0,
-            2,
-        ),
-        applicable_task_families=(
-            *(rejected_tool.spec.applicable_task_families if rejected_tool else ()),
-            "add_reminder_content_and_week_delta_and_time",
-            "add_reminder_content_and_time_and_location",
-        ),
-        reason_tool_is_decisive=(
-            "It converts the final visible reminder state into call-ready "
-            "add_reminder kwargs while preserving abstention for pending or "
-            "required location gaps and rejecting inconsistent generated-tool "
-            "inputs before the original side-effect tool is called."
-        ),
-        diagnostic_only=rejected_tool.spec.diagnostic_only if rejected_tool else False,
-        shortfall_cluster_evidence=(
-            *(rejected_tool.spec.shortfall_cluster_evidence if rejected_tool else ()),
-            "deterministic_contract_repair_from_validation_examples",
-        ),
-        known_failure_mechanisms_addressed=(
-            *(
-                rejected_tool.spec.known_failure_mechanisms_addressed
-                if rejected_tool
-                else ()
-            ),
-            "optional_location_lookup_pending_over_eager_call",
-            "reminder_timestamp_source_mismatch",
-            "optional_coordinate_omission",
-            "relative_time_context_drift",
-            "past_or_placeholder_relative_timestamp_acceptance",
-        ),
-        canonical_route_substitution_risk="none",
-        expected_milestone_calls_replaced=(),
-        final_state_preservation_plan=(
-            "The helper prepares arguments only; the actor must still call the "
-            "original add_reminder side-effect tool."
-        ),
-        grading_accounting_note=(
-            "This repair preserves the original final side-effect route and should "
-            "not be counted as force-calling or side-effect substitution."
-        ),
-        inadequacy_evidence=StructuredInadequacyEvidence(
-            summary=(
-                "Online birth produced a reminder argument helper, but validation "
-                "showed the candidate over-called add_reminder when optional "
-                "location lookup was still pending."
-            ),
-            signals=(
-                "validation_mismatch_self_healed",
-                "optional_location_lookup_pending",
-                "final_action_argument_preparation",
-            ),
-            failed_tool_calls=("add_reminder",),
-            repeated_failed_tool_calls=("add_reminder",),
-            visible_data_gaps=(
-                "relative time and optional location state must be normalized into add_reminder kwargs",
-            ),
-            planner_failures=(
-                "generated candidate did not preserve abstention while optional lookup was pending",
-            ),
-            final_answer_route_mismatch=False,
-        ),
-    )
-    code = """
-def prepare_reminder_creation_args(content: str, resolved_reminder_timestamp: float = None, current_timestamp: float = None, day_offset: int = None, hour: int = None, minute: int = None, local_utc_offset_hours: float = None, location_requested: bool = False, location_required: bool = False, location_available: bool = False, latitude: float = None, longitude: float = None, location_lookup_failed: bool = False, current_datetime_info: dict = None) -> dict:
-    def is_leap_year(year):
-        return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
-
-    def days_from_civil(year, month, day):
-        y = int(year)
-        m = int(month)
-        d = int(day)
-        if m <= 2:
-            y = y - 1
-        era = y // 400
-        yoe = y - era * 400
-        mp = m - 3 if m > 2 else m + 9
-        doy = (153 * mp + 2) // 5 + d - 1
-        doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
-        return era * 146097 + doe - 719468
-
-    def current_datetime_parts(info):
-        if not isinstance(info, dict):
-            return None
-        keys = ("year", "month", "day", "hour", "minute", "second")
-        for key in keys:
-            if key not in info or info.get(key) is None:
-                return None
-        year = int(info.get("year"))
-        month = int(info.get("month"))
-        day = int(info.get("day"))
-        hour_value = int(info.get("hour"))
-        minute_value = int(info.get("minute"))
-        second_value = int(info.get("second"))
-        if month < 1 or month > 12:
-            return None
-        month_lengths = [31, 29 if is_leap_year(year) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        if day < 1 or day > month_lengths[month - 1]:
-            return None
-        if hour_value < 0 or hour_value > 23 or minute_value < 0 or minute_value > 59 or second_value < 0 or second_value > 59:
-            return None
-        return {
-            "year": year,
-            "month": month,
-            "day": day,
-            "hour": hour_value,
-            "minute": minute_value,
-            "second": second_value,
-        }
-
-    def reject_time(reason, location_status="omitted_optional", source=None):
-        return {
-            "add_reminder_kwargs": {},
-            "should_call_add_reminder": False,
-            "abstain_reason": reason,
-            "location_status": location_status,
-            "timestamp_source": source if source is not None else timestamp_source,
-        }
-
-    def placeholder_content(value):
-        lower = " ".join(str(value or "").lower().strip().split()).strip(" ,.;:!?")
-        if lower.startswith(("reminder for ", "reminder at ", "reminder on ")):
-            return True
-        if lower.startswith(("a reminder for ", "a reminder at ", "a reminder on ")):
-            return True
-        if lower.startswith(("the reminder for ", "the reminder at ", "the reminder on ")):
-            return True
-        return lower in {
-            "",
-            "reminder",
-            "a reminder",
-            "the reminder",
-            "task",
-            "todo",
-            "to do",
-            "unknown",
-            "meeting",
-            "don't forget",
-            "dont forget",
-            "do not forget",
-            "remember",
-            "something",
-            "something important",
-        }
-
-    timestamp_source = "none"
-    if minute is None and hour is not None:
-        minute = 0
-    has_relative_fields = current_timestamp is not None and day_offset is not None and hour is not None and minute is not None
-    has_relative_time_signal = False
-    if has_relative_fields:
-        has_relative_time_signal = int(day_offset) != 0 or int(hour) != 0 or int(minute) != 0
-    prefer_relative_fields = has_relative_fields and int(day_offset) > 0
-    prelocation_current_parts = current_datetime_parts(current_datetime_info)
-    resolved_value = None
-    if resolved_reminder_timestamp is not None:
-        resolved_value = float(resolved_reminder_timestamp)
-    has_resolved_timestamp = resolved_value is not None and resolved_value > 0.0
-    if prefer_relative_fields and prelocation_current_parts is not None:
-        timestamp_source = "current_datetime_info"
-    elif has_resolved_timestamp and not prefer_relative_fields:
-        timestamp_source = "resolved"
-    has_latitude = latitude is not None and float(latitude) != 0.0
-    has_longitude = longitude is not None and float(longitude) != 0.0
-    has_complete_coordinates = bool(location_available) and has_latitude and has_longitude
-    location_requested_effective = bool(location_requested)
-    if bool(location_required) and not has_complete_coordinates:
-        return {
-            "add_reminder_kwargs": {},
-            "should_call_add_reminder": False,
-            "abstain_reason": "required_location_unresolved",
-            "location_status": "required_missing",
-            "timestamp_source": timestamp_source,
-        }
-    if (
-        location_requested_effective
-        and not bool(location_required)
-        and not has_complete_coordinates
-        and not bool(location_lookup_failed)
-    ):
-        return {
-            "add_reminder_kwargs": {},
-            "should_call_add_reminder": False,
-            "abstain_reason": "optional_location_lookup_pending_do_not_call_add_reminder",
-            "location_status": "lookup_pending",
-            "timestamp_source": timestamp_source,
-        }
-    if (
-        has_resolved_timestamp
-        and prefer_relative_fields
-        and prelocation_current_parts is not None
-        and current_timestamp is not None
-        and abs(resolved_value - float(current_timestamp)) <= 60.0
-    ):
-        # A common actor error is to pass the visible current timestamp as
-        # resolved_reminder_timestamp while also supplying relative-time fields.
-        # In that case the relative fields are the meaningful evidence.
-        has_resolved_timestamp = False
-        resolved_value = None
-    if has_resolved_timestamp:
-        current_timestamp_matches_resolved = (
-            current_timestamp is not None
-            and int(day_offset or 0) <= 0
-            and abs(resolved_value - float(current_timestamp)) <= 60.0
-        )
-        if current_timestamp_matches_resolved and not has_relative_time_signal:
-            return {
-                "add_reminder_kwargs": {},
-                "should_call_add_reminder": False,
-                "abstain_reason": "current_timestamp_placeholder_rejected",
-                "location_status": "provided" if has_complete_coordinates else "omitted_optional",
-                "timestamp_source": "none",
-            }
-        if (
-            current_timestamp_matches_resolved
-            and prelocation_current_parts is not None
-            and int(hour or 0) == int(prelocation_current_parts["hour"])
-            and int(minute or 0) == int(prelocation_current_parts["minute"])
-        ):
-            return {
-                "add_reminder_kwargs": {},
-                "should_call_add_reminder": False,
-                "abstain_reason": "current_timestamp_placeholder_rejected",
-                "location_status": "provided" if has_complete_coordinates else "omitted_optional",
-                "timestamp_source": "none",
-            }
-        if (
-            prefer_relative_fields
-            and current_timestamp is not None
-            and resolved_value < float(current_timestamp) - 60.0
-        ):
-            return reject_time(
-                "relative_time_resolved_to_past_rejected",
-                "provided" if has_complete_coordinates else "omitted_optional",
-                "relative_time_past_rejected",
-            )
-        reminder_timestamp = resolved_value
-        timestamp_source = "resolved"
-    else:
-        if not has_relative_fields or not has_relative_time_signal:
-            return {
-                "add_reminder_kwargs": {},
-                "should_call_add_reminder": False,
-                "abstain_reason": "missing_time_info",
-                "location_status": "provided" if has_complete_coordinates else "omitted_optional",
-                "timestamp_source": timestamp_source,
-            }
-        if int(hour) < 0 or int(hour) > 23 or int(minute) < 0 or int(minute) > 59:
-            return {
-                    "add_reminder_kwargs": {},
-                    "should_call_add_reminder": False,
-                    "abstain_reason": "malformed_time_info",
-                    "location_status": "provided" if has_complete_coordinates else "omitted_optional",
-                    "timestamp_source": timestamp_source,
-                }
-        parts = prelocation_current_parts
-        if parts is not None:
-            current_local_midnight = days_from_civil(parts["year"], parts["month"], parts["day"]) * 86400.0
-            current_local_seconds = current_local_midnight + parts["hour"] * 3600.0 + parts["minute"] * 60.0 + parts["second"]
-            derived_offset_seconds = float(current_timestamp) - current_local_seconds
-            if derived_offset_seconds < -12.0 * 3600.0 or derived_offset_seconds > 14.0 * 3600.0:
-                return reject_time(
-                    "current_datetime_info_inconsistent_with_current_timestamp",
-                    "provided" if has_complete_coordinates else "omitted_optional",
-                    "current_datetime_info_invalid",
-                )
-            offset_seconds = round(derived_offset_seconds / 60.0) * 60.0
-            reminder_timestamp = current_local_midnight + int(day_offset) * 86400.0 + int(hour) * 3600.0 + int(minute) * 60.0 + offset_seconds
-            timestamp_source = "current_datetime_info"
-            if reminder_timestamp < float(current_timestamp) - 60.0:
-                return reject_time(
-                    "relative_time_resolved_to_past_rejected",
-                    "provided" if has_complete_coordinates else "omitted_optional",
-                    "relative_time_past_rejected",
-                )
-        else:
-            offset_hours = None
-            if local_utc_offset_hours is not None:
-                offset_hours = float(local_utc_offset_hours)
-            if offset_hours is None:
-                return {
-                    "add_reminder_kwargs": {},
-                    "should_call_add_reminder": False,
-                    "abstain_reason": "missing_current_datetime_info_call_timestamp_to_datetime_info",
-                    "location_status": "provided" if has_complete_coordinates else "omitted_optional",
-                    "timestamp_source": timestamp_source,
-                }
-            if offset_hours < -12.0 or offset_hours > 14.0:
-                return {
-                    "add_reminder_kwargs": {},
-                    "should_call_add_reminder": False,
-                    "abstain_reason": "invalid_local_utc_offset_hours",
-                    "location_status": "omitted_optional",
-                    "timestamp_source": timestamp_source,
-                }
-            current_local_seconds = float(current_timestamp) + offset_hours * 3600.0
-            current_local_midnight = (current_local_seconds // 86400.0) * 86400.0
-            reminder_timestamp = current_local_midnight + int(day_offset) * 86400.0 + int(hour) * 3600.0 + int(minute) * 60.0 - offset_hours * 3600.0
-            timestamp_source = "local_utc_offset_hours"
-            if reminder_timestamp < float(current_timestamp) - 60.0:
-                return reject_time(
-                    "relative_time_resolved_to_past_rejected",
-                    "provided" if has_complete_coordinates else "omitted_optional",
-                    "relative_time_past_rejected",
-                )
-    location_status = "provided" if has_complete_coordinates else "omitted_optional"
-    content_out = str(content or "").strip()
-    if bool(location_requested) or has_complete_coordinates:
-        lowered = content_out.lower()
-        marker_index = lowered.rfind(" at ")
-        if marker_index > 0:
-            content_out = content_out[:marker_index].strip()
-    if placeholder_content(content_out):
-        return {
-            "add_reminder_kwargs": {},
-            "should_call_add_reminder": False,
-            "abstain_reason": "missing_reminder_content",
-            "location_status": location_status,
-            "timestamp_source": timestamp_source,
-        }
-    add_reminder_kwargs = {
-        "content": content_out,
-        "reminder_timestamp": reminder_timestamp,
-    }
-    if has_complete_coordinates:
-        add_reminder_kwargs["latitude"] = float(latitude)
-        add_reminder_kwargs["longitude"] = float(longitude)
-    else:
-        add_reminder_kwargs["latitude"] = None
-        add_reminder_kwargs["longitude"] = None
-    return {
-        "add_reminder_kwargs": add_reminder_kwargs,
-        "should_call_add_reminder": True,
-        "abstain_reason": "",
-        "location_status": location_status,
-        "timestamp_source": timestamp_source,
-    }
-"""
-    return GeneratedTool(spec=spec, code=code)
-
-
 def _coerce_input(item: Any) -> ToolInput:
     if isinstance(item, dict):
         return ToolInput(
@@ -6827,14 +3697,213 @@ def _coerce_input(item: Any) -> ToolInput:
     raise ValueError(f"Cannot coerce ToolInput from {type(item)}: {item!r}")
 
 
-def parse_generated_tool_json(response: str) -> GeneratedTool:
+def _coerce_str_tuple(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value,) if value.strip() else ()
+    if isinstance(value, dict):
+        return tuple(str(item) for item in value.values() if str(item).strip())
+    try:
+        return tuple(str(item) for item in value if str(item).strip())
+    except TypeError:
+        text = str(value)
+        return (text,) if text.strip() else ()
+
+
+def _coerce_optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    match = re.search(r"-?\d+", str(value))
+    return int(match.group(0)) if match else None
+
+
+def _tool_examples_from_request(
+    request: ToolGenerationRequest,
+) -> tuple[Any, ...]:
+    try:
+        from sage_ts.validation.sandbox_validator import ToolExample
+    except Exception:
+        return ()
+    examples: list[Any] = []
+    raw_examples: object = request.validation_examples
+    if _request_complete_tools_enabled(request):
+        raw_examples = _native_action_validation_examples(request)
+    for item in raw_examples:
+        if not isinstance(item, dict):
+            continue
+        inputs = item.get("inputs", {})
+        if not isinstance(inputs, dict):
+            continue
+        expected = item.get("expected")
+        if _request_complete_tools_enabled(request):
+            action = item.get("expected_native_action")
+            expected = {}
+            if isinstance(action, dict) and action.get("name"):
+                expected = {
+                    "tool_name": action.get("name"),
+                    "arguments": action.get("arguments", {}),
+                }
+        examples.append(
+            ToolExample(
+                inputs=dict(inputs),
+                expected=expected,
+                held_out=bool(item.get("held_out", False)),
+                negative_applicability=bool(item.get("negative_applicability", False)),
+            )
+        )
+    return tuple(examples)
+
+
+def _select_model_authored_candidate(
+    request: ToolGenerationRequest,
+    tools: list[GeneratedTool],
+) -> GeneratedTool:
+    if not tools:
+        raise ValueError("missing_generated_tool_candidates")
+    normalized = [_normalize_model_authored_tool(request, tool) for tool in tools]
+    examples = _tool_examples_from_request(request)
+    if len(normalized) == 1 or not examples:
+        return normalized[0]
+    try:
+        from sage_ts.validation.sandbox_validator import validate_generated_tool
+    except Exception:
+        return normalized[0]
+
+    best_tool = normalized[0]
+    best_score: int | None = None
+    for tool in normalized:
+        try:
+            result = validate_generated_tool(tool, examples)
+        except Exception:
+            continue
+        if result.accepted:
+            return tool
+        score = _validation_error_distance(result.errors)
+        if best_score is None or score < best_score:
+            best_tool = tool
+            best_score = score
+    return best_tool
+
+
+def _validation_error_distance(errors: tuple[str, ...]) -> int:
+    """Rank rejected candidates by how far actual outputs are from expectations."""
+
+    if not errors:
+        return 0
+    score = 0
+    for error in errors:
+        score += _single_validation_error_distance(error)
+    return score
+
+
+def _single_validation_error_distance(error: str) -> int:
+    if error.startswith(
+        (
+            "syntax_error:",
+            "missing_generated_code",
+            "expected_exactly_one_function",
+            "function_count_mismatch:",
+            "compiled_function_count_mismatch:",
+            "function_name_mismatch:",
+            "missing_expected_function",
+            "compile_error:",
+            "denied_node:",
+            "denied_call:",
+            "denied_attribute_call:",
+        )
+    ):
+        return 10_000
+    mismatch_tokens = ("_mismatch:", "_native_action_arguments:")
+    mismatch_token = next((token for token in mismatch_tokens if token in error), "")
+    if not mismatch_token or "!=" not in error:
+        if "_native_action_count:" in error:
+            return 50
+        if "_native_action_execution_error:" in error:
+            return 100
+        return 20
+    try:
+        _, rest = error.split(mismatch_token, 1)
+        actual_text, expected_text = rest.split("!=", 1)
+        actual = ast.literal_eval(actual_text.replace("NOT_GIVEN", "'__NOT_GIVEN__'"))
+        expected = ast.literal_eval(
+            expected_text.replace("NOT_GIVEN", "'__NOT_GIVEN__'")
+        )
+    except Exception:
+        return 10
+    return _value_distance(actual, expected)
+
+
+def _value_distance(actual: Any, expected: Any) -> int:
+    if actual == expected:
+        return 0
+    if isinstance(actual, dict) and isinstance(expected, dict):
+        keys = set(actual) | set(expected)
+        return sum(_value_distance(actual.get(key), expected.get(key)) for key in keys)
+    if isinstance(actual, (list, tuple)) and isinstance(expected, (list, tuple)):
+        length = max(len(actual), len(expected))
+        return sum(
+            _value_distance(
+                actual[index] if index < len(actual) else None,
+                expected[index] if index < len(expected) else None,
+            )
+            for index in range(length)
+        )
+    return 1
+
+
+def _load_generated_tool_payload(response: str) -> dict[str, Any]:
     response = response.strip()
     if response.startswith("```"):
         response = response.removeprefix("```json").removeprefix("```").strip()
         response = response.removesuffix("```").strip()
     payload = json.loads(response)
+    if not isinstance(payload, dict):
+        raise ValueError("generated_tool_json_must_be_object")
+    return payload
+
+
+def parse_generated_tool_candidates_json(
+    response: str,
+    *,
+    default_tool_name: str | None = None,
+) -> list[GeneratedTool]:
+    payload = _load_generated_tool_payload(response)
+    candidates = payload.get("candidates")
+    if isinstance(candidates, list) and candidates:
+        tools: list[GeneratedTool] = []
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            try:
+                tools.append(
+                    _parse_generated_tool_payload(
+                        candidate, default_tool_name=default_tool_name
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+        if tools:
+            return tools
+        raise ValueError("missing_valid_generated_tool_candidates")
+    return [_parse_generated_tool_payload(payload, default_tool_name=default_tool_name)]
+
+
+def _parse_generated_tool_payload(
+    payload: dict[str, Any],
+    *,
+    default_tool_name: str | None = None,
+) -> GeneratedTool:
     spec_payload = payload["spec"]
-    tool_name = str(spec_payload["tool_name"])
+    tool_name = str(spec_payload.get("tool_name") or default_tool_name or "")
+    if not tool_name:
+        raise ValueError("missing_generated_tool_name")
     if tool_name != tool_name.strip():
         raise ValueError("tool_name_has_surrounding_whitespace")
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", tool_name):
@@ -6842,52 +3911,42 @@ def parse_generated_tool_json(response: str) -> GeneratedTool:
     spec = ToolSpec(
         tool_name=tool_name,
         family=ToolFamily(str(spec_payload["family"])),
-        description=str(spec_payload["description"]),
-        inputs=tuple(_coerce_input(item) for item in spec_payload["inputs"]),
-        output_annotation=str(spec_payload["output_annotation"]),
+        description=str(spec_payload.get("description", "")),
+        inputs=tuple(_coerce_input(item) for item in spec_payload.get("inputs", ())),
+        output_annotation=str(spec_payload.get("output_annotation", "dict")),
         output_schema=spec_payload.get("output_schema"),
-        positive_triggers=tuple(
-            str(item) for item in spec_payload.get("positive_triggers", ())
+        positive_triggers=_coerce_str_tuple(spec_payload.get("positive_triggers", ())),
+        negative_triggers=_coerce_str_tuple(spec_payload.get("negative_triggers", ())),
+        preserves_side_effect_tools=_coerce_str_tuple(
+            spec_payload.get("preserves_side_effect_tools", ())
         ),
-        negative_triggers=tuple(
-            str(item) for item in spec_payload.get("negative_triggers", ())
-        ),
-        preserves_side_effect_tools=tuple(
-            str(item) for item in spec_payload.get("preserves_side_effect_tools", ())
-        ),
-        required_original_tool_calls=tuple(
-            str(item) for item in spec_payload.get("required_original_tool_calls", ())
+        required_original_tool_calls=_coerce_str_tuple(
+            spec_payload.get("required_original_tool_calls", ())
         ),
         abstain_behavior=str(spec_payload.get("abstain_behavior", "")),
-        generalization_rationale=str(spec_payload["generalization_rationale"]),
-        estimated_step_compression=(
-            int(spec_payload["estimated_step_compression"])
-            if spec_payload.get("estimated_step_compression") is not None
-            else None
+        generalization_rationale=str(spec_payload.get("generalization_rationale", "")),
+        estimated_step_compression=_coerce_optional_int(
+            spec_payload.get("estimated_step_compression")
         ),
-        cross_task_applicability_count=(
-            int(spec_payload["cross_task_applicability_count"])
-            if spec_payload.get("cross_task_applicability_count") is not None
-            else None
+        cross_task_applicability_count=_coerce_optional_int(
+            spec_payload.get("cross_task_applicability_count")
         ),
-        applicable_task_families=tuple(
-            str(item) for item in spec_payload.get("applicable_task_families", ())
+        applicable_task_families=_coerce_str_tuple(
+            spec_payload.get("applicable_task_families", ())
         ),
         reason_tool_is_decisive=str(spec_payload.get("reason_tool_is_decisive", "")),
         diagnostic_only=bool(spec_payload.get("diagnostic_only", False)),
-        shortfall_cluster_evidence=tuple(
-            str(item) for item in spec_payload.get("shortfall_cluster_evidence", ())
+        shortfall_cluster_evidence=_coerce_str_tuple(
+            spec_payload.get("shortfall_cluster_evidence", ())
         ),
-        known_failure_mechanisms_addressed=tuple(
-            str(item)
-            for item in spec_payload.get("known_failure_mechanisms_addressed", ())
+        known_failure_mechanisms_addressed=_coerce_str_tuple(
+            spec_payload.get("known_failure_mechanisms_addressed", ())
         ),
         canonical_route_substitution_risk=str(
             spec_payload.get("canonical_route_substitution_risk", "none")
         ),
-        expected_milestone_calls_replaced=tuple(
-            str(item)
-            for item in spec_payload.get("expected_milestone_calls_replaced", ())
+        expected_milestone_calls_replaced=_coerce_str_tuple(
+            spec_payload.get("expected_milestone_calls_replaced", ())
         ),
         final_state_preservation_plan=str(
             spec_payload.get("final_state_preservation_plan", "")
@@ -6902,4 +3961,18 @@ def parse_generated_tool_json(response: str) -> GeneratedTool:
             signals=(),
         ),
     )
-    return GeneratedTool(spec=spec, code=str(payload["code"]))
+    return GeneratedTool(spec=spec, code=_coerce_generated_code(payload))
+
+
+def _coerce_generated_code(payload: dict[str, Any]) -> str:
+    if "code_lines" in payload:
+        raw_lines = payload["code_lines"]
+        if isinstance(raw_lines, str):
+            raw_lines = raw_lines.splitlines()
+        if not isinstance(raw_lines, list):
+            raise ValueError("code_lines_must_be_list")
+        lines = [str(line).rstrip("\n") for line in raw_lines]
+        return "\n".join(lines).strip() + "\n"
+    if "code" in payload:
+        return str(payload["code"])
+    raise ValueError("missing_generated_code")

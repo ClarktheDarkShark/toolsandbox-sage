@@ -3,9 +3,7 @@ import json
 from dataclasses import replace
 
 from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate
-from sage_ts.registry.promotion_gate import evaluate_promotion_entry
 from tests.unit.test_candidate_gate import _state_spec
-from tests.unit.test_promotion_gate import _entry, _summary
 
 
 def _write_failure_memory(path, *, status="active_failure"):
@@ -58,36 +56,3 @@ def test_same_name_rediscovery_allowed_when_materially_repaired(tmp_path) -> Non
     decision = evaluate_candidate_gate(spec, failure_memory_path=memory)
 
     assert decision.allowed
-
-
-def test_promotion_gate_consults_failure_memory(tmp_path) -> None:
-    memory = tmp_path / "failure_memory.json"
-    memory.write_text(
-        json.dumps(
-            {
-                "entries": [
-                    {
-                        "mechanism_id": "wrong_visible_record_selected",
-                        "candidate_name": "other_name",
-                        "failure_symptoms": [],
-                        "suspected_root_cause": "wrong selected record",
-                        "unblock_conditions": [],
-                        "status": "active_failure",
-                    }
-                ]
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    decision = evaluate_promotion_entry(
-        _entry(),
-        _summary(),
-        failure_memory_path=memory,
-    )
-
-    assert not decision.allowed
-    assert any(
-        reason.startswith("unresolved_failure_memory") for reason in decision.reasons
-    )

@@ -985,7 +985,7 @@
   - Versioned methodology heuristics: `docs/sage_protocol/protocol_heuristics_v1.json`.
   - Statistical report: `docs/sage_protocol/final_statistical_analysis_report.md`.
   - Statistical JSON: `artifacts/summaries/final_statistical_analysis/analysis.json`.
-  - Chapter 3 methodology prep: `docs/sage_protocol/chapter3_methodology_prep.md`.
+  - Chapter 3 methodology architecture: `docs/sage_protocol/chapter3_sage_methodology_system_architecture_v061.md`.
   - Trace-audited feedback exports: `artifacts/summaries/v2_6_feedback_packets_trace_audit/`.
 - Validation so far:
   - `PYTHONPATH=src:. pytest tests/unit/test_final_run_preflight.py tests/unit/test_runtime_routing_scorer.py tests/unit/test_v2_6_feedback_packets.py -q` -> `36 passed`.
@@ -1017,7 +1017,7 @@
 - Praxis formal500 run: `outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731`; outcome `0.696169`; run-vs-control outcome lift `0.101297`; canonical `0.722681`; exact successes `105`; runtime exceptions `0`; helper side-effect failures `13`.
 - Pairwise result: Praxis-vs-best3 outcome diff `+0.040884`, 95% CI `[0.004697, 0.078220]`, p `0.0283`; Praxis-vs-V2.6 outcome diff `+0.031883`, 95% CI `[-0.009376, 0.072576]`, p `0.1199`.
 - Safety blocker: Praxis side-effect report `outputs/praxis_final_hardening/registry_only/praxis_bridgepack_formal500/full_benchmark_20260510_223731/candidate/full_benchmark_candidate_agent_gpt-4o-mini_user_GPT_4_o_2024_05_13_05_10_2026_22_38_10/side_effect_preservation_report.jsonl`, SHA `81bf6ee740368bc83f8444f5c608e108d352f5029533d52695d4b430d5fd1aaa`.
-- Reports: `docs/sage_protocol/praxis_final_hardening_review.md`, `docs/sage_protocol/praxis_treatment_dependency_audit.md`, `docs/sage_protocol/praxis_matched_formal500_statistical_report.md`, `docs/sage_protocol/praxis_methodology_delta.md`, `docs/sage_protocol/praxis_final_hardening_blocker_report.md`.
+- Reports: `docs/sage_protocol/praxis_final_hardening_review.md`, `docs/sage_protocol/praxis_treatment_dependency_audit.md`, `docs/sage_protocol/praxis_matched_formal500_statistical_report.md`, and `docs/sage_protocol/praxis_final_hardening_blocker_report.md`. The obsolete bridge-policy methodology delta was removed during production cleanup.
 - Machine-readable summary: `artifacts/praxis_final_hardening/praxis_final_hardening_summary.json`.
 - Dashboard checks: Praxis standard dashboard and Task Focus dashboard opened in the in-app browser with zero console errors; Task Compare was not generated.
 - Treatment classification: registry-only outcome lift reproduced, but not protected-claim ready because helper side-effect preservation failed. A combined registry plus bridge-policy/checker treatment remains plausible but unvalidated.
@@ -1073,7 +1073,7 @@
 - Clean first100 v2 same-code aggregate: canonical `0.654 -> 0.723`, delta `+0.069`, relative lift `+10.6%`; outcome `0.604 -> 0.737`, delta `+0.133`, relative lift `+22.0%`; exact successes `5 -> 20`; canonical gains/regressions `59 / 28`; outcome gains/regressions `40 / 16`; runtime exceptions `0`; no side-effect preservation reports found.
 - Machine summary v2: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_first100_v2_same_code_summary.json`, SHA `fd279d109437c4bc361595efb8b52efdfe4b2c83829dbe1ec5017e54260d6ae3`.
 - Validation: registry hashes matched for best3 reference copy, V2.6 reference copy, and Praxis combined registry; registry check-only PASS for 22 active entries; focused unit tests `35 passed, 2 warnings`; dashboard browser check showed Task Compare dark mode with `Run Progress 40/40` and zero console errors; `git diff --check` PASS.
-- Report: `docs/sage_protocol/praxis_combined_bridge_policy_recovery_report.md`.
+- Report: obsolete combined bridge-policy recovery report removed during production cleanup.
 - Decision label: `PROMISING_BUT_NOT_CLAIM_READY: combined_treatment_requires_clean_formal_rerun`.
 - Next action: commit the dashboard/bridge/checker repairs, then run a clean same-code formal100 or formal500 with Task Compare default and zero side-effect rows before any claim update.
 
@@ -1115,7 +1115,7 @@
 - Gap packet: `artifacts/praxis_combined_bridge_policy/summary/praxis_combined_bridge_policy_formal500_v2_gap_packets.json`, SHA `708abc10ec97a2bc36f703a27702abbd50dcdf39b3dc4f265ff08a52dd03db60`.
 - Leading residual bucket after formal500: `contact_lookup_update_search_crud` with 140 tasks, 17 outcome regressions, negative outcome mass `4.606`, 32 canonical regressions, negative canonical mass `8.565`, and 62 no-visible-helper cases.
 - Next candidate tool family: `prepare_contact_lookup_or_update_action_v2`, with minefields for duplicate names, missing phone/relationship fields, missing update values, ambiguous message-counterparty evidence, and absent original side-effect tools.
-- Reports updated: `docs/sage_protocol/praxis_combined_bridge_policy_recovery_report.md`, `docs/sage_protocol/praxis_bridge_policy_methodology.md`, `docs/sage_protocol/praxis_combined_bridge_policy_formal500_report.md`, `docs/sage_protocol/praxis_next_gap_and_self_evolving_sage_plan.md`, and `docs/sage_protocol/current_state.md`.
+- Reports updated at the time included combined bridge-policy drafts; those obsolete bridge-policy documents were removed during production cleanup. Current state is maintained in `docs/sage_protocol/current_state.md`.
 - Decision label: `PROMISING_COMBINED_TREATMENT_FORMAL500_POSITIVE_NOT_PROTECTED_CLAIM_READY`.
 - Next action: run a dedicated matched ablation under the same committed runtime with best3, V2.6, Praxis registry-only repair v2, and Praxis combined bridge-policy v2 before any protected final-claim update.
 
@@ -1124,14 +1124,13 @@
 - Objective: prepare Chapter 3 and peer-review visual methodology assets for the current SAGE Praxis self-evolving system; first sketch-level figures were replaced with architecture-grade system-design diagrams.
 - Branch: `codex/self-evolving-sage-mini60`.
 - Status comment: SAGE Praxis with true self-evolution working is the current main SAGE system going forward for methodology drafting and future validation campaigns; protected final claims remain separate until locked matched review.
-- Figure renderer: `scripts/render_sage_methodology_diagrams.py`.
+- Figure renderer: obsolete methodology-diagram renderer removed during production cleanup; current renderers are listed in `docs/sage_protocol/chapter3_methodology_figures.md`.
 - Figure index: `docs/sage_protocol/chapter3_methodology_figures.md`.
 - Generated assets:
-  - `docs/sage_protocol/figures/sage_toolsandbox_system_overview.svg` and `.png`
-  - `docs/sage_protocol/figures/sage_internal_components_zoom.svg` and `.png`
+  - Obsolete system-overview and internal-components figure assets removed during production cleanup.
   - `docs/sage_protocol/figures/sage_tool_generation_validation_repair_loop.svg` and `.png`
   - `docs/sage_protocol/figures/sage_peer_review_methodology_figure.svg` and `.png`
-- Documentation updated: `README.md`, `docs/sage_protocol/chapter3_methodology_prep.md`, and `docs/sage_protocol/current_state.md`.
+- Documentation updated: `README.md` and `docs/sage_protocol/current_state.md`; current Chapter 3 methodology lives in `docs/sage_protocol/chapter3_sage_methodology_system_architecture_v061.md`.
 - Decision label: `METHODOLOGY_FIGURE_PACKAGE_READY_FOR_CHAPTER_3_DRAFTING`.
 
 ## 2026-05-21 - Standalone SAGE CyberGym Batched Live Portability Smoke
@@ -2518,3 +2517,207 @@
   Earlier v70/v71/v111/v140/v258 runs remain historical comparison evidence,
   but v061 is now the implementation and evidence boundary referred to as
   "SAGE" in the repository.
+
+## 2026-06-28 - Claim-Grade Model-Codegen Full Dataset v198
+
+- Run:
+  `outputs/claim_grade_model_codegen/v198_full_direct_device_state_contract_repair_20260627_230909/online_build_full_20260627_230913`.
+- Dashboard:
+  `outputs/claim_grade_model_codegen/v198_full_direct_device_state_contract_repair_20260627_230909/online_build_full_20260627_230913/dashboard/task_compare.html`.
+- Configuration: ToolSandbox `online_build_full`, formal full manifest,
+  self-evolving Praxis, actor/user/generation `gpt-4o-mini`, generation on,
+  cached controls, SAGE task cache off, OpenAI response cache disabled,
+  `SAGE_PRAXIS_BRIDGE_POLICY=disabled`,
+  `SAGE_DISABLE_SCENARIO_NAME_BIRTH=1`,
+  `SAGE_DISABLE_SCENARIO_NAME_ROUTING=1`,
+  `SAGE_SCENARIO_METADATA_POLICY=visible_context`,
+  deterministic codegen disabled, model-authored tool candidates enabled,
+  visible-not-called retry off, side-effect fair-chance extra turns off, and
+  generated-tool synthetic repair off.
+- Method change tested: state-precondition output normalization now repairs
+  model-authored direct device-state tool outputs for visible on/off settings
+  requests such as cellular, wifi, location service, and low-battery mode. This
+  is a generated-tool contract repair from visible request text, not scenario
+  name routing or hidden-answer leakage.
+- Final score: `0.692499 -> 0.787091`, delta/lift
+  `+0.094592 / +13.66%`.
+- Final outcome: `0.494012 -> 0.749952`, delta/lift
+  `+0.255940 / +51.81%`.
+- Exact successes: baseline `98`, SAGE `375`, delta `+277`.
+- Paired counts: `1032` score scenarios and `800` outcome-scored scenarios;
+  score gain/regression/preserved `647 / 211 / 174`; outcome
+  gain/regression/preserved `537 / 134 / 129`.
+- Generated-tool evidence: 24 accepted tools, 24 called tools, 741
+  generated-tool-called scenarios, 802 generated-tool-visible scenarios, 1,935
+  generated-tool invocation events, and no accepted-but-uncalled tools.
+- Runtime/safety: 0 runtime exceptions. Helper contribution summary reported 0
+  failed generated-tool scenarios; task feedback contained 10 rows with
+  generated-tool or side-effect-warning metadata that require adjudication
+  before calling the run completely clean.
+- Primary remaining blockers by negative outcome contribution:
+  `find_distance_with_location_name_multiple_user_turn`,
+  `modify_reminder_with_recency_latest_alt`,
+  `turn_on_cellular_low_battery_mode`,
+  `add_reminder_content_and_week_delta_and_time_and_location_multiple_user_turn_alt`,
+  and `search_message_with_recency_oldest_multiple_user_turn_alt`.
+- Decision: keep v198 as the current clean claim-grade full-dataset run that
+  meets the minimum `50%` outcome-lift goal under the bridge-disabled,
+  no-scenario-name, model-authored tool-generation methodology.
+
+## 2026-07-20 - Native-Action Matched Validation
+
+- Completed 60-task action-first A/B:
+  `outputs/native_action_4omini_ab/action_first60_20260720_111546`.
+  Standard/native outcome `0.672286 / 0.645933`; paired difference
+  `-0.026354`, bootstrap 95% interval `[-0.120545, 0.069072]`, zero runtime
+  exceptions, and one native-arm side-effect-preservation flag.
+- Root causes corrected after the 60-task run: the contact native-action tool
+  now receives the visible `self_person_id` scalar instead of requiring the
+  actor to preserve `is_self` in projected records; native-action repair now
+  receives only the best candidate's remaining validation errors.
+- Corrected 20-task A/B:
+  `outputs/native_action_4omini_ab/action20_20260720_122526`. Standard/native
+  outcome `0.759804 / 0.826936`; paired difference `+0.067132` over 17 scored
+  tasks; six native wins, three standard wins, eight ties; three successful
+  native executions; no failed native call, runtime exception, side-effect
+  flag, or tool runtime incident.
+- The recency admission contract was then strengthened to require latest and
+  oldest selection plus a genuine tie negative. This changed validation only;
+  no generated tool implementation was added to framework code.
+- Strict 8-task A/B:
+  `outputs/native_action_4omini_ab/action8_20260720_124835`. Standard/native
+  outcome `0.873149 / 0.827342`; paired difference `-0.045806` over seven
+  scored tasks. The model-authored recency tool passed the stricter contract on
+  repair five and executed modify/remove actions successfully. All three direct
+  native executions reached task outcome `1.0`; no failed native call, runtime
+  exception, side-effect flag, or tool runtime incident occurred.
+- Decision: preserve native-action mode as an experimental extension. Direct
+  mechanism viability is established, but broad superiority over standard
+  SAGE is not. Standard SAGE remains the publication default.
+
+## 2026-07-21 - Native-Action Full Dataset Completion
+
+- Run:
+  `outputs/native_action_4omini_ab/full_20260721_091909/native_action/online_build_full_20260721_091916`
+- Dashboard:
+  `outputs/native_action_4omini_ab/full_20260721_091909/native_action/online_build_full_20260721_091916/dashboard/task_compare.html`
+- Resume source:
+  `outputs/native_action_4omini_ab/full_20260721_052007/native_action/online_build_full_20260721_052014`
+  after task `794`, with registry checkpoint and fixed clock preserved.
+- Sample: `1,032` score tasks; `800` outcome-scored tasks.
+- Models: `gpt-4o-mini` actor/user/generation.
+- Controls: strict cached `1,032`; fresh `0`.
+- Score: `0.733488 -> 0.806969`, delta `+0.073480`, lift `+10.02%`.
+- Composite outcome: `0.457342 -> 0.786036`, delta `+0.328694`, lift
+  `+71.87%`.
+- State checks: mean `0.925000`, `666/720` exact.
+- Exact successes: `200 -> 370`.
+- Generated-tool-called scenarios: `734`; their matched outcome was
+  `0.370593 -> 0.804165` (`+116.99%`).
+- Tool reuse events: `1,864`.
+- Resume births: `11` candidates, `3` accepted, `8` rejected; registry
+  `24 -> 27`.
+- Runtime exceptions: `0`.
+- Safety: no new flag after task 553; 21 inherited pre-fix audit flags from
+  tasks 151-519 require adjudication.
+- Decision: keep as the leading full-dataset native-action candidate. It
+  exceeds `0.8` on state completion but reaches `0.786036` on the benchmark
+  composite because answer checks remain weaker. Do not add an unfair final
+  turn to recover answer-only credit.
+
+## 2026-07-23 - Full Native-Action Outcome Record
+
+- Run:
+  `outputs/native_action_4omini_ab/full_outcome80_finite_domain_full_20260723_114932/native_action/online_build_full_20260723_114954`
+- Dashboard:
+  `http://127.0.0.1:63689/outputs/native_action_4omini_ab/full_outcome80_finite_domain_full_20260723_114932/native_action/online_build_full_20260723_114954/dashboard/task_compare.html`
+- Sample: `1,032` score tasks; `800` outcome-scored tasks.
+- Models: `gpt-4o-mini` actor, user, generation, and repair.
+- Controls: strict cached `1,032`; fresh `0`; cache manifest
+  `7c704d399bd665bc81041e0baa5d4a68c51a90a20cad9ce6f4ba215295a241d7`.
+- Evidence controls: empty starting registry; SAGE task cache off; OpenAI
+  response cache disabled; bridge disabled; scenario-name birth/routing
+  disabled; no force calls; no SAGE-only extra actor turns.
+- Score: `0.733488 -> 0.797695`, delta `+0.064207`, lift `+8.75%`.
+- Composite outcome: `0.457342 -> 0.800043`, delta `+0.342702`, lift
+  `+74.93%`.
+- Exact outcome successes: `161 -> 441`.
+- Included state checks: `0.712231 -> 0.906944`; exact `510 -> 653`.
+- Included answer checks: `0.405415 -> 0.706502`; exact `134 -> 297`.
+- Tool lifecycle: 29 accepted live-born tools; 28 naturally called; 1,864
+  reuse events; 771 generated-tool-called scenarios.
+- Called-tool attribution: outcome `0.373165 -> 0.809496`, delta `+0.436331`,
+  lift `+116.93%`; score `0.710701 -> 0.796761`, lift `+12.11%`.
+- Non-tool attribution checks: no-visible-tool outcome was effectively tied
+  (`-0.18%` lift); visible-not-called outcome regressed `-17.77%`.
+- Runtime: zero exceptions and zero tool runtime incidents.
+- Failed calls: 43 total, comprising 42
+  `apply_single_device_state_action` failures and one
+  `extract_distance_result` failure.
+- Safety: one side-effect-preservation contract flag for
+  `plan_device_state_action_sequence_v3`. The task reached the correct
+  low-battery, location, and Wi-Fi states; the flag records a final planned
+  cellular action not executed before the turn limit, not an unsafe mutation.
+- Provenance: commit `25466400ae48b4520a3d7cf914d9c85d3a512755`;
+  code-tree SHA-256
+  `d6aad9bc350a3e6ba7389298d7ed66deaacdff54064fa4f4db5c15fd1463a928`;
+  manifest SHA-256
+  `21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec`.
+- Decision: current leading completed full-dataset outcome run. It exceeds the
+  prior `0.786036` record by `+0.014008` and reaches the `0.8` composite
+  outcome target without bridge behavior, scenario metadata, hidden labels, or
+  extra actor turns.
+
+## 2026-07-24 - Current SAGE Five-Run Full-Dataset Replication
+
+- Batch:
+  `outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047`
+- Configuration: five independent `online_build_full` native-action SAGE
+  replicas launched concurrently; `gpt-4o-mini` actor, user, generation, and
+  repair; strict cached control; fresh SAGE arms; empty registry per replica;
+  fixed ToolSandbox clock; SAGE task cache off; OpenAI response cache disabled;
+  bridge disabled; scenario-name birth/routing disabled.
+- Provenance: commit `25466400ae48b4520a3d7cf914d9c85d3a512755`;
+  code-tree SHA-256
+  `d6aad9bc350a3e6ba7389298d7ed66deaacdff54064fa4f4db5c15fd1463a928`;
+  manifest SHA-256
+  `21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec`.
+- Completion: all five replicas reached `1,032/1,032`, all five launchers
+  returned status `0`, and all five protocol gates passed.
+- Per-run SAGE outcomes: `0.778770`, `0.798097`, `0.801611`, `0.806536`,
+  `0.809509`.
+- Per-run outcome lifts: `+70.28%`, `+74.51%`, `+75.28%`, `+76.35%`,
+  `+77.00%`.
+- Aggregate outcome: baseline `0.457342`; mean SAGE `0.798905`; mean delta
+  `+0.341563`; mean lift `+74.68%`; run-level SD `0.012084`; run-level 95% t
+  interval `[0.783900, 0.813909]`.
+- Two-way run/task bootstrap 95% interval for outcome delta:
+  `[+0.309375, +0.374102]`; task-level paired sign-flip test
+  `p < 0.000010`.
+- Per-run SAGE scores: `0.791434`, `0.796437`, `0.799026`, `0.796598`,
+  `0.787598`.
+- Aggregate score: baseline `0.733488`; mean SAGE `0.794218`; mean delta
+  `+0.060730`; mean lift `+8.28%`; two-way run/task bootstrap 95% interval for
+  score delta `[+0.039296, +0.081917]`.
+- Exact outcome successes: baseline `161` per run; SAGE
+  `426 / 440 / 434 / 447 / 453`.
+- Tool evidence: `142` accepted tools across run instances, `9,290` reuse
+  events, and `3,856` generated-tool-called scenario-runs. The called-tool
+  bucket produced weighted outcome `0.380854 -> 0.806497`, delta `+0.425643`,
+  lift `+111.76%`.
+- Reliability: zero runtime exceptions and zero tool runtime incidents.
+  Generated-tool failed scenarios totaled `177`; `164` were
+  `apply_single_device_state_action`. Four side-effect-preservation contract
+  flags all involved `plan_device_state_action_sequence_v3` and remain
+  adjudication items.
+- Infrastructure note: iCloud evicted one active trajectory file during the
+  batch. Re-materializing the unchanged file resumed the affected replica; a
+  read-only materialization monitor prevented recurrence. The outer zsh batch
+  collector later hit a read-only variable error while recording statuses,
+  after all five child runs had completed successfully; this did not affect
+  any run or metric.
+- Analysis exports:
+  `artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/aggregate`.
+- Decision: retain all five replicas for Chapter 4 analysis. The aggregate
+  independently reproduces a large outcome lift and shows that the lift is
+  concentrated in rows where generated tools were actually called.

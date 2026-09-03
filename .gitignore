@@ -106,6 +106,7 @@ celerybeat.pid
 .env.*
 !.env.example
 .venv
+.venv-publication/
 env/
 venv/
 ENV/
@@ -162,6 +163,17 @@ data/
 outputs/
 artifacts/*
 !artifacts/.gitkeep
+# One credential-scanned benchmark fixture and two content-pinned archival
+# analysis inputs are published; all other local bundle material remains ignored.
+!artifacts/publication_cleanup_20260901/
+artifacts/publication_cleanup_20260901/*
+!artifacts/publication_cleanup_20260901/fixtures/
+artifacts/publication_cleanup_20260901/fixtures/*
+!artifacts/publication_cleanup_20260901/fixtures/rapid_api_cache.sanitized.json
+!artifacts/publication_cleanup_20260901/analysis/
+artifacts/publication_cleanup_20260901/analysis/*
+!artifacts/publication_cleanup_20260901/analysis/campaign_manifest.json
+!artifacts/publication_cleanup_20260901/analysis/chapter4_evidence_data.json
 .sage_cache/
 persistent_prompt_cache/
 generated_tools/
@@ -170,6 +182,18 @@ generated_tools/
 
 # Generated review bundles too large for git
 docs/sage_protocol/decisive_tool_review_bundle.md
+
+# Regenerable publication previews (SVG/PDF sources remain tracked)
+docs/sage_protocol/figures/chapter4_evidence_tables/chapter4_evidence_tables_contact_sheet.png
+docs/sage_protocol/figures/sage_self_evolution_loop_design.png
+docs/sage_protocol/figures/sage_self_evolution_loop_publication.png
+docs/sage_protocol/figures/v061_architecture/sage_architecture_images.zip
+docs/sage_protocol/figures/v061_architecture/sage_architecture_images/
+docs/sage_protocol/figures/v061_architecture/sage_v061_architecture_overview.png
+docs/sage_protocol/figures/v061_architecture/sage_v061_generation_validation.png
+docs/sage_protocol/figures/v061_architecture/sage_v061_routing_lifecycle.png
+figures/chapter4/chapter4_evidence_tables/chapter4_evidence_tables_contact_sheet.png
+figures/chapter4/chapter4_evidence_tables_contact_sheet.png
 
 # Local notebooks and ad-hoc analysis
 notebooks/local/
@@ -180,3 +204,6 @@ external/
 cybergym_data/
 server_poc/
 cybergym_tmp/
+
+# Standalone game repository (deployed independently from SAGE)
+/language-life-game/

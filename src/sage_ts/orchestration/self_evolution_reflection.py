@@ -1,7 +1,8 @@
 """Online reflection and lifecycle policy for self-evolving SAGE runs.
 
-The controller uses cached control rows as a baseline comparator during a
-candidate run. It does not read labels, expected answers, or prior SAGE traces.
+Publication runs compare against exact same-run live control rows. The legacy
+cache comparator remains available only to non-publication callers. Neither
+path reads labels, expected answers, or prior SAGE traces.
 """
 
 from __future__ import annotations
@@ -22,40 +23,7 @@ from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.registry.store import RegistryStore
 from tool_sandbox.common.scenario import Scenario
 
-REFLECTION_ENABLED_ENV = "SAGE_SELF_EVOLVING_REFLECTION"
-REFLECTION_STOP_ENV = "SAGE_SELF_EVOLVING_STOP_IF_OFF_TRACK"
-REFLECTION_PULSE_INTERVAL_ENV = "SAGE_SELF_EVOLVING_PULSE_INTERVAL"
-REFLECTION_MIN_TASKS_ENV = "SAGE_SELF_EVOLVING_MIN_PULSE_TASKS"
-REFLECTION_MIN_SCORE_LIFT_ENV = "SAGE_SELF_EVOLVING_MIN_SCORE_LIFT_PERCENT"
-REFLECTION_MIN_OUTCOME_DELTA_ENV = "SAGE_SELF_EVOLVING_MIN_OUTCOME_DELTA"
 REFLECTION_CONTROL_CACHE_ROOT_ENV = "SAGE_SELF_EVOLVING_CONTROL_CACHE_ROOT"
-
-
-def _env_enabled(name: str, *, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name, "").strip()
-    if not raw:
-        return default
-    try:
-        return int(raw)
-    except ValueError:
-        return default
-
-
-def _env_float(name: str, default: float) -> float:
-    raw = os.environ.get(name, "").strip()
-    if not raw:
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        return default
 
 
 def _optional_float(value: Any) -> float | None:
@@ -123,12 +91,6 @@ class ToolLifecycleStats:
         }
 
 
-@dataclass(frozen=True)
-class ReflectionDecision:
-    stop_run: bool
-    reason: str = ""
-
-
 @dataclass
 class SelfEvolutionReflectionController:
     store: RegistryStore
@@ -137,12 +99,14 @@ class SelfEvolutionReflectionController:
     user: str
     base_tool_policy: str
     manifest_path: Path
-    control_cache: ControlBaselineCache
-    pulse_interval: int = 8
-    min_pulse_tasks: int = 16
+    control_cache: ControlBaselineCache | None
+    fresh_control_rows: dict[str, dict[str, Any]] | None = None
+    require_fresh_control: bool = False
+    fresh_control_consumed: set[str] = field(default_factory=set)
+    pulse_interval: int = 4
+    min_pulse_tasks: int = 8
     min_score_lift_percent: float = 8.0
     min_outcome_delta: float = 0.12
-    stop_if_off_track: bool = False
     completed_count: int = 0
     cache_hit_count: int = 0
     cache_miss_count: int = 0
@@ -166,12 +130,19 @@ class SelfEvolutionReflectionController:
         user: str,
         base_tool_policy: str,
         manifest_path: Path,
-    ) -> "SelfEvolutionReflectionController | None":
-        if not _env_enabled(REFLECTION_ENABLED_ENV):
-            return None
-        cache_root = Path(
-            os.environ.get(REFLECTION_CONTROL_CACHE_ROOT_ENV, "") or CACHE_ROOT
-        )
+        fresh_control_rows: dict[str, dict[str, Any]] | None = None,
+        require_fresh_control: bool = False,
+    ) -> "SelfEvolutionReflectionController":
+        if require_fresh_control and fresh_control_rows is None:
+            raise ValueError(
+                "Strict fresh-control reflection requires same-run control rows."
+            )
+        control_cache: ControlBaselineCache | None = None
+        if not require_fresh_control:
+            cache_root = Path(
+                os.environ.get(REFLECTION_CONTROL_CACHE_ROOT_ENV, "") or CACHE_ROOT
+            )
+            control_cache = ControlBaselineCache(cache_root)
         controller = cls(
             store=store,
             output_dir=output_dir,
@@ -179,15 +150,17 @@ class SelfEvolutionReflectionController:
             user=user,
             base_tool_policy=base_tool_policy,
             manifest_path=manifest_path,
-            control_cache=ControlBaselineCache(cache_root),
-            pulse_interval=max(1, _env_int(REFLECTION_PULSE_INTERVAL_ENV, 8)),
-            min_pulse_tasks=max(1, _env_int(REFLECTION_MIN_TASKS_ENV, 16)),
-            min_score_lift_percent=_env_float(
-                REFLECTION_MIN_SCORE_LIFT_ENV,
-                8.0,
+            control_cache=control_cache,
+            fresh_control_rows=(
+                {name: dict(row) for name, row in fresh_control_rows.items()}
+                if fresh_control_rows is not None
+                else None
             ),
-            min_outcome_delta=_env_float(REFLECTION_MIN_OUTCOME_DELTA_ENV, 0.12),
-            stop_if_off_track=_env_enabled(REFLECTION_STOP_ENV),
+            require_fresh_control=require_fresh_control,
+            pulse_interval=4,
+            min_pulse_tasks=8,
+            min_score_lift_percent=8.0,
+            min_outcome_delta=0.12,
         )
         controller._hydrate_from_existing_feedback()
         return controller
@@ -212,9 +185,82 @@ class SelfEvolutionReflectionController:
                 by_scenario[scenario] = row
 
         for row in by_scenario.values():
+            self._consume_resumed_fresh_control(row)
             self._record_feedback_row(row)
         if by_scenario:
             self._write_current_state()
+
+    def _consume_resumed_fresh_control(self, feedback: dict[str, Any]) -> None:
+        if not self.require_fresh_control:
+            return
+        scenario_name = str(feedback.get("scenario") or "")
+        row = self._fresh_control_row(scenario_name, consume=False)
+        if feedback.get("control_source") != "same_run_fresh":
+            raise ValueError(
+                "Cannot resume strict fresh-control reflection from feedback "
+                f"without same-run provenance: {scenario_name!r}."
+            )
+        expected_score = _optional_float(row.get("similarity"))
+        expected_outcome = _optional_float(row.get("outcome_similarity"))
+        if _optional_float(feedback.get("control_score")) != expected_score:
+            raise ValueError(
+                f"Resumed fresh control score changed for {scenario_name!r}."
+            )
+        if _optional_float(feedback.get("control_outcome")) != expected_outcome:
+            raise ValueError(
+                f"Resumed fresh control outcome changed for {scenario_name!r}."
+            )
+        self.fresh_control_consumed.add(scenario_name)
+
+    def _fresh_control_row(
+        self,
+        scenario_name: str,
+        *,
+        consume: bool = True,
+    ) -> dict[str, Any]:
+        if self.fresh_control_rows is None:
+            raise ValueError("Same-run fresh control rows are not configured.")
+        if not scenario_name or scenario_name not in self.fresh_control_rows:
+            raise ValueError(
+                f"Missing same-run fresh control observation for {scenario_name!r}."
+            )
+        if consume and scenario_name in self.fresh_control_consumed:
+            raise ValueError(
+                f"Duplicate same-run fresh control use for {scenario_name!r}."
+            )
+        row = self.fresh_control_rows[scenario_name]
+        if str(row.get("name") or "") != scenario_name:
+            raise ValueError(
+                f"Mismatched same-run fresh control observation for {scenario_name!r}."
+            )
+        if consume:
+            self.fresh_control_consumed.add(scenario_name)
+        return row
+
+    def assert_fresh_control_complete(
+        self,
+        expected_scenarios: tuple[str, ...],
+    ) -> None:
+        """Fail closed unless reflection consumed one fresh row per candidate task."""
+        if not self.require_fresh_control:
+            return
+        expected = set(expected_scenarios)
+        available = set(self.fresh_control_rows or {})
+        consumed = set(self.fresh_control_consumed)
+        if len(expected) != len(expected_scenarios):
+            raise ValueError("Candidate scenario list contains duplicate task names.")
+        if available != expected:
+            raise ValueError(
+                "Same-run fresh control map does not exactly match the candidate "
+                f"cohort (missing={sorted(expected - available)!r}, "
+                f"extra={sorted(available - expected)!r})."
+            )
+        if consumed != expected:
+            raise ValueError(
+                "Reflection did not consume exactly one same-run fresh control per "
+                f"candidate task (missing={sorted(expected - consumed)!r}, "
+                f"extra={sorted(consumed - expected)!r})."
+            )
 
     def _record_feedback_row(self, row: dict[str, Any]) -> None:
         scenario_name = str(row.get("scenario") or "")
@@ -344,28 +390,40 @@ class SelfEvolutionReflectionController:
         side_effect_failures: list[str],
         task_context_label: str | None = None,
         task_family_key: str | None = None,
-    ) -> ReflectionDecision:
-        """Record feedback and optionally stop a run at a pulse boundary."""
+    ) -> None:
+        """Record feedback and update lifecycle state at pulse boundaries."""
 
-        lookup = self.control_cache.lookup(
-            compatibility_context(
-                scenario_key=scenario_name,
-                scenario=baseline_scenario,
-                agent=self.agent,
-                user=self.user,
-                base_tool_policy=self.base_tool_policy,
-                manifest_path=self.manifest_path,
+        if self.require_fresh_control:
+            control_row = self._fresh_control_row(scenario_name)
+            control_source = "same_run_fresh"
+            control_available = True
+            control_reason = "exact_same_run_task_match"
+        else:
+            if self.control_cache is None:
+                raise ValueError("Legacy reflection requires a control baseline cache.")
+            lookup = self.control_cache.lookup(
+                compatibility_context(
+                    scenario_key=scenario_name,
+                    scenario=baseline_scenario,
+                    agent=self.agent,
+                    user=self.user,
+                    base_tool_policy=self.base_tool_policy,
+                    manifest_path=self.manifest_path,
+                )
             )
-        )
+            control_row = lookup.row
+            control_source = "legacy_control_cache"
+            control_available = bool(lookup.eligible and lookup.row is not None)
+            control_reason = lookup.reason
         control_score = None
         control_outcome = None
         candidate_score = _optional_float(result.get("similarity"))
         candidate_outcome = _optional_float(result.get("outcome_similarity"))
         score_delta = None
         outcome_delta = None
-        if lookup.eligible and lookup.row is not None:
-            control_score = _optional_float(lookup.row.get("similarity"))
-            control_outcome = _optional_float(lookup.row.get("outcome_similarity"))
+        if control_available and control_row is not None:
+            control_score = _optional_float(control_row.get("similarity"))
+            control_outcome = _optional_float(control_row.get("outcome_similarity"))
             if control_score is not None and candidate_score is not None:
                 score_delta = candidate_score - control_score
             if control_outcome is not None and candidate_outcome is not None:
@@ -394,9 +452,15 @@ class SelfEvolutionReflectionController:
             "source_task_id_redacted": bool(task_context_label),
             "base_family": family,
             "completed_count": self.completed_count + 1,
-            "control_cache_eligible": lookup.eligible,
-            "control_cache_hit": bool(lookup.eligible and lookup.row is not None),
-            "control_cache_reason": lookup.reason,
+            "control_source": control_source,
+            "control_baseline_available": control_available,
+            "control_cache_eligible": (
+                control_available if control_source == "legacy_control_cache" else False
+            ),
+            "control_cache_hit": (
+                control_available if control_source == "legacy_control_cache" else False
+            ),
+            "control_cache_reason": control_reason,
             "control_score": control_score,
             "candidate_score": candidate_score,
             "score_delta": score_delta,
@@ -417,8 +481,8 @@ class SelfEvolutionReflectionController:
 
         if self.completed_count % self.pulse_interval != 0:
             self._write_current_state()
-            return ReflectionDecision(False)
-        return self._pulse()
+            return
+        self._pulse()
 
     def _is_harmful_call(
         self,
@@ -545,14 +609,6 @@ class SelfEvolutionReflectionController:
             helpful_count = len(stats.helpful_called_scenarios)
             harmful_count = len(stats.harmful_called_scenarios)
             if called_outcome is not None:
-                positive_called_subset = called_outcome > 0.05 or (
-                    called_outcome >= 0 and helpful_count > harmful_count
-                )
-            else:
-                positive_called_subset = (
-                    called_score is not None and called_score > 0.05
-                ) or helpful_count > harmful_count
-            if called_outcome is not None:
                 negative_called_subset = called_outcome < -0.05
             else:
                 negative_called_subset = (
@@ -604,7 +660,7 @@ class SelfEvolutionReflectionController:
             snapshot[tool_name] = row
         return snapshot
 
-    def _pulse(self) -> ReflectionDecision:
+    def _pulse(self) -> None:
         score_delta_mean = _mean(self.score_deltas)
         outcome_delta_mean = _mean(self.outcome_deltas)
         control_score_mean = _mean(self.control_scores)
@@ -646,19 +702,11 @@ class SelfEvolutionReflectionController:
             "side_effect_incidents": self.side_effect_incidents,
             "on_track": on_track,
             "off_track_reasons": reasons,
-            "stop_recommended": bool(
-                self.stop_if_off_track
-                and self.completed_count >= self.min_pulse_tasks
-                and not on_track
-            ),
             "tool_lifecycle": self._tool_lifecycle_snapshot(),
             "top_gap_buckets": self._top_gap_buckets(),
         }
         append_jsonl(self.output_dir / "self_evolution_reflections.jsonl", pulse)
         self._write_current_state(extra=pulse)
-        if pulse["stop_recommended"]:
-            return ReflectionDecision(True, ",".join(reasons))
-        return ReflectionDecision(False)
 
     def _top_gap_buckets(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []

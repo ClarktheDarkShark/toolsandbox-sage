@@ -30,6 +30,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       background: var(--bg);
       color: var(--text);
       font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
     }
     button, input, select {
       font: inherit;
@@ -162,12 +163,373 @@ TASK_COMPARE_HTML = r"""<!doctype html>
 	      text-transform: uppercase;
 	      letter-spacing: .06em;
 	    }
-	    .live-tool-name {
-	      max-width: 270px;
-	      overflow-wrap: anywhere;
-	      color: var(--ink);
-	      font-weight: 750;
-	    }
+    .live-tool-name {
+      max-width: 270px;
+      overflow-wrap: anywhere;
+      color: var(--ink);
+      font-weight: 750;
+    }
+    .header-dashboard-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+      gap: 12px;
+      align-items: start;
+      margin-top: 12px;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .summary-stack {
+      min-width: 0;
+      max-width: 100%;
+    }
+    .sage-status-stack {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+    .sage-thinking-box {
+      width: 100%;
+      margin-top: 12px;
+      border: 1px solid rgba(119, 189, 255, .38);
+      background:
+        linear-gradient(90deg, rgba(119, 189, 255, .10), rgba(65, 217, 150, .08), rgba(119, 189, 255, .10)),
+        var(--panel2);
+      background-size: 240% 100%, auto;
+      border-radius: 8px;
+      padding: 16px 36px 16px 24px;
+      box-shadow: 0 8px 22px var(--shadow);
+      display: grid;
+      align-content: center;
+      gap: 8px;
+      height: 126px;
+      min-height: 126px;
+      max-height: 126px;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      position: relative;
+      animation: sageStatusPanelFlow 5.6s ease-in-out infinite;
+    }
+    .sage-thinking-box::before {
+      content: "";
+      position: absolute;
+      left: 10px;
+      top: 14px;
+      width: 4px;
+      height: calc(100% - 28px);
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(119, 189, 255, .18), rgba(119, 189, 255, .82), rgba(65, 217, 150, .24));
+      animation: sageStatusScan 1.8s ease-in-out infinite;
+    }
+    .sage-thinking-box::after {
+      content: "";
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(119, 189, 255, .92);
+      box-shadow: 0 0 0 0 rgba(119, 189, 255, .46);
+      animation: sageStatusPulse 1.6s ease-out infinite;
+    }
+    .sage-thinking-title {
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .sage-thinking-text {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 750;
+      line-height: 1.35;
+      max-width: 1120px;
+      overflow-wrap: anywhere;
+      word-break: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      padding-right: 10px;
+    }
+    @keyframes sageStatusPanelFlow {
+      0%, 100% { background-position: 0% 50%, 0 0; }
+      50% { background-position: 100% 50%, 0 0; }
+    }
+    @keyframes sageStatusScan {
+      0%, 100% { opacity: .45; transform: scaleY(.72); }
+      50% { opacity: 1; transform: scaleY(1); }
+    }
+    @keyframes sageStatusPulse {
+      0% { box-shadow: 0 0 0 0 rgba(119, 189, 255, .44); }
+      70% { box-shadow: 0 0 0 9px rgba(119, 189, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(119, 189, 255, 0); }
+    }
+    .tool-generation-card {
+      width: 280px;
+      max-width: 100%;
+      min-width: 0;
+      min-height: 338px;
+      border: 1px solid #3f80bd;
+      background: linear-gradient(180deg, #162a3d 0%, #101a27 100%);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 8px 22px var(--shadow);
+      text-align: left;
+      cursor: pointer;
+      display: grid;
+      align-content: start;
+      gap: 9px;
+      overflow: hidden;
+    }
+    .tool-generation-card.state-idle,
+    .tool-generation-card.state-scanning {
+      border-color: #3f80bd;
+      background: linear-gradient(180deg, #162a3d 0%, #101a27 100%);
+    }
+    .tool-generation-card.state-gap {
+      border-color: rgba(119, 189, 255, .78);
+      background: linear-gradient(180deg, #143453 0%, #101a27 100%);
+    }
+    .tool-generation-card.state-generating {
+      border-color: rgba(255, 200, 87, .68);
+      background: linear-gradient(180deg, #33270f 0%, #171c23 100%);
+    }
+    .tool-generation-card.state-validating {
+      border-color: rgba(180, 151, 255, .72);
+      background: linear-gradient(180deg, #2b2350 0%, #131b2a 100%);
+    }
+    .tool-generation-card.state-repairing {
+      border-color: rgba(255, 143, 82, .76);
+      background: linear-gradient(180deg, #3c2414 0%, #171a23 100%);
+    }
+    .tool-generation-card.state-using {
+      border-color: rgba(65, 217, 150, .68);
+      background: linear-gradient(180deg, #123827 0%, #101a24 100%);
+    }
+    .tool-generation-card.state-accepted {
+      border-color: rgba(65, 217, 150, .68);
+      background: linear-gradient(180deg, #123827 0%, #101a24 100%);
+    }
+    .tool-generation-card.state-complete {
+      border-color: rgba(65, 217, 150, .72);
+      background: linear-gradient(180deg, #102f27 0%, #101a24 100%);
+    }
+    .tool-generation-card.state-rejected {
+      border-color: rgba(255, 107, 115, .72);
+      background: linear-gradient(180deg, #3a171d 0%, #171a23 100%);
+    }
+    .tool-generation-card:hover,
+    .tool-generation-card:focus-visible {
+      outline: 2px solid rgba(119, 189, 255, .55);
+      outline-offset: 2px;
+    }
+    .tool-gen-stage {
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      overflow-wrap: anywhere;
+    }
+    .tool-gen-status-main {
+      color: var(--text);
+      font-size: 25px;
+      font-weight: 950;
+      line-height: 1.05;
+      overflow-wrap: anywhere;
+    }
+    .state-repairing .tool-gen-status-main { color: #ffbf95; }
+    .state-validating .tool-gen-status-main { color: #d0c2ff; }
+    .state-generating .tool-gen-status-main,
+    .state-gap .tool-gen-status-main { color: var(--amber); }
+    .state-accepted .tool-gen-status-main,
+    .state-complete .tool-gen-status-main,
+    .state-using .tool-gen-status-main { color: var(--green); }
+    .state-rejected .tool-gen-status-main { color: var(--red); }
+    .tool-gen-kicker {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .tool-gen-title {
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.08;
+      overflow-wrap: anywhere;
+      min-width: 0;
+    }
+    .tool-gen-body {
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+      min-width: 0;
+    }
+    .tool-gen-purpose {
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(10, 16, 24, .36);
+      border-radius: 8px;
+      padding: 9px;
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .tool-gen-step-row {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.3;
+    }
+    .tool-gen-step-row strong {
+      color: var(--text);
+      font-size: 12px;
+    }
+    .tool-gen-timeline {
+      display: grid;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .tool-gen-timeline-row {
+      display: grid;
+      grid-template-columns: 14px minmax(0, 1fr);
+      gap: 7px;
+      align-items: start;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+      min-width: 0;
+    }
+    .tool-gen-timeline-dot {
+      width: 9px;
+      height: 9px;
+      margin-top: 3px;
+      border-radius: 50%;
+      border: 1px solid rgba(147, 164, 184, .55);
+      background: rgba(147, 164, 184, .22);
+    }
+    .tool-gen-timeline-row.done .tool-gen-timeline-dot {
+      border-color: rgba(65, 217, 150, .72);
+      background: rgba(65, 217, 150, .85);
+    }
+    .tool-gen-timeline-row.current .tool-gen-timeline-dot {
+      border-color: rgba(255, 200, 87, .9);
+      background: var(--amber);
+      box-shadow: 0 0 0 4px rgba(255, 200, 87, .16);
+    }
+    .tool-gen-timeline-row.next .tool-gen-timeline-dot {
+      border-style: dashed;
+    }
+    .tool-gen-timeline-label {
+      color: var(--text);
+      font-weight: 850;
+      overflow-wrap: anywhere;
+    }
+    .tool-gen-timeline-detail {
+      color: var(--muted);
+      margin-top: 1px;
+      overflow-wrap: anywhere;
+    }
+    .tool-gen-meta {
+      display: grid;
+      gap: 5px;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .tool-gen-status-pill {
+      display: inline-flex;
+      width: fit-content;
+      border: 1px solid rgba(65, 217, 150, .45);
+      background: rgba(13, 45, 32, .75);
+      color: var(--green);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 950;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .tool-gen-status-pill.idle {
+      border-color: rgba(119, 189, 255, .46);
+      background: rgba(16, 44, 69, .78);
+      color: var(--blue);
+    }
+    .tool-gen-status-pill.warn {
+      border-color: rgba(255, 200, 87, .48);
+      background: rgba(49, 37, 13, .82);
+      color: var(--amber);
+    }
+    .tool-gen-status-pill.validating {
+      border-color: rgba(180, 151, 255, .48);
+      background: rgba(40, 31, 79, .82);
+      color: #c8b8ff;
+    }
+    .tool-gen-status-pill.repairing {
+      border-color: rgba(255, 143, 82, .52);
+      background: rgba(58, 31, 16, .82);
+      color: #ffb17f;
+    }
+    .tool-gen-status-pill.bad {
+      border-color: rgba(255, 107, 115, .48);
+      background: rgba(55, 18, 24, .82);
+      color: var(--red);
+    }
+    .tool-gen-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .tool-gen-detail-card {
+      border: 1px solid var(--line);
+      background: var(--panel3);
+      border-radius: 8px;
+      padding: 10px;
+      min-width: 0;
+    }
+    .tool-gen-detail-card h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+    .tool-gen-code {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0a1018;
+      color: var(--ink);
+      max-height: 440px;
+      overflow: auto;
+      padding: 12px;
+      white-space: pre;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .tool-gen-drawer-timeline {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .tool-gen-drawer-timeline .tool-gen-timeline-row {
+      border: 1px solid var(--line);
+      background: var(--panel3);
+      border-radius: 8px;
+      padding: 9px;
+      grid-template-columns: 16px minmax(0, 1fr);
+    }
 	    .run-progress {
 	      display: inline-flex;
 	      align-items: baseline;
@@ -741,6 +1103,12 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
     @media (max-width: 760px) {
       .metrics, .compare-grid, .split, .transaction-grid, .check-evidence { grid-template-columns: 1fr; }
+      header { padding: 16px 12px 12px; }
+      .header-dashboard-grid { grid-template-columns: minmax(0, 1fr); width: 100%; overflow: hidden; }
+      .sage-status-stack { width: 100%; }
+      .sage-thinking-box { height: 146px; min-height: 146px; max-height: 146px; padding-right: 30px; }
+      .sage-thinking-text { -webkit-line-clamp: 5; }
+      .tool-generation-card { width: 100%; min-height: 220px; }
       main { grid-template-columns: 1fr; }
       aside {
         position: relative;
@@ -775,11 +1143,37 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <option value="task_compare.html">Task Compare</option>
       </select>
     </div>
-    <div class="run-progress" id="runProgress"></div>
-	    <div class="metrics" id="metrics"></div>
-	    <div class="metrics tool-metrics" id="toolMetrics"></div>
-	    <div class="cache-panel" id="cachePanel"></div>
-	    <div class="live-tool-panel" id="liveToolPanel"></div>
+    <div class="sage-thinking-box" id="sageThinkingBox">
+      <div class="sage-thinking-title">Agent Actions</div>
+      <div class="sage-thinking-text" id="sageThinkingText" aria-live="polite">Waiting for live SAGE lifecycle events.</div>
+    </div>
+    <div class="header-dashboard-grid">
+      <div class="summary-stack">
+        <div class="run-progress" id="runProgress"></div>
+        <div class="metrics" id="metrics"></div>
+        <div class="metrics tool-metrics" id="toolMetrics"></div>
+        <div class="cache-panel" id="cachePanel"></div>
+        <div class="live-tool-panel" id="liveToolPanel"></div>
+      </div>
+      <div class="sage-status-stack">
+        <button type="button" class="tool-generation-card state-idle" id="toolGenerationCard">
+          <div class="tool-gen-stage" id="toolGenStage">Current Lifecycle Status</div>
+          <div class="tool-gen-status-main" id="toolGenStatusMain">Monitoring</div>
+          <div>
+            <div class="tool-gen-kicker">Tool</div>
+            <div class="tool-gen-title" id="toolGenTitle">Waiting for tool activity</div>
+          </div>
+          <div class="tool-gen-purpose" id="toolGenPurpose">Waiting for the next gap, generated tool, or validation event.</div>
+          <div class="tool-gen-step-row">
+            <strong id="toolGenCurrentStep">Current step: waiting</strong>
+            <span id="toolGenNextStep">Next: watch for a generated-tool lifecycle event.</span>
+          </div>
+          <div class="tool-gen-timeline" id="toolGenTimeline"></div>
+          <div class="tool-gen-status-pill" id="toolGenStatus">Idle</div>
+          <div class="tool-gen-meta" id="toolGenMeta"></div>
+        </button>
+      </div>
+    </div>
 	  </header>
   <main>
     <aside>
@@ -816,13 +1210,24 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       <pre class="code-block" id="toolCodeBlock"></pre>
     </div>
   </div>
+  <div class="drawer" id="toolGenerationDrawer" aria-hidden="true">
+    <div class="drawer-panel code-panel">
+      <div class="drawer-head">
+        <div>
+          <h2 style="margin:0">SAGE Tool Generation Status</h2>
+          <div class="code-meta" id="toolGenerationSub"></div>
+        </div>
+        <button class="close" id="closeToolGeneration">Close</button>
+      </div>
+      <div id="toolGenerationDetail"></div>
+    </div>
+  </div>
   <script>
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     function envDisplayName(value) {
       const raw = String(value || "ToolSandbox").trim();
       const normalized = raw.toLowerCase().replaceAll("_", "-");
       if (normalized.includes("toolsandbox")) return "ToolSandbox";
-      if (normalized.includes("cybergym")) return "CyberGym";
       if (normalized.includes("minigrid")) return "MiniGrid";
       return raw ? raw.replaceAll("-", " ") : "ToolSandbox";
     }
@@ -963,6 +1368,21 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     let transactionArm = "candidate";
     let handlersBound = false;
     let refreshTimer = null;
+    let toolGenerationRefreshTimer = null;
+    let lastAgentActionText = "";
+    let lastAgentActionRenderedAt = 0;
+    const AGENT_ACTION_MIN_DISPLAY_MS = 5000;
+    let toolGenerationStatus = {
+      state: "idle",
+      stage: "SAGE Tool Generation",
+      title: "Monitoring",
+      body: "Waiting for the next gap, generated tool, or validation event.",
+      thinkingText: "Waiting for live SAGE lifecycle events.",
+      meta: [],
+      details: [],
+      code: "",
+      toolName: "",
+    };
 
     function metric(label, value, hint, className = "", clickable = false) {
       return `<div class="metric ${clickable ? "clickable" : ""}" ${clickable ? 'id="toolsMetric" role="button" tabindex="0"' : ""}>
@@ -1070,6 +1490,589 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       return `${gains ?? 0} gains / ${regressions ?? 0} regressions`;
     }
 
+    function runRootPath() {
+      return String(payload?.run_root || ".").replace(/\/+$/, "");
+    }
+
+    function candidateRunDir() {
+      return payload?.arm_progress?.candidate?.run_dir || null;
+    }
+
+    function relativeToDashboard(path) {
+      const root = runRootPath();
+      if (!path) return null;
+      const value = String(path);
+      if (value.startsWith(root + "/")) return "../" + value.slice(root.length + 1);
+      if (value.startsWith("outputs/")) return null;
+      return value;
+    }
+
+    async function fetchTextMaybe(path) {
+      const rel = relativeToDashboard(path);
+      if (!rel) return "";
+      try {
+        const response = await fetch(`${rel}?ts=${Date.now()}`, {cache: "no-store"});
+        if (!response.ok) return "";
+        return await response.text();
+      } catch {
+        return "";
+      }
+    }
+
+    function parseJsonLines(text) {
+      return String(text || "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          try { return JSON.parse(line); } catch { return null; }
+        })
+        .filter(Boolean);
+    }
+
+    function statusLabelForState(state) {
+      const labels = {
+        idle: "Waiting",
+        scanning: "Scanning",
+        gap: "Gap Found",
+        generating: "Generating",
+        validating: "Validating",
+        repairing: "Repairing",
+        accepted: "Accepted",
+        rejected: "Blocked",
+        using: "Using Tool",
+        complete: "Complete",
+      };
+      return labels[state] || "Monitoring";
+    }
+
+    function toolGenerationStateClass(state) {
+      if (state === "accepted") return "state-accepted";
+      if (state === "rejected") return "state-rejected";
+      if (state === "gap") return "state-gap";
+      if (state === "generating") return "state-generating";
+      if (state === "validating") return "state-validating";
+      if (state === "repairing") return "state-repairing";
+      if (state === "using") return "state-using";
+      if (state === "complete") return "state-complete";
+      if (state === "scanning") return "state-scanning";
+      return "state-idle";
+    }
+
+    function toolGenerationCardClass(state) {
+      return `tool-generation-card ${toolGenerationStateClass(state)}`;
+    }
+
+    function toolGenerationStateForEvent(event) {
+      const name = String(event?.event || "");
+      if (name === "run_finished") return "complete";
+      if (["validation_passed", "tool_birth_succeeded", "registry_saved", "registry_save"].includes(name)) return "accepted";
+      if (["validation_failed", "tool_birth_rejected", "generation_error"].includes(name)) return "rejected";
+      if (name === "jit_proactive_inadequacy_detected" || name === "proactive_inadequacy_detected") return "gap";
+      if (name === "tool_birth_started" || name === "tool_generation_completed") return "generating";
+      if (name === "validation_started") return "validating";
+      if (name.startsWith("tool_repair")) return "repairing";
+      if (name === "generated_tool_invoked" || name === "jit_birth_tools_available_for_same_task") return "using";
+      if (name.includes("skipped") || name.includes("reflection_completed")) return "scanning";
+      if (event?.accepted === true) return "accepted";
+      if (event?.accepted === false) return "rejected";
+      return "idle";
+    }
+
+    function humanToolStage(event) {
+      if (!event) return "Monitoring";
+      if (!event.event && event.scenario) return "Current task";
+      if (event.event === "run_finished") return "Run complete";
+      if (event.accepted === true) return "Tool accepted";
+      if (event.accepted === false) return "Validation rejected";
+      if (event.event === "jit_proactive_inadequacy_detected") return "Gap identified";
+      if (event.event === "proactive_inadequacy_detected") return "Gap identified";
+      if (event.event === "tool_birth_started") return "Gap identified";
+      if (event.event === "tool_generation_completed") return "Tool generated";
+      if (event.event === "validation_started") return "Validation running";
+      if (event.event === "tool_repair_started") return "Repair running";
+      if (event.event === "tool_repair_attempted") return "Repair checked";
+      if (event.event === "validation_passed") return "Tool accepted";
+      if (event.event === "validation_failed") return "Validation rejected";
+      if (event.event === "tool_birth_succeeded") return "Tool stored";
+      if (event.event === "tool_birth_rejected") return "Birth rejected";
+      if (event.event === "registry_saved") return "Registry updated";
+      if (event.event === "registry_save") return "Tool stored";
+      if (event.event === "generated_tool_invoked") return "Generated tool in use";
+      if (event.event === "jit_birth_tools_available_for_same_task") return "Tool ready for task";
+      if (event.event === "jit_proactive_scenario_reflection_completed") return "Task scanned";
+      if (String(event.event || "").includes("skipped")) return "Birth skipped";
+      return event.event ? String(event.event).replaceAll("_", " ") : "Tool generation";
+    }
+
+    function eventPriority(event) {
+      const state = toolGenerationStateForEvent(event);
+      const order = {
+        complete: 100,
+        rejected: 90,
+        accepted: 80,
+        repairing: 70,
+        validating: 65,
+        generating: 60,
+        gap: 50,
+        using: 45,
+        scanning: 20,
+        idle: 0,
+      };
+      return order[state] ?? 0;
+    }
+
+    function latestMeaningfulRunEvent(runEvents) {
+      const noisy = new Set(["registry_checkpoint_written"]);
+      for (let index = runEvents.length - 1; index >= 0; index -= 1) {
+        const event = runEvents[index];
+        if (!event || noisy.has(String(event.event || ""))) continue;
+        return event;
+      }
+      return null;
+    }
+
+    function reuseEventForScenario(reuseEvents, scenario) {
+      if (!scenario) return null;
+      for (let index = reuseEvents.length - 1; index >= 0; index -= 1) {
+        const event = reuseEvents[index];
+        if (String(event?.scenario || "") === String(scenario)) return event;
+      }
+      return null;
+    }
+
+    function sameScenarioText(left, right) {
+      const a = String(left || "").trim();
+      const b = String(right || "").trim();
+      return Boolean(a && b && (a === b || a.includes(b) || b.includes(a)));
+    }
+
+    function eventMatchesCurrentTask(event, current, liveStatus) {
+      if (!event || !current?.scenario) return false;
+      const currentScenario = current.scenario;
+      const liveLabels = [
+        liveStatus?.scenario,
+        liveStatus?.task_context_label,
+      ].filter(Boolean);
+      const eventLabels = [
+        event.scenario,
+        event.birth_scenario,
+        event.task_context_label,
+      ].filter(Boolean);
+      return eventLabels.some((label) => sameScenarioText(label, currentScenario))
+        || eventLabels.some((label) => liveLabels.some((liveLabel) => sameScenarioText(label, liveLabel)));
+    }
+
+    function chooseCurrentToolLifecycleEvent({current, liveStatus, latestRunEvent, latestBirth, latestReuse}) {
+      if (latestRunEvent?.event === "run_finished") {
+        return {event: latestRunEvent, state: "complete"};
+      }
+      const liveState = liveStatus ? toolGenerationStateForEvent(liveStatus) : "idle";
+      const birthState = latestBirth ? toolGenerationStateForEvent(latestBirth) : "idle";
+      const activeBirthStates = new Set(["gap", "generating", "validating", "repairing"]);
+      const terminalBirthStates = new Set(["accepted", "rejected"]);
+      if (liveStatus && activeBirthStates.has(liveState) && eventMatchesCurrentTask(liveStatus, current, liveStatus)) {
+        return {event: liveStatus, state: liveState};
+      }
+      if (latestBirth && activeBirthStates.has(birthState) && eventMatchesCurrentTask(latestBirth, current, liveStatus)) {
+        return {event: latestBirth, state: birthState};
+      }
+      if (latestReuse) {
+        return {event: latestReuse, state: "using"};
+      }
+      if (current?.scenario) {
+        if (liveStatus && terminalBirthStates.has(liveState) && eventMatchesCurrentTask(liveStatus, current, liveStatus)) {
+          return {event: liveStatus, state: liveState};
+        }
+        if (latestBirth && terminalBirthStates.has(birthState) && eventMatchesCurrentTask(latestBirth, current, liveStatus)) {
+          return {event: latestBirth, state: birthState};
+        }
+        if (liveStatus && eventMatchesCurrentTask(liveStatus, current, liveStatus)) {
+          return {event: liveStatus, state: liveState === "idle" ? "scanning" : liveState};
+        }
+        return {event: current, state: "scanning"};
+      }
+      const fallback = latestRunEvent || latestBirth || liveStatus;
+      return {event: fallback, state: fallback ? toolGenerationStateForEvent(fallback) : "idle"};
+    }
+
+    function chooseToolTileLifecycleEvent({liveStatus, latestRunEvent, latestBirth, latestReuse}) {
+      if (latestRunEvent?.event === "run_finished") {
+        return {event: latestRunEvent, state: "complete"};
+      }
+      const activeStates = new Set(["gap", "generating", "validating", "repairing"]);
+      const liveState = liveStatus ? toolGenerationStateForEvent(liveStatus) : "idle";
+      const birthState = latestBirth ? toolGenerationStateForEvent(latestBirth) : "idle";
+      if (liveStatus && activeStates.has(liveState)) return {event: liveStatus, state: liveState};
+      if (latestBirth && activeStates.has(birthState)) return {event: latestBirth, state: birthState};
+      if (latestReuse) return {event: latestReuse, state: "using"};
+      const candidates = [liveStatus, latestBirth, latestRunEvent]
+        .filter(Boolean)
+        .filter((event) => {
+          const state = toolGenerationStateForEvent(event);
+          return !["idle", "scanning"].includes(state);
+        });
+      const event = candidates.length
+        ? candidates.reduce((best, item) => eventPriority(item) >= eventPriority(best) ? item : best)
+        : null;
+      return {event, state: event ? toolGenerationStateForEvent(event) : "idle"};
+    }
+
+    function extractedRequestText(text) {
+      const match = String(text || "").match(/request='([^']+)'/);
+      return match?.[1] || "";
+    }
+
+    function taskKindLabel(name) {
+      const request = extractedRequestText(name);
+      if (request) {
+        return request.length > 76 ? `the request "${request.slice(0, 73)}..."` : `the request "${request}"`;
+      }
+      const text = String(name || "").toLowerCase();
+      if (text.includes("message") && text.includes("recency")) return "a message recency task";
+      if (text.includes("message")) return "a message task";
+      if (text.includes("reminder") && text.includes("recency")) return "a reminder recency task";
+      if (text.includes("reminder")) return "a reminder task";
+      if (text.includes("relationship")) return "a contact relationship task";
+      if (text.includes("phone")) return "a phone-number lookup task";
+      if (text.includes("contact")) return "a contact task";
+      if (text.includes("wifi") || text.includes("cellular") || text.includes("battery") || text.includes("location")) return "a device status task";
+      return "the current task";
+    }
+
+    function compactScenarioName(name) {
+      return taskKindLabel(name);
+    }
+
+    function conciseGapText(event) {
+      const raw = event?.observation_reason || event?.canonical_key || event?.gap || "";
+      const text = String(raw).replace("visible_task_context:", "").trim();
+      if (!text) return "";
+      return text.length > 70 ? `${text.slice(0, 67)}...` : text;
+    }
+
+    function toolNameForLifecycleEvent(event) {
+      if (event?.tool_name) return String(event.tool_name);
+      const key = String(event?.canonical_key || "");
+      if (key.includes(":")) return key.split(":").pop();
+      return key;
+    }
+
+    function lifecycleStatusHeadline(event, state) {
+      const name = String(event?.event || "");
+      if (name === "tool_repair_started") return "Tool Repair Started";
+      if (name === "tool_repair_attempted") return "Repair Attempt Checked";
+      if (state === "repairing") return "Tool Repair Running";
+      if (name === "validation_started" || state === "validating") return "Validation Running";
+      if (name === "tool_generation_completed") return "Tool Draft Generated";
+      if (name === "tool_birth_started" || state === "generating") return "Tool Generation Started";
+      if (name === "jit_proactive_inadequacy_detected" || name === "proactive_inadequacy_detected" || state === "gap") return "Gap Identified";
+      if (event?.accepted === true || state === "accepted") return "Tool Accepted";
+      if (event?.accepted === false || state === "rejected") return "Tool Rejected";
+      if (state === "using") return "Tool Being Used";
+      if (state === "complete") return "Run Complete";
+      if (state === "scanning") return "Task Being Scanned";
+      return "Monitoring";
+    }
+
+    function readableGapPurpose(event, current) {
+      const key = String(event?.canonical_key || "").toLowerCase();
+      const reason = String(event?.observation_reason || "").replace("visible_task_context:", "").replaceAll("_", " ").trim();
+      const scenario = event?.scenario || event?.birth_scenario || current?.scenario || "";
+      const taskText = compactScenarioName(scenario);
+      if (key.includes("prepare_add_contact_args")) {
+        return "Why: SAGE needs a reusable tool that converts the visible add-contact request into validated contact arguments before the actor calls the original contact tool.";
+      }
+      if (key.includes("prepare_direct_contact_action_args")) {
+        return "Why: SAGE needs a reusable tool that turns visible contact details into safe, structured action arguments while preserving the original environment action.";
+      }
+      if (key.includes("prepare_reminder_creation_args")) {
+        return "Why: SAGE needs a reusable tool that turns visible reminder content, dates, times, and locations into structured reminder arguments.";
+      }
+      if (key.includes("relative") && key.includes("timestamp")) {
+        return "Why: SAGE needs a deterministic time tool so relative dates can become exact timestamps without guessing.";
+      }
+      if (key.includes("weekday") && key.includes("timestamp")) {
+        return "Why: SAGE needs a deterministic weekday-time tool so phrases like next Friday can become exact timestamps.";
+      }
+      if (key.includes("select_record_by_timestamp") || key.includes("recency")) {
+        return "Why: SAGE needs a reusable ranking tool to select the right visible record by recency or timestamp.";
+      }
+      if (key.includes("message_counterparty")) {
+        return "Why: SAGE needs a reusable tool to identify the correct message counterparty before a contact or message action.";
+      }
+      if (key.includes("location")) {
+        return "Why: SAGE needs a reusable tool to turn a visible location phrase into structured search or action arguments.";
+      }
+      if (key.includes("plan_")) {
+        return `Why: SAGE needs a reusable planning tool for ${taskText} so the actor can choose the correct original environment action.`;
+      }
+      if (reason) {
+        return `Why: ${reason}.`;
+      }
+      const tool = toolNameForLifecycleEvent(event);
+      return tool
+        ? `Why: SAGE identified a reusable tool gap for ${taskText}: ${compactToolName(tool)}.`
+        : "Why: SAGE is checking whether a reusable generated tool is needed for the current task.";
+    }
+
+    function nextStepForState(state, event) {
+      if (state === "gap") return "Next: generate a candidate tool only if the gap is reusable.";
+      if (state === "generating") return "Next: validate the generated tool against schema and runtime checks.";
+      if (state === "validating") return "Next: accept the tool, reject it, or repair it if validation finds a fixable issue.";
+      if (state === "repairing") return "Next: re-run validation on the repaired tool.";
+      if (state === "accepted") return "Next: route the stored tool when later visible task context matches.";
+      if (state === "rejected") return "Next: continue without storing this candidate tool.";
+      if (state === "using") return "Next: use the tool output to complete the task with original environment actions.";
+      if (state === "complete") return "Next: review final paired metrics and generated-tool contribution evidence.";
+      return event ? "Next: continue monitoring SAGE lifecycle events." : "Next: wait for a generated-tool lifecycle event.";
+    }
+
+    function timelineRowsForLifecycle(event, state) {
+      const key = String(event?.canonical_key || "");
+      const tool = compactToolName(toolNameForLifecycleEvent(event) || "generated tool");
+      const base = [
+        ["gap", "Gap identified", key ? `Reusable capability gap: ${key}` : "SAGE found a possible reusable tool gap."],
+        ["generating", "Tool generation", `Create a candidate for ${tool}.`],
+        ["validating", "Validation", "Check schema, contract, examples, and runtime behavior."],
+        ["repairing", "Repair", "Use validation errors to fix the candidate tool."],
+        ["accepted", "Registry decision", "Store accepted tools for later routing and reuse."],
+      ];
+      const order = {gap: 0, generating: 1, validating: 2, repairing: 3, accepted: 4, rejected: 4, using: 5, complete: 5, scanning: -1, idle: -1};
+      const currentIndex = order[state] ?? -1;
+      return base.map(([step, label, detail], index) => {
+        let status = "next";
+        if (currentIndex < 0) status = "next";
+        else if (index < currentIndex) status = "done";
+        else if (index === currentIndex) status = "current";
+        if (state === "rejected" && index === 4) {
+          label = "Rejected";
+          detail = "Candidate did not pass validation or contract checks.";
+        }
+        if (state === "using" && index === 4) {
+          status = "done";
+          detail = "Tool is available for the actor in this task.";
+        }
+        if (state === "complete") status = "done";
+        return {status, label, detail};
+      });
+    }
+
+    function renderTimelineRows(rows, limit = 5) {
+      const visible = rows.slice(0, limit);
+      return visible.map((row) => `
+        <div class="tool-gen-timeline-row ${esc(row.status || "next")}">
+          <div class="tool-gen-timeline-dot"></div>
+          <div>
+            <div class="tool-gen-timeline-label">${esc(row.label)}</div>
+            <div class="tool-gen-timeline-detail">${esc(row.detail)}</div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function sageThinkingMessage(state, latest, current, toolName) {
+      const scenario = current?.scenario || latest?.scenario || latest?.birth_scenario || "";
+      const tool = toolName ? compactToolName(toolName) : "the generated tool";
+      const gapText = conciseGapText(latest);
+      const taskText = compactScenarioName(scenario);
+      let text = "SAGE is waiting for the next live lifecycle event.";
+      if (state === "scanning") {
+        text = `SAGE is working on ${taskText}. It is checking whether an existing generated tool fits or whether a new tool gap exists.`;
+      } else if (state === "gap") {
+        text = gapText
+          ? `SAGE found a possible tool gap for ${taskText}: ${gapText}. It is deciding whether to generate a new tool.`
+          : `SAGE found a possible tool gap for ${taskText}. It is deciding whether to generate a new tool.`;
+      } else if (state === "generating") {
+        text = `SAGE is generating "${tool}" for the detected gap. The tool must pass validation before it can be reused.`;
+      } else if (state === "validating") {
+        text = `SAGE is validating "${tool}" against its schema, examples, and runtime behavior.`;
+      } else if (state === "repairing") {
+        text = `SAGE is repairing "${tool}" using validation errors. The repaired tool must pass the same checks.`;
+      } else if (state === "accepted") {
+        text = `SAGE accepted "${tool}" into the registry. It can be routed later when visible context matches.`;
+      } else if (state === "rejected") {
+        text = `SAGE rejected "${tool}" because validation or contract checks did not pass.`;
+      } else if (state === "using") {
+        text = `SAGE is using "${tool}" to help with ${taskText}. Any state changes still use the original environment tools.`;
+      } else if (state === "complete") {
+        text = "The SAGE arm is complete. Final paired metrics and generated-tool contribution data are available below.";
+      }
+      return {
+        text,
+      };
+    }
+
+    function throttledAgentActionText(nextText, force = false) {
+      const text = String(nextText || "SAGE is monitoring the current task.").trim();
+      const now = Date.now();
+      if (force || !lastAgentActionText || text === lastAgentActionText || (now - lastAgentActionRenderedAt) >= AGENT_ACTION_MIN_DISPLAY_MS) {
+        lastAgentActionText = text;
+        lastAgentActionRenderedAt = now;
+      }
+      return lastAgentActionText;
+    }
+
+    async function loadToolCodeForEvent(event, candidateDir) {
+      if (event?.code) return String(event.code);
+      if (event?.snapshot_path) return await fetchTextMaybe(event.snapshot_path);
+      const tool = event?.tool_name;
+      if (!tool || !candidateDir) return "";
+      return await fetchTextMaybe(`${candidateDir}/generated_tool_snapshots/${tool}_v1.py`);
+    }
+
+    async function updateToolGenerationStatus() {
+      const candidateDir = candidateRunDir();
+      if (!candidateDir) {
+        toolGenerationStatus = {
+          state: "idle",
+          stage: "SAGE Tool Generation",
+          statusHeadline: "Waiting For SAGE",
+          title: "No active generated tool",
+          body: "Candidate run artifacts are not available yet.",
+          purpose: "Why: candidate run artifacts are not available yet.",
+          currentStep: "Current step: waiting for candidate artifacts",
+          nextStep: "Next: load live SAGE lifecycle files when they are created.",
+          timeline: timelineRowsForLifecycle(null, "idle"),
+          thinkingText: "Waiting for candidate run artifacts before live SAGE status can be displayed.",
+          meta: [],
+          details: [],
+          code: "",
+          toolName: "",
+        };
+        renderToolGenerationStatus();
+        return;
+      }
+      const [currentText, birthText, eventText, statusText, reuseText] = await Promise.all([
+        fetchTextMaybe(`${candidateDir}/currently_running.json`),
+        fetchTextMaybe(`${candidateDir}/tool_birth_events.jsonl`),
+        fetchTextMaybe(`${candidateDir}/sage_run_events.jsonl`),
+        fetchTextMaybe(`${candidateDir}/tool_generation_status.json`),
+        fetchTextMaybe(`${candidateDir}/reuse_events.jsonl`),
+      ]);
+      let current = null;
+      let liveStatus = null;
+      try { current = currentText.trim() ? JSON.parse(currentText) : null; } catch { current = null; }
+      try { liveStatus = statusText.trim() ? JSON.parse(statusText) : null; } catch { liveStatus = null; }
+      const birthEvents = parseJsonLines(birthText);
+      const runEvents = parseJsonLines(eventText);
+      const reuseEvents = parseJsonLines(reuseText);
+      const latestBirth = birthEvents.length ? birthEvents[birthEvents.length - 1] : null;
+      const latestRunEvent = latestMeaningfulRunEvent(runEvents);
+      const latestReuse = reuseEventForScenario(reuseEvents, current?.scenario);
+      const actionChoice = chooseCurrentToolLifecycleEvent({current, liveStatus, latestRunEvent, latestBirth, latestReuse});
+      const tileChoice = chooseToolTileLifecycleEvent({liveStatus, latestRunEvent, latestBirth, latestReuse});
+      const actionLatest = actionChoice.event;
+      const latest = tileChoice.event;
+      const state = tileChoice.state;
+      const displayScenario = latest?.scenario || latest?.birth_scenario || current?.scenario || "";
+      const toolName = toolNameForLifecycleEvent(latest);
+      const stage = humanToolStage(latest);
+      const acceptedCount = birthEvents.filter((event) => event.accepted === true).length;
+      const rejectedCount = birthEvents.filter((event) => event.accepted === false).length;
+      const actionToolName = toolNameForLifecycleEvent(actionLatest) || toolName;
+      const thinking = sageThinkingMessage(actionChoice.state, actionLatest, current, actionToolName);
+      const timeline = timelineRowsForLifecycle(latest, state);
+      const currentTimeline = timeline.find((row) => row.status === "current") || timeline.find((row) => row.status === "next") || timeline[timeline.length - 1];
+      const purpose = readableGapPurpose(latest, current);
+      const statusHeadline = lifecycleStatusHeadline(latest, state);
+      const bodyParts = [];
+      if (latest?.observation_reason) bodyParts.push(String(latest.observation_reason).replace("visible_task_context:", ""));
+      if (latest?.canonical_key) bodyParts.push(`Gap: ${latest.canonical_key}`);
+      if (latest?.event === "generated_tool_invoked" && latest?.tool_name) bodyParts.push(`Calling ${latest.tool_name}`);
+      if (!bodyParts.length && latest?.replacement_strategy) bodyParts.push(latest.replacement_strategy);
+      if (!bodyParts.length) bodyParts.push("Waiting for the next generated-tool lifecycle event.");
+      const code = await loadToolCodeForEvent(latest, candidateDir);
+      toolGenerationStatus = {
+        state,
+        stage: "Current Lifecycle Status",
+        statusHeadline,
+        title: toolName ? compactToolName(toolName) : "No active generated tool",
+        body: bodyParts.join(" · "),
+        purpose,
+        currentStep: currentTimeline ? `Current step: ${currentTimeline.label}` : `Current step: ${stage}`,
+        nextStep: nextStepForState(state, latest),
+        timeline,
+        thinkingText: throttledAgentActionText(thinking.text, actionChoice.state === "complete"),
+        meta: [
+          `scenario ${current?.completed_count ?? payload?.summary?.candidate_completed ?? 0}/${current?.scenario_count ?? payload?.summary?.scenario_count ?? 0}`,
+          `${acceptedCount} accepted · ${rejectedCount} rejected`,
+          latest?.event ? String(latest.event).replaceAll("_", " ") : "no active birth event",
+        ],
+        details: [
+          ["Current status", statusHeadline],
+          ["Why this tool exists", purpose.replace(/^Why:\s*/i, "")],
+          ["Current step", currentTimeline?.label || stage],
+          ["Next step", nextStepForState(state, latest).replace(/^Next:\s*/i, "")],
+          ["Current scenario", displayScenario || "n/a"],
+          ["Latest stage", stage],
+          ["Tool", toolName || "n/a"],
+          ["Gap key", latest?.canonical_key || "n/a"],
+          ["Validation", latest?.accepted === true ? "accepted" : latest?.accepted === false ? "rejected" : "n/a"],
+          ["Validation errors", Array.isArray(latest?.errors) && latest.errors.length ? latest.errors.join("; ") : "none"],
+          ["Repair attempts", latest?.repair_attempt_count ?? latest?.attempt ?? "n/a"],
+          ["Accepted / rejected births", `${acceptedCount} / ${rejectedCount}`],
+        ],
+        code,
+        toolName,
+      };
+      renderToolGenerationStatus();
+    }
+
+    function renderToolGenerationStatus() {
+      const status = toolGenerationStatus;
+      const card = document.getElementById("toolGenerationCard");
+      if (!card) return;
+      card.className = toolGenerationCardClass(status.state);
+      const thinkingText = document.getElementById("sageThinkingText");
+      if (thinkingText) thinkingText.textContent = status.thinkingText || "Waiting for live SAGE lifecycle events.";
+      document.getElementById("toolGenStage").textContent = status.stage;
+      document.getElementById("toolGenStatusMain").textContent = status.statusHeadline || statusLabelForState(status.state);
+      document.getElementById("toolGenTitle").textContent = status.title;
+      document.getElementById("toolGenPurpose").textContent = status.purpose || status.body;
+      document.getElementById("toolGenCurrentStep").textContent = status.currentStep || `Current step: ${statusLabelForState(status.state)}`;
+      document.getElementById("toolGenNextStep").textContent = status.nextStep || "Next: continue monitoring SAGE lifecycle events.";
+      document.getElementById("toolGenTimeline").innerHTML = renderTimelineRows(status.timeline || []);
+      const pill = document.getElementById("toolGenStatus");
+      pill.textContent = statusLabelForState(status.state);
+      const pillClass = status.state === "rejected"
+        ? "bad"
+        : status.state === "repairing"
+          ? "repairing"
+          : status.state === "validating"
+            ? "validating"
+            : ["gap", "generating"].includes(status.state)
+              ? "warn"
+              : ["idle", "scanning"].includes(status.state)
+                ? "idle"
+                : "";
+      pill.className = `tool-gen-status-pill ${pillClass}`;
+      document.getElementById("toolGenMeta").innerHTML = (status.meta || []).map((item) => `<div>${esc(item)}</div>`).join("");
+    }
+
+    function openToolGenerationDrawer() {
+      const status = toolGenerationStatus;
+      document.getElementById("toolGenerationSub").textContent = `${statusLabelForState(status.state)} · ${status.toolName || "no active tool"}`;
+      const rows = (status.details || []).map(([label, value]) => `<div class="tool-gen-detail-card"><h3>${esc(label)}</h3><div class="small">${esc(value)}</div></div>`).join("");
+      document.getElementById("toolGenerationDetail").innerHTML = `
+        <div class="tool-gen-detail-grid">${rows}</div>
+        <div class="section" style="margin-top:12px">
+          <div class="section-head"><h3>Lifecycle Timeline</h3><div class="small">${esc(status.statusHeadline || statusLabelForState(status.state))}</div></div>
+          <div class="tool-gen-drawer-timeline">${renderTimelineRows(status.timeline || [], 8)}</div>
+        </div>
+        <div class="section" style="margin-top:12px">
+          <div class="section-head"><h3>Current Generated Tool Code</h3><div class="small">${esc(status.toolName || "No generated tool snapshot available")}</div></div>
+          <pre class="tool-gen-code">${esc(status.code || "No generated code is available for the latest status yet.")}</pre>
+        </div>`;
+      document.getElementById("toolGenerationDrawer").classList.add("open");
+      document.getElementById("toolGenerationDrawer").setAttribute("aria-hidden", "false");
+    }
+
+    function closeToolGenerationDrawer() {
+      document.getElementById("toolGenerationDrawer").classList.remove("open");
+      document.getElementById("toolGenerationDrawer").setAttribute("aria-hidden", "true");
+    }
+
     function plannedTaskCount(summary) {
       const modeMatch = String(payload?.mode || "").match(/_(\d+)$/);
       const modeCap = modeMatch ? Number(modeMatch[1]) : 0;
@@ -1138,19 +2141,19 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         ? llmPairValue(s.control_llm_total_tokens, s.candidate_llm_total_tokens, tokenNum)
         : "- / -";
       const llmCallsHint = controlUsageRecorded || candidateUsageRecorded
-        ? `live ${intNum(s.control_llm_live_call_count)} / ${intNum(s.candidate_llm_live_call_count)} · cached ${intNum(s.control_llm_cached_call_count)} / ${intNum(s.candidate_llm_cached_call_count)}`
+        ? `live ${intNum(s.control_llm_live_call_count)} / ${intNum(s.candidate_llm_live_call_count)} · stored-response replays ${intNum(s.control_llm_cached_call_count)} / ${intNum(s.candidate_llm_cached_call_count)}`
         : "usage not recorded in this run";
       const llmTokensHint = controlUsageRecorded || candidateUsageRecorded
-        ? `prompt ${tokenNum(s.control_llm_prompt_tokens)} / ${tokenNum(s.candidate_llm_prompt_tokens)} · completion ${tokenNum(s.control_llm_completion_tokens)} / ${tokenNum(s.candidate_llm_completion_tokens)}`
+        ? `prompt ${tokenNum(s.control_llm_prompt_tokens)} / ${tokenNum(s.candidate_llm_prompt_tokens)} · provider-prefix cached ${tokenNum(s.control_llm_provider_cached_prompt_tokens)} / ${tokenNum(s.candidate_llm_provider_cached_prompt_tokens)} · provider metadata ${intNum(s.control_llm_provider_cached_prompt_tokens_available_count)} / ${intNum(s.candidate_llm_provider_cached_prompt_tokens_available_count)} calls · completion ${tokenNum(s.control_llm_completion_tokens)} / ${tokenNum(s.candidate_llm_completion_tokens)}`
         : "OpenAI usage metadata unavailable";
       document.getElementById("runProgress").innerHTML = `<span class="label">Run Progress</span><strong>${matched || 0}/${totalTasks || 0}</strong><span>baseline ${baselineDone}/${totalTasks || 0} ${esc(baselineProgress.status)} · SAGE ${sageDone}/${totalTasks || 0} ${esc(sageProgress.status)}</span>`;
       document.getElementById("metrics").innerHTML = [
-        metric("Baseline Score", num(baselineScore), `${paired.scoreCount || matched || 0} paired score tasks`),
-        metric("SAGE Score", num(sageScore), `${paired.scoreCount || matched || 0} paired score tasks`),
-        metric("Score Lift", liftPct(scoreLift, approxZeroBaselineLift(scoreDelta, baselineScore)), liftHint(scoreDelta, baselineScore, "score"), cls(scoreDelta)),
         metric("Baseline Outcome", num(baselineOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("SAGE Outcome", num(sageOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("Outcome Lift", liftPct(outcomeLift, approxZeroBaselineLift(outcomeDelta, baselineOutcome)), liftHint(outcomeDelta, baselineOutcome, "outcome"), cls(outcomeDelta)),
+        metric("Baseline Canonical Audit", num(baselineScore), `${paired.scoreCount || matched || 0} descriptive route-match tasks`),
+        metric("SAGE Canonical Audit", num(sageScore), `${paired.scoreCount || matched || 0} descriptive route-match tasks`),
+        metric("Canonical Audit Movement", liftPct(scoreLift, approxZeroBaselineLift(scoreDelta, baselineScore)), `${liftHint(scoreDelta, baselineScore, "route-match")} · descriptive only`),
         metric("Total Time B / S", totalTimePairValue(s), totalTimeHint(s)),
         metric("LLM Calls B / S", llmCallsValue, llmCallsHint),
         metric("Tokens B / S", llmTokensValue, llmTokensHint),
@@ -1192,8 +2195,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         return `<button class="task-btn ${index === selected ? "active" : ""}" data-index="${index}">
           <div class="task-name">${esc(pair.display_index || index + 1)}. ${esc(pair.short_name || pair.scenario)}</div>
           <div class="task-meta">
-            <span class="meta-pill"><span class="meta-label">score</span><span class="${cls(d.scoreDelta)}">${signedNum(d.scoreDelta)}</span></span>
             <span class="meta-pill"><span class="meta-label">outcome</span><span class="${cls(d.outcomeDelta)}">${signedNum(d.outcomeDelta)}</span></span>
+            <span class="meta-pill"><span class="meta-label">canonical audit</span><span>${signedNum(d.scoreDelta)}</span></span>
           </div>
           ${events.length ? `<div class="tool-badges">${chips}${overflow}</div>` : ""}
         </button>`;
@@ -1392,7 +2395,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <div class="check-totals">
           <span class="pill">Milestones ${totals.requiredPassed}/${totals.requiredTotal}</span>
           <span class="pill">${esc(guardrailText)}</span>
-          <span class="pill">Final ${num(totals.finalScore)}</span>
+          <span class="pill">Canonical audit ${num(totals.finalScore)}</span>
         </div>
         ${checks.map((check, idx) => {
           const status = inferCheckStatus(check);
@@ -1563,15 +2566,15 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           </div>
           <div class="pill-row">${cats.map((cat) => `<span class="pill">${esc(cat)}</span>`).join("")}</div>
           <div class="compare-grid">
-            <div class="mini"><div class="label">Baseline Score</div><div class="value">${pct(control.similarity)}</div></div>
-            <div class="mini"><div class="label">SAGE Score</div><div class="value">${pct(candidate.similarity)}</div></div>
-            <div class="mini"><div class="label">Score Lift</div><div class="value ${cls(d.scoreDelta)}">${liftPct(relLift(d.scoreDelta, control.similarity), approxZeroBaselineLift(d.scoreDelta, control.similarity))}</div><div class="hint">${liftHint(d.scoreDelta, control.similarity, "score")}</div></div>
             <div class="mini"><div class="label">Baseline Outcome</div><div class="value">${pct(outcome(control))}</div></div>
             <div class="mini"><div class="label">SAGE Outcome</div><div class="value">${pct(outcome(candidate))}</div></div>
             <div class="mini"><div class="label">Outcome Lift</div><div class="value ${cls(d.outcomeDelta)}">${liftPct(relLift(d.outcomeDelta, outcome(control)), approxZeroBaselineLift(d.outcomeDelta, outcome(control)))}</div><div class="hint">${approxZeroBaselineLift(d.outcomeDelta, outcome(control)) ? liftHint(d.outcomeDelta, outcome(control), "outcome") : `${num(outcome(control))} -> ${num(outcome(candidate))}; delta ${signedNum(d.outcomeDelta)}`}</div></div>
+            <div class="mini"><div class="label">Baseline Canonical Audit</div><div class="value">${pct(control.similarity)}</div><div class="hint">descriptive route match</div></div>
+            <div class="mini"><div class="label">SAGE Canonical Audit</div><div class="value">${pct(candidate.similarity)}</div><div class="hint">descriptive route match</div></div>
+            <div class="mini"><div class="label">Canonical Audit Movement</div><div class="value">${liftPct(relLift(d.scoreDelta, control.similarity), approxZeroBaselineLift(d.scoreDelta, control.similarity))}</div><div class="hint">${liftHint(d.scoreDelta, control.similarity, "route-match")} · descriptive only</div></div>
             <div class="mini"><div class="label">Turns B / S</div><div class="value">${esc(control.turn_count ?? "-")} / ${esc(candidate.turn_count ?? "-")}</div></div>
             <div class="mini"><div class="label">LLM Calls B / S</div><div class="value">${esc(llmPairValue(control.llm_call_count, candidate.llm_call_count, intNum))}</div><div class="hint">live ${esc(llmPairValue(control.llm_live_call_count, candidate.llm_live_call_count, intNum))}</div></div>
-            <div class="mini"><div class="label">Tokens B / S</div><div class="value">${esc(llmPairValue(control.llm_total_tokens, candidate.llm_total_tokens, tokenNum))}</div><div class="hint">prompt ${esc(llmPairValue(control.llm_prompt_tokens, candidate.llm_prompt_tokens, tokenNum))}</div></div>
+            <div class="mini"><div class="label">Tokens B / S</div><div class="value">${esc(llmPairValue(control.llm_total_tokens, candidate.llm_total_tokens, tokenNum))}</div><div class="hint">prompt ${esc(llmPairValue(control.llm_prompt_tokens, candidate.llm_prompt_tokens, tokenNum))} · provider-prefix cached ${esc(llmPairValue(control.llm_provider_cached_prompt_tokens, candidate.llm_provider_cached_prompt_tokens, tokenNum))} · provider metadata ${esc(llmPairValue(control.llm_provider_cached_prompt_tokens_available_count, candidate.llm_provider_cached_prompt_tokens_available_count, intNum))} calls</div></div>
             <div class="mini"><div class="label">Control Cache</div><div class="value">${esc(control.control_cache_source || "-")}</div></div>
             <div class="mini"><div class="label">SAGE Tool Events</div><div class="value">${esc(toolEvents(pair).length)}</div></div>
           </div>
@@ -1583,8 +2586,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <div class="section">
           <div class="section-head">
             <div>
-              <h3>Scored Milestones And Guardrails</h3>
-              <div class="small check-explainer">Milestones are required task facts, tool calls, or state changes. Guardrails are forbidden actions or unsafe states. The score is the benchmark's per-check match score using the expected and observed evidence below.</div>
+              <h3>Canonical Route-Match Audit</h3>
+              <div class="small check-explainer">This descriptive audit compares expected and observed milestones and guardrails. It is not a performance or release criterion.</div>
             </div>
           </div>
           <div class="split check-split">
@@ -1610,7 +2613,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const contributionKnown = Boolean(tools.contribution_known ?? rows.some((tool) => tool.called_subset_mean_outcome_delta !== null && tool.called_subset_mean_outcome_delta !== undefined));
       document.getElementById("toolDrawerSub").textContent = `${rows.length} tools; ${tools.called_tool_count || 0} called naturally in this run.${visibilityKnown ? "" : " Visibility counts are pending until live selection artifacts are available."}${contributionKnown ? "" : " Contribution columns are pending until completed paired called-tool tasks are available."}`;
       document.getElementById("toolTable").innerHTML = `<table>
-        <thead><tr><th>Tool</th><th>Origin</th><th>Visible</th><th>Called</th><th>VNC</th><th>Outcome Contribution</th><th>Score Contribution</th><th>Safety</th></tr></thead>
+        <thead><tr><th>Tool</th><th>Origin</th><th>Visible</th><th>Called</th><th>VNC</th><th>Outcome Contribution</th><th>Canonical Audit Contribution</th><th>Safety</th></tr></thead>
         <tbody>${rows.map((tool) => `<tr>
           <td><strong>${toolNameButton(tool)}</strong><div class="small">${esc(tool.decision || "")}</div></td>
           <td>${esc(tool.origin || "-")}</td>
@@ -1618,7 +2621,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           <td>${esc(tool.called_count ?? 0)}</td>
           <td>${esc(maybeValue(tool.visible_not_called_count, "pending"))}</td>
           <td class="${cls(tool.called_subset_mean_outcome_delta)}">${esc(contributionDeltaText(tool))}<div class="small">${esc(gainLossText(tool.outcome_gains, tool.outcome_regressions, tool.contribution_pending))}</div></td>
-          <td class="${cls(tool.called_subset_mean_canonical_delta)}">${signedNum(tool.called_subset_mean_canonical_delta)}</td>
+          <td>${signedNum(tool.called_subset_mean_canonical_delta)}</td>
           <td>${esc(tool.side_effect_incident_count ?? 0)} side effects<br><span class="small">${esc(tool.runtime_incident_count ?? 0)} runtime incidents</span></td>
         </tr>`).join("")}</tbody>
       </table>`;
@@ -1694,6 +2697,10 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           window.clearInterval(refreshTimer);
           refreshTimer = null;
         }
+        if (toolGenerationRefreshTimer !== null) {
+          window.clearInterval(toolGenerationRefreshTimer);
+          toolGenerationRefreshTimer = null;
+        }
         return;
       }
       if (refreshTimer === null) {
@@ -1702,6 +2709,13 @@ TASK_COMPARE_HTML = r"""<!doctype html>
             if (!isTransientDataError(error)) console.error(error);
           });
         }, 5000);
+      }
+      if (toolGenerationRefreshTimer === null) {
+        toolGenerationRefreshTimer = window.setInterval(() => {
+          updateToolGenerationStatus().catch((error) => {
+            if (!isTransientDataError(error)) console.error(error);
+          });
+        }, 2000);
       }
     }
 
@@ -1746,12 +2760,14 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const matched = Math.min(baselineDone, sageDone);
       const matchedText = `${matched || 0}/${totalTasks || 0} matched tasks`;
       const environmentName = envDisplayName(payload.environment || payload.benchmark || s.environment || "ToolSandbox");
+      const startedAt = payload.started_at ? new Date(payload.started_at).toLocaleString() : "unknown start";
       document.title = `Task Compare - ${environmentName} - SAGE`;
       document.getElementById("envBadge").textContent = environmentName;
-      document.getElementById("subtitle").textContent = `${payload.mode || "run"} · ${payload.status || "unknown"} · ${payload.agent || ""} · ${matchedText} · refreshed ${new Date().toLocaleTimeString()}`;
+      document.getElementById("subtitle").textContent = `${payload.mode || "run"} · ${payload.status || "unknown"} · ${payload.agent || ""} · ${matchedText} · started ${startedAt} · refreshed ${new Date().toLocaleTimeString()}`;
       document.getElementById("runtimeLine").textContent = formatRuntimeLine();
       if (selected >= pairs.length) selected = Math.max(0, pairs.length - 1);
       renderMetrics();
+      await updateToolGenerationStatus();
       renderList();
       renderDetail();
       restoreScrollState(scrollState);
@@ -1766,11 +2782,16 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         document.getElementById("search").addEventListener("input", renderList);
         document.getElementById("closeTools").addEventListener("click", closeTools);
         document.getElementById("closeToolCode").addEventListener("click", closeToolCode);
+        document.getElementById("toolGenerationCard").addEventListener("click", openToolGenerationDrawer);
+        document.getElementById("closeToolGeneration").addEventListener("click", closeToolGenerationDrawer);
         document.getElementById("toolDrawer").addEventListener("click", (event) => {
           if (event.target.id === "toolDrawer") closeTools();
         });
         document.getElementById("toolCodeDrawer").addEventListener("click", (event) => {
           if (event.target.id === "toolCodeDrawer") closeToolCode();
+        });
+        document.getElementById("toolGenerationDrawer").addEventListener("click", (event) => {
+          if (event.target.id === "toolGenerationDrawer") closeToolGenerationDrawer();
         });
         document.addEventListener("click", (event) => {
           const target = event.target?.closest?.("[data-tool-code-name]");
@@ -1782,6 +2803,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           if (event.key === "Escape") {
             closeToolCode();
             closeTools();
+            closeToolGenerationDrawer();
           }
         });
         updateRefreshTimer();

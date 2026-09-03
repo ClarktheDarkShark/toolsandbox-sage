@@ -9,25 +9,24 @@ import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from sage_ts.adapters.toolsandbox_adapter import (
     EventHook,
     ProgressHook,
     ToolSandboxRunConfig,
-    run_one_scenario,
     run_scenario_sequence,
 )
 from sage_ts.adequacy.inadequacy_classifier import (
-    classify_scenario_observations,
     classify_visible_task_observations,
+    classify_visible_trace_observations,
     visible_task_context_from_scenario,
 )
-from sage_ts.generation.tool_spec import ToolFamily
+from sage_ts.generation.complete_tools import native_action_tool_enabled
 from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.orchestration.online_birth import (
     GeneratedToolFactory,
     OnlineBirthController,
-    visible_context_metadata_enabled,
 )
 from sage_ts.orchestration.self_evolution_reflection import (
     SelfEvolutionReflectionController,
@@ -129,6 +128,68 @@ def _conversation_generated_tool_attempts(
             ) and tool_name not in failed:
                 failed.append(tool_name)
     return attempted, failed
+
+
+def _visible_conversation_messages_for_observation(
+    output_directory: Path,
+    scenario_name: str,
+) -> list[dict[str, object]]:
+    """Load only visible trajectory text for capability observation.
+
+    Saved ToolSandbox trajectories can contain scorer metadata under fields such
+    as tool_details. Tool birth must not see scorer internals, so keep only the
+    transcript fields that were visible in the interaction: roles, text, tool
+    names, and tool-call arguments.
+    """
+
+    path = output_directory / "trajectories" / scenario_name / "conversation.json"
+    if not path.exists():
+        return []
+    try:
+        messages = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(messages, list):
+        return []
+
+    visible: list[dict[str, object]] = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        sanitized: dict[str, object] = {}
+        for key in ("role", "content", "name", "tool_call_id"):
+            value = message.get(key)
+            if isinstance(value, str):
+                sanitized[key] = value
+        tool_calls = message.get("tool_calls")
+        if isinstance(tool_calls, list):
+            sanitized_tool_calls: list[dict[str, object]] = []
+            for tool_call in tool_calls:
+                if not isinstance(tool_call, dict):
+                    continue
+                function = tool_call.get("function")
+                if not isinstance(function, dict):
+                    continue
+                sanitized_function: dict[str, object] = {}
+                for key in ("name", "arguments"):
+                    value = function.get(key)
+                    if isinstance(value, str):
+                        sanitized_function[key] = value
+                if not sanitized_function:
+                    continue
+                sanitized_call: dict[str, object] = {
+                    "function": sanitized_function,
+                    "type": str(tool_call.get("type") or "function"),
+                }
+                call_id = tool_call.get("id")
+                if isinstance(call_id, str):
+                    sanitized_call["id"] = call_id
+                sanitized_tool_calls.append(sanitized_call)
+            if sanitized_tool_calls:
+                sanitized["tool_calls"] = sanitized_tool_calls
+        if sanitized:
+            visible.append(sanitized)
+    return visible
 
 
 def _safe_checkpoint_name(scenario_name: str) -> str:
@@ -312,236 +373,6 @@ def _reconcile_generated_tool_calls_from_conversation(
         if tool_name not in reconciled:
             reconciled.append(tool_name)
     return reconciled
-
-
-VISIBLE_NOT_CALLED_RETRY_ENV = "SAGE_SELF_EVOLVING_VISIBLE_NOT_CALLED_RETRY"
-HELPER_ADOPTION_RETRY_ACTIVE_ENV = "SAGE_TS_HELPER_ADOPTION_RETRY_ACTIVE"
-HELPER_ADOPTION_RETRY_TOOLS_ENV = "SAGE_TS_HELPER_ADOPTION_RETRY_TOOLS"
-SIDE_EFFECT_FAIR_CHANCE_EXTRA_TURNS_ENV = "SAGE_SIDE_EFFECT_FAIR_CHANCE_EXTRA_TURNS"
-HELPER_ADOPTION_RETRY_TOOL_HINTS = {
-    "constraint_to_action_planner",
-    "plan_contact_lookup_query",
-    "plan_contact_relationship_batch_update",
-    "plan_contact_update_from_id",
-    "plan_device_state_action_sequence",
-    "plan_message_counterparty_search",
-    "prepare_location_search_args",
-    "prepare_reminder_creation_args",
-    "prepare_safe_action_or_abstain",
-    "prepare_side_effect_args_from_selected_record",
-    "relative_day_time_to_timestamp",
-    "resolve_search_window_or_bounds",
-    "select_action_target_by_recency",
-    "select_message_counterparty_for_contact_update",
-    "select_record_by_timestamp_extreme",
-}
-LOW_VALUE_ADOPTION_RETRY_TOOL_NAME_PARTS = (
-    "search_window",
-    "window_or_bounds",
-    "window_bounds",
-)
-RECENCY_ADOPTION_RETRY_WORKFLOW_TOOLS = {
-    "relative_day_time_to_timestamp",
-    "resolve_search_window_or_bounds",
-    "select_action_target_by_recency",
-    "select_record_by_timestamp_extreme",
-}
-
-
-def _visible_not_called_retry_enabled() -> bool:
-    raw = os.environ.get(VISIBLE_NOT_CALLED_RETRY_ENV, "0").strip().lower()
-    return raw not in {"0", "false", "no", "off"}
-
-
-def _helper_adoption_retry_tools(generated_visible: list[str]) -> list[str]:
-    return [
-        tool_name
-        for tool_name in generated_visible
-        if _matches_adoption_retry_hint(tool_name)
-    ]
-
-
-def _low_value_adoption_retry_tool(tool_name: str) -> bool:
-    normalized = tool_name.lower()
-    if normalized == "resolve_search_window_or_bounds":
-        return False
-    return any(part in normalized for part in LOW_VALUE_ADOPTION_RETRY_TOOL_NAME_PARTS)
-
-
-def _matches_adoption_retry_hint(tool_name: str) -> bool:
-    normalized = tool_name.lower()
-    return any(
-        normalized == hint or normalized.startswith(f"{hint}_v")
-        for hint in HELPER_ADOPTION_RETRY_TOOL_HINTS
-    )
-
-
-def _helper_adoption_retry_candidates(
-    generated_visible: list[str],
-    generated_attempted: list[str],
-    generated_failed: list[str],
-) -> list[str]:
-    """Return visible generated tools that deserve a bounded adoption retry.
-
-    When no generated tool was attempted, preserve the original broad retry
-    behavior. When the actor used some generated tools, keep the retry focused
-    on hinted tools that remained unattempted so the retry is about generated
-    tool adoption rather than giving the actor another ordinary pass.
-    """
-
-    if generated_failed:
-        return []
-    attempted_or_failed = set(generated_attempted) | set(generated_failed)
-    unattempted = [
-        tool_name
-        for tool_name in generated_visible
-        if tool_name not in attempted_or_failed
-    ]
-    if not unattempted:
-        return []
-    if not generated_attempted:
-        return [
-            tool_name
-            for tool_name in unattempted
-            if not _low_value_adoption_retry_tool(tool_name)
-        ]
-    hinted_unattempted = [
-        tool_name
-        for tool_name in unattempted
-        if _matches_adoption_retry_hint(tool_name)
-    ]
-    if "resolve_search_window_or_bounds" in generated_visible and any(
-        tool_name in RECENCY_ADOPTION_RETRY_WORKFLOW_TOOLS
-        for tool_name in hinted_unattempted
-    ):
-        workflow_tools = [
-            tool_name
-            for tool_name in generated_visible
-            if tool_name in RECENCY_ADOPTION_RETRY_WORKFLOW_TOOLS
-        ]
-        return workflow_tools + [
-            tool_name
-            for tool_name in hinted_unattempted
-            if tool_name not in set(workflow_tools)
-        ]
-    return hinted_unattempted
-
-
-def _side_effect_fair_chance_extra_turns() -> int:
-    raw = os.environ.get(SIDE_EFFECT_FAIR_CHANCE_EXTRA_TURNS_ENV, "").strip()
-    if not raw:
-        return 0
-    try:
-        return max(0, min(8, int(raw)))
-    except ValueError:
-        return 0
-
-
-def _should_retry_visible_not_called(
-    *,
-    generated_visible: list[str],
-    generated_attempted: list[str],
-    generated_failed: list[str],
-    similarity: float,
-    outcome_similarity: float | None,
-) -> bool:
-    if not _visible_not_called_retry_enabled():
-        return False
-    if os.environ.get(HELPER_ADOPTION_RETRY_ACTIVE_ENV, "").strip():
-        return False
-    if not generated_visible or generated_failed:
-        return False
-    retry_tools = _helper_adoption_retry_candidates(
-        generated_visible,
-        generated_attempted,
-        generated_failed,
-    )
-    if not retry_tools:
-        return False
-    if "prepare_safe_action_or_abstain" in retry_tools:
-        # Validation/abstention tools are the generated mechanism for
-        # insufficient-information lanes, but retrying a full-credit no-outcome
-        # row only to force a validation-tool call wastes tokens and can create
-        # scorer-visible action noise. Keep the retry for failed or materially
-        # incomplete attempts.
-        if outcome_similarity is None:
-            return similarity < 1.0
-        return outcome_similarity < 0.5 or similarity < 1.0
-    hinted_retry = any(
-        _matches_adoption_retry_hint(tool_name) for tool_name in retry_tools
-    )
-    if outcome_similarity is not None:
-        # Same-task adoption retry is meant to rescue failed attempts where a
-        # visible generated tool was ignored. Keep high-quality partial/complete
-        # outcomes, but allow a bounded retry for hinted generated tools when the
-        # actor only earned tiny partial credit without using the visible tool.
-        if outcome_similarity >= 0.5:
-            return False
-        if outcome_similarity > 0.0 and not hinted_retry:
-            return False
-        return similarity < 1.0 or (hinted_retry and similarity < 1.0)
-    return similarity < 1.0
-
-
-def _archive_helper_adoption_retry_trajectory(
-    output_directory: Path,
-    scenario_name: str,
-) -> str | None:
-    trajectory_dir = output_directory / "trajectories" / scenario_name
-    if not trajectory_dir.exists():
-        return None
-    archive_base = trajectory_dir.with_name(
-        f"{scenario_name}__helper_adoption_retry_initial_attempt"
-    )
-    archive_dir = archive_base
-    suffix = 2
-    while archive_dir.exists():
-        archive_dir = archive_base.with_name(f"{archive_base.name}_{suffix}")
-        suffix += 1
-    shutil.move(str(trajectory_dir), str(archive_dir))
-    return str(archive_dir)
-
-
-def _helper_requires_side_effect_followup(helper_outputs: list[object]) -> bool:
-    if not helper_outputs:
-        return True
-    requires_followup = False
-    saw_explicit_flag = False
-    for item in helper_outputs:
-        if not isinstance(item, dict):
-            requires_followup = True
-            continue
-        if "should_call_add_reminder" in item:
-            saw_explicit_flag = True
-            if bool(item.get("should_call_add_reminder")):
-                requires_followup = True
-        elif "should_call" in item:
-            saw_explicit_flag = True
-            if bool(item.get("should_call")):
-                requires_followup = True
-        else:
-            requires_followup = True
-    if saw_explicit_flag:
-        return requires_followup
-    return True
-
-
-def _helper_forbids_side_effect_followup(helper_outputs: list[object]) -> bool:
-    if not helper_outputs:
-        return False
-    saw_explicit_flag = False
-    for item in helper_outputs:
-        if not isinstance(item, dict):
-            continue
-        if "should_call_add_reminder" in item:
-            saw_explicit_flag = True
-            if bool(item.get("should_call_add_reminder")):
-                return False
-        elif "should_call" in item:
-            saw_explicit_flag = True
-            if bool(item.get("should_call")):
-                return False
-    return saw_explicit_flag
 
 
 def _side_effect_tool_name(tool_name: object, required: set[str]) -> str | None:
@@ -764,6 +595,26 @@ def _side_effect_followup_failures(
     if not required_side_effect_calls:
         return False
     if actual_tool_trace_events:
+        traced_tools = {
+            str(event.get("tool_name") or "")
+            for event in actual_tool_trace_events
+            if isinstance(event, dict)
+        }
+        for message in messages:
+            if not isinstance(message, dict) or message.get("role") != "tool":
+                continue
+            payload = _parse_tool_message_content(message.get("content"))
+            if not isinstance(payload, dict):
+                continue
+            native_action = str(payload.get("native_action") or "")
+            if (
+                str(payload.get("status") or "").lower() == "success"
+                and native_action in required_side_effect_calls
+                and native_action in traced_tools
+                and payload.get("native_result") is not None
+            ):
+                return False
+    if actual_tool_trace_events:
         trace_failure = _side_effect_followup_failures_from_trace_events(
             actual_tool_trace_events,
             helper_name=helper_name,
@@ -888,12 +739,16 @@ class SageRunConfig:
     resume_from_dir: Path | None = None
     resume_completed_limit: int | None = None
     manifest_path: Path = Path("")
+    reflection_control_rows: dict[str, dict[str, Any]] | None = None
+    require_fresh_reflection_control: bool = False
+    failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
 
 
 def run_sage_with_registry(
     config: SageRunConfig,
     *,
     generator: GeneratedToolFactory | None = None,
+    scenarios: dict[str, Scenario] | None = None,
     progress_hook: ProgressHook | None = None,
     event_hook: EventHook | None = None,
 ) -> Path:
@@ -924,8 +779,8 @@ def run_sage_with_registry(
                 output_dir=output_directory,
                 recurrence_threshold=config.recurrence_threshold,
                 event_hook=birth_event_hook,
+                failure_memory_path=config.failure_memory_path,
             )
-            birth_controller.prime_from_scenario_names(config.scenario_names)
         if generator is not None and reflection_controller is None:
             reflection_controller = SelfEvolutionReflectionController.from_env(
                 store=store,
@@ -934,27 +789,13 @@ def run_sage_with_registry(
                 user=config.user,
                 base_tool_policy=config.base_tool_policy,
                 manifest_path=config.manifest_path,
+                fresh_control_rows=config.reflection_control_rows,
+                require_fresh_control=config.require_fresh_reflection_control,
             )
-        visible_task_context = (
-            visible_task_context_from_scenario(scenario)
-            if visible_context_metadata_enabled()
-            else None
-        )
-        routing_context_text = (
-            visible_task_context.routing_text()
-            if visible_task_context is not None
-            else None
-        )
-        routing_context_label = (
-            visible_task_context.generation_label()
-            if visible_task_context is not None
-            else None
-        )
-        routing_family_key = (
-            visible_task_context.primary_family_key
-            if visible_task_context is not None
-            else None
-        )
+        visible_task_context = visible_task_context_from_scenario(scenario)
+        routing_context_text = visible_task_context.routing_text()
+        routing_context_label = visible_task_context.generation_label()
+        routing_family_key = visible_task_context.primary_family_key
         if birth_controller is not None:
             accepted_tools = birth_controller.prime_before_scenario(name, scenario)
             if accepted_tools:
@@ -1082,34 +923,6 @@ def run_sage_with_registry(
             for tool_name in sorted(store.load_entries())
             if tool_name in available_tools
         ]
-        side_effect_fair_chance_tools = [
-            tool_name
-            for tool_name in generated_tools
-            if (
-                (entry := loaded_entries.get(tool_name)) is not None
-                and entry.tool.spec.family != ToolFamily.VALIDATION_ABSTENTION_HELPER
-                and (
-                    entry.tool.spec.required_original_tool_calls
-                    or entry.tool.spec.preserves_side_effect_tools
-                )
-            )
-        ]
-        extra_turns = _side_effect_fair_chance_extra_turns()
-        if extra_turns and side_effect_fair_chance_tools:
-            original_max_messages = int(getattr(enhanced, "max_messages", 0) or 0)
-            if original_max_messages > 0:
-                enhanced.max_messages = original_max_messages + extra_turns
-                append_jsonl(
-                    output_directory / "sage_run_events.jsonl",
-                    {
-                        "event": "side_effect_fair_chance_turn_extension",
-                        "scenario": name,
-                        "visible_tools": side_effect_fair_chance_tools,
-                        "extra_turns": extra_turns,
-                        "original_max_messages": original_max_messages,
-                        "extended_max_messages": enhanced.max_messages,
-                    },
-                )
         visible_generated_by_scenario[name] = generated_tools
         priority_injection_changed_tool_order = bool(
             generated_tools
@@ -1213,116 +1026,6 @@ def run_sage_with_registry(
             )
         except ValueError:
             outcome_similarity = None
-        if _should_retry_visible_not_called(
-            generated_visible=generated_visible,
-            generated_attempted=generated_attempted,
-            generated_failed=generated_failed,
-            similarity=similarity,
-            outcome_similarity=outcome_similarity,
-        ):
-            initial_similarity = similarity
-            initial_outcome_similarity = outcome_similarity
-            retry_tools = _helper_adoption_retry_candidates(
-                generated_visible,
-                generated_attempted,
-                generated_failed,
-            )
-            archive = _archive_helper_adoption_retry_trajectory(
-                output_directory,
-                name,
-            )
-            append_jsonl(
-                output_directory / "sage_run_events.jsonl",
-                {
-                    "event": "helper_visible_not_called_same_task_retry",
-                    "scenario": name,
-                    "visible_tools": generated_visible,
-                    "retry_tools": retry_tools,
-                    "initial_similarity": initial_similarity,
-                    "initial_outcome_similarity": initial_outcome_similarity,
-                    "initial_trajectory_archive": archive,
-                },
-            )
-            prior_active = os.environ.get(HELPER_ADOPTION_RETRY_ACTIVE_ENV)
-            prior_tools = os.environ.get(HELPER_ADOPTION_RETRY_TOOLS_ENV)
-            os.environ[HELPER_ADOPTION_RETRY_ACTIVE_ENV] = "1"
-            os.environ[HELPER_ADOPTION_RETRY_TOOLS_ENV] = ",".join(retry_tools)
-            try:
-                called_generated_by_scenario[name] = []
-                result = run_one_scenario(
-                    name,
-                    scenario,
-                    agent=config.agent,
-                    user=config.user,
-                    output_directory=output_directory,
-                )
-            finally:
-                if prior_active is None:
-                    os.environ.pop(HELPER_ADOPTION_RETRY_ACTIVE_ENV, None)
-                else:
-                    os.environ[HELPER_ADOPTION_RETRY_ACTIVE_ENV] = prior_active
-                if prior_tools is None:
-                    os.environ.pop(HELPER_ADOPTION_RETRY_TOOLS_ENV, None)
-                else:
-                    os.environ[HELPER_ADOPTION_RETRY_TOOLS_ENV] = prior_tools
-            generated_called = list(called_generated_by_scenario.get(name, []))
-            for tool_name in _reuse_log_tools(output_directory, name):
-                if tool_name not in generated_called:
-                    generated_called.append(tool_name)
-            generated_attempted, generated_failed = (
-                _conversation_generated_tool_attempts(
-                    output_directory,
-                    name,
-                    generated_visible,
-                )
-            )
-            generated_called = _reconcile_generated_tool_calls_from_conversation(
-                output_directory,
-                name,
-                generated_visible,
-                generated_called,
-            )
-            if generated_failed:
-                failed_set = set(generated_failed)
-                generated_called = [
-                    tool_name
-                    for tool_name in generated_called
-                    if tool_name not in failed_set
-                ]
-            raw_similarity = result.get("similarity", 0.0)
-            try:
-                similarity = (
-                    float(raw_similarity)
-                    if isinstance(raw_similarity, (int, float, str))
-                    else 0.0
-                )
-            except ValueError:
-                similarity = 0.0
-            raw_outcome_similarity = result.get("outcome_similarity")
-            try:
-                outcome_similarity = (
-                    float(raw_outcome_similarity)
-                    if isinstance(raw_outcome_similarity, (int, float, str))
-                    else None
-                )
-            except ValueError:
-                outcome_similarity = None
-            append_jsonl(
-                output_directory / "sage_run_events.jsonl",
-                {
-                    "event": "helper_visible_not_called_same_task_retry_result",
-                    "scenario": name,
-                    "visible_tools": generated_visible,
-                    "retry_tools": retry_tools,
-                    "initial_similarity": initial_similarity,
-                    "initial_outcome_similarity": initial_outcome_similarity,
-                    "final_called_tools": generated_called,
-                    "final_attempted_tools": generated_attempted,
-                    "final_failed_tools": generated_failed,
-                    "final_similarity": similarity,
-                    "final_outcome_similarity": outcome_similarity,
-                },
-            )
         generated_not_called = [
             tool for tool in generated_visible if tool not in set(generated_called)
         ]
@@ -1426,6 +1129,8 @@ def run_sage_with_registry(
                 entry = loaded_entries_for_check.get(helper_name)
                 if entry is None:
                     continue
+                if native_action_tool_enabled(entry.tool):
+                    continue
                 required = tuple(entry.tool.spec.required_original_tool_calls)
                 if _side_effect_followup_failures(
                     conv_messages,
@@ -1444,68 +1149,20 @@ def run_sage_with_registry(
                     "generated_tools_called": generated_called,
                 },
             )
-        suppress_zero_score = os.environ.get(
-            "SAGE_SELF_EVOLVING_SUPPRESS_ZERO_SCORE_TOOLS",
-            "",
-        ).strip().lower() in {"1", "true", "yes", "on"}
-        if (
-            suppress_zero_score
-            and generated_called
-            and similarity <= 0.0
-            and not side_effect_failures
-        ):
-            for helper_name in generated_called:
-                store.retire(helper_name)
-                payload = {
-                    "event": "tool_runtime_suppressed",
-                    "tool_name": helper_name,
-                    "scenario": name,
-                    "reason": "generated_tool_called_with_zero_similarity",
-                    "similarity": similarity,
-                    "outcome_similarity": outcome_similarity,
-                    "registry_dir": str(config.registry_dir),
-                }
-                append_jsonl(output_directory / "sage_run_events.jsonl", payload)
-                if event_hook is not None:
-                    event_hook("tool_runtime_suppressed", output_directory, payload)
-
         if reflection_controller is not None:
-            decision = reflection_controller.assess_scenario(
+            reflection_controller.assess_scenario(
                 scenario_name=name,
                 baseline_scenario=baseline_scenario_by_name.get(name, scenario),
                 result=result,
                 selection_record=selection_record,
                 side_effect_failures=side_effect_failures,
-                task_context_label=(
-                    selection_context_by_scenario.get(name, {}).get(
-                        "task_context_label"
-                    )
-                    if visible_context_metadata_enabled()
-                    else None
+                task_context_label=selection_context_by_scenario.get(name, {}).get(
+                    "task_context_label"
                 ),
-                task_family_key=(
-                    selection_context_by_scenario.get(name, {}).get("task_family_key")
-                    if visible_context_metadata_enabled()
-                    else None
+                task_family_key=selection_context_by_scenario.get(name, {}).get(
+                    "task_family_key"
                 ),
             )
-            if decision.stop_run:
-                result["_sage_stop_run"] = True
-                result["_sage_stop_reason"] = decision.reason
-                payload = {
-                    "event": "self_evolution_stop_recommended",
-                    "scenario": name,
-                    "reason": decision.reason,
-                    "completed_count": reflection_controller.completed_count,
-                    "registry_dir": str(config.registry_dir),
-                }
-                append_jsonl(output_directory / "sage_run_events.jsonl", payload)
-                if event_hook is not None:
-                    event_hook(
-                        "self_evolution_stop_recommended",
-                        output_directory,
-                        payload,
-                    )
 
         if birth_controller is None:
             checkpoint = _snapshot_registry_checkpoint(
@@ -1524,10 +1181,35 @@ def run_sage_with_registry(
                     },
                 )
             return result
-        if visible_context_metadata_enabled():
-            observations = classify_visible_task_observations(name, scenario)
-        else:
-            observations = classify_scenario_observations(name, scenario, result)
+        trace_result = result
+        visible_messages = _visible_conversation_messages_for_observation(
+            output_directory,
+            name,
+        )
+        if visible_messages:
+            trace_result = dict(result)
+            trace_result["messages"] = visible_messages
+        visible_task_context_processed = (
+            name in birth_controller.pre_scenario_visible_observations
+        )
+        visible_task_observations = (
+            ()
+            if visible_task_context_processed
+            else classify_visible_task_observations(name, scenario)
+        )
+        observations = (
+            *visible_task_observations,
+            *classify_visible_trace_observations(name, scenario, trace_result),
+        )
+        if visible_task_context_processed:
+            append_jsonl(
+                output_directory / "sage_run_events.jsonl",
+                {
+                    "event": "post_task_duplicate_visible_observation_skipped",
+                    "scenario": name,
+                    "reason": "visible_task_context_processed_before_task",
+                },
+            )
         for observation in observations:
             if event_hook is not None:
                 event_hook(
@@ -1566,11 +1248,14 @@ def run_sage_with_registry(
             resume_from_dir=config.resume_from_dir,
             resume_completed_limit=config.resume_completed_limit,
         ),
+        scenarios=scenarios,
         scenario_transform=transform,
         result_hook=after_result,
         progress_hook=progress_hook,
         event_hook=event_hook,
     )
+    if reflection_controller is not None:
+        reflection_controller.assert_fresh_control_complete(config.scenario_names)
     final_registry_tools = sorted(store.load_entries())
     append_jsonl(
         output_directory / "sage_run_events.jsonl",

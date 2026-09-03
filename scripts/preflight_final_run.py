@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, cast
 
 DIAGNOSTIC_FORCE_ENV_VARS = (
+    "SAGE_DIAGNOSTIC_EXPOSE_TOOL_NAME",
     "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME",
     "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_ERROR",
     "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_BASE_TOOL",
@@ -216,12 +217,6 @@ def main() -> int:
         choices=("use-if-eligible", "strict", "off", "collect", "refresh"),
         required=True,
     )
-    parser.add_argument(
-        "--routing-evidence-mode",
-        choices=("disabled", "pinned", "auto", "default"),
-        required=True,
-    )
-    parser.add_argument("--routing-evidence-path", type=Path)
     parser.add_argument("--allow-low-quality-cohort", action="store_true")
     parser.add_argument("--diagnostic-mode", action="store_true")
     parser.add_argument("--allow-dirty", action="store_true")
@@ -254,8 +249,8 @@ def main() -> int:
     )
     add(
         results,
-        "control_cache_use_if_eligible",
-        args.control_cache == "use-if-eligible",
+        "control_cache_off",
+        args.control_cache == "off",
         f"control_cache={args.control_cache}",
         severity="high",
     )
@@ -272,36 +267,6 @@ def main() -> int:
         not force_env or args.diagnostic_mode,
         f"active={sorted(force_env)} diagnostic_mode={args.diagnostic_mode}",
     )
-
-    routing_mode = args.routing_evidence_mode
-    if routing_mode == "default":
-        routing_mode = "disabled" if final_mode else "auto"
-    routing_ok = (not final_mode) or routing_mode in {"disabled", "pinned"}
-    add(
-        results,
-        "routing_evidence_explicit_for_final",
-        routing_ok,
-        f"routing_evidence_mode={routing_mode}",
-    )
-    if routing_mode == "pinned":
-        path_ok = (
-            args.routing_evidence_path is not None
-            and args.routing_evidence_path.exists()
-        )
-        add(
-            results,
-            "routing_evidence_pinned_path_exists",
-            path_ok,
-            str(args.routing_evidence_path),
-        )
-        if path_ok:
-            add(
-                results,
-                "routing_evidence_pinned_path_is_summary",
-                args.routing_evidence_path.name == "helper_contribution_summary.json",
-                str(args.routing_evidence_path),
-                severity="high",
-            )
 
     add(
         results,
@@ -337,10 +302,7 @@ def main() -> int:
         "mode": args.mode,
         "generation": args.generation,
         "control_cache": args.control_cache,
-        "routing_evidence_mode": routing_mode,
-        "routing_evidence_path": str(args.routing_evidence_path)
-        if args.routing_evidence_path
-        else None,
+        "fresh_control_required": args.control_cache == "off",
         "diagnostic_mode": args.diagnostic_mode,
         "run_affecting_sage_env": run_affecting_sage_env(dict(os.environ)),
         "checks": [result.to_json() for result in results],

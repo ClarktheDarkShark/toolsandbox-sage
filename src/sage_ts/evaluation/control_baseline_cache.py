@@ -20,14 +20,14 @@ from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_discovery import ToolBackend
 
 CACHE_SCHEMA_VERSION = 1
-MIN_COMPATIBLE_RUNS = 3
+MIN_COMPATIBLE_RUNS = 1
 MIN_COMPATIBLE_RUNS_ENV = "SAGE_CONTROL_CACHE_MIN_COMPATIBLE_RUNS"
 CACHE_ROOT = Path("artifacts/baselines/control_task_baselines")
 DEFAULT_TOOL_BACKEND = ToolBackend("DEFAULT")
-CACHE_MATCH_POLICY = "task_name_agent_user_base_tool_policy_min3"
+CACHE_MATCH_POLICY = "task_name_agent_user_base_tool_policy_min1"
 EXPERIMENTAL_TASK_ONLY_CACHE_ENV = "SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY"
 EXPERIMENTAL_TASK_ONLY_CACHE_POLICY = (
-    "experimental_task_name_base_tool_policy_min3_model_user_bypassed"
+    "experimental_task_name_base_tool_policy_min1_model_user_bypassed"
 )
 
 COMPATIBILITY_FIELDS = (
@@ -100,8 +100,8 @@ def min_compatible_runs() -> int:
 def active_cache_match_policy() -> str:
     minimum = min_compatible_runs()
     if _experimental_task_only_cache_enabled():
-        return EXPERIMENTAL_TASK_ONLY_CACHE_POLICY.replace("min3", f"min{minimum}")
-    return CACHE_MATCH_POLICY.replace("min3", f"min{minimum}")
+        return EXPERIMENTAL_TASK_ONLY_CACHE_POLICY.replace("min1", f"min{minimum}")
+    return CACHE_MATCH_POLICY.replace("min1", f"min{minimum}")
 
 
 def active_task_level_cache_fields() -> tuple[str, ...]:
@@ -343,24 +343,16 @@ def compatibility_key(context: dict[str, Any]) -> str:
 def _record_matches_context(record: dict[str, Any], context: dict[str, Any]) -> bool:
     """Return whether a stored baseline is task-compatible with this run.
 
-    Baseline control reuse is intentionally task-level: if the same task has
-    been seen enough times under the same baseline model/user/base-tool policy,
-    average those prior controls and reuse the aggregate. Do not include
-    initial-state checksum, local ToolSandbox SHA, runner SHA, scorer SHA, or
-    manifest checksum in this match; those fields fragmented otherwise valid
-    task-level baselines and made reuse stochastic.
+    Legacy non-publication reuse is intentionally task-level, but lookup is
+    eligible only when exactly one compatible completed control exists. Multiple
+    records fail closed instead of being averaged. Do not include initial-state
+    checksum, local ToolSandbox SHA, runner SHA, scorer SHA, or manifest checksum
+    in this compatibility predicate; publication execution bypasses this module.
     """
     for field in active_task_level_cache_fields():
         if stable_json(record.get(field)) != stable_json(context.get(field)):
             return False
     return True
-
-
-def _variance(values: list[float]) -> float:
-    if len(values) < 2:
-        return 0.0
-    mean = sum(values) / len(values)
-    return sum((value - mean) ** 2 for value in values) / (len(values) - 1)
 
 
 def _read_json(path: Path, default: Any) -> Any:
@@ -509,6 +501,15 @@ class ControlBaselineCache:
                 "llm_live_call_count": result_row.get("llm_live_call_count"),
                 "llm_cached_call_count": result_row.get("llm_cached_call_count"),
                 "llm_prompt_tokens": result_row.get("llm_prompt_tokens"),
+                "llm_provider_cached_prompt_tokens": result_row.get(
+                    "llm_provider_cached_prompt_tokens"
+                ),
+                "llm_provider_cached_prompt_call_count": result_row.get(
+                    "llm_provider_cached_prompt_call_count"
+                ),
+                "llm_provider_cached_prompt_tokens_available_count": result_row.get(
+                    "llm_provider_cached_prompt_tokens_available_count"
+                ),
                 "llm_completion_tokens": result_row.get("llm_completion_tokens"),
                 "llm_total_tokens": result_row.get("llm_total_tokens"),
                 "llm_usage_available_count": result_row.get(
@@ -652,20 +653,29 @@ class ControlBaselineCache:
                     str(record.get("record_id")) for record in records
                 ),
             )
-        canonical = [
-            float(record.get("canonical_score", 0.0) or 0.0) for record in records
-        ]
-        outcome = [
+        compatible_record_ids = tuple(
+            str(record.get("record_id")) for record in records
+        )
+        if len(records) != 1:
+            return CacheLookup(
+                str(context["scenario_key"]),
+                False,
+                "ambiguous_multiple_compatible_controls",
+                compatible_record_ids=compatible_record_ids,
+            )
+        record = records[0]
+        canonical = float(record.get("canonical_score", 0.0) or 0.0)
+        outcome = (
             float(record["outcome_score"])
-            for record in records
             if record.get("outcome_score") is not None
-        ]
-        exact = [1.0 if record.get("exact_success") else 0.0 for record in records]
-        base_row = dict(records[-1].get("result_row", {}))
+            else None
+        )
+        exact = 1.0 if record.get("exact_success") else 0.0
+        base_row = dict(record.get("result_row", {}))
         base_row.update(
             {
-                "similarity": sum(canonical) / len(canonical),
-                "outcome_similarity": sum(outcome) / len(outcome) if outcome else None,
+                "similarity": canonical,
+                "outcome_similarity": outcome,
                 "exception_type": None,
                 "traceback": None,
                 "control_cache": {
@@ -676,13 +686,13 @@ class ControlBaselineCache:
                         _experimental_task_only_cache_enabled()
                     ),
                     "min_compatible_completed_runs": minimum,
-                    "compatible_count": len(records),
-                    "canonical_mean": sum(canonical) / len(canonical),
-                    "canonical_variance": _variance(canonical),
-                    "outcome_mean": sum(outcome) / len(outcome) if outcome else None,
-                    "outcome_variance": _variance(outcome),
-                    "exact_success_rate": sum(exact) / len(exact),
-                    "record_ids": [record["record_id"] for record in records],
+                    "compatible_count": 1,
+                    "canonical_mean": canonical,
+                    "canonical_variance": 0.0,
+                    "outcome_mean": outcome,
+                    "outcome_variance": 0.0,
+                    "exact_success_rate": exact,
+                    "record_ids": [record["record_id"]],
                     "cache_manifest_hash": self.manifest_hash(),
                 },
             }
@@ -691,12 +701,10 @@ class ControlBaselineCache:
         return CacheLookup(
             str(context["scenario_key"]),
             True,
-            "eligible",
+            "eligible_single_record",
             row=base_row,
             stats=stats,
-            compatible_record_ids=tuple(
-                str(record.get("record_id")) for record in records
-            ),
+            compatible_record_ids=compatible_record_ids,
         )
 
     def collect_run(

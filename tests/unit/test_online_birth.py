@@ -2,39 +2,38 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
+import sage_ts.orchestration.online_birth as online_birth
 from sage_ts.adequacy.inadequacy_classifier import (
+    _latest_record_selection_observation,
+    _location_search_argument_observation,
+    _plan_device_state_action_sequence_observation,
+    _recency_action_target_observation,
+    _relative_day_time_timestamp_observation,
+    _reminder_optional_location_argument_observation,
+    _resolve_search_window_or_bounds_observation,
     _visible_task_signals,
-    classify_planned_scenario_observations,
-    classify_scenario_observations,
     classify_visible_task_observations,
 )
-from sage_ts.generation.tool_generator import (
-    ToolGenerationRequest,
-    _prepare_location_search_args_contract_tool,
-    _resolve_search_window_or_bounds_contract_tool,
-)
+from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.orchestration.online_birth import (
     CHAIN_ROUTING_FAMILIES_BY_KEY,
     FIRST_OBSERVATION_BIRTH_KEYS,
     OnlineBirthController,
-    _normalize_live_birth_routing_metadata,
-    _original_tool_contract_errors,
-    _prepare_location_validation_examples,
-    _validation_examples_for_tool,
+    _advances_repair_case_frontier,
+    _complements_validated_native_action,
+    _native_action_observation_priority,
+    _validation_error_case_labels,
+    _validation_failure_score,
 )
-from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
-from sage_ts.validation.sandbox_validator import (
-    ValidationResult,
-    validate_generated_tool,
-)
+from sage_ts.validation.sandbox_validator import ValidationResult
 from tool_sandbox.common.execution_context import (
     DatabaseNamespace,
     ExecutionContext,
     RoleType,
-    ScenarioCategories,
 )
 from tool_sandbox.common.scenario import Scenario
 
@@ -72,24 +71,19 @@ def test_first_observation_birth_includes_direct_status_and_day_distance() -> No
     assert "composite:prepare_holiday_search_args" in FIRST_OBSERVATION_BIRTH_KEYS
 
 
-def test_direct_status_lookup_observation_enabled_by_default(monkeypatch) -> None:
-    monkeypatch.delenv("SAGE_ENABLE_DIRECT_STATUS_LOOKUP_TOOL", raising=False)
-
-    planned = classify_planned_scenario_observations("get_wifi")
-    result_backed = classify_scenario_observations(
-        "get_wifi",
-        Scenario(
-            starting_context=ExecutionContext(tool_allow_list=["get_wifi_status"])
-        ),
-        {"similarity": 0.9},
+def test_decomposed_recency_tools_route_only_to_matching_visible_signals() -> None:
+    assert (
+        CHAIN_ROUTING_FAMILIES_BY_KEY.get(
+            "derived_value:prepare_upcoming_reminder_search_args", ()
+        )
+        == ()
     )
-
-    assert "derived_value:plan_device_status_lookup" in {
-        observation.canonical_key for observation in planned
-    }
-    assert "derived_value:plan_device_status_lookup" in {
-        observation.canonical_key for observation in result_backed
-    }
+    assert online_birth.VISIBLE_ROUTING_FAMILIES_BY_KEY[
+        "derived_value:prepare_upcoming_reminder_search_args"
+    ] == ("upcoming_reminder_search",)
+    assert online_birth.VISIBLE_ROUTING_FAMILIES_BY_KEY[
+        "derived_value:prepare_past_reminder_recency_search_args"
+    ] == ("past_reminder_recency_search",)
 
 
 def test_visible_context_contact_phone_mutation_is_not_external_lookup() -> None:
@@ -107,6 +101,57 @@ def test_visible_context_contact_phone_mutation_is_not_external_lookup() -> None
     assert "contact_lookup" in signals
     assert "external_lookup" not in signals
     assert "service_answer_extraction" not in signals
+
+
+def test_visible_contact_update_by_id_uses_narrow_action_contract() -> None:
+    signals = _visible_task_signals(
+        "Update phone number of the person with id "
+        "11111111-1111-1111-1111-111111111111 to +1 (555) 0199",
+        (
+            "modify_contact",
+            "search_contacts",
+            "search_location_around_lat_lon",
+            "set_location_service_status",
+            "end_conversation",
+        ),
+    )
+
+    assert "contact_update_by_id" in signals
+    assert "direct_contact_action" in signals
+    assert "location_phrase" not in signals
+    assert "state_precondition_possible" not in signals
+
+
+def test_device_observation_uses_structured_visible_transition_contract() -> None:
+    observation = _plan_device_state_action_sequence_observation(
+        "visible_task_context(family=device_state_action; "
+        "signals=direct_device_state_action,device_state_action; "
+        "request='Turn on wifi')"
+    )
+
+    input_shapes = {
+        tuple(sorted(example.inputs)) for example in observation.validation_examples
+    }
+    services = {
+        str(example.inputs.get("target_service") or "")
+        for example in observation.validation_examples
+    }
+    assert observation.canonical_key == (
+        "state_precondition:plan_device_state_action_sequence"
+    )
+    assert len(input_shapes) == 1
+    assert next(iter(input_shapes)) == (
+        "additional_services_to_enable",
+        "desired_on",
+        "low_battery_blocks_enable",
+        "resume_original_task",
+        "target_service",
+    )
+    assert {"wifi", "cellular", "location", "contact"} <= services
+    assert all(
+        "user_request" not in example.inputs
+        for example in observation.validation_examples
+    )
 
 
 def test_visible_context_raw_phone_remove_births_contact_lookup_signal() -> None:
@@ -235,21 +280,6 @@ def test_visible_context_weather_today_ignores_distractor_recency_tools() -> Non
     assert "recency_search" not in signals
 
 
-def test_location_search_contract_extracts_place_not_task_wrapper() -> None:
-    request = ToolGenerationRequest(
-        scenario_name="visible_task_context(family=reminder_create)",
-        observation="visible location argument preparation",
-        allowed_families=("composite_workflow_helper",),
-        validation_examples=(),
-        suggested_tool_name="prepare_location_search_args",
-    )
-    tool = _prepare_location_search_args_contract_tool(request)
-
-    validation = validate_generated_tool(tool, _prepare_location_validation_examples())
-
-    assert validation.accepted
-
-
 def test_visible_reminder_relative_time_births_timestamp_tool_without_scenario_name() -> (
     None
 ):
@@ -306,6 +336,37 @@ def test_visible_context_direct_device_setting_is_not_precondition_workflow() ->
     assert "state_precondition_possible" not in signals
 
 
+def test_complete_tools_direct_device_setting_births_action_and_sequence_tools(
+    monkeypatch,
+) -> None:
+    context = ExecutionContext(
+        tool_allow_list=[
+            "set_wifi_status",
+            "set_cellular_service_status",
+            "set_location_service_status",
+            "end_conversation",
+        ]
+    )
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.USER,
+                "recipient": RoleType.AGENT,
+                "content": "Turn off cellular service.",
+            }
+        ],
+    )
+
+    observations = classify_visible_task_observations(
+        "redacted", Scenario(starting_context=context)
+    )
+    keys = {observation.canonical_key for observation in observations}
+
+    assert "state_precondition:apply_single_device_state_action" in keys
+    assert "state_precondition:plan_device_state_action_sequence" in keys
+
+
 def test_visible_context_dependent_device_setting_is_precondition_workflow() -> None:
     signals = _visible_task_signals(
         "Send a message to Alex saying hi. Resolve any issue alone.",
@@ -350,6 +411,7 @@ def test_visible_context_contact_message_recency_update_is_not_generic_recency_a
     )
 
     assert "message_counterparty_update" in signals
+    assert "contact_lookup" not in signals
     assert "direct_contact_action" not in signals
     assert "recency_action" not in signals
 
@@ -362,8 +424,20 @@ def test_visible_context_contacted_last_update_is_message_counterparty_update() 
 
     assert "message_counterparty_update" in signals
     assert "message_counterparty_lookup" in signals
+    assert "message_recency_search" in signals
+    assert "contact_lookup" not in signals
     assert "direct_contact_action" not in signals
     assert "recency_action" not in signals
+
+
+def test_visible_context_mark_latest_sender_is_message_counterparty_update() -> None:
+    signals = _visible_task_signals(
+        "Whoever wrote to me most recently should be marked as my coworker.",
+        ("search_messages", "modify_contact", "search_contacts"),
+    )
+
+    assert "message_counterparty_update" in signals
+    assert "contact_lookup" not in signals
 
 
 def test_visible_context_reminder_recency_update_still_routes_recency_action() -> None:
@@ -373,90 +447,107 @@ def test_visible_context_reminder_recency_update_still_routes_recency_action() -
     )
 
     assert "recency_action" in signals
+    assert "past_reminder_recency_search" in signals
 
 
-def test_direct_status_lookup_observation_can_be_disabled_for_ablation(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("SAGE_ENABLE_DIRECT_STATUS_LOOKUP_TOOL", "0")
-
-    observations = classify_planned_scenario_observations("get_wifi")
-
-    assert "derived_value:plan_device_status_lookup" not in {
-        observation.canonical_key for observation in observations
-    }
-
-
-def test_direct_scalar_action_births_contact_action_planner() -> None:
-    observations = classify_planned_scenario_observations("remove_contact_with_id")
-
-    assert "composite:prepare_direct_contact_action_args" in {
-        observation.canonical_key for observation in observations
-    }
-
-
-def test_planned_add_contact_births_argument_preparation_tool() -> None:
-    observations = classify_planned_scenario_observations(
-        "add_contact_with_name_and_phone_number"
+def test_visible_context_upcoming_reminder_push_routes_recency_action() -> None:
+    signals = _visible_task_signals(
+        "Push my upcoming reminder to tomorrow 5PM.",
+        ("search_reminder", "modify_reminder"),
     )
 
+    assert "reminder_modify" in signals
+    assert "recency_action" in signals
+    assert "upcoming_reminder_search" in signals
+
+
+def test_visible_context_reminder_recency_remove_still_routes_recency_action() -> None:
+    signals = _visible_task_signals(
+        "Get rid of my next reminder.",
+        ("search_reminder", "remove_reminder", "search_messages"),
+    )
+
+    assert "recency_action" in signals
+    assert "upcoming_reminder_search" in signals
+    assert "message_recency" not in signals
+
+
+def test_visible_upcoming_reminder_uses_small_search_argument_contract() -> None:
+    context = ExecutionContext(
+        tool_allow_list=["search_reminder", "remove_reminder", "search_messages"]
+    )
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.USER,
+                "recipient": RoleType.AGENT,
+                "content": "Get rid of my next reminder.",
+            }
+        ],
+    )
+
+    observations = classify_visible_task_observations(
+        "redacted", Scenario(starting_context=context)
+    )
     keys = {observation.canonical_key for observation in observations}
-    assert "composite:prepare_add_contact_args" in keys
 
-
-def test_generic_dependency_bundle_observation_uses_allowed_tool_structure(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "dependency_logic")
-    scenario = Scenario(
-        starting_context=ExecutionContext(
-            tool_allow_list=[
-                "set_example_service_status",
-                "search_records",
-                "send_message",
-            ]
-        )
-    )
-
-    observations = classify_scenario_observations(
-        "generic_dependency_bundle_case",
-        scenario,
-        {"similarity": 0.0},
-    )
-
-    dependency = next(
+    assert "derived_value:prepare_upcoming_reminder_search_args" in keys
+    assert "derived_value:resolve_search_window_or_bounds" not in keys
+    upcoming = next(
         observation
         for observation in observations
         if observation.canonical_key
-        == "state_precondition:dependency_precondition_tool_call"
+        == "derived_value:prepare_upcoming_reminder_search_args"
     )
-    assert dependency.generation_allowed
-    assert dependency.failed_tool_calls == ("set_example_service_status",)
+    assert upcoming.validation_examples[0].expected["search_kwargs"] == {
+        "reminder_timestamp_lowerbound": 1700000000.0
+    }
 
 
-def test_dependency_bundle_feature_can_be_disabled(monkeypatch) -> None:
-    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "grading_accounting")
-    scenario = Scenario(
-        starting_context=ExecutionContext(
-            tool_allow_list=[
-                "set_example_service_status",
-                "search_records",
-                "send_message",
-            ]
-        )
+def test_visible_context_reminder_recency_does_not_birth_message_selector() -> None:
+    signals = _visible_task_signals(
+        "Postpone my most recent reminder to tomorrow 5PM.",
+        ("search_reminder", "modify_reminder", "search_messages"),
     )
 
-    observations = classify_scenario_observations(
-        "generic_dependency_bundle_case",
-        scenario,
-        {"similarity": 0.0},
-    )
+    assert "recency_action" in signals
+    assert "message_recency" not in signals
 
-    assert not any(
-        observation.canonical_key
-        == "state_precondition:dependency_precondition_tool_call"
+
+def test_native_action_contract_is_prioritized_before_preparatory_tools(
+    monkeypatch,
+) -> None:
+    context = ExecutionContext(
+        tool_allow_list=[
+            "search_reminder",
+            "modify_reminder",
+            "search_messages",
+        ]
+    )
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.USER,
+                "recipient": RoleType.AGENT,
+                "content": "Postpone my most recent reminder to tomorrow 5PM.",
+            }
+        ],
+    )
+    observations = classify_visible_task_observations(
+        "redacted", Scenario(starting_context=context)
+    )
+    priorities = {
+        observation.canonical_key: _native_action_observation_priority(observation)
         for observation in observations
-    )
+    }
+
+    assert priorities["search_filter:select_action_target_by_recency"] == 0
+    assert priorities["search_filter:select_record_by_timestamp_extreme"] == 1
+    assert "canonicalizer:relative_day_time_timestamp" in priorities
+    assert "derived_value:prepare_past_reminder_recency_search_args" in priorities
+    assert "derived_value:resolve_search_window_or_bounds" not in priorities
 
 
 @dataclass
@@ -623,6 +714,51 @@ class FakeRepairRecordSelectorGenerator(FakeRecordSelectorGenerator):
 
 
 @dataclass
+class FakeRepairCandidateBatchGenerator(FakeRecordSelectorGenerator):
+    repair_calls: int = 0
+
+    def repair(
+        self,
+        request: ToolGenerationRequest,
+        rejected_tool: GeneratedTool,
+        errors: tuple[str, ...],
+    ) -> GeneratedTool:
+        raise AssertionError("batch-aware repair should validate repair_candidates")
+
+    def repair_candidates(
+        self,
+        request: ToolGenerationRequest,
+        rejected_tool: GeneratedTool,
+        errors: tuple[str, ...],
+    ) -> tuple[GeneratedTool, ...]:
+        self.repair_calls += 1
+        self.invalid_attempts = 0
+        return rejected_tool, self.generate(request)
+
+
+@dataclass
+class FakeStagedRepairRecordSelectorGenerator(FakeRecordSelectorGenerator):
+    repair_calls: int = 0
+    repair_error_inputs: tuple[tuple[str, ...], ...] = ()
+
+    def repair(
+        self,
+        request: ToolGenerationRequest,
+        rejected_tool: GeneratedTool,
+        errors: tuple[str, ...],
+    ) -> GeneratedTool:
+        self.repair_calls += 1
+        self.repair_error_inputs += (errors,)
+        if "if True return" in rejected_tool.code:
+            return GeneratedTool(
+                spec=rejected_tool.spec,
+                code=rejected_tool.code.replace("if True return", "if False return"),
+            )
+        self.invalid_attempts = 0
+        return self.generate(request)
+
+
+@dataclass
 class FakeContactLookupGenerator:
     calls: int = 0
 
@@ -762,593 +898,9 @@ def _resolve_search_window_tool() -> GeneratedTool:
 
 
 def _latest_record_observation():
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL))]
+    return _latest_record_selection_observation(
+        "visible_task_context(message_recency,contact_update)"
     )
-    observations = classify_scenario_observations(
-        "modify_contact_with_message_recency_10_distraction_tools",
-        scenario,
-        {"similarity": 0.0},
-    )
-    return next(
-        observation
-        for observation in observations
-        if observation.canonical_key
-        == "search_filter:select_record_by_timestamp_extreme"
-    )
-
-
-def test_live_birth_routing_metadata_normalizes_variant_family_labels() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-    observation = next(
-        item
-        for item in classify_scenario_observations(
-            "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_tool_description_scrambled",
-            scenario,
-            {"similarity": 0.0},
-        )
-        if item.canonical_key == "composite:plan_contact_relationship_batch_update"
-    )
-    generated = GeneratedTool(
-        spec=ToolSpec(
-            tool_name="plan_contact_relationship_batch_update",
-            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-            description="Prepare relationship batch update calls.",
-            inputs=(),
-            output_annotation="dict",
-            output_schema={"type": "object", "properties": {}},
-            positive_triggers=("Update contact relationships with relationship",),
-            negative_triggers=("missing relationship",),
-            preserves_side_effect_tools=("modify_contact",),
-            required_original_tool_calls=("modify_contact",),
-            abstain_behavior="Abstain when the target relationship is missing.",
-            generalization_rationale="Relationship batch updates recur across variants.",
-            estimated_step_compression=3,
-            cross_task_applicability_count=2,
-            applicable_task_families=(
-                "update_contact_relationship_with_relationship_twice_multiple_user_turn_10_distraction_tools",
-                "update_contact_relationship_with_relationship_twice_multiple_user_turn_3_distraction_tools_arg_description_scrambled",
-            ),
-            reason_tool_is_decisive="It prepares every required modify_contact call.",
-            shortfall_cluster_evidence=("relationship_batch_update",),
-            known_failure_mechanisms_addressed=("batch_update_arguments",),
-            inadequacy_evidence={
-                "summary": "relationship update gap",
-                "signals": ("relationship_update",),
-            },
-        ),
-        code="def plan_contact_relationship_batch_update():\n    return {}\n",
-    )
-
-    repaired = _normalize_live_birth_routing_metadata(
-        generated,
-        observation,
-        ("update_contact_relationship_with_relationship_twice",),
-    )
-
-    assert repaired.spec.applicable_task_families == (
-        "update_contact_relationship_with_relationship_twice",
-        "update_contact_relationship_with_relationship",
-    )
-    assert (
-        "update_contact_relationship_with_relationship_twice"
-        in repaired.spec.positive_triggers
-    )
-    assert not any(
-        "3_distraction_tools" in family
-        for family in repaired.spec.applicable_task_families
-    )
-
-
-def test_sparse_counterparty_selector_normalizes_to_base_family() -> None:
-    observation = next(
-        item
-        for item in classify_planned_scenario_observations(
-            "modify_contact_with_message_recency_10_distraction_tools"
-        )
-        if item.canonical_key
-        == "composite:select_message_counterparty_for_contact_update"
-    )
-    generated = GeneratedTool(
-        spec=ToolSpec(
-            tool_name="select_message_counterparty_for_contact_update",
-            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-            description="Select non-self message counterparty for contact updates.",
-            inputs=(),
-            output_annotation="dict",
-            output_schema={"type": "object", "properties": {}},
-            positive_triggers=("latest message contact update",),
-            negative_triggers=("missing updates",),
-            preserves_side_effect_tools=("modify_contact",),
-            required_original_tool_calls=("modify_contact",),
-            abstain_behavior="Abstain when the counterparty is ambiguous.",
-            generalization_rationale="Message counterparty selection recurs.",
-            estimated_step_compression=3,
-            cross_task_applicability_count=2,
-            applicable_task_families=("modify_contact_with_message_recency",),
-            reason_tool_is_decisive="It prepares the non-self modify_contact target.",
-            shortfall_cluster_evidence=("message_counterparty_update",),
-            known_failure_mechanisms_addressed=("wrong_counterparty_selected",),
-            inadequacy_evidence={
-                "summary": "message counterparty contact update gap",
-                "signals": ("wrong_selected_record",),
-            },
-        ),
-        code="def select_message_counterparty_for_contact_update():\n    return {}\n",
-    )
-
-    repaired = _normalize_live_birth_routing_metadata(
-        generated,
-        observation,
-        ("modify_contact_with_message_recency",),
-    )
-
-    assert repaired.spec.applicable_task_families == (
-        "modify_contact_with_message_recency",
-    )
-
-
-def test_sparse_contact_id_update_planner_gets_reuse_family() -> None:
-    observation = next(
-        item
-        for item in classify_planned_scenario_observations(
-            "update_contact_with_id_and_phone_number_10_distraction_tools"
-        )
-        if item.canonical_key == "composite:plan_contact_update_from_id"
-    )
-    generated = GeneratedTool(
-        spec=ToolSpec(
-            tool_name="plan_contact_update_from_id",
-            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-            description="Prepare modify_contact kwargs from a visible person id.",
-            inputs=(),
-            output_annotation="dict",
-            output_schema={"type": "object", "properties": {}},
-            positive_triggers=("update_contact_with_id",),
-            negative_triggers=("missing person id",),
-            preserves_side_effect_tools=("modify_contact",),
-            required_original_tool_calls=("modify_contact",),
-            abstain_behavior="Abstain when the person id is missing.",
-            generalization_rationale="Direct contact-id update planning recurs across variants.",
-            estimated_step_compression=3,
-            cross_task_applicability_count=2,
-            applicable_task_families=("update_contact_with_id_and_phone_number",),
-            reason_tool_is_decisive="It prepares original modify_contact kwargs.",
-            shortfall_cluster_evidence=("contact_id_update_argument_planning",),
-            known_failure_mechanisms_addressed=("side_effect_argument_preparation",),
-            inadequacy_evidence={
-                "summary": "contact id update planner gap",
-                "signals": ("side_effect_argument_preparation_failure",),
-            },
-        ),
-        code="def plan_contact_update_from_id():\n    return {}\n",
-    )
-
-    repaired = _normalize_live_birth_routing_metadata(
-        generated,
-        observation,
-        ("update_contact_with_id_and_phone_number",),
-    )
-
-    assert repaired.spec.applicable_task_families == (
-        "update_contact_with_id_and_phone_number",
-        "contact_id_update_argument_planning",
-    )
-
-
-def test_sparse_send_message_lookup_planner_gets_reuse_family() -> None:
-    observation = next(
-        item
-        for item in classify_planned_scenario_observations(
-            "send_message_with_contact_content_cellular_off_10_distraction_tools"
-        )
-        if item.canonical_key == "composite:plan_send_message_contact_lookup"
-    )
-    generated = GeneratedTool(
-        spec=ToolSpec(
-            tool_name="plan_send_message_contact_lookup",
-            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-            description="Prepare contact lookup before sending a message.",
-            inputs=(),
-            output_annotation="dict",
-            output_schema={"type": "object", "properties": {}},
-            positive_triggers=("send_message_with_contact_content",),
-            negative_triggers=("missing recipient",),
-            preserves_side_effect_tools=(
-                "search_contacts",
-                "send_message_with_phone_number",
-            ),
-            required_original_tool_calls=(
-                "search_contacts",
-                "send_message_with_phone_number",
-            ),
-            abstain_behavior="Abstain when recipient or content is missing.",
-            generalization_rationale="Named-recipient message sending recurs across service variants.",
-            estimated_step_compression=3,
-            cross_task_applicability_count=2,
-            applicable_task_families=(
-                "send_message_with_contact_content_cellular_off",
-            ),
-            reason_tool_is_decisive="It prepares original search and send-message steps.",
-            shortfall_cluster_evidence=("send_message_named_recipient_lookup",),
-            known_failure_mechanisms_addressed=(
-                "planner_failed_to_issue_available_search",
-            ),
-            inadequacy_evidence={
-                "summary": "send-message contact lookup planner gap",
-                "signals": ("planner_failed_to_issue_available_search",),
-            },
-        ),
-        code="def plan_send_message_contact_lookup():\n    return {}\n",
-    )
-
-    repaired = _normalize_live_birth_routing_metadata(
-        generated,
-        observation,
-        ("send_message_with_contact_content_cellular_off",),
-    )
-
-    assert repaired.spec.applicable_task_families == (
-        "send_message_with_contact_content_cellular_off",
-        "send_message_with_contact_content",
-    )
-
-
-def test_contact_lookup_births_after_first_observation_and_gets_chain_families(
-    tmp_path: Path,
-) -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-    observation = next(
-        item
-        for item in classify_scenario_observations(
-            "search_phone_number_with_name_3_distraction_tools",
-            scenario,
-            {"similarity": 0.0},
-        )
-        if item.canonical_key == "composite:plan_contact_lookup_query"
-    )
-    store = RegistryStore(tmp_path / "registry")
-    generator = FakeContactLookupGenerator()
-    controller = OnlineBirthController(
-        store=store,
-        generator=generator,
-        output_dir=tmp_path,
-        recurrence_threshold=2,
-        failure_memory_path=None,
-    )
-
-    controller.observe(observation)
-
-    entry = store.get(_CONTACT_LOOKUP_TOOL_NAME)
-    assert generator.calls == 1
-    assert entry is not None
-    assert "search_phone_number_with_name" in entry.tool.spec.applicable_task_families
-    assert (
-        "update_contact_relationship_with_relationship"
-        in entry.tool.spec.applicable_task_families
-    )
-    assert "remove_contact_by_phone" in entry.tool.spec.applicable_task_families
-
-
-def test_recency_observation_rejects_bounds_only_birth_after_recurrence(
-    tmp_path: Path,
-) -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
-    )
-    observations = classify_scenario_observations(
-        "search_message_with_recency_latest",
-        scenario,
-        {"similarity": 0},
-    )
-    recency = next(
-        observation
-        for observation in observations
-        if observation.canonical_key == "derived_value:recency_timestamp_bounds"
-    )
-    assert recency.generation_allowed
-
-    store = RegistryStore(tmp_path / "registry")
-    generator = FakeRecencyGenerator()
-    controller = OnlineBirthController(
-        store=store,
-        generator=generator,
-        output_dir=tmp_path,
-        recurrence_threshold=2,
-    )
-
-    controller.observe(recency)
-    assert generator.calls == 0
-    assert store.get(_TOOL_NAME) is None
-
-    controller.observe(recency)
-    assert generator.calls == 1
-    assert store.get(_TOOL_NAME) is None
-
-    birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
-    assert birth_event["accepted"] is False
-    assert birth_event["tool_name"] == _TOOL_NAME
-    assert birth_event["errors"] == ["bounds_only_derived_helper_low_value"]
-    assert birth_event["estimated_step_compression"] == 3
-    assert birth_event["cross_task_applicability_count"] == 2
-
-
-def test_successful_recency_task_does_not_birth_from_task_type_alone() -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
-    )
-    observations = classify_scenario_observations(
-        "search_message_with_recency_latest",
-        scenario,
-        {"similarity": 1.0},
-    )
-
-    assert observations == ()
-
-
-def test_existing_bounds_only_registry_tool_does_not_skip_repaired_gate(
-    tmp_path: Path,
-) -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
-    )
-    observations = classify_scenario_observations(
-        "search_message_with_recency_latest",
-        scenario,
-        {"similarity": 0},
-    )
-
-    store = RegistryStore(tmp_path / "registry")
-    generator = FakeRecencyGenerator()
-    controller = OnlineBirthController(
-        store=store,
-        generator=generator,
-        output_dir=tmp_path,
-        recurrence_threshold=2,
-    )
-    tool = generator.generate(
-        ToolGenerationRequest(
-            scenario_name="seed",
-            observation="Seed accepted recency helper.",
-            allowed_families=("derived_value_calculator",),
-            suggested_tool_name=_TOOL_NAME,
-        )
-    )
-    store.put(
-        RegistryEntry.accepted(
-            tool,
-            ValidationResult(
-                accepted=True,
-                errors=(),
-                source_example_count=1,
-                held_out_check_count=1,
-                runtime_smoke_passed=True,
-            ),
-            birth_scenario="seed",
-        )
-    )
-    generator.calls = 0
-
-    controller.observe(observations[0])
-    controller.observe(observations[0])
-
-    assert generator.calls == 1
-    assert store.get(_TOOL_NAME) is not None
-    events = (tmp_path / "tool_birth_events.jsonl").read_text()
-    assert "bounds_only_derived_helper_low_value" in events
-
-
-def test_existing_broader_registry_tool_suppresses_narrow_birth(
-    tmp_path: Path,
-) -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
-    )
-    observations = classify_scenario_observations(
-        "search_message_with_recency_latest",
-        scenario,
-        {"similarity": 0},
-    )
-    recency = next(
-        observation
-        for observation in observations
-        if observation.canonical_key == "derived_value:recency_timestamp_bounds"
-    )
-
-    store = RegistryStore(tmp_path / "registry")
-    store.put(
-        RegistryEntry.accepted(
-            _resolve_search_window_tool(),
-            ValidationResult(
-                accepted=True,
-                errors=(),
-                source_example_count=1,
-                held_out_check_count=1,
-                runtime_smoke_passed=True,
-            ),
-            birth_scenario="seed",
-        )
-    )
-    generator = FakeRecencyGenerator()
-    controller = OnlineBirthController(
-        store=store,
-        generator=generator,
-        output_dir=tmp_path,
-        recurrence_threshold=2,
-    )
-
-    controller.observe(recency)
-    controller.observe(recency)
-
-    assert generator.calls == 0
-    assert store.get(_TOOL_NAME) is None
-    assert "derived_value:recency_timestamp_bounds" in controller.generated_keys
-    events = (tmp_path / "sage_run_events.jsonl").read_text()
-    assert "tool_birth_skipped_existing_broader_helper" in events
-    assert _RESOLVE_WINDOW_TOOL_NAME in events
-
-
-def test_recency_bounds_repair_validates_against_broader_window_contract() -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
-    )
-    observations = classify_scenario_observations(
-        "search_message_with_recency_latest",
-        scenario,
-        {"similarity": 0},
-    )
-    recency = next(
-        observation
-        for observation in observations
-        if observation.canonical_key == "derived_value:recency_timestamp_bounds"
-    )
-    request = ToolGenerationRequest(
-        scenario_name=recency.scenario_name,
-        observation=recency.observation,
-        allowed_families=recency.allowed_families,
-        suggested_tool_name=_RESOLVE_WINDOW_TOOL_NAME,
-    )
-    tool = _resolve_search_window_or_bounds_contract_tool(request)
-
-    examples = _validation_examples_for_tool(tool, recency)
-
-    assert examples != recency.validation_examples
-    assert all("recency_label" not in example.inputs for example in examples)
-    validation = validate_generated_tool(tool, examples=examples)
-    assert validation.accepted, validation.errors
-
-
-def test_modify_reminder_relative_datetime_observation_is_canonicalizer() -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
-    )
-    observations = classify_scenario_observations(
-        "modify_reminder_with_recency_latest_3_distraction_tools",
-        scenario,
-        {"similarity": 2 / 3},
-    )
-
-    keys = {observation.canonical_key for observation in observations}
-    assert "derived_value:recency_timestamp_bounds" in keys
-    assert "canonicalizer:relative_day_time_timestamp" in keys
-
-    relative = next(
-        observation
-        for observation in observations
-        if observation.canonical_key == "canonicalizer:relative_day_time_timestamp"
-    )
-    assert relative.generation_allowed
-    assert relative.allowed_families == (str(ToolFamily.CANONICALIZER),)
-    assert relative.validation_examples[0].inputs == {
-        "current_timestamp": 1777428906.194959,
-        "day_offset": 1,
-        "hour": 17,
-        "minute": 0,
-        "local_utc_offset_hours": 0,
-        "current_datetime_info": {
-            "year": 2026,
-            "month": 4,
-            "day": 28,
-            "hour": 22,
-            "minute": 15,
-            "second": 6,
-            "isoweekday": 2,
-        },
-    }
-    assert relative.validation_examples[0].expected == 1777496400.0
-
-
-def test_add_reminder_optional_location_observation_prepares_side_effect_args() -> None:
-    scenario = Scenario(
-        categories=[
-            ScenarioCategories(str(ScenarioCategories.CANONICALIZATION)),
-            ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL)),
-        ]
-    )
-    observations = classify_scenario_observations(
-        "add_reminder_content_and_week_delta_and_time_and_location_3_distraction_tools",
-        scenario,
-        {"similarity": 0.2},
-    )
-
-    assert {observation.canonical_key for observation in observations} == {
-        "composite:prepare_reminder_creation_args",
-        "composite:prepare_location_search_args",
-    }
-    observation = next(
-        item
-        for item in observations
-        if item.canonical_key == "composite:prepare_reminder_creation_args"
-    )
-    assert observation.canonical_key == "composite:prepare_reminder_creation_args"
-    assert observation.allowed_families == (str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),)
-    assert observation.generation_allowed
-    assert "add_reminder" in observation.observation
-    assert "must not create or modify reminders itself" in observation.observation
-    assert observation.validation_examples[0].expected == {
-        "add_reminder_kwargs": {
-            "content": "Buy tickets",
-            "reminder_timestamp": 147600.0,
-            "latitude": None,
-            "longitude": None,
-        },
-        "should_call_add_reminder": True,
-        "location_status": "omitted_optional",
-        "abstain_reason": "",
-        "timestamp_source": "current_datetime_info",
-    }
-
-
-def test_modify_contact_message_recency_requests_search_filter_helper() -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL))]
-    )
-    observations = classify_scenario_observations(
-        "modify_contact_with_message_recency_10_distraction_tools",
-        scenario,
-        {"similarity": 0.0},
-    )
-
-    selector = next(
-        observation
-        for observation in observations
-        if observation.canonical_key
-        == "search_filter:select_record_by_timestamp_extreme"
-    )
-    assert selector.generation_allowed
-    assert selector.allowed_families == (str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),)
-    assert selector.validation_examples[0].inputs == {
-        "records": [
-            {"content": "older", "creation_timestamp": 10.0},
-            {"content": "newer", "creation_timestamp": 20.0},
-        ],
-        "timestamp_key": "creation_timestamp",
-        "selection_mode": "latest",
-    }
-    assert selector.validation_examples[0].expected == {
-        "selected_record": {"content": "newer", "creation_timestamp": 20.0},
-        "selected_index": 1,
-        "selected_timestamp": 20.0,
-        "abstain_reason": "",
-    }
-
-
-def test_message_recency_answer_prioritizes_final_answer_helper() -> None:
-    scenario = Scenario(
-        categories=[
-            ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL)),
-        ]
-    )
-    observations = classify_scenario_observations(
-        "search_message_with_recency_oldest_10_distraction_tools",
-        scenario,
-        {"similarity": 0.0, "outcome_similarity": 0.2},
-    )
-    keys = [observation.canonical_key for observation in observations]
-
-    assert "search_filter:select_message_content_by_recency" in keys
-    assert "search_filter:select_record_by_timestamp_extreme" not in keys
-    assert keys[0] == "search_filter:select_message_content_by_recency"
 
 
 def test_visible_context_first_ever_text_marks_message_recency() -> None:
@@ -1400,6 +952,8 @@ def test_visible_context_vague_message_search_marks_followup_possible() -> None:
 
     assert "message" in signals
     assert "message_search_followup_possible" in signals
+    assert "device_state_action" not in signals
+    assert "state_precondition_possible" not in signals
 
 
 def test_rejected_birth_can_retry_on_later_observation(tmp_path: Path) -> None:
@@ -1433,6 +987,236 @@ def test_rejected_birth_can_retry_on_later_observation(tmp_path: Path) -> None:
         for line in (tmp_path / "tool_birth_events.jsonl").read_text().splitlines()
     ]
     assert [event["accepted"] for event in birth_events] == [False, True]
+
+
+def test_native_action_repair_ranking_keeps_near_argument_match() -> None:
+    near_match = ValidationResult(
+        accepted=False,
+        errors=(
+            "source_0_native_action_arguments:{'person_id': 'p1', "
+            "'phone_number': '+1555', 'relationship': None}!="
+            "{'person_id': 'p1', 'phone_number': '+1555', "
+            "'relationship': NOT_GIVEN}",
+        ),
+    )
+    missing_action = ValidationResult(
+        accepted=False,
+        errors=(
+            "source_0_native_action_count:0!=1:"
+            "expected=modify_contact:{'person_id': 'p1'}",
+        ),
+    )
+
+    assert _validation_failure_score(near_match) < _validation_failure_score(
+        missing_action
+    )
+
+
+def test_native_action_repair_ranking_never_prefers_invalid_python() -> None:
+    executable_candidate = ValidationResult(
+        accepted=False,
+        errors=("negative_0_unexpected_native_action:modify_contact",),
+    )
+    syntax_failure = ValidationResult(
+        accepted=False,
+        errors=("syntax_error:invalid syntax",),
+    )
+
+    assert _validation_failure_score(executable_candidate) < (
+        _validation_failure_score(syntax_failure)
+    )
+
+    invalid_shape = ValidationResult(
+        accepted=False,
+        errors=("expected_exactly_one_function",),
+    )
+    assert _validation_failure_score(executable_candidate) < (
+        _validation_failure_score(invalid_shape)
+    )
+
+
+def test_native_action_repair_can_advance_across_complementary_case_failures() -> None:
+    previous = (
+        "negative_3_unexpected_native_action:add_reminder",
+        "negative_3_native_action_abstain_status_missing",
+    )
+    repaired = (
+        "source_0_native_action_count:0!=1:expected=add_reminder:{}",
+        "held_out_0_native_action_count:0!=1:expected=add_reminder:{}",
+    )
+
+    assert _validation_error_case_labels(previous) == {"negative_3"}
+    assert _validation_error_case_labels(repaired) == {"source_0", "held_out_0"}
+    assert _advances_repair_case_frontier(previous, repaired)
+    assert not _advances_repair_case_frontier(previous, (*previous, *repaired))
+    assert not _advances_repair_case_frontier(previous, ("syntax_error:bad",))
+
+
+def test_just_in_time_birth_stops_after_validated_native_action_tool(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAGE_SELF_EVOLVING_PROACTIVE_BIRTH", "1")
+    observations = (_latest_record_observation(), _latest_record_observation())
+    monkeypatch.setattr(
+        online_birth,
+        "classify_visible_task_observations",
+        lambda _name, _scenario: observations,
+    )
+    store = RegistryStore(tmp_path / "registry")
+    emitted_events: list[str] = []
+    controller = OnlineBirthController(
+        store=store,
+        generator=FakeRecordSelectorGenerator(),
+        output_dir=tmp_path,
+        recurrence_threshold=1,
+        event_hook=lambda event, _payload: emitted_events.append(event),
+    )
+    observed: list[str] = []
+
+    def observe(observation) -> str:
+        observed.append(observation.canonical_key)
+        return "complete_action"
+
+    monkeypatch.setattr(controller, "observe", observe)
+    monkeypatch.setattr(
+        store,
+        "get",
+        lambda _name: SimpleNamespace(
+            tool=SimpleNamespace(spec=SimpleNamespace(native_action_delegation=True))
+        ),
+    )
+
+    accepted = controller.prime_before_scenario("redacted", Scenario())
+
+    assert accepted == ["complete_action"]
+    assert len(observed) == 1
+    assert "redacted" in controller.pre_scenario_visible_observations
+    assert "jit_proactive_birth_stopped_after_action_tool" in emitted_events
+
+
+def test_just_in_time_birth_stops_for_existing_validated_native_action_tool(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAGE_SELF_EVOLVING_PROACTIVE_BIRTH", "1")
+    observations = (_latest_record_observation(), _latest_record_observation())
+    monkeypatch.setattr(
+        online_birth,
+        "classify_visible_task_observations",
+        lambda _name, _scenario: observations,
+    )
+    monkeypatch.setattr(
+        online_birth, "has_current_validation_proof", lambda _entry: True
+    )
+    store = RegistryStore(tmp_path / "registry")
+    emitted_events: list[str] = []
+    controller = OnlineBirthController(
+        store=store,
+        generator=FakeRecordSelectorGenerator(),
+        output_dir=tmp_path,
+        recurrence_threshold=1,
+        event_hook=lambda event, _payload: emitted_events.append(event),
+    )
+    observed: list[str] = []
+
+    def observe(observation) -> None:
+        observed.append(observation.canonical_key)
+        return None
+
+    monkeypatch.setattr(controller, "observe", observe)
+    monkeypatch.setattr(
+        store,
+        "get",
+        lambda _name: SimpleNamespace(
+            retired=False,
+            tool=SimpleNamespace(spec=SimpleNamespace(native_action_delegation=True)),
+        ),
+    )
+
+    accepted = controller.prime_before_scenario("redacted", Scenario())
+
+    assert accepted == []
+    assert len(observed) == 1
+    assert "jit_proactive_birth_stopped_after_action_tool" in emitted_events
+
+
+def test_just_in_time_birth_keeps_input_transforms_after_native_action(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAGE_SELF_EVOLVING_PROACTIVE_BIRTH", "1")
+    observations = (
+        _recency_action_target_observation("redacted"),
+        _relative_day_time_timestamp_observation("redacted"),
+        _resolve_search_window_or_bounds_observation("redacted"),
+        _latest_record_selection_observation("redacted"),
+    )
+    monkeypatch.setattr(
+        online_birth,
+        "classify_visible_task_observations",
+        lambda _name, _scenario: observations,
+    )
+    store = RegistryStore(tmp_path / "registry")
+    emitted_events: list[str] = []
+    controller = OnlineBirthController(
+        store=store,
+        generator=FakeRecordSelectorGenerator(),
+        output_dir=tmp_path,
+        recurrence_threshold=1,
+        event_hook=lambda event, _payload: emitted_events.append(event),
+    )
+    observed: list[str] = []
+    names = {
+        "search_filter:select_action_target_by_recency": "complete_action",
+        "canonicalizer:relative_day_time_timestamp": "canonicalize_time",
+        "derived_value:resolve_search_window_or_bounds": "prepare_search",
+        "search_filter:select_record_by_timestamp_extreme": "redundant_selector",
+    }
+
+    def observe(observation) -> str:
+        observed.append(observation.canonical_key)
+        return names[observation.canonical_key]
+
+    monkeypatch.setattr(controller, "observe", observe)
+    monkeypatch.setattr(
+        store,
+        "get",
+        lambda name: SimpleNamespace(
+            retired=False,
+            tool=SimpleNamespace(
+                spec=SimpleNamespace(native_action_delegation=name == "complete_action")
+            ),
+        ),
+    )
+
+    accepted = controller.prime_before_scenario("redacted", Scenario())
+
+    assert accepted == ["complete_action", "canonicalize_time", "prepare_search"]
+    assert observed == [
+        "search_filter:select_action_target_by_recency",
+        "canonicalizer:relative_day_time_timestamp",
+        "derived_value:resolve_search_window_or_bounds",
+    ]
+    assert "jit_proactive_action_tool_ready" in emitted_events
+    assert "jit_proactive_birth_stopped_after_action_tool" in emitted_events
+
+
+def test_native_action_complements_allow_read_only_producers_not_second_action(
+    monkeypatch,
+) -> None:
+
+    assert _complements_validated_native_action(
+        _location_search_argument_observation("visible request")
+    )
+    assert _complements_validated_native_action(
+        _plan_device_state_action_sequence_observation(
+            "visible_task_context location_phrase reminder"
+        )
+    )
+    assert not _complements_validated_native_action(
+        _reminder_optional_location_argument_observation("visible request")
+    )
 
 
 def test_rejected_birth_retry_is_capped(tmp_path: Path) -> None:
@@ -1490,592 +1274,89 @@ def test_candidate_repair_pass_can_accept_initial_rejection(
     assert birth_event["repair_final_errors"] == []
 
 
-def test_near_duplicate_only_birth_is_marked_diagnostic(tmp_path: Path) -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL))]
-    )
-    first = next(
-        item
-        for item in classify_scenario_observations(
-            "modify_contact_with_message_recency",
-            scenario,
-            {"similarity": 0.0},
-        )
-        if item.canonical_key == "search_filter:select_record_by_timestamp_extreme"
-    )
-    second = next(
-        item
-        for item in classify_scenario_observations(
-            "modify_contact_with_message_recency_3_distraction_tools",
-            scenario,
-            {"similarity": 0.0},
-        )
-        if item.canonical_key == "search_filter:select_record_by_timestamp_extreme"
-    )
-    store = RegistryStore(tmp_path / "registry")
-    generator = FakeRecordSelectorGenerator()
-    controller = OnlineBirthController(
-        store=store,
-        generator=generator,
-        output_dir=tmp_path,
-        recurrence_threshold=2,
-        failure_memory_path=None,
-    )
-
-    controller.observe(first)
-    controller.observe(second)
-
-    entry = store.get(_RECORD_SELECTOR_TOOL_NAME)
-    assert entry is not None
-    assert entry.tool.spec.diagnostic_only is True
-
-
-def test_raw_latest_message_births_selector_and_marks_window_diagnostic() -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL))]
-    )
-    observations = classify_scenario_observations(
-        "search_message_with_recency_latest",
-        scenario,
-        {"similarity": 0.0},
-    )
-
-    keys = {observation.canonical_key for observation in observations}
-    assert "search_filter:select_message_content_by_recency" in keys
-    assert "search_filter:select_record_by_timestamp_extreme" not in keys
-    assert "derived_value:message_search_time_window" in keys
-    window = next(
-        observation
-        for observation in observations
-        if observation.canonical_key == "derived_value:message_search_time_window"
-    )
-    assert not window.generation_allowed
-
-
-def test_modify_contact_message_recency_marks_message_window_diagnostic() -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL))]
-    )
-    observations = classify_scenario_observations(
-        "modify_contact_with_message_recency",
-        scenario,
-        {"similarity": 0.0},
-    )
-
-    assert {observation.canonical_key for observation in observations} == {
-        "search_filter:select_record_by_timestamp_extreme",
-        "composite:plan_message_counterparty_search",
-        "composite:select_message_counterparty_for_contact_update",
-        "search_filter:select_action_target_by_recency",
-        "composite:prepare_side_effect_args_from_selected_record",
-        "derived_value:message_search_time_window",
-    }
-    window_helper = next(
-        observation
-        for observation in observations
-        if observation.canonical_key == "derived_value:message_search_time_window"
-    )
-    assert not window_helper.generation_allowed
-    assert window_helper.reason == "diagnostic_only_bounds_helper_low_value"
-    assert window_helper.allowed_families == (str(ToolFamily.DERIVED_VALUE_CALCULATOR),)
-    assert window_helper.validation_examples[0].inputs == {
-        "anchor_timestamp": 864000.0,
-        "lookback_days": 2,
-    }
-
-
-def test_modify_contact_message_recency_can_birth_record_selector() -> None:
-    scenario = Scenario(
-        categories=[
-            ScenarioCategories(str(ScenarioCategories.CANONICALIZATION)),
-            ScenarioCategories(str(ScenarioCategories.MULTIPLE_TOOL_CALL)),
-        ]
-    )
-    observations = classify_scenario_observations(
-        "modify_contact_with_message_recency_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    keys = {observation.canonical_key for observation in observations}
-    assert "derived_value:recency_timestamp_bounds" in keys
-    assert "search_filter:select_record_by_timestamp_extreme" in keys
-
-
-def test_oldest_record_failure_births_trace_compatible_search_helpers() -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
-    )
-    observations = classify_scenario_observations(
-        "search_message_with_recency_oldest_10_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    keys = {observation.canonical_key for observation in observations}
-    assert "search_filter:select_message_content_by_recency" in keys
-    assert "search_filter:select_record_by_timestamp_extreme" not in keys
-    window = next(
-        observation
-        for observation in observations
-        if observation.canonical_key == "derived_value:message_search_time_window"
-    )
-    assert not window.generation_allowed
-
-
-def test_holiday_distance_failure_requests_timestamp_diff_helper() -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
-    )
-    observations = classify_scenario_observations(
-        "find_days_till_holiday_3_distraction_tools_tool_name_scrambled",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert len(observations) == 1
-    observation = observations[0]
-    assert observation.canonical_key == "derived_value:days_between_timestamps"
-    assert observation.generation_allowed
-    assert observation.allowed_families == (str(ToolFamily.DERIVED_VALUE_CALCULATOR),)
-    assert observation.validation_examples[1].expected == {
-        "days": 1,
-        "seconds": 3661,
-    }
-
-
-def test_holiday_timestamp_failure_requests_search_args_helper() -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.CANONICALIZATION))]
-    )
-    observations = classify_scenario_observations(
-        "find_thanksgiving_timestamp",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert len(observations) == 1
-    observation = observations[0]
-    assert observation.canonical_key == "composite:prepare_holiday_search_args"
-    assert observation.generation_allowed
-    assert observation.validation_examples[0].expected["search_holiday_kwargs"] == {
-        "holiday_name": "Thanksgiving"
-    }
-
-
-def test_planned_holiday_timestamp_births_search_args_helper() -> None:
-    observations = classify_planned_scenario_observations("find_thanksgiving_timestamp")
-
-    keys = {observation.canonical_key for observation in observations}
-    assert "composite:prepare_holiday_search_args" in keys
-
-
-def test_direct_contact_remove_by_phone_failure_births_constraint_helpers() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-
-    observations = classify_scenario_observations(
-        "remove_contact_by_phone_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "composite:plan_contact_lookup_query",
-        "composite:prepare_side_effect_args_from_selected_record",
-    ]
-
-
-def test_contact_lookup_failure_births_scalar_lookup_planner() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-
-    observations = classify_scenario_observations(
-        "search_phone_number_with_name_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "composite:plan_contact_lookup_query",
-    ]
-    observation = observations[0]
-    assert observation.allowed_families == (str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),)
-    assert observation.failed_tool_calls == ("search_contacts",)
-    assert observation.validation_examples[0].inputs == {
-        "contact_name": "Homer S",
-        "phone_number": "",
-        "relationship": "",
-        "requested_field": "phone_number",
-    }
-
-
-def test_ambiguous_contact_lookup_failure_does_not_birth_helper() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-
-    observations = classify_scenario_observations(
-        "remove_contact_by_phone_ambiguous_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert observations == ()
-
-
-def test_contact_update_failure_births_contact_selection_helper() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-
-    observations = classify_scenario_observations(
-        "update_contact_relationship_with_relationship_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "composite:plan_contact_relationship_batch_update",
-    ]
-    assert observations[0].failed_tool_calls == ("search_contacts", "modify_contact")
-
-
-def test_contact_id_update_failure_births_scalar_update_planner() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.SINGLE_TOOL_CALL])
-
-    observations = classify_scenario_observations(
-        "update_contact_with_id_and_phone_number_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "composite:plan_contact_update_from_id",
-    ]
-    assert observations[0].failed_tool_calls == ("modify_contact",)
-
-
-def test_send_message_contact_lookup_births_named_recipient_planner() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-
-    observations = classify_scenario_observations(
-        "send_message_with_contact_content_cellular_off_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "state_precondition:next_service_tool_call",
-        "composite:plan_send_message_contact_lookup",
-    ]
-    assert observations[1].failed_tool_calls == (
-        "search_contacts",
-        "send_message_with_phone_number",
-    )
-
-
-def test_message_counterparty_update_births_contact_update_selector() -> None:
-    scenario = Scenario(
-        categories=[
-            ScenarioCategories.CANONICALIZATION,
-            ScenarioCategories.MULTIPLE_TOOL_CALL,
-        ]
-    )
-
-    observations = classify_scenario_observations(
-        "modify_contact_with_message_recency_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert "composite:select_message_counterparty_for_contact_update" in [
-        item.canonical_key for item in observations
-    ]
-    assert "composite:plan_message_counterparty_search" in [
-        item.canonical_key for item in observations
-    ]
-    counterparty = next(
-        item
-        for item in observations
-        if item.canonical_key
-        == "composite:select_message_counterparty_for_contact_update"
-    )
-    assert counterparty.failed_tool_calls == ("modify_contact",)
-
-
-def test_insufficient_information_safe_abstain_birth_is_flagged(monkeypatch) -> None:
-    monkeypatch.setenv("SAGE_ENABLE_SAFE_ABSTAIN_BIRTH", "1")
-    scenario = Scenario(categories=[ScenarioCategories.INSUFFICIENT_INFORMATION])
-
-    observations = classify_scenario_observations(
-        "remove_contact_by_phone_no_search_contacts_insufficient_information",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "validation:prepare_safe_action_or_abstain",
-    ]
-    observation = observations[0]
-    assert observation.allowed_families == (
-        str(ToolFamily.VALIDATION_ABSTENTION_HELPER),
-    )
-    assert observation.generation_allowed
-    assert observation.validation_examples[0].expected["should_abstain"] is True
-
-
-def test_insufficient_information_safe_abstain_birth_is_parked_by_default() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.INSUFFICIENT_INFORMATION])
-
-    observations = classify_scenario_observations(
-        "remove_contact_by_phone_no_search_contacts_insufficient_information",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "validation:prepare_safe_action_or_abstain",
-    ]
-    assert not observations[0].generation_allowed
-
-
-def test_recency_action_failure_births_action_target_and_arg_prep_helpers() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-
-    observations = classify_scenario_observations(
-        "remove_reminder_with_recency_latest_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    keys = {item.canonical_key for item in observations}
-    assert "search_filter:select_action_target_by_recency" in keys
-    assert "composite:prepare_side_effect_args_from_selected_record" in keys
-
-
-def test_weekday_reminder_failure_births_next_weekday_timestamp_helper() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.CANONICALIZATION])
-
-    observations = classify_scenario_observations(
-        "add_reminder_content_and_weekday_delta_and_time",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "canonicalizer:next_weekday_time_to_timestamp",
-    ]
-    assert observations[0].generation_allowed
-    assert observations[0].validation_examples[0].expected == 1778878800.0
-
-
-def test_stock_symbol_failure_births_symbol_extraction_helper() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-
-    observations = classify_scenario_observations(
-        "find_stock_symbol_with_company_name_low_battery_mode_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "derived_value:extract_stock_symbol"
-    ]
-    assert observations[0].validation_examples[-1].expected == ""
-    assert observations[0].validation_examples[-1].negative_applicability
-
-
-def test_external_payload_failure_births_answer_extraction_helper() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-
-    observations = classify_scenario_observations(
-        "find_phone_number_with_location_name_3_distraction_tools_arg_description_scrambled",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "derived_value:extract_service_answer_field"
-    ]
-    observation = observations[0]
-    assert observation.generation_allowed
-    assert observation.allowed_families == (str(ToolFamily.DERIVED_VALUE_CALCULATOR),)
-    assert observation.validation_examples[-1].negative_applicability
-    assert observation.validation_examples[-1].expected["abstain_reason"] == (
-        "no_supported_answer_field"
-    )
-
-
-def test_external_payload_contract_rejects_placeholder_original_tool() -> None:
-    scenario = Scenario(categories=[ScenarioCategories.MULTIPLE_TOOL_CALL])
-    observation = classify_scenario_observations(
-        "find_phone_number_with_location_name_3_distraction_tools_arg_description_scrambled",
-        scenario,
-        {"similarity": 0.5},
-    )[0]
-    tool = GeneratedTool(
-        spec=ToolSpec(
-            tool_name="extract_service_answer_field",
-            family=ToolFamily.DERIVED_VALUE_CALCULATOR,
-            description="Extract visible service answer payload fields.",
-            inputs=(ToolInput("service_payload", "dict", "Visible service payload."),),
-            output_annotation="dict",
-            output_schema={
-                "type": "object",
-                "properties": {
-                    "answer_value": {"type": "string"},
-                    "answer_kind": {"type": "string"},
-                    "answer_unit": {"type": "string"},
-                    "abstain_reason": {"type": "string"},
-                },
-            },
-            positive_triggers=("service_payload contains answer field",),
-            negative_triggers=("service_payload lacks answer field",),
-            required_original_tool_calls=("search_service_payload",),
-            preserves_side_effect_tools=("search_service_payload",),
-            abstain_behavior="Return empty answer fields when unsupported.",
-            generalization_rationale="Visible service payload extraction recurs.",
-            estimated_step_compression=3,
-            cross_task_applicability_count=2,
-            applicable_task_families=(
-                "find_temperature_f_with_location",
-                "find_phone_number_with_location_name",
-            ),
-            reason_tool_is_decisive=(
-                "It prevents manual field-copying mistakes after original lookups."
-            ),
-            shortfall_cluster_evidence=("derived_value:extract_service_answer_field",),
-            known_failure_mechanisms_addressed=(
-                "visible_raw_data_lacking_deterministic_transform",
-            ),
-            inadequacy_evidence=observation.to_inadequacy_evidence(),
-        ),
-        code="def extract_service_answer_field(service_payload: dict) -> dict:\n    return {}\n",
-    )
-
-    assert _original_tool_contract_errors(tool, observation) == (
-        "placeholder_downstream_original_tool:search_service_payload",
-    )
-
-
-def test_medium_grain_constraint_action_observation_is_opt_in(
-    monkeypatch,
-) -> None:
-    scenario = Scenario(starting_context=ExecutionContext())
-
-    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "contract_synthesis")
-    disabled = classify_scenario_observations(
-        "remove_contact_by_phone_3_distraction_tools",
-        scenario,
-        {"similarity": 0.0},
-    )
-    assert not any(
-        item.canonical_key == "composite:constraint_to_action_planner"
-        for item in disabled
-    )
-
-    monkeypatch.setenv(
-        "SAGE_V2_EXPERIMENT_FEATURES",
-        "contract_synthesis,medium_grain_skills",
-    )
-    enabled = classify_scenario_observations(
-        "remove_contact_by_phone_3_distraction_tools",
-        scenario,
-        {"similarity": 0.0},
-    )
-    medium = next(
-        item
-        for item in enabled
-        if item.canonical_key == "composite:constraint_to_action_planner"
-    )
-    assert medium.generation_allowed
-    assert medium.allowed_families == ("composite_workflow_helper",)
-    assert len(medium.validation_examples) >= 4
-    assert any(item.negative_applicability for item in medium.validation_examples)
-
-
-def test_relationship_batch_observation_preferred_over_generic_constraint_planner(
-    monkeypatch,
-) -> None:
-    scenario = Scenario(starting_context=ExecutionContext())
-    monkeypatch.setenv(
-        "SAGE_V2_EXPERIMENT_FEATURES",
-        "contract_synthesis,medium_grain_skills",
-    )
-
-    observations = classify_scenario_observations(
-        "update_contact_relationship_with_relationship_3_distraction_tools",
-        scenario,
-        {"similarity": 0.0},
-    )
-    keys = [item.canonical_key for item in observations]
-
-    assert "composite:plan_contact_relationship_batch_update" in keys
-    assert "composite:constraint_to_action_planner" not in keys
-
-
-def test_direct_state_failure_births_trace_compatible_tool_call_helper() -> None:
-    scenario = Scenario(
-        categories=[ScenarioCategories(str(ScenarioCategories.STATE_DEPENDENCY))]
-    )
-
-    observations = classify_scenario_observations(
-        "turn_on_wifi_low_battery_mode_implicit_3_distraction_tools",
-        scenario,
-        {"similarity": 0.5},
-    )
-
-    assert [item.canonical_key for item in observations] == [
-        "state_precondition:next_service_tool_call"
-    ]
-    observation = observations[0]
-    assert observation.generation_allowed
-    assert observation.allowed_families == (str(ToolFamily.STATE_PRECONDITION_HELPER),)
-    assert observation.validation_examples[0].expected == {
-        "ready": False,
-        "tool_name": "set_low_battery_mode_status",
-        "arguments": {"on": False},
-        "should_call": True,
-        "reason": "wifi cannot be enabled while low battery mode is on",
-    }
-
-
-def test_planned_manifest_observations_use_unlabeled_task_text() -> None:
-    observations = classify_planned_scenario_observations(
-        "send_message_with_contact_content_cellular_off_3_distraction_tools"
-    )
-
-    keys = {item.canonical_key for item in observations}
-    assert "state_precondition:next_service_tool_call" in keys
-    assert "composite:plan_send_message_contact_lookup" in keys
-    assert all(
-        item.evidence_source == "unlabeled_manifest_task_text" for item in observations
-    )
-    assert all(
-        item.reason.startswith("unlabeled_manifest_gap_plan:") for item in observations
-    )
-
-
-def test_proactive_manifest_reflection_births_from_empty_registry(
+def test_candidate_repair_validates_every_model_authored_candidate(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("SAGE_SELF_EVOLVING_PROACTIVE_BIRTH", "1")
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "candidate_repair")
+    observation = _latest_record_observation()
     store = RegistryStore(tmp_path / "registry")
-    generator = FakeContactLookupGenerator()
+    generator = FakeRepairCandidateBatchGenerator(invalid_attempts=1)
     controller = OnlineBirthController(
         store=store,
         generator=generator,
         output_dir=tmp_path,
-        recurrence_threshold=2,
+        recurrence_threshold=1,
         failure_memory_path=None,
     )
 
-    controller.prime_from_scenario_names(
-        (
-            "search_phone_number_with_name_3_distraction_tools",
-            "search_name_with_relationship_3_distraction_tools",
-        )
+    controller.observe(observation)
+
+    assert generator.repair_calls == 1
+    assert store.get(_RECORD_SELECTOR_TOOL_NAME) is not None
+    birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
+    repair_event = birth_event["repair_history"][0]
+    assert repair_event["repair_candidate_count"] == 2
+    assert repair_event["selected_candidate_index"] == 1
+    assert repair_event["repair_candidate_validations"][0]["accepted"] is False
+    assert repair_event["repair_candidate_validations"][1]["accepted"] is True
+
+
+def test_candidate_repair_can_build_on_flat_intermediate_candidate(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "candidate_repair")
+    monkeypatch.setenv("SAGE_CANDIDATE_REPAIR_ATTEMPTS", "2")
+    observation = _latest_record_observation()
+    store = RegistryStore(tmp_path / "registry")
+    generator = FakeStagedRepairRecordSelectorGenerator(invalid_attempts=1)
+    controller = OnlineBirthController(
+        store=store,
+        generator=generator,
+        output_dir=tmp_path,
+        recurrence_threshold=1,
+        failure_memory_path=None,
     )
 
-    entry = store.get(_CONTACT_LOOKUP_TOOL_NAME)
-    assert generator.calls == 1
-    assert entry is not None
-    assert entry.birth_scenario.startswith("search_")
-    events = (tmp_path / "tool_birth_events.jsonl").read_text()
-    assert "plan_contact_lookup_query" in events
+    controller.observe(observation)
+
+    assert generator.repair_calls == 2
+    substantive_errors = [
+        {error for error in errors if not error.startswith("repair_strategy:")}
+        for errors in generator.repair_error_inputs
+    ]
+    assert substantive_errors[0].issubset(substantive_errors[1])
+    assert [
+        next(error for error in errors if error.startswith("repair_strategy:"))
+        for errors in generator.repair_error_inputs
+    ] == ["repair_strategy:1", "repair_strategy:2"]
+    assert store.get(_RECORD_SELECTOR_TOOL_NAME) is not None
+    birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
+    assert birth_event["accepted"] is True
+    assert birth_event["repair_attempt_count"] == 2
+
+
+def test_recency_action_contract_is_decomposed_to_reminder_actions() -> None:
+    observation = _recency_action_target_observation("redacted")
+    positive_examples = [
+        example
+        for example in observation.validation_examples
+        if not example.negative_applicability
+    ]
+    actions = {
+        str(example.expected.get("downstream_tool_name") or "")
+        for example in positive_examples
+    }
+    modes = {
+        str(example.inputs.get("selection_mode") or "") for example in positive_examples
+    }
+    negative_examples = [
+        example
+        for example in observation.validation_examples
+        if example.negative_applicability
+    ]
+
+    assert actions == {"modify_reminder", "remove_reminder"}
+    assert modes == {"latest", "oldest"}
+    assert negative_examples[0].inputs["updates"] == {"reminder_timestamp": 99.0}

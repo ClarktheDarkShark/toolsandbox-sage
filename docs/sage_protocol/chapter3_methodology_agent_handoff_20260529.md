@@ -41,12 +41,13 @@ ToolSandbox self-evolving Praxis implementation:
 - Runner: `scripts/run_sage_protocol.py`
 - Policy preset: `--sage-policy self-evolving-praxis`
 - Full-dataset build mode: `online_build_full`
-- SAGE execution path: `src/sage_ts/adapters/sage_run_adapter.py`
-- ToolSandbox integration: `src/sage_ts/runtime/toolsandbox_integration.py`
+- Reusable SAGE core: `src/sage_ts/`
+- ToolSandbox SAGE execution adapter: `src/sage_research/toolsandbox/sage_run_adapter.py`
+- ToolSandbox integration: `src/sage_research/toolsandbox/integration.py`
 - Tool generation: `src/sage_ts/generation/tool_generator.py`
 - Tool validation: `src/sage_ts/validation/`
 - Registry/manifests: `src/sage_ts/registry/manifest.py`
-- Actor/checker bridge: `src/sage_ts/adapters/openai_toolsandbox_roles.py`
+- Actor/tool-use policy: `src/sage_research/toolsandbox/openai_roles.py`
 - Dashboard: `src/sage_ts/dashboard/task_compare_template.py`
 - Methodology setup note: `docs/sage_protocol/chapter3_sage_methodology_working_setup.md`
 
@@ -543,7 +544,7 @@ for the dissertation draft:
 3. Tool generation, validation, repair, and registry lifecycle loop.
 4. Evidence ladder from seed/dev diagnostics to 20/60/250/500/full validation.
 5. Control-cache and SAGE-fresh evaluation discipline.
-6. Generated-helper contribution flow: visible -> called -> outcome gain.
+6. Generated-tool contribution flow: visible -> called -> outcome gain.
 7. Portability boundary: native ToolSandbox integration vs import-agent mode.
 8. One-page professional SAGE infographic.
 
@@ -551,7 +552,7 @@ Existing figure files:
 
 - `docs/sage_protocol/figures/sage_peer_review_methodology_figure.svg`
 - `docs/sage_protocol/figures/sage_peer_review_methodology_figure.png`
-- `docs/sage_protocol/figures/sage_one_page_infographic.html`
+- `docs/sage_protocol/figures/sage_self_evolution_loop_publication.html`
 
 When updating one figure format, update the companion formats.
 
@@ -597,7 +598,7 @@ Follow this process:
 
 Create or update these as the methodology work progresses:
 
-- `docs/sage_protocol/chapter3_methodology_prep.md`
+- `docs/sage_protocol/chapter3_sage_methodology_system_architecture_v061.md`
 - `docs/sage_protocol/chapter3_sage_methodology_working_setup.md`
 - `docs/sage_protocol/chapter3_methodology_figures.md`
 - `docs/sage_protocol/chapter3_methodology_agent_work_log_20260529.md`

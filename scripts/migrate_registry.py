@@ -27,10 +27,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 sys.path.insert(0, str(_ROOT))
 
 from sage_ts.adequacy.candidate_gate import evaluate_candidate_gate  # noqa: E402
-from sage_ts.registry.manifest import (  # noqa: E402
-    RegistryEntry,
-    has_current_validation_proof,
-)
+from sage_ts.registry.manifest import RegistryEntry  # noqa: E402
 
 REGISTRY_SCHEMA_VERSION = 2
 TOOL_SPEC_SCHEMA_VERSION = 2
@@ -115,30 +112,6 @@ def migrate_manifest(path: Path) -> dict[str, Any]:
         "migrated_entries": migrated_entries,
         "changes": all_changes,
     }
-
-
-def check_validation_proof(path: Path) -> list[dict[str, Any]]:
-    """Return active (non-retired) entries that fail has_current_validation_proof."""
-    raw = path.read_text(encoding="utf-8")
-    data = json.loads(raw)
-    tools = data.get("tools", {})
-    failing = []
-    for tool_name, entry in tools.items():
-        registry_entry = RegistryEntry.from_json(entry)
-        if registry_entry.retired:
-            continue
-        if not has_current_validation_proof(registry_entry):
-            reasons = _validation_proof_reasons(registry_entry)
-            failing.append(
-                {
-                    "tool_name": tool_name,
-                    "path": str(path),
-                    "schema_version": registry_entry.schema_version,
-                    "passes_validation_proof": False,
-                    "reasons": reasons,
-                }
-            )
-    return failing
 
 
 def _validation_proof_reasons(entry: RegistryEntry) -> list[str]:

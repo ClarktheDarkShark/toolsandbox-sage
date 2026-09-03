@@ -1,91 +1,119 @@
-# For licensing see accompanying LICENSE file.
-# Copyright (C) 2024 Apple Inc. All Rights Reserved.
-# Adapted from: https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+# For licensing see accompanying LICENSE and ACKNOWLEDGEMENTS files.
+# ToolSandbox portions are Copyright (C) 2024 Apple Inc. All Rights Reserved.
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tool_sandbox"
-version = "0.0.1"
-description = "A controllable, stateful and interactive sandbox for agent evaluation"
+name = "toolsandbox-sage"
+version = "0.1.0"
+description = "Research implementation of self-evolving tool use on ToolSandbox"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11,<3.13"
+license = "LicenseRef-Apple-Sample-Code"
+license-files = ["LICENSE"]
 authors = [
-    { name = "Jiarui Lu", email = "jiarui_lu@apple.com" }
+    { name = "Christopher Clark" },
+]
+keywords = [
+    "agent evaluation",
+    "research",
+    "self-evolving agents",
+    "tool use",
+    "ToolSandbox",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
     "anthropic==0.26.1",
-    "ccy==1.3.1",
+    "ccy==2.0.0",
     "decorator==5.1.1",
-    "dill==0.3.8",
+    "dill==0.4.1",
     "geopy==2.4.1",
-    "holidays==0.51",
-    "httpx==0.27.2",
-    "huggingface_hub==0.23.4",
-    "jsonschema==4.19.2",
-    "langchain==0.1.3",
-    "networkx==3.2.1",
+    "google-cloud-aiplatform==1.149.0",
+    "holidays==0.95",
+    "httpx==0.28.1",
+    "huggingface-hub==1.10.1",
+    "jsonschema==4.23.0",
+    "langchain-core==0.2.43",
+    "networkx==3.3",
     "numpy==1.26.4",
-    "openai==1.17.0",
-    "phonenumbers==8.13.39",
-    "pint==0.23",
+    "openai==2.37.0",
+    "phonenumbers==9.0.29",
+    "pint==0.25.3",
     "polars==0.20.31",
-    "pydantic==2.7.4",
-    "pyyaml==6.0.1",
-    "rapidfuzz==3.9.3",
-    "requests==2.32.3",
+    "pydantic==2.13.4",
+    "pyyaml==6.0.3",
+    "rapidfuzz==3.13.0",
+    "requests==2.33.1",
     "rouge-score==0.1.2",
     "scipy==1.13.1",
-    "sentencepiece==0.2.0",
+    "sentencepiece==0.2.1",
     "StrEnum==0.4.15",
-    "tenacity==8.4.1",
-    "transformers==4.41.2",
-    "tree-sitter==0.22.3",
-    "tree-sitter-languages==1.10.2",
-    "typing_extensions==4.12.2",
-    "vertexai==1.49.0",
+    "tenacity==8.5.0",
+    "tqdm==4.67.3",
+    "transformers==5.7.0",
+    "typing-extensions==4.15.0",
 ]
 
-[project.urls]
-Homepage = "https://github.com/apple/ToolSandbox"
-Issues = "https://github.com/apple/ToolSandbox/issues"
-
-
 [project.optional-dependencies]
+publication = [
+    "matplotlib==3.10.9",
+    "Pillow==11.3.0",
+]
 dev = [
-    "genbadge[all]",
-    "google-auth-stubs",
-    "mypy",
-    "pre-commit",
-    "pyarrow==16.1.0", # < for converting polars to pandas dataframes
-    "pydantic-extra-types",
-    "pytest",
-    "pytest-cov",
-    "pytest-xdist",
-    "ruff",
-    "seaborn==0.13.2",
-    "types-decorator",
-    "types-networkx",
-    "types-requests",
-    "types-tornado",
-    "types-tqdm",
-    "types-PyYAML",
+    "build==1.2.2.post1",
+    "mypy==1.11.2",
+    "pre-commit==4.0.1",
+    "pytest==7.4.4",
+    "pytest-cov>=5,<7",
+    "ruff==0.15.13",
 ]
 
 [project.scripts]
 tool_sandbox = "tool_sandbox.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ClarktheDarkShark/toolsandbox-sage"
+Repository = "https://github.com/ClarktheDarkShark/toolsandbox-sage"
+Issues = "https://github.com/ClarktheDarkShark/toolsandbox-sage/issues"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = [".", "src"]
+include = ["tool_sandbox*", "sage_ts*"]
+exclude = [
+    "artifacts*",
+    "cybergym_data*",
+    "docs*",
+    "external*",
+    "figures*",
+    "language-life-game*",
+    "memory*",
+    "outputs*",
+    "scripts*",
+    "src*",
+    "tests*",
+]
+namespaces = false
+
+[tool.setuptools.package-data]
+"sage_ts.dashboard" = ["*.html"]
+"tool_sandbox.roles" = ["*.yaml"]
+
+[tool.pytest.ini_options]
+addopts = ""
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -95,19 +123,7 @@ extend-select = ["I"]
 ignore = ["F841"]
 
 [tool.ruff.lint.per-file-ignores]
-# Ignore `F401` (unusesd import) in all `__init__.py` files, and in `path/to/file.py`.
 "__init__.py" = ["F401"]
-
-[tool.setuptools.packages.find]
-where = [".", "src"]
-include = ["tool_sandbox*", "sage_ts*"]
-exclude = ["data/"]
-
-# Configure pytest to parallelize test execution. This configuration is used e.g.
-# - by VSCode's built-in testing extension
-# - when running `pytest .` on the command line
-[tool.pytest.ini_options]
-addopts=""
 
 [[tool.mypy.overrides]]
 module = ["holidays", "polars", "rouge_score", "rouge_score.*", "tqdm", "tqdm.*"]
@@ -115,7 +131,6 @@ ignore_missing_imports = true
 
 [tool.mypy]
 mypy_path = "src"
-# The options below are what `--strict` encompasses.
 check_untyped_defs = true
 disallow_any_generics = true
 disallow_incomplete_defs = true

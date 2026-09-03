@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SAGE Chapter 4 Evidence Dashboard Mockup</title>
+  <style>
+    :root {
+      --bg: #071019;
+      --surface: #0d1823;
+      --surface-raised: #122131;
+      --surface-soft: #101c29;
+      --line: #26394b;
+      --line-strong: #35536d;
+      --text: #ecf2f7;
+      --muted: #92a6b8;
+      --blue: #67b7ee;
+      --green: #40d493;
+      --amber: #f1bd57;
+      --red: #f16f78;
+      --violet: #b6a0ee;
+      --white-soft: #c9d6e2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0;
+    }
+
+    button,
+    select {
+      font: inherit;
+    }
+
+    .topbar {
+      min-height: 72px;
+      padding: 15px 28px;
+      border-bottom: 1px solid var(--line);
+      background: #0a151f;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--blue);
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .brand-copy {
+      min-width: 0;
+    }
+
+    .brand-copy h1 {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.2;
+    }
+
+    .brand-copy p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mock-badge,
+    .run-select {
+      min-height: 34px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: var(--surface-raised);
+      color: var(--white-soft);
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .mock-badge {
+      border-color: #745f2e;
+      color: #f7d48c;
+      text-transform: uppercase;
+    }
+
+    .run-select {
+      min-width: 190px;
+    }
+
+    .page {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 20px 28px 34px;
+    }
+
+    .run-strip {
+      min-height: 58px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+      display: grid;
+      grid-template-columns: minmax(220px, 1.2fr) minmax(240px, 2fr) auto;
+      gap: 24px;
+      align-items: center;
+      padding: 11px 15px;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .run-name {
+      margin-top: 4px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .progress-track {
+      height: 7px;
+      overflow: hidden;
+      border-radius: 4px;
+      background: #1d2c3b;
+    }
+
+    .progress-value {
+      width: 82%;
+      height: 100%;
+      background: var(--blue);
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .paired-count {
+      text-align: right;
+    }
+
+    .paired-count strong {
+      display: block;
+      margin-top: 2px;
+      color: var(--text);
+      font-size: 17px;
+    }
+
+    .section-head {
+      margin: 22px 0 10px;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .hypothesis-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .hypothesis {
+      min-height: 210px;
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--green);
+      border-radius: 7px;
+      background: var(--surface);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .hypothesis-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .hypothesis-id {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .hypothesis-title {
+      margin: 6px 0 0;
+      max-width: 290px;
+      color: var(--white-soft);
+      font-size: 13px;
+      font-weight: 750;
+      line-height: 1.35;
+    }
+
+    .status {
+      flex: 0 0 auto;
+      border: 1px solid rgba(64, 212, 147, .5);
+      border-radius: 999px;
+      background: rgba(64, 212, 147, .09);
+      color: var(--green);
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .primary-value {
+      margin-top: 18px;
+      color: var(--green);
+      font-size: 35px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .primary-label {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .threshold-track {
+      position: relative;
+      height: 7px;
+      margin-top: 14px;
+      border-radius: 4px;
+      background: #1d2c3b;
+    }
+
+    .threshold-fill {
+      width: var(--fill);
+      max-width: 100%;
+      height: 100%;
+      border-radius: 4px;
+      background: var(--green);
+    }
+
+    .threshold-mark {
+      position: absolute;
+      left: var(--target);
+      top: -4px;
+      width: 2px;
+      height: 15px;
+      background: var(--text);
+    }
+
+    .threshold-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .panel {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+      padding: 15px;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 11px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-title strong {
+      font-size: 12px;
+    }
+
+    .panel-title span {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .outcome-pair {
+      display: grid;
+      grid-template-columns: 1fr 30px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 18px 0 14px;
+    }
+
+    .outcome-value {
+      min-width: 0;
+    }
+
+    .outcome-value span {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .outcome-value strong {
+      display: block;
+      margin-top: 5px;
+      font-size: 27px;
+    }
+
+    .outcome-value.sage strong {
+      color: var(--green);
+    }
+
+    .arrow {
+      color: var(--blue);
+      text-align: center;
+      font-size: 20px;
+    }
+
+    .secondary-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .secondary-line strong {
+      color: var(--white-soft);
+    }
+
+    .stat-list,
+    .integrity-list {
+      margin: 0;
+      padding: 5px 0 0;
+      list-style: none;
+    }
+
+    .stat-list li,
+    .integrity-list li {
+      min-height: 37px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+      border-bottom: 1px solid rgba(38, 57, 75, .72);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .stat-list li:last-child,
+    .integrity-list li:last-child {
+      border-bottom: 0;
+    }
+
+    .stat-list strong {
+      color: var(--text);
+    }
+
+    .integrity-value {
+      min-width: 25px;
+      color: var(--green);
+      font-weight: 900;
+      text-align: right;
+    }
+
+    .tool-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .tool-stat {
+      min-height: 69px;
+      border-left: 2px solid var(--blue);
+      background: var(--surface-soft);
+      padding: 10px;
+    }
+
+    .tool-stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .tool-stat strong {
+      display: block;
+      margin-top: 6px;
+      color: var(--text);
+      font-size: 19px;
+    }
+
+    .tool-stat.green {
+      border-left-color: var(--green);
+    }
+
+    .tool-stat.amber {
+      border-left-color: var(--amber);
+    }
+
+    .lower-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 12px;
+    }
+
+    .replication-chart {
+      height: 183px;
+      padding-top: 12px;
+      display: grid;
+      grid-template-columns: 47px minmax(0, 1fr);
+      gap: 10px;
+    }
+
+    .axis-labels {
+      height: 145px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 9px;
+      text-align: right;
+    }
+
+    .plot {
+      position: relative;
+      height: 145px;
+      border-left: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+      background-image: linear-gradient(
+        to bottom,
+        transparent calc(25% - 1px),
+        rgba(53, 83, 109, .35) 25%,
+        transparent calc(25% + 1px),
+        transparent calc(50% - 1px),
+        rgba(53, 83, 109, .35) 50%,
+        transparent calc(50% + 1px),
+        transparent calc(75% - 1px),
+        rgba(53, 83, 109, .35) 75%,
+        transparent calc(75% + 1px)
+      );
+    }
+
+    .target-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 30%;
+      border-top: 1px dashed var(--amber);
+    }
+
+    .target-line span {
+      position: absolute;
+      right: 4px;
+      top: -15px;
+      color: var(--amber);
+      font-size: 9px;
+    }
+
+    .dot {
+      position: absolute;
+      left: var(--x);
+      bottom: var(--y);
+      width: 10px;
+      height: 10px;
+      margin: 0 0 -5px -5px;
+      border: 2px solid #bfe8d8;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .mean-line {
+      position: absolute;
+      left: 3%;
+      right: 3%;
+      bottom: 63%;
+      border-top: 2px solid var(--blue);
+    }
+
+    .mean-line span {
+      position: absolute;
+      left: 0;
+      top: -18px;
+      color: var(--blue);
+      font-size: 9px;
+      font-weight: 850;
+    }
+
+    .run-labels {
+      grid-column: 2;
+      display: flex;
+      justify-content: space-around;
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .contribution-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 10px;
+    }
+
+    .contribution-table th,
+    .contribution-table td {
+      padding: 9px 7px;
+      border-bottom: 1px solid rgba(38, 57, 75, .72);
+      text-align: right;
+    }
+
+    .contribution-table th:first-child,
+    .contribution-table td:first-child {
+      text-align: left;
+    }
+
+    .contribution-table th {
+      color: var(--muted);
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+
+    .contribution-table td:first-child {
+      max-width: 165px;
+      overflow: hidden;
+      color: var(--white-soft);
+      font-weight: 750;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .positive {
+      color: var(--green);
+      font-weight: 800;
+    }
+
+    .negative {
+      color: var(--red);
+      font-weight: 800;
+    }
+
+    .footer-note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 980px) {
+      .hypothesis-grid,
+      .evidence-grid,
+      .lower-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .run-strip {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .paired-count {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .topbar {
+        align-items: flex-start;
+        padding: 14px;
+      }
+
+      .top-actions {
+        display: none;
+      }
+
+      .page {
+        padding: 14px;
+      }
+
+      .tool-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .hypothesis {
+        min-height: 195px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">SG</div>
+      <div class="brand-copy">
+        <h1>Task Compare</h1>
+        <p>SAGE Chapter 4 evidence dashboard</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="mock-badge">Design mockup - illustrative values</span>
+      <select class="run-select" aria-label="Select evidence view">
+        <option>Aggregate - 10 full runs</option>
+        <option>Online build - Run 01</option>
+        <option>Frozen registry reuse</option>
+      </select>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="run-strip" aria-label="Run progress">
+      <div>
+        <div class="eyebrow">Evidence campaign</div>
+        <div class="run-name">gpt-4o-mini / ToolSandbox full benchmark</div>
+      </div>
+      <div>
+        <div class="progress-track" aria-hidden="true">
+          <div class="progress-value"></div>
+        </div>
+        <div class="progress-meta">
+          <span>8 of 10 replications complete</span>
+          <span>Matched task order</span>
+        </div>
+      </div>
+      <div class="paired-count">
+        <div class="eyebrow">Paired observations</div>
+        <strong>8,256</strong>
+      </div>
+    </section>
+
+    <div class="section-head">
+      <h2>Hypothesis Evidence</h2>
+      <p>Outcome is the sole performance endpoint; canonical score is descriptive route-compatibility output only.</p>
+    </div>
+
+    <section class="hypothesis-grid">
+      <article class="hypothesis">
+        <div>
+          <div class="hypothesis-top">
+            <div>
+              <div class="hypothesis-id">Hypothesis 1</div>
+              <div class="hypothesis-title">Frozen-registry preservation of online-build gain</div>
+            </div>
+            <span class="status">Pass</span>
+          </div>
+          <div class="primary-value">83.8%</div>
+          <div class="primary-label">gain retained with generation and repair off</div>
+        </div>
+        <div>
+          <div class="threshold-track" style="--fill:84%; --target:80%">
+            <div class="threshold-fill"></div>
+            <div class="threshold-mark"></div>
+          </div>
+          <div class="threshold-meta">
+            <span>Observed 83.8%</span>
+            <span>Target >= 80%</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="hypothesis">
+        <div>
+          <div class="hypothesis-top">
+            <div>
+              <div class="hypothesis-id">Hypothesis 2</div>
+              <div class="hypothesis-title">Overall matched task-completion improvement</div>
+            </div>
+            <span class="status">Pass</span>
+          </div>
+          <div class="primary-value">+66.7%</div>
+          <div class="primary-label">relative outcome lift over the non-learning baseline</div>
+        </div>
+        <div>
+          <div class="threshold-track" style="--fill:100%; --target:15%">
+            <div class="threshold-fill"></div>
+            <div class="threshold-mark"></div>
+          </div>
+          <div class="threshold-meta">
+            <span>Observed +66.7%</span>
+            <span>Target >= 10%</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="hypothesis">
+        <div>
+          <div class="hypothesis-top">
+            <div>
+              <div class="hypothesis-id">Hypothesis 3</div>
+              <div class="hypothesis-title">Outcome lift when a generated tool is naturally called</div>
+            </div>
+            <span class="status">Pass</span>
+          </div>
+          <div class="primary-value">+128.6%</div>
+          <div class="primary-label">relative lift on the generated-tool-called subset</div>
+        </div>
+        <div>
+          <div class="threshold-track" style="--fill:100%; --target:24%">
+            <div class="threshold-fill"></div>
+            <div class="threshold-mark"></div>
+          </div>
+          <div class="threshold-meta">
+            <span>Observed +128.6%</span>
+            <span>Target >= 30%</span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <div class="section-head">
+      <h2>Matched Performance And Tool Evidence</h2>
+      <p>Values are calculated only from tasks observed in both arms.</p>
+    </div>
+
+    <section class="evidence-grid">
+      <article class="panel">
+        <div class="panel-title">
+          <strong>Overall Task Completion</strong>
+          <span>Performance endpoint</span>
+        </div>
+        <div class="outcome-pair">
+          <div class="outcome-value">
+            <span>Baseline</span>
+            <strong>0.454</strong>
+          </div>
+          <div class="arrow">-&gt;</div>
+          <div class="outcome-value sage">
+            <span>SAGE</span>
+            <strong>0.757</strong>
+          </div>
+        </div>
+        <div class="secondary-line">
+          <span>Absolute difference <strong>+0.303</strong></span>
+          <span>Relative outcome lift <strong>+66.7%</strong></span>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-title">
+          <strong>Paired Statistical Evidence</strong>
+          <span>Across completed runs</span>
+        </div>
+        <ul class="stat-list">
+          <li><span>Mean paired outcome difference</span><strong>+0.303</strong></li>
+          <li><span>Paired bootstrap 95% CI</span><strong>[+0.281, +0.324]</strong></li>
+          <li><span>Permutation test</span><strong>p &lt; .001</strong></li>
+          <li><span>Full-outcome successes B / S</span><strong>2,314 / 4,806</strong></li>
+        </ul>
+      </article>
+
+      <article class="panel">
+        <div class="panel-title">
+          <strong>Research Integrity</strong>
+          <span>Claim safeguards</span>
+        </div>
+        <ul class="integrity-list">
+          <li><span>Benchmark-answer leakage incidents</span><span class="integrity-value">0</span></li>
+          <li><span>Synthetic code-based completions</span><span class="integrity-value">0</span></li>
+          <li><span>Unfair extra task-solving turns</span><span class="integrity-value">0</span></li>
+          <li><span>Tool side-effect incidents</span><span class="integrity-value">0</span></li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="tool-row" aria-label="Generated tool metrics">
+      <div class="tool-stat">
+        <span>Accepted tools</span>
+        <strong>21</strong>
+      </div>
+      <div class="tool-stat green">
+        <span>Reused on later tasks</span>
+        <strong>17</strong>
+      </div>
+      <div class="tool-stat green">
+        <span>Tool reuse rate</span>
+        <strong>81.0%</strong>
+      </div>
+      <div class="tool-stat">
+        <span>Natural tool calls</span>
+        <strong>825</strong>
+      </div>
+      <div class="tool-stat green">
+        <span>Attributed gains</span>
+        <strong>492</strong>
+      </div>
+      <div class="tool-stat">
+        <span>Preserved outcomes</span>
+        <strong>286</strong>
+      </div>
+      <div class="tool-stat amber">
+        <span>Attributed regressions</span>
+        <strong>47</strong>
+      </div>
+      <div class="tool-stat green">
+        <span>Tool runtime failures</span>
+        <strong>0</strong>
+      </div>
+    </section>
+
+    <div class="section-head">
+      <h2>Replication Stability And Tool Contribution</h2>
+      <p>Run-level variation remains visible instead of being hidden by the aggregate.</p>
+    </div>
+
+    <section class="lower-grid">
+      <article class="panel">
+        <div class="panel-title">
+          <strong>Outcome Lift Across Full Runs</strong>
+          <span>Mean and hypothesis threshold</span>
+        </div>
+        <div class="replication-chart" aria-label="Illustrative run-level outcome lift chart">
+          <div class="axis-labels">
+            <span>80%</span>
+            <span>60%</span>
+            <span>40%</span>
+            <span>20%</span>
+            <span>0%</span>
+          </div>
+          <div class="plot">
+            <div class="target-line"><span>H2 threshold: 10%</span></div>
+            <div class="mean-line"><span>Mean: 66.7%</span></div>
+            <span class="dot" style="--x:6%; --y:70%"></span>
+            <span class="dot" style="--x:16%; --y:62%"></span>
+            <span class="dot" style="--x:27%; --y:68%"></span>
+            <span class="dot" style="--x:38%; --y:59%"></span>
+            <span class="dot" style="--x:49%; --y:66%"></span>
+            <span class="dot" style="--x:60%; --y:73%"></span>
+            <span class="dot" style="--x:71%; --y:64%"></span>
+            <span class="dot" style="--x:82%; --y:69%"></span>
+            <span class="dot" style="--x:93%; --y:65%"></span>
+          </div>
+          <div class="run-labels">
+            <span>R1</span><span>R2</span><span>R3</span><span>R4</span><span>R5</span>
+            <span>R6</span><span>R7</span><span>R8</span><span>R9</span><span>R10</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-title">
+          <strong>Top Generated-Tool Contributions</strong>
+          <span>Natural calls only</span>
+        </div>
+        <table class="contribution-table">
+          <thead>
+            <tr>
+              <th>Generated tool</th>
+              <th>Later calls</th>
+              <th>Outcome delta</th>
+              <th>G / R</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>select_contact_from_messages</td>
+              <td>118</td>
+              <td class="positive">+0.412</td>
+              <td>91 / 8</td>
+            </tr>
+            <tr>
+              <td>normalize_reminder_schedule</td>
+              <td>96</td>
+              <td class="positive">+0.367</td>
+              <td>74 / 6</td>
+            </tr>
+            <tr>
+              <td>prepare_location_message</td>
+              <td>82</td>
+              <td class="positive">+0.344</td>
+              <td>61 / 7</td>
+            </tr>
+            <tr>
+              <td>apply_device_state_action</td>
+              <td>71</td>
+              <td class="positive">+0.281</td>
+              <td>49 / 5</td>
+            </tr>
+            <tr>
+              <td>resolve_relative_date</td>
+              <td>54</td>
+              <td class="positive">+0.193</td>
+              <td>35 / 4</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="footer-note">
+          G / R reports matched generated-tool-attributed gains and regressions.
+          Clicking a production row would open its code, validation record, birth task,
+          reuse history, and paired outcomes.
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

@@ -292,16 +292,16 @@ TASK_FOCUS_HTML = r"""<!doctype html>
         const oc = s.balanced_control_mean_outcome_similarity;
         const os = s.balanced_candidate_mean_outcome_similarity;
         const od = present(oc) && present(os) ? Number(os) - Number(oc) : null;
-        const lift = s.balanced_lift_percent;
         const balancedDone = s.balanced_completed || 0;
         const cp = armProgressFor("control", s.control_completed);
         const sp = armProgressFor("candidate", s.candidate_completed);
         cards = [
-          {l:"Baseline Score", v:fmt(c), n:`${balancedDone} paired done`},
-          {l:"SAGE Score", v:fmt(sg), n:`${balancedDone} paired done`},
-          {l:"Delta", v:fmtD(d), n:d===null?"":d>0?"improvement":d<0?"regression":"no change", cls:d===null?"":d>0?"good":d<0?"bad":""},
-          {l:"Lift", v:fmtPct(lift), n:"vs baseline", cls:present(lift) && Number(lift)>0?"good":present(lift) && Number(lift)<0?"bad":""},
-          ...(od===null?[]:[{l:"Outcome Delta", v:fmtD(od), n:`${fmt(oc)} → ${fmt(os)}`, cls:od>0?"good":od<0?"bad":""}]),
+          {l:"Baseline Outcome", v:fmt(oc), n:`${balancedDone} paired done`},
+          {l:"SAGE Outcome", v:fmt(os), n:`${balancedDone} paired done`},
+          {l:"Outcome Delta", v:fmtD(od), n:od===null?"not yet available":`${fmt(oc)} → ${fmt(os)}`, cls:od===null?"":od>0?"good":od<0?"bad":""},
+          {l:"Baseline Canonical Audit", v:fmt(c), n:"descriptive route match"},
+          {l:"SAGE Canonical Audit", v:fmt(sg), n:"descriptive route match"},
+          {l:"Canonical Audit Delta", v:fmtD(d), n:"descriptive only"},
           {l:"Tools", v:`${s.accepted_tools||0} new`, n:`${s.reuse_count||0} reuse · ${s.generated_tool_attempted_scenarios||0} attempts · ${s.generated_tool_called_scenarios||0} called · ${s.generated_tool_failed_scenarios||0} failed`},
           {l:"Baseline Progress", v:progressText(cp), n:cp.status},
           {l:"SAGE Progress", v:progressText(sp), n:sp.status},
@@ -309,7 +309,8 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       } else if (arm === "candidate") {
         const sp = armProgressFor("candidate", s.candidate_completed);
         cards = [
-          {l:"SAGE Score", v:fmt(s.candidate_mean_similarity), n:`${s.candidate_completed||0} done`},
+          {l:"SAGE Outcome", v:fmt(s.candidate_mean_outcome_similarity), n:`${s.candidate_completed||0} done`},
+          {l:"SAGE Canonical Audit", v:fmt(s.candidate_mean_similarity), n:"descriptive route match"},
           {l:"New Tools", v:`${s.accepted_tools||0}`, n:"accepted this run"},
           {l:"Reuse Calls", v:`${s.reuse_count||0}`, n:"generated tool uses"},
           {l:"Tool Attempts", v:`${s.generated_tool_attempted_scenarios||0}`, n:`${s.generated_tool_called_scenarios||0} called · ${s.generated_tool_failed_scenarios||0} failed`},
@@ -319,7 +320,8 @@ TASK_FOCUS_HTML = r"""<!doctype html>
       } else {
         const cp = armProgressFor("control", s.control_completed);
         cards = [
-          {l:"Baseline Score", v:fmt(s.control_mean_similarity), n:`${s.control_completed||0} done`},
+          {l:"Baseline Outcome", v:fmt(s.control_mean_outcome_similarity), n:`${s.control_completed||0} done`},
+          {l:"Baseline Canonical Audit", v:fmt(s.control_mean_similarity), n:"descriptive route match"},
           {l:"Turns", v:`${s.current_turns||0}`, n:"total"},
           {l:"Baseline Progress", v:progressText(cp), n:cp.status},
           {l:"Exceptions", v:`${s.current_exceptions||0}`, n:"errors"},
@@ -342,13 +344,16 @@ TASK_FOCUS_HTML = r"""<!doctype html>
           const tools = s.generated_tools || [];
           const cStatus = c.status || "pending";
           const sStatus = s.status || "pending";
+          const cOutcome = present(c.outcome_similarity) ? fmt(c.outcome_similarity) : "—";
+          const sOutcome = present(s.outcome_similarity) ? fmt(s.outcome_similarity) : "—";
           return `<button class="task${sel?" selected":""}" data-id="${esc(entry.id)}">
             <div class="t-row">${taskNumberHtml(entry)}<span class="status-pair"><span class="pill ${esc(cStatus)}">B ${esc(cStatus)}</span><span class="pill ${esc(sStatus)}">S ${esc(sStatus)}</span></span></div>
             <div class="t-title">${taskTitleHtml(entry, entry.short_name||entry.scenario)}</div>
             <div class="score-pair">
-              <span class="sc">B ${fmt(c.similarity)}</span>
-              <span class="sc${tools.length?" hit":""}">S ${fmt(s.similarity)}</span>
+              <span class="sc">B outcome ${cOutcome}</span>
+              <span class="sc${tools.length?" hit":""}">S outcome ${sOutcome}</span>
             </div>
+            <div class="tiny">canonical audit B ${fmt(c.similarity)} · S ${fmt(s.similarity)}</div>
             ${tools.map(t=>`<span class="tbadge">${esc(t)}</span>`).join("")}
           </button>`;
         }
@@ -356,7 +361,8 @@ TASK_FOCUS_HTML = r"""<!doctype html>
         return `<button class="task${sel?" selected":""}${entry.status==="running"?" running":""}" data-id="${esc(entry.id)}">
           <div class="t-row">${taskNumberHtml(entry)}<span class="pill ${esc(entry.status)}">${esc(entry.status)}</span></div>
           <div class="t-title">${taskTitleHtml(entry, entry.short_name||entry.scenario)}</div>
-          <div class="t-score">score ${fmt(entry.similarity)} · ${entry.turn_count||"—"} turns</div>
+          <div class="t-score">outcome ${present(entry.outcome_similarity) ? fmt(entry.outcome_similarity) : "—"} · ${entry.turn_count||"—"} turns</div>
+          <div class="tiny">canonical audit ${fmt(entry.similarity)}</div>
           ${(entry.generated_tools||[]).map(t=>`<span class="tbadge">${esc(t)}</span>`).join("")}
         </button>`;
       }).join("");
@@ -378,12 +384,12 @@ TASK_FOCUS_HTML = r"""<!doctype html>
     }
 
     function evaluationSummaryHtml(ev) {
-      const finalNote = ev.blocked_by_guardrail ? "guardrail triggered" : "scored from required checks";
+      const finalNote = ev.blocked_by_guardrail ? "guardrail triggered" : "descriptive route-match audit";
       const guardrailState = ev.forbidden_total ? `${ev.forbidden_triggered}/${ev.forbidden_total} triggered` : "none";
       const requiredState = ev.required_total ? `${ev.required_passed}/${ev.required_total} matched` : "none";
       return `
         <div class="eval-top">
-          <div class="eval-metric"><div class="sec-head">Final</div><div class="big">${esc(fmt(ev.final_score))}</div><div class="note">${esc(finalNote)}</div></div>
+          <div class="eval-metric"><div class="sec-head">Canonical Audit</div><div class="big">${esc(fmt(ev.final_score))}</div><div class="note">${esc(finalNote)}</div></div>
           <div class="eval-metric"><div class="sec-head">Required</div><div class="big">${esc(fmt(ev.required_score))}</div><div class="note">${esc(requiredState)}</div></div>
           <div class="eval-metric"><div class="sec-head">Forbidden</div><div class="big">${esc(fmt(ev.forbidden_score))}</div><div class="note">${esc(guardrailState)}</div></div>
         </div>`;
@@ -453,7 +459,7 @@ TASK_FOCUS_HTML = r"""<!doctype html>
           <div class="paired-run-status">${esc(task.status || "pending")} · ${esc(String(task.turn_count ?? "—"))} turns</div>
         </div>
         <div class="paired-run-metrics">
-          <div class="paired-mini"><div class="mlabel">Final</div><div class="mvalue">${esc(fmt(ev.final_score))}</div><div class="mnote">${ev.blocked_by_guardrail ? "guardrail" : "score"}</div></div>
+          <div class="paired-mini"><div class="mlabel">Canonical Audit</div><div class="mvalue">${esc(fmt(ev.final_score))}</div><div class="mnote">${ev.blocked_by_guardrail ? "guardrail" : "descriptive only"}</div></div>
           <div class="paired-mini"><div class="mlabel">Required</div><div class="mvalue">${esc(fmt(ev.required_score))}</div><div class="mnote">${esc(requiredState)}</div></div>
           <div class="paired-mini"><div class="mlabel">Forbidden</div><div class="mvalue">${esc(fmt(ev.forbidden_score))}</div><div class="mnote">${esc(forbiddenState)}</div></div>
         </div>
@@ -531,18 +537,18 @@ TASK_FOCUS_HTML = r"""<!doctype html>
         const c = control || {}, s = candidate || {};
         const d = (c.similarity!=null&&s.similarity!=null) ? Number(s.similarity)-Number(c.similarity) : null;
         const od = (present(c.outcome_similarity)&&present(s.outcome_similarity)) ? Number(s.outcome_similarity)-Number(c.outcome_similarity) : null;
-        const dc = d===null?"":d>0?"good":d<0?"bad":"";
+        const dc = od===null?"":od>0?"good":od<0?"bad":"";
         const cats = dedupe([...(c.categories || []), ...(s.categories || [])]);
         dh.innerHTML = `
           <div class="d-title">${detailTitleHtml(entry, entry.short_name||entry.scenario)}</div>
           <div class="comparison">
-            <div class="cmp"><div class="mlabel">Baseline</div><div class="cv">${fmt(c.similarity)}</div>${present(c.outcome_similarity)?`<div class="tiny">outcome ${fmt(c.outcome_similarity)}</div>`:""}</div>
+            <div class="cmp"><div class="mlabel">Baseline Outcome</div><div class="cv">${present(c.outcome_similarity)?fmt(c.outcome_similarity):"—"}</div><div class="tiny">canonical audit ${fmt(c.similarity)}</div></div>
             <div class="cmp-sep">→</div>
-            <div class="cmp sage"><div class="mlabel">SAGE</div><div class="cv">${fmt(s.similarity)}</div>
-              ${present(s.outcome_similarity)?`<div class="tiny">outcome ${fmt(s.outcome_similarity)}</div>`:""}
+            <div class="cmp sage"><div class="mlabel">SAGE Outcome</div><div class="cv">${present(s.outcome_similarity)?fmt(s.outcome_similarity):"—"}</div>
+              <div class="tiny">canonical audit ${fmt(s.similarity)}</div>
               ${(s.generated_tools||[]).map(t=>`<span class="tbadge">⚡ ${esc(t)}</span>`).join("")}
             </div>
-            ${d!==null?`<div class="cmp ${dc}"><div class="mlabel">Δ</div><div class="cv">${fmtD(d)}</div>${od!==null?`<div class="tiny">outcome ${fmtD(od)}</div>`:""}</div>`:""}
+            <div class="cmp ${dc}"><div class="mlabel">Outcome Δ</div><div class="cv">${od!==null?fmtD(od):"—"}</div><div class="tiny">canonical audit ${d!==null?fmtD(d):"—"}</div></div>
           </div>
           <div class="tags">
             ${cats.map(c=>`<span class="pill">${esc(c)}</span>`).join("")}
@@ -563,12 +569,13 @@ TASK_FOCUS_HTML = r"""<!doctype html>
 
       const o = task.outcome || {};
       const sim = task.similarity ?? o.similarity;
-      const scoreClass = Number.isFinite(Number(sim)) ? (Number(sim) >= .999 ? "good" : "bad") : "";
+      const outcomeValue = task.outcome_similarity;
+      const outcomeClass = present(outcomeValue) ? (Number(outcomeValue) >= .999 ? "good" : "bad") : "";
       const cats = (task.categories||[]).map(c=>`<span class="pill">${esc(c)}</span>`).join("");
-      const outcome = present(task.outcome_similarity) ? `<span class="pill">outcome ${fmt(task.outcome_similarity)}</span>` : "";
+      const outcomePill = `<span class="pill ${outcomeClass}">outcome ${present(outcomeValue) ? fmt(outcomeValue) : "—"}</span>`;
       dh.innerHTML = `
         <div class="d-title">${detailTitleHtml(task, task.short_name||task.scenario)}</div>
-        <div class="tags">${cats}<span class="pill ${scoreClass}">score ${fmt(sim)}</span>${outcome}<span class="pill">${task.turn_count||"—"} turns</span></div>`;
+        <div class="tags">${cats}${outcomePill}<span class="pill">canonical audit ${fmt(sim)}</span><span class="pill">${task.turn_count||"—"} turns</span></div>`;
 
       renderEvaluation(task);
     }

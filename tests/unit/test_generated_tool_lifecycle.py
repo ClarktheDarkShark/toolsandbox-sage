@@ -9,9 +9,10 @@ from sage_ts.generation.tool_spec import (
 )
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
-from sage_ts.runtime.tool_invoker import invoke_registered_tool
+from sage_ts.runtime.toolsandbox_integration import inject_registry_tools_into_context
 from sage_ts.validation.ast_safety import check_ast_safety
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
+from tool_sandbox.common.execution_context import ExecutionContext
 
 
 def _evidence(summary: str, *signals: str) -> StructuredInadequacyEvidence:
@@ -65,11 +66,18 @@ def test_generated_tool_birth_reuse_and_success_flip(tmp_path: Path) -> None:
     raw_label: str = "Wi Fi"
     expected_label: str = "wifi"
     baseline_later_success = raw_label == expected_label
-    normalized = invoke_registered_tool(
-        store,
-        "canonicalize_connectivity_label",
-        {"label": raw_label},
-        success_flip=not baseline_later_success,
+    context = ExecutionContext(tool_allow_list=[])
+    injected = inject_registry_tools_into_context(
+        context,
+        store.load_entries().values(),
+        on_reuse=lambda tool_name: store.record_reuse(
+            tool_name,
+            success_flip=not baseline_later_success,
+        ),
+    )
+    assert injected == ["canonicalize_connectivity_label"]
+    normalized = context.name_to_tool["canonicalize_connectivity_label"](
+        label=raw_label
     )
 
     assert normalized == expected_label

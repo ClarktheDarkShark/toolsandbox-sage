@@ -8,7 +8,9 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
+import subprocess
 import time
 import traceback
 from datetime import datetime
@@ -19,17 +21,6 @@ from typing import Any, cast
 from sage_ts.adapters.openai_agent_adapter import OpenAIChatAdapter
 from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
 from sage_ts.adapters.toolsandbox_adapter import ToolSandboxRunConfig, run_toolsandbox
-from sage_ts.cache.openai_response_cache import (
-    configure_response_cache_context,
-    install_openai_response_cache,
-    write_cache_artifacts,
-)
-from sage_ts.cache.openai_response_cache import (
-    reset_metrics as reset_openai_response_cache_metrics,
-)
-from sage_ts.cache.openai_response_cache import (
-    write_metrics as write_openai_response_cache_metrics,
-)
 from sage_ts.campaign.artifacts import (
     append_event,
     initialize_campaign,
@@ -55,9 +46,8 @@ from sage_ts.evaluation.control_baseline_cache import (
 from sage_ts.evaluation.helper_contribution import write_helper_contribution_summary
 from sage_ts.evaluation.run_metrics import compare_runs
 from sage_ts.evaluation.task_strata import cohort_policy_report
-from sage_ts.generation.prompt_cache import PromptCache
 from sage_ts.generation.tool_generator import ToolGenerator
-from sage_ts.runtime.base_toolset import KNOWN_POLICIES, UPSTREAM_POLICY
+from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 
 # Run modes are also split names. Keep these explicit so bad campaign labels
 # fail early, but support campaign-sized protocol runs directly.
@@ -90,48 +80,32 @@ MODES = (
 SAGE_POLICY_NONE = "none"
 SAGE_POLICY_AUTO = "auto"
 SAGE_POLICY_SELF_EVOLVING_PRAXIS = "self-evolving-praxis"
-SAGE_POLICY_SELF_EVOLVING_PRAXIS_COMBINED = "self-evolving-praxis-combined"
 SAGE_POLICIES = (
     SAGE_POLICY_AUTO,
     SAGE_POLICY_NONE,
     SAGE_POLICY_SELF_EVOLVING_PRAXIS,
-    SAGE_POLICY_SELF_EVOLVING_PRAXIS_COMBINED,
 )
 SELF_EVOLVING_PRAXIS_ENV_DEFAULTS = {
-    "SAGE_SELF_EVOLVING_PROACTIVE_BIRTH": "1",
-    "SAGE_SELF_EVOLVING_PROACTIVE_SCOPE": "just_in_time",
-    "SAGE_SCENARIO_METADATA_POLICY": "visible_context",
-    "SAGE_SELF_EVOLVING_BIRTH_SCENARIO_FAIR_CHANCE": "0",
-    "SAGE_SELF_EVOLVING_VISIBLE_NOT_CALLED_RETRY": "0",
-    "SAGE_SIDE_EFFECT_FAIR_CHANCE_EXTRA_TURNS": "0",
-    "SAGE_ENABLE_SAFE_ABSTAIN_BIRTH": "1",
-    "SAGE_PRAXIS_BRIDGE_POLICY": "disabled",
-    "SAGE_GENERATED_TOOL_GUIDANCE_MODE": "minimal",
-    "SAGE_GENERATED_TOOL_FIRST_ATTEMPT_CHOICE": "1",
-    "SAGE_GENERATED_TOOL_CONTINUATION_CHOICE": "1",
-    "SAGE_GENERATED_TOOL_CONTRACT_RETRY_ATTEMPTS": "0",
-    "SAGE_GENERATED_TOOL_SYNTHETIC_REPAIR": "0",
-    "SAGE_GENERATED_TOOL_DOCSTRING_MODE": "compact",
-    "SAGE_MAX_RUNTIME_GENERATED_TOOL_BUNDLE_SIZE": "4",
-    "SAGE_SELF_EVOLVING_REFLECTION": "1",
-    "SAGE_SELF_EVOLVING_PULSE_INTERVAL": "4",
-    "SAGE_SELF_EVOLVING_MIN_PULSE_TASKS": "8",
     "SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS": "4",
-    "SAGE_V2_EXPERIMENT_FEATURES": (
-        "contract_synthesis,candidate_repair,dependency_logic,medium_grain_skills"
-    ),
     "SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS": "120",
-    "SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY": "1",
-}
-SELF_EVOLVING_PRAXIS_COMBINED_ENV_DEFAULTS = {
-    **SELF_EVOLVING_PRAXIS_ENV_DEFAULTS,
-    "SAGE_PRAXIS_BRIDGE_POLICY": "combined",
+    "SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS": "600",
 }
 
-
-def _bridge_policy_value_enabled(value: str | None) -> bool:
-    raw = (value or "").strip().lower()
-    return raw in {"1", "true", "yes", "on", "combined", "full"}
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP = 1784832588
+PUBLICATION_ENVIRONMENT_LOCK = "requirements-publication-lock.txt"
+PUBLICATION_EXECUTION_ENV = {
+    "SAGE_OPENAI_MAX_RETRIES": "5",
+    "SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
+    "SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
+    "SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS": "4",
+    "SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS": "120",
+    "SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS": "600",
+}
+PINNED_PUBLICATION_ENVIRONMENT_LOCK_SHA256 = (
+    "5c3ea1802331bf45809fd3e3e31fd8352473449e709cd7a443d03d1975477d1f"
+)
+_PUBLICATION_LOCK_LINE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;]+)$")
 
 
 def _apply_sage_policy_preset(policy: str) -> dict[str, dict[str, str]]:
@@ -141,22 +115,6 @@ def _apply_sage_policy_preset(policy: str) -> dict[str, dict[str, str]]:
         return {}
     if policy == SAGE_POLICY_SELF_EVOLVING_PRAXIS:
         defaults = SELF_EVOLVING_PRAXIS_ENV_DEFAULTS
-        bridge_value = os.environ.get("SAGE_PRAXIS_BRIDGE_POLICY")
-        if _bridge_policy_value_enabled(bridge_value):
-            raise ValueError(
-                "--sage-policy self-evolving-praxis is the autonomous "
-                "tool-generation policy and requires SAGE_PRAXIS_BRIDGE_POLICY "
-                "to be unset or disabled. Use --sage-policy "
-                "self-evolving-praxis-combined only for bridge-policy ablations."
-            )
-    elif policy == SAGE_POLICY_SELF_EVOLVING_PRAXIS_COMBINED:
-        defaults = SELF_EVOLVING_PRAXIS_COMBINED_ENV_DEFAULTS
-        bridge_value = os.environ.get("SAGE_PRAXIS_BRIDGE_POLICY")
-        if bridge_value is not None and not _bridge_policy_value_enabled(bridge_value):
-            raise ValueError(
-                "--sage-policy self-evolving-praxis-combined requires "
-                "SAGE_PRAXIS_BRIDGE_POLICY to be unset or enabled."
-            )
     else:
         raise ValueError(f"Unknown SAGE policy preset: {policy}")
     applied: dict[str, dict[str, str]] = {}
@@ -264,6 +222,7 @@ def _scenario_limit_for_mode(mode: str) -> int | None:
 
 
 DIAGNOSTIC_FORCE_ENV_VARS = (
+    "SAGE_DIAGNOSTIC_EXPOSE_TOOL_NAME",
     "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME",
     "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_ERROR",
     "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_BASE_TOOL",
@@ -319,23 +278,6 @@ def _preflight_openai_api_key(
             "OPENAI_API_KEY is required for this OpenAI-backed run but is "
             "missing or blank. Aborting before task execution."
         )
-
-
-def _resolve_routing_evidence_mode(requested: str, *, frozen_final_run: bool) -> str:
-    requested = requested.strip().lower()
-    if requested == "default":
-        return "disabled" if frozen_final_run else "auto"
-    if requested in {"auto", "disabled", "pinned"}:
-        return requested
-    raise ValueError(f"unsupported_routing_evidence_mode:{requested}")
-
-
-def _apply_routing_evidence_env(mode: str, path: Path | None) -> None:
-    os.environ["SAGE_ROUTING_EVIDENCE_MODE"] = mode
-    if path is not None:
-        os.environ["SAGE_ROUTING_EVIDENCE_PATH"] = str(path)
-    else:
-        os.environ.pop("SAGE_ROUTING_EVIDENCE_PATH", None)
 
 
 def _timestamp() -> str:
@@ -416,6 +358,314 @@ def _digest_file(path: Path) -> str | None:
     if not path.exists():
         return None
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _external_distribution_lock_identity(lock_path: Path) -> tuple[int, str]:
+    """Independently derive the canonical external-distribution identity."""
+
+    if not lock_path.is_file():
+        raise ValueError(f"Publication environment lock is missing: {lock_path}")
+    locked: dict[str, str] = {}
+    for line_number, raw_line in enumerate(
+        lock_path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = _PUBLICATION_LOCK_LINE.fullmatch(line)
+        if match is None:
+            raise ValueError(
+                "Publication environment lock must contain exact name==version "
+                f"entries; line {line_number} is invalid: {line!r}."
+            )
+        display_name, version = match.groups()
+        canonical_name = re.sub(r"[-_.]+", "-", display_name).lower()
+        if canonical_name in locked:
+            raise ValueError(
+                "Publication environment lock contains duplicate distribution "
+                f"{canonical_name!r}."
+            )
+        locked[canonical_name] = version
+    if not locked:
+        raise ValueError("Publication environment lock is empty.")
+    canonical_entries = sorted(
+        f"{name}=={version}\n" for name, version in locked.items()
+    )
+    canonical_bytes = "".join(canonical_entries).encode("utf-8")
+    return len(locked), hashlib.sha256(canonical_bytes).hexdigest()
+
+
+def _git_output(repo_root: Path, *arguments: str) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(repo_root), *arguments],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(f"Cannot inspect publication Git identity: {exc}") from exc
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise ValueError(
+            "Cannot inspect publication Git identity: "
+            f"git {' '.join(arguments)} failed ({detail or completed.returncode})."
+        )
+    return completed.stdout.strip()
+
+
+def _clean_source_identity(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
+    """Return HEAD identity only when the exact repository worktree is clean."""
+
+    repo_root = repo_root.resolve()
+    git_root = Path(_git_output(repo_root, "rev-parse", "--show-toplevel")).resolve()
+    if git_root != repo_root:
+        raise ValueError(
+            f"Publication source root mismatch: expected {repo_root}, observed {git_root}."
+        )
+    status = _git_output(
+        repo_root,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    )
+    if status:
+        first_entries = ", ".join(status.splitlines()[:5])
+        raise ValueError(
+            "Publication source worktree is not clean"
+            + (f": {first_entries}" if first_entries else ".")
+        )
+    commit = _git_output(repo_root, "rev-parse", "--verify", "HEAD")
+    tree = _git_output(repo_root, "rev-parse", "--verify", "HEAD^{tree}")
+    if not re.fullmatch(r"[0-9a-f]{40,64}", commit) or not re.fullmatch(
+        r"[0-9a-f]{40,64}", tree
+    ):
+        raise ValueError("Publication Git commit or tree identity is malformed.")
+    return {"git_commit": commit, "git_tree": tree, "git_clean": True}
+
+
+def _active_publication_environment(
+    lock_path: Path,
+    *,
+    repo_root: Path = REPO_ROOT,
+) -> dict[str, Any]:
+    try:
+        from scripts.verify_publication_environment import verify_environment
+    except ModuleNotFoundError:
+        from verify_publication_environment import verify_environment
+
+    try:
+        report = verify_environment(lock_path, repo_root=repo_root)
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise ValueError(f"Publication environment verification failed: {exc}") from exc
+    if not isinstance(report, dict) or report.get("status") != "pass":
+        raise ValueError("Publication environment verifier did not return pass status.")
+    return cast(dict[str, Any], report)
+
+
+def _publication_provenance(
+    *,
+    fixed_toolsandbox_timestamp: str | None,
+    freeze_toolsandbox_clock: bool,
+    repo_root: Path = REPO_ROOT,
+) -> dict[str, Any]:
+    """Fail closed and capture the exact runtime/source publication identity."""
+
+    if not freeze_toolsandbox_clock:
+        raise ValueError("Publication runs require --freeze-toolsandbox-clock.")
+    required_timestamp = str(PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP)
+    if fixed_toolsandbox_timestamp != required_timestamp:
+        raise ValueError(
+            "Publication ToolSandbox timestamp must be exactly "
+            f"{required_timestamp}; observed {fixed_toolsandbox_timestamp!r}."
+        )
+
+    repo_root = repo_root.resolve()
+    source = _clean_source_identity(repo_root)
+    exported_commit = os.environ.get("SAGE_PUBLICATION_GIT_COMMIT")
+    exported_tree = os.environ.get("SAGE_PUBLICATION_GIT_TREE")
+    if exported_commit != source["git_commit"]:
+        raise ValueError(
+            "SAGE_PUBLICATION_GIT_COMMIT is missing or does not match clean HEAD."
+        )
+    if exported_tree != source["git_tree"]:
+        raise ValueError(
+            "SAGE_PUBLICATION_GIT_TREE is missing or does not match the clean HEAD tree."
+        )
+
+    lock_path = (repo_root / PUBLICATION_ENVIRONMENT_LOCK).resolve()
+    observed_lock_sha256 = _digest_file(lock_path)
+    if observed_lock_sha256 != PINNED_PUBLICATION_ENVIRONMENT_LOCK_SHA256:
+        raise ValueError(
+            "Publication environment lock hash mismatch: expected "
+            f"{PINNED_PUBLICATION_ENVIRONMENT_LOCK_SHA256}, observed "
+            f"{observed_lock_sha256 or 'missing'}."
+        )
+    distribution_count, distribution_sha256 = _external_distribution_lock_identity(
+        lock_path
+    )
+    environment = _active_publication_environment(lock_path, repo_root=repo_root)
+    required_environment: dict[str, Any] = {
+        "python_version": "3.12.7",
+        "python_implementation": "CPython",
+        "isolated_environment": True,
+        "platform_system": "Darwin",
+        "platform_machine": "arm64",
+        "environment_lock_path": str(lock_path),
+        "environment_lock_sha256": observed_lock_sha256,
+        "external_distribution_count": distribution_count,
+        "external_distribution_sha256": distribution_sha256,
+    }
+    for field, expected in required_environment.items():
+        if environment.get(field) != expected:
+            raise ValueError(
+                f"Publication environment field {field!r} is "
+                f"{environment.get(field)!r}; expected {expected!r}."
+            )
+
+    exported_fields = {
+        "python_executable": "SAGE_PUBLICATION_PYTHON_EXECUTABLE",
+        "python_version": "SAGE_PUBLICATION_PYTHON_VERSION",
+        "python_prefix": "SAGE_PUBLICATION_PYTHON_PREFIX",
+        "python_base_prefix": "SAGE_PUBLICATION_PYTHON_BASE_PREFIX",
+        "python_implementation": "SAGE_PUBLICATION_PYTHON_IMPLEMENTATION",
+        "platform_system": "SAGE_PUBLICATION_PLATFORM_SYSTEM",
+        "platform_machine": "SAGE_PUBLICATION_PLATFORM_MACHINE",
+        "environment_lock_path": "SAGE_PUBLICATION_ENVIRONMENT_LOCK",
+        "environment_lock_sha256": "SAGE_PUBLICATION_ENVIRONMENT_LOCK_SHA256",
+        "external_distribution_count": ("SAGE_PUBLICATION_EXTERNAL_DISTRIBUTION_COUNT"),
+        "external_distribution_sha256": (
+            "SAGE_PUBLICATION_EXTERNAL_DISTRIBUTION_SHA256"
+        ),
+    }
+    for field, env_name in exported_fields.items():
+        exported = os.environ.get(env_name)
+        observed = environment.get(field)
+        if exported is None or exported != str(observed):
+            raise ValueError(
+                f"{env_name} is missing or does not match the verified "
+                f"publication environment field {field!r}."
+            )
+    for env_name, expected in PUBLICATION_EXECUTION_ENV.items():
+        if os.environ.get(env_name) != expected:
+            raise ValueError(
+                f"{env_name} must be pinned to {expected!r} for publication runs."
+            )
+
+    return {
+        "schema_version": 2,
+        **source,
+        "fixed_toolsandbox_timestamp": PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP,
+        "python_executable": environment["python_executable"],
+        "python_version": environment["python_version"],
+        "python_implementation": environment["python_implementation"],
+        "python_prefix": environment["python_prefix"],
+        "python_base_prefix": environment["python_base_prefix"],
+        "isolated_environment": environment["isolated_environment"],
+        "platform_system": environment["platform_system"],
+        "platform_machine": environment["platform_machine"],
+        "environment_lock_path": PUBLICATION_ENVIRONMENT_LOCK,
+        "environment_lock_sha256": observed_lock_sha256,
+        "external_distribution_count": distribution_count,
+        "external_distribution_sha256": distribution_sha256,
+        "execution_environment": dict(PUBLICATION_EXECUTION_ENV),
+    }
+
+
+def _assert_publication_source_unchanged(
+    provenance: dict[str, Any],
+    *,
+    repo_root: Path = REPO_ROOT,
+) -> None:
+    current = _clean_source_identity(repo_root)
+    for field in ("git_commit", "git_tree", "git_clean"):
+        if current.get(field) != provenance.get(field):
+            raise ValueError(
+                f"Publication source identity changed during execution ({field})."
+            )
+    lock_path = (repo_root.resolve() / PUBLICATION_ENVIRONMENT_LOCK).resolve()
+    if _digest_file(lock_path) != provenance.get("environment_lock_sha256"):
+        raise ValueError("Publication environment lock changed during execution.")
+    count, digest = _external_distribution_lock_identity(lock_path)
+    if count != provenance.get(
+        "external_distribution_count"
+    ) or digest != provenance.get("external_distribution_sha256"):
+        raise ValueError(
+            "Publication external-distribution identity changed during execution."
+        )
+    active_environment = _active_publication_environment(
+        lock_path,
+        repo_root=repo_root.resolve(),
+    )
+    end_of_run_fields = (
+        "python_executable",
+        "python_version",
+        "python_implementation",
+        "python_prefix",
+        "python_base_prefix",
+        "isolated_environment",
+        "platform_system",
+        "platform_machine",
+        "environment_lock_sha256",
+        "external_distribution_count",
+        "external_distribution_sha256",
+    )
+    for field in end_of_run_fields:
+        if active_environment.get(field) != provenance.get(field):
+            raise ValueError(
+                f"Publication environment identity changed during execution ({field})."
+            )
+    if active_environment.get("environment_lock_path") != str(lock_path):
+        raise ValueError("Publication environment lock path changed during execution.")
+    if provenance.get("execution_environment") != PUBLICATION_EXECUTION_ENV:
+        raise ValueError("Publication execution policy provenance is malformed.")
+    for env_name, expected in PUBLICATION_EXECUTION_ENV.items():
+        if os.environ.get(env_name) != expected:
+            raise ValueError(
+                f"Publication execution policy changed during execution ({env_name})."
+            )
+
+
+def _validated_external_fixture(
+    path: Path | None,
+    expected_sha256: str | None,
+) -> dict[str, Any] | None:
+    if path is None and expected_sha256 is None:
+        return None
+    if path is None or not expected_sha256:
+        raise ValueError(
+            "Validated external fixture requires both a path and pinned SHA-256."
+        )
+    resolved = path.resolve()
+    if not resolved.is_file():
+        raise ValueError(f"Validated external fixture is missing: {resolved}")
+    expected = expected_sha256.strip().lower()
+    if len(expected) != 64 or any(char not in "0123456789abcdef" for char in expected):
+        raise ValueError("Validated external fixture SHA-256 is malformed.")
+    actual = _digest_file(resolved)
+    if actual != expected:
+        raise ValueError(
+            "Validated external fixture hash mismatch: "
+            f"expected {expected}, observed {actual}."
+        )
+    mode = os.environ.get("TOOLSANDBOX_RAPID_CACHE_MODE", "")
+    if mode != "read_only":
+        raise ValueError(
+            "Validated external fixture requires "
+            "TOOLSANDBOX_RAPID_CACHE_MODE=read_only."
+        )
+    env_path_raw = os.environ.get("TOOLSANDBOX_RAPID_CACHE_PATH", "")
+    if not env_path_raw or Path(env_path_raw).resolve() != resolved:
+        raise ValueError(
+            "TOOLSANDBOX_RAPID_CACHE_PATH does not match the validated fixture."
+        )
+    return {
+        "policy": "validated_read_only_fixture",
+        "path": str(resolved),
+        "sha256": actual,
+        "mode": mode,
+    }
 
 
 def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str, Any]:
@@ -553,8 +803,9 @@ def _protocol_gate_decision(
     comparison: dict[str, Any],
     *,
     scenario_count: int,
+    outcome_only: bool = False,
 ) -> tuple[bool, list[str]]:
-    """Apply campaign viability gates with outcome primary and canonical reported."""
+    """Apply legacy gates or the strict publication outcome-only viability gate."""
     reasons: list[str] = []
     delta = float(comparison.get("mean_similarity_delta", 0.0) or 0.0)
     outcome_delta = _optional_float(comparison.get("mean_outcome_similarity_delta"))
@@ -567,7 +818,7 @@ def _protocol_gate_decision(
     candidate = cast(dict[str, Any], comparison.get("candidate", {}))
     called = int(candidate.get("generated_tool_called_scenarios", 0) or 0)
     accepted = int(candidate.get("accepted_tool_count", 0) or 0)
-    route_mismatch = _route_mismatch_qualified(comparison)
+    route_mismatch = False if outcome_only else _route_mismatch_qualified(comparison)
     outcome_qualified = (
         runtime_exceptions == 0
         and outcome_delta is not None
@@ -583,31 +834,39 @@ def _protocol_gate_decision(
             reasons.append("non_positive_outcome_delta")
         if outcome_gains <= outcome_regressions:
             reasons.append("outcome_gains_do_not_exceed_regressions")
+    elif outcome_only:
+        reasons.append("outcome_score_unavailable")
     elif delta <= 0:
         reasons.append("outcome_score_unavailable_and_non_positive_canonical_delta")
-    if delta <= 0 and not (route_mismatch or outcome_qualified):
-        reasons.append("non_positive_canonical_delta")
-    if gains <= regressions and not outcome_qualified:
-        reasons.append("gains_do_not_exceed_regressions")
+    if not outcome_only:
+        if delta <= 0 and not (route_mismatch or outcome_qualified):
+            reasons.append("non_positive_canonical_delta")
+        if gains <= regressions and not outcome_qualified:
+            reasons.append("gains_do_not_exceed_regressions")
 
     if scenario_count >= 30:
-        primary_delta = outcome_delta if outcome_delta is not None else delta
-        primary_gains = outcome_gains if outcome_delta is not None else gains
-        primary_regressions = (
-            outcome_regressions if outcome_delta is not None else regressions
-        )
+        if outcome_only:
+            primary_delta = outcome_delta if outcome_delta is not None else 0.0
+            primary_gains = outcome_gains
+            primary_regressions = outcome_regressions
+        else:
+            primary_delta = outcome_delta if outcome_delta is not None else delta
+            primary_gains = outcome_gains if outcome_delta is not None else gains
+            primary_regressions = (
+                outcome_regressions if outcome_delta is not None else regressions
+            )
         ratio = primary_gains / max(primary_regressions, 1)
         called_share = called / scenario_count if scenario_count else 0.0
         if primary_delta < 0.08:
             reasons.append("confirmation_outcome_delta_below_0_08")
-        if exact_delta <= 0 and not outcome_qualified:
+        if not outcome_only and exact_delta <= 0 and not outcome_qualified:
             reasons.append("exact_successes_not_improved")
         if ratio < 1.4:
             reasons.append("gain_regression_ratio_below_1_4")
         if called_share < 0.25:
             reasons.append("helper_call_share_below_25_percent")
     elif scenario_count >= 12:
-        if exact_delta < 0 and not outcome_qualified:
+        if not outcome_only and exact_delta < 0 and not outcome_qualified:
             reasons.append("exact_successes_regressed")
         if accepted <= 0 and called < 3:
             reasons.append("no_accepted_helper_and_fewer_than_3_helper_calls")
@@ -647,7 +906,6 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
     artifact_root = Path(params["artifact_root"])
     control_root = Path(params["control_root"])
     scenario_names = tuple(params["scenario_names"])
-    response_cache_enabled = bool(params["response_cache_enabled"])
     _write_arm_status(
         run_root,
         "control",
@@ -656,25 +914,6 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
         scenario_count=len(scenario_names),
     )
     try:
-        if response_cache_enabled:
-            install_openai_response_cache(
-                Path(params["openai_response_cache_dir"]),
-                mode=str(params["cache_mode"]),
-            )
-        configure_response_cache_context(
-            mode=str(params["mode"]),
-            arm="control",
-            agent=str(params["agent"]),
-            user=str(params["user"]),
-            base_tool_policy=str(params["base_tool_policy"]),
-            scenario_names=scenario_names,
-            registry_dir=None,
-            generation_enabled=False,
-            generation_model=str(params["generation_model"]),
-            recurrence_threshold=int(params["recurrence_threshold"]),
-            run_config_extra={"parallel_arms": True},
-        )
-        reset_openai_response_cache_metrics()
 
         def progress(
             run_dir: Path,
@@ -718,11 +957,6 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
             progress_hook=progress,
             event_hook=event_hook,
         )
-        if response_cache_enabled:
-            write_openai_response_cache_metrics(
-                run_dir / "openai_response_cache_metrics.json"
-            )
-            write_cache_artifacts(run_root / "cache_artifacts" / "control")
         append_event(
             "phase_completed",
             {
@@ -764,7 +998,6 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
     registry_dir = Path(params["registry_dir"])
     scenario_names = tuple(params["scenario_names"])
     generation_enabled = bool(params["generation_enabled"])
-    response_cache_enabled = bool(params["response_cache_enabled"])
     _write_arm_status(
         run_root,
         "candidate",
@@ -773,30 +1006,9 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
         scenario_count=len(scenario_names),
     )
     try:
-        if response_cache_enabled:
-            install_openai_response_cache(
-                Path(params["openai_response_cache_dir"]),
-                mode=str(params["cache_mode"]),
-            )
-        configure_response_cache_context(
-            mode=str(params["mode"]),
-            arm="candidate",
-            agent=str(params["agent"]),
-            user=str(params["user"]),
-            base_tool_policy=str(params["base_tool_policy"]),
-            scenario_names=scenario_names,
-            registry_dir=registry_dir,
-            generation_enabled=generation_enabled,
-            generation_model=str(params["generation_model"]),
-            recurrence_threshold=int(params["recurrence_threshold"]),
-            run_config_extra={"parallel_arms": True},
-        )
-        reset_openai_response_cache_metrics()
-        prompt_cache = PromptCache(Path(params["prompt_cache_dir"]))
         generator = (
             ToolGenerator(
-                completer=OpenAIChatAdapter(model=str(params["generation_model"])),
-                cache=prompt_cache,
+                completer=OpenAIChatAdapter(model=str(params["generation_model"]))
             )
             if generation_enabled
             else None
@@ -847,15 +1059,6 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
             progress_hook=progress,
             event_hook=event_hook,
         )
-        (run_dir / "prompt_cache_metrics.json").write_text(
-            json.dumps(prompt_cache.metrics(), indent=2) + "\n",
-            encoding="utf-8",
-        )
-        if response_cache_enabled:
-            write_openai_response_cache_metrics(
-                run_dir / "openai_response_cache_metrics.json"
-            )
-            write_cache_artifacts(run_root / "cache_artifacts" / "candidate")
         live_summary = _read_metrics(run_dir / "live_result_summary.json")
         completed_count = int(
             live_summary.get("completed_count", len(scenario_names))
@@ -892,78 +1095,96 @@ def _read_metrics(path: Path) -> dict[str, Any]:
     return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
 
 
-def _write_parallel_cache_artifacts(
+def _run_result_rows(run_dir: Path, *, require_complete: bool) -> list[dict[str, Any]]:
+    final_path = run_dir / "result_summary.json"
+    live_path = run_dir / "live_result_summary.json"
+    if require_complete and not final_path.is_file():
+        raise ValueError(f"Completed result summary is missing: {final_path}")
+    source = final_path if final_path.is_file() else live_path
+    payload = _read_metrics(source)
+    rows = payload.get("per_scenario_results")
+    if not isinstance(rows, list):
+        raise ValueError(f"Scenario result rows are missing: {source}")
+    return [cast(dict[str, Any], row) for row in rows if isinstance(row, dict)]
+
+
+def _validate_uncached_result_rows(
+    run_dir: Path,
     *,
-    artifact_root: Path,
-    run_root: Path,
-    cache_mode: str,
-    control_cache_dir: Path,
-    candidate_cache_dir: Path,
-    control_dir: Path | None,
-    candidate_dir: Path | None,
-) -> None:
-    cache_root = artifact_root / "cache"
-    cache_root.mkdir(parents=True, exist_ok=True)
-    metrics_by_arm = {
-        "control": _read_metrics(
-            control_dir / "openai_response_cache_metrics.json"
-            if control_dir is not None
-            else Path("")
-        ),
-        "candidate": _read_metrics(
-            candidate_dir / "openai_response_cache_metrics.json"
-            if candidate_dir is not None
-            else Path("")
-        ),
-    }
-    totals: dict[str, int] = {}
-    for metrics in metrics_by_arm.values():
-        for key, value in metrics.items():
-            if isinstance(value, int):
-                totals[key] = totals.get(key, 0) + value
-    manifest = {
-        "cache_mode": cache_mode,
-        "parallel_arms": True,
-        "parallel_cache_policy": "per_arm",
-        "arm_cache_roots": {
-            "control": str(control_cache_dir),
-            "candidate": str(candidate_cache_dir),
-        },
-        "run_root": str(run_root),
-        "combined_sqlite_path": str(cache_root / "openai_response_cache.sqlite"),
-        "note": "Parallel paired runs keep per-arm SQLite caches to avoid cross-arm cache state and write-lock contention.",
-    }
-    stats = {
-        "cache_mode": cache_mode,
-        "parallel_arms": True,
-        "control_evolve_cache_symmetry": cache_mode,
-        "arms": metrics_by_arm,
-        "totals": totals,
-    }
-    (cache_root / "cache_manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
-    (cache_root / "cache_stats.json").write_text(
-        json.dumps(stats, indent=2) + "\n", encoding="utf-8"
-    )
-    event_parts: list[str] = []
-    for arm in ("control", "candidate"):
-        events_path = (
-            run_root / "cache_artifacts" / arm / "cache" / "cache_events.jsonl"
+    expected_scenarios: tuple[str, ...],
+    arm: str,
+    require_complete: bool,
+) -> dict[str, dict[str, Any]]:
+    """Validate a one-row-per-task live run and return rows keyed by task name."""
+    if len(set(expected_scenarios)) != len(expected_scenarios):
+        raise ValueError("Protocol cohort contains duplicate scenario names.")
+    rows = _run_result_rows(run_dir, require_complete=require_complete)
+    by_name: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        name = str(row.get("name") or "")
+        if not name:
+            raise ValueError(f"{arm} result contains a row without a task name.")
+        if name in by_name:
+            raise ValueError(f"Duplicate {arm} result for task {name!r}.")
+        if name not in expected_scenarios:
+            raise ValueError(f"Unexpected {arm} result for task {name!r}.")
+        cache_source = str(row.get("control_cache_source") or "").strip().lower()
+        cache_detail = row.get("control_cache")
+        if cache_source and cache_source != "fresh":
+            raise ValueError(
+                f"{arm} task {name!r} was marked as cache sourced: {cache_source!r}."
+            )
+        if isinstance(cache_detail, dict) and (
+            str(cache_detail.get("source") or "").strip().lower() == "cached"
+            or bool(cache_detail.get("record_ids"))
+        ):
+            raise ValueError(f"{arm} task {name!r} contains cached baseline data.")
+        if "llm_cached_call_count" not in row:
+            raise ValueError(
+                f"{arm} task {name!r} does not report repository whole-response "
+                "replay provenance."
+            )
+        repository_response_replays = int(row["llm_cached_call_count"])
+        if repository_response_replays:
+            raise ValueError(
+                f"{arm} task {name!r} reports {repository_response_replays} "
+                "repository whole-response replay calls."
+            )
+        by_name[name] = dict(row)
+
+    expected = set(expected_scenarios)
+    actual = set(by_name)
+    if require_complete and actual != expected:
+        raise ValueError(
+            f"{arm} task coverage mismatch (missing={sorted(expected - actual)!r}, "
+            f"extra={sorted(actual - expected)!r})."
         )
-        if events_path.exists():
-            event_parts.append(events_path.read_text(encoding="utf-8"))
-    (cache_root / "cache_events.jsonl").write_text(
-        "".join(event_parts), encoding="utf-8"
-    )
-    (cache_root / "openai_response_cache.sqlite").touch()
-    for arm, source_root in (
-        ("control", control_cache_dir),
-        ("candidate", candidate_cache_dir),
+    for cache_artifact in (
+        run_dir / "openai_response_cache_metrics.json",
+        run_dir / "prompt_cache_metrics.json",
     ):
-        source = source_root / "openai_response_cache.sqlite"
-        if source.exists():
-            shutil.copy2(source, cache_root / f"{arm}_openai_response_cache.sqlite")
+        if cache_artifact.exists():
+            raise ValueError(
+                f"Strict uncached {arm} run emitted a cache artifact: {cache_artifact}"
+            )
+    return by_name
+
+
+def _assert_strict_fresh_report(
+    report: dict[str, Any],
+    *,
+    scenario_count: int,
+) -> None:
+    if report.get("mode") != "off":
+        raise ValueError("Strict fresh-control run did not use control-cache mode off.")
+    if str(report.get("control_source") or "") != "fresh":
+        raise ValueError("Strict fresh-control run did not report a fresh control arm.")
+    if int(report.get("cached_control_tasks") or 0) != 0:
+        raise ValueError("Strict fresh-control run contains cached control tasks.")
+    if int(report.get("fresh_control_tasks") or 0) != scenario_count:
+        raise ValueError("Strict fresh-control run has incomplete fresh controls.")
+    if report.get("cache_accessed") is not False:
+        raise ValueError("Strict fresh-control run accessed ControlBaselineCache.")
 
 
 def main() -> None:
@@ -975,11 +1196,6 @@ def main() -> None:
     parser.add_argument("--generation-model", default=DEFAULT_MODEL)
     parser.add_argument("--recurrence-threshold", type=int, default=2)
     parser.add_argument(
-        "--base-tool-policy",
-        choices=KNOWN_POLICIES,
-        default=UPSTREAM_POLICY,
-    )
-    parser.add_argument(
         "--sage-policy",
         choices=SAGE_POLICIES,
         default=os.environ.get("SAGE_POLICY_PRESET", SAGE_POLICY_AUTO),
@@ -987,16 +1203,11 @@ def main() -> None:
             "Optional SAGE runtime policy preset. The default 'auto' resolves "
             "to self-evolving-praxis for generation-enabled build/mechanism "
             "runs and to none for frozen validation. 'self-evolving-praxis' "
-            "enables the audited high-lift online birth, repair, bridge, and "
-            "fair-chance controls used by the self-evolving Praxis runs."
+            "enables the audited online tool-birth, validation, registry, "
+            "routing, reflection, and contribution-accounting lifecycle."
         ),
     )
     parser.add_argument("--registry-dir", type=Path)
-    parser.add_argument(
-        "--prompt-cache-dir",
-        type=Path,
-        default=Path("outputs/prompt_cache"),
-    )
     parser.add_argument(
         "-o",
         "--output-root",
@@ -1007,17 +1218,6 @@ def main() -> None:
     parser.add_argument("--no-dashboard-open", action="store_true")
     parser.add_argument("--artifact-root", type=Path, default=Path("artifacts"))
     parser.add_argument(
-        "--openai-response-cache-dir",
-        type=Path,
-        default=Path("outputs/openai_response_cache"),
-    )
-    parser.add_argument(
-        "--cache-mode",
-        choices=("off", "read_write", "read_only", "write_only"),
-        default=os.environ.get("CACHE_MODE", "read_write"),
-    )
-    parser.add_argument("--disable-openai-response-cache", action="store_true")
-    parser.add_argument(
         "--parallel-arms",
         action="store_true",
         help="Run the matched control and SAGE arms concurrently in isolated processes.",
@@ -1025,7 +1225,7 @@ def main() -> None:
     parser.add_argument(
         "--control-cache",
         choices=("off", "collect", "use-if-eligible", "refresh", "strict"),
-        default=os.environ.get("CONTROL_CACHE", "use-if-eligible"),
+        default=os.environ.get("CONTROL_CACHE", "off"),
         help="Control-arm baseline cache mode. Never applies to the SAGE/candidate arm.",
     )
     parser.add_argument(
@@ -1033,6 +1233,16 @@ def main() -> None:
         type=Path,
         default=Path("artifacts/baselines/control_task_baselines"),
         help="Authoritative completed-control baseline cache root.",
+    )
+    parser.add_argument(
+        "--require-fresh-control",
+        action="store_true",
+        help=(
+            "Publication fail-closed mode: run control first, require exactly one "
+            "live uncached control row per task, and supply those same-run rows to "
+            "online reflection. Incompatible with --parallel-arms and every "
+            "--control-cache mode except off."
+        ),
     )
     parser.add_argument(
         "--freeze-toolsandbox-clock",
@@ -1049,26 +1259,6 @@ def main() -> None:
         choices=("auto", "on", "off"),
         default="auto",
         help="Override candidate-side helper generation. Use off for frozen-registry validation.",
-    )
-    parser.add_argument(
-        "--routing-evidence-mode",
-        choices=("default", "auto", "disabled", "pinned"),
-        default=os.environ.get("SAGE_ROUTING_EVIDENCE_MODE", "default"),
-        help=(
-            "Helper-contribution evidence mode for runtime routing. Final frozen "
-            "runs resolve default to disabled; diagnostics/discovery resolve "
-            "default to auto."
-        ),
-    )
-    parser.add_argument(
-        "--routing-evidence-path",
-        type=Path,
-        default=(
-            Path(os.environ["SAGE_ROUTING_EVIDENCE_PATH"])
-            if os.environ.get("SAGE_ROUTING_EVIDENCE_PATH")
-            else None
-        ),
-        help="Pinned helper_contribution_summary.json used when routing evidence mode is pinned.",
     )
     parser.add_argument(
         "--diagnostic-force-allowed",
@@ -1102,6 +1292,19 @@ def main() -> None:
         help="Allow stock/location/weather/API-contaminated cohorts for explicit diagnostics.",
     )
     parser.add_argument(
+        "--validated-external-fixture",
+        type=Path,
+        help=(
+            "Read-only external-service fixture approved for a publication run. "
+            "Requires --validated-external-fixture-sha256 and matching "
+            "TOOLSANDBOX_RAPID_CACHE_* environment."
+        ),
+    )
+    parser.add_argument(
+        "--validated-external-fixture-sha256",
+        help="Pinned SHA-256 for --validated-external-fixture.",
+    )
+    parser.add_argument(
         "--allow-low-quality-cohort",
         action="store_true",
         help=(
@@ -1111,17 +1314,65 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.require_fresh_control and args.control_cache != "off":
+        raise SystemExit(
+            "--require-fresh-control requires --control-cache off; cache lookup "
+            "and collection are prohibited in publication runs."
+        )
+    if args.require_fresh_control and args.parallel_arms:
+        raise SystemExit(
+            "--require-fresh-control is incompatible with --parallel-arms because "
+            "the complete live control arm must precede SAGE reflection."
+        )
+    if args.require_fresh_control and (
+        args.resume_run_root is not None or args.resume_completed_limit is not None
+    ):
+        raise SystemExit(
+            "--require-fresh-control forbids --resume-run-root and "
+            "--resume-completed-limit; every publication task row must execute "
+            "from the clean checkpoint."
+        )
+    active_force_env = _active_diagnostic_force_env()
+    if args.require_fresh_control and active_force_env:
+        raise SystemExit(
+            "Diagnostic force-call environment is forbidden during a strict "
+            "publication run: "
+            f"{', '.join(sorted(active_force_env))}. Unset these variables; "
+            "--diagnostic-force-allowed cannot override publication mode."
+        )
+    try:
+        external_fixture = _validated_external_fixture(
+            args.validated_external_fixture,
+            args.validated_external_fixture_sha256,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+
     if args.freeze_toolsandbox_clock and not os.environ.get(
         "TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"
     ):
         os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = str(time.time())
     toolsandbox_fixed_now = os.environ.get("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP")
+    publication_provenance: dict[str, Any] | None = None
+    if args.require_fresh_control:
+        try:
+            publication_provenance = _publication_provenance(
+                fixed_toolsandbox_timestamp=toolsandbox_fixed_now,
+                freeze_toolsandbox_clock=args.freeze_toolsandbox_clock,
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
 
     split_name = _manifest_split_for_mode(args.mode)
     scenario_names = tuple(load_split_names(args.manifest, split_name))
     scenario_limit = _scenario_limit_for_mode(args.mode)
     if scenario_limit is not None:
         scenario_names = scenario_names[:scenario_limit]
+    benchmark_manifest_path = args.manifest.resolve()
+    benchmark_manifest_sha256 = _digest_file(benchmark_manifest_path)
+    scenario_order_sha256 = hashlib.sha256(
+        ("\n".join(scenario_names) + "\n").encode("utf-8")
+    ).hexdigest()
     manifest_type = _manifest_type(args.manifest)
     model_metadata = paired_model_metadata(
         agent_model=args.agent,
@@ -1176,28 +1427,15 @@ def main() -> None:
             "Final/frozen protocol modes must not run with --generation on. "
             "Use a mechanism/discovery mode for tool birth diagnostics."
         )
-    active_force_env = _active_diagnostic_force_env()
     if frozen_final_run and active_force_env and not args.diagnostic_force_allowed:
         raise SystemExit(
             "Diagnostic force-call environment is set during a frozen final run: "
             f"{', '.join(sorted(active_force_env))}. Unset these variables or pass "
             "--diagnostic-force-allowed only for explicit diagnostics."
         )
-    routing_evidence_mode = _resolve_routing_evidence_mode(
-        args.routing_evidence_mode,
-        frozen_final_run=frozen_final_run,
-    )
-    if routing_evidence_mode == "pinned":
-        if args.routing_evidence_path is None:
-            raise SystemExit(
-                "--routing-evidence-mode pinned requires --routing-evidence-path"
-            )
-        if not args.routing_evidence_path.exists():
-            raise SystemExit(
-                f"Pinned routing evidence path not found: {args.routing_evidence_path}"
-            )
-    _apply_routing_evidence_env(routing_evidence_mode, args.routing_evidence_path)
-    control_cache = ControlBaselineCache(args.control_cache_root)
+    control_cache: ControlBaselineCache | None = None
+    if args.control_cache != "off":
+        control_cache = ControlBaselineCache(args.control_cache_root)
     control_cache_plan: dict[str, Any] | None = None
     control_cache_report: dict[str, Any] = {
         "mode": args.control_cache,
@@ -1207,7 +1445,11 @@ def main() -> None:
         "cached_scenarios": [],
         "fresh_scenarios": list(scenario_names),
         "cache_misses": {},
-        "cache_manifest_hash": control_cache.manifest_hash(),
+        "cache_manifest_hash": (
+            control_cache.manifest_hash() if control_cache is not None else None
+        ),
+        "cache_accessed": control_cache is not None,
+        "fresh_control_enforced": args.require_fresh_control,
         "baseline_count_and_variance_per_cached_task": {},
         "estimated_token_time_savings": {
             "cached_tasks_skipped": 0,
@@ -1219,12 +1461,14 @@ def main() -> None:
         "cohort_selection_influenced_by_cache": False,
     }
     if args.control_cache in {"use-if-eligible", "strict"}:
+        if control_cache is None:
+            raise AssertionError("Control cache was not initialized for cache mode.")
         control_cache_plan = plan_control_cache(
             cache=control_cache,
             scenario_names=scenario_names,
             agent=args.agent,
             user=args.user,
-            base_tool_policy=args.base_tool_policy,
+            base_tool_policy=UPSTREAM_POLICY,
             manifest_path=args.manifest,
         )
         control_cache_report = build_control_cache_report(
@@ -1267,10 +1511,6 @@ def main() -> None:
             "control_cache_manifest_hash": control_cache_report.get(
                 "cache_manifest_hash"
             ),
-            "routing_evidence_mode": routing_evidence_mode,
-            "routing_evidence_path": str(args.routing_evidence_path)
-            if args.routing_evidence_path
-            else None,
             "sage_policy": effective_sage_policy,
             "sage_policy_requested": args.sage_policy,
             "sage_policy_env": sage_policy_env,
@@ -1301,7 +1541,7 @@ def main() -> None:
             f"{run_root / 'cohort_preflight_report.json'}"
         )
     contaminated = cohort_preflight.get("contaminated_external_service_scenarios", [])
-    if contaminated and not args.allow_contaminated_preflight:
+    if contaminated and not (args.allow_contaminated_preflight or external_fixture):
         append_event(
             "gate_failed",
             {
@@ -1319,7 +1559,8 @@ def main() -> None:
         raise SystemExit(
             "Cohort preflight blocked this run because it contains external-service "
             "contamination. Pass --allow-contaminated-preflight only for explicit "
-            f"diagnostics. See {run_root / 'cohort_preflight_report.json'}"
+            "diagnostics, or provide a hash-pinned read-only external fixture for "
+            f"publication. See {run_root / 'cohort_preflight_report.json'}"
         )
     if (
         cohort_preflight.get("should_block_quality")
@@ -1366,12 +1607,12 @@ def main() -> None:
             "agent": args.agent,
             "model_metadata": model_metadata,
             "generation_enabled": generation_enabled,
-            "base_tool_policy": args.base_tool_policy,
+            "base_tool_policy": UPSTREAM_POLICY,
             "scenario_count": len(scenario_names),
             "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
             "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
             "cohort_quality_gate_status": cohort_preflight.get("quality_gate_status"),
-            "routing_evidence_mode": routing_evidence_mode,
+            "external_fixture": external_fixture,
             "sage_policy": effective_sage_policy,
             "sage_policy_requested": args.sage_policy,
         },
@@ -1386,7 +1627,7 @@ def main() -> None:
         user=args.user,
         model_metadata=model_metadata,
         generation_enabled=generation_enabled,
-        base_tool_policy=args.base_tool_policy,
+        base_tool_policy=UPSTREAM_POLICY,
         scenario_count=len(scenario_names),
         registry_dir=registry_dir,
         artifact_root=args.artifact_root,
@@ -1424,19 +1665,6 @@ def main() -> None:
             + "\n",
             encoding="utf-8",
         )
-    response_cache_enabled = (
-        not args.disable_openai_response_cache and args.cache_mode != "off"
-    )
-    control_cache_dir = args.openai_response_cache_dir
-    candidate_cache_dir = args.openai_response_cache_dir
-    if effective_parallel_arms:
-        control_cache_dir = args.openai_response_cache_dir / "control"
-        candidate_cache_dir = args.openai_response_cache_dir / "candidate"
-    if response_cache_enabled and not effective_parallel_arms:
-        install_openai_response_cache(
-            args.openai_response_cache_dir,
-            mode=args.cache_mode,
-        )
 
     def refresh_dashboard(phase: str, status: str) -> None:
         write_protocol_dashboard(
@@ -1448,7 +1676,7 @@ def main() -> None:
             user=args.user,
             model_metadata=model_metadata,
             generation_enabled=generation_enabled,
-            base_tool_policy=args.base_tool_policy,
+            base_tool_policy=UPSTREAM_POLICY,
             scenario_count=len(scenario_names),
             control_dir=control_dir,
             candidate_dir=candidate_dir,
@@ -1472,6 +1700,7 @@ def main() -> None:
             root=args.artifact_root,
         )
 
+    reflection_control_rows: dict[str, dict[str, Any]] | None = None
     if effective_parallel_arms:
         append_event(
             "subtask_started",
@@ -1491,12 +1720,10 @@ def main() -> None:
             "user": args.user,
             "generation_model": args.generation_model,
             "recurrence_threshold": args.recurrence_threshold,
-            "base_tool_policy": args.base_tool_policy,
+            "base_tool_policy": UPSTREAM_POLICY,
             "registry_dir": str(registry_dir),
             "scenario_names": list(scenario_names),
             "manifest": str(args.manifest),
-            "cache_mode": args.cache_mode,
-            "response_cache_enabled": response_cache_enabled,
             "control_resume_dir": str(control_resume_dir)
             if control_resume_dir
             else None,
@@ -1512,7 +1739,6 @@ def main() -> None:
                 {
                     **base_params,
                     "control_root": str(control_root),
-                    "openai_response_cache_dir": str(control_cache_dir),
                 },
             ),
             name="sage_ts_control_arm",
@@ -1523,8 +1749,6 @@ def main() -> None:
                 {
                     **base_params,
                     "candidate_root": str(candidate_root),
-                    "prompt_cache_dir": str(args.prompt_cache_dir),
-                    "openai_response_cache_dir": str(candidate_cache_dir),
                     "generation_enabled": generation_enabled,
                 },
             ),
@@ -1564,16 +1788,6 @@ def main() -> None:
             raise SystemExit(
                 "Parallel arms finished but run directories were not found"
             )
-        if response_cache_enabled:
-            _write_parallel_cache_artifacts(
-                artifact_root=args.artifact_root,
-                run_root=run_root,
-                cache_mode=args.cache_mode,
-                control_cache_dir=control_cache_dir,
-                candidate_cache_dir=candidate_cache_dir,
-                control_dir=control_dir,
-                candidate_dir=candidate_dir,
-            )
         append_event(
             "subtask_completed",
             {
@@ -1589,6 +1803,8 @@ def main() -> None:
         )
         fresh_control_dir = control_dir
         if args.control_cache in {"collect", "use-if-eligible", "refresh"}:
+            if control_cache is None:
+                raise AssertionError("Control cache collection was not initialized.")
             collected = control_cache.collect_run(
                 run_dir=fresh_control_dir,
                 config=ToolSandboxRunConfig(
@@ -1598,7 +1814,7 @@ def main() -> None:
                     output_dir=control_root,
                     processes=1,
                     run_type=f"{args.mode}_control",
-                    base_tool_policy=args.base_tool_policy,
+                    base_tool_policy=UPSTREAM_POLICY,
                 ),
                 manifest_path=args.manifest,
             )
@@ -1625,19 +1841,6 @@ def main() -> None:
             }
             fresh_control_scenarios = tuple(control_cache_plan["fresh_scenarios"])
         if fresh_control_scenarios:
-            configure_response_cache_context(
-                mode=args.mode,
-                arm="control",
-                agent=args.agent,
-                user=args.user,
-                base_tool_policy=args.base_tool_policy,
-                scenario_names=fresh_control_scenarios,
-                registry_dir=None,
-                generation_enabled=False,
-                generation_model=args.generation_model,
-                recurrence_threshold=args.recurrence_threshold,
-            )
-            reset_openai_response_cache_metrics()
             fresh_control_dir = run_toolsandbox(
                 ToolSandboxRunConfig(
                     agent=args.agent,
@@ -1646,7 +1849,7 @@ def main() -> None:
                     output_dir=control_root,
                     processes=1,
                     run_type=f"{args.mode}_control",
-                    base_tool_policy=args.base_tool_policy,
+                    base_tool_policy=UPSTREAM_POLICY,
                     resume_from_dir=control_resume_dir
                     if fresh_control_scenarios == scenario_names
                     else None,
@@ -1658,12 +1861,11 @@ def main() -> None:
                 event_hook=campaign_event,
             )
             control_dir = fresh_control_dir
-            if response_cache_enabled:
-                write_openai_response_cache_metrics(
-                    fresh_control_dir / "openai_response_cache_metrics.json"
-                )
-                write_cache_artifacts(args.artifact_root)
             if args.control_cache in {"collect", "use-if-eligible", "refresh"}:
+                if control_cache is None:
+                    raise AssertionError(
+                        "Control cache collection was not initialized."
+                    )
                 collected = control_cache.collect_run(
                     run_dir=fresh_control_dir,
                     config=ToolSandboxRunConfig(
@@ -1673,7 +1875,7 @@ def main() -> None:
                         output_dir=control_root,
                         processes=1,
                         run_type=f"{args.mode}_control",
-                        base_tool_policy=args.base_tool_policy,
+                        base_tool_policy=UPSTREAM_POLICY,
                     ),
                     manifest_path=args.manifest,
                 )
@@ -1705,14 +1907,28 @@ def main() -> None:
             },
             root=args.artifact_root,
         )
+        if args.require_fresh_control:
+            if control_dir is None:
+                raise SystemExit(
+                    "Strict fresh-control run did not produce a control arm."
+                )
+            try:
+                reflection_control_rows = _validate_uncached_result_rows(
+                    control_dir,
+                    expected_scenarios=scenario_names,
+                    arm="control",
+                    require_complete=True,
+                )
+                _assert_strict_fresh_report(
+                    control_cache_report,
+                    scenario_count=len(scenario_names),
+                )
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
         refresh_dashboard("candidate", "running")
 
-        prompt_cache = PromptCache(args.prompt_cache_dir)
         generator = (
-            ToolGenerator(
-                completer=OpenAIChatAdapter(model=args.generation_model),
-                cache=prompt_cache,
-            )
+            ToolGenerator(completer=OpenAIChatAdapter(model=args.generation_model))
             if generation_enabled
             else None
         )
@@ -1727,19 +1943,6 @@ def main() -> None:
             candidate_dir = run_dir
             refresh_dashboard("candidate", status)
 
-        configure_response_cache_context(
-            mode=args.mode,
-            arm="candidate",
-            agent=args.agent,
-            user=args.user,
-            base_tool_policy=args.base_tool_policy,
-            scenario_names=scenario_names,
-            registry_dir=registry_dir,
-            generation_enabled=generation_enabled,
-            generation_model=args.generation_model,
-            recurrence_threshold=args.recurrence_threshold,
-        )
-        reset_openai_response_cache_metrics()
         candidate_dir = run_sage_with_registry(
             SageRunConfig(
                 agent=args.agent,
@@ -1749,24 +1952,41 @@ def main() -> None:
                 registry_dir=registry_dir,
                 run_type=f"{args.mode}_candidate",
                 recurrence_threshold=args.recurrence_threshold,
-                base_tool_policy=args.base_tool_policy,
+                base_tool_policy=UPSTREAM_POLICY,
                 resume_from_dir=candidate_resume_dir,
                 resume_completed_limit=resume_completed_limit,
                 manifest_path=args.manifest,
+                reflection_control_rows=reflection_control_rows,
+                require_fresh_reflection_control=(
+                    args.require_fresh_control and generation_enabled
+                ),
+                # Publication runs must not inherit conclusions from earlier
+                # campaigns. Non-publication runs retain the historical
+                # failure-memory behavior through SageRunConfig's default.
+                failure_memory_path=None
+                if args.require_fresh_control
+                else Path("artifacts/summaries/failure_memory.json"),
             ),
             generator=generator,
             progress_hook=candidate_progress,
             event_hook=campaign_event,
         )
-        (candidate_dir / "prompt_cache_metrics.json").write_text(
-            json.dumps(prompt_cache.metrics(), indent=2) + "\n",
-            encoding="utf-8",
-        )
-        if response_cache_enabled:
-            write_openai_response_cache_metrics(
-                candidate_dir / "openai_response_cache_metrics.json"
+    if args.require_fresh_control:
+        if candidate_dir is None:
+            raise SystemExit("Strict fresh-control run did not produce a SAGE arm.")
+        try:
+            _validate_uncached_result_rows(
+                candidate_dir,
+                expected_scenarios=scenario_names,
+                arm="candidate",
+                require_complete=True,
             )
-            write_cache_artifacts(args.artifact_root)
+            _assert_strict_fresh_report(
+                control_cache_report,
+                scenario_count=len(scenario_names),
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
     control_cache_report_path = run_root / "control_cache_report.json"
     control_cache_report_path.write_text(
         json.dumps(control_cache_report, indent=2) + "\n", encoding="utf-8"
@@ -1793,6 +2013,7 @@ def main() -> None:
     protocol_gate_passed, protocol_gate_reasons = _protocol_gate_decision(
         comparison,
         scenario_count=len(scenario_names),
+        outcome_only=args.require_fresh_control,
     )
     comparison["protocol_gate_passed"] = protocol_gate_passed
     comparison["protocol_gate_reasons"] = protocol_gate_reasons
@@ -1855,6 +2076,11 @@ def main() -> None:
     elif args.mode in {"transfer_40", "transfer_60", "transfer_100"}:
         update_task("frozen_registry_transfer", "completed", root=args.artifact_root)
     refresh_dashboard("comparison", "complete")
+    if publication_provenance is not None:
+        try:
+            _assert_publication_source_unchanged(publication_provenance)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
     manifest = {
         "mode": args.mode,
         "manifest_split": split_name,
@@ -1865,11 +2091,14 @@ def main() -> None:
         "model_metadata": model_metadata,
         "comparison_model_key": model_metadata["comparison_key"],
         "generation_enabled": generation_enabled,
-        "base_tool_policy": args.base_tool_policy,
+        "base_tool_policy": UPSTREAM_POLICY,
         "sage_policy": effective_sage_policy,
         "sage_policy_requested": args.sage_policy,
         "sage_policy_env": sage_policy_env,
         "scenario_count": len(scenario_names),
+        "benchmark_manifest_path": str(benchmark_manifest_path),
+        "benchmark_manifest_sha256": benchmark_manifest_sha256,
+        "scenario_order_sha256": scenario_order_sha256,
         "control_dir": str(control_dir),
         "candidate_dir": str(candidate_dir),
         "registry_dir": str(registry_dir),
@@ -1884,6 +2113,7 @@ def main() -> None:
         "cohort_quality_gate_failures": cohort_preflight.get(
             "quality_gate_failures", []
         ),
+        "external_fixture": external_fixture,
         "resume_run_root": str(args.resume_run_root) if args.resume_run_root else None,
         "resume_completed_limit": resume_completed_limit,
         "control_resume_dir": str(control_resume_dir) if control_resume_dir else None,
@@ -1897,21 +2127,45 @@ def main() -> None:
         "fresh_control_tasks": control_cache_report.get("fresh_control_tasks"),
         "control_cache_report_path": str(control_cache_report_path),
         "control_cache_manifest_hash": control_cache_report.get("cache_manifest_hash"),
+        "fresh_control_required": args.require_fresh_control,
+        "cross_run_failure_memory_enabled": not args.require_fresh_control,
+        "cross_run_failure_memory_path": (
+            None
+            if args.require_fresh_control
+            else "artifacts/summaries/failure_memory.json"
+        ),
+        "reflection_control_source": (
+            "same_run_fresh"
+            if args.require_fresh_control and generation_enabled
+            else "not_applicable"
+            if not generation_enabled
+            else "legacy_control_cache"
+        ),
+        "publication_performance_endpoint": (
+            "outcome_task_completion_similarity" if args.require_fresh_control else None
+        ),
+        "openai_response_cache_enabled": False,
+        "openai_response_cache_mode": "off",
+        "openai_response_cache_scope": "persistent_repository_whole_response_replay",
+        # Legacy field retained for the predeclared sample gate. It refers to
+        # the retired persistent generated-output cache, not either the
+        # generator's within-run contract/repair analysis memoization or OpenAI's
+        # provider-managed prompt-prefix/KV cache.
+        "prompt_cache_enabled": False,
+        "prompt_cache_scope": "persistent_generation_output_replay",
+        "generator_contract_and_repair_analysis_memoization": "within_run_only",
+        "openai_provider_prompt_prefix_cache_policy": "automatic_implicit",
+        "openai_provider_prompt_prefix_cache_reuses_responses": False,
+        "sage_task_cache_enabled": False,
         "helper_contribution_summary_path": str(helper_contribution_path),
         "helper_contribution_artifact_path": str(helper_contribution_artifact_path),
-        "routing_evidence_mode": routing_evidence_mode,
-        "routing_evidence_path": str(args.routing_evidence_path)
-        if args.routing_evidence_path
-        else None,
-        "routing_evidence_path_digest": _digest_file(args.routing_evidence_path)
-        if args.routing_evidence_path
-        else None,
         "diagnostic_force_allowed": args.diagnostic_force_allowed,
         "active_diagnostic_force_env": sorted(active_force_env),
         "toolsandbox_clock_policy": "frozen"
         if args.freeze_toolsandbox_clock
         else "wall_clock",
         "toolsandbox_fixed_now_timestamp": toolsandbox_fixed_now,
+        "publication_provenance": publication_provenance,
         "run_affecting_sage_env": _redacted_run_affecting_sage_env(),
         "accepted_but_uncalled_tools": helper_contribution.get(
             "accepted_but_uncalled_tools", []
@@ -1922,12 +2176,11 @@ def main() -> None:
         "dashboard_task_focus_url": dashboard_task_focus_url,
         "dashboard_task_compare_url": dashboard_task_compare_url,
         "parallel_arms": args.parallel_arms,
-        "parallel_cache_policy": "per_arm" if args.parallel_arms else "shared_process",
-        "openai_response_cache_enabled": response_cache_enabled,
-        "openai_response_cache_mode": args.cache_mode,
-        "openai_response_cache_dir": str(args.openai_response_cache_dir),
-        "control_openai_response_cache_dir": str(control_cache_dir),
-        "candidate_openai_response_cache_dir": str(candidate_cache_dir),
+        "model_authored_generation_enabled": True,
+        "native_action_tools_enabled": True,
+        "scenario_name_birth_enabled": False,
+        "scenario_name_routing_enabled": False,
+        "synthetic_bridge_completions_enabled": False,
         "mean_similarity_delta": comparison.get("mean_similarity_delta"),
         "mean_outcome_similarity_delta": comparison.get(
             "mean_outcome_similarity_delta"
@@ -1949,7 +2202,7 @@ def main() -> None:
             "model_metadata": model_metadata,
             "comparison_model_key": model_metadata["comparison_key"],
             "generation_enabled": generation_enabled,
-            "base_tool_policy": args.base_tool_policy,
+            "base_tool_policy": UPSTREAM_POLICY,
             "scenario_count": len(scenario_names),
             "control_dir": str(control_dir),
             "candidate_dir": str(candidate_dir),
@@ -1965,6 +2218,7 @@ def main() -> None:
             "cohort_quality_gate_failures": cohort_preflight.get(
                 "quality_gate_failures", []
             ),
+            "external_fixture": external_fixture,
             "comparison_path": str(comparison_path),
             "control_cache_mode": args.control_cache,
             "control_source": control_cache_report.get("control_source"),
@@ -1974,12 +2228,9 @@ def main() -> None:
             "control_cache_manifest_hash": control_cache_report.get(
                 "cache_manifest_hash"
             ),
+            "fresh_control_required": args.require_fresh_control,
             "helper_contribution_summary_path": str(helper_contribution_path),
             "helper_contribution_artifact_path": str(helper_contribution_artifact_path),
-            "routing_evidence_mode": routing_evidence_mode,
-            "routing_evidence_path": str(args.routing_evidence_path)
-            if args.routing_evidence_path
-            else None,
             "accepted_but_uncalled_tools": helper_contribution.get(
                 "accepted_but_uncalled_tools", []
             ),

@@ -1,8 +1,12 @@
-name: toolsandbox-sage
+# Development-only environment. Strict publication runs must use the isolated
+# .venv-publication environment produced by scripts/bootstrap_env.sh.
+name: toolsandbox-sage-dev
 channels:
   - conda-forge
 dependencies:
-  - python=3.9
+  - python=3.12.7
   - pip
   - pip:
-      - -e .[dev]
+      # Start from the same runtime versions, then layer developer-only tools.
+      - -r requirements-publication-lock.txt
+      - -e .[dev,publication]

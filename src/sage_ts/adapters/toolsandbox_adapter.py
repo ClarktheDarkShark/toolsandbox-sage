@@ -361,6 +361,7 @@ def run_one_scenario(
 def run_scenario_sequence(
     config: ToolSandboxRunConfig,
     *,
+    scenarios: dict[str, Scenario] | None = None,
     scenario_transform: ScenarioTransform | None = None,
     result_hook: ResultHook | None = None,
     progress_hook: ProgressHook | None = None,
@@ -381,10 +382,20 @@ def run_scenario_sequence(
         completed_limit=config.resume_completed_limit,
     )
 
-    name_to_scenario = resolve_scenarios(
-        desired_scenario_names=list(config.scenario_names),
-        preferred_tool_backend=DEFAULT_TOOL_BACKEND,
+    name_to_scenario = (
+        dict(scenarios)
+        if scenarios is not None
+        else resolve_scenarios(
+            desired_scenario_names=list(config.scenario_names),
+            preferred_tool_backend=DEFAULT_TOOL_BACKEND,
+        )
     )
+    missing_scenarios = set(config.scenario_names) - set(name_to_scenario)
+    if missing_scenarios:
+        raise KeyError(
+            "The following requested scenarios were not provided: "
+            f"{sorted(missing_scenarios)}"
+        )
     prior_by_name = {
         str(row.get("name")): row
         for row in _resume_rows(
@@ -474,8 +485,6 @@ def run_scenario_sequence(
             )
         result.update(snapshot_scenario_usage(name))
         clear_scenario_usage(name)
-        stop_requested = bool(result.pop("_sage_stop_run", False))
-        stop_reason = result.pop("_sage_stop_reason", None)
         result_summary.append(result)
         if event_hook is not None:
             event_hook(
@@ -489,8 +498,6 @@ def run_scenario_sequence(
                     "exception_type": result.get("exception_type"),
                     "completed_count": len(result_summary),
                     "scenario_count": len(config.scenario_names),
-                    "stop_requested": stop_requested,
-                    "stop_reason": stop_reason,
                 },
             )
         write_live_result_summary(
@@ -507,22 +514,6 @@ def run_scenario_sequence(
                 "running",
                 len(config.scenario_names),
             )
-        if stop_requested:
-            final_status = "stopped_early"
-            if event_hook is not None:
-                event_hook(
-                    "run_stopped_early",
-                    output_directory,
-                    {
-                        "scenario": name,
-                        "run_type": config.run_type,
-                        "completed_count": len(result_summary),
-                        "scenario_count": len(config.scenario_names),
-                        "reason": stop_reason,
-                    },
-                )
-            break
-
     write_result_summary(
         result_summary=result_summary,
         category_summary=get_category_summary(result_summary),

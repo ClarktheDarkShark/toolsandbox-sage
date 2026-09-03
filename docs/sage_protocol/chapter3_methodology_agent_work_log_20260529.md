@@ -369,3 +369,41 @@
   `extract_service_answer_field`, `prepare_reminder_creation_args`, and
   `prepare_safe_action_or_abstain`, canonical-score loss from `find_days`, and
   add-reminder multi-turn timestamp/location regressions.
+
+### Run Card - 2026-07-23 11:49 PDT - Full Native-Action Outcome Record
+
+- Branch: current working branch
+- Commit: `25466400ae48b4520a3d7cf914d9c85d3a512755`
+- Implementation: native ToolSandbox self-evolving Praxis with model-authored
+  native-action tools and generated finite-domain call schemas
+- Hypothesis: exposing a generated tool's own finite input contract in its call
+  schema and projecting action sequences onto visible native actions will
+  improve later state-dependent task completion without task-specific rules
+- Command: recorded in
+  `artifacts/native_action_4omini_ab/full_outcome80_finite_domain_full_20260723_114932/native_action_command.txt`
+- Manifest:
+  `docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json`,
+  SHA-256
+  `21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec`
+- Sample: `1,032` score tasks; `800` outcome-scored tasks
+- Models: `gpt-4o-mini` actor, user, generation, and repair
+- Cache policy: strict cached controls `1,032 / 0`; SAGE cache off; OpenAI
+  response cache disabled; empty starting registry
+- Dashboard:
+  `http://127.0.0.1:63689/outputs/native_action_4omini_ab/full_outcome80_finite_domain_full_20260723_114932/native_action/online_build_full_20260723_114954/dashboard/task_compare.html`
+- Results: score `0.733488 -> 0.797695` (`+8.75%`); outcome
+  `0.457342 -> 0.800043` (`+74.93%`); exact outcome successes `161 -> 441`
+- Tool-attributed gains: called-tool bucket outcome
+  `0.373165 -> 0.809496`; 462 gain rows and 57 regression rows
+- Tool-attributed regressions: visible-not-called bucket outcome delta
+  `-0.151440`; 43 failed calls, predominantly the single-device action tool
+- Safety: zero runtime exceptions and tool runtime incidents; one
+  side-effect-preservation contract flag caused by an unexecuted final planned
+  action at the turn limit, with no prohibited state mutation
+- Decision: promote as the leading completed full-dataset outcome run; retain
+  the failed-call and incomplete-sequence issues as explicit reliability
+  limitations
+- Chapter 3 implication: the full-run gain is concentrated in rows where
+  generated tools were actually called, while no-visible-tool rows were
+  effectively tied with baseline. This is direct evidence for autonomous tool
+  generation, validation, routing, and reuse as the operative intervention.

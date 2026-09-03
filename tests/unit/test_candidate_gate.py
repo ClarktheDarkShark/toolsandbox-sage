@@ -96,6 +96,29 @@ def test_state_precondition_helper_allows_next_action_micro_helper() -> None:
     assert decision.allowed
 
 
+def test_decisive_gate_allows_one_specific_family_for_cross_task_reuse() -> None:
+    spec = replace(
+        _state_spec("Return a concrete next_action and readiness predicate."),
+        applicable_task_families=("service_preconditions",),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert decision.allowed
+
+
+def test_decisive_gate_rejects_missing_applicable_family() -> None:
+    spec = replace(
+        _state_spec("Return a concrete next_action and readiness predicate."),
+        applicable_task_families=(),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert not decision.allowed
+    assert decision.reason == "insufficient_applicable_task_families"
+
+
 def test_state_precondition_helper_allows_trace_compatible_tool_call() -> None:
     spec = replace(
         _state_spec("Return the exact ToolSandbox setter name and arguments."),
@@ -127,7 +150,7 @@ def test_state_precondition_helper_rejects_opaque_dict_input_contract() -> None:
     assert decision.reason == "state_helper_opaque_dict_input_contract"
 
 
-def test_search_helper_can_substitute_canonical_route_with_grading_accounting(
+def test_retired_grading_flag_cannot_bypass_downstream_preservation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "grading_accounting")
@@ -177,11 +200,9 @@ def test_search_helper_can_substitute_canonical_route_with_grading_accounting(
 
     decision = evaluate_candidate_gate(spec)
 
-    assert decision.allowed
-    assert (
-        decision.grading_classification
-        == "outcome_preserving_but_canonical_substituting"
-    )
+    assert not decision.allowed
+    assert decision.reason == "missing_downstream_tool_preservation"
+    assert decision.grading_classification == "canonical_preserving"
 
 
 def test_search_filter_gate_accepts_ambiguity_abstention_without_literal_tie() -> None:
@@ -315,6 +336,53 @@ def test_action_selector_gate_requires_side_effect_required_call() -> None:
 
     assert not decision.allowed
     assert decision.reason == "action_selector_missing_required_side_effect_call"
+
+
+def test_native_action_search_filter_uses_native_result_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spec = ToolSpec(
+        tool_name="select_action_target_by_recency",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        description="Select one visible reminder record and execute its validated action.",
+        inputs=(ToolInput("records", "list", "Visible reminder records."),),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "status": {"type": "string"},
+                "confirmation": {"type": "string"},
+                "abstain_reason": {"type": "string"},
+                "native_action": {"type": "string"},
+                "native_result": {},
+            },
+        },
+        positive_triggers=("visible_reminder_action",),
+        negative_triggers=("no_candidates", "ambiguous_tie"),
+        preserves_side_effect_tools=("search_reminder", "remove_reminder"),
+        required_original_tool_calls=("search_reminder", "remove_reminder"),
+        native_action_delegation=True,
+        abstain_behavior="Abstain on no candidates or an ambiguous timestamp tie.",
+        generalization_rationale=(
+            "Reminder selection and one native action recur across reminder tasks."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=("reminder_modify", "reminder_remove"),
+        reason_tool_is_decisive=(
+            "It validates one visible target before delegating the native action."
+        ),
+        shortfall_cluster_evidence=("visible_reminder_action_gap",),
+        known_failure_mechanisms_addressed=("wrong_visible_reminder_target",),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary="Agents select the wrong visible reminder before an action.",
+            signals=("wrong_selected_record",),
+        ),
+    )
+
+    decision = evaluate_candidate_gate(spec)
+
+    assert decision.allowed
 
 
 def test_decisive_gate_rejects_thin_helper() -> None:

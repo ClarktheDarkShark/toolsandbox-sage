@@ -204,7 +204,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
       <div class="table-wrap"><table>
         <thead><tr>
-          <th>Scenario</th><th>Control</th><th>SAGE</th><th>Delta</th><th>Turns</th><th>Generated Tool</th><th>Artifacts</th>
+          <th>Scenario</th><th>Control Outcome</th><th>SAGE Outcome</th><th>Outcome Delta</th><th>Turns</th><th>Generated Tool</th><th>Artifacts</th>
         </tr></thead>
         <tbody id="scenarioRows"></tbody>
       </table></div>
@@ -267,7 +267,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       const c = data.control || {};
       const s = data.candidate || {};
       const d = data.comparison || {};
-      const deltaCls = Number(data.mean_similarity_delta || 0) >= 0 ? "good" : "bad";
       const outcomeDelta = data.mean_outcome_similarity_delta;
       const outcomeCls = Number(outcomeDelta || 0) >= 0 ? "good" : "bad";
       const completed = s.scenario_count || c.scenario_count || 0;
@@ -275,17 +274,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       const metrics = [
         metric("Run", `${completed}/${planned}`, `${data.status || "unknown"} · ${data.phase || "waiting"}`),
         controlCacheMetric(data),
-        metric("Score Lift", pct(data.mean_similarity_delta || 0), `${pct(c.mean_similarity)} → ${pct(s.mean_similarity)}`, deltaCls),
-        metric("Perfect Tasks", `${c.success_count || 0} → ${s.success_count || 0}`, "exact success, control → SAGE"),
+        metric("Canonical Audit Movement", pct(data.mean_similarity_delta || 0), `${pct(c.mean_similarity)} → ${pct(s.mean_similarity)} · descriptive only`),
+        metric("Canonical Perfect Matches", `${c.success_count || 0} → ${s.success_count || 0}`, "descriptive route-match audit, control → SAGE"),
         metric("Accepted Tools", s.accepted_tool_count || 0, `${(s.accepted_tools || []).join(", ") || "none yet"}`, (s.accepted_tool_count || 0) > 0 ? "good" : "warn"),
         metric("Reuse Calls", s.reuse_count || 0, `${(s.reuse_scenarios || []).length || 0} scenario-level calls`, (s.reuse_count || 0) > 0 ? "good" : "warn"),
         metric("Tool Attempts", s.generated_tool_attempted_scenarios || 0, `${s.generated_tool_called_scenarios || 0} called · ${s.generated_tool_failed_scenarios || 0} failed`, (s.generated_tool_failed_scenarios || 0) > 0 ? "bad" : ""),
-        metric("Scenario Mix", `${d.gain_count || 0} / ${d.regression_count || 0}`, `gains / regressions · ${d.preserved_count || 0} preserved`, (d.gain_count || 0) >= (d.regression_count || 0) ? "good" : "bad"),
+        metric("Canonical Audit Mix", `${d.gain_count || 0} / ${d.regression_count || 0}`, `higher / lower route match · ${d.preserved_count || 0} unchanged · descriptive only`),
         metric("Turns", `${c.total_turns || 0} → ${s.total_turns || 0}`, "total turns, control → SAGE"),
         metric("Exceptions", `${c.exception_count || 0} → ${s.exception_count || 0}`, "control → SAGE", (s.exception_count || 0) ? "bad" : "")
       ];
       if (present(outcomeDelta)) {
-        metrics.splice(2, 0, metric("Outcome Lift", pct(outcomeDelta), `${pct(c.mean_outcome_similarity)} → ${pct(s.mean_outcome_similarity)}`, outcomeCls));
+        metrics.splice(2, 0, metric("Outcome Difference", pct(outcomeDelta), `${pct(c.mean_outcome_similarity)} → ${pct(s.mean_outcome_similarity)}`, outcomeCls));
       }
       document.getElementById("metricGrid").innerHTML = metrics.join("");
       renderTimeline(data);
@@ -298,7 +297,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const phases = ["control", "candidate", "comparison"];
       document.getElementById("timeline").innerHTML = phases.map(p => {
         const cls = data.phase === p ? "active" : phases.indexOf(p) < phases.indexOf(data.phase || "") ? "done" : "";
-        const note = p === "control" ? "baseline reduced-tool run" : p === "candidate" ? "SAGE generation/reuse run" : "paired score + reuse analysis";
+        const note = p === "control" ? "baseline reduced-tool run" : p === "candidate" ? "SAGE generation/reuse run" : "paired outcome + reuse analysis";
         return `<div class="step ${cls}"><strong>${p}</strong><div class="tiny">${note}</div></div>`;
       }).join("");
     }
@@ -344,20 +343,25 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (f === "all") return true;
         if (f === "reuse") return (r.reused_tools || []).length > 0;
         if (f === "exception") return r.control_exception || r.candidate_exception;
-        return r.status === f;
+        const outcomeStatus = !present(r.outcome_delta) ? "unscored" : Number(r.outcome_delta) > 0 ? "gain" : Number(r.outcome_delta) < 0 ? "regression" : "preserved";
+        return outcomeStatus === f;
       });
       document.getElementById("scenarioRows").innerHTML = rows.map(r => {
-        const dcls = Number(r.delta || 0) > 0 ? "good" : Number(r.delta || 0) < 0 ? "bad" : "";
+        const dcls = Number(r.outcome_delta || 0) > 0 ? "good" : Number(r.outcome_delta || 0) < 0 ? "bad" : "";
+        const outcomeStatus = !present(r.outcome_delta) ? "unscored" : Number(r.outcome_delta) > 0 ? "gain" : Number(r.outcome_delta) < 0 ? "regression" : "preserved";
         const artifacts = [r.control_trace_url ? `<a href="${r.control_trace_url}">control</a>` : "", r.candidate_trace_url ? `<a href="${r.candidate_trace_url}">sage</a>` : ""].filter(Boolean).join(" · ");
-        const controlOutcome = present(r.control_outcome_similarity) ? `<div class="tiny">outcome ${pct(r.control_outcome_similarity)}</div>` : "";
+        const controlOutcome = present(r.control_outcome_similarity) ? pct(r.control_outcome_similarity) : "-";
+        const controlCanonical = `<div class="tiny">canonical audit ${pct(r.control_similarity)}</div>`;
         const controlCache = r.control_cache_source === "cached" ? `<div class="tiny">control source: cached</div>` : "";
-        const sageOutcome = present(r.candidate_outcome_similarity) ? `<div class="tiny">outcome ${pct(r.candidate_outcome_similarity)}</div>` : "";
-        const deltaOutcome = present(r.outcome_delta) ? `<div class="tiny">outcome ${fmt(r.outcome_delta, 4)}</div>` : "";
-        return `<tr class="${r.status || ""}">
+        const sageOutcome = present(r.candidate_outcome_similarity) ? pct(r.candidate_outcome_similarity) : "-";
+        const sageCanonical = `<div class="tiny">canonical audit ${pct(r.candidate_similarity)}</div>`;
+        const deltaOutcome = present(r.outcome_delta) ? fmt(r.outcome_delta, 4) : "-";
+        const canonicalDelta = `<div class="tiny">canonical audit ${fmt(r.delta, 4)}</div>`;
+        return `<tr class="${outcomeStatus}">
           <td><div class="scenario-name">${esc(r.scenario)}</div><div class="tiny">${esc((r.categories || []).join(" · "))}</div></td>
-          <td class="score">${pct(r.control_similarity)}${controlOutcome}${controlCache}${r.control_exception ? `<div class="tiny bad">${esc(r.control_exception)}</div>` : ""}</td>
-          <td class="score">${pct(r.candidate_similarity)}${sageOutcome}${r.candidate_exception ? `<div class="tiny bad">${esc(r.candidate_exception)}</div>` : ""}</td>
-          <td class="score ${dcls}">${fmt(r.delta, 4)}${deltaOutcome}</td>
+          <td class="score">${controlOutcome}${controlCanonical}${controlCache}${r.control_exception ? `<div class="tiny bad">${esc(r.control_exception)}</div>` : ""}</td>
+          <td class="score">${sageOutcome}${sageCanonical}${r.candidate_exception ? `<div class="tiny bad">${esc(r.candidate_exception)}</div>` : ""}</td>
+          <td class="score ${dcls}">${deltaOutcome}${canonicalDelta}</td>
           <td>${r.control_turns ?? "-"} → ${r.candidate_turns ?? "-"}</td>
           <td>${esc((r.reused_tools || []).join(", ") || "-")}</td>
           <td>${artifacts}</td>

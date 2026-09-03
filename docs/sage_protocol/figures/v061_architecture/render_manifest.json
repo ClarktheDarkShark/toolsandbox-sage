@@ -1,0 +1,457 @@
+[
+  {
+    "slug": "sage_v061_architecture_overview",
+    "shortTitle": "End-to-end architecture",
+    "width": 1800,
+    "height": 1350,
+    "checks": [
+      {
+        "id": "scenario",
+        "x": 57.5,
+        "y": 287,
+        "w": 235,
+        "h": 230.8,
+        "textBottom": 493.8
+      },
+      {
+        "id": "native-tools",
+        "x": 60,
+        "y": 662,
+        "w": 230,
+        "h": 222.79999999999995,
+        "textBottom": 860.8
+      },
+      {
+        "id": "visible-context",
+        "x": 347.5,
+        "y": 293,
+        "w": 185,
+        "h": 216.8,
+        "textBottom": 485.8
+      },
+      {
+        "id": "gap-analysis",
+        "x": 555,
+        "y": 293,
+        "w": 190,
+        "h": 216.8,
+        "textBottom": 485.8
+      },
+      {
+        "id": "birth-controller",
+        "x": 762.5,
+        "y": 294,
+        "w": 195,
+        "h": 214.8,
+        "textBottom": 484.8
+      },
+      {
+        "id": "candidate-generation",
+        "x": 977.5,
+        "y": 292,
+        "w": 205,
+        "h": 218.8,
+        "textBottom": 486.8
+      },
+      {
+        "id": "validation",
+        "x": 1215,
+        "y": 286,
+        "w": 210,
+        "h": 230.8,
+        "textBottom": 492.8
+      },
+      {
+        "id": "registry",
+        "x": 535,
+        "y": 662,
+        "w": 230,
+        "h": 218.79999999999995,
+        "textBottom": 856.8
+      },
+      {
+        "id": "runtime-router",
+        "x": 812.5,
+        "y": 663,
+        "w": 235,
+        "h": 213.79999999999995,
+        "textBottom": 852.8
+      },
+      {
+        "id": "tool-injection",
+        "x": 1095,
+        "y": 662,
+        "w": 230,
+        "h": 218.79999999999995,
+        "textBottom": 856.8
+      },
+      {
+        "id": "combined-inventory",
+        "x": 1507.5,
+        "y": 295,
+        "w": 225,
+        "h": 212.8,
+        "textBottom": 483.8
+      },
+      {
+        "id": "actor",
+        "x": 1510,
+        "y": 664,
+        "w": 220,
+        "h": 167.79999999999995,
+        "textBottom": 807.8
+      },
+      {
+        "id": "task-score",
+        "x": 1510,
+        "y": 1041,
+        "w": 220,
+        "h": 195.79999999999995,
+        "textBottom": 1212.8
+      },
+      {
+        "id": "execution-log",
+        "x": 1147.5,
+        "y": 1038,
+        "w": 225,
+        "h": 201.79999999999995,
+        "textBottom": 1215.8
+      },
+      {
+        "id": "side-effect-audit",
+        "x": 912.5,
+        "y": 1038,
+        "w": 215,
+        "h": 179.79999999999995,
+        "textBottom": 1193.8
+      },
+      {
+        "id": "reflection",
+        "x": 680,
+        "y": 1042,
+        "w": 220,
+        "h": 193.79999999999995,
+        "textBottom": 1211.8
+      },
+      {
+        "id": "lifecycle",
+        "x": 435,
+        "y": 1041,
+        "w": 230,
+        "h": 220.79999999999995,
+        "textBottom": 1237.8
+      }
+    ],
+    "paths": {
+      "svg": "/Users/christopherclark/Library/Mobile Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage/docs/sage_protocol/figures/v061_architecture/sage_v061_architecture_overview.svg",
+      "png": "/Users/christopherclark/Library/Mobile Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage/docs/sage_protocol/figures/v061_architecture/sage_v061_architecture_overview.png",
+      "pdf": "/Users/christopherclark/Library/Mobile Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage/docs/sage_protocol/figures/v061_architecture/sage_v061_architecture_overview.pdf"
+    }
+  },
+  {
+    "slug": "sage_v061_generation_validation",
+    "shortTitle": "Generation and validation",
+    "width": 1800,
+    "height": 1500,
+    "checks": [
+      {
+        "id": "gen-context",
+        "x": 60,
+        "y": 281,
+        "w": 140,
+        "h": 187,
+        "textBottom": 444
+      },
+      {
+        "id": "gen-memory",
+        "x": 202.5,
+        "y": 283,
+        "w": 145,
+        "h": 182,
+        "textBottom": 441
+      },
+      {
+        "id": "gen-template",
+        "x": 350,
+        "y": 279,
+        "w": 140,
+        "h": 190,
+        "textBottom": 445
+      },
+      {
+        "id": "capability-observation",
+        "x": 135,
+        "y": 460,
+        "w": 280,
+        "h": 242.39999999999998,
+        "textBottom": 678.4
+      },
+      {
+        "id": "online-birth",
+        "x": 132.5,
+        "y": 751,
+        "w": 285,
+        "h": 235.39999999999998,
+        "textBottom": 962.4
+      },
+      {
+        "id": "suppression-memory",
+        "x": 35,
+        "y": 1091,
+        "w": 190,
+        "h": 194,
+        "textBottom": 1261
+      },
+      {
+        "id": "generation-request",
+        "x": 552.5,
+        "y": 298,
+        "w": 245,
+        "h": 246.39999999999998,
+        "textBottom": 520.4
+      },
+      {
+        "id": "synthesis-dispatch",
+        "x": 735,
+        "y": 508,
+        "w": 170,
+        "h": 96.79999999999995,
+        "textBottom": 580.8
+      },
+      {
+        "id": "mapped-contract",
+        "x": 610,
+        "y": 655,
+        "w": 220,
+        "h": 185.39999999999998,
+        "textBottom": 816.4
+      },
+      {
+        "id": "llm-synthesis",
+        "x": 855,
+        "y": 654,
+        "w": 230,
+        "h": 187.39999999999998,
+        "textBottom": 817.4
+      },
+      {
+        "id": "candidate-artifact",
+        "x": 742.5,
+        "y": 857,
+        "w": 255,
+        "h": 202.4000000000001,
+        "textBottom": 1035.4
+      },
+      {
+        "id": "metadata-normalization",
+        "x": 1190,
+        "y": 314,
+        "w": 240,
+        "h": 228,
+        "textBottom": 518
+      },
+      {
+        "id": "candidate-gate",
+        "x": 1455,
+        "y": 309,
+        "w": 250,
+        "h": 238,
+        "textBottom": 523
+      },
+      {
+        "id": "sandbox-validator",
+        "x": 1330,
+        "y": 585,
+        "w": 290,
+        "h": 230,
+        "textBottom": 794.4
+      },
+      {
+        "id": "validation-decision",
+        "x": 1370,
+        "y": 882,
+        "w": 210,
+        "h": 182,
+        "textBottom": 1040
+      },
+      {
+        "id": "repair-loop",
+        "x": 1190,
+        "y": 1095,
+        "w": 180,
+        "h": 199.5999999999999,
+        "textBottom": 1270.6
+      },
+      {
+        "id": "rejection",
+        "x": 1385,
+        "y": 1097,
+        "w": 180,
+        "h": 217.5999999999999,
+        "textBottom": 1290.6
+      },
+      {
+        "id": "registry-admission",
+        "x": 1570,
+        "y": 1096,
+        "w": 170,
+        "h": 178.5999999999999,
+        "textBottom": 1250.6
+      }
+    ],
+    "paths": {
+      "svg": "/Users/christopherclark/Library/Mobile Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage/docs/sage_protocol/figures/v061_architecture/sage_v061_generation_validation.svg",
+      "png": "/Users/christopherclark/Library/Mobile Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage/docs/sage_protocol/figures/v061_architecture/sage_v061_generation_validation.png",
+      "pdf": "/Users/christopherclark/Library/Mobile Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage/docs/sage_protocol/figures/v061_architecture/sage_v061_generation_validation.pdf"
+    }
+  },
+  {
+    "slug": "sage_v061_routing_lifecycle",
+    "shortTitle": "Routing and lifecycle",
+    "width": 1800,
+    "height": 1450,
+    "checks": [
+      {
+        "id": "route-registry-input",
+        "x": 55,
+        "y": 285,
+        "w": 230,
+        "h": 184,
+        "textBottom": 445
+      },
+      {
+        "id": "route-context-input",
+        "x": 55,
+        "y": 531,
+        "w": 230,
+        "h": 192,
+        "textBottom": 699
+      },
+      {
+        "id": "route-lifecycle-input",
+        "x": 55,
+        "y": 785,
+        "w": 230,
+        "h": 184,
+        "textBottom": 945
+      },
+      {
+        "id": "runtime-router",
+        "x": 380,
+        "y": 320,
+        "w": 400,
+        "h": 370,
+        "textBottom": 666
+      },
+      {
+        "id": "routing-decision",
+        "x": 737.5,
+        "y": 759,
+        "w": 245,
+        "h": 196,
+        "textBottom": 931
+      },
+      {
+        "id": "tool-bundle",
+        "x": 770,
+        "y": 466,
+        "w": 180,
+        "h": 222.60000000000002,
+        "textBottom": 664.6
+      },
+      {
+        "id": "runtime-compile",
+        "x": 950,
+        "y": 464,
+        "w": 180,
+        "h": 182.60000000000002,
+        "textBottom": 622.6
+      },
+      {
+        "id": "runtime-handoff",
+        "x": 1150,
+        "y": 464,
+        "w": 180,
+        "h": 204.60000000000002,
+        "textBottom": 644.6
+      },
+      {
+        "id": "combined-inventory-runtime",
+        "x": 1350,
+        "y": 465,
+        "w": 180,
+        "h": 180.60000000000002,
+        "textBottom": 621.6
+      },
+      {
+        "id": "runtime-native-tools",
+        "x": 1575.5,
+        "y": 278,
+        "w": 165,
+        "h": 185.2,
+        "textBottom": 439.2
+      },
+      {
+        "id": "runtime-actor",
+        "x": 1573,
+        "y": 464,
+        "w": 170,
+        "h": 183.60000000000002,
+        "textBottom": 623.6
+      },
+      {
+        "id": "benchmark-state",
+        "x": 1573,
+        "y": 996,
+        "w": 170,
+        "h": 200.5999999999999,
+        "textBottom": 1172.6
+      },
+      {
+        "id": "runtime-telemetry",
+        "x": 1330,
+        "y": 988,
+        "w": 200,
+        "h": 194.5999999999999,
+        "textBottom": 1158.6
+      },
+      {
+        "id": "side-effect-follow-up",
+        "x": 1097.5,
+        "y": 988,
+        "w": 205,
+        "h": 197.5999999999999,
+        "textBottom": 1161.6
+      },
+      {
+        "id": "runtime-reflection",
+        "x": 870,
+        "y": 990,
+        "w": 200,
+        "h": 190.5999999999999,
+        "textBottom": 1156.6
+      },
+      {
+        "id": "future-visibility",
+        "x": 640,
+        "y": 994,
+        "w": 200,
+        "h": 182.5999999999999,
+        "textBottom": 1152.6
+      },
+      {
+        "id": "checkpoint",
+        "x": 397.5,
+        "y": 993,
+        "w": 205,
+        "h": 206.5999999999999,
+        "textBottom": 1175.6
+      }
+    ],
+    "paths": {
+      "svg": "/Users/christopherclark/Library/Mobile Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage/docs/sage_protocol/figures/v061_architecture/sage_v061_routing_lifecycle.svg",
+      "png": "/Users/christopherclark/Library/Mobile Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage/docs/sage_protocol/figures/v061_architecture/sage_v061_routing_lifecycle.png",
+      "pdf": "/Users/christopherclark/Library/Mobile Documents/com~apple~CloudDocs/_Chris_Docs/Coding/toolsandbox-sage/docs/sage_protocol/figures/v061_architecture/sage_v061_routing_lifecycle.pdf"
+    }
+  }
+]

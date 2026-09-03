@@ -1,5 +1,8 @@
 # V2 Promotion Gate Repair Report
 
+> Archival record: the promotion-only gate, CLI, and tests described here were
+> removed from the publication product during the 2026-09-01 R1 cleanup.
+
 ## Objective
 Prevent proof-passing but idle, diagnostic-only, harmful, or unresolved-failure candidates from being promoted by path convention.
 

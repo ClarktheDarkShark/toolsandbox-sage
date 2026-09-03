@@ -314,10 +314,6 @@ def test_state_tool_call_fits_direct_service_precondition_tasks() -> None:
     )
 
 
-def test_state_tool_call_fits_downstream_low_battery_tasks() -> None:
-    scenario = "find_temperature_low_battery_mode_3_distraction_tools"
-
-
 def test_cohort_policy_report_blocks_empty_generation_with_no_birth_path() -> None:
     report = cohort_policy_report(
         ["unsupported_miscellaneous_task"],

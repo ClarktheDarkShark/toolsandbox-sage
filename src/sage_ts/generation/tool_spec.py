@@ -56,19 +56,13 @@ class StructuredInadequacyEvidence:
     def from_json(cls, payload: dict[str, Any]) -> "StructuredInadequacyEvidence":
         return cls(
             summary=str(payload.get("summary", "")),
-            signals=tuple(str(item) for item in payload.get("signals", ())),
-            failed_tool_calls=tuple(
-                str(item) for item in payload.get("failed_tool_calls", ())
+            signals=_coerce_str_tuple(payload.get("signals", ())),
+            failed_tool_calls=_coerce_str_tuple(payload.get("failed_tool_calls", ())),
+            repeated_failed_tool_calls=_coerce_str_tuple(
+                payload.get("repeated_failed_tool_calls", ())
             ),
-            repeated_failed_tool_calls=tuple(
-                str(item) for item in payload.get("repeated_failed_tool_calls", ())
-            ),
-            visible_data_gaps=tuple(
-                str(item) for item in payload.get("visible_data_gaps", ())
-            ),
-            planner_failures=tuple(
-                str(item) for item in payload.get("planner_failures", ())
-            ),
+            visible_data_gaps=_coerce_str_tuple(payload.get("visible_data_gaps", ())),
+            planner_failures=_coerce_str_tuple(payload.get("planner_failures", ())),
             final_answer_route_mismatch=bool(
                 payload.get("final_answer_route_mismatch", False)
             ),
@@ -86,6 +80,20 @@ def coerce_inadequacy_evidence(
         summary=str(payload),
         signals=("legacy_unstructured_evidence",),
     )
+
+
+def _coerce_str_tuple(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value,) if value.strip() else ()
+    if isinstance(value, dict):
+        return tuple(str(item) for item in value.values() if str(item).strip())
+    try:
+        return tuple(str(item) for item in value if str(item).strip())
+    except TypeError:
+        text = str(value)
+        return (text,) if text.strip() else ()
 
 
 @dataclass(frozen=True)
@@ -113,6 +121,7 @@ class ToolSpec:
     expected_milestone_calls_replaced: tuple[str, ...] = ()
     final_state_preservation_plan: str = ""
     grading_accounting_note: str = ""
+    native_action_delegation: bool = False
     inadequacy_evidence: StructuredInadequacyEvidence = StructuredInadequacyEvidence(
         summary="",
         signals=(),
@@ -150,11 +159,13 @@ class ToolSpec:
             ),
             "final_state_preservation_plan": self.final_state_preservation_plan,
             "grading_accounting_note": self.grading_accounting_note,
+            "native_action_delegation": self.native_action_delegation,
             "inadequacy_evidence": evidence.to_json(),
         }
 
     @classmethod
     def from_json(cls, payload: dict[str, Any]) -> "ToolSpec":
+        raw_output_schema = payload.get("output_schema")
         return cls(
             schema_version=int(payload.get("schema_version", TOOL_SPEC_SCHEMA_VERSION)),
             tool_name=str(payload["tool_name"]),
@@ -162,7 +173,9 @@ class ToolSpec:
             description=str(payload["description"]),
             inputs=tuple(ToolInput(**item) for item in payload["inputs"]),
             output_annotation=str(payload["output_annotation"]),
-            output_schema=payload.get("output_schema"),
+            output_schema=raw_output_schema
+            if isinstance(raw_output_schema, dict)
+            else None,
             positive_triggers=tuple(
                 str(item) for item in payload.get("positive_triggers", ())
             ),
@@ -210,6 +223,9 @@ class ToolSpec:
                 payload.get("final_state_preservation_plan", "")
             ),
             grading_accounting_note=str(payload.get("grading_accounting_note", "")),
+            native_action_delegation=bool(
+                payload.get("native_action_delegation", False)
+            ),
             inadequacy_evidence=coerce_inadequacy_evidence(
                 payload.get("inadequacy_evidence", "")
             ),

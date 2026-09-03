@@ -76,7 +76,7 @@
 - Statistical analysis report SHA-256: `cb715c70adbf856e2b6bdea5a9ac485ce6661f1984d6d04bd31926ee8330a645`
 - Statistical analysis JSON: `artifacts/summaries/final_statistical_analysis/analysis.json`
 - Statistical analysis JSON SHA-256: `02649b0193f03e8fc795524ec0c3b39c8b75ccee302080d666cc65b65a1f3429`
-- Chapter 3 methodology prep: `docs/sage_protocol/chapter3_methodology_prep.md`
+- Chapter 3 methodology architecture: `docs/sage_protocol/chapter3_sage_methodology_system_architecture_v061.md`
 - Trace-audited feedback exports:
   - `artifacts/summaries/v2_6_feedback_packets_trace_audit/v2_formal250_best3_trace_audit/feedback_summary.json`
   - `artifacts/summaries/v2_6_feedback_packets_trace_audit/v2_6_current_code_original250_best3_trace_audit/feedback_summary.json`
@@ -94,6 +94,6 @@
 - Pre-final supplements copied into final package:
   - `artifacts/final_sage_praxis_package/final_run_readiness_report.md`
   - `artifacts/final_sage_praxis_package/final_statistical_analysis_report.md`
-  - `artifacts/final_sage_praxis_package/chapter3_methodology_prep.md`
+  - `artifacts/final_sage_praxis_package/chapter3_sage_methodology_system_architecture_v061.md`
   - `artifacts/final_sage_praxis_package/protocol_heuristics_v1.json`
   - `artifacts/final_sage_praxis_package/final_run_preflight_config.json`
