@@ -102,6 +102,13 @@ generated-tool execution failures before the full comparison is allowed; the
 full comparison records those failures as outcome-relevant behavior instead of
 silently discarding the arm.
 
+Runtime recovery is also fail-closed. The one known warning-only ToolSandbox
+case (`search_contacts(person_id=None)`) keeps the original actor request,
+state, result, and tool trace in the same trajectory; it is not retried with a
+new model sample. Genuine transient model/API retries retain the existing
+bounded retry policy and now record ordered failure and trajectory-archive
+provenance that the publication verifier checks before accepting either arm.
+
 Run the sealed 30-task feasibility pilot first:
 
 ```bash

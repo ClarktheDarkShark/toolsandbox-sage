@@ -12,6 +12,10 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from sage_ts.evaluation.retry_provenance import (
+    validate_successful_retry_provenance,
+)
+
 PINNED_RAPID_FIXTURE_SHA256 = (
     "eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
 )
@@ -394,6 +398,28 @@ def _uncached_rows(
             raise ValueError(f"{arm} result summary contains an unnamed task.")
         if name in by_name:
             raise ValueError(f"{arm} result summary duplicates task {name!r}.")
+        for exception_field in ("exception_type", "traceback"):
+            if exception_field not in item:
+                raise ValueError(
+                    f"{arm} task {name!r} does not report runtime exception "
+                    f"field {exception_field!r}."
+                )
+        if item["exception_type"] is not None:
+            raise ValueError(
+                f"{arm} task {name!r} contains runtime exception "
+                f"{item['exception_type']!r}."
+            )
+        if item["traceback"] is not None:
+            raise ValueError(
+                f"{arm} task {name!r} contains a runtime exception traceback."
+            )
+        validate_successful_retry_provenance(
+            item,
+            run_dir=run_dir,
+            repo_root=REPO_ROOT,
+            arm=arm,
+            scenario=name,
+        )
         cache_source = str(item.get("control_cache_source") or "").lower()
         cache_detail = item.get("control_cache")
         if cache_source and cache_source != "fresh":

@@ -25,6 +25,12 @@ from sage_ts.evaluation.llm_usage import (
     write_llm_usage_artifacts,
 )
 from sage_ts.evaluation.outcome_score import compute_outcome_score
+from sage_ts.evaluation.retry_provenance import (
+    TRANSIENT_EXCEPTION_TYPE_NAMES as _TRANSIENT_EXCEPTION_TYPE_NAMES,
+)
+from sage_ts.evaluation.retry_provenance import (
+    TRANSIENT_TRACEBACK_MARKERS as _TRANSIENT_TRACEBACK_MARKERS,
+)
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY, apply_base_tool_policy
 from tool_sandbox.cli import write_result_summary
 from tool_sandbox.cli.utils import (
@@ -215,35 +221,35 @@ def _transient_scenario_retry_attempts() -> int:
         return DEFAULT_TRANSIENT_SCENARIO_RETRY_ATTEMPTS
 
 
-def _is_transient_model_exception(exc: Exception, traceback_text: str) -> bool:
-    names: set[str] = set()
+def _exception_chain_type_names(exc: Exception) -> list[str]:
+    names: list[str] = []
+    seen: set[int] = set()
     current: BaseException | None = exc
-    while current is not None:
-        names.add(type(current).__name__)
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        names.append(type(current).__name__)
         current = current.__cause__ or current.__context__
-    transient_names = {
-        "APIConnectionError",
-        "APITimeoutError",
-        "APIStatusError",
-        "InternalServerError",
-        "RateLimitError",
-        "RetryError",
-        "TimeoutException",
-        "ReadTimeout",
-        "ConnectTimeout",
-    }
-    if names & transient_names:
-        return True
-    transient_markers = (
-        "openai.APIConnectionError",
-        "openai.APITimeoutError",
-        "Connection error.",
-        "ReadTimeout",
-        "ConnectTimeout",
-        "RateLimitError",
-        "RetryError[",
-    )
-    return any(marker in traceback_text for marker in transient_markers)
+    return names
+
+
+def _transient_retry_evidence(
+    exc: Exception,
+    traceback_text: str,
+) -> tuple[list[str], dict[str, str] | None]:
+    exception_chain_type_names = _exception_chain_type_names(exc)
+    for type_name in exception_chain_type_names:
+        if type_name in _TRANSIENT_EXCEPTION_TYPE_NAMES:
+            return exception_chain_type_names, {
+                "kind": "exception_chain_type",
+                "identifier": type_name,
+            }
+    for identifier, marker in _TRANSIENT_TRACEBACK_MARKERS:
+        if marker in traceback_text:
+            return exception_chain_type_names, {
+                "kind": "traceback_marker",
+                "identifier": identifier,
+            }
+    return exception_chain_type_names, None
 
 
 def _archive_transient_failed_trajectory(
@@ -253,7 +259,7 @@ def _archive_transient_failed_trajectory(
     attempt: int,
 ) -> str | None:
     trajectory_dir = output_directory / "trajectories" / scenario_name
-    if not trajectory_dir.exists():
+    if not trajectory_dir.is_dir():
         return None
     archive_base = (
         output_directory
@@ -266,7 +272,7 @@ def _archive_transient_failed_trajectory(
         archive_dir = archive_base.with_name(f"{archive_base.name}_{suffix}")
         suffix += 1
     shutil.move(str(trajectory_dir), str(archive_dir))
-    return str(archive_dir)
+    return str(archive_dir) if archive_dir.is_dir() else None
 
 
 def run_one_scenario(
@@ -280,6 +286,7 @@ def run_one_scenario(
 ) -> dict[str, Any]:
     max_attempts = _transient_scenario_retry_attempts()
     transient_retry_archives: list[str] = []
+    transient_retry_failures: list[dict[str, Any]] = []
     for attempt in range(1, max_attempts + 1):
         roles: dict[RoleType, BaseRole] = {
             RoleType("USER"): make_user(user),
@@ -315,6 +322,7 @@ def run_one_scenario(
                 "exception_type": None,
                 "transient_retry_count": attempt - 1,
                 "transient_retry_archives": transient_retry_archives,
+                "transient_retry_failures": transient_retry_failures,
                 "milestone_similarity": result.evaluation_result.milestone_similarity,
                 "minefield_similarity": result.evaluation_result.minefield_similarity,
                 "similarity": result.evaluation_result.similarity,
@@ -325,9 +333,12 @@ def run_one_scenario(
             }
         except Exception as exc:
             traceback_text = traceback.format_exc()
-            should_retry = attempt < max_attempts and _is_transient_model_exception(
-                exc, traceback_text
+            exception_chain_type_names, retry_reason = _transient_retry_evidence(
+                exc,
+                traceback_text,
             )
+            should_retry = attempt < max_attempts and retry_reason is not None
+            archive: str | None = None
             if should_retry:
                 archive = _archive_transient_failed_trajectory(
                     output_directory,
@@ -336,7 +347,20 @@ def run_one_scenario(
                 )
                 if archive:
                     transient_retry_archives.append(archive)
-            else:
+                else:
+                    should_retry = False
+            transient_retry_failures.append(
+                {
+                    "attempt": attempt,
+                    "exception_type": type(exc).__name__,
+                    "exception_message": str(exc),
+                    "traceback": traceback_text,
+                    "archive_path": archive,
+                    "exception_chain_type_names": exception_chain_type_names,
+                    "retry_reason": retry_reason,
+                }
+            )
+            if not should_retry:
                 return {
                     "name": name,
                     "categories": scenario.categories,
@@ -344,6 +368,7 @@ def run_one_scenario(
                     "exception_type": type(exc).__name__,
                     "transient_retry_count": attempt - 1,
                     "transient_retry_archives": transient_retry_archives,
+                    "transient_retry_failures": transient_retry_failures,
                     "milestone_similarity": 0,
                     "minefield_similarity": 0,
                     "similarity": 0,

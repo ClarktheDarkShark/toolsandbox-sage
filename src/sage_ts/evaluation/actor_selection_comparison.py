@@ -8,8 +8,13 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable
 
+from sage_ts.evaluation.retry_provenance import (
+    validate_successful_retry_provenance,
+)
+
 INVENTORY_AUTHORITY_ARTIFACT = "sage_matched_inventory_authority"
 INVENTORY_AUTHORITY_SCHEMA_VERSION = 2
+REPO_ROOT = Path(__file__).resolve().parents[3]
 LLM_USAGE_INTEGER_FIELDS = (
     "llm_call_count",
     "llm_live_call_count",
@@ -524,9 +529,26 @@ def validate_live_uncached_run(
             f"Live and final result summaries are not identically complete for {run_dir}"
         )
     rows_by_name = {str(row["name"]): row for row in rows}
-    exception_rows = [
-        str(row.get("name") or "") for row in rows if row.get("exception_type")
-    ]
+    exception_rows: list[str] = []
+    for row in rows:
+        scenario = str(row["name"])
+        for exception_field in ("exception_type", "traceback"):
+            if exception_field not in row:
+                raise ActorSelectionVerificationError(
+                    f"actor-selection task {scenario!r} does not report runtime "
+                    f"exception field {exception_field!r}"
+                )
+        if row["exception_type"] is not None or row["traceback"] is not None:
+            exception_rows.append(scenario)
+            continue
+        validate_successful_retry_provenance(
+            row,
+            run_dir=run_dir,
+            repo_root=REPO_ROOT,
+            arm="actor-selection",
+            scenario=scenario,
+            error_type=ActorSelectionVerificationError,
+        )
     for artifact_name in PERSISTENT_RESPONSE_CACHE_ARTIFACTS:
         artifact = run_dir / artifact_name
         if artifact.exists():

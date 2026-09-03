@@ -56,6 +56,18 @@ def _read_jsonl(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
+def _write_matching_result_summaries(
+    run_dir: Path,
+    result_summary: dict[str, object],
+) -> None:
+    _write_json(run_dir / "result_summary.json", result_summary)
+    live_summary = json.loads(
+        (run_dir / "live_result_summary.json").read_text(encoding="utf-8")
+    )
+    live_summary["per_scenario_results"] = result_summary["per_scenario_results"]
+    _write_json(run_dir / "live_result_summary.json", live_summary)
+
+
 def _schema_bundle() -> tuple[str, dict[str, object]]:
     native = {
         "type": "function",
@@ -246,6 +258,10 @@ def _write_run(
                     "name": scenario,
                     "outcome_similarity": outcome,
                     "exception_type": None,
+                    "traceback": None,
+                    "transient_retry_count": 0,
+                    "transient_retry_archives": [],
+                    "transient_retry_failures": [],
                     "llm_usage_recorded": True,
                     "llm_call_count": 1,
                     "llm_live_call_count": 1,
@@ -649,6 +665,91 @@ def test_live_run_rejects_cache_artifact(tmp_path: Path) -> None:
         validate_live_uncached_run(
             policy_dir,
             expected_scenarios=SCENARIOS,
+        )
+
+
+@pytest.mark.parametrize("arm_name", ["policy", "auto"])
+def test_live_run_rejects_malformed_retry_count_in_both_arms(
+    tmp_path: Path,
+    arm_name: str,
+) -> None:
+    policy_dir, auto_dir, _authority_path = _write_experiment(tmp_path)
+    run_dir = policy_dir if arm_name == "policy" else auto_dir
+    result = json.loads((run_dir / "result_summary.json").read_text(encoding="utf-8"))
+    result["per_scenario_results"][0]["transient_retry_count"] = True
+    _write_matching_result_summaries(run_dir, result)
+
+    with pytest.raises(
+        ActorSelectionVerificationError,
+        match="invalid or missing transient_retry_count",
+    ):
+        validate_live_uncached_run(
+            run_dir,
+            expected_scenarios=SCENARIOS,
+        )
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    [
+        ("missing_chain", "invalid exception_chain_type_names"),
+        ("non_string_reason_kind", "reason outside the producer allowlist"),
+        ("marker_absent", "does not contain its classified marker"),
+        ("null_archive", "invalid or missing archive_path"),
+        ("wrong_archive", "not the exact expected trajectory directory"),
+    ],
+)
+def test_auto_live_run_rejects_malformed_retry_provenance(
+    tmp_path: Path,
+    case: str,
+    message: str,
+) -> None:
+    _policy_dir, auto_dir, _authority_path = _write_experiment(tmp_path)
+    result = json.loads((auto_dir / "result_summary.json").read_text(encoding="utf-8"))
+    row = result["per_scenario_results"][0]
+    archive = auto_dir / "trajectories" / "task_a__transient_retry_failed_attempt_1"
+    archive.mkdir(parents=True)
+    failure = {
+        "attempt": 1,
+        "exception_type": "APIConnectionError",
+        "exception_message": "connection reset",
+        "traceback": "Traceback: openai.APIConnectionError: connection reset",
+        "exception_chain_type_names": ["APIConnectionError"],
+        "retry_reason": {
+            "kind": "exception_chain_type",
+            "identifier": "APIConnectionError",
+        },
+        "archive_path": str(archive),
+    }
+    row["transient_retry_count"] = 1
+    row["transient_retry_archives"] = [str(archive)]
+    row["transient_retry_failures"] = [failure]
+    if case == "missing_chain":
+        failure.pop("exception_chain_type_names")
+    elif case == "non_string_reason_kind":
+        failure["retry_reason"]["kind"] = []
+    elif case == "marker_absent":
+        failure["exception_type"] = "WrapperError"
+        failure["exception_chain_type_names"] = ["WrapperError"]
+        failure["retry_reason"] = {
+            "kind": "traceback_marker",
+            "identifier": "read_timeout",
+        }
+        failure["traceback"] = "Traceback: no transient marker"
+    elif case == "null_archive":
+        failure["archive_path"] = None
+    elif case == "wrong_archive":
+        wrong_archive = auto_dir / "trajectories" / "forged"
+        wrong_archive.mkdir()
+        failure["archive_path"] = str(wrong_archive)
+        row["transient_retry_archives"] = [str(wrong_archive)]
+    _write_matching_result_summaries(auto_dir, result)
+
+    with pytest.raises(ActorSelectionVerificationError, match=message):
+        validate_live_uncached_run(
+            auto_dir,
+            expected_scenarios=SCENARIOS,
+            allow_generation_source=False,
         )
 
 

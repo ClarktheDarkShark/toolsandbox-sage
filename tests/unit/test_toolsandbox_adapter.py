@@ -1,10 +1,12 @@
 # mypy: ignore-errors
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import sage_ts.adapters.role_factory as role_factory
+import sage_ts.adapters.toolsandbox_adapter as toolsandbox_adapter
 from sage_ts.adapters.toolsandbox_adapter import (
     ToolSandboxRunConfig,
     run_scenario_sequence,
@@ -12,6 +14,201 @@ from sage_ts.adapters.toolsandbox_adapter import (
 )
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
+
+
+class APIConnectionError(Exception):
+    pass
+
+
+class _NoopRole:
+    def teardown(self) -> None:
+        pass
+
+
+def _patch_run_one_dependencies(monkeypatch) -> None:
+    def make_role(*_args: object, **_kwargs: object) -> _NoopRole:
+        return _NoopRole()
+
+    monkeypatch.setattr(toolsandbox_adapter, "make_user", make_role)
+    monkeypatch.setattr(toolsandbox_adapter, "make_agent", make_role)
+    monkeypatch.setattr(toolsandbox_adapter, "ExecutionEnvironment", make_role)
+    monkeypatch.setattr(
+        toolsandbox_adapter,
+        "compute_outcome_score",
+        lambda *_args, **_kwargs: {
+            "outcome_similarity": 1.0,
+            "outcome_milestone_similarity": 1.0,
+            "outcome_minefield_similarity": 1.0,
+            "outcome_check_count": 1,
+            "outcome_checks": [],
+        },
+    )
+
+
+def _successful_scenario_result() -> SimpleNamespace:
+    return SimpleNamespace(
+        evaluation_result=SimpleNamespace(
+            milestone_mapping={},
+            minefield_mapping={},
+            milestone_similarity=1.0,
+            minefield_similarity=1.0,
+            similarity=1.0,
+            turn_count=2,
+        ),
+        ending_context=object(),
+    )
+
+
+def test_transient_api_connection_retry_is_archived_and_classified(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _patch_run_one_dependencies(monkeypatch)
+    monkeypatch.setenv("SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS", "2")
+    attempt_count = 0
+
+    def play_and_evaluate(
+        *,
+        roles: object,
+        output_directory: Path,
+        scenario_name: str,
+    ) -> object:
+        nonlocal attempt_count
+        del roles
+        attempt_count += 1
+        trajectory = output_directory / "trajectories" / scenario_name
+        trajectory.mkdir(parents=True)
+        (trajectory / "attempt.txt").write_text(str(attempt_count), encoding="utf-8")
+        if attempt_count == 1:
+            raise APIConnectionError("temporary model connection failure")
+        return _successful_scenario_result()
+
+    scenario = SimpleNamespace(
+        categories=["unit_test"],
+        max_messages=4,
+        play_and_evaluate=play_and_evaluate,
+    )
+
+    result = toolsandbox_adapter.run_one_scenario(
+        "api_retry",
+        scenario,
+        agent="agent",
+        user="user",
+        output_directory=tmp_path,
+    )
+
+    archive = tmp_path / "trajectories" / "api_retry__transient_retry_failed_attempt_1"
+    assert attempt_count == 2
+    assert result["exception_type"] is None
+    assert result["transient_retry_count"] == 1
+    assert result["transient_retry_archives"] == [str(archive)]
+    assert (archive / "attempt.txt").read_text(encoding="utf-8") == "1"
+    assert (tmp_path / "trajectories" / "api_retry" / "attempt.txt").read_text(
+        encoding="utf-8"
+    ) == "2"
+    assert len(result["transient_retry_failures"]) == 1
+    failure = result["transient_retry_failures"][0]
+    assert failure["attempt"] == 1
+    assert failure["exception_type"] == "APIConnectionError"
+    assert failure["exception_message"] == "temporary model connection failure"
+    assert (
+        "APIConnectionError: temporary model connection failure" in failure["traceback"]
+    )
+    assert failure["archive_path"] == str(archive)
+    assert failure["exception_chain_type_names"] == ["APIConnectionError"]
+    assert failure["retry_reason"] == {
+        "kind": "exception_chain_type",
+        "identifier": "APIConnectionError",
+    }
+
+
+def test_transient_retry_fails_terminally_without_trajectory_archive(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _patch_run_one_dependencies(monkeypatch)
+    monkeypatch.setenv("SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS", "2")
+    attempt_count = 0
+
+    def play_and_evaluate(**_kwargs: object) -> object:
+        nonlocal attempt_count
+        attempt_count += 1
+        raise APIConnectionError("failure before trajectory creation")
+
+    scenario = SimpleNamespace(
+        categories=["unit_test"],
+        max_messages=4,
+        play_and_evaluate=play_and_evaluate,
+    )
+
+    result = toolsandbox_adapter.run_one_scenario(
+        "missing_trajectory",
+        scenario,
+        agent="agent",
+        user="user",
+        output_directory=tmp_path,
+    )
+
+    assert attempt_count == 1
+    assert result["exception_type"] == "APIConnectionError"
+    assert result["transient_retry_count"] == 0
+    assert result["transient_retry_archives"] == []
+    assert result["transient_retry_failures"][0]["archive_path"] is None
+    assert result["transient_retry_failures"][0]["retry_reason"] == {
+        "kind": "exception_chain_type",
+        "identifier": "APIConnectionError",
+    }
+
+
+def test_generic_connection_error_requires_an_existing_traceback_marker() -> None:
+    exception = ConnectionError("generic connection failure")
+
+    chain, reason = toolsandbox_adapter._transient_retry_evidence(
+        exception,
+        "Traceback: generic connection failure",
+    )
+
+    assert chain == ["ConnectionError"]
+    assert reason is None
+
+    chain, reason = toolsandbox_adapter._transient_retry_evidence(
+        exception,
+        "Traceback: Connection error.",
+    )
+
+    assert chain == ["ConnectionError"]
+    assert reason == {
+        "kind": "traceback_marker",
+        "identifier": "connection_error",
+    }
+
+
+def test_transient_retry_evidence_has_deterministic_precedence() -> None:
+    inner = APIConnectionError("inner connection failure")
+    outer = RuntimeError("outer wrapper")
+    outer.__cause__ = inner
+
+    chain, reason = toolsandbox_adapter._transient_retry_evidence(
+        outer,
+        "Traceback also mentions RateLimitError",
+    )
+
+    assert chain == ["RuntimeError", "APIConnectionError"]
+    assert reason == {
+        "kind": "exception_chain_type",
+        "identifier": "APIConnectionError",
+    }
+
+    chain, reason = toolsandbox_adapter._transient_retry_evidence(
+        ConnectionError("generic"),
+        "Traceback mentions ConnectTimeout before ReadTimeout",
+    )
+
+    assert chain == ["ConnectionError"]
+    assert reason == {
+        "kind": "traceback_marker",
+        "identifier": "read_timeout",
+    }
 
 
 def test_make_agent_propagates_auto_selection_mode(monkeypatch) -> None:

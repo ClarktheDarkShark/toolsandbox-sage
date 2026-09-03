@@ -155,6 +155,11 @@ def _fresh_run(tmp_path: Path) -> Path:
     control_rows = [
         {
             "name": "task_a",
+            "exception_type": None,
+            "traceback": None,
+            "transient_retry_count": 0,
+            "transient_retry_archives": [],
+            "transient_retry_failures": [],
             "similarity": 0.25,
             "outcome_similarity": 0.5,
             "llm_usage_recorded": True,
@@ -171,6 +176,11 @@ def _fresh_run(tmp_path: Path) -> Path:
         },
         {
             "name": "task_b",
+            "exception_type": None,
+            "traceback": None,
+            "transient_retry_count": 0,
+            "transient_retry_archives": [],
+            "transient_retry_failures": [],
             "similarity": 1.0,
             "outcome_similarity": None,
             "llm_usage_recorded": True,
@@ -189,6 +199,11 @@ def _fresh_run(tmp_path: Path) -> Path:
     candidate_rows = [
         {
             "name": "task_a",
+            "exception_type": None,
+            "traceback": None,
+            "transient_retry_count": 0,
+            "transient_retry_archives": [],
+            "transient_retry_failures": [],
             "similarity": 0.75,
             "outcome_similarity": 1.0,
             "llm_usage_recorded": True,
@@ -205,6 +220,11 @@ def _fresh_run(tmp_path: Path) -> Path:
         },
         {
             "name": "task_b",
+            "exception_type": None,
+            "traceback": None,
+            "transient_retry_count": 0,
+            "transient_retry_archives": [],
+            "transient_retry_failures": [],
             "similarity": 1.0,
             "outcome_similarity": None,
             "llm_usage_recorded": True,
@@ -570,6 +590,319 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
     assert result["platform_machine"] == "arm64"
     assert result["external_distribution_count"] == 108
     assert len(result["external_distribution_sha256"]) == 64
+
+
+def test_verifier_accepts_exception_free_zero_retry_rows(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+
+    result = verify_run(
+        run_root.parent,
+        expected_tasks=2,
+        expect_reflection="same-run-fresh",
+        **_verification_pins(run_root),
+    )
+
+    assert result["status"] == "pass"
+
+
+@pytest.mark.parametrize(
+    ("protocol_dir_field", "arm"),
+    [
+        ("control_dir", "control"),
+        ("candidate_dir", "candidate"),
+    ],
+)
+def test_verifier_rejects_runtime_exception_row_in_either_arm(
+    tmp_path: Path,
+    protocol_dir_field: str,
+    arm: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol[protocol_dir_field]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["per_scenario_results"][0]["exception_type"] = "RuntimeError"
+    _write_json(summary_path, summary)
+
+    with pytest.raises(
+        ValueError,
+        match=rf"{arm} task 'task_a' contains runtime exception 'RuntimeError'",
+    ):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_non_null_traceback_without_exception_type(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol["candidate_dir"]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["per_scenario_results"][0]["traceback"] = "hidden failure"
+    _write_json(summary_path, summary)
+
+    with pytest.raises(
+        ValueError,
+        match="candidate task 'task_a' contains a runtime exception traceback",
+    ):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_accepts_consistent_successful_retry_provenance(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol["candidate_dir"]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    row = summary["per_scenario_results"][0]
+    archive = (
+        Path(protocol["candidate_dir"])
+        / "trajectories"
+        / "task_a__transient_retry_failed_attempt_1"
+    )
+    archive.mkdir(parents=True)
+    archive_path = str(archive)
+    row["transient_retry_count"] = 1
+    row["transient_retry_archives"] = [archive_path]
+    row["transient_retry_failures"] = [
+        {
+            "attempt": 1,
+            "exception_type": "APIConnectionError",
+            "exception_message": "connection reset",
+            "traceback": "Traceback: openai.APIConnectionError: connection reset",
+            "exception_chain_type_names": ["APIConnectionError"],
+            "retry_reason": {
+                "kind": "exception_chain_type",
+                "identifier": "APIConnectionError",
+            },
+            "archive_path": archive_path,
+        }
+    ]
+    _write_json(summary_path, summary)
+
+    result = verify_run(
+        run_root.parent,
+        expected_tasks=2,
+        expect_reflection="same-run-fresh",
+        **_verification_pins(run_root),
+    )
+
+    assert result["status"] == "pass"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("transient_retry_count", True, "invalid or missing transient_retry_count"),
+        ("transient_retry_count", -1, "negative transient_retry_count"),
+        (
+            "transient_retry_archives",
+            None,
+            "invalid or missing transient_retry_archives",
+        ),
+        (
+            "transient_retry_failures",
+            None,
+            "invalid or missing transient_retry_failures",
+        ),
+    ],
+)
+def test_verifier_rejects_malformed_retry_provenance(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol["candidate_dir"]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["per_scenario_results"][0][field] = value
+    _write_json(summary_path, summary)
+
+    with pytest.raises(ValueError, match=message):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    [
+        ("failure_count", "retry failure count does not match"),
+        ("attempt_sequence", "retry attempts are not exactly 1..1"),
+        ("archive_type", "invalid or missing archive_path"),
+        ("archive_mismatch", "archives do not exactly match"),
+        ("zero_retry_orphan_archive", "archives do not exactly match"),
+        ("archive_outside_run", "not the exact expected trajectory directory"),
+        ("archive_missing", "archive is not an existing directory"),
+        ("empty_chain", "invalid exception_chain_type_names"),
+        ("chain_first_mismatch", "does not start with exception_type"),
+        ("reason_kind_not_string", "reason outside the producer allowlist"),
+        ("chain_identifier_absent", "does not occur in its exception chain"),
+        (
+            "unknown_marker_identifier",
+            "traceback-marker identifier outside the producer allowlist",
+        ),
+        ("classified_marker_absent", "does not contain its classified marker"),
+        ("null_archive", "invalid or missing archive_path"),
+    ],
+)
+def test_verifier_rejects_inconsistent_retry_provenance(
+    tmp_path: Path,
+    case: str,
+    message: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol["candidate_dir"]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    row = summary["per_scenario_results"][0]
+    archive = (
+        Path(protocol["candidate_dir"])
+        / "trajectories"
+        / "task_a__transient_retry_failed_attempt_1"
+    )
+    archive.mkdir(parents=True)
+    archive_path = str(archive)
+    failure = {
+        "attempt": 1,
+        "exception_type": "APIConnectionError",
+        "exception_message": "connection reset",
+        "traceback": "Traceback: openai.APIConnectionError: connection reset",
+        "exception_chain_type_names": ["APIConnectionError"],
+        "retry_reason": {
+            "kind": "exception_chain_type",
+            "identifier": "APIConnectionError",
+        },
+        "archive_path": archive_path,
+    }
+    row["transient_retry_count"] = 1
+    row["transient_retry_archives"] = [archive_path]
+    row["transient_retry_failures"] = [failure]
+    if case == "failure_count":
+        row["transient_retry_failures"] = []
+    elif case == "attempt_sequence":
+        failure["attempt"] = 2
+    elif case == "archive_type":
+        failure["archive_path"] = 1
+    elif case == "archive_mismatch":
+        row["transient_retry_archives"] = ["different/archive"]
+    elif case == "zero_retry_orphan_archive":
+        row["transient_retry_count"] = 0
+        row["transient_retry_failures"] = []
+    elif case == "archive_outside_run":
+        forged_archive = tmp_path / "forged_retry_archive"
+        forged_archive.mkdir()
+        failure["archive_path"] = str(forged_archive)
+        row["transient_retry_archives"] = [str(forged_archive)]
+    elif case == "archive_missing":
+        archive.rmdir()
+    elif case == "empty_chain":
+        failure["exception_chain_type_names"] = []
+    elif case == "chain_first_mismatch":
+        failure["exception_chain_type_names"] = [
+            "WrapperError",
+            "APIConnectionError",
+        ]
+    elif case == "reason_kind_not_string":
+        failure["retry_reason"]["kind"] = []
+    elif case == "chain_identifier_absent":
+        failure["exception_type"] = "WrapperError"
+        failure["exception_chain_type_names"] = ["WrapperError"]
+    elif case == "unknown_marker_identifier":
+        failure["exception_type"] = "WrapperError"
+        failure["exception_chain_type_names"] = ["WrapperError"]
+        failure["retry_reason"] = {
+            "kind": "traceback_marker",
+            "identifier": "unknown_marker",
+        }
+    elif case == "classified_marker_absent":
+        failure["exception_type"] = "WrapperError"
+        failure["exception_chain_type_names"] = ["WrapperError"]
+        failure["retry_reason"] = {
+            "kind": "traceback_marker",
+            "identifier": "read_timeout",
+        }
+        failure["traceback"] = "Traceback: no transient marker"
+    elif case == "null_archive":
+        failure["archive_path"] = None
+    _write_json(summary_path, summary)
+
+    with pytest.raises(ValueError, match=message):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["exception_type", "exception_message", "traceback"],
+)
+def test_verifier_rejects_empty_retry_failure_evidence(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol["candidate_dir"]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    row = summary["per_scenario_results"][0]
+    row["transient_retry_count"] = 1
+    row["transient_retry_archives"] = []
+    row["transient_retry_failures"] = [
+        {
+            "attempt": 1,
+            "exception_type": "APIConnectionError",
+            "exception_message": "connection reset",
+            "traceback": "Traceback: openai.APIConnectionError: connection reset",
+            "exception_chain_type_names": ["APIConnectionError"],
+            "retry_reason": {
+                "kind": "exception_chain_type",
+                "identifier": "APIConnectionError",
+            },
+            "archive_path": None,
+        }
+    ]
+    row["transient_retry_failures"][0][field] = "   "
+    _write_json(summary_path, summary)
+
+    with pytest.raises(ValueError, match=rf"invalid or missing {field}"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
 
 
 def test_verifier_rejects_hybrid_control_report(tmp_path: Path) -> None:
