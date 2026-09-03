@@ -113,9 +113,12 @@ stochastic score.
 
 ## Next Gate
 
-The configuration-ineligible sample and its raw v1 report remain preserved. No replacement sample was
-silently selected, the campaign was not prepared or executed, and the GitHub
-release push remains paused pending researcher review.
+The configuration-ineligible sample and its raw v1 report remain preserved. At
+the time this attempt closed, no replacement sample had been run and the
+campaign had not been prepared or executed. Sample 03 subsequently passed on
+the corrected tree; that later result is recorded separately in
+`publication_validation_sample03_report.md` and does not change this attempt's
+ineligible decision.
 
 ## Decision Label
 

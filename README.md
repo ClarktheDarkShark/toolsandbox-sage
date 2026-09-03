@@ -262,13 +262,36 @@ responses, and exact same-run reflection mapping. Its candidate outcome score
 (`0.7760515297`), and its relative outcome lift was `58.04%`. The initial v1
 report incorrectly treated canonical/reference similarity as a release gate;
 that policy is now explicitly superseded and content-addressed. Sample 02 is
-still **configuration-ineligible**, and the final campaign has not been
-prepared or executed. The diagnostic record is
+still **configuration-ineligible**. The diagnostic record is
 [`docs/sage_protocol/publication_validation_sample02_report.md`](docs/sage_protocol/publication_validation_sample02_report.md).
 That post-run audit also found and corrected two release drifts: removed
 within-run generator memoization and an omitted historical five-retry setting.
 The replacement launcher now fail-closes all retry layers and request timeouts.
 It also rejects diagnostic force/exposure variables in either publication arm.
+
+Sample 03 is the completed corrected-tree engineering validation. Both arms
+completed all 1,032 tasks with zero runtime exceptions, zero cached control
+tasks, zero repository whole-response replay, and same-run-fresh reflection.
+Across the 800 tasks with an outcome evaluator, outcome increased from
+`0.5087366331780064` to `0.7986035515693737`: an absolute increase of
+`0.2898669183913673` and a relative lift of `56.97779548144769%`. Exact
+outcome successes increased from `220` to `443`; paired outcomes comprised
+`413` gains, `283` preserved results, and `104` regressions. The outcome-only
+sample verifier passed. The tracked record is
+[`docs/sage_protocol/publication_validation_sample03_report.md`](docs/sage_protocol/publication_validation_sample03_report.md).
+
+The ten-online/ten-frozen manifest has been prepared and verified at
+`artifacts/chapter4_evidence/chapter4_strict_fresh_control_10x_20260902/campaign_manifest.json`.
+Its initial SHA-256 is
+`af5045911ac96e2bfdd67fac5aed3ce5b22cae6389ca94832d340b6d719d4853`.
+The ten online and ten matched frozen runs are queued but unstarted.
+Preparation made no model calls. The campaign has **not** been executed and
+still requires explicit researcher approval. Execution is pinned to validated
+runtime commit `519d6fa3739f4c933487073c5888f7576e2a646a` and tree
+`718ef02a85f0490d7e4dbbec4192567a1bd10b9d`, not the later
+documentation-only commit. The clean public-history runtime checkpoint is
+`5bf1a1a3377bb913cb11fdcd1228f18003300714`; it has that identical validated
+tree while omitting intermediate commits that contained removed experiments.
 
 To evaluate an already-built registry under the same fresh-control protocol:
 
@@ -276,21 +299,21 @@ To evaluate an already-built registry under the same fresh-control protocol:
 RESUME_REGISTRY_CHECKPOINT=artifacts/<registry> make paper-frozen
 ```
 
-## Prepare the final paper rerun
+## Prepared final paper rerun
 
-Preparation is deliberately separate from execution. This command creates a
-timestamped plan for ten online builds and ten matched frozen-registry runs; it
-does not make model calls:
+Preparation is deliberately separate from execution. The active manifest was
+created with the following command; preparation did not make model calls:
 
 ```bash
 make prepare-paper-rerun \
-  SAMPLE_REPORT=outputs/publication_validation/<sample>/native_action/<run>/publication_validation_report.json \
-  CAMPAIGN_ARGS='--campaign-id chapter4_strict_fresh_control_10x_20260901 --expected-online-runs 10'
+  SAMPLE_REPORT=outputs/publication_validation/publication_validation_20260902_strict_sample03/native_action/online_build_full_20260902_071820/publication_validation_report.json \
+  CAMPAIGN_ARGS='--campaign-id chapter4_strict_fresh_control_10x_20260902 --expected-online-runs 10'
 ```
 
-Preparation requires the passing, content-hashed single-sample report and a
-clean Git tree. The prepared manifest pins the Git commit/tree, runtime and
-generation digests, benchmark, fixture, and exactly ten online/frozen pairs.
+The prepared manifest pins the passing single-sample report, validated Git
+commit/tree, runtime and generation digests, benchmark, fixture, and exactly
+ten online/frozen pairs. This later documentation update does not change the
+pinned runtime identity.
 
 After explicit approval, the guarded campaign runner requires both the
 prepared manifest and `--approve-execution`:

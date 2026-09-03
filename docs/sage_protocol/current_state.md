@@ -11,13 +11,45 @@ the first completed strict-intent validation attempt, passed both outcome
 performance gates but is ineligible because cleanup had removed validated
 within-run generator contract-and-repair-analysis memoization and its
 launcher omitted the historical five-retry SDK setting. Both drifts are restored
-and pinned on the corrected tree. The earlier canonical gate is superseded:
-outcome/task-completion similarity is the only release performance endpoint,
-and canonical/reference similarity is descriptive only. A replacement
-1,032-task validation sample is
-required before campaign preparation. The final ten-pair campaign has not been
-started and still requires explicit researcher approval. See
+and pinned on the corrected tree. Outcome/task-completion similarity is the
+only release performance endpoint. Sample 03 completed on that corrected tree
+and passed the strict integrity and outcome-only engineering gate. The final
+ten-pair campaign manifest is prepared and verified, but no campaign arm has
+started; execution still requires explicit researcher approval. See
 `chapter4_evidence_correction_and_rerun_readiness_20260901.md`.
+
+## Corrected-Tree Validation Sample 03
+
+- Run:
+  `outputs/publication_validation/publication_validation_20260902_strict_sample03/native_action/online_build_full_20260902_071820`
+- Complete tasks: control `1,032/1,032`; SAGE `1,032/1,032`.
+- Outcome-scored matched tasks: `800`.
+- Mean outcome: `0.5087366331780064 -> 0.7986035515693737`.
+- Absolute outcome increase: `0.2898669183913673`.
+- Relative outcome lift: `56.97779548144769%`.
+- Exact outcome successes: `220 -> 443`.
+- Paired outcomes: `413` gains, `283` preserved, `104` regressions.
+- Runtime exceptions: `0` in both arms.
+- Cached control tasks: `0`.
+- Repository whole-response replay hits: `0`.
+- Reflection source: same-run fresh control with exact task matching.
+- Independent publication/sample verifier: `PASS`.
+
+This is a release-engineering check, not a confirmatory replication and not a
+hypothesis decision. Its tracked record is
+`publication_validation_sample03_report.md`. The prepared ten-online/ten-frozen
+manifest is
+`artifacts/chapter4_evidence/chapter4_strict_fresh_control_10x_20260902/campaign_manifest.json`;
+its campaign ID is `chapter4_strict_fresh_control_10x_20260902`, and its initial
+prepared-manifest SHA-256 is
+`af5045911ac96e2bfdd67fac5aed3ce5b22cae6389ca94832d340b6d719d4853`.
+Status is **prepared/unstarted**, with ten online and ten matched frozen runs
+queued. Execution remains pinned to validated runtime commit
+`519d6fa3739f4c933487073c5888f7576e2a646a` and tree
+`718ef02a85f0490d7e4dbbec4192567a1bd10b9d`; this documentation-only follow-up
+does not replace that runtime identity. Public checkpoint
+`5bf1a1a3377bb913cb11fdcd1228f18003300714` has the identical validated tree
+without publishing the intermediate cleanup history.
 
 ## Canonical SAGE Implementation
 
@@ -149,8 +181,8 @@ limit, not a prohibited mutation; the preceding state changes were valid.
 These are the primary reliability issues for the next iteration.
 
 This native-action configuration was the leading outcome-focused candidate in
-July. It is now a historical reference pending the corrected-tree validation and
-fresh-control campaign described above. A separate standard-SAGE arm would still
+July. It is now a historical reference pending the fresh-control campaign
+described above; corrected-tree validation has passed. A separate standard-SAGE arm would still
 be required to claim broad
 superiority over the prior SAGE implementation itself rather than over the
 non-learning baseline.

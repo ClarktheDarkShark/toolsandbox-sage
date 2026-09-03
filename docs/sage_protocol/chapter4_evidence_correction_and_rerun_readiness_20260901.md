@@ -4,9 +4,10 @@
 
 The July 2026 ten-online/ten-frozen campaign is preserved as an archival
 development result but withdrawn as final inferential evidence. H1, H2, and H3
-are pending replacement by a strict fresh-control ten-pair rerun. That rerun
-must not start until a corrected-tree replacement sample passes every release
-gate and the researcher gives explicit approval.
+are pending replacement by a strict fresh-control ten-pair rerun. The
+corrected-tree replacement sample has passed every release gate, and the
+ten-pair manifest has been prepared and verified. No campaign arm may start
+until the researcher gives explicit approval.
 
 ## Verified Correction
 
@@ -162,26 +163,42 @@ default value of 2. The replacement release restores 5 and pins the complete
 operational policy: both 1/3-second wrapper delay lists, four scenario attempts,
 and 120/600-second request timeouts. This closes inherited-environment drift and
 restores documented historical configuration before the replacement sample;
-The separate outcome-only metric-policy correction is recorded explicitly in
+the separate outcome-only metric-policy correction is recorded explicitly in
 the checkpoint amendment rather than being hidden as a retry decision.
+
+## Corrected-Tree Validation Sample (Sample 03)
+
+Sample 03 completed all 1,032 control tasks and all 1,032 SAGE tasks on the
+corrected release tree. Across the 800 tasks with an explicit outcome
+evaluator, mean outcome increased from `0.5087366331780064` to
+`0.7986035515693737`, an absolute increase of `0.2898669183913673` and a
+relative lift of `56.97779548144769%`. Exact outcome successes increased from
+`220` to `443`; the paired outcome counts were `413` gains, `283` preserved,
+and `104` regressions.
+
+The strict verifier passed with complete `1,032/1,032` task coverage in both
+arms, zero runtime exceptions, zero cached control tasks, zero repository
+whole-response replay, and same-run-fresh reflection. The outcome-only
+no-regression and same-run lift gates both passed. This is an engineering
+validation result, not a confirmatory replication or a hypothesis decision.
+The tracked record is `publication_validation_sample03_report.md`.
 
 ## Readiness and Approval Gates
 
-Before the final campaign is authorized:
+Readiness before the final campaign is authorized:
 
-1. freeze and verify the source, environment, benchmark, RapidAPI fixture,
-   analysis inputs, and publication manifests;
-2. complete static checks, retained unit/integration tests, and package-install
-   smoke tests;
-3. complete one replacement strict fresh-control 1,032-task validation sample
-   from the corrected source tree (sample 02 is diagnostic and ineligible);
-4. verify exact task coverage, zero prohibited cache use, same-run reflection
-   matching, zero runtime exceptions, lifecycle activity, and the predeclared
-   outcome no-inferiority boundary;
-5. record the validation separately from Chapter 4 inference;
-6. prepare and verify the ten-pair campaign manifest without executing it;
-7. obtain explicit researcher approval before passing the campaign launcher's
-   execution acknowledgement.
+1. **Complete:** source, environment, benchmark, RapidAPI fixture, analysis
+   inputs, and publication manifests are frozen and verified.
+2. **Complete:** static checks, retained unit/integration tests, and
+   package-install smoke tests passed.
+3. **Complete:** corrected-tree sample 03 finished both 1,032-task arms.
+4. **Complete:** the strict verifier passed the integrity, lifecycle, and
+   predeclared outcome-only gates.
+5. **Complete:** sample 03 is recorded separately from Chapter 4 inference.
+6. **Complete:** the ten-pair campaign manifest was prepared and verified
+   without executing a campaign arm.
+7. **Outstanding:** obtain explicit researcher approval before passing the
+   campaign launcher's execution acknowledgement.
 
 No failed or incomplete arm may be silently retried, excluded, or replaced.
 Any failure must be preserved and reviewed before the campaign continues.
@@ -197,4 +214,4 @@ inferential value may be copied forward manually.
 
 ## Decision Label
 
-`BLOCKED_BY_CONFIGURATION_INELIGIBLE_RELEASE_VALIDATION: DO_NOT_EXECUTE_10_PAIR_CAMPAIGN`
+`READY_FOR_RESEARCHER_REVIEW: DO_NOT_EXECUTE_10_PAIR_CAMPAIGN_WITHOUT_EXPLICIT_APPROVAL`

@@ -6,6 +6,13 @@ This plan supersedes the control policy used by the July 2026 campaign
 `chapter4_final_claim_10x_20260730`. The preserved July results remain available
 for audit and sensitivity analysis, but they are not final hypothesis evidence.
 
+The corrected-tree strict sample 03 has passed the engineering integrity and
+outcome-only release gate. The final ten-online/ten-frozen manifest is prepared
+and verified at
+`artifacts/chapter4_evidence/chapter4_strict_fresh_control_10x_20260902/campaign_manifest.json`.
+No campaign arm has been executed; explicit researcher approval remains the
+only outstanding launch gate.
+
 The historical cache contained 1,182 complete records for 1,032 unique tasks:
 957 tasks had one record and 75 tasks had three records. Compatible records for
 the 75 triplicated tasks were averaged. Those hybrid values supplied the
@@ -101,9 +108,9 @@ work:
 
 ```bash
 PYTHONPATH=src:. python scripts/run_chapter4_evidence_campaign.py prepare \
-  --campaign-id chapter4_strict_fresh_control_10x_20260901 \
+  --campaign-id chapter4_strict_fresh_control_10x_20260902 \
   --expected-online-runs 10 \
-  --sample-validation-report outputs/publication_validation/<sample>/native_action/<run>/publication_validation_report.json \
+  --sample-validation-report outputs/publication_validation/publication_validation_20260902_strict_sample03/native_action/online_build_full_20260902_071820/publication_validation_report.json \
   --max-parallel 10
 ```
 
@@ -115,7 +122,7 @@ Verify the resulting manifest before execution:
 
 ```bash
 PYTHONPATH=src:. python scripts/run_chapter4_evidence_campaign.py verify \
-  --campaign-manifest artifacts/chapter4_evidence/chapter4_strict_fresh_control_10x_20260901/campaign_manifest.json
+  --campaign-manifest artifacts/chapter4_evidence/chapter4_strict_fresh_control_10x_20260902/campaign_manifest.json
 ```
 
 Preparation and verification do not authorize the final experiment. The run
@@ -144,7 +151,7 @@ does not replay a stored response.
 
 After an approved and complete rerun, the campaign evidence dashboard will be:
 
-`outputs/chapter4_evidence/chapter4_strict_fresh_control_10x_20260901/dashboard/chapter4_evidence.html`
+`outputs/chapter4_evidence/chapter4_strict_fresh_control_10x_20260902/dashboard/chapter4_evidence.html`
 
 The dashboard refreshes from run artifacts while the campaign is active. It
 shows:
@@ -210,14 +217,21 @@ manifests, and contribution summaries.
 
 ## Single-Sample Validation Is Not Confirmatory Evidence
 
-Before the ten-pair campaign, one complete 1,032-task strict fresh-control
-online sample may be run as a release-validation gate. Its purposes are to
-verify completeness, absence of prohibited caching, exact same-run reflection
-matching, frozen-input hashes, zero runtime exceptions, lifecycle activity, and
-a predeclared outcome no-inferiority floor. A single stochastic sample cannot estimate
+Sample 03 completed the required 1,032-task strict fresh-control engineering
+validation: both arms finished all 1,032 tasks, the strict verifier passed, and
+outcome increased from `0.5087366331780064` to `0.7986035515693737` across
+800 outcome-scored matched tasks. The absolute increase was
+`0.2898669183913673`, relative lift was `56.97779548144769%`, and exact
+outcome successes increased from `220` to `443`. The paired outcome counts
+were `413` gains, `283` preserved, and `104` regressions. Verification found
+zero runtime exceptions, zero cached control tasks, zero repository
+whole-response replay, and same-run-fresh reflection.
+
+A single stochastic sample cannot estimate
 run-level variation, support the planned run-level sign-flip test, replace ten
 independently evolved registries, or accept/reject H1, H2, or H3. Its result
-must be reported separately from the Chapter 4 confirmatory analysis.
+is reported separately from the Chapter 4 confirmatory analysis in
+`publication_validation_sample03_report.md`.
 
 ## Publication Replacement Rule
 
