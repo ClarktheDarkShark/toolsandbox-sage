@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "manifest_type": "publication_release_input_chain",
+  "created_at": "2026-09-03",
+  "purpose": "Content-address the immutable P0 inputs, corrected checkpoint policy, concurrent no-cache execution policy, current outcome evaluator and historical endpoint rescore, and outcome-only validation thresholds.",
+  "supersedes_release_manifest": {
+    "path": "docs/sage_protocol/publication_release_manifest_20260902.json",
+    "sha256": "2aa4db601e2eed5a84648cea38df29791fa6178526eaf0e14d781f3454ba9ddd"
+  },
+  "base_input_manifest": {
+    "path": "docs/sage_protocol/publication_input_manifest_20260901.json",
+    "sha256": "3a54888be13143b3bac9dac1b8b542220812d40424c97395e5e3d3448a261fbb"
+  },
+  "checkpoint_policy_amendment": {
+    "path": "docs/sage_protocol/publication_checkpoint_amendment_20260902.json",
+    "sha256": "bac8d45e2d75984a187e5b0dbb9ed59dd07d91eec965ad1440ba4ec898729dab"
+  },
+  "active_execution_policy": {
+    "path": "docs/sage_protocol/publication_execution_policy_20260903.json",
+    "sha256": "805d095fd3c3ada9a6ad43c5e2f841056033839d08255c1e63e5ed03b6efe725"
+  },
+  "historical_outcome_rescore_summary": {
+    "path": "docs/sage_protocol/historical_outcome_rescore_v4_summary.json",
+    "sha256": "3dc78ec78986b74230971f01b0f40bae74710de2065371c46208061d392f48a7"
+  },
+  "active_validation_thresholds": {
+    "path": "docs/sage_protocol/publication_validation_thresholds_v4.json",
+    "sha256": "f14d86181b2085afc94df5c8cc39a2892f9e8c4bb44a0ba2b9d418a81d9f39f6"
+  }
+}

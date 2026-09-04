@@ -1,5 +1,9 @@
 # Phase E: Pilot & Formal 100-Task Run
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This phase protocol predates the current
+> outcome-only, concurrent fresh-control publication design. Do not use its
+> commands, metric gates, or decisions. See [current_state.md](current_state.md).
+
 **Objective:** Conduct a pilot mini run (18 tasks) to verify pipeline stability, then execute formal 100-task canonical + final-task evaluation.
 
 **Entry condition:** Phase D report complete with no blockers.

@@ -10,7 +10,7 @@ from typing import Iterable, Sequence
 
 from PIL import Image, ImageDraw, ImageFont
 
-MINIMUM_SCHEMA_VERSION = 2
+MINIMUM_SCHEMA_VERSION = 3
 
 SYSTEM_FONT_CANDIDATES = {
     False: (
@@ -422,13 +422,18 @@ def build_tables(data: dict) -> list[dict]:
                 ],
                 [
                     "Evidence set",
-                    f"{campaign['completed_runs']} runs; {campaign['paired_observations']:,} paired observations",
+                    f"{campaign['completed_runs']} runs; {campaign['paired_observations']:,} paired outcomes",
                     "Replicated full-benchmark evidence.",
                 ],
                 [
-                    "Baseline cache",
+                    "Outcome coverage",
+                    campaign["outcome_coverage_label"],
+                    "Every benchmark task must have a matched outcome before hypothesis decisions are final.",
+                ],
+                [
+                    "Control execution",
                     campaign["baseline_cache_policy"],
-                    "Fixed matched baseline values.",
+                    "Each control task executes live alongside its matched SAGE task.",
                 ],
                 [
                     "SAGE safeguards",
@@ -439,11 +444,6 @@ def build_tables(data: dict) -> list[dict]:
                     "Performance endpoint",
                     "Outcome / task completion",
                     "Sole performance criterion: requested final result achieved.",
-                ],
-                [
-                    "Descriptive audit",
-                    "Canonical/reference similarity",
-                    "Route-compatibility audit only; not an acceptance or performance criterion.",
                 ],
             ],
             "caption": f"Benchmark manifest hash: {campaign['benchmark_sha256']}.",
@@ -581,7 +581,7 @@ def build_tables(data: dict) -> list[dict]:
                     "SAGE count exceeds baseline",
                 ],
             ],
-            "caption": "Outcome/task completion is the sole performance endpoint because it evaluates whether the requested final result was achieved; canonical/reference similarity is descriptive only.",
+            "caption": "Outcome/task completion is the sole performance endpoint because it evaluates whether the requested final result was achieved.",
         },
         {
             "filename": "table_4_5_h3_generated_tool_attribution.png",
@@ -676,7 +676,7 @@ def build_tables(data: dict) -> list[dict]:
                     "Scenarios containing at least one failed generated-tool call.",
                 ],
             ],
-            "caption": "These metrics describe the autonomous tool lifecycle rather than only the final task score.",
+            "caption": "These metrics describe the autonomous tool lifecycle alongside the final task outcome.",
         },
         {
             "filename": "table_4_8_hypothesis_decision_summary.png",

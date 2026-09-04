@@ -1,5 +1,9 @@
 # Final Evidence Index
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This former evidence index has been removed
+> from the active documentation index. None of the values, paths, or decisions
+> below is current paper evidence. See [current_state.md](current_state.md).
+
 ## Protected Best3 Broad Claim
 
 - Frozen best3 registry: `artifacts/registry_frozen_best3_claim/registry_manifest.json`

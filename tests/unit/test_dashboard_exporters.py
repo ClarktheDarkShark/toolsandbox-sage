@@ -1,11 +1,15 @@
 # mypy: ignore-errors
 import json
+import threading
+from functools import partial
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
 
 from sage_ts.dashboard import exporters
 from sage_ts.dashboard.exporters import write_protocol_dashboard
+from sage_ts.dashboard.server import DashboardRequestHandler
 
 
 @pytest.fixture(autouse=True)
@@ -52,6 +56,19 @@ def test_dashboard_json_readers_tolerate_in_progress_empty_files(
     assert exporters._read_json_value(partial, []) == []
 
 
+def test_dashboard_jsonl_reader_tolerates_only_unterminated_live_tail(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "live.jsonl"
+    path.write_text('{"complete": true}\n{"partial":', encoding="utf-8")
+
+    assert exporters._read_jsonl(path) == [{"complete": True}]
+
+    path.write_text('{"complete": true}\nnot-json\n', encoding="utf-8")
+    with pytest.raises(json.JSONDecodeError):
+        exporters._read_jsonl(path)
+
+
 def test_cached_control_transcript_loading_is_opt_in(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -92,8 +109,26 @@ def test_cached_control_transcript_loading_is_opt_in(
     assert source["transcript_loaded"] is True
 
 
-def test_open_dashboard_falls_back_to_macos_open(tmp_path: Path, monkeypatch) -> None:
+class _SuccessfulDashboardResponse:
+    status = 200
+
+    def __init__(self, body: bytes = b"dashboard") -> None:
+        self._body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def test_open_dashboard_uses_checked_macos_open(tmp_path: Path, monkeypatch) -> None:
     calls: list[tuple[str, object]] = []
+    index = tmp_path / "index.html"
+    index.write_text("dashboard", encoding="utf-8")
 
     monkeypatch.setattr(
         exporters,
@@ -107,48 +142,156 @@ def test_open_dashboard_falls_back_to_macos_open(tmp_path: Path, monkeypatch) ->
             f"http://127.0.0.1:{port}/dashboard/index.html"
         ),
     )
-    monkeypatch.setattr(exporters.webbrowser, "open_new_tab", lambda url: False)
+    monkeypatch.setattr(
+        exporters, "urlopen", lambda url, timeout: _SuccessfulDashboardResponse()
+    )
+    monkeypatch.setattr(
+        exporters.webbrowser,
+        "open_new_tab",
+        lambda _url: pytest.fail("macOS must use only the checked OS opener"),
+    )
     monkeypatch.setattr(exporters.sys, "platform", "darwin")
     monkeypatch.setattr(
         exporters.subprocess,
-        "Popen",
-        lambda args, **_kwargs: calls.append(("open", args)),
+        "run",
+        lambda args, **kwargs: calls.append(("open", (args, kwargs))),
     )
 
-    url = exporters.open_dashboard(tmp_path / "index.html", port=5520)
+    url = exporters.open_dashboard(index, port=5520)
 
     assert url == "http://127.0.0.1:5520/dashboard/index.html"
     assert ("server", 5520) in calls
-    assert ("open", ["open", url]) in calls
+    open_call = next(value for label, value in calls if label == "open")
+    assert open_call[0] == ["open", url]
+    assert open_call[1]["check"] is True
+    assert open_call[1]["timeout"] == 10
 
 
-def test_open_dashboard_always_uses_macos_open(tmp_path: Path, monkeypatch) -> None:
-    calls: list[tuple[str, object]] = []
+def test_open_dashboard_requires_existing_file(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="Dashboard file does not exist"):
+        exporters.open_dashboard(tmp_path / "missing.html", port=5520)
 
-    monkeypatch.setattr(
-        exporters,
-        "ensure_dashboard_server",
-        lambda *, port, server_root: calls.append(("server", port)),
-    )
+
+def test_open_dashboard_requires_non_macos_browser_acceptance(
+    tmp_path: Path, monkeypatch
+) -> None:
+    index = tmp_path / "index.html"
+    index.write_text("dashboard", encoding="utf-8")
+    monkeypatch.setattr(exporters, "ensure_dashboard_server", lambda **_kwargs: None)
     monkeypatch.setattr(
         exporters,
         "dashboard_url",
-        lambda index_path, *, port, server_root: (
-            f"http://127.0.0.1:{port}/dashboard/index.html"
-        ),
+        lambda *_args, **_kwargs: "http://127.0.0.1:5520/index.html",
     )
-    monkeypatch.setattr(exporters.webbrowser, "open_new_tab", lambda url: True)
-    monkeypatch.setattr(exporters.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        exporters, "urlopen", lambda url, timeout: _SuccessfulDashboardResponse()
+    )
+    monkeypatch.setattr(exporters.sys, "platform", "linux")
+    monkeypatch.setattr(exporters.webbrowser, "open_new_tab", lambda _url: False)
+
+    with pytest.raises(RuntimeError, match="default browser refused"):
+        exporters.open_dashboard(index, port=5520)
+
+
+def test_dashboard_server_rejects_listener_with_wrong_root(
+    tmp_path: Path, monkeypatch
+) -> None:
+    desired_root = tmp_path / "desired"
+    wrong_root = tmp_path / "wrong"
+    monkeypatch.setattr(exporters, "_dashboard_port_is_open", lambda _port: True)
+    monkeypatch.setattr(
+        exporters,
+        "_dashboard_server_identity",
+        lambda _port: {
+            "protocol": exporters.DASHBOARD_SERVER_PROTOCOL,
+            "root": str(wrong_root.resolve()),
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="different dashboard root"):
+        exporters.ensure_dashboard_server(port=5520, server_root=desired_root)
+
+
+def test_dashboard_server_reuses_only_matching_identified_root(
+    tmp_path: Path, monkeypatch
+) -> None:
+    desired_root = tmp_path / "desired"
+    monkeypatch.setattr(exporters, "_dashboard_port_is_open", lambda _port: True)
+    monkeypatch.setattr(
+        exporters,
+        "_dashboard_server_identity",
+        lambda _port: {
+            "protocol": exporters.DASHBOARD_SERVER_PROTOCOL,
+            "root": str(desired_root.resolve()),
+        },
+    )
     monkeypatch.setattr(
         exporters.subprocess,
         "Popen",
-        lambda args, **_kwargs: calls.append(("open", args)),
+        lambda *_args, **_kwargs: pytest.fail("matching server must be reused"),
     )
 
-    url = exporters.open_dashboard(tmp_path / "index.html", port=5520)
+    exporters.ensure_dashboard_server(port=5520, server_root=desired_root)
 
-    assert url == "http://127.0.0.1:5520/dashboard/index.html"
-    assert ("open", ["open", url]) in calls
+
+def test_dashboard_server_identity_endpoint_is_bound_to_served_root(
+    tmp_path: Path,
+) -> None:
+    handler = partial(
+        DashboardRequestHandler,
+        directory=str(tmp_path),
+        dashboard_root=str(tmp_path),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        identity = exporters._dashboard_server_identity(server.server_port)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert identity == {
+        "protocol": exporters.DASHBOARD_SERVER_PROTOCOL,
+        "root": str(tmp_path.resolve()),
+    }
+
+
+def test_open_dashboard_rejects_content_from_a_different_root(
+    tmp_path: Path, monkeypatch
+) -> None:
+    index = tmp_path / "index.html"
+    index.write_text("expected dashboard", encoding="utf-8")
+    monkeypatch.setattr(exporters, "ensure_dashboard_server", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        exporters,
+        "dashboard_url",
+        lambda *_args, **_kwargs: "http://127.0.0.1:5520/index.html",
+    )
+    monkeypatch.setattr(
+        exporters,
+        "urlopen",
+        lambda _url, timeout: _SuccessfulDashboardResponse(b"wrong dashboard"),
+    )
+
+    with pytest.raises(RuntimeError, match="different file/root"):
+        exporters.open_dashboard(index, port=5520)
+
+
+def test_open_dashboard_rejects_file_outside_explicit_server_root(
+    tmp_path: Path,
+) -> None:
+    index = tmp_path / "outside" / "index.html"
+    index.parent.mkdir()
+    index.write_text("dashboard", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="outside server root"):
+        exporters.open_dashboard(
+            index,
+            port=5520,
+            server_root=tmp_path / "different-root",
+        )
 
 
 def test_dashboard_url_supports_output_outside_repo(tmp_path: Path) -> None:
@@ -335,10 +478,12 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
     assert "LLM Calls B / S" in task_compare_html
     assert "Tokens B / S" in task_compare_html
     assert "provider-prefix cached" in task_compare_html
-    assert "Baseline Outcome" in task_compare_html
-    assert "Canonical Audit Movement" in task_compare_html
+    assert 'metric(`${armLabel("control")} Outcome`' in task_compare_html
+    assert 'metric(`${armLabel("candidate")} Outcome`' in task_compare_html
+    assert "Canonical" not in task_compare_html
     assert "Score Lift" not in task_compare_html
     assert "Score Contribution" not in task_compare_html
+    assert "outcome_milestone_similarity" not in task_compare_html
     assert not (index.parent / "custom_task.html").exists()
     assert "control source: cached" in (index.parent / "index.html").read_text(
         encoding="utf-8"
@@ -457,10 +602,197 @@ def test_task_compare_live_tool_summary_uses_partial_fallback_data(
     assert helper["visible_count"] == 2
     assert helper["called_count"] == 1
     assert helper["visible_not_called_count"] == 1
-    assert helper["called_subset_mean_canonical_delta"] == pytest.approx(0.4)
+    assert "called_subset_mean_canonical_delta" not in helper
     assert helper["called_subset_mean_outcome_delta"] == pytest.approx(0.5)
     assert helper["contribution_pending"] is False
     assert helper["decision"] == "provisional live paired subset"
+
+
+def test_task_compare_data_recursively_excludes_non_outcome_performance_fields(
+    tmp_path: Path,
+) -> None:
+    run_root = tmp_path / "run"
+    dashboard_dir = run_root / "dashboard"
+    dashboard_dir.mkdir(parents=True)
+    (run_root / "helper_contribution_summary.json").write_text(
+        json.dumps(
+            {
+                "helpers": {
+                    "generated_terminal_action": {
+                        "origin": "newly_generated",
+                        "visible_count": 1,
+                        "called_count": 1,
+                        "called_subset": {
+                            "scenario_count": 1,
+                            "mean_canonical_delta": 0.25,
+                            "mean_outcome_delta": 1.0,
+                            "canonical_gains": 1,
+                            "canonical_regressions": 0,
+                            "outcome_gains": 1,
+                            "outcome_regressions": 0,
+                            "outcome_preserved": 0,
+                        },
+                    }
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    transcript = {
+        "index": 0,
+        "role": "assistant",
+        "label": "assistant",
+        "content": (
+            "The transcript may say score, milestone, minefield, or canonical; "
+            "task evidence must not be redacted."
+        ),
+        "generated_tools": ["generated_terminal_action"],
+        "uses_generated_tool": True,
+    }
+    task = {
+        "id": "candidate:run:direct_action",
+        "phase": "candidate",
+        "scenario": "direct_action",
+        "short_name": "direct action",
+        "status": "complete",
+        "display_index": 1,
+        "similarity": 0.25,
+        "score": 0.25,
+        "outcome_similarity": 1.0,
+        "outcome_milestone_similarity": 0.25,
+        "milestones": [{"score": 0.25}],
+        "minefields": [{"score": 0.0}],
+        "evaluation": {"final_score": 0.25},
+        "outcome": {
+            "similarity": 0.25,
+            "correctness_label": "not exact",
+            "agent_result_summary": "Score: 0.250",
+        },
+        "control_cache_source": "cached",
+        "control_cache": {
+            "canonical_mean": 0.25,
+            "canonical_variance": 0.01,
+            "outcome_mean": 1.0,
+            "record_ids": ["cache-record"],
+        },
+        "generated_tools": ["generated_terminal_action"],
+        "generated_tool_events": [
+            {"kind": "called", "tool": "generated_terminal_action"}
+        ],
+        "routing": {
+            "selected_tool": "generated_terminal_action",
+            "inventory": ["native_action", "generated_terminal_action"],
+        },
+        "messages": [transcript],
+        "outcome_checks": [
+            {
+                "kind": "milestone",
+                "score": 1.0,
+                "observed_messages": ["generated terminal action completed"],
+            }
+        ],
+    }
+    focus_payload = {
+        "mode": "paired",
+        "summary": {
+            "control_mean_similarity": 0.25,
+            "candidate_mean_similarity": 0.5,
+            "balanced_delta": 0.25,
+            "balanced_lift_percent": 100.0,
+            "control_mean_outcome_similarity": 0.0,
+            "candidate_mean_outcome_similarity": 1.0,
+            "balanced_outcome_delta": 1.0,
+        },
+        "control_cache": {
+            "cached_control_tasks": 1,
+            "fresh_control_tasks": 0,
+            "task_level_fields": ["canonical_mean", "outcome_mean"],
+            "baseline_count_and_variance_per_cached_task": {
+                "direct_action": {"canonical_mean": 0.25}
+            },
+        },
+        "metric_label": "Canonical Audit",
+        "tasks": [task],
+        "pairs": [
+            {
+                "scenario": "direct_action",
+                "short_name": "direct action",
+                "display_index": 1,
+                "control": task,
+                "candidate": task,
+            }
+        ],
+    }
+
+    exporters._write_task_compare_dashboard(
+        dashboard_dir,
+        run_root,
+        {},
+        focus_payload,
+    )
+
+    task_compare = json.loads(
+        (dashboard_dir / "task_compare_data.json").read_text(encoding="utf-8")
+    )
+    forbidden_exact_keys = {
+        "baseline_count_and_variance_per_cached_task",
+        "balanced_delta",
+        "balanced_lift_percent",
+        "correctness_label",
+        "evaluation",
+        "exact_correct",
+        "exact_success_rate",
+        "outcome",
+        "task_level_fields",
+    }
+
+    def assert_outcome_only(value: object, path: tuple[str, ...] = ()) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                normalized = str(key).strip().lower().replace("-", "_")
+                key_parts = normalized.split("_")
+                field_path = (*path, str(key))
+                assert normalized not in forbidden_exact_keys, field_path
+                assert "canonical" not in normalized, field_path
+                assert "milestone" not in normalized, field_path
+                assert "minefield" not in normalized, field_path
+                assert not ("reference" in normalized and "similarity" in normalized), (
+                    field_path
+                )
+                assert not any(part.startswith("score") for part in key_parts), (
+                    field_path
+                )
+                assert not (
+                    normalized.endswith("similarity") and "outcome" not in key_parts
+                ), field_path
+                if normalized in {"kind", "label", "metric", "metric_label", "title"}:
+                    label = item.strip().lower() if isinstance(item, str) else ""
+                    label_words = set(label.split())
+                    assert not label_words.intersection(
+                        {"canonical", "score", "milestone", "minefield"}
+                    ), field_path
+                    assert "reference similarity" not in label, field_path
+                assert_outcome_only(item, field_path)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                assert_outcome_only(item, (*path, str(index)))
+
+    assert_outcome_only(task_compare)
+    exported_task = task_compare["tasks"][0]
+    assert exported_task["outcome_similarity"] == pytest.approx(1.0)
+    assert exported_task["routing"] == task["routing"]
+    assert exported_task["generated_tool_events"] == task["generated_tool_events"]
+    assert exported_task["messages"] == [transcript]
+    assert exported_task["outcome_checks"] == [
+        {"observed_messages": ["generated terminal action completed"]}
+    ]
+    assert exported_task["control_cache"]["record_ids"] == ["cache-record"]
+    helper = task_compare["tool_summary"]["tools"][0]
+    assert helper["called_subset_mean_outcome_delta"] == pytest.approx(1.0)
+    assert helper["outcome_gains"] == 1
+    assert focus_payload["summary"]["control_mean_similarity"] == pytest.approx(0.25)
+    assert task["milestones"] == [{"score": 0.25}]
 
 
 def test_task_compare_tool_birth_count_uses_registry_for_resumed_runs(
@@ -1587,6 +1919,8 @@ def test_task_focus_resolves_arm_roots_and_renders_paired_compare(
         control_dir=control_root / "sage_ts_run_manifest.json",
         candidate_dir=candidate_root,
         registry_dir=registry,
+        control_label="Policy selection",
+        candidate_label="Auto selection",
     )
 
     task_focus = json.loads(
@@ -1602,6 +1936,14 @@ def test_task_focus_resolves_arm_roots_and_renders_paired_compare(
     assert task_focus["arm_progress"]["candidate"]["status"] == "running"
     assert task_focus["arm_progress"]["candidate"]["completed_count"] == 0
     assert task_focus["arm_progress"]["candidate"]["scenario_count"] == 1
+    assert task_focus["arm_labels"] == {
+        "control": "Policy selection",
+        "candidate": "Auto selection",
+    }
+    task_compare = json.loads(
+        (index.parent / "task_compare_data.json").read_text(encoding="utf-8")
+    )
+    assert task_compare["arm_labels"] == task_focus["arm_labels"]
 
     html = (index.parent / "task_focus.html").read_text(encoding="utf-8")
     assert "paired-check-grid" in html

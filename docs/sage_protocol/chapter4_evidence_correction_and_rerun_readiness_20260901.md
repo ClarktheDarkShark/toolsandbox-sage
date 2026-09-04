@@ -1,5 +1,11 @@
 # Chapter 4 Evidence Correction and Rerun Readiness — 2026-09-01
 
+> **SUPERSEDED — ARCHIVAL READINESS RECORD.** Later audits invalidated this
+> document's evaluator/rescore and sample-readiness claims. Generic state checks
+> were route-conditioned, and historical arms require their evidenced
+> timezones. Do not use its values, hashes, thresholds, manifest, or decision
+> label. See [current_state.md](current_state.md).
+
 ## Decision
 
 The July 2026 ten-online/ten-frozen campaign is preserved as an archival

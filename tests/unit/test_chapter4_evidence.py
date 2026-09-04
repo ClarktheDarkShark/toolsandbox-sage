@@ -184,6 +184,10 @@ def test_builds_hypothesis_metrics_and_drilldowns(tmp_path: Path) -> None:
         "expected_online_runs": 1,
         "expected_frozen_runs": 1,
         "baseline_cache": "artifacts/baseline",
+        "claim_safeguards": {
+            "fresh_control_required": True,
+            "canonical_metric_policy": "descriptive_only",
+        },
         "statistical_plan": {
             "hypothesis_1_threshold_percent": 70,
             "hypothesis_2_threshold_percent": 50,
@@ -212,11 +216,15 @@ def test_builds_hypothesis_metrics_and_drilldowns(tmp_path: Path) -> None:
     )
 
     assert data["campaign"]["paired_observations"] == 2
-    assert data["schema_version"] == 2
+    assert data["schema_version"] == 3
     assert data["performance"]["baseline"] == pytest.approx(0.5)
     assert data["performance"]["sage"] == pytest.approx(0.8)
     assert data["performance"]["frozen_sage"] == pytest.approx(0.74)
     assert data["performance"]["outcome_lift_label"] == "+60.0%"
+    assert not any(
+        token in json.dumps(data).lower()
+        for token in ("canonical", "reference similarity", "route-compatibility")
+    )
     assert data["hypotheses"][0]["value_label"] == "80.0%"
     assert data["hypotheses"][0]["estimate_percent"] == pytest.approx(80.0)
     assert data["hypotheses"][0]["threshold_percent"] == pytest.approx(70.0)
@@ -227,6 +235,9 @@ def test_builds_hypothesis_metrics_and_drilldowns(tmp_path: Path) -> None:
     assert data["hypotheses"][2]["baseline_mean"] == pytest.approx(0.2)
     assert data["hypotheses"][2]["sage_mean"] == pytest.approx(0.8)
     assert data["statistics"]["matched_task_observations"] == 2
+    assert data["campaign"]["outcome_coverage_complete"] is True
+    assert data["campaign"]["outcome_coverage_label"] == "2 / 2 online; 2 / 2 frozen"
+    assert data["campaign"]["claim_safeguards"] == {"fresh_control_required": True}
     assert data["integrity"]["counts"]["shortcut_violations"] == 0
     assert data["tool_failure_summary"] == {
         "completed_online_runs": 1,
@@ -240,13 +251,20 @@ def test_builds_hypothesis_metrics_and_drilldowns(tmp_path: Path) -> None:
 
     tables = {table["filename"]: table for table in renderer.build_tables(data)}
     campaign_rows = tables["table_4_1_evidence_campaign.png"]["rows"]
-    assert campaign_rows[-2] == [
+    assert [
+        "Outcome coverage",
+        "2 / 2 online; 2 / 2 frozen",
+        "Every benchmark task must have a matched outcome before hypothesis decisions are final.",
+    ] in campaign_rows
+    assert campaign_rows[-1] == [
         "Performance endpoint",
         "Outcome / task completion",
         "Sole performance criterion: requested final result achieved.",
     ]
-    assert campaign_rows[-1][0] == "Descriptive audit"
-    assert "not an acceptance or performance criterion" in campaign_rows[-1][2]
+    rendered_tables = json.dumps(list(tables.values())).lower()
+    assert "canonical" not in rendered_tables
+    assert "reference similarity" not in rendered_tables
+    assert "route-compatibility" not in rendered_tables
     h1_rows = tables["table_4_3_h1_frozen_registry_retention.png"]["rows"]
     assert h1_rows[0][1] == "80.0%"
     assert h1_rows[0][2] == ">= 70%"
@@ -270,7 +288,7 @@ def test_builds_hypothesis_metrics_and_drilldowns(tmp_path: Path) -> None:
 
 def test_renderer_requires_versioned_data_and_explicit_paths() -> None:
     with pytest.raises(ValueError, match="schema is too old"):
-        renderer.build_tables({"schema_version": 1})
+        renderer.build_tables({"schema_version": 2})
 
     args = renderer.parse_args(
         [
@@ -303,6 +321,12 @@ def test_writes_dashboard_and_resolves_search_root(tmp_path: Path) -> None:
     assert evidence is not None
     assert evidence.complete
     assert evidence.dashboard_url.endswith("/dashboard/task_compare.html")
+    assert set(evidence.task_rows[0]) == {
+        "scenario",
+        "control_outcome",
+        "candidate_outcome",
+        "outcome_delta",
+    }
 
     campaign_path = tmp_path / "campaign.json"
     _write_json(
@@ -324,4 +348,103 @@ def test_writes_dashboard_and_resolves_search_root(tmp_path: Path) -> None:
     )
     assert (output_dir / "chapter4_evidence.html").exists()
     payload = json.loads((output_dir / "chapter4_evidence_data.json").read_text())
+    dashboard_html = (output_dir / "chapter4_evidence.html").read_text(encoding="utf-8")
+    assert payload["schema_version"] == 3
     assert payload["campaign"]["completed_online_runs"] == 1
+    assert "canonical score" not in dashboard_html.lower()
+    assert "reference similarity" not in dashboard_html.lower()
+    assert "route-compatibility" not in dashboard_html.lower()
+
+
+def test_missing_outcome_keeps_hypothesis_decisions_pending(tmp_path: Path) -> None:
+    run_root = tmp_path / "outputs" / "online"
+    registry = tmp_path / "artifacts" / "registry"
+    _run(
+        run_root,
+        control_outcomes=[0.2, 0.8],
+        candidate_outcomes=[0.8, 0.8],
+        called_indices={0},
+        registry_dir=registry,
+        generation_enabled=True,
+    )
+    paired_path = run_root / "paired_comparison.json"
+    paired = json.loads(paired_path.read_text(encoding="utf-8"))
+    paired["deltas"][1]["control_outcome_similarity"] = None
+    paired["deltas"][1]["candidate_outcome_similarity"] = None
+    paired["deltas"][1]["outcome_delta"] = None
+    _write_json(paired_path, paired)
+
+    data = build_evidence_data(
+        repo_root=tmp_path,
+        campaign_manifest={
+            "expected_online_runs": 1,
+            "expected_frozen_runs": 0,
+            "expected_tasks_per_run": 2,
+            "statistical_plan": {
+                "outcome_scored_tasks_per_run": 2,
+                "expected_outcome_scored_pairs": 2,
+            },
+            "run_pairs": [
+                {
+                    "replication": 1,
+                    "online": {"run_root": str(run_root)},
+                    "frozen": {},
+                }
+            ],
+        },
+        bootstrap_iterations=100,
+        randomization_iterations=100,
+    )
+
+    assert data["campaign"]["status_label"] == "Outcome coverage incomplete"
+    assert data["campaign"]["paired_observations"] == 1
+    assert data["campaign"]["expected_paired_observations"] == 2
+    assert data["campaign"]["outcome_coverage_complete"] is False
+    assert data["statistics"]["matched_task_observations"] == 1
+    assert all(item["decision"] == "pending" for item in data["hypotheses"])
+
+
+def test_run_evidence_ignores_retired_complete_tools_environment_switch(
+    tmp_path: Path,
+) -> None:
+    run_root = tmp_path / "outputs" / "online"
+    registry = tmp_path / "artifacts" / "registry"
+    _run(
+        run_root,
+        control_outcomes=[0.2],
+        candidate_outcomes=[0.8],
+        called_indices={0},
+        registry_dir=registry,
+        generation_enabled=True,
+    )
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    protocol.pop("native_action_tools_enabled")
+    protocol["run_affecting_sage_env"]["SAGE_COMPLETE_TOOLS_MODE"] = "native-action"
+    _write_json(protocol_path, protocol)
+
+    data = build_evidence_data(
+        repo_root=tmp_path,
+        campaign_manifest={
+            "expected_online_runs": 1,
+            "expected_frozen_runs": 0,
+            "expected_tasks_per_run": 1,
+            "run_pairs": [
+                {
+                    "replication": 1,
+                    "online": {"run_root": str(run_root)},
+                    "frozen": {},
+                }
+            ],
+        },
+        bootstrap_iterations=100,
+        randomization_iterations=100,
+    )
+    configuration = next(
+        section
+        for section in data["runs"][0]["detail"]["sections"]
+        if section["heading"] == "Run configuration"
+    )
+    values = {row["label"]: row["value"] for row in configuration["rows"]}
+
+    assert values["Complete/native-action tools"] == "disabled"

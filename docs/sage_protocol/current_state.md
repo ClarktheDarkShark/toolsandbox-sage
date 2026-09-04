@@ -1,273 +1,109 @@
-# Current State
+# Current Publication State
 
-Last updated: 2026-09-02.
+Last updated: 2026-09-04.
 
-## Publication Release Status
+## Status
 
-The July 2026 ten-online/ten-frozen campaign is archival development evidence,
-not final inference: its reported “v140” control was the verified hybrid cache.
-Sample 01 stopped at dependency preflight without an experiment run. Sample 02,
-the first completed strict-intent validation attempt, passed both outcome
-performance gates but is ineligible because cleanup had removed validated
-within-run generator contract-and-repair-analysis memoization and its
-launcher omitted the historical five-retry SDK setting. Both drifts are restored
-and pinned on the corrected tree. Outcome/task-completion similarity is the
-only release performance endpoint. Sample 03 completed on that corrected tree
-and passed the strict integrity and outcome-only engineering gate. The final
-ten-pair campaign manifest is prepared and verified, but no campaign arm has
-started; execution still requires explicit researcher approval. See
-`chapter4_evidence_correction_and_rerun_readiness_20260901.md`.
+The publication cleanup, protocol correction, and v4 release-input chain are
+complete. No current-release full validation run, selector comparison, or
+confirmatory paper campaign has started. Live execution still requires explicit
+researcher approval.
 
-## Corrected-Tree Validation Sample 03
+The July campaign, the early phase/final reports, the v061 materials, and
+publication validation samples 01--03 are archival development records. They
+are not current release evidence and must not supply paper values, release
+thresholds, or control rows. In particular, sample 03 covered only the older
+partial outcome-evaluator surface and did not use the current concurrent-pair
+protocol.
 
-- Run:
-  `outputs/publication_validation/publication_validation_20260902_strict_sample03/native_action/online_build_full_20260902_071820`
-- Complete tasks: control `1,032/1,032`; SAGE `1,032/1,032`.
-- Outcome-scored matched tasks: `800`.
-- Mean outcome: `0.5087366331780064 -> 0.7986035515693737`.
-- Absolute outcome increase: `0.2898669183913673`.
-- Relative outcome lift: `56.97779548144769%`.
-- Exact outcome successes: `220 -> 443`.
-- Paired outcomes: `413` gains, `283` preserved, `104` regressions.
-- Runtime exceptions: `0` in both arms.
-- Cached control tasks: `0`.
-- Repository whole-response replay hits: `0`.
-- Reflection source: same-run fresh control with exact task matching.
-- Independent publication/sample verifier: `PASS`.
+The route-independent v4 evaluator and timezone-aware historical rescore passed
+independent checks. Their identities and outcome-only engineering floor are
+frozen in the
+[`v4 rescore summary`](historical_outcome_rescore_v4_summary.json),
+[`v4 thresholds`](publication_validation_thresholds_v4.json), and
+[`2026-09-03 release manifest`](publication_release_manifest_20260903.json).
+The rescore uses New York for the baseline and replications 6--10 and Los
+Angeles for replications 1--5, as inferred independently from each arm's raw
+valid time-conversion traces. It remains a terminal-trajectory historical
+reference only: it does not repair the superseded campaign's cache, online
+feedback, tool-birth, routing, or lifecycle confounding and is not confirmatory
+evidence.
 
-This is a release-engineering check, not a confirmatory replication and not a
-hypothesis decision. Its tracked record is
-`publication_validation_sample03_report.md`. The prepared ten-online/ten-frozen
-manifest is
-`artifacts/chapter4_evidence/chapter4_strict_fresh_control_10x_20260902/campaign_manifest.json`;
-its campaign ID is `chapter4_strict_fresh_control_10x_20260902`, and its initial
-prepared-manifest SHA-256 is
-`af5045911ac96e2bfdd67fac5aed3ce5b22cae6389ca94832d340b6d719d4853`.
-Status is **prepared/unstarted**, with ten online and ten matched frozen runs
-queued. Execution remains pinned to validated runtime commit
-`519d6fa3739f4c933487073c5888f7576e2a646a` and tree
-`718ef02a85f0490d7e4dbbec4192567a1bd10b9d`; this documentation-only follow-up
-does not replace that runtime identity. Public checkpoint
-`5bf1a1a3377bb913cb11fdcd1228f18003300714` has the identical validated tree
-without publishing the intermediate cleanup history.
+## Active Performance Contract
 
-## Canonical SAGE Implementation
+Outcome/task-completion similarity is the sole publication performance
+endpoint. Every task in both arms must receive an outcome from the same frozen,
+route-independent evaluator. Route similarity, native-tool sequence,
+generated-tool counts, selection counts, and reuse counts are diagnostics; they
+do not pass or fail a publication claim or release gate.
 
-SAGE is the native ToolSandbox self-evolving Praxis system in this repository.
-From this point forward, "SAGE" refers to the v061 evidence-line configuration:
+A validated generated tool may be the terminal action when it produces the
+correct final state. No separate visible native-tool follow-up is required.
+Final-state correctness, minefield checks, allow-list enforcement, runtime
+safety, and correct abstention remain mandatory.
 
-- runner: `scripts/run_sage_protocol.py`;
-- policy: `--sage-policy self-evolving-praxis`;
-- actor/user/generation model: `gpt-4o-mini`;
-- generation: on;
-- SAGE task cache: off;
-- persistent repository whole-response replay cache: disabled (provider prompt-prefix
-  computation is a distinct OpenAI-managed mechanism);
-- baseline/control cache: historically allowed when explicitly reported, but
-  prohibited in new publication runs;
-- dashboard: Task Compare;
-- synthetic bridge completions: removed from the active runtime;
-- scenario-name birth/routing: disabled;
-- gap detection and routing use visible task text, tool schemas, and tool results;
-- generated-tool guidance: minimal;
-- generated-tool docstrings: compact;
-- runtime generated-tool bundle cap: `4`;
-- online reflection: enabled as explicit task-feedback for lifecycle decisions.
+## Active Execution Contract
 
-## Validated Production Cleanup Checkpoint (2026-08-02 Historical)
+The sole publication launcher is `scripts/run_native_action_4omini_ab.sh`, backed by
+`scripts/run_sage_protocol.py`. Strict publication execution requires:
 
-At that checkpoint, the non-dashboard `src/sage_ts` production surface was 43,545 Python
-lines across 53 files. The 2026-08-02 optional-branch cleanup removed another
-2,651 net lines (2,766 deletions and 115 additions) without changing dashboard
-source.
+- the pinned benchmark order, fixed clock, environment, and read-only external
+  fixture;
+- no control-result cache, task-result cache, stored whole-response replay,
+  persistent generated-output replay, partial-row resume, or cross-run failure
+  memory;
+- a clean Git tree and the validated publication environment;
+- complete task and model-call provenance; and
+- a Task Compare dashboard whose served root and bytes are verified and opened
+  in the external/default browser before the first model request for each live
+  pair.
 
-Deterministic checks matched the pre-cleanup checkpoint exactly across all
-1,032 tasks and 1,810 classifier observations, generation prompts, and repair
-prompts. Three independent 30-task validation cohorts passed their fixed
-pre-cleanup floors. The final 1,032-task run completed with:
+The ordinary publication comparison runs a fresh non-learning control and the
+policy-selection SAGE arm concurrently in isolated child processes. Online
+reflection consumes the same-run control row at the matching task boundary and
+fails closed on missing, duplicate, out-of-order, extra, or unconsumed rows.
 
-- score: `0.733488 -> 0.798621`, lift `+8.88%`;
-- outcome: `0.457342 -> 0.789970`, lift `+72.73%`;
-- accepted tools: `30`;
-- naturally called tools/scenarios: `29 / 768`;
-- reuse events: `1,878`;
-- runtime exceptions: `0`;
-- harmful side-effect incidents after audit: `0`.
+The actor-selection experiment contains two live concurrent pairs:
 
-The score was slightly above the protected ten-run mean of `0.797953`. Outcome
-was 0.48 standard deviations below the protected mean of `0.795407` and inside
-the observed `0.776052-0.809509` range. This passes the distributional
-no-degradation gate; it does not claim deterministic reproduction of the
-stronger 0.807327 single run.
+1. fresh non-learning control versus policy-selection SAGE; and
+2. fresh independent non-learning control versus `sage_auto_selection`.
 
-Run:
-`outputs/production_cleanup_20260802/full_optional_cleanup_equivalence_20260802_172055/online_build_full_20260802_172101`
+The second pair starts only after the policy arm has captured the exact
+per-task actor-ready inventory needed for matched auto replay. Its fresh control
+runs concurrently with auto but does not influence auto's inventory or
+execution. The experiment produces three Task Compare views: control versus
+policy, independent control versus auto, and policy versus auto. The first two
+open before their pair's first model request; the causal policy-versus-auto view
+opens after both treatment arms finish.
 
-Report:
-`docs/sage_protocol/production_optional_branch_cleanup_20260802.md`
+## Next Authorized Steps
 
-Gate:
-`artifacts/production_cleanup_20260802/optional_branch_cleanup_gate.json`
+1. Complete the final static, focused, packaging, link, and publication-input
+   checks against the frozen v4 chain.
+2. Present the frozen release and pilot plan for researcher review.
+3. Only after approval, run the sealed representative selector pilot.
+4. Only after a passing pilot and separate explicit approval, run the complete
+   matched comparison and then prepare the paper campaign manifest.
 
-The cleaned codebase no longer includes active runtime packages for the
-standalone/import-agent, CyberGym, tau, MiniGrid, or BBH experiments. Those
-paths remain only as historical methodology and portability context.
+Preparation and verification are not execution authorization. Failed or
+interrupted arms are preserved for review and are never silently replaced.
 
-## Canonical Full Dataset Evidence
+## Active Documents
 
-- Run:
-  `outputs/chapter3_token_reduction/v061_finish_v059_full/online_build_full_20260613_203410`
-- Dashboard:
-  `outputs/chapter3_token_reduction/v061_finish_v059_full/online_build_full_20260613_203410/dashboard/task_compare.html`
-- Protocol manifest:
-  `outputs/chapter3_token_reduction/v061_finish_v059_full/online_build_full_20260613_203410/protocol_manifest.json`
-- Completed paired tasks: `1032/1032`
-- Score: baseline `0.733214` to SAGE `0.801186`
-- Score delta/lift: `+0.067971`, `+9.27%`
-- Outcome: baseline `0.454251` to SAGE `0.757267`
-- Outcome delta/lift: `+0.303016`, `+66.71%`
-- Exact successes: baseline `201`, SAGE `406`
-- Accepted/generated tools in registry: `22`
-- Called tools: `21`
-- Generated-tool-called scenarios: `825`
-- Tool reuse events: `1171`
-- Generated-tool failures: `3`
-- Runtime exceptions: `0`
-- Runtime incidents: `0`
-- Side-effect preservation incidents: `1`
-- Baseline LLM tokens: `10,465,294`
-- SAGE LLM tokens: `17,245,671`
+- `README.md`
+- `docs/sage_protocol/00_global_working_agreement.md`
+- `docs/sage_protocol/README.md`
+- `docs/sage_protocol/publication_execution_policy_20260903.json`
+- `docs/sage_protocol/publication_release_manifest_20260903.json`
+- `docs/sage_protocol/historical_outcome_rescore_v4_summary.json`
+- `docs/sage_protocol/publication_validation_thresholds_v4.json`
+- `docs/sage_protocol/publication_input_manifest_20260901.json`
+- `docs/sage_protocol/publication_checkpoint_amendment_20260902.json`
+- `docs/sage_protocol/publication_cleanup_audit_20260901.md` (historical audit
+  evidence only; not an execution guide)
+- `docs/sage_protocol/chapter4_4omini_data_collection_plan.md`
+- `docs/sage_protocol/chapter4_results_completed.tex` (pending-rerun scaffold)
 
-The primary claim supported by v061 is outcome improvement through autonomous
-tool generation, validation/repair, registry retention, routing/reuse, natural
-tool calls, and contribution accounting. Canonical/reference score also
-improved, but the strongest result is the final-task/outcome lift.
+## Decision
 
-## Native-Action SAGE Status
-
-The leading completed full-dataset outcome run in July was:
-
-- Run:
-  `outputs/native_action_4omini_ab/full_outcome80_finite_domain_full_20260723_114932/native_action/online_build_full_20260723_114954`
-- Score: `0.733488 -> 0.797695`, lift `+8.75%`.
-- Composite outcome: `0.457342 -> 0.800043`, lift `+74.93%`.
-- Exact outcome successes: `161 -> 441`.
-- State checks: `0.712231 -> 0.906944`; exact `510 -> 653`.
-- Answer checks: `0.405415 -> 0.706502`; exact `134 -> 297`.
-- Generated-tool-called rows: `771`, with outcome
-  `0.373165 -> 0.809496` (`+116.93%`).
-- Runtime exceptions: `0`.
-
-The run used model-authored `gpt-4o-mini` generation and repair, an empty
-starting registry, visible task text and schemas, validation, registry reuse,
-natural calls, and native actions. Bridge behavior, scenario-name birth and
-routing, diagnostic force calls, persistent repository whole-response replay, SAGE task caching,
-and SAGE-only extra actor turns were disabled.
-
-The framework now exposes finite input values declared by generated code as
-call-schema enums and projects generated action sequences onto native actions
-available in the current tool surface. This is a generated-tool interface
-method, not a task-name or answer-specific rule.
-
-The strongest attribution result is that called-generated-tool rows produced
-the lift. Rows with no visible generated tool were effectively tied with the
-baseline, and visible-but-not-called rows regressed.
-
-The run recorded 43 failed tool calls: 42 from
-`apply_single_device_state_action` and one from `extract_distance_result`.
-There was one side-effect-preservation contract flag for the generated device
-sequence planner. It reflected an unexecuted final planned action at the turn
-limit, not a prohibited mutation; the preceding state changes were valid.
-These are the primary reliability issues for the next iteration.
-
-This native-action configuration was the leading outcome-focused candidate in
-July. It is now a historical reference pending the fresh-control campaign
-described above; corrected-tree validation has passed. A separate standard-SAGE arm would still
-be required to claim broad
-superiority over the prior SAGE implementation itself rather than over the
-non-learning baseline.
-
-## Five-Run Native-Action Replication
-
-Five independent full-dataset replications of that July native-action
-configuration completed in parallel:
-
-- Batch:
-  `outputs/chapter4_current_sage_replications/current_sage_rep5_20260723_220047`
-- Completed paired tasks: `5 x 1,032`; all five protocol gates passed.
-- Shared baseline: score `0.733488`; outcome `0.457342`.
-- Mean SAGE score: `0.794218`; mean score delta/lift:
-  `+0.060730 / +8.28%`.
-- Mean SAGE outcome: `0.798905`; mean outcome delta/lift:
-  `+0.341563 / +74.68%`.
-- SAGE outcome range: `0.778770` to `0.809509`; run-level SD `0.012084`.
-- Run-level 95% t interval for mean SAGE outcome:
-  `[0.783900, 0.813909]`.
-- Two-way run/task bootstrap 95% interval for outcome delta:
-  `[+0.309375, +0.374102]`.
-- Three of five replications reached outcome `>= 0.8`; all five exceeded
-  `+50%` outcome lift.
-- Generated-tool-called scenario-runs: `3,856`; their weighted outcome was
-  `0.380854 -> 0.806497`, delta `+0.425643`, lift `+111.76%`.
-- Accepted tools: mean `28.4` per run; total reuse events `9,290`.
-- Runtime exceptions/tool runtime incidents: `0 / 0`.
-- Generated-tool failed scenarios: `177`, of which `164` came from
-  `apply_single_device_state_action`.
-- Side-effect-preservation contract flags: `4`, all involving
-  `plan_device_state_action_sequence_v3`; these remain explicit safety
-  adjudication items.
-
-Analysis-ready exports and inferential statistics are in:
-
-`artifacts/chapter4_current_sage_replications/current_sage_rep5_20260723_220047/aggregate`
-
-## Evidence Boundary
-
-Primary SAGE evidence must not enable synthetic bridge completions,
-route-around answer policies, hidden label access, generated tools that encode
-scenario IDs or expected answers, SAGE-only extra retry turns, or scenario-name
-tool birth/routing.
-
-SAGE may use visible task text, visible tool schemas, visible tool outputs,
-generated-tool validation results, official task feedback/control deltas for
-online lifecycle decisions, registry metadata, and contribution/safety logs.
-
-Generated tools are deterministic Python tools. They prepare action arguments,
-normalize timestamps or units, select records from visible evidence, detect
-insufficient information, recommend original tool calls, or summarize visible
-evidence. Original ToolSandbox tools remain responsible for state mutation.
-
-## Retained Code Surface
-
-The active implementation surface is:
-
-- `scripts/run_sage_protocol.py`
-- `scripts/prepare_toolsandbox_full_self_evolving_run.py`
-- `scripts/render_chapter3_sage_figures.py`
-- `src/sage_ts/` reusable SAGE core
-- `tool_sandbox/`
-- focused `tests/unit/` and `tests/integration/`
-
-Use `make compile`, `make test-core`, and `make test` for validation.
-
-## Historical References
-
-The strongest older broad500 reference remains v71:
-
-- Run:
-  `outputs/self_evolving_sage/formal500_live_generation_v71_clean_repro/online_build_500_20260514_204356`
-- Score: `0.656799 -> 0.854188`, lift `+30.05%`
-- Outcome: `0.494746 -> 0.880845`, lift `+78.04%`
-- Caveat: one strict side-effect-preservation near miss on a read-only
-  reminder-search task; no state mutation occurred.
-
-The clean safety reference remains v70:
-
-- Run:
-  `outputs/self_evolving_sage/formal500_live_generation_v70_jit_birth_retry_repair/online_build_500_20260513_174839`
-- Score: `0.656799 -> 0.827506`, lift `+25.99%`
-- Outcome: `0.494746 -> 0.872782`, lift `+76.41%`
-- Runtime/tool incidents: `0 / 0`
-
-These older runs are retained as historical evidence, not as the current
-publication configuration.
+`READY_FOR_RESEARCHER_REVIEW_AFTER_FINAL_CHECKS; DO_NOT_START_SELECTOR_PILOT_OR_FULL_RUN_WITHOUT_EXPLICIT_RESEARCHER_APPROVAL`

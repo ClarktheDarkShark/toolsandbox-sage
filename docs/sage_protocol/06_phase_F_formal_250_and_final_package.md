@@ -1,5 +1,9 @@
 # Phase F: Formal 250-Task Run & Final Package
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This phase protocol predates the current
+> outcome-only, concurrent fresh-control publication design. Do not use its
+> commands, metric gates, or decisions. See [current_state.md](current_state.md).
+
 **Objective:** Execute formal 250-task canonical + final-task evaluation (the main claim). Package all artifacts for dissertation submission.
 
 **Entry condition:** Phase E report complete with recommendation to proceed.

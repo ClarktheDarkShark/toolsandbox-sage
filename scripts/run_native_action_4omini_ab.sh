@@ -158,6 +158,7 @@ pin_publication_env() {
 # Preserve the operational policy used by the historical launcher and make
 # every wrapper/SDK retry layer and timeout explicit. No inherited shell value
 # may silently alter a publication run.
+pin_publication_env TZ "America/New_York"
 pin_publication_env SAGE_OPENAI_MAX_RETRIES "5"
 pin_publication_env SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS "1,3"
 pin_publication_env SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS "1,3"
@@ -251,12 +252,14 @@ if [[ "$EXECUTION_MODE" == "native-only" ]]; then
   GENERATION="on"
   SAGE_POLICY="self-evolving-praxis"
   REFLECTION_EXPECTATION="same-run-fresh"
+  REFLECTION_CONTROL_DELIVERY="task_synchronous_stream"
 else
   ARM="frozen_registry"
   RUN_MODE="full_benchmark"
   GENERATION="off"
   SAGE_POLICY="none"
   REFLECTION_EXPECTATION="not-applicable"
+  REFLECTION_CONTROL_DELIVERY="not_applicable_generation_disabled"
 fi
 
 ARM_OUTPUT="$OUTPUT_ROOT/$ARM"
@@ -295,6 +298,7 @@ CMD=(
   --generation "$GENERATION"
   --control-cache off
   --require-fresh-control
+  --parallel-arms
   --validated-external-fixture "$TOOLSANDBOX_RAPID_CACHE_PATH"
   --validated-external-fixture-sha256 "$PINNED_RAPID_FIXTURE_SHA256"
   --freeze-toolsandbox-clock
@@ -316,7 +320,8 @@ if [[ "$AUTO_SELECTION_EXPERIMENT" == "1" ]]; then
   CMD+=(--inventory-authority-capture-dir "$SELECTOR_AUTHORITY_DIR")
 fi
 if [[ "${SAGE_BATCH_NO_DASHBOARD_OPEN:-0}" == "1" ]]; then
-  CMD+=(--no-dashboard-open)
+  echo "Publication runs require the Task Compare dashboard to open externally; SAGE_BATCH_NO_DASHBOARD_OPEN=1 is forbidden." >&2
+  exit 1
 fi
 {
   echo "study_id=${SIZE}_$RUN_STAMP"
@@ -328,6 +333,11 @@ fi
   echo "actor_selection_mode=policy"
   echo "auto_selection_experiment=$AUTO_SELECTION_EXPERIMENT"
   echo "auto_selection_stage=$AUTO_SELECTION_STAGE"
+  echo "auto_selection_parallel_fresh_control=$AUTO_SELECTION_EXPERIMENT"
+  echo "auto_selection_control_cache=off"
+  echo "auto_selection_control_delivery=not_connected"
+  echo "auto_selection_control_output_influences_inventory=false"
+  echo "auto_selection_control_output_influences_execution=false"
   echo "selector_authority_dir=$SELECTOR_AUTHORITY_DIR"
   echo "auto_selection_registry_dir=$AUTO_SELECTION_REGISTRY_DIR"
   echo "selector_pilot_evidence_path=$SELECTOR_PILOT_EVIDENCE_PATH"
@@ -350,9 +360,12 @@ fi
   echo "manifest_sha256=$MANIFEST_SHA256"
   echo "scenario_order_sha256=$MANIFEST_SCENARIO_ORDER_SHA256"
   echo "fixed_now=$TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"
+  echo "timezone=$TZ"
   echo "control_cache=off"
   echo "fresh_control_required=true"
   echo "reflection_control=$REFLECTION_EXPECTATION"
+  echo "parallel_arms=true"
+  echo "reflection_control_delivery=$REFLECTION_CONTROL_DELIVERY"
   echo "openai_response_cache=off"
   echo "openai_response_cache_scope=persistent_repository_whole_response_replay"
   echo "persistent_generation_output_cache=off"
@@ -377,7 +390,7 @@ fi
 } > "$COMMAND_FILE"
 cp "$COMMAND_FILE" "$STUDY_FILE"
 
-echo "Starting strict fresh-control publication run: ${SIZE}_$RUN_STAMP"
+echo "Starting strict parallel fresh-control publication run: ${SIZE}_$RUN_STAMP"
 echo "[$ARM] output: $ARM_OUTPUT"
 echo "[$ARM] log: $LOG_FILE"
 "${CMD[@]}" 2>&1 | tee "$LOG_FILE"
@@ -407,10 +420,12 @@ if [[ "$AUTO_SELECTION_EXPERIMENT" == "1" ]]; then
     --policy-run-root "${POLICY_RUN_ROOTS[0]}"
     --stage "$AUTO_SELECTION_STAGE"
     --auto-registry-dir "$AUTO_SELECTION_REGISTRY_DIR"
+    --dashboard-port "$DASHBOARD_PORT"
   )
   if [[ "$AUTO_SELECTION_STAGE" == "full" ]]; then
     AUTO_REPLAY_CMD+=(--pilot-evidence "$SELECTOR_PILOT_EVIDENCE_PATH")
   fi
-  "${AUTO_REPLAY_CMD[@]}" | tee -a "$LOG_FILE"
+  echo "Starting concurrent fresh-control + SAGE auto-selection pair"
+  "${AUTO_REPLAY_CMD[@]}" 2>&1 | tee -a "$LOG_FILE"
 fi
-echo "Strict fresh-control publication run complete: ${SIZE}_$RUN_STAMP"
+echo "Strict parallel fresh-control publication run complete: ${SIZE}_$RUN_STAMP"

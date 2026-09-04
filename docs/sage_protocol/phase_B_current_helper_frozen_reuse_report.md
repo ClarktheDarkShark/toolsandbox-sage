@@ -1,5 +1,9 @@
 # Phase B Current Helper Frozen Reuse
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This development report is not a current
+> protocol, release gate, or paper result. Its values and decision labels must
+> not be carried forward. See [current_state.md](current_state.md).
+
 ## Objective
 Validate frozen-registry reuse for `prepare_reminder_creation_args` under transfer_40 with generation OFF.
 

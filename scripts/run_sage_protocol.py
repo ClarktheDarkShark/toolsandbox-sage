@@ -41,6 +41,7 @@ from sage_ts.dashboard.exporters import (
     open_dashboard,
     write_protocol_dashboard,
 )
+from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.control_baseline_cache import (
     ControlBaselineCache,
     build_control_cache_report,
@@ -48,9 +49,15 @@ from sage_ts.evaluation.control_baseline_cache import (
     write_synthetic_control_run,
 )
 from sage_ts.evaluation.helper_contribution import write_helper_contribution_summary
+from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 from sage_ts.evaluation.run_metrics import compare_runs
 from sage_ts.evaluation.task_strata import cohort_policy_report
 from sage_ts.generation.tool_generator import ToolGenerator
+from sage_ts.orchestration.self_evolution_reflection import (
+    FRESH_CONTROL_COMPLETE_EVENT,
+    FRESH_CONTROL_ERROR_EVENT,
+    FRESH_CONTROL_ROW_EVENT,
+)
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 
 # Run modes are also split names. Keep these explicit so bad campaign labels
@@ -100,6 +107,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP = 1784832588
 PUBLICATION_ENVIRONMENT_LOCK = "requirements-publication-lock.txt"
 PUBLICATION_EXECUTION_ENV = {
+    "TZ": "America/New_York",
     "SAGE_OPENAI_MAX_RETRIES": "5",
     "SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
     "SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
@@ -262,7 +270,7 @@ def _redacted_run_affecting_sage_env() -> dict[str, str]:
     blocked_tokens = ("API", "KEY", "TOKEN", "SECRET")
     values: dict[str, str] = {}
     for name, value in sorted(os.environ.items()):
-        if not name.startswith("SAGE_"):
+        if not name.startswith("SAGE_") and name != "TZ":
             continue
         if any(token in name.upper() for token in blocked_tokens):
             values[name] = "<redacted>"
@@ -308,6 +316,13 @@ def _arm_status_path(run_root: Path, arm: str) -> Path:
     return run_root / f"{arm}_arm_status.json"
 
 
+def _atomic_write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
 def _write_arm_status(
     run_root: Path,
     arm: str,
@@ -317,11 +332,19 @@ def _write_arm_status(
     completed_count: int | None = None,
     scenario_count: int | None = None,
     error: str | None = None,
+    process_pid: int | None = None,
 ) -> None:
+    path = _arm_status_path(run_root, arm)
+    prior = _read_arm_status(run_root, arm)
+    now = datetime.now().astimezone().isoformat()
+    now_monotonic_ns = time.monotonic_ns()
     payload: dict[str, object] = {
         "arm": arm,
         "status": status,
-        "updated_at": datetime.now().isoformat(),
+        "process_pid": prior.get("process_pid") or process_pid or os.getpid(),
+        "started_at": prior.get("started_at") or now,
+        "started_monotonic_ns": prior.get("started_monotonic_ns") or now_monotonic_ns,
+        "updated_at": now,
     }
     if run_dir is not None:
         payload["run_dir"] = str(run_dir)
@@ -331,16 +354,85 @@ def _write_arm_status(
         payload["scenario_count"] = scenario_count
     if error is not None:
         payload["error"] = error
-    _arm_status_path(run_root, arm).write_text(
-        json.dumps(payload, indent=2) + "\n", encoding="utf-8"
-    )
+    if status not in {"starting", "running"}:
+        payload["completed_at"] = now
+        payload["completed_monotonic_ns"] = now_monotonic_ns
+    _atomic_write_json(path, payload)
 
 
 def _read_arm_status(run_root: Path, arm: str) -> dict[str, Any]:
     path = _arm_status_path(run_root, arm)
     if not path.exists():
         return {}
-    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
+
+
+def _parallel_arm_execution_record(run_root: Path) -> dict[str, Any]:
+    statuses = {
+        arm: _read_arm_status(run_root, arm) for arm in ("control", "candidate")
+    }
+    intervals: dict[str, tuple[int, int]] = {}
+    arms: dict[str, dict[str, Any]] = {}
+    for arm, status in statuses.items():
+        if status.get("status") != "complete":
+            raise ValueError(
+                f"Parallel {arm} arm did not preserve complete terminal status."
+            )
+        pid = status.get("process_pid")
+        started = status.get("started_monotonic_ns")
+        completed = status.get("completed_monotonic_ns")
+        if (
+            isinstance(pid, bool)
+            or not isinstance(pid, int)
+            or pid <= 0
+            or isinstance(started, bool)
+            or not isinstance(started, int)
+            or isinstance(completed, bool)
+            or not isinstance(completed, int)
+            or completed <= started
+        ):
+            raise ValueError(f"Parallel {arm} arm timing/PID evidence is invalid.")
+        intervals[arm] = (started, completed)
+        arms[arm] = {
+            key: status.get(key)
+            for key in (
+                "status",
+                "process_pid",
+                "started_at",
+                "completed_at",
+                "started_monotonic_ns",
+                "completed_monotonic_ns",
+            )
+        }
+    if arms["control"]["process_pid"] == arms["candidate"]["process_pid"]:
+        raise ValueError("Parallel arms recorded the same process PID.")
+    overlap_ns = min(interval[1] for interval in intervals.values()) - max(
+        interval[0] for interval in intervals.values()
+    )
+    if overlap_ns <= 0:
+        raise ValueError("Control and SAGE process intervals did not overlap.")
+    return {
+        "unit": "isolated_child_process",
+        "arms": arms,
+        "positive_overlap_asserted": True,
+        "overlap_monotonic_ns": overlap_ns,
+        "overlap_seconds": overlap_ns / 1_000_000_000,
+    }
+
+
+def _stop_parallel_process(process: Any, *, timeout_seconds: float = 10.0) -> None:
+    if process.is_alive():
+        process.terminate()
+    process.join(timeout=timeout_seconds)
+    if process.is_alive():
+        kill = getattr(process, "kill", None)
+        if callable(kill):
+            kill()
+            process.join(timeout=timeout_seconds)
 
 
 def _latest_run_dir(root: Path) -> Path | None:
@@ -823,103 +915,39 @@ def _optional_float(value: Any) -> float | None:
         return None
 
 
-def _route_mismatch_qualified(comparison: dict[str, Any]) -> bool:
-    """True when outcome improves despite canonical/exact accounting disagreement."""
-    canonical_delta = float(comparison.get("mean_similarity_delta", 0.0) or 0.0)
-    outcome_delta = _optional_float(comparison.get("mean_outcome_similarity_delta"))
-    exact_delta = int(comparison.get("exact_success_delta", 0) or 0)
-    gains = int(comparison.get("gain_count", 0) or 0)
-    regressions = int(comparison.get("regression_count", 0) or 0)
-    outcome_gains = int(comparison.get("outcome_gain_count", 0) or 0)
-    outcome_regressions = int(comparison.get("outcome_regression_count", 0) or 0)
-    runtime_exceptions = int(comparison.get("runtime_exception_count", 0) or 0)
-    candidate = cast(dict[str, Any], comparison.get("candidate", {}))
-    called = int(candidate.get("generated_tool_called_scenarios", 0) or 0)
-    accepted = int(candidate.get("accepted_tool_count", 0) or 0)
-    canonical_or_exact_disagrees = (
-        canonical_delta <= 0 or gains <= regressions or exact_delta < 0
-    )
-    return (
-        runtime_exceptions == 0
-        and outcome_delta is not None
-        and outcome_delta > 0
-        and outcome_gains > outcome_regressions
-        and (called > 0 or accepted > 0)
-        and canonical_or_exact_disagrees
-    )
-
-
 def _protocol_gate_decision(
     comparison: dict[str, Any],
     *,
     scenario_count: int,
-    outcome_only: bool = False,
 ) -> tuple[bool, list[str]]:
-    """Apply legacy gates or the strict publication outcome-only viability gate."""
+    """Apply the outcome-only viability gate used by every protocol run."""
     reasons: list[str] = []
-    delta = float(comparison.get("mean_similarity_delta", 0.0) or 0.0)
     outcome_delta = _optional_float(comparison.get("mean_outcome_similarity_delta"))
-    exact_delta = int(comparison.get("exact_success_delta", 0) or 0)
-    gains = int(comparison.get("gain_count", 0) or 0)
-    regressions = int(comparison.get("regression_count", 0) or 0)
     outcome_gains = int(comparison.get("outcome_gain_count", 0) or 0)
     outcome_regressions = int(comparison.get("outcome_regression_count", 0) or 0)
+    outcome_scenario_count = int(comparison.get("outcome_scenario_count", 0) or 0)
     runtime_exceptions = int(comparison.get("runtime_exception_count", 0) or 0)
-    candidate = cast(dict[str, Any], comparison.get("candidate", {}))
-    called = int(candidate.get("generated_tool_called_scenarios", 0) or 0)
-    accepted = int(candidate.get("accepted_tool_count", 0) or 0)
-    route_mismatch = False if outcome_only else _route_mismatch_qualified(comparison)
-    outcome_qualified = (
-        runtime_exceptions == 0
-        and outcome_delta is not None
-        and outcome_delta > 0
-        and outcome_gains > outcome_regressions
-        and (called > 0 or accepted > 0)
-    )
-
     if runtime_exceptions:
         reasons.append("runtime_exceptions_present")
-    if outcome_delta is not None:
+    if outcome_scenario_count != scenario_count:
+        reasons.append("outcome_score_coverage_incomplete")
+    if outcome_delta is None:
+        reasons.append("outcome_score_unavailable")
+    else:
         if outcome_delta <= 0:
             reasons.append("non_positive_outcome_delta")
         if outcome_gains <= outcome_regressions:
             reasons.append("outcome_gains_do_not_exceed_regressions")
-    elif outcome_only:
-        reasons.append("outcome_score_unavailable")
-    elif delta <= 0:
-        reasons.append("outcome_score_unavailable_and_non_positive_canonical_delta")
-    if not outcome_only:
-        if delta <= 0 and not (route_mismatch or outcome_qualified):
-            reasons.append("non_positive_canonical_delta")
-        if gains <= regressions and not outcome_qualified:
-            reasons.append("gains_do_not_exceed_regressions")
 
     if scenario_count >= 30:
-        if outcome_only:
-            primary_delta = outcome_delta if outcome_delta is not None else 0.0
-            primary_gains = outcome_gains
-            primary_regressions = outcome_regressions
-        else:
-            primary_delta = outcome_delta if outcome_delta is not None else delta
-            primary_gains = outcome_gains if outcome_delta is not None else gains
-            primary_regressions = (
-                outcome_regressions if outcome_delta is not None else regressions
-            )
+        primary_delta = outcome_delta if outcome_delta is not None else 0.0
+        primary_gains = outcome_gains
+        primary_regressions = outcome_regressions
         ratio = primary_gains / max(primary_regressions, 1)
-        called_share = called / scenario_count if scenario_count else 0.0
         if primary_delta < 0.08:
             reasons.append("confirmation_outcome_delta_below_0_08")
-        if not outcome_only and exact_delta <= 0 and not outcome_qualified:
-            reasons.append("exact_successes_not_improved")
         if ratio < 1.4:
             reasons.append("gain_regression_ratio_below_1_4")
-        if called_share < 0.25:
-            reasons.append("helper_call_share_below_25_percent")
-    elif scenario_count >= 12:
-        if not outcome_only and exact_delta < 0 and not outcome_qualified:
-            reasons.append("exact_successes_regressed")
-        if accepted <= 0 and called < 3:
-            reasons.append("no_accepted_helper_and_fewer_than_3_helper_calls")
 
     return not reasons, reasons
 
@@ -965,6 +993,8 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
     artifact_root = Path(params["artifact_root"])
     control_root = Path(params["control_root"])
     scenario_names = tuple(params["scenario_names"])
+    reflection_control_channel = params.get("reflection_control_channel")
+    published_count = 0
     _write_arm_status(
         run_root,
         "control",
@@ -980,6 +1010,27 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
             status: str,
             scenario_count: int,
         ) -> None:
+            nonlocal published_count
+            if len(rows) < published_count:
+                raise ValueError("Live control progress rows moved backwards.")
+            for index in range(published_count, len(rows)):
+                row = rows[index]
+                expected_scenario = scenario_names[index]
+                observed_scenario = str(row.get("name") or "")
+                if observed_scenario != expected_scenario:
+                    raise ValueError(
+                        "Live control stream is out of order: expected "
+                        f"{expected_scenario!r}, observed {observed_scenario!r}."
+                    )
+                if reflection_control_channel is not None:
+                    reflection_control_channel.put(
+                        {
+                            "event": FRESH_CONTROL_ROW_EVENT,
+                            "scenario": expected_scenario,
+                            "row": dict(row),
+                        }
+                    )
+            published_count = len(rows)
             _write_arm_status(
                 run_root,
                 "control",
@@ -1017,6 +1068,18 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
             progress_hook=progress,
             event_hook=event_hook,
         )
+        if published_count != len(scenario_names):
+            raise ValueError(
+                "Live control stream ended before every task row was published: "
+                f"{published_count}/{len(scenario_names)}."
+            )
+        if reflection_control_channel is not None:
+            reflection_control_channel.put(
+                {
+                    "event": FRESH_CONTROL_COMPLETE_EVENT,
+                    "scenario_count": len(scenario_names),
+                }
+            )
         append_event(
             "phase_completed",
             {
@@ -1037,6 +1100,10 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
         )
     except Exception:
         error = traceback.format_exc()
+        if reflection_control_channel is not None:
+            reflection_control_channel.put(
+                {"event": FRESH_CONTROL_ERROR_EVENT, "error": error}
+            )
         _write_arm_status(run_root, "control", status="failed", error=error)
         append_event(
             "blocker_detected",
@@ -1062,6 +1129,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
         generation_enabled,
         params.get("inventory_authority_replay_dir"),
     )
+    require_fresh_control = bool(params.get("require_fresh_control"))
     _write_arm_status(
         run_root,
         "candidate",
@@ -1130,9 +1198,14 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 else None,
                 resume_completed_limit=params.get("resume_completed_limit"),
                 manifest_path=Path(params["manifest"]),
+                reflection_control_channel=params.get("reflection_control_channel"),
+                require_fresh_reflection_control=(
+                    require_fresh_control and candidate_generation_enabled
+                ),
                 failure_memory_path=(
                     None
-                    if params.get("inventory_authority_replay_dir")
+                    if require_fresh_control
+                    or params.get("inventory_authority_replay_dir")
                     else Path("artifacts/summaries/failure_memory.json")
                 ),
             ),
@@ -1346,10 +1419,11 @@ def main() -> None:
         "--require-fresh-control",
         action="store_true",
         help=(
-            "Publication fail-closed mode: run control first, require exactly one "
-            "live uncached control row per task, and supply those same-run rows to "
-            "online reflection. Incompatible with --parallel-arms and every "
-            "--control-cache mode except off."
+            "Publication fail-closed mode: require exactly one live uncached "
+            "control row per task and supply those same-run rows to online "
+            "reflection. Requires --parallel-arms so rows are streamed to SAGE at "
+            "each matched task boundary. Incompatible with every --control-cache "
+            "mode except off."
         ),
     )
     parser.add_argument(
@@ -1457,10 +1531,15 @@ def main() -> None:
             "--require-fresh-control requires --control-cache off; cache lookup "
             "and collection are prohibited in publication runs."
         )
-    if args.require_fresh_control and args.parallel_arms:
+    if args.require_fresh_control and not args.parallel_arms:
         raise SystemExit(
-            "--require-fresh-control is incompatible with --parallel-arms because "
-            "the complete live control arm must precede SAGE reflection."
+            "--require-fresh-control requires --parallel-arms; every strict "
+            "publication control/SAGE pair must run concurrently."
+        )
+    if args.require_fresh_control and args.no_dashboard_open:
+        raise SystemExit(
+            "Strict publication runs require the Task Compare dashboard to open "
+            "in the external browser; --no-dashboard-open is forbidden."
         )
     if args.require_fresh_control and (
         args.resume_run_root is not None or args.resume_completed_limit is not None
@@ -1521,6 +1600,8 @@ def main() -> None:
         generation_model=args.generation_model,
         user_model=args.user,
     )
+    outcome_evaluator = outcome_evaluator_manifest()
+    run_timezone = os.environ.get("TZ")
     candidate_arm_name = _candidate_arm_name(args.actor_selection_mode)
     inventory_authority_capture_dir = (
         args.inventory_authority_capture_dir.resolve()
@@ -1657,6 +1738,17 @@ def main() -> None:
     effective_parallel_arms = args.parallel_arms and not (
         control_cache_plan is not None and control_cache_plan["cached_scenarios"]
     )
+    reflection_control_delivery = (
+        "task_synchronous_stream"
+        if args.require_fresh_control
+        and candidate_generation_enabled
+        and effective_parallel_arms
+        else "preloaded_complete_map"
+        if args.require_fresh_control and candidate_generation_enabled
+        else "not_applicable_generation_disabled"
+        if args.require_fresh_control
+        else "not_applicable"
+    )
     cohort_preflight = _write_cohort_preflight(
         run_root,
         scenario_names=scenario_names,
@@ -1688,6 +1780,8 @@ def main() -> None:
             "generation_enabled": candidate_generation_enabled,
             "generation_requested": generation_requested,
             "candidate_generation_enabled": candidate_generation_enabled,
+            "parallel_arms": effective_parallel_arms,
+            "reflection_control_delivery": reflection_control_delivery,
             "inventory_authority_mode": inventory_authority_mode,
             "inventory_authority_capture_dir": str(inventory_authority_capture_dir)
             if inventory_authority_capture_dir
@@ -1699,6 +1793,8 @@ def main() -> None:
             if args.freeze_toolsandbox_clock
             else "wall_clock",
             "toolsandbox_fixed_now_timestamp": toolsandbox_fixed_now,
+            "outcome_evaluator": outcome_evaluator,
+            "timezone": run_timezone,
         },
         root=args.artifact_root,
     )
@@ -1800,6 +1896,10 @@ def main() -> None:
             "actor_selection_mode": args.actor_selection_mode,
             "candidate_arm_name": candidate_arm_name,
             "candidate_generation_enabled": candidate_generation_enabled,
+            "parallel_arms": effective_parallel_arms,
+            "reflection_control_delivery": reflection_control_delivery,
+            "outcome_evaluator": outcome_evaluator,
+            "timezone": run_timezone,
             "inventory_authority_mode": inventory_authority_mode,
             "inventory_authority_capture_dir": str(inventory_authority_capture_dir)
             if inventory_authority_capture_dir
@@ -1823,6 +1923,10 @@ def main() -> None:
         scenario_count=len(scenario_names),
         registry_dir=registry_dir,
         artifact_root=args.artifact_root,
+        control_label="Fresh non-learning control"
+        if args.require_fresh_control
+        else "Non-learning",
+        candidate_label=f"SAGE {args.actor_selection_mode} selection",
     )
     # Dashboard visibility is part of the experiment surface. Keep it on by
     # default for every run; only the explicit CLI flag should suppress it.
@@ -1830,18 +1934,24 @@ def main() -> None:
     dashboard_url = dashboard_standard_url = dashboard_task_focus_url = (
         dashboard_task_compare_url
     ) = None
+    dashboard_open_receipt_path: Path | None = None
     if should_open_dashboard:
         dashboard_task_compare_url = open_dashboard(
             dashboard_index.with_name("task_compare.html"),
             port=args.dashboard_port,
+            server_root=run_root,
         )
+        dashboard_opened_monotonic_ns = time.monotonic_ns()
         dashboard_standard_url = make_dashboard_url(
-            dashboard_index, port=args.dashboard_port
+            dashboard_index,
+            port=args.dashboard_port,
+            server_root=run_root,
         )
         dashboard_url = dashboard_task_compare_url
         dashboard_task_focus_url = make_dashboard_url(
             dashboard_index.with_name("task_focus.html"),
             port=args.dashboard_port,
+            server_root=run_root,
         )
         (run_root / "dashboard_urls.json").write_text(
             json.dumps(
@@ -1851,6 +1961,31 @@ def main() -> None:
                     "dashboard_task_focus_url": dashboard_task_focus_url,
                     "dashboard_task_compare_url": dashboard_task_compare_url,
                     "default_dashboard": "task_compare",
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        dashboard_open_receipt_path = run_root / "dashboard_open_receipt.json"
+        dashboard_open_receipt_path.write_text(
+            json.dumps(
+                {
+                    "dashboard": "task_compare",
+                    "comparison": (
+                        f"fresh_control_vs_sage_{args.actor_selection_mode}_selection"
+                    ),
+                    "path": str(
+                        dashboard_index.with_name("task_compare.html").resolve()
+                    ),
+                    "url": dashboard_task_compare_url,
+                    "external_browser_opened": True,
+                    "http_verified_before_open": True,
+                    "dashboard_server_protocol": DASHBOARD_SERVER_PROTOCOL,
+                    "dashboard_server_root": str(run_root.resolve()),
+                    "opened_at": datetime.now().astimezone().isoformat(),
+                    "opened_monotonic_ns": dashboard_opened_monotonic_ns,
+                    "opened_before_model_processes": True,
                 },
                 indent=2,
             )
@@ -1874,6 +2009,10 @@ def main() -> None:
             candidate_dir=candidate_dir,
             registry_dir=registry_dir,
             artifact_root=args.artifact_root,
+            control_label="Fresh non-learning control"
+            if args.require_fresh_control
+            else "Non-learning",
+            candidate_label=f"SAGE {args.actor_selection_mode} selection",
         )
 
     def campaign_event(
@@ -1893,6 +2032,7 @@ def main() -> None:
         )
 
     reflection_control_rows: dict[str, dict[str, Any]] | None = None
+    parallel_arm_execution: dict[str, Any] | None = None
     if effective_parallel_arms:
         append_event(
             "subtask_started",
@@ -1903,6 +2043,12 @@ def main() -> None:
                 "parallel_cache_policy": "per_arm",
             },
             root=args.artifact_root,
+        )
+        ctx = get_context("spawn")
+        reflection_control_channel = (
+            ctx.Queue()
+            if args.require_fresh_control and candidate_generation_enabled
+            else None
         )
         base_params: dict[str, Any] = {
             "mode": args.mode,
@@ -1931,8 +2077,9 @@ def main() -> None:
             "inventory_authority_replay_dir": str(inventory_authority_replay_dir)
             if inventory_authority_replay_dir
             else None,
+            "require_fresh_control": args.require_fresh_control,
+            "reflection_control_channel": reflection_control_channel,
         }
-        ctx = get_context("spawn")
         control_process = ctx.Process(
             target=_run_control_arm_worker,
             args=(
@@ -1954,40 +2101,100 @@ def main() -> None:
             ),
             name="sage_ts_candidate_arm",
         )
-        control_process.start()
-        candidate_process.start()
-        while control_process.is_alive() or candidate_process.is_alive():
+        started = {"control": False, "candidate": False}
+        detected_failed_arm: str | None = None
+        processes = {
+            "control": control_process,
+            "candidate": candidate_process,
+        }
+        try:
+            control_process.start()
+            started["control"] = True
+            candidate_process.start()
+            started["candidate"] = True
+            while control_process.is_alive() or candidate_process.is_alive():
+                if control_process.exitcode not in (None, 0):
+                    detected_failed_arm = "control"
+                    break
+                if candidate_process.exitcode not in (None, 0):
+                    detected_failed_arm = "candidate"
+                    break
+                control_dir = _status_run_dir(run_root, "control", control_root)
+                candidate_dir = _status_run_dir(run_root, "candidate", candidate_root)
+                refresh_dashboard("parallel", "running")
+                time.sleep(5)
+            if detected_failed_arm is not None:
+                peer = "candidate" if detected_failed_arm == "control" else "control"
+                _stop_parallel_process(processes[peer])
+                raise RuntimeError(
+                    f"{detected_failed_arm} arm exited with code "
+                    f"{processes[detected_failed_arm].exitcode}."
+                )
+            control_process.join()
+            candidate_process.join()
+            if control_process.exitcode != 0 or candidate_process.exitcode != 0:
+                raise RuntimeError("One or more parallel arms exited unsuccessfully.")
             control_dir = _status_run_dir(run_root, "control", control_root)
             candidate_dir = _status_run_dir(run_root, "candidate", candidate_root)
+            if control_dir is None or candidate_dir is None:
+                raise RuntimeError(
+                    "Parallel arms finished but run directories were not found."
+                )
+            parallel_arm_execution = _parallel_arm_execution_record(run_root)
             refresh_dashboard("parallel", "running")
-            time.sleep(5)
-        control_process.join()
-        candidate_process.join()
-        control_dir = _status_run_dir(run_root, "control", control_root)
-        candidate_dir = _status_run_dir(run_root, "candidate", candidate_root)
-        refresh_dashboard("parallel", "running")
-        failed = {
-            "control": control_process.exitcode,
-            "candidate": candidate_process.exitcode,
-        }
-        if control_process.exitcode != 0 or candidate_process.exitcode != 0:
-            append_event(
-                "blocker_detected",
-                {
-                    "mode": args.mode,
-                    "run_root": str(run_root),
-                    "parallel_arms": True,
-                    "exitcodes": failed,
-                    "control_status": _read_arm_status(run_root, "control"),
-                    "candidate_status": _read_arm_status(run_root, "candidate"),
-                },
-                root=args.artifact_root,
-            )
-            raise SystemExit(f"Parallel arm failure: {failed}")
-        if control_dir is None or candidate_dir is None:
-            raise SystemExit(
-                "Parallel arms finished but run directories were not found"
-            )
+        except BaseException as exc:
+            for arm, process in processes.items():
+                if not started[arm]:
+                    continue
+                _stop_parallel_process(process)
+                status = _read_arm_status(run_root, arm)
+                if status.get("status") in {"complete", "failed"}:
+                    continue
+                failure_status = (
+                    "failed"
+                    if arm == detected_failed_arm
+                    else "aborted_peer_failure"
+                    if detected_failed_arm is not None
+                    else "aborted_orchestrator_failure"
+                )
+                _write_arm_status(
+                    run_root,
+                    arm,
+                    status=failure_status,
+                    error=str(exc),
+                    process_pid=process.pid,
+                )
+            failed = {arm: process.exitcode for arm, process in processes.items()}
+            try:
+                refresh_dashboard("parallel", "failed")
+            except Exception:
+                pass
+            try:
+                append_event(
+                    "blocker_detected",
+                    {
+                        "mode": args.mode,
+                        "run_root": str(run_root),
+                        "parallel_arms": True,
+                        "exitcodes": failed,
+                        "control_status": _read_arm_status(run_root, "control"),
+                        "candidate_status": _read_arm_status(run_root, "candidate"),
+                        "orchestrator_error": repr(exc),
+                    },
+                    root=args.artifact_root,
+                )
+            except Exception:
+                pass
+            if isinstance(exc, KeyboardInterrupt):
+                raise
+            raise SystemExit(f"Parallel arm failure: {failed}; {exc}") from exc
+        finally:
+            if reflection_control_channel is not None:
+                try:
+                    reflection_control_channel.cancel_join_thread()
+                    reflection_control_channel.close()
+                except (OSError, ValueError):
+                    pass
         append_event(
             "subtask_completed",
             {
@@ -1996,6 +2203,7 @@ def main() -> None:
                 "run_root": str(run_root),
                 "control_dir": str(control_dir),
                 "candidate_dir": str(candidate_dir),
+                "parallel_arm_execution": parallel_arm_execution,
                 "control_cache_mode": args.control_cache,
                 "control_cache_source": control_cache_report.get("control_source"),
             },
@@ -2181,9 +2389,17 @@ def main() -> None:
             event_hook=campaign_event,
         )
     if args.require_fresh_control:
+        if control_dir is None:
+            raise SystemExit("Strict fresh-control run did not produce a control arm.")
         if candidate_dir is None:
             raise SystemExit("Strict fresh-control run did not produce a SAGE arm.")
         try:
+            _validate_uncached_result_rows(
+                control_dir,
+                expected_scenarios=scenario_names,
+                arm="control",
+                require_complete=True,
+            )
             _validate_uncached_result_rows(
                 candidate_dir,
                 expected_scenarios=scenario_names,
@@ -2218,11 +2434,10 @@ def main() -> None:
     comparison["control_cache"] = control_cache_report
     comparison["model_metadata"] = model_metadata
     comparison["comparison_model_key"] = model_metadata["comparison_key"]
-    comparison["route_mismatch_qualified"] = _route_mismatch_qualified(comparison)
+    comparison["outcome_evaluator"] = outcome_evaluator
     protocol_gate_passed, protocol_gate_reasons = _protocol_gate_decision(
         comparison,
         scenario_count=len(scenario_names),
-        outcome_only=args.require_fresh_control,
     )
     comparison["protocol_gate_passed"] = protocol_gate_passed
     comparison["protocol_gate_reasons"] = protocol_gate_reasons
@@ -2256,15 +2471,11 @@ def main() -> None:
         {
             "mode": args.mode,
             "run_root": str(run_root),
-            "mean_similarity_delta": comparison.get("mean_similarity_delta"),
             "mean_outcome_similarity_delta": comparison.get(
                 "mean_outcome_similarity_delta"
             ),
-            "gain_count": comparison.get("gain_count"),
-            "regression_count": comparison.get("regression_count"),
             "outcome_gain_count": comparison.get("outcome_gain_count"),
             "outcome_regression_count": comparison.get("outcome_regression_count"),
-            "route_mismatch_qualified": comparison.get("route_mismatch_qualified"),
             "protocol_gate_reasons": protocol_gate_reasons,
             "registry_gate_restore": registry_gate_restore,
         },
@@ -2417,6 +2628,7 @@ def main() -> None:
         "publication_performance_endpoint": (
             "outcome_task_completion_similarity" if args.require_fresh_control else None
         ),
+        "outcome_evaluator": outcome_evaluator,
         "openai_response_cache_enabled": False,
         "openai_response_cache_mode": "off",
         "openai_response_cache_scope": "persistent_repository_whole_response_replay",
@@ -2439,6 +2651,7 @@ def main() -> None:
         else "wall_clock",
         "toolsandbox_fixed_now_timestamp": toolsandbox_fixed_now,
         "publication_provenance": publication_provenance,
+        "timezone": run_timezone,
         "run_affecting_sage_env": _redacted_run_affecting_sage_env(),
         "accepted_but_uncalled_tools": helper_contribution.get(
             "accepted_but_uncalled_tools", []
@@ -2448,17 +2661,21 @@ def main() -> None:
         "dashboard_standard_url": dashboard_standard_url,
         "dashboard_task_focus_url": dashboard_task_focus_url,
         "dashboard_task_compare_url": dashboard_task_compare_url,
-        "parallel_arms": args.parallel_arms,
+        "dashboard_open_required": args.require_fresh_control,
+        "dashboard_open_receipt_path": str(dashboard_open_receipt_path)
+        if dashboard_open_receipt_path
+        else None,
+        "parallel_arms": effective_parallel_arms,
+        "parallel_arm_execution": parallel_arm_execution,
+        "reflection_control_delivery": reflection_control_delivery,
         "model_authored_generation_enabled": candidate_generation_enabled,
         "native_action_tools_enabled": True,
         "scenario_name_birth_enabled": False,
         "scenario_name_routing_enabled": False,
         "synthetic_bridge_completions_enabled": False,
-        "mean_similarity_delta": comparison.get("mean_similarity_delta"),
         "mean_outcome_similarity_delta": comparison.get(
             "mean_outcome_similarity_delta"
         ),
-        "route_mismatch_qualified": comparison.get("route_mismatch_qualified"),
         "protocol_gate_passed": protocol_gate_passed,
         "protocol_gate_reasons": protocol_gate_reasons,
     }
@@ -2538,6 +2755,8 @@ def main() -> None:
                 "cache_manifest_hash"
             ),
             "fresh_control_required": args.require_fresh_control,
+            "outcome_evaluator": outcome_evaluator,
+            "timezone": run_timezone,
             "helper_contribution_summary_path": str(helper_contribution_path),
             "helper_contribution_artifact_path": str(helper_contribution_artifact_path),
             "accepted_but_uncalled_tools": helper_contribution.get(
@@ -2548,8 +2767,13 @@ def main() -> None:
             "dashboard_standard_url": dashboard_standard_url,
             "dashboard_task_focus_url": dashboard_task_focus_url,
             "dashboard_task_compare_url": dashboard_task_compare_url,
-            "parallel_arms": args.parallel_arms,
-            "mean_similarity_delta": comparison.get("mean_similarity_delta"),
+            "dashboard_open_required": args.require_fresh_control,
+            "dashboard_open_receipt_path": str(dashboard_open_receipt_path)
+            if dashboard_open_receipt_path
+            else None,
+            "parallel_arms": effective_parallel_arms,
+            "parallel_arm_execution": parallel_arm_execution,
+            "reflection_control_delivery": reflection_control_delivery,
             "mean_outcome_similarity_delta": comparison.get(
                 "mean_outcome_similarity_delta"
             ),

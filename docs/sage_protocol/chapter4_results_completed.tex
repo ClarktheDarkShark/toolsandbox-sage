@@ -1,195 +1,110 @@
+% PUBLICATION HOLD: This chapter is an intentionally result-free scaffold.
+% Populate it only from the verified outputs of the approved replacement
+% campaign. Do not restore archived values or archived table images by hand.
+
 \chapter{Chapter 4---Results}
 \label{ch:results}
 
-\section{Overview}
-\label{subsec:overview}
+\section{Evidence Status}
+\label{sec:chapter4-evidence-status}
 
-This chapter presents the results of the praxis and evaluates the three research hypotheses. Hypothesis 1 evaluates whether tools generated during online learning remain useful when reused from a frozen registry, with tool generation and repair disabled. Hypothesis 2 evaluates whether SAGE improves overall task-completion accuracy compared with the non-learning baseline agent. Hypothesis 3 evaluates whether the observed improvement is attributable to the natural selection and use of generated tools rather than other components of the SAGE implementation, benchmark-answer leakage, or synthetic task-completion logic.
+The publication results are pending a complete rerun from the frozen release.
+The earlier development campaigns and validation samples are superseded as
+paper evidence. They are retained separately for auditability, but none of
+their point estimates, intervals, tests, counts, tables, or decisions appears
+in this chapter.
 
-The historical July 2026 campaign used the complete 1,032-task ToolSandbox benchmark and
-\texttt{gpt-4o-mini} for the agent, automated participant, and tool-generation roles. Ten online-build runs were completed using independently generated tool registries. Each online-build run was followed by a paired frozen-registry run using the registry created during that run. The frozen-registry runs disabled tool generation and repair. Outcome, which measures whether the requested final result was achieved, is the sole performance endpoint. The ToolSandbox canonical score is retained only as a descriptive route-compatibility audit value.
+The route-independent outcome evaluator, release inputs, validation thresholds,
+and source identity are frozen and verified. The replacement campaign has not
+started; staged validation and live execution still require explicit researcher
+approval. This scaffold therefore makes no empirical claim and accepts or
+rejects no hypothesis.
 
-\subsection{Publication Evidence Status and Correction}
-\label{subsec:chapter4-publication-correction}
+\section{Evaluation Contract}
+\label{sec:chapter4-evaluation-contract}
 
-The July campaign is retained as an archival development result, but it is no longer treated as the final inferential evidence for the three hypotheses. A publication audit found that the object described as the v140 baseline was an expanded hybrid cache containing 1,182 complete records for 1,032 unique tasks. Of those tasks, 957 had one record and 75 had three records. The lookup used by the campaign averaged all compatible records for each triplicated task. The resulting hybrid values supplied the reported control rows in all ten online and ten frozen arms. The online self-evolution reflection controller also read those hybrid control values when making lifecycle decisions. Thus, the issue was not limited to a mislabeled table input: 75 tasks had unequal control replication, and the online intervention could react to cache-conditioned comparisons.
+Outcome/task-completion similarity is the sole publication performance
+endpoint. The same frozen evaluator must produce an outcome for every benchmark
+task in every arm. Tool-route similarity and mechanism counts may be reported
+as diagnostics, but they cannot determine a performance result or hypothesis
+decision.
 
-As a directional sensitivity check, the original v140 snapshot contains exactly one record for each of the 1,032 tasks and has an outcome mean of $0.4528026204750015$. Substituting that outcome mean for the hybrid mean of $0.4573418739$, while leaving the historical online SAGE mean unchanged, changes the H2 point-estimate lift from approximately $73.9\%$ to $75.7\%$. The hybrid cache therefore did not inflate the headline H2 point estimate. This sensitivity check does not repair the provenance error, unequal replication, confidence intervals, randomization tests, H1/H3 analyses, or cache-conditioned online reflection, so it cannot validate the historical hypothesis decisions.
+Each publication comparison runs its fresh non-learning control and SAGE arm
+concurrently in isolated child processes. Online SAGE receives only the
+same-run control row for the matching task boundary. Stored task results and
+stored model responses are not replayed. Every live pair exposes a verified
+Task Compare dashboard in the external browser before its first model request.
 
-All estimates, intervals, $p$-values, counts, tables, and decisions below are consequently labeled historical and descriptive pending replacement. The confirmatory replacement is a prepared but not-yet-executed ten-pair campaign in which every arm executes a complete fresh control before its SAGE arm, control caching is prohibited, and online reflection receives exactly one same-run control row for the matching task or fails closed. The corrected-tree replacement 1,032-task validation sample passed every engineering release gate, and the content-addressed campaign manifest was then prepared and verified. That single sample verifies task completeness, cache exclusion, provenance, and outcome no-inferiority against the protected historical range, but it is not a confirmatory replication and will not be used to accept or reject the research hypotheses. Campaign execution still requires explicit researcher approval.
+A validated generated tool may be the terminal action when it safely achieves
+the requested final state. No separate visible native-tool call is required.
+Final-state correctness, minefield protection, allow-list enforcement, runtime
+safety, and correct abstention remain required.
 
-Sample 01 stopped at dependency preflight before experiment outputs or model requests were created. Sample 02 was the first completed strict-intent engineering attempt: all 1,032 tasks finished in both arms and the then-current integrity checks passed, including zero cached control rows, zero persistently replayed whole model responses, zero runtime exceptions, and exact same-run reflection mapping. Its candidate outcome score of $0.7788122917$ exceeded the historical minimum of $0.7760515297$, and the relative outcome lift over its fresh control was $58.04\%$, so it passed both active outcome performance gates. The original v1 report incorrectly treated canonical/reference similarity as a release criterion; the researcher clarified that outcome/task-completion similarity is the sole performance endpoint, and the content-addressed v2 policy makes canonical descriptive only. A post-run audit nevertheless made sample 02 configuration-ineligible: cleanup had changed the generator's model-call sequence by removing nonpersistent within-run contract-and-repair-analysis memoization, contrary to the decision to defer generator behavior, and the launcher omitted the July campaign's five-retry SDK setting. The corrected release restores both historical settings and pins every retry layer and request timeout before any replacement sample.
+\section{Primary Hypothesis Results}
+\label{sec:chapter4-primary-results}
 
-Sample 03 executed that corrected release and passed the outcome-only engineering gate. The control and SAGE arms each completed all 1,032 tasks with zero runtime exceptions, zero cached control tasks, zero repository whole-response replay, and same-run-fresh reflection. Across the 800 tasks with an explicit outcome evaluator, mean outcome increased from $0.5087366331780064$ to $0.7986035515693737$, an absolute increase of $0.2898669183913673$ and a relative lift of $56.97779548144769\%$. Exact outcome successes increased from 220 to 443. Paired outcomes comprised 413 gains, 283 preserved results, and 104 regressions. These values establish release readiness only; they are not pooled into the planned ten-pair inference.
+\subsection{Frozen-Registry Retention}
+\label{subsec:chapter4-h1-results}
 
-\begin{table}[!htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/chapter4/table_4_1_evidence_campaign.png}
-    \caption{Archival July campaign settings. The cache description in the rendered table is superseded by the publication correction in Section \ref{subsec:chapter4-publication-correction}.}
-    \label{tab:chapter4-evidence-campaign}
-\end{table}
+\textbf{Status: pending approved rerun.}
 
-\begin{table}[!htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/chapter4/table_4_2_replication_results.png}
-    \caption{Historical ToolSandbox replication results. The final row reports means; these values are descriptive pending the strict fresh-control rerun.}
-    \label{tab:chapter4-replication-results}
-\end{table}
+This subsection will report the preregistered outcome-based comparison between
+each online-build arm and its matched frozen-registry arm. The final text will
+be generated from the verified campaign evidence and will include the
+predeclared uncertainty analysis and decision rule.
 
-\section{Hypothesis 1}
-\label{sec:chapter4-hypothesis1}
+\subsection{Overall Task Completion}
+\label{subsec:chapter4-h2-results}
 
-\subsection{Hypothesis 1 Statement}
-\label{subsec:h1-statement}
+\textbf{Status: pending approved rerun.}
 
-\textbf{Hypothesis 1:} A self-evolving AI agent using autonomous tool generation can create reusable tools that are naturally selected and called in later tasks, preserving at least 80 percent of online-build accuracy gains when reused from a frozen registry.
+This subsection will report paired outcome/task-completion results for SAGE and
+its concurrent fresh non-learning control. It will contain only values derived
+from complete, verified arms under the frozen evaluator.
 
-\textbf{H0:} SAGE does not preserve at least 80 percent of online-build accuracy gains when generated tools are reused from a frozen registry.
+\subsection{Generated-Tool-Called Tasks}
+\label{subsec:chapter4-h3-results}
 
-\textbf{H1:} SAGE preserves at least 80 percent of online-build accuracy gains when generated tools are reused from a frozen registry.
+\textbf{Status: pending approved rerun.}
 
-\subsection{Hypothesis 1 Elaboration}
-\label{subsec:h1-elaboration}
+This subsection will report the predeclared outcome analysis for tasks on which
+a generated tool was naturally called. Tool visibility, selection, calls,
+reuse, and failure counts will remain diagnostic evidence and will not replace
+the task outcome endpoint.
 
-This hypothesis tests whether SAGE-generated tools provide downstream value instead of only producing one-time task improvements. A self-evolving agent must retain and apply what it creates across later interactions instead of generating an isolated solution for the current task \parencite{fang2025selfevolvingagentsurvey}. During each online-build run, SAGE begins with an empty generated-tool registry. When SAGE identifies a capability gap, it generates and validates a candidate tool. Tools that pass validation are stored in the registry and become available for natural selection and reuse during later tasks.
+\section{Actor-Selection Comparison}
+\label{sec:chapter4-actor-selection}
 
-The frozen-registry evaluation is intended to separate tool creation from tool reuse. Each frozen run receives the completed registry produced by its paired online-build run, while additional tool generation and repair are disabled. The frozen and online runs use the same sealed benchmark manifest and task order. Under the corrected strict fresh-control protocol, this design will test whether generated tools remain useful after the build process stops. The historical implementation did not satisfy the final-evidence control contract described in Section \ref{subsec:chapter4-publication-correction}.
+\textbf{Status: pending feasibility pilot and approval.}
 
-\subsection{Hypothesis 1: Frozen-Registry Reuse Results}
-\label{subsec:h1-frozen-registry-results}
+The exploratory actor-selection analysis will compare policy-directed
+selection with model-auto selection over the exact same per-task routed tool
+inventory. The experiment contains a concurrent fresh-control/policy pair and
+a concurrent independent-fresh-control/auto pair. It provides Task Compare
+views for each live pair and a post-run policy/auto causal comparison. Only
+outcome values will support a performance conclusion.
 
-\begin{table}[!htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/chapter4/table_4_3_h1_frozen_registry_retention.png}
-    \caption{Historical H1 estimate from the superseded hybrid-cache campaign. A hypothesis decision awaits the strict fresh-control rerun.}
-    \label{tab:chapter4-h1-frozen-registry-retention}
-\end{table}
+\section{Integrity and Safety Findings}
+\label{sec:chapter4-integrity-safety}
 
-\subsection{Hypothesis 1 Interpretation}
-\label{subsec:h1-interpretation}
+\textbf{Status: pending approved rerun.}
 
-The historical average frozen-registry gain retention calculated using Equation \ref{eq:sage_frozen_gain_retention} was $100.4\%$, with a run-paired bootstrap $95\%$ confidence interval of $[98.2\%, 102.6\%]$. These values exceeded the established threshold of $80\%$ in the archival analysis. Because the online and frozen comparisons used the hybrid baseline and the paired runs crossed uncaptured dirty source-tree states, the interval and threshold decision are not accepted as final evidence. The H1 decision is pending the strict fresh-control ten-pair rerun from one clean release state.
+This section will summarize task coverage, evaluator coverage, cache exclusion,
+concurrent-process evidence, control-row provenance, dashboard receipts,
+generated-tool execution failures, runtime failures, final-state violations,
+minefield violations, and abstention correctness. An incomplete or unverifiable
+arm will be preserved and reported rather than silently replaced.
 
-A retention value slightly above $100\%$ does not mean that task accuracy exceeded $100\%$. In the historical analysis, it meant that the frozen-registry condition preserved the measured online-build gain and performed slightly better on average than the online-build condition. This remains a descriptive observation about the archived runs, not a confirmed claim that value persisted after online tool creation stopped.
+\section{Hypothesis Decisions}
+\label{sec:chapter4-hypothesis-decisions}
 
-\section{Hypothesis 2}
-\label{sec:chapter4-hypothesis2}
-
-\subsection{Hypothesis 2 Statement}
-\label{subsec:h2-statement}
-
-\textbf{Hypothesis 2:} A self-evolving AI agent using autonomous tool generation can improve task-completion accuracy by at least 10 percent over a non-learning AI agent on matched benchmark tasks.
-
-\textbf{H0:} SAGE does not improve task-completion accuracy by at least 10 percent over the non-learning baseline agent.
-
-\textbf{H1:} SAGE improves task-completion accuracy by at least 10 percent over the non-learning baseline agent.
-
-\subsection{Hypothesis 2 Elaboration}
-\label{subsec:h2-elaboration}
-
-This hypothesis evaluates overall benchmark performance based on task-completion outcomes. Since the value of an AI agent is based on its ability to correctly complete the requested task, this hypothesis tests the central claim that a self-evolving AI agent using autonomous tool generation provides better overall outcomes than the same language model operating as a non-learning agent.
-
-The corrected comparison uses freshly executed matched tasks in the same benchmark order. The baseline agent and SAGE use the same underlying model and native ToolSandbox tools. The primary intended difference is that SAGE can identify capability gaps, generate and validate new tools, store accepted tools in a registry, and naturally select those tools during later tasks. The baseline agent does not generate, retain, or reuse new tools. The strict same-run control and reflection contract is required before this matched design can isolate the intervention for final inference.
-
-\subsection{Hypothesis 2: Overall Task-Completion Accuracy Results}
-\label{subsec:h2-overall-results}
-
-\begin{table}[!htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/chapter4/table_4_4_h2_overall_task_completion.png}
-    \caption{Historical H2 estimate from the superseded hybrid-cache campaign. A hypothesis decision awaits the strict fresh-control rerun.}
-    \label{tab:chapter4-h2-overall-task-completion}
-\end{table}
-
-\subsection{Hypothesis 2 Interpretation}
-\label{subsec:h2-interpretation}
-
-In the historical analysis shown in Table \ref{tab:chapter4-h2-overall-task-completion}, the hybrid baseline produced a mean task-completion outcome of $0.4573$, while SAGE produced a mean outcome of $0.7954$. The corresponding archival estimates were an absolute improvement of $0.3381$ and a relative improvement of $73.9\%$. The pure-original-v140 sensitivity baseline was $0.4528026204750015$ and produced an approximately $75.7\%$ relative point-estimate lift, confirming that the hybrid cache did not inflate the reported headline. Neither point estimate is a final H2 decision.
-
-The archival paired bootstrap $95\%$ confidence interval for the absolute outcome difference was $[0.3279, 0.3488]$, and the interval for the relative lift was $[71.7\%, 76.3\%]$. The paired randomization analysis reported $p < .001$, and the run-level sign-flip analysis reported $p = .002$. Those inferential quantities were calculated with reused hybrid control values and do not model the unequal control-record replication or the effect of those values on online reflection. They are reported for auditability only. The null hypothesis is not rejected on the basis of this campaign; the H2 decision is pending replacement by the strict fresh-control ten-pair analysis.
-
-\section{Hypothesis 3}
-\label{sec:chapter4-hypothesis3}
-
-\subsection{Hypothesis 3 Statement}
-\label{subsec:h3-statement}
-
-\textbf{Hypothesis 3:} A self-evolving AI agent using autonomous tool generation can improve task-completion accuracy by at least 30 percent on tasks where generated tools are naturally called, without relying on benchmark-answer leakage or synthetic code-based task completions.
-
-\textbf{H0:} On tasks where generated tools are naturally called, SAGE does not improve task-completion accuracy by at least 30 percent, or the observed improvement depends on leakage or synthetic task-completion logic.
-
-\textbf{H1:} On tasks where generated tools are naturally called, SAGE improves task-completion accuracy by at least 30 percent without relying on leakage or synthetic task-completion logic.
-
-\subsection{Hypothesis 3 Elaboration}
-\label{subsec:h3-elaboration}
-
-Hypothesis 3 evaluates whether generated tools account for the strongest improvement observed in SAGE. The purpose is to distinguish gains associated with actual generated-tool use from gains that could be caused by unrelated framework behavior. A task is included in the generated-tool-called subset only when the execution trace shows that SAGE naturally selected and called at least one generated tool. Diagnostic settings that force a tool to be visible or called were disabled and were not accepted as hypothesis evidence.
-
-Each SAGE outcome in this subset is intended to be compared with the fresh baseline outcome for the same benchmark task. This identifies the measured difference on tasks where the generated-tool mechanism was actually used. The design also disables scenario-name tool birth and routing, synthetic bridge completions, and code-based task-completion shortcuts. The generated tools receive only information available through the task interaction and visible tool results. These safeguards are necessary but were not sufficient to overcome the historical hybrid-control and reflection defect; mechanism-specific attribution remains pending.
-
-\subsection{Hypothesis 3: Generated-Tool-Called Task Results}
-\label{subsec:h3-generated-tool-called-results}
-
-\begin{table}[!htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/chapter4/table_4_5_h3_generated_tool_attribution.png}
-    \caption{Historical H3 generated-tool-called subset from the superseded hybrid-cache campaign. A hypothesis decision awaits the strict fresh-control rerun.}
-    \label{tab:chapter4-h3-generated-tool-attribution}
-\end{table}
-
-\subsection{Hypothesis 3 Interpretation}
-\label{subsec:h3-interpretation}
-
-The historical generated-tool-called subset contained $6,782$ matched task observations. The hybrid baseline mean outcome on these tasks was $0.4013$, while the SAGE mean outcome was $0.8043$. The archival estimates were an absolute improvement of $0.4030$ and a relative improvement of $100.4\%$, with a paired bootstrap $95\%$ confidence interval for relative lift of $[95.5\%, 105.2\%]$. Because generated-tool birth, retention, and routing decisions could be conditioned by hybrid-cache reflection comparisons, these quantities cannot establish mechanism-specific attribution.
-
-Within this archival subset, $4,593$ task observations produced a positive outcome difference, $1,514$ preserved the hybrid baseline outcome, and $675$ produced a negative difference. These counts do not indicate that every generated-tool call improved a task. The evidence audit recorded zero benchmark-metadata shortcut violations, zero synthetic bridge-policy violations, and zero diagnostic force-call violations; those safeguards do not remedy the control provenance and reflection defect. The null hypothesis is not rejected on the basis of this campaign, and the H3 mechanism-attribution decision is pending the strict fresh-control ten-pair rerun.
-
-\section{Cross-Hypothesis Results Summary}
-\label{sec:chapter4-cross-hypothesis-summary}
-
-\subsection{Summary of Hypothesis Decisions}
-\label{subsec:hypothesis-decision-summary}
-
-Table \ref{tab:hypothesis-decision-summary} preserves the decisions produced by the superseded July analysis. Those decisions are withdrawn as final publication evidence because the analysis used hybrid control values and the online lifecycle could respond to the same cache. The current status of H1, H2, and H3 is \emph{pending confirmatory rerun}; none is accepted or rejected by the historical campaign.
-
-\begin{table}[!htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/chapter4/table_4_8_hypothesis_decision_summary.png}
-    \caption{Archival July hypothesis decisions, withdrawn pending the strict fresh-control ten-pair rerun.}
-    \label{tab:hypothesis-decision-summary}
-\end{table}
-
-\subsection{Generated Tool Lifecycle Results}
-\label{subsec:generated-tool-lifecycle-results}
-
-Across the ten historical online-build runs, SAGE accepted $291$ generated-tool instances into the registry after validation. Of those, $280$ were reused during later tasks, producing an archival reuse rate of $96.2\%$. The execution records contained $7,659$ natural generated-tool calls. These are descriptive lifecycle counts from the superseded campaign. They do not establish confirmatory reuse because lifecycle decisions could be conditioned by hybrid-cache reflection comparisons.
-
-The historical contribution analysis separated naturally called tasks into gains, preserved outcomes, and regressions. The $4,593$ attributed gains exceeded the $675$ attributed regressions, while another $1,514$ observations preserved the hybrid baseline outcome. The lifecycle counts are aggregated across independent runs. Therefore, the $291$ accepted tools represent accepted tool instances across ten independently evolving registries, not $291$ guaranteed unique tool designs. These counts remain descriptive only.
-
-\begin{table}[!htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/chapter4/table_4_6_generated_tool_lifecycle.png}
-    \caption{Historical generated-tool lifecycle and contribution counts from the superseded campaign; confirmatory interpretation awaits the strict fresh-control rerun.}
-    \label{tab:chapter4-generated-tool-lifecycle}
-\end{table}
-
-\subsection{Generated Tool Failure Results}
-\label{subsec:generated-tool-failure-results}
-
-The historical evidence campaign recorded $372$ task scenarios containing at least one failed generated-tool call. This value does not represent $372$ separate failed tools. Most of these scenarios, $355$, involved the device-setting action tool. Review of the recorded failures showed that this tool was commonly called when the requested setting was already in the desired state or the action was otherwise unnecessary. The remaining $17$ failed-call scenarios were distributed across five other generated tools.
-
-The historical lifecycle did not automatically retire a tool because of a single failed call. Tools that remained useful across other tasks were retained and, when necessary, marked for improved routing or additional repair. No tool was retired solely because of the failures summarized in Table \ref{tab:chapter4-generated-tool-failure-summary}. These failures are separate from the $12$ side-effect audit flags recorded during the ten online-build runs. The audit flags remain in the archival evidence record as an operational limitation.
-
-\begin{table}[!htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/chapter4/table_4_9_generated_tool_failure_summary.png}
-    \caption{Historical generated-tool failure summary across the ten superseded July online-build runs.}
-    \label{tab:chapter4-generated-tool-failure-summary}
-\end{table}
+No hypothesis decision is available. Decisions will be inserted only by the
+single-source analysis pipeline after every required arm and artifact passes
+the frozen publication verifier.
 
 \section{Chapter Summary}
 \label{sec:chapter4-summary}
 
-This chapter preserves the results of the July SAGE campaign while correcting their evidentiary status. The historical analysis reported frozen-registry gain retention of $100.4\%$, overall outcome movement from a hybrid baseline of $0.4573$ to $0.7954$, and generated-tool-called subset movement from $0.4013$ to $0.8043$. The original v140 outcome sensitivity value of $0.4528026204750015$ shows that the hybrid cache did not inflate the headline H2 point estimate. It does not correct the use of 1,182 records for 1,032 tasks, averaging for 75 triplicated tasks, or cache-conditioned online reflection.
-
-H1, H2, and H3 therefore remain pending. Sample 03 passed the corrected-tree outcome-only engineering gate with outcome movement from $0.5087366331780064$ to $0.7986035515693737$, but a single validation sample cannot decide the hypotheses. The ten-pair campaign manifest is prepared and verified, but the campaign has not been executed and still requires explicit researcher approval. Final hypothesis decisions will be recomputed only after that campaign completes with one fresh same-run control row per task, no control/task-result/persistent repository whole-response replay, fail-closed control matching, one clean code state, and newly generated inferential outputs. OpenAI-managed prompt-prefix computation, when reported by the API, is distinguished from stored-response reuse.
+Chapter 4 remains pending. The final version will be rendered from the approved
+replacement campaign; archived results and stale image embeds will not be
+copied forward.

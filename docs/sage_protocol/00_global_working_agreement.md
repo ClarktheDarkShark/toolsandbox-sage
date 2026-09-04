@@ -19,21 +19,21 @@ These rules apply throughout all phases and all coding-agent sessions.
 - **Active registry must be claim-safe:** every PASS entry must have `held_out_check_count >= 1`, `negative_applicability_count >= 1`, and `runtime_smoke_passed=true` (unless frozen-reuse mode explicitly exempts a helper).
 - **Frozen reuse requires generation OFF:** no new helpers are generated during frozen reuse runs; only existing registry entries are loaded and routed.
 - **Every retained helper needs full provenance:** birth_scenario, acceptance timestamp, validation run ID, code hash, reuse counts, and any repair/legacy metadata.
-- **Side-effect tools are sacred:** helpers must preserve the side-effect tools they claim (e.g., `prepare_reminder_creation_args` preserves `add_reminder`). No hidden-answer checkers.
+- **Correct action outcomes are sacred:** a validated generated tool may complete an action directly; no separate visible native-tool follow-up is required. The evaluator must verify the final state, and minefield, allow-list, and runtime safety checks remain mandatory. When a task remains unresolved or the agent abstains, abstention correctness is mandatory. No hidden-answer checkers.
 
 ## 4. Validation and Scoring
 
-- **Canonical score** is the ToolSandbox milestone score (baseline requirement).
-- **Final-task success score** is whether the agent completed the user's goal (additional evidence).
-- **Matched comparison:** control and SAGE cohorts use the same scenario order, model, base tools, and cache policy.
-- **Route-mismatch reporting:** log when a helper is routed (visible, called, filtered) and compare against expectations.
-- **Route-mismatch = regression risk:** if reuse pattern diverges from design, flag and investigate before proceeding.
+- **Outcome/task completion is the sole publication performance endpoint:** every benchmark task must receive a value from the frozen evaluator used by both arms.
+- **Matched comparison:** the non-learning control and SAGE use the same scenario order, model, base tools, fixture, and cache policy and run concurrently in isolated child processes.
+- **Actor-selection schedule:** selector studies run two concurrent isolated pairs: fresh control with policy SAGE, then (after policy inventory capture) an independent fresh control with matched auto SAGE. The second control cannot influence auto inventory or execution.
+- **Route and mechanism reporting is diagnostic:** log when a helper is routed, visible, called, filtered, accepted, or reused, but those counts and expected native routes do not pass or fail publication performance gates.
+- **Outcome regression is regression risk:** investigate lower task completion, wrong final state, safety failures, incomplete tool attempts, and runtime failures before proceeding.
 
 ## 5. Code Integrity
 
 - **No scenario-name overfitting:** helpers are generated for reusable inadequacy patterns, not one-off scenario patches.
 - **No hidden edits during benchmark runs:** if a code change is needed, stop the run, fix it, then restart with generation or reuse settings as appropriate.
-- **Test before claim:** every code change must pass lightweight type/lint checks and focused unit tests. Broad test suite is not required in every phase, but critical-path tests (registry proofing, generated tool injection, side-effect preservation) must pass.
+- **Test before claim:** every code change must pass lightweight type/lint checks and focused unit tests. Broad test suite is not required in every phase, but critical-path tests (outcome contracts, registry proofing, generated tool injection, final-state safety, concurrent execution, and dashboard receipts) must pass.
 
 ## 6. Live Verification
 
@@ -44,7 +44,7 @@ These rules apply throughout all phases and all coding-agent sessions.
 
 - **Provenance consistency:** if a tool is retired, flagged legacy, or moved to a failed cohort, it must be explicitly excluded from future active registries.
 - **Artifact paths:** registry manifests, run logs, dashboards, and evaluation artifacts must all point to the same version of the active registry.
-- **Dashboard continuity:** every live run must generate a dashboard with the exact registry path, generation mode, and run ID so results are auditable.
+- **Dashboard continuity:** every live run must generate `dashboard/task_compare.html` with the exact registry path, generation mode, and run ID, verify the served root and bytes, and open it in the external/default browser before the first model request. Selector studies require three views: control/policy and independent-control/auto before their respective pairs start, then policy/auto after both treatment arms complete.
 
 ## 8. Contradiction Resolution
 
@@ -52,5 +52,5 @@ If a rule in this agreement contradicts guidance in a phase file, **stop and fla
 
 ---
 
-**Last updated:** 2026-05-02
+**Last updated:** 2026-09-03
 **Phase-gated enforcement:** All phases must acknowledge and respect this agreement.

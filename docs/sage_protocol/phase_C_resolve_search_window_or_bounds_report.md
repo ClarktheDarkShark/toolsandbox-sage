@@ -1,5 +1,9 @@
 # Phase C.2 Report — resolve_search_window_or_bounds
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This development report is not a current
+> protocol, release gate, or paper result. Its values and decision labels must
+> not be carried forward. See [current_state.md](current_state.md).
+
 Date: 2026-05-02
 Candidate: `resolve_search_window_or_bounds`
 Decision label: `pass`

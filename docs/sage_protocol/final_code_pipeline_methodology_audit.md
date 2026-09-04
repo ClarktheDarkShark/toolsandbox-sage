@@ -1,5 +1,9 @@
 # Final Code, Pipeline, and Methodology Audit
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This audit predates the current publication
+> release and is not an active code or execution specification. See
+> [current_state.md](current_state.md).
+
 Audit date: 2026-05-07
 
 Audit commit: `d3374eff4a9d93a76f83339ff956bf749f983546`

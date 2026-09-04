@@ -1,5 +1,9 @@
 # SAGE Core Implementation Cleanup Manifest
 
+> **SUPERSEDED — ARCHIVAL CLEANUP MANIFEST.** The retained-source list below
+> describes an earlier tree and is not the current release inventory. See
+> [current_state.md](current_state.md).
+
 Date: 2026-06-14.
 
 ## Purpose
@@ -34,7 +38,7 @@ SAGE_DISABLE_SCENARIO_NAME_ROUTING=1
 The retained active implementation is:
 
 - `scripts/run_sage_protocol.py`
-- `scripts/prepare_toolsandbox_full_self_evolving_run.py`
+- whole-dataset preflight launcher (removed from the publication release)
 - `scripts/render_chapter3_sage_figures.py`
 - `src/sage_ts/adapters/`
 - `src/sage_ts/adequacy/`

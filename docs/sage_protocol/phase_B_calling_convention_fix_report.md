@@ -1,5 +1,9 @@
 # Phase B Calling Convention Fix Report
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This development report is not a current
+> protocol, release gate, or paper result. Its values and decision labels must
+> not be carried forward. See [current_state.md](current_state.md).
+
 **Date:** 2026-05-02
 **Phase:** Phase B v2 — Corrected Helper Description, Frozen Reuse Rerun
 **Prior run:** `outputs/phase_B_nearby_reminder_cohort/transfer_40_20260502_171552` (FAILED, gate blocked)

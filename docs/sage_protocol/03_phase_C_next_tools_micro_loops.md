@@ -1,5 +1,9 @@
 # Phase C: Next Tools Micro-Loops
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This phase protocol predates the current
+> outcome-only, concurrent fresh-control publication design. Do not use its
+> commands, metric gates, or decisions. See [current_state.md](current_state.md).
+
 **Objective:** Generate, validate, and accept 2–3 new deterministic helpers via micro-loops. Each micro-loop is self-contained: run a small cohort, observe inadequacy, generate a candidate, validate it, and either accept or reject before moving to the next helper.
 
 **Entry condition:** Phase B report complete with status `READY_FOR_PHASE_C`.

@@ -17,8 +17,10 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def _thresholds(tmp_path: Path) -> Path:
     path = tmp_path / "thresholds.json"
+    summary = tmp_path / "historical_outcome_summary.json"
     campaign = tmp_path / "historical_campaign.json"
     evidence = tmp_path / "historical_evidence.json"
+    _write_json(summary, {"historical": "outcome summary"})
     _write_json(campaign, {"historical": "campaign"})
     _write_json(evidence, {"historical": "evidence"})
     _write_json(
@@ -27,7 +29,7 @@ def _thresholds(tmp_path: Path) -> Path:
             "schema_version": 2,
             "purpose": "test",
             "performance_endpoint": "outcome_task_completion_similarity",
-            "canonical_metric_policy": "descriptive_only_never_a_release_gate",
+            "outcome_evaluator": sample_verifier.outcome_evaluator_manifest(),
             "benchmark": {
                 "task_count": 2,
                 "outcome_scored_task_count": 2,
@@ -38,12 +40,11 @@ def _thresholds(tmp_path: Path) -> Path:
             "required_no_regression": {
                 "candidate_outcome_minimum": 0.70,
                 "minimum_relative_outcome_lift_percent_over_same_run_control": 10.0,
-                "minimum_accepted_tool_count": 1,
-                "minimum_tool_reuse_event_count": 1,
-                "minimum_generated_tool_called_scenario_count": 1,
             },
             "historical_reference": {
                 "candidate_outcome_mean": 0.75,
+                "summary_path": str(summary),
+                "summary_sha256": hashlib.sha256(summary.read_bytes()).hexdigest(),
                 "campaign_manifest": str(campaign),
                 "campaign_manifest_sha256": hashlib.sha256(
                     campaign.read_bytes()
@@ -79,6 +80,7 @@ def _comparison(
     _write_json(
         run_root / "paired_comparison.json",
         {
+            "outcome_evaluator": sample_verifier.outcome_evaluator_manifest(),
             "control": {
                 **common,
                 "mean_similarity": 0.60,
@@ -108,6 +110,7 @@ def _stub_integrity(
             "status": "pass",
             "run_root": str(run_root),
             "scenario_count": 2,
+            "outcome_evaluator": sample_verifier.outcome_evaluator_manifest(),
         },
     )
 
@@ -125,10 +128,18 @@ def test_sample_verifier_passes_outcome_gate_and_reports_mean_comparison(
     )
 
     assert result["status"] == "pass"
+    assert result["outcome_evaluator"] == sample_verifier.outcome_evaluator_manifest()
     assert result["metrics"]["same_run_relative_outcome_lift_percent"] == pytest.approx(
         60.0
     )
-    assert "candidate_canonical_no_regression" not in result["gates"]
+    assert all("canonical" not in name for name in result["metrics"])
+    assert "canonical_metric_policy" not in result
+    assert result["mechanism_diagnostics"] == {
+        "release_gate": False,
+        "accepted_tool_count": 2,
+        "tool_reuse_event_count": 3,
+        "generated_tool_called_scenario_count": 1,
+    }
     assert (run_root / "publication_validation_report.json").is_file()
 
 
@@ -145,7 +156,7 @@ def test_sample_verifier_never_uses_canonical_as_a_release_gate(
     )
 
     assert result["status"] == "pass"
-    assert result["metrics"]["candidate_canonical"] == 0.0
+    assert all("canonical" not in name for name in result["metrics"])
     assert all("canonical" not in name for name in result["gates"])
 
 
@@ -162,7 +173,43 @@ def test_sample_verifier_does_not_require_canonical_metric(
     )
 
     assert result["status"] == "pass"
-    assert result["metrics"]["candidate_canonical"] is None
+    assert all("canonical" not in name for name in result["metrics"])
+
+
+def test_sample_verifier_rejects_threshold_evaluator_identity_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = _comparison(tmp_path)
+    _stub_integrity(monkeypatch, run_root)
+    thresholds_path = _thresholds(tmp_path)
+    thresholds = json.loads(thresholds_path.read_text(encoding="utf-8"))
+    thresholds["outcome_evaluator"]["source_sha256"] = "0" * 64
+    _write_json(thresholds_path, thresholds)
+
+    with pytest.raises(ValueError, match="do not pin the current outcome evaluator"):
+        sample_verifier.verify_sample(
+            tmp_path,
+            thresholds_path=thresholds_path,
+        )
+
+
+def test_sample_verifier_rejects_comparison_evaluator_identity_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = _comparison(tmp_path)
+    _stub_integrity(monkeypatch, run_root)
+    comparison_path = run_root / "paired_comparison.json"
+    comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+    comparison["outcome_evaluator"]["contract_sha256"] = "0" * 64
+    _write_json(comparison_path, comparison)
+
+    with pytest.raises(ValueError, match="Paired comparison did not use"):
+        sample_verifier.verify_sample(
+            tmp_path,
+            thresholds_path=_thresholds(tmp_path),
+        )
 
 
 def test_sample_verifier_rejects_canonical_release_threshold(
@@ -176,7 +223,34 @@ def test_sample_verifier_rejects_canonical_release_threshold(
     thresholds["required_no_regression"]["candidate_canonical_minimum"] = 0.0
     _write_json(thresholds_path, thresholds)
 
-    with pytest.raises(ValueError, match="must not be a release gate"):
+    with pytest.raises(ValueError, match="must not be publication release gates"):
+        sample_verifier.verify_sample(
+            tmp_path,
+            thresholds_path=thresholds_path,
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "minimum_accepted_tool_count",
+        "minimum_tool_reuse_event_count",
+        "minimum_generated_tool_called_scenario_count",
+    ],
+)
+def test_sample_verifier_rejects_non_outcome_mechanism_release_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+) -> None:
+    run_root = _comparison(tmp_path)
+    _stub_integrity(monkeypatch, run_root)
+    thresholds_path = _thresholds(tmp_path)
+    thresholds = json.loads(thresholds_path.read_text(encoding="utf-8"))
+    thresholds["required_no_regression"][field] = 1
+    _write_json(thresholds_path, thresholds)
+
+    with pytest.raises(ValueError, match="must not be publication release gates"):
         sample_verifier.verify_sample(
             tmp_path,
             thresholds_path=thresholds_path,

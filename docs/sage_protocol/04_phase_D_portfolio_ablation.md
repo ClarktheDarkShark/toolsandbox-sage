@@ -1,5 +1,9 @@
 # Phase D: Portfolio Ablation (3–5 Tool Validation)
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This phase protocol predates the current
+> outcome-only, concurrent fresh-control publication design. Do not use its
+> commands, metric gates, or decisions. See [current_state.md](current_state.md).
+
 **Objective:** Validate the 3–5 tool portfolio via matched control/SAGE pairs. Ensure each tool contributes positively (or is neutral) without causing regressions or triggering unexpected side effects.
 
 **Entry condition:** Phase C report complete with 3–5 tools accepted.

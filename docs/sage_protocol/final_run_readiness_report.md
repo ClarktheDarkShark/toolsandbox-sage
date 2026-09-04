@@ -1,5 +1,9 @@
 # Final-Run Readiness Report
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This former readiness decision does not
+> authorize a current run. Use the outcome-only concurrent protocol and approval
+> boundary in [current_state.md](current_state.md).
+
 Decision label: `ARCHIVAL_READINESS_RECORD; superseded by strict fresh-control publication protocol`
 
 > Historical note (updated 2026-09-01): this report records the earlier

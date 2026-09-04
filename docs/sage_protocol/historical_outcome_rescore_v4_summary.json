@@ -1,0 +1,203 @@
+{
+  "schema_version": 2,
+  "report_type": "historical_terminal_trajectory_outcome_rescore_summary",
+  "created_at": "2026-09-03",
+  "provenance_status": "historical_terminal_trajectories_timezone_inferred_not_confirmatory",
+  "provenance_caveat": "This report re-scores preserved terminal trajectories only. It does not replay or validate the historical online feedback, baseline-cache, tool-birth, routing, or lifecycle provenance and cannot repair confounding in the superseded campaign. Historical manifests omitted the process timezone, so each arm's scenario-resolution timezone is inferred and fail-closed from every preserved complete, valid civil-time conversion trace in that arm. Evidence counts are raw trace occurrences, not a deduplicated anchor subset; the baseline and every candidate replication are inferred independently.",
+  "source_report": {
+    "local_path": "artifacts/publication_cleanup_20260901/analysis/historical_outcome_rescore_v4.json",
+    "available_in_public_release": false,
+    "content_address_sha256": "edbb2d80bba606f558897946d4a62043e4292b78ea535d5c991e720c900e76a6",
+    "file_sha256": "0833bf57ef06c5195ac82eb41b27e22f31cdc184f88183481622e404ea9204d9"
+  },
+  "benchmark": {
+    "task_count": 1032,
+    "manifest_sha256": "21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec",
+    "ordered_task_name_sha256": "fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176"
+  },
+  "outcome_evaluator": {
+    "version": "sage_outcome_contracts_v4",
+    "contract_sha256": "4032411fd203ddfd061753e330cee2218d715756950b69d059792de7409efdce",
+    "source_sha256": "c4fd84d9fbc42488c051565a96faf952c2580fca2df9e582817933aeed9e3eab",
+    "insufficient_information_scenario_count": 224,
+    "scalar_scenario_count": 24
+  },
+  "rescorer": {
+    "input_mode": "read_only",
+    "outcome_input_contract": [
+      "resolved_scenario",
+      "execution_context"
+    ],
+    "source": {
+      "path": "scripts/rescore_historical_outcomes.py",
+      "sha256": "17d17a2c5ca65f8a0f11d0eadb1d0a6d24a70280d1171ad0f6c722bfe214489f",
+      "size": 46941
+    },
+    "stored_result_summary_consumed": false,
+    "stored_score_fields_consumed": false,
+    "timezone_inference": {
+      "arm_identity_or_replication_used_for_selection": false,
+      "arm_independence": "baseline and every candidate replication are inferred from their own raw trajectory traces",
+      "candidate_timezones": [
+        "America/New_York",
+        "America/Los_Angeles"
+      ],
+      "evidence_granularity": "trace occurrences, not deduplicated conversions",
+      "failure_policy": "fail_closed_on_missing_unmatched_ambiguous_or_conflicting_evidence",
+      "scope": "all_complete_valid_traces_per_arm",
+      "selection_inputs": [
+        "tool_name",
+        "arguments",
+        "result"
+      ],
+      "tool": "datetime_info_to_timestamp"
+    }
+  },
+  "coverage": {
+    "arm_count": 11,
+    "task_count_per_arm": 1032,
+    "outcome_value_count_per_arm": 1032,
+    "null_outcome_count": 0,
+    "all_arms_complete": true,
+    "all_arms_match_benchmark_order": true,
+    "observed_order_sha256": "fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176"
+  },
+  "baseline": {
+    "task_count": 1032,
+    "outcome_mean": 0.4370005023280137,
+    "exact_outcome_successes": 333,
+    "input_files_sha256": "df499d12987427f5920db1203c663e5bc5d3ef3f0cb656af39267bb43a7f2951",
+    "fixed_toolsandbox_timestamp": "1781261549.0067909",
+    "timezone": "America/New_York"
+  },
+  "candidate_summary": {
+    "run_count": 10,
+    "task_outcome_observation_count": 10320,
+    "mean_of_run_outcome_means": 0.6436038062482871,
+    "lower_envelope": {
+      "minimum_run_exact_outcome_success_replications": [
+        7
+      ],
+      "minimum_run_exact_outcome_successes": 584,
+      "minimum_run_outcome_mean": 0.6276863642409402,
+      "minimum_run_outcome_mean_replications": [
+        7
+      ]
+    },
+    "total_exact_outcome_successes": 5981
+  },
+  "candidate_runs": [
+    {
+      "replication": 1,
+      "task_count": 1032,
+      "outcome_mean": 0.6303399012755212,
+      "exact_outcome_successes": 586,
+      "input_files_sha256": "ce862c2b0461471ac11f99deab251c3a5f11fff9943241d1e47d553b8c3a83e0",
+      "fixed_toolsandbox_timestamp": "1784832588",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "replication": 2,
+      "task_count": 1032,
+      "outcome_mean": 0.6395502956291442,
+      "exact_outcome_successes": 598,
+      "input_files_sha256": "6d251456ea077acd4a13ae939dd7e67f493fdd1d78bc1224781bed0b98607217",
+      "fixed_toolsandbox_timestamp": "1784832588",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "replication": 3,
+      "task_count": 1032,
+      "outcome_mean": 0.646512180364071,
+      "exact_outcome_successes": 595,
+      "input_files_sha256": "ec2f4853888b12424ee481577a1b28f19ab17a04df24e374a9283a282e507aba",
+      "fixed_toolsandbox_timestamp": "1784832588",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "replication": 4,
+      "task_count": 1032,
+      "outcome_mean": 0.6549703119139403,
+      "exact_outcome_successes": 605,
+      "input_files_sha256": "83b819a46e5dc2a13bacb33fbff46490b1320fe6132cb0ca5478da6047b1dbb2",
+      "fixed_toolsandbox_timestamp": "1784832588",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "replication": 5,
+      "task_count": 1032,
+      "outcome_mean": 0.6538498545298271,
+      "exact_outcome_successes": 609,
+      "input_files_sha256": "ba84da5c3d936c0432a099f38798f85c087258cf1657aeb8abbc50349c3ac186",
+      "fixed_toolsandbox_timestamp": "1784832588",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "replication": 6,
+      "task_count": 1032,
+      "outcome_mean": 0.6442447265872352,
+      "exact_outcome_successes": 595,
+      "input_files_sha256": "e570a3790c7c35efdc0388b25e1a21432d1cac58b6a03699a4970c3245c2e73b",
+      "fixed_toolsandbox_timestamp": "1784832588",
+      "timezone": "America/New_York"
+    },
+    {
+      "replication": 7,
+      "task_count": 1032,
+      "outcome_mean": 0.6276863642409402,
+      "exact_outcome_successes": 584,
+      "input_files_sha256": "eb4d74e011fca4c0821e0a9500366c0b43a4d71078cecb1cb65cf632477ec266",
+      "fixed_toolsandbox_timestamp": "1784832588",
+      "timezone": "America/New_York"
+    },
+    {
+      "replication": 8,
+      "task_count": 1032,
+      "outcome_mean": 0.653510024984735,
+      "exact_outcome_successes": 605,
+      "input_files_sha256": "381c6f3d3d4111333c2265c8b582b42cbfe6bdbe96d60342e0ca336d07d2c10e",
+      "fixed_toolsandbox_timestamp": "1784832588",
+      "timezone": "America/New_York"
+    },
+    {
+      "replication": 9,
+      "task_count": 1032,
+      "outcome_mean": 0.6395811861389011,
+      "exact_outcome_successes": 602,
+      "input_files_sha256": "62505316f0a6e502a5b7672bdf76a0ae890ff8316d4899b15ddde3eedbd001f7",
+      "fixed_toolsandbox_timestamp": "1784832588",
+      "timezone": "America/New_York"
+    },
+    {
+      "replication": 10,
+      "task_count": 1032,
+      "outcome_mean": 0.6457932168185546,
+      "exact_outcome_successes": 602,
+      "input_files_sha256": "3289f2a005f737ab7791c1ac8fb82f0bd1a24b3f4236943231104f97832d86eb",
+      "fixed_toolsandbox_timestamp": "1784832588",
+      "timezone": "America/New_York"
+    }
+  ],
+  "primary_input_files": [
+    {
+      "path": "artifacts/publication_cleanup_20260901/analysis/campaign_manifest.json",
+      "sha256": "6ec114f15fd5d53283ce9afad12bcf0523217b07325183762d61666e860dd532",
+      "size": 23202
+    },
+    {
+      "path": "artifacts/publication_cleanup_20260901/baseline/original_v140_reference_metadata.json",
+      "sha256": "46748c6bf15ac166b4a6e2cc1995302b978d7b9867db75c2322eda83c442c671",
+      "size": 2311
+    },
+    {
+      "path": "artifacts/publication_cleanup_20260901/baseline/original_v140_reference_records.jsonl",
+      "sha256": "4f9db0f186a25a247a31fe6a934c3e87785bc80c65b455f20e677d6315638c88",
+      "size": 4238419
+    },
+    {
+      "path": "docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json",
+      "sha256": "21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec",
+      "size": 189041
+    }
+  ]
+}

@@ -1,5 +1,9 @@
 # Final Statistical Analysis Report
 
+> **SUPERSEDED — ARCHIVAL ONLY.** These analyses and decisions are not current
+> paper evidence and must not be copied into Chapter 4. See
+> [current_state.md](current_state.md).
+
 ## Scope
 
 This report is generated from existing paired comparison, helper-contribution, feedback-summary, and control-cache artifacts. It does not run new benchmarks and does not modify registries.

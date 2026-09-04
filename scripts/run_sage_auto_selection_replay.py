@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Append and verify a matched SAGE auto-selection arm to a policy protocol run."""
+"""Run and verify matched SAGE auto-selection beside a fresh non-learning control."""
 
 from __future__ import annotations
 
@@ -7,17 +7,30 @@ import argparse
 import atexit
 import hashlib
 import json
+import math
 import os
 import subprocess
+import time
 import traceback
 from datetime import datetime, timezone
+from multiprocessing import get_context
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
+from sage_ts.dashboard.exporters import open_dashboard, write_protocol_dashboard
+from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.actor_selection_comparison import (
     ActorSelectionVerificationError,
     verify_matched_actor_selection_experiment,
+)
+from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
+from scripts.run_sage_protocol import (
+    _parallel_arm_execution_record,
+    _run_candidate_arm_worker,
+    _run_control_arm_worker,
+    _status_run_dir,
+    _stop_parallel_process,
+    _validate_uncached_result_rows,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -215,6 +228,197 @@ def _write_status(
     _write_json(path, payload)
 
 
+def _outcome_only_pair_summary(
+    control_rows: dict[str, dict[str, Any]],
+    auto_rows: dict[str, dict[str, Any]],
+    scenario_names: tuple[str, ...],
+) -> dict[str, object]:
+    if not scenario_names:
+        raise RuntimeError("Parallel auto-selection pair has an empty task cohort.")
+    control_values: list[float] = []
+    auto_values: list[float] = []
+    for name in scenario_names:
+        raw_control = control_rows[name].get("outcome_similarity")
+        raw_auto = auto_rows[name].get("outcome_similarity")
+        if (
+            isinstance(raw_control, bool)
+            or not isinstance(raw_control, (int, float))
+            or not math.isfinite(float(raw_control))
+            or isinstance(raw_auto, bool)
+            or not isinstance(raw_auto, (int, float))
+            or not math.isfinite(float(raw_auto))
+            or not 0.0 <= float(raw_control) <= 1.0
+            or not 0.0 <= float(raw_auto) <= 1.0
+        ):
+            raise RuntimeError(
+                f"Parallel auto-selection pair has no outcome value for {name!r}."
+            )
+        control_values.append(float(raw_control))
+        auto_values.append(float(raw_auto))
+    count = len(scenario_names)
+    return {
+        "schema_version": 1,
+        "publication_performance_endpoint": "outcome_task_completion_similarity",
+        "scenario_count": count,
+        "outcome_evaluated_count": count,
+        "control_exact_outcome_successes": sum(
+            value == 1.0 for value in control_values
+        ),
+        "auto_exact_outcome_successes": sum(value == 1.0 for value in auto_values),
+        "control_mean_outcome_similarity": sum(control_values) / count,
+        "auto_mean_outcome_similarity": sum(auto_values) / count,
+        "mean_outcome_similarity_delta": (
+            sum(auto_values) / count - sum(control_values) / count
+        ),
+        "auto_outcome_gain_count": sum(
+            auto > control for control, auto in zip(control_values, auto_values)
+        ),
+        "auto_outcome_regression_count": sum(
+            auto < control for control, auto in zip(control_values, auto_values)
+        ),
+        "outcome_tie_count": sum(
+            auto == control for control, auto in zip(control_values, auto_values)
+        ),
+    }
+
+
+def _run_parallel_auto_pair(
+    *,
+    pair_root: Path,
+    pair_artifact_root: Path,
+    control_root: Path,
+    auto_root: Path,
+    auto_registry: Path,
+    mode: str,
+    agent: str,
+    user: str,
+    generation_model: str,
+    recurrence_threshold: int,
+    base_tool_policy: str,
+    scenario_names: tuple[str, ...],
+    benchmark_manifest: Path,
+    authority_root: Path,
+    progress_hook: Callable[[Path | None, Path | None, str], None],
+) -> tuple[Path, Path, dict[str, Any], dict[str, object]]:
+    """Run fresh non-learning control and matched-inventory auto SAGE together."""
+
+    if not pair_root.is_dir():
+        raise RuntimeError(
+            "Auto-selection pair root must be initialized by its dashboard preflight."
+        )
+    pair_artifact_root.mkdir(parents=True, exist_ok=False)
+    base_params: dict[str, Any] = {
+        "mode": mode,
+        "run_root": str(pair_root),
+        "artifact_root": str(pair_artifact_root),
+        "agent": agent,
+        "user": user,
+        "generation_model": generation_model,
+        "recurrence_threshold": recurrence_threshold,
+        "base_tool_policy": base_tool_policy,
+        "registry_dir": str(auto_registry),
+        "scenario_names": list(scenario_names),
+        "manifest": str(benchmark_manifest),
+        "control_resume_dir": None,
+        "candidate_resume_dir": None,
+        "resume_completed_limit": None,
+        "actor_selection_mode": "auto",
+        "candidate_arm_name": "sage_auto_selection",
+        "inventory_authority_capture_dir": None,
+        "inventory_authority_replay_dir": str(authority_root),
+        "require_fresh_control": True,
+        # Inventory replay has generation and online reflection disabled. The
+        # fresh control is nevertheless required as the concurrent peer for
+        # every experimental SAGE execution.
+        "reflection_control_channel": None,
+    }
+    ctx = get_context("spawn")
+    control_process = ctx.Process(
+        target=_run_control_arm_worker,
+        args=({**base_params, "control_root": str(control_root)},),
+        name="sage_ts_auto_selection_control_arm",
+    )
+    auto_process = ctx.Process(
+        target=_run_candidate_arm_worker,
+        args=(
+            {
+                **base_params,
+                "candidate_root": str(auto_root),
+                "generation_enabled": False,
+            },
+        ),
+        name="sage_ts_auto_selection_arm",
+    )
+    processes = {"control": control_process, "candidate": auto_process}
+    started = {arm: False for arm in processes}
+    failed_arm: str | None = None
+    try:
+        control_process.start()
+        started["control"] = True
+        auto_process.start()
+        started["candidate"] = True
+        while control_process.is_alive() or auto_process.is_alive():
+            for arm, process in processes.items():
+                if process.exitcode not in (None, 0):
+                    failed_arm = arm
+                    break
+            if failed_arm is not None:
+                break
+            progress_hook(
+                _status_run_dir(pair_root, "control", control_root),
+                _status_run_dir(pair_root, "candidate", auto_root),
+                "running",
+            )
+            time.sleep(5)
+        if failed_arm is not None:
+            peer = "candidate" if failed_arm == "control" else "control"
+            _stop_parallel_process(processes[peer])
+            raise RuntimeError(
+                f"{failed_arm} arm exited with code {processes[failed_arm].exitcode}."
+            )
+        control_process.join()
+        auto_process.join()
+        if control_process.exitcode != 0 or auto_process.exitcode != 0:
+            raise RuntimeError(
+                "Fresh control or auto-selection SAGE exited unsuccessfully."
+            )
+        control_dir = _status_run_dir(pair_root, "control", control_root)
+        auto_dir = _status_run_dir(pair_root, "candidate", auto_root)
+        if control_dir is None or auto_dir is None:
+            raise RuntimeError(
+                "Parallel auto-selection pair finished without both run directories."
+            )
+        parallel_execution = _parallel_arm_execution_record(pair_root)
+        control_rows = _validate_uncached_result_rows(
+            control_dir,
+            expected_scenarios=scenario_names,
+            arm="auto-selection fresh control",
+            require_complete=True,
+        )
+        auto_rows = _validate_uncached_result_rows(
+            auto_dir,
+            expected_scenarios=scenario_names,
+            arm="sage_auto_selection",
+            require_complete=True,
+        )
+        if tuple(control_rows) != scenario_names or tuple(auto_rows) != scenario_names:
+            raise RuntimeError(
+                "Parallel auto-selection pair did not preserve exact task order."
+            )
+        progress_hook(control_dir, auto_dir, "complete")
+        return (
+            control_dir,
+            auto_dir,
+            parallel_execution,
+            _outcome_only_pair_summary(control_rows, auto_rows, scenario_names),
+        )
+    except BaseException:
+        for arm, process in processes.items():
+            if started[arm]:
+                _stop_parallel_process(process)
+        raise
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -235,6 +439,12 @@ def main() -> None:
         help="Fresh mutable registry used while replaying donor state.",
     )
     parser.add_argument(
+        "--dashboard-port",
+        type=int,
+        default=5520,
+        help="Port for the externally opened live control-versus-auto dashboard.",
+    )
+    parser.add_argument(
         "--pilot-evidence",
         type=Path,
         default=(
@@ -252,6 +462,7 @@ def main() -> None:
     run_root = args.policy_run_root.resolve()
     if not run_root.is_dir():
         raise SystemExit(f"Policy run root is missing: {run_root}")
+    current_outcome_evaluator = outcome_evaluator_manifest()
     status_path = run_root / "sage_auto_selection_arm_status.json"
     report_path = run_root / "actor_selection_outcome_comparison.json"
     experiment_manifest_path = run_root / "actor_selection_experiment_manifest.json"
@@ -265,11 +476,12 @@ def main() -> None:
     _write_json(
         experiment_manifest_path,
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "experiment": "sage_auto_selection",
             "stage": args.stage,
             "status": "preflight",
             "policy_run_root": str(run_root),
+            "outcome_evaluator": current_outcome_evaluator,
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
     )
@@ -294,6 +506,10 @@ def main() -> None:
     atexit.register(mark_incomplete_failure)
     protocol_path = run_root / "protocol_manifest.json"
     protocol = _read_json(protocol_path)
+    if protocol.get("outcome_evaluator") != current_outcome_evaluator:
+        raise SystemExit(
+            "Policy donor does not use the current outcome evaluator identity."
+        )
     if (
         protocol.get("candidate_actor_selection_mode") != "policy"
         or protocol.get("inventory_authority_mode") != "capture"
@@ -314,9 +530,18 @@ def main() -> None:
             )
         pilot_evidence = _read_json(args.pilot_evidence.resolve())
         if (
-            pilot_evidence.get("experiment") != "sage_auto_selection"
+            pilot_evidence.get("schema_version") != 2
+            or pilot_evidence.get("experiment") != "sage_auto_selection"
             or pilot_evidence.get("stage") != "pilot"
             or pilot_evidence.get("status") != "complete"
+            or pilot_evidence.get("mechanism_counts_are_performance_gates") is not False
+            or pilot_evidence.get("integrity_gate_passed") is not True
+            or pilot_evidence.get("integrity_gate_reasons") != []
+            or pilot_evidence.get("outcome_evidence_complete") is not True
+            or pilot_evidence.get("performance_gate_applied") is not False
+            or pilot_evidence.get("performance_gate_reason")
+            != "no_predeclared_selector_performance_threshold"
+            or pilot_evidence.get("experiment_passed") is not True
             or pilot_evidence.get("stability_gate_passed") is not True
             or pilot_evidence.get("scenario_count")
             != STAGE_PINS["pilot"]["scenario_count"]
@@ -325,6 +550,19 @@ def main() -> None:
             or pilot_evidence.get("scenario_order_sha256")
             != STAGE_PINS["pilot"]["scenario_order_sha256"]
             or pilot_evidence.get("source_identity") != source_identity
+            or pilot_evidence.get("outcome_evaluator") != current_outcome_evaluator
+            or pilot_evidence.get("auto_parallel_arms") is not True
+            or pilot_evidence.get("auto_control_cache_mode") != "off"
+            or pilot_evidence.get("auto_control_source") != "fresh"
+            or pilot_evidence.get("auto_cached_control_tasks") != 0
+            or pilot_evidence.get("auto_fresh_control_tasks")
+            != STAGE_PINS["pilot"]["scenario_count"]
+            or pilot_evidence.get("auto_control_cache_accessed") is not False
+            or pilot_evidence.get("auto_control_delivery") != "not_connected"
+            or pilot_evidence.get("auto_control_output_influences_inventory")
+            is not False
+            or pilot_evidence.get("auto_control_output_influences_execution")
+            is not False
         ):
             raise SystemExit(
                 "Full replay pilot evidence is not valid or source-matched."
@@ -417,33 +655,120 @@ def main() -> None:
         if args.auto_registry_dir is not None
         else run_root / "sage_auto_selection_registry"
     )
+    pair_root = run_root / "sage_auto_selection_parallel_pair"
+    pair_artifact_root = pair_root / "artifacts"
+    auto_control_root = pair_root / "control"
     _assert_empty_target(auto_root, label="Auto-selection output root")
     _assert_empty_target(auto_registry, label="Auto-selection registry")
+    _assert_empty_target(pair_root, label="Auto-selection parallel-pair root")
+    pair_root.mkdir(parents=True, exist_ok=False)
+    auto_dashboard_root = pair_root
+    dashboard_index = write_protocol_dashboard(
+        auto_dashboard_root,
+        mode="sage_auto_selection",
+        status="running",
+        phase="parallel_control_and_auto_selection",
+        agent=agent,
+        user=user,
+        model_metadata=protocol.get("model_metadata")
+        if isinstance(protocol.get("model_metadata"), dict)
+        else None,
+        generation_enabled=False,
+        base_tool_policy=str(source_run_config.get("base_tool_policy") or ""),
+        scenario_count=len(scenario_names),
+        registry_dir=auto_registry,
+        control_label="Fresh non-learning control",
+        candidate_label="SAGE auto selection",
+    )
+    dashboard_task_compare_path = dashboard_index.with_name("task_compare.html")
+    dashboard_url = open_dashboard(
+        dashboard_task_compare_path,
+        port=args.dashboard_port,
+        server_root=run_root,
+    )
+    dashboard_opened_monotonic_ns = time.monotonic_ns()
+    dashboard_open_receipt_path = auto_dashboard_root / "dashboard_open_receipt.json"
+    _write_json(
+        dashboard_open_receipt_path,
+        {
+            "dashboard": "task_compare",
+            "comparison": "fresh_control_vs_sage_auto_selection",
+            "path": str(dashboard_task_compare_path.resolve()),
+            "url": dashboard_url,
+            "external_browser_opened": True,
+            "http_verified_before_open": True,
+            "dashboard_server_protocol": DASHBOARD_SERVER_PROTOCOL,
+            "dashboard_server_root": str(run_root.resolve()),
+            "opened_at": datetime.now(timezone.utc).isoformat(),
+            "opened_monotonic_ns": dashboard_opened_monotonic_ns,
+            "opened_before_model_processes": True,
+        },
+    )
     _write_status(status_path, status="running")
 
+    auto_control_dir: Path | None = None
     auto_dir: Path | None = None
+    last_dashboard_refresh = 0.0
+
+    def refresh_auto_dashboard(
+        control_run_dir: Path | None,
+        auto_run_dir: Path | None,
+        status: str,
+    ) -> None:
+        nonlocal last_dashboard_refresh
+        now = time.monotonic()
+        if status == "running" and now - last_dashboard_refresh < 5.0:
+            return
+        write_protocol_dashboard(
+            auto_dashboard_root,
+            mode="sage_auto_selection",
+            status=status,
+            phase="auto_selection",
+            agent=agent,
+            user=user,
+            model_metadata=protocol.get("model_metadata")
+            if isinstance(protocol.get("model_metadata"), dict)
+            else None,
+            generation_enabled=False,
+            base_tool_policy=str(source_run_config.get("base_tool_policy") or ""),
+            scenario_count=len(scenario_names),
+            control_dir=control_run_dir,
+            candidate_dir=auto_run_dir,
+            registry_dir=auto_registry,
+            control_label="Fresh non-learning control",
+            candidate_label="SAGE auto selection",
+        )
+        last_dashboard_refresh = now
+
     try:
-        auto_dir = run_sage_with_registry(
-            SageRunConfig(
-                agent=agent,
-                user=user,
-                scenario_names=scenario_names,
-                output_dir=auto_root,
-                registry_dir=auto_registry,
-                run_type=f"{protocol.get('mode')}_sage_auto_selection",
-                recurrence_threshold=int(
-                    source_run_config.get("recurrence_threshold") or 2
-                ),
-                base_tool_policy=str(source_run_config.get("base_tool_policy") or ""),
-                actor_selection_mode="auto",
-                inventory_authority_replay_dir=authority_path.parent,
-                manifest_path=benchmark_manifest,
-                failure_memory_path=None,
-                generation_model=generation_model,
+        (
+            auto_control_dir,
+            auto_dir,
+            auto_parallel_execution,
+            auto_control_outcomes,
+        ) = _run_parallel_auto_pair(
+            pair_root=pair_root,
+            pair_artifact_root=pair_artifact_root,
+            control_root=auto_control_root,
+            auto_root=auto_root,
+            auto_registry=auto_registry,
+            mode=str(protocol.get("mode") or ""),
+            agent=agent,
+            user=user,
+            generation_model=generation_model,
+            recurrence_threshold=int(
+                source_run_config.get("recurrence_threshold") or 2
             ),
-            generator=None,
+            base_tool_policy=str(source_run_config.get("base_tool_policy") or ""),
+            scenario_names=scenario_names,
+            benchmark_manifest=benchmark_manifest,
+            authority_root=authority_path.parent,
+            progress_hook=refresh_auto_dashboard,
         )
         auto_run_config = _read_json(auto_dir.parent / "sage_ts_run_manifest.json")
+        auto_control_run_config = _read_json(
+            auto_control_dir.parent / "sage_ts_run_manifest.json"
+        )
         matched_run_config_fields = (
             "agent",
             "user",
@@ -463,6 +788,28 @@ def main() -> None:
             raise ActorSelectionVerificationError(
                 "Auto-selection run configuration drifted from the policy donor."
             )
+        if (
+            auto_control_run_config.get("actor_selection_mode") != "policy"
+            or any(
+                auto_control_run_config.get(field) != source_run_config.get(field)
+                for field in matched_run_config_fields
+            )
+            or auto_control_run_config.get("resume_from_dir") is not None
+            or auto_control_run_config.get("resume_completed_limit") is not None
+        ):
+            raise ActorSelectionVerificationError(
+                "Concurrent non-learning control configuration drifted from the "
+                "auto-selection arm."
+            )
+        first_model_process_start = min(
+            int(auto_parallel_execution["arms"][arm]["started_monotonic_ns"])
+            for arm in ("control", "candidate")
+        )
+        if dashboard_opened_monotonic_ns >= first_model_process_start:
+            raise ActorSelectionVerificationError(
+                "Auto-selection Task Compare was not opened before both model "
+                "processes started."
+            )
         final_source_identity = _assert_clean_matching_source(protocol)
         environment_after = _verified_environment()
         if (
@@ -476,13 +823,130 @@ def main() -> None:
                 "Source, environment, or frozen experiment inputs changed during "
                 "auto replay."
             )
+        auto_control_outcome_comparison_path = (
+            pair_root / "auto_control_outcome_comparison.json"
+        )
+        _write_json(auto_control_outcome_comparison_path, auto_control_outcomes)
+        pair_manifest_path = pair_root / "parallel_pair_manifest.json"
+        pair_manifest = {
+            "schema_version": 1,
+            "experiment": "sage_auto_selection_parallel_control_pair",
+            "status": "complete",
+            "mode": str(protocol.get("mode") or ""),
+            "agent": agent,
+            "user": user,
+            "base_tool_policy": str(source_run_config.get("base_tool_policy") or ""),
+            "scenario_count": len(scenario_names),
+            "scenario_order_sha256": scenario_order_sha256,
+            "control_role": "fresh_non_learning_control",
+            "candidate_role": "sage_auto_selection",
+            "control_run_dir": str(auto_control_dir),
+            "auto_run_dir": str(auto_dir),
+            "control_cache_mode": "off",
+            "control_source": "fresh",
+            "cached_control_tasks": 0,
+            "fresh_control_tasks": len(scenario_names),
+            "cache_accessed": False,
+            "openai_response_cache_enabled": False,
+            "sage_task_cache_enabled": False,
+            "persistent_response_cache_reuse": False,
+            "publication_performance_endpoint": ("outcome_task_completion_similarity"),
+            "legacy_score_is_performance_gate": False,
+            "parallel_arms": True,
+            "parallel_arm_execution": auto_parallel_execution,
+            "auto_control_delivery": "not_connected",
+            "auto_control_output_influences_inventory": False,
+            "auto_control_output_influences_execution": False,
+            "auto_inventory_source": "matched_policy_inventory_authority",
+            "inventory_authority_path": str(authority_path),
+            "inventory_authority_sha256": authority_sha256,
+            "outcome_evaluator": current_outcome_evaluator,
+            "outcome_comparison_path": str(auto_control_outcome_comparison_path),
+            "outcome_comparison_sha256": _sha256(auto_control_outcome_comparison_path),
+            "timezone": os.environ.get("TZ"),
+            "dashboard_task_compare_path": str(dashboard_task_compare_path.resolve()),
+            "dashboard_task_compare_url": dashboard_url,
+            "dashboard_open_receipt_path": str(dashboard_open_receipt_path.resolve()),
+        }
+        _write_json(pair_manifest_path, pair_manifest)
+        try:
+            from scripts.verify_publication_run import (
+                verify_auto_selection_parallel_pair,
+            )
+        except ModuleNotFoundError:
+            from verify_publication_run import verify_auto_selection_parallel_pair
+
+        auto_parallel_verification = verify_auto_selection_parallel_pair(
+            pair_manifest_path,
+            run_root=run_root,
+            expected_tasks=len(scenario_names),
+            expected_scenario_order_sha256=scenario_order_sha256,
+            expected_auto_dir=auto_dir,
+        )
         report = verify_matched_actor_selection_experiment(
             policy_dir=policy_dir,
             auto_dir=auto_dir,
             authority_path=authority_path,
             require_zero_generated_tool_failures=args.stage == "pilot",
         )
+        if report.get("outcome_evaluator") != current_outcome_evaluator:
+            raise ActorSelectionVerificationError(
+                "Actor-selection comparison used an unexpected outcome evaluator."
+            )
+        experiment_passed = bool(report["experiment_passed"])
         _write_json(report_path, report)
+        policy_auto_dashboard_root = run_root / "actor_selection_dashboard"
+        policy_auto_dashboard_index = write_protocol_dashboard(
+            policy_auto_dashboard_root,
+            mode="sage_auto_selection",
+            status="complete" if experiment_passed else "failed_gate",
+            phase="policy_vs_auto_outcome_comparison",
+            agent=agent,
+            user=user,
+            model_metadata=protocol.get("model_metadata")
+            if isinstance(protocol.get("model_metadata"), dict)
+            else None,
+            generation_enabled=False,
+            base_tool_policy=str(source_run_config.get("base_tool_policy") or ""),
+            scenario_count=len(scenario_names),
+            control_dir=policy_dir,
+            candidate_dir=auto_dir,
+            registry_dir=auto_registry,
+            control_label="SAGE policy selection",
+            candidate_label="SAGE auto selection",
+        )
+        policy_auto_dashboard_path = policy_auto_dashboard_index.with_name(
+            "task_compare.html"
+        )
+        policy_auto_dashboard_url = open_dashboard(
+            policy_auto_dashboard_path,
+            port=args.dashboard_port,
+            server_root=run_root,
+        )
+        policy_auto_dashboard_receipt_path = (
+            policy_auto_dashboard_root / "dashboard_open_receipt.json"
+        )
+        _write_json(
+            policy_auto_dashboard_receipt_path,
+            {
+                "dashboard": "task_compare",
+                "comparison": "policy_vs_sage_auto_selection",
+                "path": str(policy_auto_dashboard_path.resolve()),
+                "url": policy_auto_dashboard_url,
+                "external_browser_opened": True,
+                "http_verified_before_open": True,
+                "dashboard_server_protocol": DASHBOARD_SERVER_PROTOCOL,
+                "dashboard_server_root": str(run_root.resolve()),
+                "opened_at": datetime.now(timezone.utc).isoformat(),
+                "opened_phase": "post_run_causal_comparison",
+            },
+        )
+        final_dashboard_status = "complete" if experiment_passed else "failed_gate"
+        refresh_auto_dashboard(
+            auto_control_dir,
+            auto_dir,
+            final_dashboard_status,
+        )
         arm_evidence_filenames = (
             "actor_request_audit.jsonl",
             "actor_request_audit_summary.json",
@@ -499,25 +963,97 @@ def main() -> None:
             "policy.protocol_manifest": protocol_path,
             "policy.inventory_authority": authority_path,
             "policy.benchmark_manifest": benchmark_manifest,
+            "comparison.live_policy_control_dashboard_open_receipt": (
+                run_root / "dashboard_open_receipt.json"
+            ),
+            "comparison.live_policy_control_task_compare_data": (
+                run_root / "dashboard" / "task_compare_data.json"
+            ),
+            "comparison.live_policy_control_task_compare_html": (
+                run_root / "dashboard" / "task_compare.html"
+            ),
             "comparison.outcome_report": report_path,
+            "comparison.live_auto_control_dashboard_open_receipt": (
+                dashboard_open_receipt_path
+            ),
+            "comparison.live_auto_control_task_compare_data": (
+                auto_dashboard_root / "dashboard" / "task_compare_data.json"
+            ),
+            "comparison.live_auto_control_task_compare_html": (
+                auto_dashboard_root / "dashboard" / "task_compare.html"
+            ),
+            "comparison.policy_auto_dashboard_open_receipt": (
+                policy_auto_dashboard_receipt_path
+            ),
+            "comparison.task_compare_data": (
+                policy_auto_dashboard_root / "dashboard" / "task_compare_data.json"
+            ),
+            "comparison.task_compare_html": (
+                policy_auto_dashboard_root / "dashboard" / "task_compare.html"
+            ),
+            "auto_parallel_pair.manifest": pair_manifest_path,
+            "auto_parallel_pair.control_status": (
+                pair_root / "control_arm_status.json"
+            ),
+            "auto_parallel_pair.auto_status": pair_root / "candidate_arm_status.json",
+            "auto_parallel_pair.outcome_comparison": (
+                auto_control_outcome_comparison_path
+            ),
+            "auto_parallel_pair.control_run_manifest": (
+                auto_control_dir.parent / "sage_ts_run_manifest.json"
+            ),
             "policy.run_manifest": policy_dir.parent / "sage_ts_run_manifest.json",
             "auto.run_manifest": auto_dir.parent / "sage_ts_run_manifest.json",
         }
+        for filename in (
+            "actor_request_audit.jsonl",
+            "actor_request_audit_summary.json",
+            "actor_schema_catalog.json",
+            "actor_schema_catalog.jsonl",
+            "live_result_summary.json",
+            "llm_usage_events.jsonl",
+            "llm_usage_summary.json",
+            "result_summary.json",
+        ):
+            evidence_paths[f"auto_parallel_control.{filename}"] = (
+                auto_control_dir / filename
+            )
         for arm_name, arm_dir in (("policy", policy_dir), ("auto", auto_dir)):
             for filename in arm_evidence_filenames:
                 evidence_paths[f"{arm_name}.{filename}"] = arm_dir / filename
         evidence_hashes = _required_evidence_hashes(evidence_paths)
         experiment_manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "experiment": "sage_auto_selection",
             "stage": args.stage,
-            "status": "complete" if report["stability_gate_passed"] else "failed_gate",
+            "status": "complete" if experiment_passed else "failed_gate",
             "created_at": datetime.now(timezone.utc).isoformat(),
             "policy_protocol_manifest_path": str(protocol_path),
             "policy_protocol_manifest_sha256": protocol_sha256,
             "policy_run_dir": str(policy_dir),
             "auto_run_dir": str(auto_dir),
             "control_run_dir": protocol.get("control_dir"),
+            "auto_control_run_dir": str(auto_control_dir),
+            "auto_parallel_pair_manifest_path": str(pair_manifest_path),
+            "auto_parallel_pair_manifest_sha256": _sha256(pair_manifest_path),
+            "auto_parallel_arms": True,
+            "auto_parallel_arm_execution": auto_parallel_execution,
+            "auto_parallel_verification": auto_parallel_verification,
+            "auto_control_outcome_comparison_path": str(
+                auto_control_outcome_comparison_path
+            ),
+            "auto_control_outcomes": auto_control_outcomes,
+            "auto_control_cache_mode": "off",
+            "auto_control_source": "fresh",
+            "auto_cached_control_tasks": 0,
+            "auto_fresh_control_tasks": len(scenario_names),
+            "auto_control_cache_accessed": False,
+            "auto_control_delivery": "not_connected",
+            "auto_control_output_influences_inventory": False,
+            "auto_control_output_influences_execution": False,
+            "publication_performance_endpoint": ("outcome_task_completion_similarity"),
+            "legacy_score_is_performance_gate": False,
+            "mechanism_counts_are_performance_gates": False,
             "inventory_authority_path": str(authority_path),
             "inventory_authority_sha256": authority_sha256,
             "inventory_authority_tasks_sha256": authority.get("tasks_sha256"),
@@ -545,15 +1081,42 @@ def main() -> None:
             },
             "estimand": report["estimand"],
             "persistent_response_cache_reuse": False,
+            "outcome_evaluator": current_outcome_evaluator,
             "outcome_comparison_path": str(report_path),
+            "dashboard_task_compare_path": str(policy_auto_dashboard_path),
+            "dashboard_task_compare_url": policy_auto_dashboard_url,
+            "dashboard_open_receipt_path": str(policy_auto_dashboard_receipt_path),
+            "live_auto_control_task_compare_path": str(dashboard_task_compare_path),
+            "live_auto_control_task_compare_url": dashboard_url,
+            "live_auto_control_dashboard_open_receipt_path": str(
+                dashboard_open_receipt_path
+            ),
+            "policy_auto_dashboard_open_receipt_path": str(
+                policy_auto_dashboard_receipt_path
+            ),
+            "live_policy_control_task_compare_path": str(
+                (run_root / "dashboard" / "task_compare.html").resolve()
+            ),
+            "live_policy_control_task_compare_url": protocol.get(
+                "dashboard_task_compare_url"
+            ),
+            "live_policy_control_dashboard_open_receipt_path": str(
+                (run_root / "dashboard_open_receipt.json").resolve()
+            ),
             "evidence_hashes": evidence_hashes,
+            "integrity_gate_passed": report["integrity_gate_passed"],
+            "integrity_gate_reasons": report["integrity_gate_reasons"],
+            "outcome_evidence_complete": report["outcome_evidence_complete"],
+            "performance_gate_applied": report["performance_gate_applied"],
+            "performance_gate_reason": report["performance_gate_reason"],
+            "experiment_passed": experiment_passed,
             "stability_gate_passed": report["stability_gate_passed"],
             "stability_gate_reasons": report["stability_gate_reasons"],
         }
         _write_json(experiment_manifest_path, experiment_manifest)
         _write_status(
             status_path,
-            status="complete" if report["stability_gate_passed"] else "failed_gate",
+            status="complete" if experiment_passed else "failed_gate",
             auto_run_dir=auto_dir,
         )
         lifecycle["finalized"] = True
@@ -562,6 +1125,10 @@ def main() -> None:
             json.dumps(
                 {
                     "stage": args.stage,
+                    "integrity_gate_passed": report["integrity_gate_passed"],
+                    "outcome_evidence_complete": report["outcome_evidence_complete"],
+                    "performance_gate_applied": report["performance_gate_applied"],
+                    "experiment_passed": experiment_passed,
                     "stability_gate_passed": report["stability_gate_passed"],
                     "scenario_count": outcome["scenario_count"],
                     "outcome_evaluated_count": outcome["outcome_evaluated_count"],
@@ -577,12 +1144,18 @@ def main() -> None:
                     "auto_mean_outcome_similarity": outcome[
                         "auto_mean_outcome_similarity"
                     ],
+                    "fresh_control_exact_outcome_successes": auto_control_outcomes[
+                        "control_exact_outcome_successes"
+                    ],
+                    "fresh_control_mean_outcome_similarity": auto_control_outcomes[
+                        "control_mean_outcome_similarity"
+                    ],
                     "comparison_path": str(report_path),
                 },
                 indent=2,
             )
         )
-        if not report["stability_gate_passed"]:
+        if not experiment_passed:
             raise SystemExit(2)
     except (Exception, ActorSelectionVerificationError) as exc:
         _write_status(
@@ -591,6 +1164,14 @@ def main() -> None:
             auto_run_dir=auto_dir,
             error=traceback.format_exc(),
         )
+        try:
+            refresh_auto_dashboard(
+                auto_control_dir,
+                auto_dir,
+                "failed",
+            )
+        except Exception:
+            pass
         raise SystemExit(str(exc)) from exc
 
 

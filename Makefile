@@ -11,17 +11,21 @@ SAMPLE_REPORT ?=
 ANALYSIS_OUTPUT ?=
 EVIDENCE_DATA ?=
 TABLE_OUTPUT ?=
-VALIDATION_THRESHOLDS ?= docs/sage_protocol/publication_validation_thresholds_v2.json
+VALIDATION_THRESHOLDS ?=
+PILOT_EVIDENCE ?=
+APPROVE_LIVE_RUN ?= NO
+APPROVE_SELECTOR_FULL ?= NO
 
 COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
 
 .PHONY: \
 	compile lint test-core test package \
-	paper-online paper-frozen sample full \
+	paper-online paper-frozen selector-pilot selector-full sample full \
 	prepare-paper-rerun verify-publication verify-sample verify-campaign verify-environment verify-inputs verify-freeze \
 	analyze render-paper \
 	require-run require-sample-report require-campaign-manifest require-analysis-output \
-	require-evidence-data require-table-output
+	require-evidence-data require-table-output require-validation-thresholds \
+	require-live-run-approval require-selector-full-approval require-pilot-evidence
 
 compile:
 	$(PYTHON) -m compileall -q -x '(^|/)(__pycache__|build)/' \
@@ -36,6 +40,12 @@ lint:
 test-core:
 	$(COMMON_ENV) $(PYTHON) -m pytest \
 		tests/unit/test_sage_run_adapter.py \
+		tests/unit/test_toolsandbox_adapter.py \
+		tests/unit/test_actor_selection_comparison.py \
+		tests/unit/test_outcome_score.py \
+		tests/unit/test_outcome_score_v4_evidence.py \
+		tests/unit/test_outcome_score_v4_state_safety.py \
+		tests/unit/test_historical_outcome_rescore.py \
 		tests/unit/test_online_birth.py \
 		tests/unit/test_tool_generator.py \
 		tests/unit/test_control_baseline_cache.py \
@@ -47,6 +57,7 @@ test-core:
 		tests/unit/test_publication_environment.py \
 		tests/unit/test_publication_inputs.py \
 		tests/unit/test_publication_freeze.py \
+		tests/unit/test_dashboard_exporters.py \
 		tests/unit/test_rapid_api_cache.py \
 		tests/integration/test_toolsandbox_generated_tool_injection.py \
 		-q
@@ -57,17 +68,32 @@ test:
 package:
 	$(PYTHON) -m build --outdir $(DIST_DIR)
 
-# One complete 1,032-task online-build sample. The launcher enforces a live,
-# same-run control, disables application response/task/persistent-output replay,
-# checks the pinned read-only external-service fixture, starts from an empty
-# registry, and runs the publication verifier after completion.
-paper-online:
+# One complete 1,032-task online-build sample. The launcher runs the live
+# non-learning control and SAGE concurrently, opens the current Task Compare in
+# an external browser, disables application response/task/persistent-output
+# replay, checks the pinned fixture, starts from an empty registry, and verifies
+# the publication run after completion. Invoke only after researcher approval.
+paper-online: require-live-run-approval
 	bash scripts/run_native_action_4omini_ab.sh full $(PORT) native-only
 
 # Evaluate one already-built registry with the same strict fresh-control rules.
 # Set RESUME_REGISTRY_CHECKPOINT to the source registry before invoking.
-paper-frozen:
+paper-frozen: require-live-run-approval
 	bash scripts/run_native_action_4omini_ab.sh full $(PORT) frozen-only
+
+# Sealed 30-task policy-vs-auto feasibility pilot. The control and policy SAGE
+# donor run concurrently; after donor inventory exists, an independent fresh
+# control and matched auto replay run concurrently. Both live-pair dashboards
+# open externally before model execution; the policy/auto view opens afterward.
+selector-pilot: require-live-run-approval
+	bash scripts/run_native_action_4omini_ab.sh pilot $(PORT) native-only
+
+# Complete matched actor-selection comparison. This requires a verified pilot
+# manifest plus a separate, explicit approval for the full selector run.
+selector-full: require-live-run-approval require-selector-full-approval require-pilot-evidence
+	SAGE_AUTO_SELECTION_EXPERIMENT=1 \
+	SAGE_AUTO_SELECTION_PILOT_EVIDENCE="$(PILOT_EVIDENCE)" \
+		bash scripts/run_native_action_4omini_ab.sh full $(PORT) native-only
 
 sample: paper-online
 
@@ -91,13 +117,29 @@ require-run:
 	@test -n "$(RUN)" || \
 		(echo "Set RUN to the publication run search root." >&2; exit 2)
 
+require-live-run-approval:
+	@test "$(APPROVE_LIVE_RUN)" = "YES" || \
+		(echo "Live model execution requires explicit approval: set APPROVE_LIVE_RUN=YES." >&2; exit 2)
+
+require-selector-full-approval:
+	@test "$(APPROVE_SELECTOR_FULL)" = "YES" || \
+		(echo "The complete selector comparison needs separate approval: set APPROVE_SELECTOR_FULL=YES." >&2; exit 2)
+
+require-pilot-evidence:
+	@test -n "$(PILOT_EVIDENCE)" || \
+		(echo "Set PILOT_EVIDENCE to a passing actor_selection_experiment_manifest.json." >&2; exit 2)
+
 verify-publication: require-run
 	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_run.py \
 		--search-root "$(RUN)" \
-		--expected-tasks 1032 \
+		--cohort full \
 		--expect-reflection "$(REFLECTION_EXPECTATION)"
 
-verify-sample: require-run
+require-validation-thresholds:
+	@test -n "$(VALIDATION_THRESHOLDS)" || \
+		(echo "Set VALIDATION_THRESHOLDS=docs/sage_protocol/publication_validation_thresholds_v4.json." >&2; exit 2)
+
+verify-sample: require-run require-validation-thresholds
 	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_sample.py \
 		--search-root "$(RUN)" \
 		--thresholds "$(VALIDATION_THRESHOLDS)"

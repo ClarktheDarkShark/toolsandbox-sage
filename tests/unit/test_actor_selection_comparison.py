@@ -13,6 +13,7 @@ from sage_ts.evaluation.actor_selection_comparison import (
     validate_live_uncached_run,
     verify_matched_actor_selection_experiment,
 )
+from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 
 SCENARIOS = ("task_a", "task_b")
 
@@ -68,6 +69,19 @@ def _write_matching_result_summaries(
     _write_json(run_dir / "live_result_summary.json", live_summary)
 
 
+def _tamper_outcome_row_identity(run_dir: Path) -> None:
+    result = json.loads((run_dir / "result_summary.json").read_text(encoding="utf-8"))
+    result["per_scenario_results"][0]["outcome_evaluator_contract_sha256"] = "0" * 64
+    _write_matching_result_summaries(run_dir, result)
+
+
+def _tamper_outcome_manifest_identity(run_dir: Path) -> None:
+    manifest_path = run_dir.parent / "sage_ts_run_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["outcome_evaluator"]["source_sha256"] = "0" * 64
+    _write_json(manifest_path, manifest)
+
+
 def _schema_bundle() -> tuple[str, dict[str, object]]:
     native = {
         "type": "function",
@@ -105,9 +119,10 @@ def _write_run(
     mode: str,
     authority_mode: str,
     authority_tasks_sha256: str,
-    outcomes: tuple[float | None, float | None],
+    outcomes: tuple[float, float],
     generated_called: int = 1,
 ) -> None:
+    evaluator = outcome_evaluator_manifest()
     digest, bundle = _schema_bundle()
     ordered_schema_sha256 = _canonical_sha256(bundle["ordered_schemas"])
     audit_rows: list[dict[str, object]] = []
@@ -257,6 +272,9 @@ def _write_run(
                 {
                     "name": scenario,
                     "outcome_similarity": outcome,
+                    "outcome_evaluator_version": evaluator["version"],
+                    "outcome_evaluator_contract_sha256": evaluator["contract_sha256"],
+                    "outcome_evaluator_source_sha256": evaluator["source_sha256"],
                     "exception_type": None,
                     "traceback": None,
                     "transient_retry_count": 0,
@@ -293,6 +311,10 @@ def _write_run(
     )
     _write_jsonl(run_dir / "scenario_tool_selection.jsonl", selection_rows)
     _write_json(
+        run_dir.parent / "sage_ts_run_manifest.json",
+        {"outcome_evaluator": evaluator},
+    )
+    _write_json(
         run_dir / "selection_summary.json",
         {
             "scenario_count": len(SCENARIOS),
@@ -311,8 +333,8 @@ def _write_run(
 
 
 def _write_experiment(tmp_path: Path) -> tuple[Path, Path, Path]:
-    policy_dir = tmp_path / "policy"
-    auto_dir = tmp_path / "auto"
+    policy_dir = tmp_path / "policy" / "run"
+    auto_dir = tmp_path / "auto" / "run"
     authority_path = tmp_path / "authority" / "inventory_authority.json"
     tasks = []
     for index, scenario in enumerate(SCENARIOS):
@@ -361,14 +383,14 @@ def _write_experiment(tmp_path: Path) -> tuple[Path, Path, Path]:
         mode="policy",
         authority_mode="capture",
         authority_tasks_sha256=authority_tasks_sha256,
-        outcomes=(0.0, None),
+        outcomes=(0.0, 0.25),
     )
     _write_run(
         auto_dir,
         mode="auto",
         authority_mode="replay",
         authority_tasks_sha256=authority_tasks_sha256,
-        outcomes=(1.0, None),
+        outcomes=(1.0, 0.25),
     )
     return policy_dir, auto_dir, authority_path
 
@@ -383,16 +405,21 @@ def test_matched_experiment_verifies_exact_schemas_and_outcomes(tmp_path: Path) 
         require_zero_generated_tool_failures=True,
     )
 
+    assert report["mechanism_counts_are_performance_gates"] is False
+    assert report["outcome_evidence_complete"] is True
+    assert report["performance_gate_applied"] is False
+    assert report["integrity_gate_passed"] is True
+    assert report["experiment_passed"] is True
     assert report["stability_gate_passed"] is True
     assert report["routed_schemas_identical_by_scenario"] is True
     assert report["persistent_response_cache_reuse"] is False
     outcomes = report["outcomes"]
     assert outcomes["canonical_similarity_included"] is False
-    assert outcomes["outcome_evaluated_count"] == 1
-    assert outcomes["outcome_not_evaluated_count"] == 1
+    assert outcomes["outcome_evaluated_count"] == 2
+    assert outcomes["outcome_not_evaluated_count"] == 0
     assert outcomes["policy_exact_outcome_successes"] == 0
     assert outcomes["auto_exact_outcome_successes"] == 1
-    assert outcomes["auto_minus_policy_mean_outcome_delta"] == 1.0
+    assert outcomes["auto_minus_policy_mean_outcome_delta"] == 0.5
 
 
 def test_matched_experiment_rejects_auto_named_choice(tmp_path: Path) -> None:
@@ -502,17 +529,28 @@ def test_matched_experiment_revalidates_authority_state_files(tmp_path: Path) ->
         )
 
 
-def test_outcome_comparison_rejects_evaluator_availability_drift(
+@pytest.mark.parametrize(
+    ("invalid_outcome", "message"),
+    [
+        (None, "Missing outcome value"),
+        (True, "Invalid outcome value"),
+        ("0.5", "Invalid outcome value"),
+        (float("nan"), "Out-of-range outcome value"),
+    ],
+)
+def test_outcome_comparison_rejects_invalid_outcome(
     tmp_path: Path,
+    invalid_outcome: object,
+    message: str,
 ) -> None:
     policy_dir, auto_dir, _authority_path = _write_experiment(tmp_path)
     auto = json.loads((auto_dir / "result_summary.json").read_text(encoding="utf-8"))
-    auto["per_scenario_results"][1]["outcome_similarity"] = 1.0
+    auto["per_scenario_results"][1]["outcome_similarity"] = invalid_outcome
     _write_json(auto_dir / "result_summary.json", auto)
 
     with pytest.raises(
         ActorSelectionVerificationError,
-        match="availability changed",
+        match=message,
     ):
         compare_outcome_values(
             policy_dir,
@@ -521,7 +559,29 @@ def test_outcome_comparison_rejects_evaluator_availability_drift(
         )
 
 
-def test_stability_gate_rejects_generated_tool_execution_failures(
+@pytest.mark.parametrize("location", ["row", "manifest"])
+def test_outcome_comparison_rejects_evaluator_identity_drift(
+    tmp_path: Path,
+    location: str,
+) -> None:
+    policy_dir, auto_dir, _authority_path = _write_experiment(tmp_path)
+    if location == "row":
+        _tamper_outcome_row_identity(auto_dir)
+    else:
+        _tamper_outcome_manifest_identity(auto_dir)
+
+    with pytest.raises(
+        ActorSelectionVerificationError,
+        match="wrong outcome evaluator|identity mismatch",
+    ):
+        compare_outcome_values(
+            policy_dir,
+            auto_dir,
+            expected_scenarios=SCENARIOS,
+        )
+
+
+def test_generated_tool_execution_failures_are_diagnostic_only(
     tmp_path: Path,
 ) -> None:
     policy_dir, auto_dir, authority_path = _write_experiment(tmp_path)
@@ -552,11 +612,22 @@ def test_stability_gate_rejects_generated_tool_execution_failures(
         require_zero_generated_tool_failures=True,
     )
 
-    assert report["stability_gate_passed"] is False
-    assert "auto_generated_tool_execution_failures" in report["stability_gate_reasons"]
+    assert report["mechanism_counts_are_performance_gates"] is False
+    assert report["mechanism_diagnostics"]["affects_experiment_pass_fail"] is False
+    assert report["mechanism_diagnostics"]["auto"] == {
+        "generated_tool_called_scenarios": 0,
+        "generated_tool_failed_scenarios": 1,
+        "generated_tool_attempted_without_success_scenarios": 0,
+    }
+    assert report["integrity_gate_passed"] is True
+    assert report["experiment_passed"] is True
+    assert report["stability_gate_passed"] is True
+    assert report["stability_gate_reasons"] == []
 
 
-def test_pilot_gate_rejects_side_effect_preservation_failures(tmp_path: Path) -> None:
+def test_pilot_gate_treats_native_followup_preservation_as_diagnostic(
+    tmp_path: Path,
+) -> None:
     policy_dir, auto_dir, authority_path = _write_experiment(tmp_path)
     summary = json.loads((auto_dir / "result_summary.json").read_text(encoding="utf-8"))
     summary["per_scenario_results"][0]["side_effect_preservation_failures"] = [
@@ -576,8 +647,11 @@ def test_pilot_gate_rejects_side_effect_preservation_failures(tmp_path: Path) ->
         require_zero_generated_tool_failures=True,
     )
 
-    assert report["stability_gate_passed"] is False
-    assert "auto_side_effect_preservation_failures" in report["stability_gate_reasons"]
+    assert report["stability_gate_passed"] is True
+    assert (
+        "auto_side_effect_preservation_failures" not in report["stability_gate_reasons"]
+    )
+    assert report["auto_execution"]["side_effect_preservation_failure_count"] == 1
 
 
 def test_selection_summary_counters_are_recomputed_from_raw_rows(
@@ -617,7 +691,7 @@ def test_selection_rows_must_follow_exact_authority_order(tmp_path: Path) -> Non
         )
 
 
-def test_pilot_gate_rejects_generated_tool_attempt_without_success(
+def test_pilot_generated_tool_attempt_without_success_is_diagnostic_only(
     tmp_path: Path,
 ) -> None:
     policy_dir, auto_dir, authority_path = _write_experiment(tmp_path)
@@ -647,11 +721,76 @@ def test_pilot_gate_rejects_generated_tool_attempt_without_success(
         require_zero_generated_tool_failures=True,
     )
 
-    assert report["stability_gate_passed"] is False
-    assert (
-        "auto_generated_tool_attempts_without_success"
-        in report["stability_gate_reasons"]
+    assert report["mechanism_diagnostics"]["auto"] == {
+        "generated_tool_called_scenarios": 0,
+        "generated_tool_failed_scenarios": 0,
+        "generated_tool_attempted_without_success_scenarios": 1,
+    }
+    assert report["integrity_gate_passed"] is True
+    assert report["experiment_passed"] is True
+    assert report["stability_gate_passed"] is True
+    assert report["stability_gate_reasons"] == []
+
+
+def test_experiment_rejects_incomplete_outcome_evidence(tmp_path: Path) -> None:
+    policy_dir, auto_dir, authority_path = _write_experiment(tmp_path)
+    result = json.loads((auto_dir / "result_summary.json").read_text(encoding="utf-8"))
+    result["per_scenario_results"][0]["outcome_similarity"] = None
+    _write_matching_result_summaries(auto_dir, result)
+
+    with pytest.raises(
+        ActorSelectionVerificationError,
+        match="Missing outcome value",
+    ):
+        verify_matched_actor_selection_experiment(
+            policy_dir=policy_dir,
+            auto_dir=auto_dir,
+            authority_path=authority_path,
+            require_zero_generated_tool_failures=True,
+        )
+
+
+def test_outcome_difference_is_report_only_without_predeclared_threshold(
+    tmp_path: Path,
+) -> None:
+    policy_dir, auto_dir, authority_path = _write_experiment(tmp_path)
+    result = json.loads((auto_dir / "result_summary.json").read_text(encoding="utf-8"))
+    for row in result["per_scenario_results"]:
+        row["outcome_similarity"] = 0.0
+    _write_matching_result_summaries(auto_dir, result)
+
+    report = verify_matched_actor_selection_experiment(
+        policy_dir=policy_dir,
+        auto_dir=auto_dir,
+        authority_path=authority_path,
     )
+
+    assert report["outcomes"]["auto_minus_policy_mean_outcome_delta"] == -0.125
+    assert report["outcome_evidence_complete"] is True
+    assert report["performance_gate_applied"] is False
+    assert report["experiment_passed"] is True
+
+
+def test_runtime_exception_fails_integrity_and_overall_status(tmp_path: Path) -> None:
+    policy_dir, auto_dir, authority_path = _write_experiment(tmp_path)
+    result = json.loads((auto_dir / "result_summary.json").read_text(encoding="utf-8"))
+    result["per_scenario_results"][0]["exception_type"] = "RuntimeError"
+    result["per_scenario_results"][0]["traceback"] = "synthetic traceback"
+    _write_matching_result_summaries(auto_dir, result)
+
+    report = verify_matched_actor_selection_experiment(
+        policy_dir=policy_dir,
+        auto_dir=auto_dir,
+        authority_path=authority_path,
+        require_zero_generated_tool_failures=True,
+    )
+
+    assert report["outcome_evidence_complete"] is True
+    assert report["performance_gate_applied"] is False
+    assert report["integrity_gate_passed"] is False
+    assert report["integrity_gate_reasons"] == ["auto_runtime_exceptions"]
+    assert report["experiment_passed"] is False
+    assert report["stability_gate_passed"] is False
 
 
 def test_live_run_rejects_cache_artifact(tmp_path: Path) -> None:

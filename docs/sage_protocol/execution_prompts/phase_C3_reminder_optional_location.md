@@ -1,5 +1,8 @@
 # Phase C.3 — reminder optional-location handling
 
+> **SUPERSEDED — ARCHIVAL EXECUTION PROMPT.** Do not execute these instructions;
+> use the current publication protocol in `../current_state.md`.
+
 Objective:
 Upgrade the reminder helper lane only where it creates decisive value.
 

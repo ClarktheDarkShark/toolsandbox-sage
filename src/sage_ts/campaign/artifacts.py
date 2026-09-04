@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -96,11 +98,39 @@ def read_json(path: Path, default: dict[str, Any] | None = None) -> dict[str, An
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
-    return [
-        json.loads(line)
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    rows: list[dict[str, Any]] = []
+    for index, line in enumerate(lines):
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            # A live dashboard can read between an append opening and its final
+            # newline. Ignore only that incomplete tail; a malformed committed
+            # line remains an error so preserved evidence cannot be hidden.
+            if index == len(lines) - 1 and not text.endswith("\n"):
+                break
+            raise
+    return rows
+
+
+def _append_bytes(path: Path, payload: bytes) -> None:
+    descriptor = os.open(
+        path,
+        os.O_APPEND | os.O_CREAT | os.O_WRONLY,
+        0o666,
+    )
+    try:
+        remaining = memoryview(payload)
+        while remaining:
+            written = os.write(descriptor, remaining)
+            if written <= 0:
+                raise OSError(f"Could not append campaign event to {path}")
+            remaining = remaining[written:]
+    finally:
+        os.close(descriptor)
 
 
 def append_event(
@@ -121,13 +151,20 @@ def append_event(
         "branch": git_value("branch", "--show-current"),
         **(payload or {}),
     }
-    line = json.dumps(row, sort_keys=True)
+    line = (json.dumps(row, sort_keys=True) + "\n").encode("utf-8")
     date_path = event_dir / f"{datetime.now(timezone.utc).strftime('%Y%m%d')}.jsonl"
     latest_path = event_dir / "latest.jsonl"
-    with date_path.open("a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
-    with latest_path.open("a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
+    # Both model-arm processes append to this shared event stream. One advisory
+    # lock plus unbuffered O_APPEND writes prevents record interleaving and keeps
+    # the dated and latest streams in the same order, even after a short write.
+    lock_path = event_dir / ".append.lock"
+    with lock_path.open("a+b") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            _append_bytes(date_path, line)
+            _append_bytes(latest_path, line)
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
     return row
 
 

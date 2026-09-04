@@ -1,5 +1,8 @@
 # Phase C.2 — resolve_search_window_or_bounds
 
+> **SUPERSEDED — ARCHIVAL EXECUTION PROMPT.** Do not execute these instructions;
+> use the current publication protocol in `../current_state.md`.
+
 Objective:
 Implement `resolve_search_window_or_bounds` as the next decisive tool.
 

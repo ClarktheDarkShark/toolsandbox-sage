@@ -171,6 +171,11 @@ def _valid_campaign(
             },
         },
         "maximum_parallel_runs": campaign.MAX_CONCURRENCY,
+        "parallelism_unit": "paired_protocol_job",
+        "model_arms_per_paired_protocol_job": (
+            campaign.MODEL_ARMS_PER_PAIRED_PROTOCOL_JOB
+        ),
+        "maximum_concurrent_model_arms": campaign.MAX_CONCURRENT_MODEL_ARMS,
         "execution_waves": campaign._expected_execution_waves(campaign.MAX_CONCURRENCY),
         "statistical_plan": campaign._expected_statistical_plan(),
         "claim_safeguards": campaign._expected_claim_safeguards(),
@@ -225,6 +230,69 @@ def test_campaign_prerequisites_accept_only_the_frozen_plan(
             "write_report": False,
         }
     ]
+
+
+def test_campaign_plan_requires_full_outcome_coverage_and_pinned_timezone() -> None:
+    statistical_plan = campaign._expected_statistical_plan()
+    safeguards = campaign._expected_claim_safeguards()
+
+    assert statistical_plan["outcome_scored_tasks_per_run"] == 1032
+    assert statistical_plan["expected_outcome_scored_pairs"] == 10_320
+    assert statistical_plan["matched_online_task_pairs"] == 10_320
+    assert statistical_plan["primary_measure"] == "outcome/task completion"
+    assert safeguards["execution_environment"]["TZ"] == "America/New_York"
+    assert "canonical_metric_policy" not in safeguards
+    assert campaign.MAX_CONCURRENCY == 5
+    assert (
+        campaign.MAX_CONCURRENCY * campaign.MODEL_ARMS_PER_PAIRED_PROTOCOL_JOB
+        == campaign.MAX_CONCURRENT_MODEL_ARMS
+    )
+
+
+def test_campaign_job_pins_pair_only_execution_and_dashboard_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+    monkeypatch.setenv("SAGE_AUTO_SELECTION_EXPERIMENT", "1")
+    monkeypatch.setenv("SAGE_AUTO_SELECTION_PILOT_EVIDENCE", "stale.json")
+    monkeypatch.setenv("SAGE_BATCH_NO_DASHBOARD_OPEN", "1")
+
+    _command, env, _log = campaign._job_command(
+        repo_root=tmp_path,
+        manifest=manifest,
+        pair=manifest["run_pairs"][0],
+        arm="online",
+        port=63900,
+    )
+
+    assert env["SAGE_AUTO_SELECTION_EXPERIMENT"] == "0"
+    assert "SAGE_AUTO_SELECTION_PILOT_EVIDENCE" not in env
+    assert env["SAGE_BATCH_NO_DASHBOARD_OPEN"] == "0"
+
+
+def test_campaign_dashboard_port_is_stable_for_partial_wave_resume() -> None:
+    assert (
+        campaign._replication_dashboard_port(
+            base_port=63900,
+            replication=1,
+        )
+        == 63900
+    )
+    assert (
+        campaign._replication_dashboard_port(
+            base_port=63900,
+            replication=7,
+        )
+        == 63906
+    )
+    assert (
+        campaign._replication_dashboard_port(
+            base_port=63910,
+            replication=7,
+        )
+        == 63916
+    )
 
 
 @pytest.mark.parametrize("field", campaign._expected_statistical_plan())

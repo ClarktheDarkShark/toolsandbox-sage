@@ -1,5 +1,8 @@
 # Stop Note
 
+> **SUPERSEDED — ARCHIVAL PHASE CHECKPOINT.** This note does not describe the
+> current publication state. See [current_state.md](current_state.md).
+
 Checkpoint written after Phase C.2.
 
 Reason:

@@ -1,5 +1,9 @@
 # SAGE v061 Architecture Figure Validation
 
+> **SUPERSEDED — ARCHIVAL V061 FIGURE VALIDATION.** This report validates a
+> historical figure set, not the current publication architecture or evidence.
+> See [../../current_state.md](../../current_state.md).
+
 Validated against implementation commit `2546640` and the canonical v061 protocol artifacts.
 
 Result: **PASS (143 checks)**

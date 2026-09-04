@@ -1,5 +1,9 @@
 # Phase A Foundation Measurement Report
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This development report is not a current
+> protocol, release gate, or paper result. Its values and decision labels must
+> not be carried forward. See [current_state.md](current_state.md).
+
 **Objective:** Verify registry claim-safety, scoring/spine audibility, reporting exports, and live protocol smoke execution on clean registry with generation OFF.
 
 ## Commands run

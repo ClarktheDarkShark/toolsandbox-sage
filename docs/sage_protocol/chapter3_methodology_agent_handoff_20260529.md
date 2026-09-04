@@ -1,5 +1,9 @@
 # Chapter 3 Methodology Agent Handoff - 2026-05-29
 
+> **SUPERSEDED — ARCHIVAL HANDOFF.** Commands and source paths below describe a
+> retired development tree and are not runnable publication instructions. See
+> [current_state.md](current_state.md).
+
 This file is for a new agent whose job is to support Chapter 3 methodology
 writing for the SAGE praxis. The agent should become fluent in the validated
 ToolSandbox SAGE implementation, the self-evolving Praxis pipeline, the
@@ -228,7 +232,7 @@ For the future whole-dataset run:
 
 - `docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json`
 - mode: `online_build_full`
-- use `scripts/prepare_toolsandbox_full_self_evolving_run.py`
+- use the then-current whole-dataset preflight (launcher since removed)
 
 ## Candidate A/B/C Run Commands
 
@@ -639,7 +643,7 @@ git diff --check
 For code touched by methodology setup:
 
 ```bash
-python -m py_compile scripts/run_sage_protocol.py scripts/prepare_toolsandbox_full_self_evolving_run.py
+python -m py_compile scripts/run_sage_protocol.py
 ```
 
 For dashboard/standalone/import-agent material:

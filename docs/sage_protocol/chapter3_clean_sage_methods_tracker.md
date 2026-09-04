@@ -1,5 +1,9 @@
 # Chapter 3 Clean SAGE Methods Tracker
 
+> **SUPERSEDED — ARCHIVAL V061 DEVELOPMENT LEDGER.** The “current” statements,
+> cached baseline, metric values, and method decisions below are historical and
+> ineligible for the publication rerun. See [current_state.md](current_state.md).
+
 Last updated: 2026-06-12 13:15 ET
 
 Purpose: track the implementation methods used for the Chapter 3 primary SAGE evidence while excluding mechanisms that would give SAGE an unfair advantage over the baseline. This file is a working methods ledger for dissertation writing, not a results claim by itself.

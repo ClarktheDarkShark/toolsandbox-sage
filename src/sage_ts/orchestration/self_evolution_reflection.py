@@ -11,6 +11,7 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from queue import Empty
 from typing import Any
 
 from sage_ts.evaluation.control_baseline_cache import (
@@ -24,6 +25,10 @@ from sage_ts.registry.store import RegistryStore
 from tool_sandbox.common.scenario import Scenario
 
 REFLECTION_CONTROL_CACHE_ROOT_ENV = "SAGE_SELF_EVOLVING_CONTROL_CACHE_ROOT"
+FRESH_CONTROL_ROW_EVENT = "fresh_control_row"
+FRESH_CONTROL_COMPLETE_EVENT = "fresh_control_complete"
+FRESH_CONTROL_ERROR_EVENT = "fresh_control_error"
+FRESH_CONTROL_WAIT_TIMEOUT_SECONDS = 1800.0
 
 
 def _optional_float(value: Any) -> float | None:
@@ -47,6 +52,8 @@ class ToolLifecycleStats:
     failed_count: int = 0
     visible_not_called_count: int = 0
     side_effect_incident_count: int = 0
+    # Canonical deltas remain in artifacts for backward compatibility only.
+    # Outcome deltas are the sole quality signal used by lifecycle decisions.
     called_score_deltas: list[float] = field(default_factory=list)
     called_outcome_deltas: list[float] = field(default_factory=list)
     visible_score_deltas: list[float] = field(default_factory=list)
@@ -102,6 +109,8 @@ class SelfEvolutionReflectionController:
     control_cache: ControlBaselineCache | None
     fresh_control_rows: dict[str, dict[str, Any]] | None = None
     require_fresh_control: bool = False
+    fresh_control_channel: Any | None = field(default=None, repr=False)
+    fresh_control_stream_complete: bool = field(default=False, init=False)
     fresh_control_consumed: set[str] = field(default_factory=set)
     pulse_interval: int = 4
     min_pulse_tasks: int = 8
@@ -110,6 +119,7 @@ class SelfEvolutionReflectionController:
     completed_count: int = 0
     cache_hit_count: int = 0
     cache_miss_count: int = 0
+    # Report-only compatibility series; never consulted by reflection policy.
     score_deltas: list[float] = field(default_factory=list)
     outcome_deltas: list[float] = field(default_factory=list)
     control_scores: list[float] = field(default_factory=list)
@@ -119,6 +129,32 @@ class SelfEvolutionReflectionController:
     tool_stats: dict[str, ToolLifecycleStats] = field(default_factory=dict)
     bucket_stats: dict[str, dict[str, Any]] = field(default_factory=dict)
     retired_this_run: set[str] = field(default_factory=set)
+
+    def __post_init__(self) -> None:
+        if (
+            self.fresh_control_rows is not None
+            and self.fresh_control_channel is not None
+        ):
+            raise ValueError(
+                "Strict fresh-control reflection accepts either completed rows or "
+                "a streaming channel, not both."
+            )
+        if self.fresh_control_channel is not None and not self.require_fresh_control:
+            raise ValueError(
+                "A fresh-control streaming channel requires strict fresh-control "
+                "reflection."
+            )
+        if (
+            self.require_fresh_control
+            and self.fresh_control_rows is None
+            and self.fresh_control_channel is None
+        ):
+            raise ValueError(
+                "Strict fresh-control reflection requires same-run control rows or "
+                "a streaming channel."
+            )
+        if self.fresh_control_channel is not None:
+            self.fresh_control_rows = {}
 
     @classmethod
     def from_env(
@@ -132,10 +168,26 @@ class SelfEvolutionReflectionController:
         manifest_path: Path,
         fresh_control_rows: dict[str, dict[str, Any]] | None = None,
         require_fresh_control: bool = False,
+        fresh_control_channel: Any | None = None,
     ) -> "SelfEvolutionReflectionController":
-        if require_fresh_control and fresh_control_rows is None:
+        if fresh_control_rows is not None and fresh_control_channel is not None:
             raise ValueError(
-                "Strict fresh-control reflection requires same-run control rows."
+                "Strict fresh-control reflection accepts either completed rows or "
+                "a streaming channel, not both."
+            )
+        if fresh_control_channel is not None and not require_fresh_control:
+            raise ValueError(
+                "A fresh-control streaming channel requires strict fresh-control "
+                "reflection."
+            )
+        if (
+            require_fresh_control
+            and fresh_control_rows is None
+            and fresh_control_channel is None
+        ):
+            raise ValueError(
+                "Strict fresh-control reflection requires same-run control rows or "
+                "a streaming channel."
             )
         control_cache: ControlBaselineCache | None = None
         if not require_fresh_control:
@@ -157,6 +209,7 @@ class SelfEvolutionReflectionController:
                 else None
             ),
             require_fresh_control=require_fresh_control,
+            fresh_control_channel=fresh_control_channel,
             pulse_interval=4,
             min_pulse_tasks=8,
             min_score_lift_percent=8.0,
@@ -200,12 +253,7 @@ class SelfEvolutionReflectionController:
                 "Cannot resume strict fresh-control reflection from feedback "
                 f"without same-run provenance: {scenario_name!r}."
             )
-        expected_score = _optional_float(row.get("similarity"))
         expected_outcome = _optional_float(row.get("outcome_similarity"))
-        if _optional_float(feedback.get("control_score")) != expected_score:
-            raise ValueError(
-                f"Resumed fresh control score changed for {scenario_name!r}."
-            )
         if _optional_float(feedback.get("control_outcome")) != expected_outcome:
             raise ValueError(
                 f"Resumed fresh control outcome changed for {scenario_name!r}."
@@ -220,6 +268,12 @@ class SelfEvolutionReflectionController:
     ) -> dict[str, Any]:
         if self.fresh_control_rows is None:
             raise ValueError("Same-run fresh control rows are not configured.")
+        if (
+            scenario_name
+            and scenario_name not in self.fresh_control_rows
+            and self.fresh_control_channel is not None
+        ):
+            self._consume_streamed_control_message(expected_scenario=scenario_name)
         if not scenario_name or scenario_name not in self.fresh_control_rows:
             raise ValueError(
                 f"Missing same-run fresh control observation for {scenario_name!r}."
@@ -237,6 +291,124 @@ class SelfEvolutionReflectionController:
             self.fresh_control_consumed.add(scenario_name)
         return row
 
+    def _consume_streamed_control_message(
+        self,
+        *,
+        expected_scenario: str | None,
+    ) -> None:
+        if self.fresh_control_channel is None:
+            raise ValueError("Same-run fresh control streaming is not configured.")
+        if self.fresh_control_stream_complete:
+            if expected_scenario is None:
+                return
+            raise ValueError(
+                "Missing streamed same-run fresh control observation for "
+                f"{expected_scenario!r}; the control stream is already complete."
+            )
+        try:
+            message = self.fresh_control_channel.get(
+                timeout=FRESH_CONTROL_WAIT_TIMEOUT_SECONDS
+            )
+        except Empty as exc:
+            awaited = (
+                repr(expected_scenario)
+                if expected_scenario is not None
+                else "the completion marker"
+            )
+            raise ValueError(
+                f"Timed out waiting for streamed same-run fresh control for {awaited}."
+            ) from exc
+        except (EOFError, OSError) as exc:
+            raise ValueError(
+                "Same-run fresh control stream failed before completion."
+            ) from exc
+        if not isinstance(message, dict):
+            raise ValueError(
+                "Same-run fresh control stream emitted a non-object message."
+            )
+
+        event = message.get("event")
+        if event == FRESH_CONTROL_ERROR_EVENT:
+            detail = str(message.get("error") or "unknown control-arm failure")
+            raise ValueError(f"Same-run fresh control producer failed: {detail}")
+        if event == FRESH_CONTROL_COMPLETE_EVENT:
+            self.fresh_control_stream_complete = True
+            if expected_scenario is not None:
+                raise ValueError(
+                    "Missing streamed same-run fresh control observation for "
+                    f"{expected_scenario!r}; the control stream completed first."
+                )
+            return
+        if event != FRESH_CONTROL_ROW_EVENT:
+            raise ValueError(
+                f"Same-run fresh control stream emitted unknown event {event!r}."
+            )
+
+        scenario_name = message.get("scenario")
+        row = message.get("row")
+        if not isinstance(scenario_name, str) or not scenario_name:
+            raise ValueError(
+                "Streamed same-run fresh control row has no scenario name."
+            )
+        if not isinstance(row, dict):
+            raise ValueError(
+                f"Streamed same-run fresh control row for {scenario_name!r} is invalid."
+            )
+        if str(row.get("name") or "") != scenario_name:
+            raise ValueError(
+                "Streamed same-run fresh control message and result row disagree for "
+                f"{scenario_name!r}."
+            )
+        cache_source = str(row.get("control_cache_source") or "").strip().lower()
+        cache_detail = row.get("control_cache")
+        if cache_source and cache_source != "fresh":
+            raise ValueError(
+                f"Streamed control row for {scenario_name!r} is cache sourced."
+            )
+        if isinstance(cache_detail, dict) and (
+            str(cache_detail.get("source") or "").strip().lower() == "cached"
+            or bool(cache_detail.get("record_ids"))
+        ):
+            raise ValueError(
+                f"Streamed control row for {scenario_name!r} contains cached data."
+            )
+        if "llm_cached_call_count" not in row:
+            raise ValueError(
+                f"Streamed control row for {scenario_name!r} lacks response-replay "
+                "provenance."
+            )
+        try:
+            cached_call_count = int(row["llm_cached_call_count"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Streamed control row for {scenario_name!r} has invalid "
+                "response-replay provenance."
+            ) from exc
+        if cached_call_count:
+            raise ValueError(
+                f"Streamed control row for {scenario_name!r} contains repository "
+                "whole-response replay."
+            )
+        if scenario_name in (self.fresh_control_rows or {}):
+            raise ValueError(
+                f"Duplicate streamed same-run fresh control for {scenario_name!r}."
+            )
+        if expected_scenario is None:
+            raise ValueError(
+                "Unexpected streamed same-run fresh control row after the candidate "
+                f"cohort: {scenario_name!r}."
+            )
+        if scenario_name != expected_scenario:
+            raise ValueError(
+                "Out-of-order streamed same-run fresh control: expected "
+                f"{expected_scenario!r}, observed {scenario_name!r}."
+            )
+        if self.fresh_control_rows is None:
+            raise AssertionError(
+                "Fresh-control stream row storage was not initialized."
+            )
+        self.fresh_control_rows[scenario_name] = dict(row)
+
     def assert_fresh_control_complete(
         self,
         expected_scenarios: tuple[str, ...],
@@ -244,6 +416,11 @@ class SelfEvolutionReflectionController:
         """Fail closed unless reflection consumed one fresh row per candidate task."""
         if not self.require_fresh_control:
             return
+        if (
+            self.fresh_control_channel is not None
+            and not self.fresh_control_stream_complete
+        ):
+            self._consume_streamed_control_message(expected_scenario=None)
         expected = set(expected_scenarios)
         available = set(self.fresh_control_rows or {})
         consumed = set(self.fresh_control_consumed)
@@ -280,7 +457,17 @@ class SelfEvolutionReflectionController:
         control_score = _optional_float(row.get("control_score"))
         score_delta = _optional_float(row.get("score_delta"))
         control_outcome = _optional_float(row.get("control_outcome"))
+        candidate_outcome = _optional_float(row.get("candidate_outcome"))
         outcome_delta = _optional_float(row.get("outcome_delta"))
+        if (
+            control_outcome is None
+            or candidate_outcome is None
+            or outcome_delta is None
+        ):
+            raise ValueError(
+                "Outcome-only reflection requires non-null matched control and "
+                f"candidate outcomes for {scenario_name!r}."
+            )
         if score_delta is not None:
             self.score_deltas.append(score_delta)
             if control_score is not None:
@@ -365,10 +552,10 @@ class SelfEvolutionReflectionController:
                     stats.called_score_deltas.append(score_delta)
                 if outcome_delta is not None:
                     stats.called_outcome_deltas.append(outcome_delta)
-                if self._is_harmful_call(score_delta, outcome_delta):
+                if self._is_harmful_call(outcome_delta):
                     stats.harmful_called_scenarios.append(task_context_label)
                     stats.harmful_called_families.append(family)
-                elif self._is_helpful_call(score_delta, outcome_delta):
+                elif self._is_helpful_call(outcome_delta):
                     stats.helpful_called_scenarios.append(task_context_label)
                     stats.helpful_called_families.append(family)
             if tool_name in attempted:
@@ -428,6 +615,11 @@ class SelfEvolutionReflectionController:
                 score_delta = candidate_score - control_score
             if control_outcome is not None and candidate_outcome is not None:
                 outcome_delta = candidate_outcome - control_outcome
+        if control_outcome is None or candidate_outcome is None:
+            raise ValueError(
+                "Outcome-only reflection requires non-null matched control and "
+                f"candidate outcomes for {scenario_name!r}."
+            )
 
         visible = list(selection_record.get("generated_tools_visible") or [])
         called = list(selection_record.get("generated_tools_called") or [])
@@ -440,7 +632,6 @@ class SelfEvolutionReflectionController:
             scenario_name=lifecycle_context,
             called_tools=called,
             side_effect_failures=side_effect_failures,
-            score_delta=score_delta,
             outcome_delta=outcome_delta,
             exception_type=result.get("exception_type"),
         )
@@ -486,23 +677,15 @@ class SelfEvolutionReflectionController:
 
     def _is_harmful_call(
         self,
-        score_delta: float | None,
         outcome_delta: float | None,
     ) -> bool:
-        if outcome_delta is not None:
-            if outcome_delta >= 0:
-                return False
-            return outcome_delta <= -0.25
-        return score_delta is not None and score_delta <= -0.50
+        return outcome_delta is not None and outcome_delta <= -0.25
 
     def _is_helpful_call(
         self,
-        score_delta: float | None,
         outcome_delta: float | None,
     ) -> bool:
-        if outcome_delta is not None and outcome_delta >= 0.10:
-            return True
-        return score_delta is not None and score_delta >= 0.10
+        return outcome_delta is not None and outcome_delta >= 0.10
 
     def _retire_tool(
         self, tool_name: str, reason: str, scenario_name: str
@@ -554,13 +737,12 @@ class SelfEvolutionReflectionController:
         scenario_name: str,
         called_tools: list[str],
         side_effect_failures: list[str],
-        score_delta: float | None,
         outcome_delta: float | None,
         exception_type: Any,
     ) -> list[dict[str, Any]]:
         actions: list[dict[str, Any]] = []
         for tool_name in side_effect_failures:
-            if exception_type or self._is_harmful_call(score_delta, outcome_delta):
+            if exception_type or self._is_harmful_call(outcome_delta):
                 actions.append(
                     self._retire_tool(
                         tool_name,
@@ -588,7 +770,7 @@ class SelfEvolutionReflectionController:
                     )
                 )
                 continue
-            if self._is_harmful_call(score_delta, outcome_delta):
+            if self._is_harmful_call(outcome_delta):
                 actions.append(
                     self._route_repair_tool(
                         tool_name,
@@ -605,15 +787,9 @@ class SelfEvolutionReflectionController:
             decision = "diagnostic"
             reason = "insufficient_evidence"
             called_outcome = row["called_outcome_delta_mean"]
-            called_score = row["called_score_delta_mean"]
-            helpful_count = len(stats.helpful_called_scenarios)
-            harmful_count = len(stats.harmful_called_scenarios)
-            if called_outcome is not None:
-                negative_called_subset = called_outcome < -0.05
-            else:
-                negative_called_subset = (
-                    called_score is not None and called_score < -0.05
-                ) or harmful_count > helpful_count
+            negative_called_subset = (
+                called_outcome is not None and called_outcome < -0.05
+            )
             if tool_name in self.retired_this_run:
                 decision = "parked"
                 reason = "retired_this_run"
@@ -634,24 +810,27 @@ class SelfEvolutionReflectionController:
             elif stats.harmful_called_scenarios:
                 decision = "needs_route_repair"
                 reason = "harmful_called_subset_without_global_retirement"
-            elif stats.called_count >= 2 and (
-                (called_outcome is not None and called_outcome > 0.05)
-                or (called_score is not None and called_score > 0.05)
+            elif (
+                stats.called_count >= 2
+                and called_outcome is not None
+                and called_outcome > 0.05
             ):
                 decision = "retain"
                 reason = "positive_called_subset"
-            elif stats.called_count >= 2 and (
-                (called_outcome is not None and called_outcome < 0)
-                and (called_score is None or called_score < 0)
+            elif (
+                stats.called_count >= 2
+                and called_outcome is not None
+                and called_outcome < 0
             ):
                 decision = "needs_repair"
                 reason = "negative_called_subset"
             elif stats.visible_count >= 8 and stats.called_count == 0:
                 decision = "adoption_repair"
                 reason = "visible_not_called_repeatedly"
-            elif stats.called_count == 1 and (
-                (called_outcome is not None and called_outcome > 0.05)
-                or (called_score is not None and called_score > 0.05)
+            elif (
+                stats.called_count == 1
+                and called_outcome is not None
+                and called_outcome > 0.05
             ):
                 decision = "keep_sparse_positive"
                 reason = "single_positive_called_event"
@@ -678,15 +857,11 @@ class SelfEvolutionReflectionController:
             on_track = False
             reasons.append("side_effect_incidents_present")
         if self.completed_count >= self.min_pulse_tasks:
-            score_ok = (
-                score_lift_percent is not None
-                and score_lift_percent >= self.min_score_lift_percent
-            )
             outcome_ok = (
                 outcome_delta_mean is not None
                 and outcome_delta_mean >= self.min_outcome_delta
             )
-            if not (score_ok or outcome_ok):
+            if not outcome_ok:
                 on_track = False
                 reasons.append("pulse_lift_below_threshold")
 
@@ -713,7 +888,6 @@ class SelfEvolutionReflectionController:
         for bucket, stats in self.bucket_stats.items():
             score = (
                 float(stats["negative_outcome_mass"]) * 10.0
-                + float(stats["negative_score_mass"])
                 + float(stats["no_visible_helper"]) * 0.05
                 + float(stats["no_called_helper"]) * 0.025
             )

@@ -29,19 +29,28 @@ def _patch_run_one_dependencies(monkeypatch) -> None:
     def make_role(*_args: object, **_kwargs: object) -> _NoopRole:
         return _NoopRole()
 
+    def fake_outcome_score(
+        _scenario: object,
+        _execution_context: object,
+        *,
+        scenario_name: str,
+    ) -> dict[str, object]:
+        assert scenario_name
+        return {
+            "outcome_similarity": 1.0,
+            "outcome_milestone_similarity": 1.0,
+            "outcome_minefield_similarity": 1.0,
+            "outcome_check_count": 1,
+            "outcome_checks": [],
+        }
+
     monkeypatch.setattr(toolsandbox_adapter, "make_user", make_role)
     monkeypatch.setattr(toolsandbox_adapter, "make_agent", make_role)
     monkeypatch.setattr(toolsandbox_adapter, "ExecutionEnvironment", make_role)
     monkeypatch.setattr(
         toolsandbox_adapter,
         "compute_outcome_score",
-        lambda *_args, **_kwargs: {
-            "outcome_similarity": 1.0,
-            "outcome_milestone_similarity": 1.0,
-            "outcome_minefield_similarity": 1.0,
-            "outcome_check_count": 1,
-            "outcome_checks": [],
-        },
+        fake_outcome_score,
     )
 
 
@@ -158,6 +167,9 @@ def test_transient_retry_fails_terminally_without_trajectory_archive(
         "kind": "exception_chain_type",
         "identifier": "APIConnectionError",
     }
+    assert result["outcome_evaluator_version"]
+    assert len(result["outcome_evaluator_contract_sha256"]) == 64
+    assert len(result["outcome_evaluator_source_sha256"]) == 64
 
 
 def test_generic_connection_error_requires_an_existing_traceback_marker() -> None:
@@ -242,7 +254,8 @@ def test_make_agent_rejects_auto_for_upstream_role_alias() -> None:
         )
 
 
-def test_write_run_manifest(tmp_path: Path) -> None:
+def test_write_run_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TZ", "America/New_York")
     config = ToolSandboxRunConfig(
         agent="Unhelpful",
         user="GPT_4_o_2024_05_13",
@@ -256,6 +269,10 @@ def test_write_run_manifest(tmp_path: Path) -> None:
     assert payload["scenario_names"] == ["wifi_off"]
     assert payload["run_type"] == "baseline"
     assert payload["actor_selection_mode"] == "policy"
+    assert payload["timezone"] == "America/New_York"
+    assert payload["outcome_evaluator"]["version"]
+    assert len(payload["outcome_evaluator"]["contract_sha256"]) == 64
+    assert len(payload["outcome_evaluator"]["source_sha256"]) == 64
 
 
 def test_write_run_manifest_records_auto_actor_selection(tmp_path: Path) -> None:

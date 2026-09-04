@@ -1,5 +1,9 @@
 # SAGE CyberGym/tau3 Generalization Handoff - 2026-05-29
 
+> **SUPERSEDED — ARCHIVAL HANDOFF.** CyberGym/tau paths and the old ToolSandbox
+> preflight below were removed from the publication product. Do not use these
+> commands for a current run. See [current_state.md](current_state.md).
+
 This is the turnover file for the next agent continuing SAGE portability and
 generalization work on CyberGym and tau3. It is intentionally operational. Read
 this file first, keep it open while working, and append working notes to the log
@@ -160,7 +164,7 @@ Chapter 3 current working setup:
 Whole-dataset ToolSandbox preflight:
 
 ```bash
-PYTHONPATH=src:. python scripts/prepare_toolsandbox_full_self_evolving_run.py
+The retired whole-dataset preflight launcher was used here; it is no longer shipped.
 ```
 
 Current preflight status from 2026-05-29:
@@ -197,7 +201,7 @@ General SAGE package and import-agent work:
 ToolSandbox high-lift runtime:
 
 - `scripts/run_sage_protocol.py`
-- `scripts/prepare_toolsandbox_full_self_evolving_run.py`
+- retired whole-dataset preflight launcher (removed)
 - `src/sage_ts/adapters/sage_run_adapter.py`
 - `src/sage_ts/runtime/toolsandbox_integration.py`
 - `src/sage_ts/generation/tool_generator.py`
@@ -664,7 +668,7 @@ did not regress.
 Quick preflight:
 
 ```bash
-PYTHONPATH=src:. python scripts/prepare_toolsandbox_full_self_evolving_run.py
+The retired whole-dataset preflight launcher was used here; it is no longer shipped.
 ```
 
 Small maintenance run, using the proven policy. The sealed formal manifests in

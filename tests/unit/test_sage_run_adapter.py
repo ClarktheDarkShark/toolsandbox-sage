@@ -126,7 +126,55 @@ def test_side_effect_preservation_flags_direct_side_effect_after_abstain() -> No
     )
 
 
-def test_side_effect_preservation_requires_next_call_after_success() -> None:
+def test_side_effect_safety_flags_native_action_after_complete_tool_abstains() -> None:
+    messages = [
+        {
+            "role": "tool",
+            "name": "complete_contact_action",
+            "content": {
+                "status": "abstain",
+                "confirmation": "",
+                "abstain_reason": "The target contact is ambiguous.",
+                "native_action": "",
+                "native_result": None,
+            },
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "remove_contact"}}],
+        },
+    ]
+
+    assert _side_effect_followup_failures(
+        messages,
+        helper_name="complete_contact_action",
+        required_original_tool_calls=("remove_contact",),
+    )
+
+
+def test_side_effect_trace_flags_native_action_after_complete_tool_abstains() -> None:
+    events = [
+        {
+            "tool_name": "complete_contact_action",
+            "result": {
+                "status": "abstain",
+                "confirmation": "",
+                "abstain_reason": "The target contact is ambiguous.",
+                "native_action": "",
+                "native_result": None,
+            },
+        },
+        {"tool_name": "remove_contact", "result": None},
+    ]
+
+    assert _side_effect_followup_failures_from_trace_events(
+        events,
+        helper_name="complete_contact_action",
+        required_side_effect_calls=("remove_contact",),
+    )
+
+
+def test_side_effect_safety_allows_generated_route_without_native_followup() -> None:
     messages = [
         {"role": "tool", "name": "prepare", "content": {"should_call": True}},
         {
@@ -135,7 +183,7 @@ def test_side_effect_preservation_requires_next_call_after_success() -> None:
         },
     ]
 
-    assert _side_effect_followup_failures(
+    assert not _side_effect_followup_failures(
         messages,
         helper_name="prepare",
         required_original_tool_calls=("add_reminder",),
@@ -252,7 +300,7 @@ def test_side_effect_trace_ignores_non_mapping_scalar_helper_output() -> None:
     )
 
 
-def test_side_effect_preservation_honors_should_call_tool_contract() -> None:
+def test_side_effect_safety_leaves_missing_native_followup_to_outcome() -> None:
     messages = [
         {
             "role": "tool",
@@ -273,7 +321,7 @@ def test_side_effect_preservation_honors_should_call_tool_contract() -> None:
         },
     ]
 
-    assert _side_effect_followup_failures(
+    assert not _side_effect_followup_failures(
         messages,
         helper_name="prepare_contact",
         required_original_tool_calls=("add_contact",),
@@ -314,7 +362,7 @@ def test_side_effect_preservation_allows_target_only_selection_before_side_effec
     )
 
 
-def test_side_effect_preservation_flags_target_only_selection_without_side_effect() -> (
+def test_side_effect_safety_allows_target_selection_without_native_side_effect() -> (
     None
 ):
     messages = [
@@ -338,7 +386,7 @@ def test_side_effect_preservation_flags_target_only_selection_without_side_effec
         {"role": "assistant", "content": "Done."},
     ]
 
-    assert _side_effect_followup_failures(
+    assert not _side_effect_followup_failures(
         messages,
         helper_name="select_action_target_by_recency",
         required_original_tool_calls=("modify_reminder",),
@@ -1164,7 +1212,12 @@ def test_generation_enabled_registry_tools_do_not_capture_unpicklable_generator(
         ]
         assert tool("Wi-Fi") == "wifi"
         if result_hook is not None:
-            result_hook("toy_birth", enhanced, {"similarity": 1}, output_dir)
+            result_hook(
+                "toy_birth",
+                enhanced,
+                {"similarity": 1, "outcome_similarity": 1},
+                output_dir,
+            )
         return output_dir
 
     monkeypatch.setattr(
@@ -1180,6 +1233,14 @@ def test_generation_enabled_registry_tools_do_not_capture_unpicklable_generator(
             output_dir=tmp_path / "outputs",
             registry_dir=store.root,
             manifest_path=manifest_path,
+            reflection_control_rows={
+                "toy_birth": {
+                    "name": "toy_birth",
+                    "similarity": 1,
+                    "outcome_similarity": 1,
+                }
+            },
+            require_fresh_reflection_control=True,
         ),
         generator=UnpicklableGenerator(),  # type: ignore[arg-type]
     )
@@ -1328,3 +1389,80 @@ def test_sage_runner_counts_failed_generated_tool_attempts(
     assert summary["generated_tool_attempted_scenarios"] == 1
     assert summary["generated_tool_failed_scenarios"] == 1
     assert summary["generated_tool_called_scenarios"] == 0
+
+
+def test_sage_runner_propagates_fresh_control_channel_to_reflection(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeBirthController:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        def prime_before_scenario(
+            self,
+            _scenario_name: str,
+            _scenario: Scenario,
+        ) -> list[str]:
+            return []
+
+    class FakeReflectionController:
+        @classmethod
+        def from_env(cls, **kwargs: object) -> "FakeReflectionController":
+            captured.update(kwargs)
+            return cls()
+
+        def assert_fresh_control_complete(
+            self,
+            scenario_names: tuple[str, ...],
+        ) -> None:
+            captured["asserted_scenario_names"] = scenario_names
+
+    def fake_sequence(
+        _config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / "run"
+        output_dir.mkdir()
+        scenario_transform(
+            "toy_birth",
+            Scenario(starting_context=ExecutionContext()),
+            output_dir,
+        )
+        return output_dir
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.OnlineBirthController",
+        FakeBirthController,
+    )
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.SelfEvolutionReflectionController",
+        FakeReflectionController,
+    )
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        fake_sequence,
+    )
+    channel = object()
+
+    run_sage_with_registry(
+        SageRunConfig(
+            agent="Unhelpful",
+            user="GPT_4_o_2024_05_13",
+            scenario_names=("toy_birth",),
+            output_dir=tmp_path / "outputs",
+            registry_dir=tmp_path / "registry",
+            reflection_control_channel=channel,
+            require_fresh_reflection_control=True,
+        ),
+        generator=object(),  # type: ignore[arg-type]
+    )
+
+    assert captured["fresh_control_rows"] is None
+    assert captured["require_fresh_control"] is True
+    assert captured["fresh_control_channel"] is channel
+    assert captured["asserted_scenario_names"] == ("toy_birth",)

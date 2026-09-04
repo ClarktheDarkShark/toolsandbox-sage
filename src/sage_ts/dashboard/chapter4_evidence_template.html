@@ -961,14 +961,14 @@
         </div>
       </div>
       <div class="paired-count">
-        <div class="eyebrow">Paired observations</div>
+        <div class="eyebrow">Paired outcomes</div>
         <strong id="pairedCount">0</strong>
       </div>
     </section>
 
     <div class="section-head">
       <h2>Hypothesis Evidence</h2>
-      <p>Outcome is the sole performance endpoint; canonical score is descriptive route-compatibility output only.</p>
+      <p>Outcome is the sole performance endpoint for every hypothesis and conclusion.</p>
     </div>
     <section class="hypothesis-grid" id="hypothesisGrid"></section>
 
@@ -1123,7 +1123,7 @@
       document.getElementById("pairedCount").textContent =
         Number(campaign.paired_observations || 0).toLocaleString();
       document.getElementById("footerNote").textContent =
-        `Updated ${campaign.updated_at_label}. Baseline cache provenance, run configuration, and statistical definitions are available in the metric drilldowns.`;
+        `Updated ${campaign.updated_at_label}. Live-control provenance, outcome coverage, run configuration, and statistical definitions are available in the metric drilldowns.`;
 
       const select = document.getElementById("runSelect");
       select.innerHTML = '<option value="">Aggregate evidence</option>';

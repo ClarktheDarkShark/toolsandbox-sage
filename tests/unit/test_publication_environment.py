@@ -336,6 +336,14 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
     assert '"$PYTHON_EXECUTABLE" scripts/run_sage_protocol.py' in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/verify_publication_run.py' in launcher
     assert "--actor-selection-mode policy" in launcher
+    assert "--parallel-arms" in launcher
+    assert "--require-fresh-control" in launcher
+    assert 'REFLECTION_CONTROL_DELIVERY="task_synchronous_stream"' in launcher
+    assert (
+        'REFLECTION_CONTROL_DELIVERY="not_applicable_generation_disabled"' in launcher
+    )
+    assert "reflection_control_delivery=$REFLECTION_CONTROL_DELIVERY" in launcher
+    assert "CMD+=(--no-dashboard-open)" not in launcher
     assert "--inventory-authority-capture-dir" in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/run_sage_auto_selection_replay.py' in launcher
     assert '--cohort "$SIZE"' in launcher
@@ -347,6 +355,15 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
         'AUTO_REPLAY_CMD+=(--pilot-evidence "$SELECTOR_PILOT_EVIDENCE_PATH")'
         in launcher
     )
+    assert (
+        "auto_selection_parallel_fresh_control=$AUTO_SELECTION_EXPERIMENT" in launcher
+    )
+    assert "auto_selection_control_cache=off" in launcher
+    assert "auto_selection_control_delivery=not_connected" in launcher
+    assert "auto_selection_control_output_influences_inventory=false" in launcher
+    assert "auto_selection_control_output_influences_execution=false" in launcher
+    assert "Starting concurrent fresh-control + SAGE auto-selection pair" in launcher
+    assert '--dashboard-port "$DASHBOARD_PORT"' in launcher
     root_guard_index = launcher.index(
         "Publication $root_label root must not already exist"
     )
@@ -369,9 +386,11 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
         "transient_scenario_retry_attempts=",
         "openai_request_timeout_seconds=",
         "generation_openai_request_timeout_seconds=",
+        "timezone=",
     ):
         assert provenance_field in launcher
     assert 'pin_publication_env SAGE_OPENAI_MAX_RETRIES "5"' in launcher
+    assert 'pin_publication_env TZ "America/New_York"' in launcher
     assert (
         'pin_publication_env SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS "1,3"'
         in launcher
@@ -395,6 +414,34 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
         "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_BASE_TOOL",
     ):
         assert env_name in launcher
+
+
+def test_auto_selection_replay_runs_with_fresh_parallel_control() -> None:
+    replay = (
+        environment_verifier.REPO_ROOT / "scripts/run_sage_auto_selection_replay.py"
+    ).read_text(encoding="utf-8")
+
+    assert "_run_parallel_auto_pair(" in replay
+    assert "target=_run_control_arm_worker" in replay
+    assert "target=_run_candidate_arm_worker" in replay
+    assert 'get_context("spawn")' in replay
+    assert '"reflection_control_channel": None' in replay
+    assert '"control_cache_mode": "off"' in replay
+    assert '"auto_control_delivery": "not_connected"' in replay
+    assert '"auto_control_output_influences_inventory": False' in replay
+    assert '"auto_control_output_influences_execution": False' in replay
+    assert "run_sage_with_registry(" not in replay
+
+
+def test_obsolete_publication_launchers_are_absent() -> None:
+    obsolete_launchers = (
+        "scripts/prepare_toolsandbox_full_self_evolving_run.py",
+        "scripts/run_chapter4_4omini_full_claim_run.sh",
+        "scripts/run_chapter4_4omini_parallel_batch.sh",
+    )
+
+    for relative_path in obsolete_launchers:
+        assert not (environment_verifier.REPO_ROOT / relative_path).exists()
 
 
 def test_publication_run_verifier_cli_uses_only_internal_cohort_pins() -> None:

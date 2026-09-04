@@ -1325,7 +1325,11 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       if (Math.abs(numeric) <= 1e-12) return "neutral";
       return numeric > 0 ? "good" : "bad";
     };
-    const outcome = (row) => row?.outcome_similarity ?? row?.outcome_milestone_similarity ?? null;
+    const outcome = (row) => row?.outcome_similarity ?? null;
+    const armLabel = (arm) => String(
+      payload?.arm_labels?.[arm]
+        || (arm === "control" ? "Non-learning" : "SAGE")
+    );
     function initDashboardSwitch() {
       const select = document.getElementById("dashboardSwitch");
       if (!select) return;
@@ -1346,18 +1350,12 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     const pairedMetricRows = () => pairs.filter((pair) => completeStatus(pair.control) && completeStatus(pair.candidate));
     function pairedMetrics(summary) {
       const paired = pairedMetricRows();
-      const scoreRows = paired.filter((pair) => finite(pair.control?.similarity) && finite(pair.candidate?.similarity));
       const outcomeRows = paired.filter((pair) => finite(outcome(pair.control)) && finite(outcome(pair.candidate)));
-      const baselineScore = mean(scoreRows.map((pair) => pair.control.similarity));
-      const sageScore = mean(scoreRows.map((pair) => pair.candidate.similarity));
       const baselineOutcome = mean(outcomeRows.map((pair) => outcome(pair.control)));
       const sageOutcome = mean(outcomeRows.map((pair) => outcome(pair.candidate)));
       return {
         pairedCount: paired.length,
-        scoreCount: scoreRows.length,
         outcomeCount: outcomeRows.length,
-        baselineScore: baselineScore ?? summary.balanced_control_mean_similarity ?? null,
-        sageScore: sageScore ?? summary.balanced_candidate_mean_similarity ?? null,
         baselineOutcome: baselineOutcome ?? summary.balanced_control_mean_outcome_similarity ?? null,
         sageOutcome: sageOutcome ?? summary.balanced_candidate_mean_outcome_similarity ?? null,
       };
@@ -1446,7 +1444,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
 	        <td>${esc(tool.called_count ?? 0)}</td>
 	        <td class="${cls(tool.called_subset_mean_outcome_delta)}">${esc(contributionDeltaText(tool))}</td>
 	        <td>${esc(gainLossText(tool.outcome_gains, tool.outcome_regressions, tool.contribution_pending))}</td>
-	        <td>${esc(tool.side_effect_incident_count ?? 0)} side-effect<br><span class="small">${esc(tool.runtime_incident_count ?? 0)} runtime</span></td>
+	        <td>${esc(tool.side_effect_incident_count ?? 0)} safety<br><span class="small">${esc(tool.runtime_incident_count ?? 0)} runtime</span></td>
 	      </tr>`).join("");
 	      const visibilitySummary = tools.visible_tool_count === null || tools.visible_tool_count === undefined
 	        ? "visibility pending"
@@ -1458,7 +1456,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
 	        visibilitySummary,
 	        `${intNum(tools.called_tool_count ?? 0)} called`,
 	        contributionSummary,
-	        `${intNum(tools.side_effect_incident_count ?? 0)} side-effect rows`,
+	        `${intNum(tools.side_effect_incident_count ?? 0)} safety rows`,
 	        `${intNum(tools.runtime_incident_count ?? 0)} runtime incidents`,
 	      ].join(" / ");
 	      panel.innerHTML = `<div class="live-tool-head"><strong>Live Tool Contribution</strong><span>${esc(summary)}</span></div>
@@ -1781,10 +1779,10 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const scenario = event?.scenario || event?.birth_scenario || current?.scenario || "";
       const taskText = compactScenarioName(scenario);
       if (key.includes("prepare_add_contact_args")) {
-        return "Why: SAGE needs a reusable tool that converts the visible add-contact request into validated contact arguments before the actor calls the original contact tool.";
+        return "Why: SAGE needs a reusable tool that converts the visible add-contact request into validated contact arguments or a validated direct action.";
       }
       if (key.includes("prepare_direct_contact_action_args")) {
-        return "Why: SAGE needs a reusable tool that turns visible contact details into safe, structured action arguments while preserving the original environment action.";
+        return "Why: SAGE needs a reusable tool that turns visible contact details into a safe, structured action without requiring a particular native route.";
       }
       if (key.includes("prepare_reminder_creation_args")) {
         return "Why: SAGE needs a reusable tool that turns visible reminder content, dates, times, and locations into structured reminder arguments.";
@@ -1805,7 +1803,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         return "Why: SAGE needs a reusable tool to turn a visible location phrase into structured search or action arguments.";
       }
       if (key.includes("plan_")) {
-        return `Why: SAGE needs a reusable planning tool for ${taskText} so the actor can choose the correct original environment action.`;
+        return `Why: SAGE needs a reusable planning tool for ${taskText} so the actor can choose an outcome-correct action.`;
       }
       if (reason) {
         return `Why: ${reason}.`;
@@ -1894,7 +1892,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       } else if (state === "rejected") {
         text = `SAGE rejected "${tool}" because validation or contract checks did not pass.`;
       } else if (state === "using") {
-        text = `SAGE is using "${tool}" to help with ${taskText}. Any state changes still use the original environment tools.`;
+        text = `SAGE is using "${tool}" to help with ${taskText}. Generated tools may complete the action directly when their validated contract permits it.`;
       } else if (state === "complete") {
         text = "The SAGE arm is complete. Final paired metrics and generated-tool contribution data are available below.";
       }
@@ -2117,10 +2115,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const sageDone = sageProgress.completed;
       const matched = Math.min(baselineDone, sageDone);
       const paired = pairedMetrics(s);
-      const baselineScore = paired.baselineScore;
-      const sageScore = paired.sageScore;
-      const scoreDelta = finite(baselineScore) && finite(sageScore) ? Number(sageScore) - Number(baselineScore) : null;
-      const scoreLift = relLift(scoreDelta, baselineScore);
       const baselineOutcome = paired.baselineOutcome;
       const sageOutcome = paired.sageOutcome;
       const outcomeDelta = finite(baselineOutcome) && finite(sageOutcome) ? Number(sageOutcome) - Number(baselineOutcome) : null;
@@ -2146,14 +2140,11 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const llmTokensHint = controlUsageRecorded || candidateUsageRecorded
         ? `prompt ${tokenNum(s.control_llm_prompt_tokens)} / ${tokenNum(s.candidate_llm_prompt_tokens)} · provider-prefix cached ${tokenNum(s.control_llm_provider_cached_prompt_tokens)} / ${tokenNum(s.candidate_llm_provider_cached_prompt_tokens)} · provider metadata ${intNum(s.control_llm_provider_cached_prompt_tokens_available_count)} / ${intNum(s.candidate_llm_provider_cached_prompt_tokens_available_count)} calls · completion ${tokenNum(s.control_llm_completion_tokens)} / ${tokenNum(s.candidate_llm_completion_tokens)}`
         : "OpenAI usage metadata unavailable";
-      document.getElementById("runProgress").innerHTML = `<span class="label">Run Progress</span><strong>${matched || 0}/${totalTasks || 0}</strong><span>baseline ${baselineDone}/${totalTasks || 0} ${esc(baselineProgress.status)} · SAGE ${sageDone}/${totalTasks || 0} ${esc(sageProgress.status)}</span>`;
+      document.getElementById("runProgress").innerHTML = `<span class="label">Run Progress</span><strong>${matched || 0}/${totalTasks || 0}</strong><span>${esc(armLabel("control"))} ${baselineDone}/${totalTasks || 0} ${esc(baselineProgress.status)} · ${esc(armLabel("candidate"))} ${sageDone}/${totalTasks || 0} ${esc(sageProgress.status)}</span>`;
       document.getElementById("metrics").innerHTML = [
-        metric("Baseline Outcome", num(baselineOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
-        metric("SAGE Outcome", num(sageOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
+        metric(`${armLabel("control")} Outcome`, num(baselineOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
+        metric(`${armLabel("candidate")} Outcome`, num(sageOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("Outcome Lift", liftPct(outcomeLift, approxZeroBaselineLift(outcomeDelta, baselineOutcome)), liftHint(outcomeDelta, baselineOutcome, "outcome"), cls(outcomeDelta)),
-        metric("Baseline Canonical Audit", num(baselineScore), `${paired.scoreCount || matched || 0} descriptive route-match tasks`),
-        metric("SAGE Canonical Audit", num(sageScore), `${paired.scoreCount || matched || 0} descriptive route-match tasks`),
-        metric("Canonical Audit Movement", liftPct(scoreLift, approxZeroBaselineLift(scoreDelta, baselineScore)), `${liftHint(scoreDelta, baselineScore, "route-match")} · descriptive only`),
         metric("Total Time B / S", totalTimePairValue(s), totalTimeHint(s)),
         metric("LLM Calls B / S", llmCallsValue, llmCallsHint),
         metric("Tokens B / S", llmTokensValue, llmTokensHint),
@@ -2177,9 +2168,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     function pairDelta(pair) {
       const c = pair.control || {};
       const s = pair.candidate || {};
-      const scoreDelta = finite(c.similarity) && finite(s.similarity) ? Number(s.similarity) - Number(c.similarity) : null;
       const outcomeDelta = finite(outcome(c)) && finite(outcome(s)) ? Number(outcome(s)) - Number(outcome(c)) : null;
-      return {scoreDelta, outcomeDelta};
+      return {outcomeDelta};
     }
 
     function renderList() {
@@ -2196,7 +2186,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           <div class="task-name">${esc(pair.display_index || index + 1)}. ${esc(pair.short_name || pair.scenario)}</div>
           <div class="task-meta">
             <span class="meta-pill"><span class="meta-label">outcome</span><span class="${cls(d.outcomeDelta)}">${signedNum(d.outcomeDelta)}</span></span>
-            <span class="meta-pill"><span class="meta-label">canonical audit</span><span>${signedNum(d.scoreDelta)}</span></span>
           </div>
           ${events.length ? `<div class="tool-badges">${chips}${overflow}</div>` : ""}
         </button>`;
@@ -2206,28 +2195,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         renderList();
         renderDetail();
       }));
-    }
-
-    function checkKindLabel(check) {
-      return check?.kind === "forbidden" ? "Guardrail" : "Milestone";
-    }
-
-    function inferCheckStatus(check) {
-      if (check?.status) return String(check.status);
-      if (check?.kind === "forbidden") return check?.included ? "triggered" : "clear";
-      if (!finite(check?.score)) return check?.included ? "included" : "unknown";
-      const score = Number(check.score);
-      if (score >= 0.999) return "matched";
-      if (score > 0) return "partial";
-      return "missed";
-    }
-
-    function evidenceList(lines, emptyLabel) {
-      const values = Array.isArray(lines) ? lines.filter((line) => line !== null && line !== undefined && String(line).trim() !== "") : [];
-      if (!values.length) return `<div class="evidence-line small">${esc(emptyLabel)}</div>`;
-      const shown = values.slice(0, 2).map(evidenceLineHtml).join("");
-      const more = values.length > 2 ? `<div class="more-lines">+${values.length - 2} more line${values.length - 2 === 1 ? "" : "s"}</div>` : "";
-      return shown + more;
     }
 
     function cleanToolName(name) {
@@ -2374,53 +2341,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       return evidenceCard("text", clipped, raw);
     }
 
-    function checkTotals(row, checks) {
-      const evaluation = row?.evaluation || {};
-      const requiredTotal = finite(evaluation.required_total) ? Number(evaluation.required_total) : checks.filter((check) => check.kind !== "forbidden").length;
-      const requiredPassed = finite(evaluation.required_passed) ? Number(evaluation.required_passed) : checks.filter((check) => check.kind !== "forbidden" && inferCheckStatus(check) === "matched").length;
-      const forbiddenTotal = finite(evaluation.forbidden_total) ? Number(evaluation.forbidden_total) : checks.filter((check) => check.kind === "forbidden").length;
-      const forbiddenTriggered = finite(evaluation.forbidden_triggered) ? Number(evaluation.forbidden_triggered) : checks.filter((check) => check.kind === "forbidden" && inferCheckStatus(check) === "triggered").length;
-      const finalScore = finite(evaluation.final_score) ? Number(evaluation.final_score) : row?.similarity;
-      return {requiredTotal, requiredPassed, forbiddenTotal, forbiddenTriggered, finalScore};
-    }
-
-    function summarizeChecks(row) {
-      const checks = row?.evaluation?.checks || row?.outcome_checks || [];
-      if (!checks.length) return "<div class='small'>No outcome checks exported for this arm.</div>";
-      const totals = checkTotals(row, checks);
-      const guardrailText = totals.forbiddenTotal
-        ? `Guardrails clear ${Math.max(0, totals.forbiddenTotal - totals.forbiddenTriggered)}/${totals.forbiddenTotal}`
-        : "No guardrails";
-      return `<div class="check-summary">
-        <div class="check-totals">
-          <span class="pill">Milestones ${totals.requiredPassed}/${totals.requiredTotal}</span>
-          <span class="pill">${esc(guardrailText)}</span>
-          <span class="pill">Canonical audit ${num(totals.finalScore)}</span>
-        </div>
-        ${checks.map((check, idx) => {
-          const status = inferCheckStatus(check);
-          const kind = checkKindLabel(check);
-          const title = check.label || `${kind} ${check.index || idx + 1}`;
-          return `<div class="check-card">
-            <div class="check-head">
-              <div class="check-title">${esc(kind)} ${esc(check.index || idx + 1)}: ${esc(title)}</div>
-              <span class="status-pill status-${esc(status)}">${esc(status)} · ${num(check.score)}</span>
-            </div>
-            <div class="check-evidence">
-              <div class="evidence-block">
-                <div class="evidence-label">Expected</div>
-                ${evidenceList(check.expected || check.target_lines, "No expected evidence exported.")}
-              </div>
-              <div class="evidence-block">
-                <div class="evidence-label">Observed</div>
-                ${evidenceList(check.observed || check.observed_messages || check.observed_lines, "No observed evidence exported.")}
-              </div>
-            </div>
-          </div>`;
-        }).join("")}
-      </div>`;
-    }
-
     function transcriptFallback(row) {
       if (row?.control_cache_source === "cached") {
         const ids = row?.control_cache?.record_ids || [];
@@ -2519,13 +2439,13 @@ TASK_COMPARE_HTML = r"""<!doctype html>
 
     function transactionPanelHtml(control, candidate) {
       const row = transactionArm === "control" ? control : candidate;
-      const title = transactionArm === "control" ? "Baseline Transaction" : "SAGE Transaction";
+      const title = `${armLabel(transactionArm)} Transaction`;
       return `<div class="section">
         <div class="transaction-head">
           <h3>Full Transaction</h3>
           <select id="transactionArm" class="transaction-select" aria-label="Transaction view">
-            <option value="control" ${transactionArm === "control" ? "selected" : ""}>Baseline</option>
-            <option value="candidate" ${transactionArm === "candidate" ? "selected" : ""}>SAGE</option>
+            <option value="control" ${transactionArm === "control" ? "selected" : ""}>${esc(armLabel("control"))}</option>
+            <option value="candidate" ${transactionArm === "candidate" ? "selected" : ""}>${esc(armLabel("candidate"))}</option>
           </select>
         </div>
         <div class="box">
@@ -2566,12 +2486,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           </div>
           <div class="pill-row">${cats.map((cat) => `<span class="pill">${esc(cat)}</span>`).join("")}</div>
           <div class="compare-grid">
-            <div class="mini"><div class="label">Baseline Outcome</div><div class="value">${pct(outcome(control))}</div></div>
-            <div class="mini"><div class="label">SAGE Outcome</div><div class="value">${pct(outcome(candidate))}</div></div>
+            <div class="mini"><div class="label">${esc(armLabel("control"))} Outcome</div><div class="value">${pct(outcome(control))}</div></div>
+            <div class="mini"><div class="label">${esc(armLabel("candidate"))} Outcome</div><div class="value">${pct(outcome(candidate))}</div></div>
             <div class="mini"><div class="label">Outcome Lift</div><div class="value ${cls(d.outcomeDelta)}">${liftPct(relLift(d.outcomeDelta, outcome(control)), approxZeroBaselineLift(d.outcomeDelta, outcome(control)))}</div><div class="hint">${approxZeroBaselineLift(d.outcomeDelta, outcome(control)) ? liftHint(d.outcomeDelta, outcome(control), "outcome") : `${num(outcome(control))} -> ${num(outcome(candidate))}; delta ${signedNum(d.outcomeDelta)}`}</div></div>
-            <div class="mini"><div class="label">Baseline Canonical Audit</div><div class="value">${pct(control.similarity)}</div><div class="hint">descriptive route match</div></div>
-            <div class="mini"><div class="label">SAGE Canonical Audit</div><div class="value">${pct(candidate.similarity)}</div><div class="hint">descriptive route match</div></div>
-            <div class="mini"><div class="label">Canonical Audit Movement</div><div class="value">${liftPct(relLift(d.scoreDelta, control.similarity), approxZeroBaselineLift(d.scoreDelta, control.similarity))}</div><div class="hint">${liftHint(d.scoreDelta, control.similarity, "route-match")} · descriptive only</div></div>
             <div class="mini"><div class="label">Turns B / S</div><div class="value">${esc(control.turn_count ?? "-")} / ${esc(candidate.turn_count ?? "-")}</div></div>
             <div class="mini"><div class="label">LLM Calls B / S</div><div class="value">${esc(llmPairValue(control.llm_call_count, candidate.llm_call_count, intNum))}</div><div class="hint">live ${esc(llmPairValue(control.llm_live_call_count, candidate.llm_live_call_count, intNum))}</div></div>
             <div class="mini"><div class="label">Tokens B / S</div><div class="value">${esc(llmPairValue(control.llm_total_tokens, candidate.llm_total_tokens, tokenNum))}</div><div class="hint">prompt ${esc(llmPairValue(control.llm_prompt_tokens, candidate.llm_prompt_tokens, tokenNum))} · provider-prefix cached ${esc(llmPairValue(control.llm_provider_cached_prompt_tokens, candidate.llm_provider_cached_prompt_tokens, tokenNum))} · provider metadata ${esc(llmPairValue(control.llm_provider_cached_prompt_tokens_available_count, candidate.llm_provider_cached_prompt_tokens_available_count, intNum))} calls</div></div>
@@ -2582,24 +2499,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <div class="section">
           <h3 style="margin-top:0">Generated Tool Events On This Task</h3>
           <div class="pill-row">${toolEventHtml(pair)}</div>
-        </div>
-        <div class="section">
-          <div class="section-head">
-            <div>
-              <h3>Canonical Route-Match Audit</h3>
-              <div class="small check-explainer">This descriptive audit compares expected and observed milestones and guardrails. It is not a performance or release criterion.</div>
-            </div>
-          </div>
-          <div class="split check-split">
-            <div class="box">
-              <h3>Baseline</h3>
-              ${summarizeChecks(control)}
-            </div>
-            <div class="box">
-              <h3>SAGE</h3>
-              ${summarizeChecks(candidate)}
-            </div>
-          </div>
         </div>
         ${transactionPanelHtml(control, candidate)}
       `;
@@ -2613,7 +2512,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const contributionKnown = Boolean(tools.contribution_known ?? rows.some((tool) => tool.called_subset_mean_outcome_delta !== null && tool.called_subset_mean_outcome_delta !== undefined));
       document.getElementById("toolDrawerSub").textContent = `${rows.length} tools; ${tools.called_tool_count || 0} called naturally in this run.${visibilityKnown ? "" : " Visibility counts are pending until live selection artifacts are available."}${contributionKnown ? "" : " Contribution columns are pending until completed paired called-tool tasks are available."}`;
       document.getElementById("toolTable").innerHTML = `<table>
-        <thead><tr><th>Tool</th><th>Origin</th><th>Visible</th><th>Called</th><th>VNC</th><th>Outcome Contribution</th><th>Canonical Audit Contribution</th><th>Safety</th></tr></thead>
+        <thead><tr><th>Tool</th><th>Origin</th><th>Visible</th><th>Called</th><th>VNC</th><th>Outcome Contribution</th><th>Safety</th></tr></thead>
         <tbody>${rows.map((tool) => `<tr>
           <td><strong>${toolNameButton(tool)}</strong><div class="small">${esc(tool.decision || "")}</div></td>
           <td>${esc(tool.origin || "-")}</td>
@@ -2621,8 +2520,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
           <td>${esc(tool.called_count ?? 0)}</td>
           <td>${esc(maybeValue(tool.visible_not_called_count, "pending"))}</td>
           <td class="${cls(tool.called_subset_mean_outcome_delta)}">${esc(contributionDeltaText(tool))}<div class="small">${esc(gainLossText(tool.outcome_gains, tool.outcome_regressions, tool.contribution_pending))}</div></td>
-          <td>${signedNum(tool.called_subset_mean_canonical_delta)}</td>
-          <td>${esc(tool.side_effect_incident_count ?? 0)} side effects<br><span class="small">${esc(tool.runtime_incident_count ?? 0)} runtime incidents</span></td>
+          <td>${esc(tool.side_effect_incident_count ?? 0)} safety incidents<br><span class="small">${esc(tool.runtime_incident_count ?? 0)} runtime incidents</span></td>
         </tr>`).join("")}</tbody>
       </table>`;
       document.getElementById("toolDrawer").classList.add("open");

@@ -7,11 +7,14 @@ import argparse
 import hashlib
 import importlib
 import json
+import math
 import re
 import subprocess
 from pathlib import Path
 from typing import Any
 
+from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
+from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 from sage_ts.evaluation.retry_provenance import (
     validate_successful_retry_provenance,
 )
@@ -46,6 +49,7 @@ PUBLICATION_ENVIRONMENT_LOCK = "requirements-publication-lock.txt"
 PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP = 1784832588
 PUBLICATION_MODEL = "gpt-4o-mini"
 PUBLICATION_EXECUTION_ENV = {
+    "TZ": "America/New_York",
     "SAGE_OPENAI_MAX_RETRIES": "5",
     "SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
     "SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
@@ -53,6 +57,7 @@ PUBLICATION_EXECUTION_ENV = {
     "SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS": "120",
     "SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS": "600",
 }
+PUBLICATION_TIMEZONE = PUBLICATION_EXECUTION_ENV["TZ"]
 LLM_USAGE_INTEGER_FIELDS = (
     "llm_call_count",
     "llm_live_call_count",
@@ -68,6 +73,11 @@ LLM_USAGE_INTEGER_FIELDS = (
 LLM_USAGE_SOURCE_INTEGER_FIELDS = tuple(
     field for field in LLM_USAGE_INTEGER_FIELDS if field != "llm_usage_available_count"
 )
+OUTCOME_EVALUATOR_ROW_FIELDS = {
+    "outcome_evaluator_version": "version",
+    "outcome_evaluator_contract_sha256": "contract_sha256",
+    "outcome_evaluator_source_sha256": "source_sha256",
+}
 _PUBLICATION_LOCK_LINE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;]+)$")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -331,6 +341,70 @@ def _read_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _verify_parallel_arm_execution(
+    run_root: Path,
+    protocol: dict[str, Any],
+) -> dict[str, Any]:
+    record = protocol.get("parallel_arm_execution")
+    if not isinstance(record, dict):
+        raise ValueError("Protocol has no parallel child-process execution evidence.")
+    if (
+        record.get("unit") != "isolated_child_process"
+        or record.get("positive_overlap_asserted") is not True
+    ):
+        raise ValueError("Parallel execution evidence has invalid process metadata.")
+    recorded_arms = record.get("arms")
+    if not isinstance(recorded_arms, dict):
+        raise ValueError("Parallel execution evidence has no arm records.")
+    intervals: dict[str, tuple[int, int]] = {}
+    pids: set[int] = set()
+    fields = (
+        "status",
+        "process_pid",
+        "started_at",
+        "completed_at",
+        "started_monotonic_ns",
+        "completed_monotonic_ns",
+    )
+    for arm in ("control", "candidate"):
+        arm_record = recorded_arms.get(arm)
+        if not isinstance(arm_record, dict):
+            raise ValueError(f"Parallel execution evidence is missing {arm!r}.")
+        status = _read_json(run_root / f"{arm}_arm_status.json")
+        if any(arm_record.get(field) != status.get(field) for field in fields):
+            raise ValueError(
+                f"Parallel {arm} execution evidence differs from its arm status."
+            )
+        pid = arm_record.get("process_pid")
+        started = arm_record.get("started_monotonic_ns")
+        completed = arm_record.get("completed_monotonic_ns")
+        if (
+            arm_record.get("status") != "complete"
+            or isinstance(pid, bool)
+            or not isinstance(pid, int)
+            or pid <= 0
+            or pid in pids
+            or isinstance(started, bool)
+            or not isinstance(started, int)
+            or isinstance(completed, bool)
+            or not isinstance(completed, int)
+            or completed <= started
+        ):
+            raise ValueError(f"Parallel {arm} process timing/PID evidence is invalid.")
+        pids.add(pid)
+        intervals[arm] = (started, completed)
+    overlap_ns = min(interval[1] for interval in intervals.values()) - max(
+        interval[0] for interval in intervals.values()
+    )
+    if (
+        overlap_ns <= 0
+        or record.get("overlap_monotonic_ns") != overlap_ns
+        or record.get("overlap_seconds") != overlap_ns / 1_000_000_000
+    ):
+        raise ValueError("Control and SAGE process intervals do not prove overlap.")
+    return record
+
+
 def _resolve_declared_path(
     run_root: Path,
     value: Any,
@@ -377,12 +451,29 @@ def _completed_run_roots(search_root: Path) -> list[Path]:
     )
 
 
+def _verify_run_manifest_timezone(run_dir: Path, *, arm: str) -> dict[str, Any]:
+    """Require the arm-local manifest to record the publication timezone."""
+
+    run_manifest = _read_json(run_dir.parent / "sage_ts_run_manifest.json")
+    observed = run_manifest.get("timezone")
+    if observed != PUBLICATION_TIMEZONE:
+        raise ValueError(
+            f"{arm} run manifest timezone is {observed!r}; "
+            f"expected {PUBLICATION_TIMEZONE!r}."
+        )
+    return run_manifest
+
+
 def _uncached_rows(
     run_dir: Path,
     *,
     expected_tasks: int,
     arm: str,
 ) -> tuple[dict[str, dict[str, Any]], list[str], dict[str, int]]:
+    expected_outcome_evaluator = outcome_evaluator_manifest()
+    run_manifest = _verify_run_manifest_timezone(run_dir, arm=arm)
+    if run_manifest.get("outcome_evaluator") != expected_outcome_evaluator:
+        raise ValueError(f"{arm} run manifest has the wrong outcome evaluator.")
     summary_path = run_dir / "result_summary.json"
     payload = _read_json(summary_path)
     rows = payload.get("per_scenario_results")
@@ -413,6 +504,19 @@ def _uncached_rows(
             raise ValueError(
                 f"{arm} task {name!r} contains a runtime exception traceback."
             )
+        raw_outcome = item.get("outcome_similarity")
+        if (
+            isinstance(raw_outcome, bool)
+            or not isinstance(raw_outcome, (int, float))
+            or not math.isfinite(float(raw_outcome))
+            or not 0.0 <= float(raw_outcome) <= 1.0
+        ):
+            raise ValueError(
+                f"{arm} task {name!r} has no valid outcome-evaluator value."
+            )
+        for row_field, identity_field in OUTCOME_EVALUATOR_ROW_FIELDS.items():
+            if item.get(row_field) != expected_outcome_evaluator[identity_field]:
+                raise ValueError(f"{arm} task {name!r} has mismatched {row_field}.")
         validate_successful_retry_provenance(
             item,
             run_dir=run_dir,
@@ -753,8 +857,6 @@ def _verify_reflection(
         control = control_rows.get(name)
         if control is None:
             raise ValueError(f"Reflection task {name!r} has no matched live control.")
-        if row.get("control_score") != control.get("similarity"):
-            raise ValueError(f"Reflection control score mismatch for {name!r}.")
         if row.get("control_outcome") != control.get("outcome_similarity"):
             raise ValueError(f"Reflection control outcome mismatch for {name!r}.")
         feedback[name] = row
@@ -780,6 +882,12 @@ def verify_run(
         raise ValueError(f"No completed paired run found under {search_root}.")
     run_root = runs[-1]
     protocol = _read_json(run_root / "protocol_manifest.json")
+    current_outcome_evaluator = outcome_evaluator_manifest()
+    if protocol.get("outcome_evaluator") != current_outcome_evaluator:
+        raise ValueError("Protocol manifest has the wrong outcome evaluator identity.")
+    paired_comparison = _read_json(run_root / "paired_comparison.json")
+    if paired_comparison.get("outcome_evaluator") != current_outcome_evaluator:
+        raise ValueError("Paired comparison has the wrong outcome evaluator identity.")
     cache_report = _read_json(run_root / "control_cache_report.json")
     publication_provenance = _verify_publication_provenance(protocol)
     for model_field in ("agent", "user", "generation_model"):
@@ -829,6 +937,7 @@ def verify_run(
     required_protocol = {
         "fresh_control_required": True,
         "publication_performance_endpoint": "outcome_task_completion_similarity",
+        "timezone": PUBLICATION_TIMEZONE,
         "control_cache_mode": "off",
         "control_source": "fresh",
         "cached_control_tasks": 0,
@@ -846,7 +955,13 @@ def verify_run(
         "cross_run_failure_memory_path": None,
         "diagnostic_force_allowed": False,
         "active_diagnostic_force_env": [],
-        "parallel_arms": False,
+        "parallel_arms": True,
+        "reflection_control_delivery": (
+            "task_synchronous_stream"
+            if expected_generation
+            else "not_applicable_generation_disabled"
+        ),
+        "dashboard_open_required": True,
     }
     for field, expected in required_protocol.items():
         if protocol.get(field) != expected:
@@ -854,6 +969,63 @@ def verify_run(
                 f"Protocol field {field!r} is {protocol.get(field)!r}; "
                 f"expected {expected!r}."
             )
+    parallel_execution = _verify_parallel_arm_execution(run_root, protocol)
+    dashboard_receipt_path = _resolve_declared_path(
+        run_root,
+        protocol.get("dashboard_open_receipt_path"),
+        "dashboard_open_receipt_path",
+        required_parent=run_root,
+    )
+    dashboard_receipt = _read_json(dashboard_receipt_path)
+    expected_task_dashboard = (run_root / "dashboard" / "task_compare.html").resolve()
+    expected_actor_selection_mode = str(
+        protocol.get("candidate_actor_selection_mode") or ""
+    )
+    expected_comparison = (
+        f"fresh_control_vs_sage_{expected_actor_selection_mode}_selection"
+    )
+    opened_monotonic_ns = dashboard_receipt.get("opened_monotonic_ns")
+    first_model_process_start = min(
+        int(parallel_execution["arms"][arm]["started_monotonic_ns"])
+        for arm in ("control", "candidate")
+    )
+    if (
+        dashboard_receipt.get("dashboard") != "task_compare"
+        or dashboard_receipt.get("comparison") != expected_comparison
+        or Path(str(dashboard_receipt.get("path") or "")).resolve()
+        != expected_task_dashboard
+        or dashboard_receipt.get("url") != protocol.get("dashboard_task_compare_url")
+        or dashboard_receipt.get("external_browser_opened") is not True
+        or dashboard_receipt.get("http_verified_before_open") is not True
+        or dashboard_receipt.get("dashboard_server_protocol")
+        != DASHBOARD_SERVER_PROTOCOL
+        or Path(str(dashboard_receipt.get("dashboard_server_root") or "")).resolve()
+        != run_root.resolve()
+        or dashboard_receipt.get("opened_before_model_processes") is not True
+        or isinstance(opened_monotonic_ns, bool)
+        or not isinstance(opened_monotonic_ns, int)
+        or opened_monotonic_ns <= 0
+        or opened_monotonic_ns >= first_model_process_start
+    ):
+        raise ValueError(
+            "Task Compare dashboard external-open receipt is invalid or does not "
+            "prove a pre-model open."
+        )
+    dashboard_data = _read_json(
+        expected_task_dashboard.with_name("task_compare_data.json")
+    )
+    if (
+        dashboard_data.get("arm_labels")
+        != {
+            "control": "Fresh non-learning control",
+            "candidate": f"SAGE {expected_actor_selection_mode} selection",
+        }
+        or dashboard_data.get("scenario_count") != expected_tasks
+    ):
+        raise ValueError(
+            "Task Compare dashboard does not unambiguously identify both "
+            "concurrent publication arms."
+        )
     run_env = protocol.get("run_affecting_sage_env")
     if not isinstance(run_env, dict):
         raise ValueError("Publication run did not record its execution environment.")
@@ -991,6 +1163,9 @@ def verify_run(
             ],
         },
         "reflection_control_source": protocol.get("reflection_control_source"),
+        "timezone": PUBLICATION_TIMEZONE,
+        "outcome_evaluator": current_outcome_evaluator,
+        "parallel_arm_execution": parallel_execution,
         "external_fixture_sha256": observed_fixture_sha256,
         "git_commit": publication_provenance["git_commit"],
         "git_tree": publication_provenance["git_tree"],
@@ -1036,6 +1211,295 @@ def verify_pinned_run(
     return result
 
 
+def _outcome_only_pair_summary(
+    control_rows: dict[str, dict[str, Any]],
+    auto_rows: dict[str, dict[str, Any]],
+    scenario_order: list[str],
+) -> dict[str, object]:
+    if not scenario_order:
+        raise ValueError("Auto-selection outcome comparison has an empty cohort.")
+    control_values = [
+        float(control_rows[name]["outcome_similarity"]) for name in scenario_order
+    ]
+    auto_values = [
+        float(auto_rows[name]["outcome_similarity"]) for name in scenario_order
+    ]
+    count = len(scenario_order)
+    return {
+        "schema_version": 1,
+        "publication_performance_endpoint": "outcome_task_completion_similarity",
+        "scenario_count": count,
+        "outcome_evaluated_count": count,
+        "control_exact_outcome_successes": sum(
+            value == 1.0 for value in control_values
+        ),
+        "auto_exact_outcome_successes": sum(value == 1.0 for value in auto_values),
+        "control_mean_outcome_similarity": sum(control_values) / count,
+        "auto_mean_outcome_similarity": sum(auto_values) / count,
+        "mean_outcome_similarity_delta": (
+            sum(auto_values) / count - sum(control_values) / count
+        ),
+        "auto_outcome_gain_count": sum(
+            auto > control for control, auto in zip(control_values, auto_values)
+        ),
+        "auto_outcome_regression_count": sum(
+            auto < control for control, auto in zip(control_values, auto_values)
+        ),
+        "outcome_tie_count": sum(
+            auto == control for control, auto in zip(control_values, auto_values)
+        ),
+    }
+
+
+def verify_auto_selection_parallel_pair(
+    pair_manifest_path: Path,
+    *,
+    run_root: Path,
+    expected_tasks: int,
+    expected_scenario_order_sha256: str,
+    expected_auto_dir: Path | None = None,
+) -> dict[str, Any]:
+    """Verify that auto-selection ran beside an isolated fresh control."""
+
+    run_root = run_root.resolve()
+    pair_manifest_path = pair_manifest_path.resolve()
+    pair_root = pair_manifest_path.parent
+    if (
+        pair_root != run_root / "sage_auto_selection_parallel_pair"
+        or pair_manifest_path != pair_root / "parallel_pair_manifest.json"
+    ):
+        raise ValueError("Auto-selection parallel-pair manifest is outside its run.")
+    pair = _read_json(pair_manifest_path)
+    expected_evaluator = outcome_evaluator_manifest()
+    required = {
+        "schema_version": 1,
+        "experiment": "sage_auto_selection_parallel_control_pair",
+        "status": "complete",
+        "mode": "online_build_full",
+        "scenario_count": expected_tasks,
+        "scenario_order_sha256": expected_scenario_order_sha256,
+        "control_role": "fresh_non_learning_control",
+        "candidate_role": "sage_auto_selection",
+        "control_cache_mode": "off",
+        "control_source": "fresh",
+        "cached_control_tasks": 0,
+        "fresh_control_tasks": expected_tasks,
+        "cache_accessed": False,
+        "openai_response_cache_enabled": False,
+        "sage_task_cache_enabled": False,
+        "persistent_response_cache_reuse": False,
+        "publication_performance_endpoint": "outcome_task_completion_similarity",
+        "legacy_score_is_performance_gate": False,
+        "parallel_arms": True,
+        "auto_control_delivery": "not_connected",
+        "auto_control_output_influences_inventory": False,
+        "auto_control_output_influences_execution": False,
+        "auto_inventory_source": "matched_policy_inventory_authority",
+        "outcome_evaluator": expected_evaluator,
+        "timezone": PUBLICATION_TIMEZONE,
+    }
+    for field, expected in required.items():
+        if pair.get(field) != expected:
+            raise ValueError(
+                f"Auto-selection parallel-pair field {field!r} is "
+                f"{pair.get(field)!r}; expected {expected!r}."
+            )
+
+    control_dir = _resolve_declared_path(
+        run_root,
+        pair.get("control_run_dir"),
+        "auto_parallel_control_run_dir",
+        required_parent=pair_root / "control",
+    )
+    auto_dir = _resolve_declared_path(
+        run_root,
+        pair.get("auto_run_dir"),
+        "auto_parallel_sage_run_dir",
+        required_parent=run_root / "sage_auto_selection",
+    )
+    if expected_auto_dir is not None and auto_dir != expected_auto_dir.resolve():
+        raise ValueError("Auto-selection pair links a different SAGE run directory.")
+
+    parallel_execution = _verify_parallel_arm_execution(pair_root, pair)
+    control_rows, control_order, control_usage = _uncached_rows(
+        control_dir,
+        expected_tasks=expected_tasks,
+        arm="auto-selection fresh control",
+    )
+    auto_rows, auto_order, auto_usage = _uncached_rows(
+        auto_dir,
+        expected_tasks=expected_tasks,
+        arm="sage_auto_selection",
+    )
+    if control_order != auto_order:
+        raise ValueError(
+            "Auto-selection SAGE and its fresh control do not have identical task order."
+        )
+    observed_order_sha256 = hashlib.sha256(
+        ("\n".join(control_order) + "\n").encode("utf-8")
+    ).hexdigest()
+    if observed_order_sha256 != expected_scenario_order_sha256:
+        raise ValueError("Auto-selection parallel pair changed the pinned task order.")
+    _verify_llm_usage_artifacts(
+        control_dir,
+        rows=control_rows,
+        row_totals=control_usage,
+        arm="auto-selection fresh control",
+        expected_event_arm="online_build_full_control",
+        allow_generation_source=False,
+    )
+    outcome_comparison_path = _resolve_declared_path(
+        run_root,
+        pair.get("outcome_comparison_path"),
+        "auto_parallel_outcome_comparison_path",
+        required_parent=pair_root,
+    )
+    if (
+        outcome_comparison_path != pair_root / "auto_control_outcome_comparison.json"
+        or not outcome_comparison_path.is_file()
+        or pair.get("outcome_comparison_sha256")
+        != hashlib.sha256(outcome_comparison_path.read_bytes()).hexdigest()
+    ):
+        raise ValueError("Auto-selection control outcome comparison has drifted.")
+    outcome_comparison = _read_json(outcome_comparison_path)
+    recomputed_outcomes = _outcome_only_pair_summary(
+        control_rows,
+        auto_rows,
+        control_order,
+    )
+    if outcome_comparison != recomputed_outcomes:
+        raise ValueError(
+            "Auto-selection control outcome comparison does not match result rows."
+        )
+    _verify_llm_usage_artifacts(
+        auto_dir,
+        rows=auto_rows,
+        row_totals=auto_usage,
+        arm="sage_auto_selection",
+        expected_event_arm="online_build_full_sage_auto_selection",
+        allow_generation_source=False,
+    )
+
+    control_config = _read_json(control_dir.parent / "sage_ts_run_manifest.json")
+    auto_config = _read_json(auto_dir.parent / "sage_ts_run_manifest.json")
+    common_fields = ("agent", "user", "scenario_names", "processes", "base_tool_policy")
+    if any(
+        control_config.get(field) != auto_config.get(field) for field in common_fields
+    ):
+        raise ValueError(
+            "Auto-selection SAGE and its fresh control have mismatched run settings."
+        )
+    if (
+        control_config.get("actor_selection_mode") != "policy"
+        or auto_config.get("actor_selection_mode") != "auto"
+        or control_config.get("processes") != 1
+        or auto_config.get("processes") != 1
+        or control_config.get("resume_from_dir") is not None
+        or auto_config.get("resume_from_dir") is not None
+        or control_config.get("resume_completed_limit") is not None
+        or auto_config.get("resume_completed_limit") is not None
+    ):
+        raise ValueError("Auto-selection parallel-pair arm configuration is invalid.")
+    if (
+        pair.get("agent") != auto_config.get("agent")
+        or pair.get("user") != auto_config.get("user")
+        or pair.get("base_tool_policy") != auto_config.get("base_tool_policy")
+    ):
+        raise ValueError("Auto-selection pair manifest disagrees with arm settings.")
+
+    selection_summary = _read_json(auto_dir / "selection_summary.json")
+    authority_path = _resolve_declared_path(
+        run_root,
+        pair.get("inventory_authority_path"),
+        "auto_parallel_inventory_authority_path",
+    )
+    if (
+        not authority_path.is_file()
+        or pair.get("inventory_authority_sha256")
+        != hashlib.sha256(authority_path.read_bytes()).hexdigest()
+        or selection_summary.get("generation_enabled") is not False
+        or selection_summary.get("actor_selection_mode") != "auto"
+        or selection_summary.get("inventory_authority_mode") != "replay"
+        or selection_summary.get("inventory_authority_task_count") != expected_tasks
+        or selection_summary.get("inventory_authority_controls_later_exposure")
+        is not True
+        or selection_summary.get("inventory_authority_source_actor_selection_mode")
+        != "policy"
+    ):
+        raise ValueError(
+            "Auto-selection arm did not use the complete policy inventory authority."
+        )
+    if (auto_dir / "self_evolution_task_feedback.jsonl").exists():
+        raise ValueError(
+            "Auto-selection arm consumed control feedback despite disconnected control."
+        )
+
+    dashboard_receipt_path = _resolve_declared_path(
+        run_root,
+        pair.get("dashboard_open_receipt_path"),
+        "auto_parallel_dashboard_open_receipt_path",
+        required_parent=pair_root,
+    )
+    dashboard_receipt = _read_json(dashboard_receipt_path)
+    dashboard_path = _resolve_declared_path(
+        run_root,
+        pair.get("dashboard_task_compare_path"),
+        "auto_parallel_dashboard_task_compare_path",
+        required_parent=pair_root,
+    )
+    opened_monotonic_ns = dashboard_receipt.get("opened_monotonic_ns")
+    first_process_start = min(
+        int(parallel_execution["arms"][arm]["started_monotonic_ns"])
+        for arm in ("control", "candidate")
+    )
+    if (
+        dashboard_path != pair_root / "dashboard" / "task_compare.html"
+        or not dashboard_path.is_file()
+        or dashboard_receipt.get("dashboard") != "task_compare"
+        or dashboard_receipt.get("comparison") != "fresh_control_vs_sage_auto_selection"
+        or Path(str(dashboard_receipt.get("path") or "")).resolve() != dashboard_path
+        or dashboard_receipt.get("url") != pair.get("dashboard_task_compare_url")
+        or dashboard_receipt.get("external_browser_opened") is not True
+        or dashboard_receipt.get("http_verified_before_open") is not True
+        or dashboard_receipt.get("opened_before_model_processes") is not True
+        or dashboard_receipt.get("dashboard_server_protocol")
+        != DASHBOARD_SERVER_PROTOCOL
+        or Path(str(dashboard_receipt.get("dashboard_server_root") or "")).resolve()
+        != run_root.resolve()
+        or isinstance(opened_monotonic_ns, bool)
+        or not isinstance(opened_monotonic_ns, int)
+        or opened_monotonic_ns <= 0
+        or opened_monotonic_ns >= first_process_start
+    ):
+        raise ValueError(
+            "Auto-selection live Task Compare receipt does not prove external "
+            "pre-model opening of the paired dashboard."
+        )
+    dashboard_data = _read_json(dashboard_path.with_name("task_compare_data.json"))
+    if (
+        dashboard_data.get("arm_labels")
+        != {
+            "control": "Fresh non-learning control",
+            "candidate": "SAGE auto selection",
+        }
+        or dashboard_data.get("scenario_count") != expected_tasks
+    ):
+        raise ValueError(
+            "Auto-selection live Task Compare does not identify both concurrent arms."
+        )
+    return {
+        "status": "pass",
+        "control_run_dir": str(control_dir),
+        "auto_run_dir": str(auto_dir),
+        "scenario_count": expected_tasks,
+        "scenario_order_sha256": observed_order_sha256,
+        "parallel_arm_execution": parallel_execution,
+        "outcomes": recomputed_outcomes,
+        "outcome_comparison_path": str(outcome_comparison_path),
+        "dashboard_open_receipt_path": str(dashboard_receipt_path),
+    }
+
+
 def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
     """Revalidate a complete, same-source 30-task selector pilot artifact."""
 
@@ -1045,11 +1509,12 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
             "Selector pilot evidence must be actor_selection_experiment_manifest.json."
         )
     evidence = _read_json(evidence_path)
+    current_outcome_evaluator = outcome_evaluator_manifest()
     expected_tasks, expected_benchmark_sha256, expected_order_sha256 = (
         publication_cohort_pins("pilot")
     )
     required_evidence = {
-        "schema_version": 1,
+        "schema_version": 2,
         "experiment": "sage_auto_selection",
         "stage": "pilot",
         "status": "complete",
@@ -1057,11 +1522,30 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
         "policy_generation_enabled": True,
         "auto_generation_enabled": False,
         "auto_evolution_source": "matched_policy_inventory_authority",
+        "auto_parallel_arms": True,
+        "auto_control_cache_mode": "off",
+        "auto_control_source": "fresh",
+        "auto_cached_control_tasks": 0,
+        "auto_fresh_control_tasks": expected_tasks,
+        "auto_control_cache_accessed": False,
+        "auto_control_delivery": "not_connected",
+        "auto_control_output_influences_inventory": False,
+        "auto_control_output_influences_execution": False,
+        "publication_performance_endpoint": "outcome_task_completion_similarity",
+        "legacy_score_is_performance_gate": False,
+        "mechanism_counts_are_performance_gates": False,
         "persistent_response_cache_reuse": False,
+        "outcome_evidence_complete": True,
+        "performance_gate_applied": False,
+        "performance_gate_reason": "no_predeclared_selector_performance_threshold",
+        "integrity_gate_passed": True,
+        "integrity_gate_reasons": [],
+        "experiment_passed": True,
         "stability_gate_passed": True,
         "stability_gate_reasons": [],
         "benchmark_manifest_sha256": expected_benchmark_sha256,
         "scenario_order_sha256": expected_order_sha256,
+        "outcome_evaluator": current_outcome_evaluator,
     }
     for field, expected in required_evidence.items():
         if evidence.get(field) != expected:
@@ -1094,6 +1578,8 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
         or protocol.get("scenario_count") != expected_tasks
         or protocol.get("benchmark_manifest_sha256") != expected_benchmark_sha256
         or protocol.get("scenario_order_sha256") != expected_order_sha256
+        or protocol.get("outcome_evaluator") != current_outcome_evaluator
+        or protocol.get("timezone") != PUBLICATION_TIMEZONE
     ):
         raise ValueError(
             "Selector pilot policy protocol is not the pinned policy-authority donor."
@@ -1131,6 +1617,57 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
     )
     if not auto_dir.is_dir():
         raise ValueError("Selector pilot auto-selection run is missing.")
+    _verify_run_manifest_timezone(policy_dir, arm="policy")
+    _verify_run_manifest_timezone(auto_dir, arm="sage_auto_selection")
+    pair_manifest_path = _resolve_declared_path(
+        run_root,
+        evidence.get("auto_parallel_pair_manifest_path"),
+        "auto_parallel_pair_manifest_path",
+        required_parent=run_root / "sage_auto_selection_parallel_pair",
+    )
+    if (
+        not pair_manifest_path.is_file()
+        or evidence.get("auto_parallel_pair_manifest_sha256")
+        != hashlib.sha256(pair_manifest_path.read_bytes()).hexdigest()
+    ):
+        raise ValueError("Selector pilot auto-selection pair manifest has drifted.")
+    auto_parallel_verification = verify_auto_selection_parallel_pair(
+        pair_manifest_path,
+        run_root=run_root,
+        expected_tasks=expected_tasks,
+        expected_scenario_order_sha256=expected_order_sha256,
+        expected_auto_dir=auto_dir,
+    )
+    auto_control_dir = _resolve_declared_path(
+        run_root,
+        evidence.get("auto_control_run_dir"),
+        "auto_control_run_dir",
+        required_parent=run_root / "sage_auto_selection_parallel_pair" / "control",
+    )
+    if (
+        auto_control_dir
+        != Path(str(auto_parallel_verification["control_run_dir"])).resolve()
+        or evidence.get("auto_parallel_arm_execution")
+        != auto_parallel_verification["parallel_arm_execution"]
+    ):
+        raise ValueError(
+            "Selector pilot auto-selection concurrency evidence is inconsistent."
+        )
+    auto_control_outcome_path = _resolve_declared_path(
+        run_root,
+        evidence.get("auto_control_outcome_comparison_path"),
+        "auto_control_outcome_comparison_path",
+        required_parent=run_root / "sage_auto_selection_parallel_pair",
+    )
+    if (
+        auto_control_outcome_path
+        != Path(str(auto_parallel_verification["outcome_comparison_path"])).resolve()
+        or evidence.get("auto_control_outcomes")
+        != auto_parallel_verification["outcomes"]
+    ):
+        raise ValueError(
+            "Selector pilot auto/control outcome evidence is inconsistent."
+        )
     authority_path = _resolve_declared_path(
         run_root,
         evidence.get("inventory_authority_path"),
@@ -1176,6 +1713,76 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
         or not comparison_path.is_file()
     ):
         raise ValueError("Selector pilot outcome-comparison artifact is missing.")
+    live_dashboard_receipt = _resolve_declared_path(
+        run_root,
+        evidence.get("live_auto_control_dashboard_open_receipt_path"),
+        "live_auto_control_dashboard_open_receipt_path",
+        required_parent=run_root / "sage_auto_selection_parallel_pair",
+    )
+    if (
+        live_dashboard_receipt
+        != Path(
+            str(auto_parallel_verification["dashboard_open_receipt_path"])
+        ).resolve()
+    ):
+        raise ValueError(
+            "Selector pilot links a different live auto/control dashboard receipt."
+        )
+    policy_auto_dashboard_path = _resolve_declared_path(
+        run_root,
+        evidence.get("dashboard_task_compare_path"),
+        "dashboard_task_compare_path",
+        required_parent=run_root / "actor_selection_dashboard",
+    )
+    policy_auto_receipt_path = _resolve_declared_path(
+        run_root,
+        evidence.get("policy_auto_dashboard_open_receipt_path"),
+        "policy_auto_dashboard_open_receipt_path",
+        required_parent=run_root / "actor_selection_dashboard",
+    )
+    if (
+        _resolve_declared_path(
+            run_root,
+            evidence.get("dashboard_open_receipt_path"),
+            "dashboard_open_receipt_path",
+            required_parent=run_root / "actor_selection_dashboard",
+        )
+        != policy_auto_receipt_path
+    ):
+        raise ValueError("Selector pilot policy/auto dashboard receipt is ambiguous.")
+    policy_auto_receipt = _read_json(policy_auto_receipt_path)
+    if (
+        policy_auto_dashboard_path
+        != run_root / "actor_selection_dashboard" / "dashboard" / "task_compare.html"
+        or not policy_auto_dashboard_path.is_file()
+        or policy_auto_receipt.get("dashboard") != "task_compare"
+        or policy_auto_receipt.get("comparison") != "policy_vs_sage_auto_selection"
+        or Path(str(policy_auto_receipt.get("path") or "")).resolve()
+        != policy_auto_dashboard_path
+        or policy_auto_receipt.get("url") != evidence.get("dashboard_task_compare_url")
+        or policy_auto_receipt.get("external_browser_opened") is not True
+        or policy_auto_receipt.get("http_verified_before_open") is not True
+        or policy_auto_receipt.get("dashboard_server_protocol")
+        != DASHBOARD_SERVER_PROTOCOL
+        or Path(str(policy_auto_receipt.get("dashboard_server_root") or "")).resolve()
+        != run_root.resolve()
+        or policy_auto_receipt.get("opened_phase") != "post_run_causal_comparison"
+    ):
+        raise ValueError("Selector pilot policy/auto Task Compare receipt is invalid.")
+    policy_auto_data = _read_json(
+        policy_auto_dashboard_path.with_name("task_compare_data.json")
+    )
+    if (
+        policy_auto_data.get("arm_labels")
+        != {
+            "control": "SAGE policy selection",
+            "candidate": "SAGE auto selection",
+        }
+        or policy_auto_data.get("scenario_count") != expected_tasks
+    ):
+        raise ValueError(
+            "Selector pilot policy/auto Task Compare does not identify both arms."
+        )
     status_path = run_root / "sage_auto_selection_arm_status.json"
     status = _read_json(status_path)
     status_run_dir = _resolve_declared_path(
@@ -1198,6 +1805,10 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
     )
     if Path(str(integrity.get("run_root") or "")).resolve() != run_root:
         raise ValueError("Selector pilot publication verifier selected another run.")
+    if integrity.get("outcome_evaluator") != current_outcome_evaluator:
+        raise ValueError(
+            "Selector pilot publication verification used another outcome evaluator."
+        )
 
     from sage_ts.evaluation.actor_selection_comparison import (
         verify_matched_actor_selection_experiment,
@@ -1215,11 +1826,23 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
             "Selector pilot comparison does not match recomputed evidence."
         )
     if (
-        recomputed_comparison.get("stability_gate_passed") is not True
+        recomputed_comparison.get("mechanism_counts_are_performance_gates") is not False
+        or recomputed_comparison.get("outcome_evidence_complete") is not True
+        or recomputed_comparison.get("performance_gate_applied") is not False
+        or recomputed_comparison.get("performance_gate_reason")
+        != "no_predeclared_selector_performance_threshold"
+        or recomputed_comparison.get("integrity_gate_passed") is not True
+        or recomputed_comparison.get("integrity_gate_reasons") != []
+        or recomputed_comparison.get("experiment_passed") is not True
+        or recomputed_comparison.get("stability_gate_passed") is not True
         or recomputed_comparison.get("stability_gate_reasons") != []
         or recomputed_comparison.get("scenario_count") != expected_tasks
+        or recomputed_comparison.get("outcome_evaluator") != current_outcome_evaluator
     ):
-        raise ValueError("Selector pilot stability gate did not pass on revalidation.")
+        raise ValueError(
+            "Selector pilot integrity or complete outcome evidence did not pass "
+            "revalidation."
+        )
 
     return {
         "status": "pass",
@@ -1234,8 +1857,14 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
         ),
         "benchmark_manifest_sha256": expected_benchmark_sha256,
         "scenario_order_sha256": expected_order_sha256,
+        "outcome_evaluator": current_outcome_evaluator,
+        "timezone": PUBLICATION_TIMEZONE,
         "git_commit": current_source["git_commit"],
         "git_tree": current_source["git_tree"],
+        "outcome_evidence_complete": True,
+        "performance_gate_applied": False,
+        "integrity_gate_passed": True,
+        "experiment_passed": True,
         "stability_gate_passed": True,
     }
 

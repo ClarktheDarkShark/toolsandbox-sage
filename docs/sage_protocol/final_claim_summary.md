@@ -1,5 +1,9 @@
 # Final Claim Summary
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This former claim summary is not current paper
+> evidence. Its values and decisions must not be cited or copied forward. See
+> [current_state.md](current_state.md).
+
 ## Validated Broad Portfolio: Frozen Best3
 
 The broad validated SAGE portfolio remains the frozen best3 claim registry:

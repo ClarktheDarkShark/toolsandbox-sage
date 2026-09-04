@@ -1,5 +1,11 @@
 # SAGE Publication Cleanup Audit — 2026-09-01
 
+> **ARCHIVAL DISCOVERY AUDIT — OPERATIONAL GUIDANCE SUPERSEDED.** This report
+> preserves the defects and cleanup rationale found at the start of the release
+> work. Its proposed execution schedule, metric gates, source-size counts, and
+> launcher recommendations are not current policy. See
+> [current_state.md](current_state.md).
+
 ## Decision
 
 **AUDIT COMPLETE; REMOVAL AWAITS APPROVAL.** The protected paper campaign and

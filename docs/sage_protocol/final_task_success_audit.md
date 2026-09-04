@@ -1,5 +1,9 @@
 # Final-Task Success Audit
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This audit predates the route-independent
+> all-task outcome evaluator. Its metric descriptions are not current
+> publication policy. See [current_state.md](current_state.md).
+
 ## 1) What does canonical ToolSandbox score measure?
 Canonical score (`canonical_score.json`) is route- and benchmark-task milestone score at task level. It summarizes base-task similarity/success behavior from task result summaries (not final answer quality), and is compared between control and candidate runs.
 

@@ -16,12 +16,15 @@ from scripts.run_sage_protocol import (
     _candidate_arm_root,
     _candidate_generation_enabled,
     _generation_enabled_by_default,
+    _parallel_arm_execution_record,
     _protocol_gate_decision,
+    _read_arm_status,
     _resolve_sage_policy_preset,
     _restore_registry_after_failed_gate,
-    _route_mismatch_qualified,
     _snapshot_registry_for_gate,
+    _stop_parallel_process,
     _validate_uncached_result_rows,
+    _write_arm_status,
 )
 from scripts.run_sage_protocol import (
     main as run_protocol_main,
@@ -62,6 +65,90 @@ def test_auto_actor_selection_uses_explicit_third_arm_label(tmp_path) -> None:
     assert _candidate_arm_name("auto") == "sage_auto_selection"
     assert _candidate_arm_root(tmp_path, "policy") == tmp_path / "candidate"
     assert _candidate_arm_root(tmp_path, "auto") == tmp_path / "sage_auto_selection"
+
+
+def test_arm_status_updates_are_atomic_and_preserve_process_start(tmp_path) -> None:
+    _write_arm_status(
+        tmp_path,
+        "control",
+        status="starting",
+        process_pid=123,
+        completed_count=0,
+    )
+    started = _read_arm_status(tmp_path, "control")
+    _write_arm_status(
+        tmp_path,
+        "control",
+        status="complete",
+        process_pid=123,
+        completed_count=2,
+    )
+    completed = _read_arm_status(tmp_path, "control")
+
+    assert completed["process_pid"] == 123
+    assert completed["started_at"] == started["started_at"]
+    assert completed["started_monotonic_ns"] == started["started_monotonic_ns"]
+    assert completed["completed_monotonic_ns"] > completed["started_monotonic_ns"]
+    assert not list(tmp_path.glob(".*.tmp"))
+
+
+def test_arm_status_reader_tolerates_interrupted_or_malformed_write(tmp_path) -> None:
+    (tmp_path / "control_arm_status.json").write_text("{", encoding="utf-8")
+
+    assert _read_arm_status(tmp_path, "control") == {}
+
+
+def test_parallel_execution_record_requires_positive_process_overlap(tmp_path) -> None:
+    statuses = {
+        "control": (101, 1_000, 3_000),
+        "candidate": (102, 2_000, 4_000),
+    }
+    for arm, (pid, started, completed) in statuses.items():
+        (tmp_path / f"{arm}_arm_status.json").write_text(
+            json.dumps(
+                {
+                    "arm": arm,
+                    "status": "complete",
+                    "process_pid": pid,
+                    "started_at": "start",
+                    "completed_at": "complete",
+                    "started_monotonic_ns": started,
+                    "completed_monotonic_ns": completed,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    record = _parallel_arm_execution_record(tmp_path)
+
+    assert record["positive_overlap_asserted"] is True
+    assert record["overlap_monotonic_ns"] == 1_000
+
+
+def test_parallel_process_cleanup_escalates_from_terminate_to_kill() -> None:
+    class StubbornProcess:
+        def __init__(self) -> None:
+            self.alive = True
+            self.calls: list[str] = []
+
+        def is_alive(self) -> bool:
+            return self.alive
+
+        def terminate(self) -> None:
+            self.calls.append("terminate")
+
+        def join(self, timeout: float) -> None:
+            self.calls.append(f"join:{timeout}")
+
+        def kill(self) -> None:
+            self.calls.append("kill")
+            self.alive = False
+
+    process = StubbornProcess()
+
+    _stop_parallel_process(process, timeout_seconds=0.01)
+
+    assert process.calls == ["terminate", "join:0.01", "kill", "join:0.01"]
 
 
 def test_inventory_replay_suppresses_arm_specific_generation(tmp_path) -> None:
@@ -220,124 +307,63 @@ def test_self_evolving_praxis_policy_preserves_explicit_environment(
     }
 
 
-def test_protocol_gate_rejects_non_negative_mean_without_helper_value() -> None:
+def test_protocol_gate_requires_outcome_values_even_when_canonical_is_positive() -> (
+    None
+):
     passed, reasons = _protocol_gate_decision(
         {
-            "mean_similarity_delta": 0.0,
-            "exact_success_delta": 0,
-            "gain_count": 1,
-            "regression_count": 1,
+            "mean_similarity_delta": 1.0,
+            "mean_outcome_similarity_delta": None,
+            "exact_success_delta": 100,
+            "gain_count": 100,
+            "regression_count": 0,
+            "outcome_gain_count": 0,
+            "outcome_regression_count": 0,
+            "outcome_scenario_count": 0,
             "runtime_exception_count": 0,
             "candidate": {
-                "accepted_tool_count": 0,
-                "generated_tool_called_scenarios": 0,
+                "accepted_tool_count": 10,
+                "generated_tool_called_scenarios": 40,
             },
         },
-        scenario_count=12,
-    )
-
-    assert passed is False
-    assert "non_positive_canonical_delta" in reasons
-    assert "gains_do_not_exceed_regressions" in reasons
-
-
-def test_protocol_gate_accepts_outcome_success_with_canonical_route_mismatch() -> None:
-    comparison = {
-        "mean_similarity_delta": -0.02,
-        "mean_outcome_similarity_delta": 0.08,
-        "exact_success_delta": 0,
-        "gain_count": 1,
-        "regression_count": 3,
-        "outcome_gain_count": 5,
-        "outcome_regression_count": 2,
-        "runtime_exception_count": 0,
-        "candidate": {
-            "accepted_tool_count": 1,
-            "generated_tool_called_scenarios": 3,
-        },
-    }
-
-    passed, reasons = _protocol_gate_decision(comparison, scenario_count=20)
-
-    assert _route_mismatch_qualified(comparison) is True
-    assert passed is True
-    assert reasons == []
-
-
-def test_strict_publication_gate_ignores_canonical_and_exact_metrics() -> None:
-    comparison = {
-        "mean_similarity_delta": -1.0,
-        "mean_outcome_similarity_delta": 0.20,
-        "exact_success_delta": -100,
-        "gain_count": 0,
-        "regression_count": 100,
-        "outcome_gain_count": 20,
-        "outcome_regression_count": 1,
-        "runtime_exception_count": 0,
-        "candidate": {
-            "accepted_tool_count": 1,
-            "generated_tool_called_scenarios": 20,
-        },
-    }
-
-    passed, reasons = _protocol_gate_decision(
-        comparison,
         scenario_count=40,
-        outcome_only=True,
-    )
-
-    assert passed is True
-    assert reasons == []
-
-
-def test_strict_publication_gate_fails_when_outcome_is_unavailable() -> None:
-    comparison = {
-        "mean_similarity_delta": 1.0,
-        "mean_outcome_similarity_delta": None,
-        "exact_success_delta": 100,
-        "gain_count": 100,
-        "regression_count": 0,
-        "outcome_gain_count": 0,
-        "outcome_regression_count": 0,
-        "runtime_exception_count": 0,
-        "candidate": {
-            "accepted_tool_count": 10,
-            "generated_tool_called_scenarios": 40,
-        },
-    }
-
-    passed, reasons = _protocol_gate_decision(
-        comparison,
-        scenario_count=40,
-        outcome_only=True,
     )
 
     assert passed is False
     assert "outcome_score_unavailable" in reasons
+    assert "outcome_score_coverage_incomplete" in reasons
     assert all("canonical" not in reason for reason in reasons)
 
 
-def test_protocol_gate_accepts_outcome_success_with_exact_canonical_accounting_loss() -> (
-    None
-):
-    comparison = {
-        "mean_similarity_delta": 0.02,
-        "mean_outcome_similarity_delta": 0.16,
-        "exact_success_delta": -1,
-        "gain_count": 2,
-        "regression_count": 4,
-        "outcome_gain_count": 6,
-        "outcome_regression_count": 2,
-        "runtime_exception_count": 0,
-        "candidate": {
-            "accepted_tool_count": 1,
-            "generated_tool_called_scenarios": 1,
+@pytest.mark.parametrize(
+    ("canonical_delta", "exact_delta", "canonical_gains", "canonical_regressions"),
+    [(-1.0, -100, 0, 100), (1.0, 100, 100, 0)],
+)
+def test_protocol_gate_is_invariant_to_canonical_and_exact_metrics(
+    canonical_delta: float,
+    exact_delta: int,
+    canonical_gains: int,
+    canonical_regressions: int,
+) -> None:
+    passed, reasons = _protocol_gate_decision(
+        {
+            "mean_similarity_delta": canonical_delta,
+            "exact_success_delta": exact_delta,
+            "gain_count": canonical_gains,
+            "regression_count": canonical_regressions,
+            "mean_outcome_similarity_delta": 0.20,
+            "outcome_gain_count": 20,
+            "outcome_regression_count": 1,
+            "outcome_scenario_count": 40,
+            "runtime_exception_count": 0,
+            "candidate": {
+                "accepted_tool_count": 1,
+                "generated_tool_called_scenarios": 20,
+            },
         },
-    }
+        scenario_count=40,
+    )
 
-    passed, reasons = _protocol_gate_decision(comparison, scenario_count=20)
-
-    assert _route_mismatch_qualified(comparison) is True
     assert passed is True
     assert reasons == []
 
@@ -352,6 +378,7 @@ def test_protocol_gate_rejects_negative_outcome_even_when_canonical_improves() -
             "regression_count": 1,
             "outcome_gain_count": 1,
             "outcome_regression_count": 4,
+            "outcome_scenario_count": 20,
             "runtime_exception_count": 0,
             "candidate": {
                 "accepted_tool_count": 1,
@@ -365,13 +392,37 @@ def test_protocol_gate_rejects_negative_outcome_even_when_canonical_improves() -
     assert "non_positive_outcome_delta" in reasons
 
 
-def test_protocol_gate_accepts_positive_discovery_with_real_helper_activity() -> None:
+def test_protocol_gate_rejects_partial_outcome_coverage() -> None:
     passed, reasons = _protocol_gate_decision(
         {
-            "mean_similarity_delta": 0.05,
-            "exact_success_delta": 1,
-            "gain_count": 5,
-            "regression_count": 2,
+            "mean_outcome_similarity_delta": 0.20,
+            "outcome_gain_count": 19,
+            "outcome_regression_count": 1,
+            "outcome_scenario_count": 39,
+            "runtime_exception_count": 0,
+            "candidate": {
+                "accepted_tool_count": 1,
+                "generated_tool_called_scenarios": 20,
+            },
+        },
+        scenario_count=40,
+    )
+
+    assert passed is False
+    assert "outcome_score_coverage_incomplete" in reasons
+
+
+def test_protocol_gate_accepts_positive_discovery_with_helper_activity() -> None:
+    passed, reasons = _protocol_gate_decision(
+        {
+            "mean_similarity_delta": -1.0,
+            "mean_outcome_similarity_delta": 0.20,
+            "exact_success_delta": -1,
+            "gain_count": 0,
+            "regression_count": 10,
+            "outcome_gain_count": 5,
+            "outcome_regression_count": 2,
+            "outcome_scenario_count": 12,
             "runtime_exception_count": 0,
             "candidate": {
                 "accepted_tool_count": 1,
@@ -385,24 +436,44 @@ def test_protocol_gate_accepts_positive_discovery_with_real_helper_activity() ->
     assert reasons == []
 
 
-def test_protocol_gate_rejects_discovery_when_exact_successes_regress() -> None:
+def test_protocol_gate_is_invariant_to_helper_activity() -> None:
     passed, reasons = _protocol_gate_decision(
         {
-            "mean_similarity_delta": 0.02,
-            "exact_success_delta": -1,
-            "gain_count": 5,
-            "regression_count": 2,
+            "mean_outcome_similarity_delta": 0.20,
+            "outcome_gain_count": 5,
+            "outcome_regression_count": 2,
+            "outcome_scenario_count": 12,
             "runtime_exception_count": 0,
             "candidate": {
                 "accepted_tool_count": 0,
-                "generated_tool_called_scenarios": 3,
+                "generated_tool_called_scenarios": 2,
             },
         },
         scenario_count=12,
     )
 
-    assert passed is False
-    assert "exact_successes_regressed" in reasons
+    assert passed is True
+    assert reasons == []
+
+
+def test_protocol_confirmation_gate_is_invariant_to_helper_call_share() -> None:
+    passed, reasons = _protocol_gate_decision(
+        {
+            "mean_outcome_similarity_delta": 0.20,
+            "outcome_gain_count": 20,
+            "outcome_regression_count": 1,
+            "outcome_scenario_count": 40,
+            "runtime_exception_count": 0,
+            "candidate": {
+                "accepted_tool_count": 0,
+                "generated_tool_called_scenarios": 0,
+            },
+        },
+        scenario_count=40,
+    )
+
+    assert passed is True
+    assert reasons == []
 
 
 def test_failed_gate_restores_existing_registry_manifest(tmp_path) -> None:
@@ -492,12 +563,31 @@ def test_strict_publication_mode_rejects_every_partial_resume(
             "--manifest",
             "unused.json",
             "--require-fresh-control",
+            "--parallel-arms",
             "--resume-run-root",
             "old-run",
         ],
     )
 
     with pytest.raises(SystemExit, match="forbids --resume-run-root"):
+        run_protocol_main()
+
+
+def test_strict_publication_mode_requires_concurrent_arms(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_sage_protocol.py",
+            "--mode",
+            "full_benchmark",
+            "--manifest",
+            "unused.json",
+            "--require-fresh-control",
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="requires --parallel-arms"):
         run_protocol_main()
 
 
@@ -517,6 +607,7 @@ def test_strict_publication_mode_rejects_diagnostic_force_environment(
             "--manifest",
             "unused.json",
             "--require-fresh-control",
+            "--parallel-arms",
             "--diagnostic-force-allowed",
         ],
     )

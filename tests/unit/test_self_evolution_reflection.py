@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from queue import Empty, Queue
 
 import pytest
 
@@ -8,6 +9,10 @@ from sage_ts.evaluation.control_baseline_cache import (
     compatibility_context,
 )
 from sage_ts.orchestration.self_evolution_reflection import (
+    FRESH_CONTROL_COMPLETE_EVENT,
+    FRESH_CONTROL_ERROR_EVENT,
+    FRESH_CONTROL_ROW_EVENT,
+    FRESH_CONTROL_WAIT_TIMEOUT_SECONDS,
     SelfEvolutionReflectionController,
 )
 from sage_ts.registry.store import RegistryStore
@@ -488,3 +493,390 @@ def test_strict_reflection_rejects_duplicate_fresh_control_use(
     controller.assess_scenario(**kwargs)
     with pytest.raises(ValueError, match="Duplicate same-run fresh control"):
         controller.assess_scenario(**kwargs)
+
+
+def _outcome_only_controller(
+    tmp_path: Path,
+    *,
+    scenario_name: str,
+    control_similarity: float,
+    control_outcome: float | None,
+) -> SelfEvolutionReflectionController:
+    return SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            scenario_name: {
+                "name": scenario_name,
+                "similarity": control_similarity,
+                "outcome_similarity": control_outcome,
+            }
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+        min_pulse_tasks=1,
+    )
+
+
+def test_reflection_lifecycle_ignores_canonical_regression_when_outcome_improves(
+    tmp_path: Path,
+) -> None:
+    scenario_name = "outcome_improvement"
+    controller = _outcome_only_controller(
+        tmp_path,
+        scenario_name=scenario_name,
+        control_similarity=1.0,
+        control_outcome=0.0,
+    )
+
+    controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={"similarity": 0.0, "outcome_similarity": 1.0},
+        selection_record={
+            "generated_tools_visible": ["helper"],
+            "generated_tools_called": ["helper"],
+            "generated_tools_attempted": ["helper"],
+            "generated_tools_failed": [],
+        },
+        side_effect_failures=[],
+    )
+
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["helper"]
+    assert lifecycle["called_score_delta_mean"] == -1.0
+    assert lifecycle["called_outcome_delta_mean"] == 1.0
+    assert lifecycle["decision"] == "keep_sparse_positive"
+    assert lifecycle["harmful_called_count"] == 0
+
+
+def test_reflection_lifecycle_uses_outcome_regression_despite_canonical_gain(
+    tmp_path: Path,
+) -> None:
+    scenario_name = "outcome_regression"
+    controller = _outcome_only_controller(
+        tmp_path,
+        scenario_name=scenario_name,
+        control_similarity=0.0,
+        control_outcome=1.0,
+    )
+
+    controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={"similarity": 1.0, "outcome_similarity": 0.0},
+        selection_record={
+            "generated_tools_visible": ["helper"],
+            "generated_tools_called": ["helper"],
+            "generated_tools_attempted": ["helper"],
+            "generated_tools_failed": [],
+        },
+        side_effect_failures=[],
+    )
+
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["helper"]
+    assert lifecycle["called_score_delta_mean"] == 1.0
+    assert lifecycle["called_outcome_delta_mean"] == -1.0
+    assert lifecycle["decision"] == "needs_route_repair"
+    assert lifecycle["harmful_called_count"] == 1
+
+
+def test_reflection_pulse_does_not_accept_canonical_gain_without_outcome_lift(
+    tmp_path: Path,
+) -> None:
+    scenario_name = "neutral_outcome"
+    controller = _outcome_only_controller(
+        tmp_path,
+        scenario_name=scenario_name,
+        control_similarity=0.0,
+        control_outcome=1.0,
+    )
+
+    controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={"similarity": 1.0, "outcome_similarity": 1.0},
+        selection_record={},
+        side_effect_failures=[],
+    )
+
+    pulse = json.loads(
+        (tmp_path / "run" / "self_evolution_reflections.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
+    assert pulse["score_delta_mean"] == 1.0
+    assert pulse["outcome_delta_mean"] == 0.0
+    assert pulse["on_track"] is False
+    assert pulse["off_track_reasons"] == ["pulse_lift_below_threshold"]
+
+
+@pytest.mark.parametrize("missing_arm", ["control", "candidate"])
+def test_reflection_requires_non_null_outcomes(
+    tmp_path: Path,
+    missing_arm: str,
+) -> None:
+    scenario_name = f"missing_{missing_arm}_outcome"
+    controller = _outcome_only_controller(
+        tmp_path,
+        scenario_name=scenario_name,
+        control_similarity=0.0,
+        control_outcome=None if missing_arm == "control" else 0.0,
+    )
+
+    with pytest.raises(ValueError, match="requires non-null matched control"):
+        controller.assess_scenario(
+            scenario_name=scenario_name,
+            baseline_scenario=_scenario(),
+            result={
+                "similarity": 1.0,
+                "outcome_similarity": None if missing_arm == "candidate" else 1.0,
+            },
+            selection_record={},
+            side_effect_failures=[],
+        )
+
+
+def test_resumed_reflection_ignores_changed_canonical_value_when_outcome_matches(
+    tmp_path: Path,
+) -> None:
+    scenario_name = "resumed_task"
+    output_dir = tmp_path / "run"
+    output_dir.mkdir()
+    feedback = {
+        "event": "self_evolution_task_assessed",
+        "scenario": scenario_name,
+        "control_source": "same_run_fresh",
+        "control_cache_eligible": False,
+        "control_cache_hit": False,
+        "control_score": 0.0,
+        "candidate_score": 1.0,
+        "score_delta": 1.0,
+        "control_outcome": 0.5,
+        "candidate_outcome": 1.0,
+        "outcome_delta": 0.5,
+        "generated_tools_visible": [],
+        "generated_tools_called": [],
+        "generated_tools_attempted": [],
+        "generated_tools_failed": [],
+        "side_effect_failures": [],
+    }
+    (output_dir / "self_evolution_task_feedback.jsonl").write_text(
+        json.dumps(feedback) + "\n",
+        encoding="utf-8",
+    )
+
+    controller = SelfEvolutionReflectionController.from_env(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=output_dir,
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        fresh_control_rows={
+            scenario_name: {
+                "name": scenario_name,
+                "similarity": 1.0,
+                "outcome_similarity": 0.5,
+            }
+        },
+        require_fresh_control=True,
+    )
+
+    assert controller.completed_count == 1
+    assert controller.fresh_control_consumed == {scenario_name}
+
+
+def _streamed_control_row(
+    scenario_name: str,
+    *,
+    similarity: float = 0.25,
+    outcome_similarity: float = 0.5,
+) -> dict[str, object]:
+    return {
+        "event": FRESH_CONTROL_ROW_EVENT,
+        "scenario": scenario_name,
+        "row": {
+            "name": scenario_name,
+            "similarity": similarity,
+            "outcome_similarity": outcome_similarity,
+            "llm_cached_call_count": 0,
+        },
+    }
+
+
+def _streaming_controller(
+    tmp_path: Path,
+    channel: Queue[object],
+) -> SelfEvolutionReflectionController:
+    return SelfEvolutionReflectionController.from_env(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        require_fresh_control=True,
+        fresh_control_channel=channel,
+    )
+
+
+def test_strict_streamed_reflection_consumes_exact_row_and_terminal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario_name = "search_phone_number_with_name"
+    channel: Queue[object] = Queue()
+    channel.put(_streamed_control_row(scenario_name))
+    channel.put({"event": FRESH_CONTROL_COMPLETE_EVENT})
+
+    def fail_cache_construction(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("strict streamed reflection constructed ControlBaselineCache")
+
+    monkeypatch.setattr(
+        "sage_ts.orchestration.self_evolution_reflection.ControlBaselineCache",
+        fail_cache_construction,
+    )
+    controller = _streaming_controller(tmp_path, channel)
+    controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={"similarity": 0.75, "outcome_similarity": 1.0},
+        selection_record={},
+        side_effect_failures=[],
+    )
+    controller.assert_fresh_control_complete((scenario_name,))
+
+    feedback = json.loads(
+        (tmp_path / "run" / "self_evolution_task_feedback.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
+    assert controller.control_cache is None
+    assert controller.fresh_control_stream_complete is True
+    assert controller.fresh_control_consumed == {scenario_name}
+    assert feedback["control_source"] == "same_run_fresh"
+    assert feedback["control_score"] == 0.25
+    assert feedback["control_outcome"] == 0.5
+
+
+@pytest.mark.parametrize(
+    ("message", "match"),
+    [
+        (
+            {"event": FRESH_CONTROL_ERROR_EVENT, "error": "control crashed"},
+            "producer failed: control crashed",
+        ),
+        (
+            _streamed_control_row("unexpected_task"),
+            "Out-of-order streamed same-run fresh control",
+        ),
+        (
+            {"event": FRESH_CONTROL_COMPLETE_EVENT},
+            "Missing streamed same-run fresh control observation",
+        ),
+        (
+            {
+                **_streamed_control_row("expected_task"),
+                "row": {
+                    "name": "expected_task",
+                    "similarity": 1.0,
+                    "outcome_similarity": 1.0,
+                    "llm_cached_call_count": 1,
+                },
+            },
+            "contains repository whole-response replay",
+        ),
+    ],
+)
+def test_strict_streamed_reflection_fails_closed_before_expected_row(
+    tmp_path: Path,
+    message: dict[str, object],
+    match: str,
+) -> None:
+    channel: Queue[object] = Queue()
+    channel.put(message)
+    controller = _streaming_controller(tmp_path, channel)
+
+    with pytest.raises(ValueError, match=match):
+        controller.assess_scenario(
+            scenario_name="expected_task",
+            baseline_scenario=_scenario(),
+            result={"similarity": 1.0, "outcome_similarity": 1.0},
+            selection_record={},
+            side_effect_failures=[],
+        )
+
+
+def test_strict_streamed_reflection_rejects_duplicate_row_message(
+    tmp_path: Path,
+) -> None:
+    channel: Queue[object] = Queue()
+    channel.put(_streamed_control_row("task_a"))
+    channel.put(_streamed_control_row("task_a"))
+    controller = _streaming_controller(tmp_path, channel)
+    common = {
+        "baseline_scenario": _scenario(),
+        "result": {"similarity": 1.0, "outcome_similarity": 1.0},
+        "selection_record": {},
+        "side_effect_failures": [],
+    }
+
+    controller.assess_scenario(scenario_name="task_a", **common)
+    with pytest.raises(ValueError, match="Duplicate streamed same-run fresh control"):
+        controller.assess_scenario(scenario_name="task_b", **common)
+
+
+def test_strict_streamed_reflection_requires_terminal_after_exact_rows(
+    tmp_path: Path,
+) -> None:
+    channel: Queue[object] = Queue()
+    channel.put(_streamed_control_row("task_a"))
+    channel.put(_streamed_control_row("unexpected_extra"))
+    controller = _streaming_controller(tmp_path, channel)
+    controller.assess_scenario(
+        scenario_name="task_a",
+        baseline_scenario=_scenario(),
+        result={"similarity": 1.0, "outcome_similarity": 1.0},
+        selection_record={},
+        side_effect_failures=[],
+    )
+
+    with pytest.raises(
+        ValueError, match="Unexpected streamed same-run fresh control row"
+    ):
+        controller.assert_fresh_control_complete(("task_a",))
+
+
+def test_strict_streamed_reflection_timeout_fails_closed_immediately(
+    tmp_path: Path,
+) -> None:
+    observed_timeouts: list[float] = []
+
+    class ImmediatelyEmptyChannel:
+        def get(self, *, timeout: float) -> object:
+            observed_timeouts.append(timeout)
+            raise Empty
+
+    controller = _streaming_controller(
+        tmp_path,
+        ImmediatelyEmptyChannel(),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(ValueError, match="Timed out waiting.*'missing_task'"):
+        controller.assess_scenario(
+            scenario_name="missing_task",
+            baseline_scenario=_scenario(),
+            result={"similarity": 1.0, "outcome_similarity": 1.0},
+            selection_record={},
+            side_effect_failures=[],
+        )
+    assert observed_timeouts == [FRESH_CONTROL_WAIT_TIMEOUT_SECONDS]

@@ -11,6 +11,8 @@ import pytest
 import sage_ts.evaluation.actor_selection_comparison as actor_selection_comparison
 import scripts.run_sage_protocol as protocol_runner
 import scripts.verify_publication_run as publication_verifier
+from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
+from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 from scripts.run_chapter4_evidence_campaign import _job_command
 from scripts.verify_publication_run import verify_run
 
@@ -146,13 +148,14 @@ def _fresh_run(tmp_path: Path) -> Path:
         lock_path,
     )
     environment = _test_environment_identity(tmp_path)
+    outcome_evaluator = outcome_evaluator_manifest()
     fixture_path = tmp_path / "rapid_api_cache.json"
     fixture_path.write_text('{"fixture": true}\n', encoding="utf-8")
     fixture_sha256 = hashlib.sha256(fixture_path.read_bytes()).hexdigest()
     benchmark_path = tmp_path / "benchmark.json"
     benchmark_path.write_text('{"benchmark": true}\n', encoding="utf-8")
     benchmark_sha256 = hashlib.sha256(benchmark_path.read_bytes()).hexdigest()
-    control_rows = [
+    control_rows: list[dict[str, Any]] = [
         {
             "name": "task_a",
             "exception_type": None,
@@ -182,7 +185,7 @@ def _fresh_run(tmp_path: Path) -> Path:
             "transient_retry_archives": [],
             "transient_retry_failures": [],
             "similarity": 1.0,
-            "outcome_similarity": None,
+            "outcome_similarity": 0.0,
             "llm_usage_recorded": True,
             "llm_cached_call_count": 0,
             "llm_call_count": 1,
@@ -196,7 +199,7 @@ def _fresh_run(tmp_path: Path) -> Path:
             "llm_usage_available_count": 1,
         },
     ]
-    candidate_rows = [
+    candidate_rows: list[dict[str, Any]] = [
         {
             "name": "task_a",
             "exception_type": None,
@@ -226,7 +229,7 @@ def _fresh_run(tmp_path: Path) -> Path:
             "transient_retry_archives": [],
             "transient_retry_failures": [],
             "similarity": 1.0,
-            "outcome_similarity": None,
+            "outcome_similarity": 0.25,
             "llm_usage_recorded": True,
             "llm_cached_call_count": 0,
             "llm_call_count": 1,
@@ -240,6 +243,24 @@ def _fresh_run(tmp_path: Path) -> Path:
             "llm_usage_available_count": 1,
         },
     ]
+    for row in (*control_rows, *candidate_rows):
+        row.update(
+            {
+                "outcome_evaluator_version": outcome_evaluator["version"],
+                "outcome_evaluator_contract_sha256": outcome_evaluator[
+                    "contract_sha256"
+                ],
+                "outcome_evaluator_source_sha256": outcome_evaluator["source_sha256"],
+            }
+        )
+    for arm_root in (control_dir.parent, candidate_dir.parent):
+        _write_json(
+            arm_root / "sage_ts_run_manifest.json",
+            {
+                "outcome_evaluator": outcome_evaluator,
+                "timezone": publication_verifier.PUBLICATION_TIMEZONE,
+            },
+        )
     _write_json(
         control_dir / "result_summary.json",
         {"per_scenario_results": control_rows},
@@ -272,6 +293,67 @@ def _fresh_run(tmp_path: Path) -> Path:
         "".join(json.dumps(row) + "\n" for row in feedback),
         encoding="utf-8",
     )
+    task_compare_path = run_root / "dashboard" / "task_compare.html"
+    task_compare_path.parent.mkdir(parents=True)
+    task_compare_path.write_text("dashboard", encoding="utf-8")
+    _write_json(
+        task_compare_path.with_name("task_compare_data.json"),
+        {
+            "arm_labels": {
+                "control": "Fresh non-learning control",
+                "candidate": "SAGE policy selection",
+            },
+            "scenario_count": 2,
+        },
+    )
+    task_compare_url = "http://127.0.0.1:63105/dashboard/task_compare.html"
+    dashboard_receipt_path = run_root / "dashboard_open_receipt.json"
+    _write_json(
+        dashboard_receipt_path,
+        {
+            "dashboard": "task_compare",
+            "comparison": "fresh_control_vs_sage_policy_selection",
+            "path": str(task_compare_path.resolve()),
+            "url": task_compare_url,
+            "external_browser_opened": True,
+            "http_verified_before_open": True,
+            "dashboard_server_protocol": DASHBOARD_SERVER_PROTOCOL,
+            "dashboard_server_root": str(run_root.resolve()),
+            "opened_at": "2026-09-03T12:00:00+00:00",
+            "opened_monotonic_ns": 500_000_000,
+            "opened_before_model_processes": True,
+        },
+    )
+    parallel_arms = {
+        "control": {
+            "status": "complete",
+            "process_pid": 101,
+            "started_at": "2026-09-03T12:00:01+00:00",
+            "completed_at": "2026-09-03T12:00:03+00:00",
+            "started_monotonic_ns": 1_000_000_000,
+            "completed_monotonic_ns": 3_000_000_000,
+        },
+        "candidate": {
+            "status": "complete",
+            "process_pid": 102,
+            "started_at": "2026-09-03T12:00:02+00:00",
+            "completed_at": "2026-09-03T12:00:04+00:00",
+            "started_monotonic_ns": 2_000_000_000,
+            "completed_monotonic_ns": 4_000_000_000,
+        },
+    }
+    for arm, arm_status in parallel_arms.items():
+        _write_json(
+            run_root / f"{arm}_arm_status.json",
+            {"arm": arm, **arm_status},
+        )
+    parallel_execution = {
+        "unit": "isolated_child_process",
+        "arms": parallel_arms,
+        "positive_overlap_asserted": True,
+        "overlap_monotonic_ns": 1_000_000_000,
+        "overlap_seconds": 1.0,
+    }
     _write_json(
         run_root / "protocol_manifest.json",
         {
@@ -287,8 +369,11 @@ def _fresh_run(tmp_path: Path) -> Path:
             "scenario_order_sha256": hashlib.sha256(b"task_a\ntask_b\n").hexdigest(),
             "control_dir": str(control_dir),
             "candidate_dir": str(candidate_dir),
+            "candidate_actor_selection_mode": "policy",
             "fresh_control_required": True,
             "publication_performance_endpoint": "outcome_task_completion_similarity",
+            "timezone": publication_verifier.PUBLICATION_TIMEZONE,
+            "outcome_evaluator": outcome_evaluator,
             "control_cache_mode": "off",
             "control_source": "fresh",
             "cached_control_tasks": 0,
@@ -309,7 +394,12 @@ def _fresh_run(tmp_path: Path) -> Path:
             "cross_run_failure_memory_path": None,
             "diagnostic_force_allowed": False,
             "active_diagnostic_force_env": [],
-            "parallel_arms": False,
+            "parallel_arms": True,
+            "parallel_arm_execution": parallel_execution,
+            "reflection_control_delivery": "task_synchronous_stream",
+            "dashboard_open_required": True,
+            "dashboard_open_receipt_path": str(dashboard_receipt_path),
+            "dashboard_task_compare_url": task_compare_url,
             "run_affecting_sage_env": dict(
                 publication_verifier.PUBLICATION_EXECUTION_ENV
             ),
@@ -370,7 +460,10 @@ def _fresh_run(tmp_path: Path) -> Path:
             "fresh_control_enforced": True,
         },
     )
-    _write_json(run_root / "paired_comparison.json", {"deltas": []})
+    _write_json(
+        run_root / "paired_comparison.json",
+        {"deltas": [], "outcome_evaluator": outcome_evaluator},
+    )
     return run_root
 
 
@@ -453,12 +546,17 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
     run_root = tmp_path / "online_build_full_pilot"
     policy_dir = run_root / "candidate" / "policy_run"
     auto_dir = run_root / "sage_auto_selection" / "auto_run"
+    auto_control_dir = (
+        run_root / "sage_auto_selection_parallel_pair" / "control" / "control_run"
+    )
     policy_dir.mkdir(parents=True)
     auto_dir.mkdir(parents=True)
+    auto_control_dir.mkdir(parents=True)
     benchmark_path = tmp_path / "pilot_manifest.json"
     benchmark_path.write_text('{"sealed": true}\n', encoding="utf-8")
     benchmark_sha256 = hashlib.sha256(benchmark_path.read_bytes()).hexdigest()
     order_sha256 = "3" * 64
+    outcome_evaluator = outcome_evaluator_manifest()
     monkeypatch.setitem(
         publication_verifier.PUBLICATION_COHORT_PINS,
         "pilot",
@@ -481,18 +579,90 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
             "benchmark_manifest_sha256": benchmark_sha256,
             "scenario_order_sha256": order_sha256,
             "candidate_dir": str(policy_dir),
+            "timezone": publication_verifier.PUBLICATION_TIMEZONE,
+            "outcome_evaluator": outcome_evaluator,
         },
     )
+    for arm_dir in (policy_dir, auto_dir):
+        _write_json(
+            arm_dir.parent / "sage_ts_run_manifest.json",
+            {"timezone": publication_verifier.PUBLICATION_TIMEZONE},
+        )
     protocol_sha256 = hashlib.sha256(protocol_path.read_bytes()).hexdigest()
     comparison = {
         "schema_version": 1,
         "experiment": "sage_auto_selection",
         "scenario_count": 30,
+        "mechanism_counts_are_performance_gates": False,
+        "outcome_evidence_complete": True,
+        "performance_gate_applied": False,
+        "performance_gate_reason": "no_predeclared_selector_performance_threshold",
+        "integrity_gate_passed": True,
+        "integrity_gate_reasons": [],
+        "experiment_passed": True,
         "stability_gate_passed": True,
         "stability_gate_reasons": [],
+        "outcome_evaluator": outcome_evaluator,
     }
     comparison_path = run_root / "actor_selection_outcome_comparison.json"
     _write_json(comparison_path, comparison)
+    pair_manifest_path = (
+        run_root / "sage_auto_selection_parallel_pair" / "parallel_pair_manifest.json"
+    )
+    _write_json(pair_manifest_path, {"sealed": True})
+    pair_manifest_sha256 = hashlib.sha256(pair_manifest_path.read_bytes()).hexdigest()
+    parallel_execution = {"positive_overlap_asserted": True}
+    auto_control_outcomes = {
+        "scenario_count": 30,
+        "control_exact_outcome_successes": 10,
+        "auto_exact_outcome_successes": 20,
+    }
+    auto_control_outcome_path = (
+        run_root
+        / "sage_auto_selection_parallel_pair"
+        / "auto_control_outcome_comparison.json"
+    )
+    _write_json(auto_control_outcome_path, auto_control_outcomes)
+    live_receipt_path = (
+        run_root / "sage_auto_selection_parallel_pair" / "dashboard_open_receipt.json"
+    )
+    live_receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(live_receipt_path, {"sealed": True})
+    policy_auto_dashboard_path = (
+        run_root / "actor_selection_dashboard" / "dashboard" / "task_compare.html"
+    )
+    policy_auto_dashboard_path.parent.mkdir(parents=True)
+    policy_auto_dashboard_path.write_text("dashboard", encoding="utf-8")
+    _write_json(
+        policy_auto_dashboard_path.with_name("task_compare_data.json"),
+        {
+            "arm_labels": {
+                "control": "SAGE policy selection",
+                "candidate": "SAGE auto selection",
+            },
+            "scenario_count": 30,
+        },
+    )
+    policy_auto_dashboard_url = (
+        "http://127.0.0.1:63105/actor_selection_dashboard/dashboard/task_compare.html"
+    )
+    policy_auto_receipt_path = (
+        run_root / "actor_selection_dashboard" / "dashboard_open_receipt.json"
+    )
+    _write_json(
+        policy_auto_receipt_path,
+        {
+            "dashboard": "task_compare",
+            "comparison": "policy_vs_sage_auto_selection",
+            "path": str(policy_auto_dashboard_path),
+            "url": policy_auto_dashboard_url,
+            "external_browser_opened": True,
+            "http_verified_before_open": True,
+            "dashboard_server_protocol": DASHBOARD_SERVER_PROTOCOL,
+            "dashboard_server_root": str(run_root.resolve()),
+            "opened_phase": "post_run_causal_comparison",
+        },
+    )
     _write_json(
         run_root / "sage_auto_selection_arm_status.json",
         {
@@ -505,7 +675,7 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
     _write_json(
         evidence_path,
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "experiment": "sage_auto_selection",
             "stage": "pilot",
             "status": "complete",
@@ -513,13 +683,39 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
             "policy_generation_enabled": True,
             "auto_generation_enabled": False,
             "auto_evolution_source": "matched_policy_inventory_authority",
+            "auto_parallel_arms": True,
+            "auto_control_cache_mode": "off",
+            "auto_control_source": "fresh",
+            "auto_cached_control_tasks": 0,
+            "auto_fresh_control_tasks": 30,
+            "auto_control_cache_accessed": False,
+            "auto_control_delivery": "not_connected",
+            "auto_control_output_influences_inventory": False,
+            "auto_control_output_influences_execution": False,
+            "publication_performance_endpoint": ("outcome_task_completion_similarity"),
+            "legacy_score_is_performance_gate": False,
+            "mechanism_counts_are_performance_gates": False,
             "persistent_response_cache_reuse": False,
+            "outcome_evidence_complete": True,
+            "performance_gate_applied": False,
+            "performance_gate_reason": (
+                "no_predeclared_selector_performance_threshold"
+            ),
+            "integrity_gate_passed": True,
+            "integrity_gate_reasons": [],
+            "experiment_passed": True,
             "stability_gate_passed": True,
             "stability_gate_reasons": [],
             "policy_protocol_manifest_path": str(protocol_path),
             "policy_protocol_manifest_sha256": protocol_sha256,
             "policy_run_dir": str(policy_dir),
             "auto_run_dir": str(auto_dir),
+            "auto_control_run_dir": str(auto_control_dir),
+            "auto_parallel_pair_manifest_path": str(pair_manifest_path),
+            "auto_parallel_pair_manifest_sha256": pair_manifest_sha256,
+            "auto_parallel_arm_execution": parallel_execution,
+            "auto_control_outcome_comparison_path": str(auto_control_outcome_path),
+            "auto_control_outcomes": auto_control_outcomes,
             "inventory_authority_path": str(authority_path),
             "inventory_authority_sha256": authority_sha256,
             "inventory_authority_tasks_sha256": tasks_sha256,
@@ -530,30 +726,84 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
                 "git_commit": TEST_GIT_COMMIT,
                 "git_tree": TEST_GIT_TREE,
             },
+            "outcome_evaluator": outcome_evaluator,
             "outcome_comparison_path": str(comparison_path),
+            "dashboard_task_compare_path": str(policy_auto_dashboard_path),
+            "dashboard_task_compare_url": policy_auto_dashboard_url,
+            "dashboard_open_receipt_path": str(policy_auto_receipt_path),
+            "policy_auto_dashboard_open_receipt_path": str(policy_auto_receipt_path),
+            "live_auto_control_dashboard_open_receipt_path": str(live_receipt_path),
         },
     )
     monkeypatch.setattr(
         publication_verifier,
         "verify_pinned_run",
-        lambda *args, **kwargs: {"run_root": str(run_root), "status": "pass"},
+        lambda *args, **kwargs: {
+            "run_root": str(run_root),
+            "status": "pass",
+            "outcome_evaluator": outcome_evaluator,
+        },
     )
     monkeypatch.setattr(
         actor_selection_comparison,
         "verify_matched_actor_selection_experiment",
         lambda **kwargs: comparison,
     )
+    monkeypatch.setattr(
+        publication_verifier,
+        "verify_auto_selection_parallel_pair",
+        lambda *args, **kwargs: {
+            "status": "pass",
+            "control_run_dir": str(auto_control_dir),
+            "auto_run_dir": str(auto_dir),
+            "parallel_arm_execution": parallel_execution,
+            "outcomes": auto_control_outcomes,
+            "outcome_comparison_path": str(auto_control_outcome_path),
+            "dashboard_open_receipt_path": str(live_receipt_path),
+        },
+    )
 
     result = publication_verifier.verify_selector_pilot_evidence(evidence_path)
 
     assert result["status"] == "pass"
     assert result["scenario_count"] == 30
+    assert result["outcome_evidence_complete"] is True
+    assert result["performance_gate_applied"] is False
+    assert result["integrity_gate_passed"] is True
+    assert result["experiment_passed"] is True
     assert result["stability_gate_passed"] is True
+    assert result["outcome_evaluator"] == outcome_evaluator
     assert result["git_commit"] == TEST_GIT_COMMIT
     assert (
         result["evidence_sha256"]
         == hashlib.sha256(evidence_path.read_bytes()).hexdigest()
     )
+    assert result["timezone"] == publication_verifier.PUBLICATION_TIMEZONE
+
+    policy_auto_receipt = json.loads(
+        policy_auto_receipt_path.read_text(encoding="utf-8")
+    )
+    policy_auto_receipt["dashboard_server_root"] = str(run_root.parent.resolve())
+    _write_json(policy_auto_receipt_path, policy_auto_receipt)
+    with pytest.raises(ValueError, match="policy/auto Task Compare receipt is invalid"):
+        publication_verifier.verify_selector_pilot_evidence(evidence_path)
+    policy_auto_receipt["dashboard_server_root"] = str(run_root.resolve())
+    _write_json(policy_auto_receipt_path, policy_auto_receipt)
+
+    auto_manifest_path = auto_dir.parent / "sage_ts_run_manifest.json"
+    auto_manifest = json.loads(auto_manifest_path.read_text(encoding="utf-8"))
+    auto_manifest["timezone"] = "America/Los_Angeles"
+    _write_json(auto_manifest_path, auto_manifest)
+    with pytest.raises(ValueError, match="sage_auto_selection run manifest timezone"):
+        publication_verifier.verify_selector_pilot_evidence(evidence_path)
+    auto_manifest["timezone"] = publication_verifier.PUBLICATION_TIMEZONE
+    _write_json(auto_manifest_path, auto_manifest)
+
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    evidence["outcome_evaluator"]["source_sha256"] = "0" * 64
+    _write_json(evidence_path, evidence)
+    with pytest.raises(ValueError, match="field 'outcome_evaluator'"):
+        publication_verifier.verify_selector_pilot_evidence(evidence_path)
 
 
 def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
@@ -588,8 +838,56 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
     assert result["python_version"] == "3.12.7"
     assert result["platform_system"] == "Darwin"
     assert result["platform_machine"] == "arm64"
+    assert result["timezone"] == "America/New_York"
     assert result["external_distribution_count"] == 108
     assert len(result["external_distribution_sha256"]) == 64
+    assert result["outcome_evaluator"] == outcome_evaluator_manifest()
+
+
+@pytest.mark.parametrize(
+    "artifact",
+    ["protocol", "comparison", "arm_manifest", "result_row"],
+)
+def test_verifier_rejects_outcome_evaluator_identity_drift(
+    tmp_path: Path,
+    artifact: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads((run_root / "protocol_manifest.json").read_text())
+    if artifact == "protocol":
+        protocol["outcome_evaluator"]["source_sha256"] = "0" * 64
+        _write_json(run_root / "protocol_manifest.json", protocol)
+        expected_message = "Protocol manifest has the wrong outcome evaluator"
+    elif artifact == "comparison":
+        path = run_root / "paired_comparison.json"
+        comparison = json.loads(path.read_text())
+        comparison["outcome_evaluator"]["contract_sha256"] = "0" * 64
+        _write_json(path, comparison)
+        expected_message = "Paired comparison has the wrong outcome evaluator"
+    elif artifact == "arm_manifest":
+        candidate_dir = Path(protocol["candidate_dir"])
+        path = candidate_dir.parent / "sage_ts_run_manifest.json"
+        manifest = json.loads(path.read_text())
+        manifest["outcome_evaluator"]["version"] = "stale"
+        _write_json(path, manifest)
+        expected_message = "candidate run manifest has the wrong outcome evaluator"
+    else:
+        candidate_dir = Path(protocol["candidate_dir"])
+        path = candidate_dir / "result_summary.json"
+        summary = json.loads(path.read_text())
+        summary["per_scenario_results"][0]["outcome_evaluator_contract_sha256"] = (
+            "0" * 64
+        )
+        _write_json(path, summary)
+        expected_message = "mismatched outcome_evaluator_contract_sha256"
+
+    with pytest.raises(ValueError, match=expected_message):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
 
 
 def test_verifier_accepts_exception_free_zero_retry_rows(tmp_path: Path) -> None:
@@ -789,7 +1087,7 @@ def test_verifier_rejects_inconsistent_retry_provenance(
     )
     archive.mkdir(parents=True)
     archive_path = str(archive)
-    failure = {
+    failure: dict[str, Any] = {
         "attempt": 1,
         "exception_type": "APIConnectionError",
         "exception_message": "connection reset",
@@ -982,6 +1280,46 @@ def test_verifier_rejects_execution_policy_drift(
     _write_json(protocol_path, protocol)
 
     with pytest.raises(ValueError, match=env_name):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_protocol_timezone_drift(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    protocol["timezone"] = "America/Los_Angeles"
+    _write_json(protocol_path, protocol)
+
+    with pytest.raises(ValueError, match="Protocol field 'timezone'"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+@pytest.mark.parametrize("arm", ["control", "candidate"])
+def test_verifier_rejects_arm_manifest_timezone_drift(
+    tmp_path: Path,
+    arm: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    run_dir = Path(protocol[f"{arm}_dir"])
+    manifest_path = run_dir.parent / "sage_ts_run_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["timezone"] = "America/Los_Angeles"
+    _write_json(manifest_path, manifest)
+
+    with pytest.raises(ValueError, match=rf"{arm} run manifest timezone"):
         verify_run(
             run_root.parent,
             expected_tasks=2,
@@ -1322,6 +1660,7 @@ def test_verifier_rejects_generation_calls_in_frozen_candidate(
     protocol["generation_enabled"] = False
     protocol["sage_policy"] = "none"
     protocol["reflection_control_source"] = "not_applicable"
+    protocol["reflection_control_delivery"] = "not_applicable_generation_disabled"
     _write_json(protocol_path, protocol)
     for arm in ("control", "candidate"):
         events_path = Path(protocol[f"{arm}_dir"]) / "llm_usage_events.jsonl"
@@ -1369,6 +1708,433 @@ def test_verifier_resolves_repo_relative_paths_and_validates_fixture_hash(
     )
 
     assert result["external_fixture_sha256"] == _fixture_sha256(run_root)
+
+
+def test_verifier_ignores_compatibility_canonical_reflection_value(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    feedback_path = (
+        Path(
+            json.loads((run_root / "protocol_manifest.json").read_text())[
+                "candidate_dir"
+            ]
+        )
+        / "self_evolution_task_feedback.jsonl"
+    )
+    feedback = [
+        json.loads(line)
+        for line in feedback_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    feedback[0]["control_score"] = -999.0
+    feedback_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in feedback),
+        encoding="utf-8",
+    )
+
+    result = verify_run(
+        run_root.parent,
+        expected_tasks=2,
+        expect_reflection="same-run-fresh",
+        **_verification_pins(run_root),
+    )
+
+    assert result["status"] == "pass"
+
+
+def test_verifier_rejects_nonoverlapping_parallel_arm_evidence(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    candidate = protocol["parallel_arm_execution"]["arms"]["candidate"]
+    candidate["started_monotonic_ns"] = 3_000_000_000
+    candidate["completed_monotonic_ns"] = 4_000_000_000
+    protocol["parallel_arm_execution"]["overlap_monotonic_ns"] = 0
+    protocol["parallel_arm_execution"]["overlap_seconds"] = 0.0
+    _write_json(protocol_path, protocol)
+    candidate_status_path = run_root / "candidate_arm_status.json"
+    candidate_status = json.loads(candidate_status_path.read_text(encoding="utf-8"))
+    candidate_status["started_monotonic_ns"] = 3_000_000_000
+    candidate_status["completed_monotonic_ns"] = 4_000_000_000
+    _write_json(candidate_status_path, candidate_status)
+
+    with pytest.raises(ValueError, match="do not prove overlap"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_dashboard_opened_after_model_process_start(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    receipt_path = run_root / "dashboard_open_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["opened_monotonic_ns"] = 2_500_000_000
+    _write_json(receipt_path, receipt)
+
+    with pytest.raises(ValueError, match="pre-model open"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_dashboard_server_root_outside_current_run(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    receipt_path = run_root / "dashboard_open_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["dashboard_server_root"] = str(run_root.parent.resolve())
+    _write_json(receipt_path, receipt)
+
+    with pytest.raises(ValueError, match="pre-model open"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+@pytest.mark.parametrize("artifact", ["receipt", "dashboard_data"])
+def test_verifier_rejects_ambiguous_parallel_dashboard_identity(
+    tmp_path: Path,
+    artifact: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    if artifact == "receipt":
+        path = run_root / "dashboard_open_receipt.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["comparison"] = "fresh_control_vs_sage_auto_selection"
+        expected = "pre-model open"
+    else:
+        path = run_root / "dashboard" / "task_compare_data.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["arm_labels"]["candidate"] = "SAGE"
+        expected = "unambiguously identify"
+    _write_json(path, payload)
+
+    with pytest.raises(ValueError, match=expected):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_parallel_manifest_status_drift(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    status_path = run_root / "candidate_arm_status.json"
+    status = json.loads(status_path.read_text(encoding="utf-8"))
+    status["process_pid"] = 999
+    _write_json(status_path, status)
+
+    with pytest.raises(ValueError, match="differs from its arm status"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def _auto_parallel_pair_fixture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[Path, Path, Path]:
+    run_root = tmp_path / "online_build_full_pilot"
+    pair_root = run_root / "sage_auto_selection_parallel_pair"
+    control_dir = pair_root / "control" / "control_run"
+    auto_dir = run_root / "sage_auto_selection" / "auto_run"
+    control_dir.mkdir(parents=True)
+    auto_dir.mkdir(parents=True)
+    outcome_evaluator = outcome_evaluator_manifest()
+    common = {
+        "agent": publication_verifier.PUBLICATION_MODEL,
+        "user": publication_verifier.PUBLICATION_MODEL,
+        "scenario_names": ["task_a", "task_b"],
+        "processes": 1,
+        "base_tool_policy": "upstream",
+        "resume_from_dir": None,
+        "resume_completed_limit": None,
+        "timezone": publication_verifier.PUBLICATION_TIMEZONE,
+        "outcome_evaluator": outcome_evaluator,
+    }
+    _write_json(
+        control_dir.parent / "sage_ts_run_manifest.json",
+        {**common, "actor_selection_mode": "policy"},
+    )
+    _write_json(
+        auto_dir.parent / "sage_ts_run_manifest.json",
+        {**common, "actor_selection_mode": "auto"},
+    )
+    _write_json(
+        auto_dir / "selection_summary.json",
+        {
+            "generation_enabled": False,
+            "actor_selection_mode": "auto",
+            "inventory_authority_mode": "replay",
+            "inventory_authority_task_count": 2,
+            "inventory_authority_controls_later_exposure": True,
+            "inventory_authority_source_actor_selection_mode": "policy",
+        },
+    )
+    authority_path = tmp_path / "authority" / "inventory_authority.json"
+    _write_json(authority_path, {"complete": True})
+    parallel_arms = {
+        "control": {
+            "status": "complete",
+            "process_pid": 201,
+            "started_at": "start",
+            "completed_at": "complete",
+            "started_monotonic_ns": 1_000,
+            "completed_monotonic_ns": 3_000,
+        },
+        "candidate": {
+            "status": "complete",
+            "process_pid": 202,
+            "started_at": "start",
+            "completed_at": "complete",
+            "started_monotonic_ns": 2_000,
+            "completed_monotonic_ns": 4_000,
+        },
+    }
+    for arm, status in parallel_arms.items():
+        _write_json(pair_root / f"{arm}_arm_status.json", {"arm": arm, **status})
+    parallel_execution = {
+        "unit": "isolated_child_process",
+        "arms": parallel_arms,
+        "positive_overlap_asserted": True,
+        "overlap_monotonic_ns": 1_000,
+        "overlap_seconds": 0.000001,
+    }
+    dashboard_path = pair_root / "dashboard" / "task_compare.html"
+    dashboard_path.parent.mkdir(parents=True)
+    dashboard_path.write_text("dashboard", encoding="utf-8")
+    _write_json(
+        dashboard_path.with_name("task_compare_data.json"),
+        {
+            "arm_labels": {
+                "control": "Fresh non-learning control",
+                "candidate": "SAGE auto selection",
+            },
+            "scenario_count": 2,
+        },
+    )
+    dashboard_url = (
+        "http://127.0.0.1:63105/sage_auto_selection_parallel_pair/"
+        "dashboard/task_compare.html"
+    )
+    receipt_path = pair_root / "dashboard_open_receipt.json"
+    _write_json(
+        receipt_path,
+        {
+            "dashboard": "task_compare",
+            "comparison": "fresh_control_vs_sage_auto_selection",
+            "path": str(dashboard_path),
+            "url": dashboard_url,
+            "external_browser_opened": True,
+            "http_verified_before_open": True,
+            "opened_before_model_processes": True,
+            "opened_monotonic_ns": 500,
+            "dashboard_server_protocol": DASHBOARD_SERVER_PROTOCOL,
+            "dashboard_server_root": str(run_root.resolve()),
+        },
+    )
+    order_sha256 = hashlib.sha256(b"task_a\ntask_b\n").hexdigest()
+    row_mapping = {
+        "task_a": {"outcome_similarity": 0.0},
+        "task_b": {"outcome_similarity": 1.0},
+    }
+    auto_row_mapping = {
+        "task_a": {"outcome_similarity": 1.0},
+        "task_b": {"outcome_similarity": 1.0},
+    }
+    outcome_comparison_path = pair_root / "auto_control_outcome_comparison.json"
+    _write_json(
+        outcome_comparison_path,
+        publication_verifier._outcome_only_pair_summary(
+            row_mapping,
+            auto_row_mapping,
+            ["task_a", "task_b"],
+        ),
+    )
+    pair_manifest_path = pair_root / "parallel_pair_manifest.json"
+    _write_json(
+        pair_manifest_path,
+        {
+            "schema_version": 1,
+            "experiment": "sage_auto_selection_parallel_control_pair",
+            "status": "complete",
+            "mode": "online_build_full",
+            "agent": publication_verifier.PUBLICATION_MODEL,
+            "user": publication_verifier.PUBLICATION_MODEL,
+            "base_tool_policy": "upstream",
+            "scenario_count": 2,
+            "scenario_order_sha256": order_sha256,
+            "control_role": "fresh_non_learning_control",
+            "candidate_role": "sage_auto_selection",
+            "control_run_dir": str(control_dir),
+            "auto_run_dir": str(auto_dir),
+            "control_cache_mode": "off",
+            "control_source": "fresh",
+            "cached_control_tasks": 0,
+            "fresh_control_tasks": 2,
+            "cache_accessed": False,
+            "openai_response_cache_enabled": False,
+            "sage_task_cache_enabled": False,
+            "persistent_response_cache_reuse": False,
+            "publication_performance_endpoint": ("outcome_task_completion_similarity"),
+            "legacy_score_is_performance_gate": False,
+            "parallel_arms": True,
+            "parallel_arm_execution": parallel_execution,
+            "auto_control_delivery": "not_connected",
+            "auto_control_output_influences_inventory": False,
+            "auto_control_output_influences_execution": False,
+            "auto_inventory_source": "matched_policy_inventory_authority",
+            "inventory_authority_path": str(authority_path),
+            "inventory_authority_sha256": hashlib.sha256(
+                authority_path.read_bytes()
+            ).hexdigest(),
+            "outcome_evaluator": outcome_evaluator,
+            "outcome_comparison_path": str(outcome_comparison_path),
+            "outcome_comparison_sha256": hashlib.sha256(
+                outcome_comparison_path.read_bytes()
+            ).hexdigest(),
+            "timezone": publication_verifier.PUBLICATION_TIMEZONE,
+            "dashboard_task_compare_path": str(dashboard_path),
+            "dashboard_task_compare_url": dashboard_url,
+            "dashboard_open_receipt_path": str(receipt_path),
+        },
+    )
+
+    def fake_rows(*args: object, **kwargs: object) -> object:
+        return (
+            (
+                auto_row_mapping
+                if kwargs.get("arm") == "sage_auto_selection"
+                else row_mapping
+            ),
+            ["task_a", "task_b"],
+            {},
+        )
+
+    monkeypatch.setattr(publication_verifier, "_uncached_rows", fake_rows)
+    monkeypatch.setattr(
+        publication_verifier, "_verify_llm_usage_artifacts", lambda *a, **k: None
+    )
+    return run_root, pair_manifest_path, auto_dir
+
+
+def test_auto_selection_parallel_pair_proves_fresh_control_overlap_and_pre_model_dashboard(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root, pair_manifest_path, auto_dir = _auto_parallel_pair_fixture(
+        tmp_path, monkeypatch
+    )
+
+    result = publication_verifier.verify_auto_selection_parallel_pair(
+        pair_manifest_path,
+        run_root=run_root,
+        expected_tasks=2,
+        expected_scenario_order_sha256=hashlib.sha256(b"task_a\ntask_b\n").hexdigest(),
+        expected_auto_dir=auto_dir,
+    )
+
+    assert result["status"] == "pass"
+    assert result["parallel_arm_execution"]["positive_overlap_asserted"] is True
+
+
+def test_auto_control_outcome_summary_counts_only_exact_one_as_success() -> None:
+    summary = publication_verifier._outcome_only_pair_summary(
+        {"task": {"outcome_similarity": 1.0 - 1e-13}},
+        {"task": {"outcome_similarity": 1.0}},
+        ["task"],
+    )
+
+    assert summary["control_exact_outcome_successes"] == 0
+    assert summary["auto_exact_outcome_successes"] == 1
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "nonoverlap",
+        "late_dashboard",
+        "wrong_dashboard_root",
+        "control_feedback",
+        "control_influence",
+    ],
+)
+def test_auto_selection_parallel_pair_rejects_invalid_independence_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    run_root, pair_manifest_path, auto_dir = _auto_parallel_pair_fixture(
+        tmp_path, monkeypatch
+    )
+    if failure == "nonoverlap":
+        pair = json.loads(pair_manifest_path.read_text(encoding="utf-8"))
+        candidate = pair["parallel_arm_execution"]["arms"]["candidate"]
+        candidate["started_monotonic_ns"] = 3_000
+        candidate["completed_monotonic_ns"] = 4_000
+        pair["parallel_arm_execution"]["overlap_monotonic_ns"] = 0
+        pair["parallel_arm_execution"]["overlap_seconds"] = 0.0
+        _write_json(pair_manifest_path, pair)
+        candidate_status_path = pair_manifest_path.parent / "candidate_arm_status.json"
+        candidate_status = json.loads(candidate_status_path.read_text(encoding="utf-8"))
+        candidate_status["started_monotonic_ns"] = 3_000
+        candidate_status["completed_monotonic_ns"] = 4_000
+        _write_json(candidate_status_path, candidate_status)
+        expected = "do not prove overlap"
+    elif failure == "late_dashboard":
+        pair = json.loads(pair_manifest_path.read_text(encoding="utf-8"))
+        receipt_path = Path(pair["dashboard_open_receipt_path"])
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["opened_monotonic_ns"] = 2_500
+        _write_json(receipt_path, receipt)
+        expected = "pre-model opening"
+    elif failure == "wrong_dashboard_root":
+        pair = json.loads(pair_manifest_path.read_text(encoding="utf-8"))
+        receipt_path = Path(pair["dashboard_open_receipt_path"])
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["dashboard_server_root"] = str(run_root.parent.resolve())
+        _write_json(receipt_path, receipt)
+        expected = "pre-model opening"
+    elif failure == "control_feedback":
+        (auto_dir / "self_evolution_task_feedback.jsonl").write_text(
+            "{}\n", encoding="utf-8"
+        )
+        expected = "consumed control feedback"
+    else:
+        pair = json.loads(pair_manifest_path.read_text(encoding="utf-8"))
+        pair["auto_control_output_influences_execution"] = True
+        _write_json(pair_manifest_path, pair)
+        expected = "auto_control_output_influences_execution"
+
+    with pytest.raises(ValueError, match=expected):
+        publication_verifier.verify_auto_selection_parallel_pair(
+            pair_manifest_path,
+            run_root=run_root,
+            expected_tasks=2,
+            expected_scenario_order_sha256=hashlib.sha256(
+                b"task_a\ntask_b\n"
+            ).hexdigest(),
+            expected_auto_dir=auto_dir,
+        )
 
 
 def test_verifier_rejects_fixture_mode_or_mutated_bytes(tmp_path: Path) -> None:

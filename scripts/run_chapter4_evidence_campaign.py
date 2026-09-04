@@ -55,12 +55,17 @@ DEFAULT_FIXED_NOW = 1784832588
 DEFAULT_BOOTSTRAP_ITERATIONS = 10_000
 DEFAULT_RANDOMIZATION_ITERATIONS = 20_000
 DEFAULT_ANALYSIS_SEED = 20260730
-MAX_CONCURRENCY = 10
 EXPECTED_REPLICATIONS = 10
+MODEL_ARMS_PER_PAIRED_PROTOCOL_JOB = 2
+MAX_CONCURRENT_MODEL_ARMS = 10
+# Backward-compatible name used by the CLI/tests: the unit is now explicitly a
+# paired protocol job, and each job starts control + SAGE child processes.
+MAX_CONCURRENCY = MAX_CONCURRENT_MODEL_ARMS // MODEL_ARMS_PER_PAIRED_PROTOCOL_JOB
 EXPECTED_TASKS_PER_RUN = 1032
-EXPECTED_OUTCOME_SCORED_TASKS_PER_RUN = 800
+EXPECTED_OUTCOME_SCORED_TASKS_PER_RUN = EXPECTED_TASKS_PER_RUN
 PUBLICATION_MODEL = "gpt-4o-mini"
 PUBLICATION_EXECUTION_ENV = {
+    "TZ": "America/New_York",
     "SAGE_OPENAI_MAX_RETRIES": "5",
     "SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
     "SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
@@ -87,7 +92,7 @@ GENERATION_SETTINGS_FILES = (
     Path("src/sage_ts/generation/tool_generator.py"),
     Path("src/sage_ts/orchestration/online_birth.py"),
     Path("src/sage_ts/orchestration/self_evolution_reflection.py"),
-    Path("docs/sage_protocol/publication_validation_thresholds_v2.json"),
+    Path("docs/sage_protocol/publication_validation_thresholds_v4.json"),
 )
 SAMPLE_RELEASE_IDENTITY_FIELDS = (
     "git_commit",
@@ -118,7 +123,7 @@ def _expected_control_execution() -> dict[str, Any]:
 
 def _expected_statistical_plan() -> dict[str, Any]:
     return {
-        "primary_measure": "outcome/task-completion similarity",
+        "primary_measure": "outcome/task completion",
         "hypothesis_1_threshold_percent": 80,
         "hypothesis_2_threshold_percent": 10,
         "hypothesis_3_threshold_percent": 30,
@@ -142,7 +147,6 @@ def _expected_claim_safeguards() -> dict[str, Any]:
         "synthetic_bridge_completions_disabled": True,
         "diagnostic_force_calls_disabled": True,
         "performance_endpoint": "outcome_task_completion_similarity",
-        "canonical_metric_policy": "descriptive_only_never_a_release_gate",
         "sage_task_cache": "off",
         "openai_response_cache": "disabled",
         "openai_response_cache_scope": "persistent_repository_whole_response_replay",
@@ -153,7 +157,11 @@ def _expected_claim_safeguards() -> dict[str, Any]:
         "control_cache": "off",
         "cross_run_failure_memory": "disabled",
         "fresh_control_required": True,
-        "parallel_arms": False,
+        "parallel_arms": True,
+        "reflection_control_delivery": {
+            "online": "task_synchronous_stream",
+            "frozen": "not_applicable_generation_disabled",
+        },
         "online_reflection_control": "same_run_fresh",
         "online_registry_start": "empty",
         "frozen_generation": "off",
@@ -169,6 +177,10 @@ def _expected_execution_waves(maximum_parallel: int) -> list[dict[str, Any]]:
                 "Ten new online-build replications, each with a same-run fresh control."
             ),
             "maximum_parallel": maximum_parallel,
+            "parallelism_unit": "paired_protocol_job",
+            "maximum_concurrent_model_arms": (
+                maximum_parallel * MODEL_ARMS_PER_PAIRED_PROTOCOL_JOB
+            ),
         },
         {
             "wave": 2,
@@ -177,6 +189,10 @@ def _expected_execution_waves(maximum_parallel: int) -> list[dict[str, Any]]:
                 "by wave 1."
             ),
             "maximum_parallel": maximum_parallel,
+            "parallelism_unit": "paired_protocol_job",
+            "maximum_concurrent_model_arms": (
+                maximum_parallel * MODEL_ARMS_PER_PAIRED_PROTOCOL_JOB
+            ),
         },
     ]
 
@@ -699,6 +715,11 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
         "expected_tasks_per_run": scenario_count,
         "sample_validation": sample_validation,
         "maximum_parallel_runs": args.max_parallel,
+        "parallelism_unit": "paired_protocol_job",
+        "model_arms_per_paired_protocol_job": MODEL_ARMS_PER_PAIRED_PROTOCOL_JOB,
+        "maximum_concurrent_model_arms": (
+            args.max_parallel * MODEL_ARMS_PER_PAIRED_PROTOCOL_JOB
+        ),
         "execution_waves": _expected_execution_waves(args.max_parallel),
         "statistical_plan": _expected_statistical_plan(),
         "claim_safeguards": _expected_claim_safeguards(),
@@ -972,7 +993,10 @@ def _campaign_prerequisite_errors(
         or not isinstance(maximum_parallel, int)
         or not 1 <= maximum_parallel <= MAX_CONCURRENCY
     ):
-        errors.append("maximum_parallel_runs must be between 1 and 10")
+        errors.append(
+            "maximum_parallel_runs must be between 1 and "
+            f"{MAX_CONCURRENCY} paired protocol jobs"
+        )
     elif not _exact_value(
         manifest.get("execution_waves"),
         _expected_execution_waves(maximum_parallel),
@@ -980,6 +1004,22 @@ def _campaign_prerequisite_errors(
         errors.append(
             "execution_waves must exactly match the declared campaign parallelism"
         )
+    if manifest.get("parallelism_unit") != "paired_protocol_job":
+        errors.append("campaign parallelism unit must be paired_protocol_job")
+    if not _exact_value(
+        manifest.get("model_arms_per_paired_protocol_job"),
+        MODEL_ARMS_PER_PAIRED_PROTOCOL_JOB,
+    ):
+        errors.append("campaign must launch exactly two model arms per paired job")
+    expected_model_arms = (
+        maximum_parallel * MODEL_ARMS_PER_PAIRED_PROTOCOL_JOB
+        if isinstance(maximum_parallel, int) and not isinstance(maximum_parallel, bool)
+        else None
+    )
+    if not _exact_value(
+        manifest.get("maximum_concurrent_model_arms"), expected_model_arms
+    ):
+        errors.append("campaign maximum concurrent model-arm count is invalid")
 
     fixture = manifest.get("external_fixture")
     if not isinstance(fixture, dict):
@@ -1246,8 +1286,11 @@ def _job_command(
     env = os.environ.copy()
     env.update(
         {
-            "SAGE_BATCH_NO_DASHBOARD_OPEN": "1",
             "SAGE_RUN_STAMP": f"{model_stamp}_{rep_label}_{arm}",
+            # This campaign estimates control-versus-SAGE outcomes. The separate
+            # one-off selector experiment must never leak in from the parent shell.
+            "SAGE_AUTO_SELECTION_EXPERIMENT": "0",
+            "SAGE_BATCH_NO_DASHBOARD_OPEN": "0",
             "TOOL_SANDBOX_FIXED_NOW_TIMESTAMP": str(
                 manifest["fixed_toolsandbox_timestamp"]
             ),
@@ -1267,6 +1310,7 @@ def _job_command(
         "RESUME_RUN_ROOT",
         "RESUME_COMPLETED_LIMIT",
         "RESUME_REGISTRY_CHECKPOINT",
+        "SAGE_AUTO_SELECTION_PILOT_EVIDENCE",
         *DIAGNOSTIC_FORCE_ENV_VARS,
     ):
         env.pop(stale_name, None)
@@ -1359,6 +1403,14 @@ def _execute_job(
     }
 
 
+def _replication_dashboard_port(*, base_port: int, replication: int) -> int:
+    """Return the wave-local, resume-stable dashboard port for a replication."""
+
+    if not 1 <= replication <= EXPECTED_REPLICATIONS:
+        raise ValueError(f"Replication must be between 1 and {EXPECTED_REPLICATIONS}.")
+    return base_port + replication - 1
+
+
 def _refresh_dashboard(
     *,
     repo_root: Path,
@@ -1391,8 +1443,12 @@ def _run_wave(
 ) -> None:
     if not jobs:
         return
-    if len(jobs) > MAX_CONCURRENCY and max_parallel > MAX_CONCURRENCY:
-        raise ValueError("Campaign concurrency cannot exceed ten runs.")
+    if max_parallel > MAX_CONCURRENCY:
+        raise ValueError(
+            "Campaign concurrency cannot exceed "
+            f"{MAX_CONCURRENCY} paired protocol jobs "
+            f"({MAX_CONCURRENT_MODEL_ARMS} child model arms)."
+        )
     lock = threading.Lock()
     for replicate, arm in jobs:
         pair = _find_pair(manifest, replicate)
@@ -1432,7 +1488,7 @@ def _run_wave(
     try:
         futures: dict[Future[dict[str, Any]], tuple[int, str]] = {}
         with ThreadPoolExecutor(max_workers=max_parallel) as executor:
-            for index, (replicate, arm) in enumerate(jobs):
+            for replicate, arm in jobs:
                 pair = _find_pair(manifest, replicate)
                 future = executor.submit(
                     _execute_job,
@@ -1440,7 +1496,14 @@ def _run_wave(
                     manifest=manifest,
                     pair=pair,
                     arm=arm,
-                    port=base_port + index,
+                    # Bind a replication to the same port on both an initial
+                    # wave and a partial-wave resume. Position-based ports can
+                    # collide with detached dashboard servers left by already
+                    # completed jobs when only a subset is resumed.
+                    port=_replication_dashboard_port(
+                        base_port=base_port,
+                        replication=replicate,
+                    ),
                 )
                 futures[future] = (replicate, arm)
 
@@ -1581,11 +1644,6 @@ def _run_claimed_campaign(
             manifest=manifest,
             wave=wave,
         )
-        if len(jobs) > MAX_CONCURRENCY:
-            raise SystemExit(
-                f"Wave {wave} contains {len(jobs)} jobs. Split it before "
-                "execution; more than ten simultaneous runs are prohibited."
-            )
         manifest.setdefault("execution_events", []).append(
             {
                 "at": _now(),
@@ -1602,7 +1660,9 @@ def _run_claimed_campaign(
             manifest=manifest,
             jobs=jobs,
             max_parallel=max_parallel,
-            base_port=args.base_port + ((wave - 1) * MAX_CONCURRENCY),
+            # Detached dashboard servers persist after a wave. Reserve one port
+            # per replication so wave 2 never reuses a wave-1 server/root.
+            base_port=args.base_port + ((wave - 1) * EXPECTED_REPLICATIONS),
         )
 
     manifest = _load_manifest(manifest_path)
@@ -1712,7 +1772,16 @@ def main() -> None:
         default=DEFAULT_EXTERNAL_FIXTURE,
     )
     prepare.add_argument("--fixed-now", type=int, default=DEFAULT_FIXED_NOW)
-    prepare.add_argument("--max-parallel", type=int, default=10)
+    prepare.add_argument(
+        "--max-parallel",
+        type=int,
+        default=MAX_CONCURRENCY,
+        help=(
+            "Maximum paired protocol jobs. Each job runs two model arms; the "
+            f"default {MAX_CONCURRENCY} caps live model arms at "
+            f"{MAX_CONCURRENT_MODEL_ARMS}."
+        ),
+    )
     prepare.add_argument(
         "--bootstrap-iterations",
         type=int,
@@ -1756,7 +1825,10 @@ def main() -> None:
         requested_parallel is not None
         and not 1 <= requested_parallel <= MAX_CONCURRENCY
     ):
-        parser.error("--max-parallel must be between 1 and 10")
+        parser.error(
+            "--max-parallel must be between 1 and "
+            f"{MAX_CONCURRENCY} paired protocol jobs"
+        )
     if args.command == "prepare":
         if args.expected_online_runs != EXPECTED_REPLICATIONS:
             parser.error("--expected-online-runs must be exactly 10")

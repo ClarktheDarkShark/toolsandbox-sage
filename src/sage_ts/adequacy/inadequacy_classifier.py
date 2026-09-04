@@ -47,14 +47,6 @@ class VisibleTaskContext:
         )
 
 
-def _similarity(result: dict[str, Any]) -> float:
-    value = result.get("similarity", 0.0)
-    try:
-        return float(value) if isinstance(value, (int, float, str)) else 0.0
-    except ValueError:
-        return 0.0
-
-
 def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObservation:
     return CapabilityObservation(
         scenario_name=scenario_name,
@@ -5941,22 +5933,25 @@ def classify_visible_trace_observations(
     scenario: Scenario,
     result: dict[str, Any],
 ) -> tuple[CapabilityObservation, ...]:
-    """Classify tool-birth opportunities from visible execution trace errors."""
+    """Classify visible trace errors only after an outcome-evaluator failure."""
 
     context = visible_task_context_from_scenario(scenario)
+    try:
+        outcome_similarity = float(result.get("outcome_similarity"))
+    except (TypeError, ValueError):
+        outcome_similarity = None
+    if outcome_similarity is None:
+        raise ValueError(
+            "Outcome-only visible-trace classification requires a non-null "
+            f"outcome_similarity for {scenario_name!r}."
+        )
     signals = set(context.signals)
     if "safe_abstain_needed" in signals:
         return ()
     trace = _result_visible_trace_text(result).lower()
     if not trace:
         return ()
-    try:
-        outcome_similarity = float(result.get("outcome_similarity"))
-    except (TypeError, ValueError):
-        outcome_similarity = None
-    trace_failed = _similarity(result) < 1.0 or (
-        outcome_similarity is not None and outcome_similarity < 1.0
-    )
+    trace_failed = outcome_similarity < 1.0
     reminder_creation_trace = "reminder_create" in signals
     if (
         trace_failed

@@ -8,6 +8,10 @@ This file contains guidance for background and scheduled agents executing SAGE p
 - Include the phase file in the agent's context.
 - Agent must read and acknowledge the global working agreement (`docs/sage_protocol/00_global_working_agreement.md`) before proceeding.
 - Agent must verify all entry conditions before starting work (e.g., prior phase report complete).
+- Publication comparisons must start the non-learning control and SAGE as
+  concurrent isolated child processes. For online reflection, stream the
+  same-run control row at each matching task boundary; do not run whole arms
+  sequentially.
 
 ## 2. Scheduled Tasks (Recurring)
 
@@ -27,7 +31,9 @@ schedule --cron "0 9 * * 1" \
 
 ## 3. Dashboard Availability
 
-- After each phase run, dashboard is available at `outputs/<run_id>/dashboard.html`.
+- Every live run must create `dashboard/task_compare.html`, verify that the server
+  is rooted at the current run and serves those exact bytes, and open it in the
+  external/default browser before the first model request.
 - Remote agents can parse the run manifest to extract dashboard URL:
   ```bash
   python -c "
@@ -36,7 +42,8 @@ schedule --cron "0 9 * * 1" \
   print(manifest['dashboard_url'])
   "
   ```
-- Verify the dashboard exists and contains expected data (scores, routes, transcripts).
+- Verify the dashboard exists and contains expected outcome, route, and
+  transcript data. Legacy score fields are not publication performance gates.
 
 ## 4. Registry Lock and Promotion
 
@@ -84,9 +91,8 @@ schedule --cron "0 9 * * 1" \
   Phase A Baseline Control Run
   ============================
   Status: SUCCESS
-  Canonical score: 78.3%
-  Final-task success: 62.5%
-  Dashboard: outputs/phase_A_baseline_control_20260502_123456/dashboard.html
+  Outcome/task completion: 62.5%
+  Task Compare: outputs/phase_A_baseline_control_20260502_123456/dashboard/task_compare.html
 
   Report: docs/sage_protocol/phase_A_completion_report.md
   Decision: READY_FOR_PHASE_B
@@ -96,5 +102,5 @@ schedule --cron "0 9 * * 1" \
 
 ---
 
-**Last updated:** 2026-05-02
+**Last updated:** 2026-09-03
 **Scope:** Scheduled agents, remote orchestration, phase automation

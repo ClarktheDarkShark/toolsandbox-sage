@@ -1,5 +1,9 @@
 # Chapter 3 Methodology Figures
 
+> **SUPERSEDED — ARCHIVAL V061 FIGURE SET.** These figures are retained to audit
+> the earlier methodology boundary and are not current paper assets. See
+> [current_state.md](current_state.md).
+
 This figure set documents the current SAGE evidence boundary used for Chapter 3:
 autonomous tool generation, validation/repair, registry retention, visible-context
 routing, natural generated-tool use, lifecycle feedback, contribution accounting,

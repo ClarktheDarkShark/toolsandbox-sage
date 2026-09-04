@@ -1,5 +1,9 @@
 # Phase A: Foundation Measurement & Provenance
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This phase protocol predates the current
+> outcome-only, concurrent fresh-control publication design. Do not use its
+> commands, metric gates, or decisions. See [current_state.md](current_state.md).
+
 **Objective:** Establish baseline canonical scores, validate the scoring spine (canonical + final-task), and set up durable provenance infrastructure for all future runs.
 
 **Entry condition:** Audit report complete (`audit_alignment_report.md`) with decision `ready for Phase A`.

@@ -15,11 +15,20 @@ try:
 except ModuleNotFoundError:  # Direct ``python scripts/...`` execution.
     _run_verifier = importlib.import_module("verify_publication_run")
 verify_run = _run_verifier.verify_run
+outcome_evaluator_manifest = _run_verifier.outcome_evaluator_manifest
 
 DEFAULT_THRESHOLDS = Path(
-    "docs/sage_protocol/publication_validation_thresholds_v2.json"
+    "docs/sage_protocol/publication_validation_thresholds_v4.json"
 )
 REPO_ROOT = Path(__file__).resolve().parents[1]
+NON_OUTCOME_RELEASE_GATES = frozenset(
+    {
+        "candidate_canonical_minimum",
+        "minimum_accepted_tool_count",
+        "minimum_tool_reuse_event_count",
+        "minimum_generated_tool_called_scenario_count",
+    }
+)
 
 
 def _sha256(path: Path) -> str:
@@ -28,6 +37,7 @@ def _sha256(path: Path) -> str:
 
 def _verify_historical_reference(reference: dict[str, Any]) -> None:
     for path_field, hash_field in (
+        ("summary_path", "summary_sha256"),
         ("campaign_manifest", "campaign_manifest_sha256"),
         ("evidence_data", "evidence_data_sha256"),
     ):
@@ -60,13 +70,6 @@ def _number(mapping: dict[str, Any], field: str, label: str) -> float:
     value = mapping.get(field)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{label} does not contain numeric {field!r}.")
-    return float(value)
-
-
-def _optional_number(mapping: dict[str, Any], field: str) -> float | None:
-    value = mapping.get(field)
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
     return float(value)
 
 
@@ -103,13 +106,24 @@ def verify_sample(
         raise ValueError("Validation thresholds schema version is not 2.")
     if thresholds.get("performance_endpoint") != "outcome_task_completion_similarity":
         raise ValueError("Validation thresholds do not declare the outcome endpoint.")
-    if (
-        thresholds.get("canonical_metric_policy")
-        != "descriptive_only_never_a_release_gate"
-    ):
-        raise ValueError("Validation thresholds do not make canonical report-only.")
-    if "candidate_canonical_minimum" in no_regression:
-        raise ValueError("Canonical/reference similarity must not be a release gate.")
+    expected_outcome_evaluator = outcome_evaluator_manifest()
+    if thresholds.get("outcome_evaluator") != expected_outcome_evaluator:
+        raise ValueError(
+            "Validation thresholds do not pin the current outcome evaluator."
+        )
+    invalid_release_gates = sorted(
+        (NON_OUTCOME_RELEASE_GATES & set(no_regression))
+        | {
+            str(key)
+            for key in no_regression
+            if any(token in str(key).lower() for token in ("canonical", "reference"))
+        }
+    )
+    if invalid_release_gates:
+        raise ValueError(
+            "Non-outcome values must not be publication release gates: "
+            + ", ".join(invalid_release_gates)
+        )
     _verify_historical_reference(historical)
 
     expected_tasks = _integer(benchmark, "task_count", "benchmark")
@@ -121,8 +135,16 @@ def verify_sample(
         expected_benchmark_sha256=str(benchmark["manifest_sha256"]),
         expected_scenario_order_sha256=str(benchmark["ordered_task_name_sha256"]),
     )
+    if integrity_result.get("outcome_evaluator") != expected_outcome_evaluator:
+        raise ValueError(
+            "Integrity verification did not use the threshold-pinned outcome evaluator."
+        )
     run_root = Path(str(integrity_result["run_root"]))
     comparison = _read_object(run_root / "paired_comparison.json")
+    if comparison.get("outcome_evaluator") != expected_outcome_evaluator:
+        raise ValueError(
+            "Paired comparison did not use the threshold-pinned outcome evaluator."
+        )
     control = comparison.get("control")
     candidate = comparison.get("candidate")
     if not isinstance(control, dict) or not isinstance(candidate, dict):
@@ -194,9 +216,8 @@ def verify_sample(
         "mean_outcome_similarity",
         "candidate",
     )
-    candidate_canonical = _optional_number(candidate, "mean_similarity")
     if control_outcome <= 0:
-        raise ValueError("Relative outcome lift is undefined for this control score.")
+        raise ValueError("Relative outcome lift is undefined for this control outcome.")
     outcome_lift_percent = (
         (candidate_outcome - control_outcome) / control_outcome * 100.0
     )
@@ -223,18 +244,6 @@ def verify_sample(
         outcome_lift_percent,
         {"minimum_percent": lift_floor},
     )
-    for field, threshold_field in (
-        ("accepted_tool_count", "minimum_accepted_tool_count"),
-        ("reuse_count", "minimum_tool_reuse_event_count"),
-        (
-            "generated_tool_called_scenarios",
-            "minimum_generated_tool_called_scenario_count",
-        ),
-    ):
-        minimum = _integer(no_regression, threshold_field, "required_no_regression")
-        observed = _integer(candidate, field, "candidate")
-        gate(field, observed >= minimum, observed, {"minimum": minimum})
-
     historical_outcome_mean = _number(
         report_only,
         "compare_candidate_outcome_to_historical_mean",
@@ -245,19 +254,25 @@ def verify_sample(
         "status": "pass" if not failures else "fail",
         "purpose": thresholds.get("purpose"),
         "performance_endpoint": thresholds.get("performance_endpoint"),
-        "canonical_metric_policy": thresholds.get("canonical_metric_policy"),
+        "outcome_evaluator": expected_outcome_evaluator,
         "run_root": str(run_root),
         "thresholds_path": str(thresholds_path),
         "thresholds_sha256": _sha256(thresholds_path),
         "integrity_verification": integrity_result,
         "metrics": {
-            "control_canonical": _optional_number(control, "mean_similarity"),
             "control_outcome": control_outcome,
-            "candidate_canonical": candidate_canonical,
             "candidate_outcome": candidate_outcome,
             "same_run_relative_outcome_lift_percent": outcome_lift_percent,
             "candidate_outcome_minus_historical_mean": (
                 candidate_outcome - historical_outcome_mean
+            ),
+        },
+        "mechanism_diagnostics": {
+            "release_gate": False,
+            "accepted_tool_count": candidate.get("accepted_tool_count"),
+            "tool_reuse_event_count": candidate.get("reuse_count"),
+            "generated_tool_called_scenario_count": candidate.get(
+                "generated_tool_called_scenarios"
             ),
         },
         "historical_reference": historical,

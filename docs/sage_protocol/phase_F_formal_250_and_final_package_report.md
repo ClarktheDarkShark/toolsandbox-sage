@@ -1,5 +1,9 @@
 # Phase F Formal 250 And Final Package Report
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This development report is not a current
+> protocol, release gate, or paper result. Its values and decision labels must
+> not be carried forward. See [current_state.md](current_state.md).
+
 - Updated: `2026-05-04T06:08:30.482096`
 - Decision label: `pass`
 - Registry: `artifacts/registry_best3_resolve_select_relative/registry_manifest.json`

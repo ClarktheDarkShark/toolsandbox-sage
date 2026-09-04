@@ -1,7 +1,9 @@
-"""Chapter 4 campaign aggregation and hypothesis evidence.
+"""Outcome-only Chapter 4 campaign aggregation and hypothesis evidence.
 
 The dashboard produced from this module is an evidence view over preserved run
-artifacts. It does not alter or rescore either experimental arm.
+artifacts. It does not alter or reevaluate either experimental arm. Canonical
+similarity remains available in the source run artifacts but is intentionally
+excluded from the paper-facing evidence payload.
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ EVIDENCE_TEMPLATE = (
 )
 EVIDENCE_DATA_NAME = "chapter4_evidence_data.json"
 EVIDENCE_HTML_NAME = "chapter4_evidence.html"
-EVIDENCE_SCHEMA_VERSION = 2
+EVIDENCE_SCHEMA_VERSION = 3
 
 H1_THRESHOLD_PERCENT = 80.0
 H2_THRESHOLD_PERCENT = 10.0
@@ -41,8 +43,6 @@ class RunEvidence:
     complete: bool
     completed_tasks: int
     scenario_count: int
-    control_score: float | None
-    candidate_score: float | None
     control_outcome: float | None
     candidate_outcome: float | None
     task_rows: tuple[dict[str, Any], ...]
@@ -102,6 +102,16 @@ def _relative_lift(candidate: float | None, control: float | None) -> float | No
     if candidate is None or control in (None, 0.0):
         return None
     return (candidate - control) / control * 100.0
+
+
+def _has_paired_outcome(row: dict[str, Any]) -> bool:
+    """Return whether a row has a complete matched outcome comparison."""
+
+    return bool(
+        row.get("control_outcome") is not None
+        and row.get("candidate_outcome") is not None
+        and row.get("outcome_delta") is not None
+    )
 
 
 def _signed(value: float | None, digits: int = 3) -> str:
@@ -307,9 +317,6 @@ def load_run_evidence(
         task_rows.append(
             {
                 "scenario": scenario,
-                "control_score": _safe_float(row.get("control_similarity")),
-                "candidate_score": _safe_float(row.get("candidate_similarity")),
-                "score_delta": _safe_float(row.get("delta")),
                 "control_outcome": _safe_float(row.get("control_outcome_similarity")),
                 "candidate_outcome": _safe_float(
                     row.get("candidate_outcome_similarity")
@@ -337,16 +344,6 @@ def load_run_evidence(
         entry,
         protocol_manifest,
     )
-    control_score = _safe_float(
-        summary.get("balanced_control_mean_similarity")
-        if summary
-        else paired.get("control_mean_similarity")
-    )
-    candidate_score = _safe_float(
-        summary.get("balanced_candidate_mean_similarity")
-        if summary
-        else paired.get("candidate_mean_similarity")
-    )
     control_outcome = _safe_float(
         summary.get("balanced_control_mean_outcome_similarity")
         if summary
@@ -366,8 +363,6 @@ def load_run_evidence(
         complete=complete,
         completed_tasks=completed_tasks,
         scenario_count=scenario_count,
-        control_score=control_score,
-        candidate_score=candidate_score,
         control_outcome=control_outcome,
         candidate_outcome=candidate_outcome,
         task_rows=tuple(task_rows),
@@ -520,6 +515,18 @@ def _rows(items: Iterable[tuple[str, Any]]) -> list[dict[str, str]]:
         {"label": label, "value": "-" if value is None else str(value)}
         for label, value in items
     ]
+
+
+def _paper_claim_safeguards(raw: Any) -> dict[str, Any]:
+    """Keep operational safeguards while excluding non-outcome metric policy."""
+
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(key): value
+        for key, value in raw.items()
+        if not str(key).startswith("canonical")
+    }
 
 
 def _tool_records(
@@ -897,11 +904,13 @@ def build_evidence_data(
     """Build the complete JSON payload consumed by the evidence dashboard."""
 
     pair_entries = campaign_manifest.get("run_pairs") or []
+    expected_online_raw = campaign_manifest.get("expected_online_runs")
+    expected_frozen_raw = campaign_manifest.get("expected_frozen_runs")
     expected_online = _safe_int(
-        campaign_manifest.get("expected_online_runs") or len(pair_entries)
+        len(pair_entries) if expected_online_raw is None else expected_online_raw
     )
     expected_frozen = _safe_int(
-        campaign_manifest.get("expected_frozen_runs") or len(pair_entries)
+        len(pair_entries) if expected_frozen_raw is None else expected_frozen_raw
     )
     statistical_plan = campaign_manifest.get("statistical_plan") or {}
     h1_threshold = _safe_float(statistical_plan.get("hypothesis_1_threshold_percent"))
@@ -945,24 +954,12 @@ def build_evidence_data(
     frozen_complete = len(completed_frozen) >= expected_frozen
 
     online_task_rows = [row for _, run in completed_online for row in run.task_rows]
-    control_outcomes = [
-        row["control_outcome"]
-        for row in online_task_rows
-        if row["control_outcome"] is not None
-    ]
-    candidate_outcomes = [
-        row["candidate_outcome"]
-        for row in online_task_rows
-        if row["candidate_outcome"] is not None
-    ]
-    outcome_deltas = [
-        row["outcome_delta"]
-        for row in online_task_rows
-        if row["outcome_delta"] is not None
-    ]
-    score_deltas = [
-        row["score_delta"] for row in online_task_rows if row["score_delta"] is not None
-    ]
+    frozen_task_rows = [row for _, run in completed_frozen for row in run.task_rows]
+    online_outcome_rows = [row for row in online_task_rows if _has_paired_outcome(row)]
+    frozen_outcome_rows = [row for row in frozen_task_rows if _has_paired_outcome(row)]
+    control_outcomes = [row["control_outcome"] for row in online_outcome_rows]
+    candidate_outcomes = [row["candidate_outcome"] for row in online_outcome_rows]
+    outcome_deltas = [row["outcome_delta"] for row in online_outcome_rows]
     baseline_outcome = _mean(control_outcomes)
     sage_outcome = _mean(candidate_outcomes)
     frozen_sage_outcome = _mean(run.candidate_outcome for _, run in completed_frozen)
@@ -972,17 +969,32 @@ def build_evidence_data(
         else None
     )
     overall_outcome_lift = _relative_lift(sage_outcome, baseline_outcome)
-    baseline_score = _mean(
-        row["control_score"]
-        for row in online_task_rows
-        if row["control_score"] is not None
+
+    expected_outcomes_per_run = _safe_int(
+        statistical_plan.get("outcome_scored_tasks_per_run")
     )
-    sage_score = _mean(
-        row["candidate_score"]
-        for row in online_task_rows
-        if row["candidate_score"] is not None
+    expected_online_outcomes = _safe_int(
+        statistical_plan.get("expected_outcome_scored_pairs")
     )
-    canonical_lift = _relative_lift(sage_score, baseline_score)
+    if expected_online_outcomes <= 0:
+        expected_online_outcomes = (
+            expected_online * expected_outcomes_per_run
+            if expected_outcomes_per_run > 0
+            else sum(run.scenario_count for _, run in completed_online)
+        )
+    expected_frozen_outcomes = (
+        expected_frozen * expected_outcomes_per_run
+        if expected_outcomes_per_run > 0
+        else sum(run.scenario_count for _, run in completed_frozen)
+    )
+    observed_online_outcomes = len(online_outcome_rows)
+    observed_frozen_outcomes = len(frozen_outcome_rows)
+    online_outcomes_complete = (
+        online_complete and observed_online_outcomes == expected_online_outcomes
+    )
+    frozen_outcomes_complete = (
+        frozen_complete and observed_frozen_outcomes == expected_frozen_outcomes
+    )
 
     task_ci = _bootstrap_mean_ci(
         outcome_deltas,
@@ -992,9 +1004,7 @@ def build_evidence_data(
     online_run_mean_deltas: list[float] = []
     for _, run in completed_online:
         run_deltas = [
-            row["outcome_delta"]
-            for row in run.task_rows
-            if row["outcome_delta"] is not None
+            row["outcome_delta"] for row in run.task_rows if _has_paired_outcome(row)
         ]
         if run_deltas:
             online_run_mean_deltas.append(float(np.mean(run_deltas)))
@@ -1120,7 +1130,7 @@ def build_evidence_data(
         value=retention,
         threshold=h1_threshold,
         ci=retention_ci,
-        complete=online_complete and frozen_complete,
+        complete=online_outcomes_complete and frozen_outcomes_complete,
     )
     h2_lift_ci = (
         (task_ci[0] / baseline_outcome * 100.0)
@@ -1134,13 +1144,13 @@ def build_evidence_data(
         value=overall_outcome_lift,
         threshold=h2_threshold,
         ci=h2_lift_ci,
-        complete=online_complete,
+        complete=online_outcomes_complete,
     )
     h3_status = _hypothesis_status(
         value=called_lift,
         threshold=h3_threshold,
         ci=called_lift_ci,
-        complete=online_complete,
+        complete=online_outcomes_complete,
     )
 
     tools, tool_totals = _tool_records(completed_online)
@@ -1240,8 +1250,13 @@ def build_evidence_data(
         for run in (online, frozen)
         if run is not None and not run.complete
     )
+    outcome_coverage_complete = online_outcomes_complete and (
+        expected_frozen == 0 or frozen_outcomes_complete
+    )
     status_label = (
         "Complete"
+        if complete_run_count >= expected_run_count and outcome_coverage_complete
+        else "Outcome coverage incomplete"
         if complete_run_count >= expected_run_count
         else "Running"
         if any(online or frozen for _, online, frozen in loaded_pairs)
@@ -1503,19 +1518,14 @@ def build_evidence_data(
         "frozen_sage": frozen_sage_outcome,
         "outcome_delta": overall_outcome_delta,
         "outcome_lift_percent": overall_outcome_lift,
-        "canonical_baseline": baseline_score,
-        "canonical_sage": sage_score,
-        "canonical_delta": _mean(score_deltas),
-        "canonical_lift_percent": canonical_lift,
         "delta_label": _signed(overall_outcome_delta),
         "outcome_lift_label": _percent(overall_outcome_lift, signed=True),
-        "canonical_lift_label": _percent(canonical_lift, signed=True),
         **_detail(
             "panel:performance",
             "Overall matched performance",
             [
                 {
-                    "heading": "Outcome/task-completion score",
+                    "heading": "Outcome / task completion",
                     "rows": _rows(
                         [
                             (
@@ -1538,29 +1548,6 @@ def build_evidence_data(
                         ]
                     ),
                 },
-                {
-                    "heading": "Canonical/reference score",
-                    "rows": _rows(
-                        [
-                            (
-                                "Baseline mean",
-                                f"{baseline_score:.4f}"
-                                if baseline_score is not None
-                                else "-",
-                            ),
-                            (
-                                "SAGE mean",
-                                f"{sage_score:.4f}" if sage_score is not None else "-",
-                            ),
-                            ("Mean paired difference", _signed(_mean(score_deltas), 4)),
-                            ("Relative lift", _percent(canonical_lift, signed=True)),
-                        ]
-                    ),
-                    "note": (
-                        "Canonical score is descriptive route-compatibility output only; "
-                        "it is never a performance or release criterion."
-                    ),
-                },
             ],
         ),
     }
@@ -1569,7 +1556,10 @@ def build_evidence_data(
     sage_successes = sum(value >= 1.0 - 1e-12 for value in candidate_outcomes)
     statistics = {
         "mean_delta": overall_outcome_delta,
-        "paired_bootstrap_ci": _confidence_interval(task_ci, unit="score"),
+        "paired_bootstrap_ci": _confidence_interval(
+            task_ci,
+            unit="outcome_difference",
+        ),
         "paired_randomization_p": task_p,
         "bootstrap_iterations": bootstrap_iterations,
         "randomization_iterations": randomization_iterations,
@@ -1579,7 +1569,7 @@ def build_evidence_data(
         "independent_online_runs": len(completed_online),
         "run_cluster_bootstrap_ci": _confidence_interval(
             run_cluster_ci,
-            unit="score",
+            unit="outcome_difference",
         ),
         "run_sign_flip_p": run_p,
         "significance_alpha": 0.05,
@@ -1810,11 +1800,26 @@ def build_evidence_data(
         ),
         "progress_label": (
             f"{complete_run_count} of {expected_run_count} full runs complete"
+            + (
+                f" · {observed_online_outcomes:,} of "
+                f"{expected_online_outcomes:,} paired online outcomes"
+                if complete_run_count >= expected_run_count
+                and not outcome_coverage_complete
+                else ""
+            )
             + (f" · {active_run_count} active" if active_run_count else "")
         ),
         "recorded_task_progress": recorded_task_progress,
         "expected_task_progress": expected_task_progress,
-        "paired_observations": len(online_task_rows),
+        "paired_observations": observed_online_outcomes,
+        "expected_paired_observations": expected_online_outcomes,
+        "frozen_paired_observations": observed_frozen_outcomes,
+        "expected_frozen_paired_observations": expected_frozen_outcomes,
+        "outcome_coverage_complete": outcome_coverage_complete,
+        "outcome_coverage_label": (
+            f"{observed_online_outcomes:,} / {expected_online_outcomes:,} online; "
+            f"{observed_frozen_outcomes:,} / {expected_frozen_outcomes:,} frozen"
+        ),
         "tasks_per_run": expected_tasks_per_run,
         "updated_at": now.isoformat(),
         "updated_at_label": now.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
@@ -1823,7 +1828,9 @@ def build_evidence_data(
         "baseline_cache_policy": str(
             campaign_manifest.get("baseline_cache_policy") or ""
         ),
-        "claim_safeguards": dict(campaign_manifest.get("claim_safeguards") or {}),
+        "claim_safeguards": _paper_claim_safeguards(
+            campaign_manifest.get("claim_safeguards")
+        ),
     }
     return {
         "schema_version": EVIDENCE_SCHEMA_VERSION,

@@ -1,243 +1,165 @@
-# Chapter 4 Strict Fresh-Control Evidence Collection Plan
+# Chapter 4 Outcome Evidence Collection Plan
 
-## Status and Superseded Campaign
+## Status
 
-This plan supersedes the control policy used by the July 2026 campaign
-`chapter4_final_claim_10x_20260730`. The preserved July results remain available
-for audit and sensitivity analysis, but they are not final hypothesis evidence.
+This is the active, pending-rerun plan. No current-release full validation run,
+actor-selection comparison, or confirmatory campaign has started. Publication
+validation samples 01--03 and the July campaign are archival development
+records, not current evidence. Execution of any full run requires explicit
+researcher approval.
 
-The corrected-tree strict sample 03 has passed the engineering integrity and
-outcome-only release gate. The final ten-online/ten-frozen manifest is prepared
-and verified at
-`artifacts/chapter4_evidence/chapter4_strict_fresh_control_10x_20260902/campaign_manifest.json`.
-No campaign arm has been executed; explicit researcher approval remains the
-only outstanding launch gate.
+The route-independent v4 evaluator, timezone-aware historical rescore,
+outcome-only thresholds, and release-chain hashes have passed independent
+checks and are frozen in `publication_release_manifest_20260903.json`. The
+historical rescore supplies only a conservative lower-envelope engineering
+reference. It is not confirmatory evidence and does not repair the superseded
+campaign's cache or online-lifecycle confounding.
 
-The historical cache contained 1,182 complete records for 1,032 unique tasks:
-957 tasks had one record and 75 tasks had three records. Compatible records for
-the 75 triplicated tasks were averaged. Those hybrid values supplied the
-reported control rows and were also read by online self-evolution reflection.
-The original one-record-per-task v140 snapshot has outcome mean
-`0.4528026204750015`; substituting it in the historical H2 point-estimate
-calculation increases the relative lift from about 73.9% to about 75.7%.
-Therefore, the hybrid did not inflate the headline point estimate. However,
-that sensitivity calculation does not repair provenance, unequal replication,
-cache-conditioned online decisions, intervals, randomization tests, or H1/H3.
-All three hypothesis decisions are pending the campaign defined here.
+## Sole Performance Endpoint
 
-## Purpose
+Outcome/task-completion similarity is the only publication performance metric.
+The same frozen evaluator must return a value for every task in every compared
+arm. The evaluator judges the achieved answer or final state independently of
+the tool route used to reach it.
 
-This campaign collects the evidence needed to test the three Chapter 4
-hypotheses using the current SAGE implementation and `gpt-4o-mini`. The design
-separates online self-evolution from frozen-registry reuse while preserving a
-fresh matched non-learning baseline for every benchmark task.
+Tool visibility, selection, calls, generated-tool births, acceptance, reuse,
+and route compatibility are mechanism diagnostics. They may explain an outcome
+but cannot pass or fail a release or hypothesis decision.
 
-The evidence configuration requires:
+A validated generated tool may safely complete the requested action directly.
+It need not be followed by a visible native-tool call. Final-state correctness,
+minefield checks, allow-list enforcement, runtime safety, and correct abstention
+remain mandatory.
 
-- `gpt-4o-mini` for the baseline actor, SAGE actor, user simulator, and
-  tool-generation model;
-- model-authored generated tools with complete/native-action delegation;
-- an empty independent registry at the beginning of every online-build run;
-- generated-tool birth, validation, storage, natural routing, calls, and reuse;
-- bridge completions disabled;
-- scenario-name birth and routing disabled;
-- diagnostic force-call variables absent;
-- no SAGE task cache;
-- no persistent repository whole-response replay cache;
-- no persistent generated-output replay cache; preserve the validated
-  generator's nonpersistent within-run contract-and-repair-analysis memoization;
-- separately record OpenAI-managed prompt-prefix cached input tokens for every
-  model call and reconcile raw events exactly with task and arm totals;
-- no control baseline cache construction or lookup;
-- complete control-arm execution before the SAGE arm;
-- exactly one same-run fresh control row per task for online reflection, with
-  missing, duplicate, or mismatched rows treated as fatal protocol errors;
-- no parallel execution of control and SAGE arms;
-- the fixed 1,032-task ToolSandbox manifest and task order.
+## Frozen Inputs
 
-## Replication Design
+Before any model request, the release must bind and verify:
 
-The campaign contains ten independent online-build replications and ten paired
-frozen-registry replications.
+- the clean Git commit and tree;
+- the publication Python environment and dependency lock;
+- the complete benchmark bytes and ordered task names;
+- the fixed ToolSandbox clock and timezone;
+- the sanitized external-service fixture in read-only mode;
+- actor, user, and generation model settings;
+- retry and timeout settings;
+- evaluator version, contract digest, and source digest;
+- the outcome-only validation thresholds; and
+- all cache, resume, diagnostic-exposure, and force-call settings.
 
-Each online-build replication starts with an empty registry and runs the full
-ToolSandbox dataset. Each resulting registry is copied into its matched frozen
-run. The frozen run uses the same model, manifest, task order, clock, and
-strict fresh-control policy, but disables generation, candidate repair, and
-online reflection.
+Strict runs prohibit control-result reuse, task-result reuse, stored
+whole-response replay, persistent generated-output replay, partial-row resume,
+and cross-run failure memory. Provider-managed prompt-prefix computation is
+recorded separately and is not treated as a stored model response.
 
-This design produces:
+## Concurrent Publication Pair
 
-- 10 independently generated registries;
-- 10,320 matched benchmark task pairs with descriptive route-compatibility output;
-- 8,000 matched task pairs with an explicit ToolSandbox outcome evaluator;
-- 10 paired online/frozen registry comparisons for gain-retention analysis.
+Every ordinary online or frozen publication comparison starts a fresh
+non-learning control and its SAGE condition as concurrent isolated child
+processes. Positive process-interval overlap, distinct process identifiers,
+complete child status records, identical task order, and one-to-one outcome
+coverage are required.
 
-Ten independent replications are required for the run-level sensitivity
-analysis. With only five consistently positive run-level differences, the
-smallest possible two-sided exact sign-flip p-value is .0625. With ten
-consistently positive replications, the corresponding minimum is .00195.
+For online SAGE, the control streams its result at each matching task boundary.
+SAGE waits when necessary and consumes exactly one same-run control row for
+that task. Missing, duplicate, out-of-order, extra, or unconsumed rows fail the
+run. Online runs start from an empty registry.
 
-## Baseline Policy
+A frozen-registry run copies only the registry produced by its verified paired
+online run. Generation, candidate repair, and online reflection are disabled,
+but its fresh control and frozen SAGE arm still run concurrently.
 
-Control result reuse is prohibited. Every online and frozen arm must execute a
-new complete non-learning control before executing its SAGE condition. The
-runner must not construct or read `ControlBaselineCache`, and the run manifest
-must record `control_cache=off` and `fresh_control_required=true`.
+## Matched Actor-Selection Experiment
 
-For online runs, self-evolution reflection receives an immutable map built only
-from the just-completed same-run control arm. The map must contain exactly one
-row for each of the 1,032 task names. It must be fully consumed one-to-one by
-the 1,032 online task reflections. Missing rows, duplicate rows, task-name
-mismatches, extra rows, or partial consumption invalidate the run.
+The actor-selection experiment tests model selection from the exact
+SAGE-routed inventory. It contains two live concurrent pairs:
 
-The original v140 records and expanded 1,182-record cache are historical audit
-inputs only. They are prohibited as execution inputs for this campaign.
+1. a fresh non-learning control with policy-selection SAGE; and
+2. a fresh independent non-learning control with `sage_auto_selection`.
 
-The read-only RapidAPI fixture is a frozen external-service benchmark input,
-not a task-result, model-response, prompt, or control cache. The public,
-sanitized runtime copy has required SHA-256
-`eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f`;
-the launcher must fail before task execution if the file is missing, writable
-mode is requested, or its content hash differs.
+The policy arm captures the exact actor-ready state for each task after
+same-task tool birth, including native and generated schemas and their order.
+After that authority exists, the auto replay restores and verifies those bytes
+for the matching task. Auto generation, reflection, and lifecycle mutation are
+disabled so that policy and auto receive the same inventory. The second pair's
+fresh control runs concurrently with auto and has no path into auto's inventory
+or execution.
 
-## Preparation, Verification, and Approval Boundary
+Every auto actor request must record `choice_mode="auto"`, omit a named
+`tool_choice`, and bind the exact native and generated schema bundle sent to the
+model. The pilot must demonstrate at least one generated-tool call and stable
+execution before the complete comparison can be proposed.
 
-Preparation creates ten queued online/frozen pairs without launching API-backed
-work:
+## Task Compare Requirement
+
+Every live pair creates `dashboard/task_compare.html`, verifies that the server
+root and served bytes belong to that run, records a receipt, and opens the view
+in the external/default browser before either model process starts.
+
+The actor-selection experiment produces three views:
+
+- fresh control versus policy-selection SAGE, opened before the first pair;
+- fresh independent control versus `sage_auto_selection`, opened before the
+  second pair; and
+- policy-selection SAGE versus `sage_auto_selection`, opened after both
+  treatment arms complete.
+
+All three views expose task outcomes, transcripts, routed schemas, and tool
+execution evidence. The third view is the causal selection comparison; the two
+fresh-control views show each arm's absolute outcome behavior.
+
+## Staged Execution and Approval
+
+The intended order is:
+
+1. **Complete:** freeze and verify the corrected evaluator and publication
+   release chain;
+2. run focused tests, the full local suite, packaging checks, and clean-clone
+   publication-input verification;
+3. obtain researcher approval for the sealed representative selector pilot;
+4. run and verify that pilot;
+5. obtain separate researcher approval for a complete fresh-control validation
+   and matched actor-selection comparison;
+6. after a passing complete validation, prepare and verify a new paper campaign
+   manifest without starting it; and
+7. obtain explicit researcher approval before the confirmatory campaign.
+
+Preparation never authorizes execution. A failed or interrupted arm and its
+logs are preserved for review; it is not silently retried, excluded, or
+replaced.
+
+## Confirmatory Paper Campaign
+
+The replacement campaign will contain ten independently evolved online
+registries and ten matched frozen-registry evaluations. Each online and frozen
+condition has its own concurrent fresh non-learning control. All arms use the
+same frozen release inputs and complete benchmark order.
+
+The campaign manifest may be prepared only from a passing current-release full
+validation report:
 
 ```bash
-PYTHONPATH=src:. python scripts/run_chapter4_evidence_campaign.py prepare \
-  --campaign-id chapter4_strict_fresh_control_10x_20260902 \
-  --expected-online-runs 10 \
-  --sample-validation-report outputs/publication_validation/publication_validation_20260902_strict_sample03/native_action/online_build_full_20260902_071820/publication_validation_report.json \
-  --max-parallel 10
+make prepare-paper-rerun \
+  SAMPLE_REPORT=outputs/publication_validation/<approved-run>/native_action/<protocol-run>/publication_validation_report.json \
+  CAMPAIGN_ARGS='--campaign-id chapter4_outcome_rerun_<date> --expected-online-runs 10'
 ```
 
-The preparer rejects a dirty Git tree, a failing or modified sample report,
-any benchmark or fixture hash mismatch, and any replication count other than
-exactly ten online plus ten frozen runs.
+This command prepares artifacts but makes no model calls. The campaign runner's
+execution acknowledgement must not be supplied until the researcher separately
+approves the final run.
 
-Verify the resulting manifest before execution:
+## Analysis and Paper Replacement
 
-```bash
-PYTHONPATH=src:. python scripts/run_chapter4_evidence_campaign.py verify \
-  --campaign-manifest artifacts/chapter4_evidence/chapter4_strict_fresh_control_10x_20260902/campaign_manifest.json
-```
+The analysis pipeline consumes only the versioned campaign manifest and its
+verified raw artifacts. It will compute the preregistered outcome comparisons,
+uncertainty estimates, paired gain/preserved/regression counts, frozen-registry
+retention, and generated-tool-called subset. Integrity and safety findings are
+reported alongside the outcomes.
 
-Preparation and verification do not authorize the final experiment. The run
-command must not be issued until the researcher reviews the code cleanup,
-single-sample validation, input hashes, and prepared manifest and then gives
-explicit approval. After approval, execution additionally requires the
-launcher's `--approve-execution` acknowledgement. This document intentionally
-does not present that command as a current action.
+The paper renderer must replace the pending scaffold mechanically from the new
+structured evidence. Archived values, screenshots, and table images are never
+copied forward by hand. Until every required arm verifies, Chapter 4 remains
+explicitly pending and makes no hypothesis decision.
 
-The scheduler enforces a hard maximum of ten concurrent full runs. Each frozen
-run is eligible only after its paired online registry is complete and verified.
-The campaign is restartable only at the completed-arm boundary: verified arms
-may be skipped after an orchestration restart, but partial task rows may not be
-resumed or reused. A failed or interrupted arm is preserved for review and
-requires an explicit decision before any new arm is scheduled.
+## Decision
 
-Every completed arm must pass `scripts/verify_publication_run.py` before the
-campaign marks it complete. Verification requires 1,032 unique control rows and
-1,032 unique candidate rows in the identical pinned task order, zero cached
-control tasks, zero SAGE task-result reuse, zero persistent repository
-whole-response replay, the pinned read-only fixture, and the declared reflection
-policy. Provider-managed prompt-prefix computation is recorded separately and
-does not replay a stored response.
-
-## Dashboard
-
-After an approved and complete rerun, the campaign evidence dashboard will be:
-
-`outputs/chapter4_evidence/chapter4_strict_fresh_control_10x_20260902/dashboard/chapter4_evidence.html`
-
-The dashboard refreshes from run artifacts while the campaign is active. It
-shows:
-
-- hypothesis thresholds, observed values, confidence intervals, and decisions;
-- overall matched baseline and SAGE performance;
-- task-paired and run-level statistical evidence;
-- research-integrity safeguards and observed incidents;
-- generated tools accepted and reused;
-- natural generated-tool calls;
-- called-task gains, preserved outcomes, and regressions;
-- generated-tool failure scenarios;
-- run-level outcome variation;
-- top generated-tool contributions;
-- links to every completed Task Compare dashboard.
-
-Every main metric is selectable. Its drilldown provides the metric definition,
-formula, sample size, uncertainty estimate, per-run evidence, or tool
-provenance as applicable.
-
-## Hypothesis Metrics
-
-Hypothesis 1 uses frozen-registry gain retention:
-
-`(frozen SAGE outcome - baseline outcome) / (online SAGE outcome - baseline outcome)`
-
-The target is at least 80 percent.
-
-Hypothesis 2 uses overall relative task-completion lift:
-
-`(SAGE outcome - baseline outcome) / baseline outcome`
-
-The target is at least 10 percent.
-
-Hypothesis 3 uses the same relative outcome lift formula on the matched subset
-where at least one generated tool was naturally called. The target is at least
-30 percent.
-
-Outcome/task completion is the sole paper performance endpoint and the sole
-performance basis for release decisions. Canonical/reference similarity may be
-retained as descriptive ToolSandbox audit output but is never a hypothesis or
-release gate. Time, LLM-call count, and token count are not Chapter 4 hypothesis
-metrics and are not displayed in the evidence dashboard.
-
-## Statistical Analysis
-
-The confirmatory export uses:
-
-- paired task-level mean differences;
-- 10,000 paired bootstrap samples for 95 percent confidence intervals;
-- 20,000 paired sign-flip randomization samples when exact enumeration is not
-  feasible;
-- exact run-level sign-flip analysis for the ten independent registry
-  replications;
-- run-cluster bootstrap sensitivity;
-- gain, regression, and preserved counts;
-- a generated-tool-called matched subset;
-- paired online/frozen bootstrap analysis for gain retention.
-
-The dashboard does not rescore or modify run results. It derives all values from
-preserved protocol manifests, paired comparisons, Task Compare data, registry
-manifests, and contribution summaries.
-
-## Single-Sample Validation Is Not Confirmatory Evidence
-
-Sample 03 completed the required 1,032-task strict fresh-control engineering
-validation: both arms finished all 1,032 tasks, the strict verifier passed, and
-outcome increased from `0.5087366331780064` to `0.7986035515693737` across
-800 outcome-scored matched tasks. The absolute increase was
-`0.2898669183913673`, relative lift was `56.97779548144769%`, and exact
-outcome successes increased from `220` to `443`. The paired outcome counts
-were `413` gains, `283` preserved, and `104` regressions. Verification found
-zero runtime exceptions, zero cached control tasks, zero repository
-whole-response replay, and same-run-fresh reflection.
-
-A single stochastic sample cannot estimate
-run-level variation, support the planned run-level sign-flip test, replace ten
-independently evolved registries, or accept/reject H1, H2, or H3. Its result
-is reported separately from the Chapter 4 confirmatory analysis in
-`publication_validation_sample03_report.md`.
-
-## Publication Replacement Rule
-
-The historical July tables remain labeled archival until all ten new online
-runs and all ten paired frozen runs pass verification. Only then may the paper
-renderer consume the new structured evidence file and replace the historical
-point estimates, intervals, tests, lifecycle summaries, and hypothesis
-decisions. Failed or incomplete arms are preserved and reported; they are not
-silently retried or excluded.
+`READY_FOR_RESEARCHER_REVIEW_AFTER_FINAL_CHECKS; DO_NOT_START_SELECTOR_PILOT_OR_FULL_RUN_WITHOUT_EXPLICIT_RESEARCHER_APPROVAL`

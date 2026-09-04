@@ -1,5 +1,9 @@
 # Chapter 3 Working Draft: SAGE Methodology and System Architecture
 
+> **SUPERSEDED — ARCHIVAL V061 MATERIAL.** This draft and its evidence snapshot
+> are not the current publication method or result source. See
+> [current_state.md](current_state.md).
+
 Status: editable praxis draft for the current v061 evidence line
 Prepared: 2026-06-14
 Scope: SAGE methodology, SAGE system architecture, and the current v061 measurement package

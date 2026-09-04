@@ -1,5 +1,8 @@
 # Phase D — rapid portfolio ablation
 
+> **SUPERSEDED — ARCHIVAL EXECUTION PROMPT.** Do not execute these instructions;
+> use the current publication protocol in `../current_state.md`.
+
 Use mixed 30-scenario cohort:
 - reminder creation / optional-location lane
 - reminder search-window lane

@@ -9,13 +9,20 @@ import re
 import socket
 import subprocess
 import sys
+import time
 import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
+from urllib.error import URLError
 from urllib.parse import quote
+from urllib.request import urlopen
 
 from sage_ts.campaign.artifacts import ARTIFACT_ROOT, read_jsonl
+from sage_ts.dashboard.server import (
+    DASHBOARD_SERVER_IDENTITY_PATH,
+    DASHBOARD_SERVER_PROTOCOL,
+)
 from sage_ts.dashboard.task_compare_template import TASK_COMPARE_HTML
 from sage_ts.dashboard.task_focus_template import TASK_FOCUS_HTML
 from sage_ts.dashboard.template import DASHBOARD_HTML
@@ -49,11 +56,22 @@ def _read_json_value(path: Path, default: Any) -> Any:
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
-    return [
-        json.loads(line)
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    rows: list[dict[str, Any]] = []
+    for index, line in enumerate(lines):
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            # Live result streams are append-only. A dashboard read may catch
+            # the final append before its newline, but must never hide a corrupt
+            # completed record in the middle of the evidence file.
+            if index == len(lines) - 1 and not text.endswith("\n"):
+                break
+            raise
+    return rows
 
 
 def _optional_float(value: Any) -> float | None:
@@ -1504,6 +1522,7 @@ def _write_task_focus_dashboard(
         "status": data.get("status"),
         "agent": data.get("agent"),
         "base_tool_policy": data.get("base_tool_policy"),
+        "arm_labels": data.get("arm_labels"),
         "control_cache": data.get("control_cache"),
         "cohort_preflight": data.get("cohort_preflight"),
         "summary": {
@@ -2105,16 +2124,91 @@ def _task_compare_tool_summary(
     }
 
 
+_TASK_COMPARE_DROPPED_PERFORMANCE_SECTIONS = frozenset(
+    {
+        "evaluation",
+        "outcome",
+        "baseline_count_and_variance_per_cached_task",
+        "task_level_fields",
+    }
+)
+_TASK_COMPARE_DROPPED_PERFORMANCE_FIELDS = frozenset(
+    {
+        "balanced_delta",
+        "balanced_lift_percent",
+        "correctness_label",
+        "exact_correct",
+        "exact_success_rate",
+    }
+)
+_TASK_COMPARE_PERFORMANCE_LABEL_KEYS = frozenset(
+    {"kind", "label", "metric", "metric_label", "title"}
+)
+_TASK_COMPARE_FORBIDDEN_PERFORMANCE_LABEL = re.compile(
+    r"\b(?:canonical(?: audit| similarity| score)?|reference similarity|score|"
+    r"milestone|minefield)\b",
+    flags=re.IGNORECASE,
+)
+
+
+def _is_task_compare_performance_field(key: str) -> bool:
+    """Return whether a JSON field belongs to a non-outcome evaluator."""
+    normalized = key.strip().lower().replace("-", "_")
+    if normalized in _TASK_COMPARE_DROPPED_PERFORMANCE_SECTIONS:
+        return True
+    if normalized in _TASK_COMPARE_DROPPED_PERFORMANCE_FIELDS:
+        return True
+    if "canonical" in normalized or "milestone" in normalized:
+        return True
+    if "minefield" in normalized:
+        return True
+    if "reference" in normalized and "similarity" in normalized:
+        return True
+    key_parts = normalized.split("_")
+    if any(part.startswith("score") for part in key_parts):
+        return True
+    return normalized.endswith("similarity") and "outcome" not in key_parts
+
+
+def _sanitize_task_compare_payload(value: Any) -> Any:
+    """Remove non-outcome performance data from the Task Compare export.
+
+    Task Focus and the underlying run artifacts intentionally retain the legacy
+    evaluator diagnostics. Task Compare is publication-facing and must expose
+    only outcome performance, alongside its routing and transcript evidence.
+    """
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for raw_key, item in value.items():
+            key = str(raw_key)
+            if _is_task_compare_performance_field(key):
+                continue
+            normalized = key.strip().lower().replace("-", "_")
+            if (
+                normalized in _TASK_COMPARE_PERFORMANCE_LABEL_KEYS
+                and isinstance(item, str)
+                and _TASK_COMPARE_FORBIDDEN_PERFORMANCE_LABEL.search(item)
+            ):
+                continue
+            sanitized[key] = _sanitize_task_compare_payload(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_task_compare_payload(item) for item in value]
+    return value
+
+
 def _write_task_compare_dashboard(
     dashboard_dir: Path,
     run_root: Path,
     data: dict[str, Any],
     focus_payload: dict[str, Any],
 ) -> None:
-    payload = {
-        **focus_payload,
-        "tool_summary": _task_compare_tool_summary(run_root, data),
-    }
+    payload = _sanitize_task_compare_payload(
+        {
+            **focus_payload,
+            "tool_summary": _task_compare_tool_summary(run_root, data),
+        }
+    )
     (dashboard_dir / "task_compare_data.json").write_text(
         json.dumps(payload, indent=2) + "\n", encoding="utf-8"
     )
@@ -2247,6 +2341,8 @@ def write_protocol_dashboard(
     registry_dir: Path | None = None,
     model_metadata: dict[str, Any] | None = None,
     artifact_root: Path = ARTIFACT_ROOT,
+    control_label: str = "Non-learning",
+    candidate_label: str = "SAGE",
 ) -> Path:
     """Write dashboard HTML and data for a paired protocol run."""
     control_dir = _resolve_run_dir(control_dir)
@@ -2270,6 +2366,10 @@ def write_protocol_dashboard(
         "comparison_model_key": (model_metadata or {}).get("comparison_key"),
         "generation_enabled": generation_enabled,
         "base_tool_policy": base_tool_policy,
+        "arm_labels": {
+            "control": control_label,
+            "candidate": candidate_label,
+        },
         "scenario_count": scenario_count,
         "cohort_preflight": _read_json(run_root / "cohort_preflight_report.json"),
         "control_cache": _read_json(run_root / "control_cache_report.json"),
@@ -2362,17 +2462,53 @@ def dashboard_url(
     return f"http://127.0.0.1:{port}/{quote(str(rel))}"
 
 
+def _dashboard_port_is_open(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.2)
+        return probe.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _dashboard_server_identity(port: int) -> dict[str, Any] | None:
+    url = f"http://127.0.0.1:{port}{DASHBOARD_SERVER_IDENTITY_PATH}"
+    try:
+        with urlopen(url, timeout=1.0) as response:  # noqa: S310
+            if response.status != 200:
+                return None
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, UnicodeError, ValueError, URLError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _assert_dashboard_server_identity(port: int, server_root: Path) -> None:
+    expected_root = str(server_root.resolve())
+    identity = _dashboard_server_identity(port)
+    if identity is None:
+        raise RuntimeError(
+            f"Port {port} is occupied by a server that does not expose the "
+            "SAGE dashboard identity endpoint."
+        )
+    if (
+        identity.get("protocol") != DASHBOARD_SERVER_PROTOCOL
+        or identity.get("root") != expected_root
+    ):
+        raise RuntimeError(
+            f"Port {port} is serving a different dashboard root: "
+            f"expected {expected_root!r}, observed {identity.get('root')!r}."
+        )
+
+
 def ensure_dashboard_server(
     *,
     port: int = 5520,
     server_root: Path | None = None,
 ) -> None:
     """Start a static file server for the dashboard output root."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-        probe.settimeout(0.2)
-        if probe.connect_ex(("127.0.0.1", port)) == 0:
-            return
     repo_root = _repo_root().resolve()
+    root = (server_root or repo_root).resolve()
+    if _dashboard_port_is_open(port):
+        _assert_dashboard_server_identity(port, root)
+        return
     environment = dict(os.environ)
     environment["PYTHONPATH"] = os.pathsep.join(
         [
@@ -2391,7 +2527,7 @@ def ensure_dashboard_server(
             "--host",
             "127.0.0.1",
             "--root",
-            str((server_root or repo_root).resolve()),
+            str(root),
         ],
         cwd=repo_root,
         env=environment,
@@ -2400,28 +2536,83 @@ def ensure_dashboard_server(
         start_new_session=True,
     )
 
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline:
+        identity = _dashboard_server_identity(port)
+        if identity is not None:
+            _assert_dashboard_server_identity(port, root)
+            return
+        time.sleep(0.1)
+    raise RuntimeError(
+        f"Dashboard server on port {port} did not publish its root identity."
+    )
 
-def open_dashboard(index_path: Path, *, port: int = 5520) -> str:
+
+def open_dashboard(
+    index_path: Path,
+    *,
+    port: int = 5520,
+    server_root: Path | None = None,
+) -> str:
     resolved_index = index_path.resolve()
-    repo_root = _repo_root().resolve()
-    try:
-        resolved_index.relative_to(repo_root)
-        server_root = repo_root
-    except ValueError:
-        server_root = resolved_index.parent
-    ensure_dashboard_server(port=port, server_root=server_root)
-    url = dashboard_url(index_path, port=port, server_root=server_root)
-    webbrowser.open_new_tab(url)
-    # In non-interactive benchmark shells, webbrowser can return True even when
-    # no visible browser tab is surfaced. On macOS, also hand the URL to the OS
-    # opener so run dashboards reliably appear during campaign runs.
+    if not resolved_index.is_file():
+        raise FileNotFoundError(f"Dashboard file does not exist: {resolved_index}")
+    if server_root is None:
+        repo_root = _repo_root().resolve()
+        try:
+            resolved_index.relative_to(repo_root)
+            resolved_server_root = repo_root
+        except ValueError:
+            resolved_server_root = resolved_index.parent
+    else:
+        resolved_server_root = server_root.resolve()
+        try:
+            resolved_index.relative_to(resolved_server_root)
+        except ValueError as exc:
+            raise ValueError(
+                f"Dashboard file {resolved_index} is outside server root "
+                f"{resolved_server_root}."
+            ) from exc
+    ensure_dashboard_server(port=port, server_root=resolved_server_root)
+    url = dashboard_url(index_path, port=port, server_root=resolved_server_root)
+
+    deadline = time.monotonic() + 10.0
+    last_error: BaseException | None = None
+    while time.monotonic() < deadline:
+        try:
+            expected_body = resolved_index.read_bytes()
+            with urlopen(url, timeout=1.0) as response:  # noqa: S310
+                response_body = response.read()
+                if response.status == 200 and response_body == expected_body:
+                    break
+                if response.status == 200:
+                    raise RuntimeError(
+                        f"Dashboard URL served bytes from a different file/root: {url}"
+                    )
+                last_error = RuntimeError(
+                    f"dashboard server returned HTTP {response.status}"
+                )
+        except (OSError, URLError) as exc:
+            last_error = exc
+        time.sleep(0.1)
+    else:
+        raise RuntimeError(
+            f"Dashboard URL was not reachable before browser open: {url}"
+        ) from last_error
+
+    # Publication runs execute on macOS. Use the checked OS opener as the sole
+    # launch path there so one external browser tab is opened and failures are
+    # observable before model execution begins.
     if sys.platform == "darwin":
-        subprocess.Popen(
+        subprocess.run(
             ["open", url],
+            check=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True,
+            timeout=10,
         )
+    elif not webbrowser.open_new_tab(url):
+        raise RuntimeError(f"The default browser refused the dashboard URL: {url}")
     return url
 
 

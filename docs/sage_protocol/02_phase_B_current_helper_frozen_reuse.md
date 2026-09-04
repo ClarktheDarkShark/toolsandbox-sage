@@ -1,5 +1,9 @@
 # Phase B: Current Helper Frozen Reuse
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This phase protocol predates the current
+> outcome-only, concurrent fresh-control publication design. Do not use its
+> commands, metric gates, or decisions. See [current_state.md](current_state.md).
+
 **Objective:** Validate that `prepare_reminder_creation_args` can be reused in frozen mode (generation OFF) without regressing canonical score or final-task success. Establish the reuse baseline.
 
 **Entry condition:** Phase A report complete with status `READY_FOR_PHASE_B`.

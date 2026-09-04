@@ -1,5 +1,9 @@
 # Phase C Discovery Sprint Report — Cross-Family Decisive Tool Search
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This development report is not a current
+> protocol, release gate, or paper result. Its values and decision labels must
+> not be carried forward. See [current_state.md](current_state.md).
+
 **Date:** 2026-05-03
 **Phase:** Phase C Discovery Sprint
 **Mode:** `transfer_40`, generation ON, `--base-tool-policy upstream`

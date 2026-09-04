@@ -27,7 +27,6 @@ from sage_ts.adequacy.inadequacy_classifier import (
     classify_visible_trace_observations,
     visible_task_context_from_scenario,
 )
-from sage_ts.generation.complete_tools import native_action_tool_enabled
 from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.orchestration.online_birth import (
     GeneratedToolFactory,
@@ -1004,6 +1003,22 @@ def _output_is_preparatory_search_followup(output: dict[str, object]) -> bool:
     return "search_contacts" in next_step or "search_messages" in next_step
 
 
+def _output_explicitly_abstains(output: dict[str, object]) -> bool:
+    """Return whether a generated result explicitly forbids the final action."""
+
+    if str(output.get("status") or "").strip().lower() == "abstain":
+        return True
+    return any(
+        output.get(key) is False
+        for key in (
+            "should_call_add_reminder",
+            "should_call",
+            "should_call_tool",
+            "should_call_tools",
+        )
+    )
+
+
 def _assistant_tool_names(message: dict[str, object]) -> list[str]:
     names: list[str] = []
     tool_calls = message.get("tool_calls")
@@ -1067,16 +1082,14 @@ def _side_effect_followup_failures_from_trace_events(
     helper_name: str,
     required_side_effect_calls: tuple[str, ...],
 ) -> bool:
-    saw_helper_result = False
     for index, event in enumerate(events):
         if event.get("tool_name") != helper_name:
             continue
-        saw_helper_result = True
         output = event.get("result")
         next_tools = _next_trace_tool_names(events, start_index=index)
         required = set(required_side_effect_calls)
         if isinstance(output, dict):
-            declares_followup = any(
+            declares_followup = _output_explicitly_abstains(output) or any(
                 key in output
                 for key in (
                     "should_call_add_reminder",
@@ -1100,12 +1113,7 @@ def _side_effect_followup_failures_from_trace_events(
                 required = explicit_required
             elif _output_is_preparatory_search_followup(output):
                 continue
-            if (
-                output.get("should_call_add_reminder") is False
-                or output.get("should_call") is False
-                or output.get("should_call_tool") is False
-                or output.get("should_call_tools") is False
-            ):
+            if _output_explicitly_abstains(output):
                 if (
                     output.get("should_call_search_contacts") is True
                     and output.get("should_call_tools") is False
@@ -1123,9 +1131,9 @@ def _side_effect_followup_failures_from_trace_events(
                     )
                 )
                 if selection_only_bridge:
-                    later_tools = _later_trace_tool_names(events, start_index=index)
-                    if not (required & later_tools):
-                        return True
+                    # Selecting a target is useful on its own. Whether the actor
+                    # ultimately performs the native action is judged by the
+                    # task outcome, not by route preservation.
                     continue
                 if required & next_tools:
                     return True
@@ -1141,16 +1149,16 @@ def _side_effect_followup_failures_from_trace_events(
                 later_tools = _later_trace_tool_names(events, start_index=index)
                 if required & later_tools:
                     continue
-                return True
+                # A recommendation is not an obligation to preserve the native
+                # route. A generated tool may be the better terminal action.
+                continue
         else:
             # Scalar/extraction helpers may list downstream tools in their broad
             # preservation contract because their values can be used before a
             # later side effect. The helper output itself does not declare a
             # side-effect call, so absence of that call is not a safety incident.
             continue
-        if not (required & _later_trace_tool_names(events, start_index=index)):
-            return True
-    return not saw_helper_result
+    return False
 
 
 def _side_effect_followup_failures(
@@ -1160,10 +1168,12 @@ def _side_effect_followup_failures(
     required_original_tool_calls: tuple[str, ...],
     actual_tool_trace_events: list[dict[str, object]] | None = None,
 ) -> bool:
-    """Return True when a helper's declared follow-up contract is violated.
+    """Return True only for an unsafe action that contradicts helper abstention.
 
-    Abstaining helpers should not trigger their side-effect tool directly, but
-    they may resolve missing prerequisites first and call the side-effect later.
+    Missing native follow-up calls are intentionally not failures: generated
+    tools may replace the native actor route, and outcome evaluators determine
+    whether the task was completed. An immediate native side effect after an
+    explicit helper abstention remains a safety violation.
     """
 
     required_side_effect_calls = tuple(
@@ -1205,18 +1215,16 @@ def _side_effect_followup_failures(
         # conversation still records the assistant tool call and tool error. Use
         # the conversation as a conservative fallback before declaring that a
         # helper failed to preserve a required downstream side-effect call.
-    saw_helper_result = False
     for index, message in enumerate(messages):
         if not isinstance(message, dict):
             continue
         if message.get("role") != "tool" or message.get("name") != helper_name:
             continue
-        saw_helper_result = True
         output = _parse_tool_message_content(message.get("content"))
         next_tools = set(_next_assistant_tool_names(messages, start_index=index))
         required = set(required_side_effect_calls)
         if isinstance(output, dict):
-            declares_followup = any(
+            declares_followup = _output_explicitly_abstains(output) or any(
                 key in output
                 for key in (
                     "should_call_add_reminder",
@@ -1244,12 +1252,7 @@ def _side_effect_followup_failures(
                 required = explicit_required
             elif _output_is_preparatory_search_followup(output):
                 continue
-            if (
-                output.get("should_call_add_reminder") is False
-                or output.get("should_call") is False
-                or output.get("should_call_tool") is False
-                or output.get("should_call_tools") is False
-            ):
+            if _output_explicitly_abstains(output):
                 if (
                     output.get("should_call_search_contacts") is True
                     and output.get("should_call_tools") is False
@@ -1267,12 +1270,6 @@ def _side_effect_followup_failures(
                     )
                 )
                 if selection_only_bridge:
-                    bridge_followup_tools: set[str] = set()
-                    for later in messages[index + 1 :]:
-                        if isinstance(later, dict) and later.get("role") == "assistant":
-                            bridge_followup_tools.update(_assistant_tool_names(later))
-                    if not (required & bridge_followup_tools):
-                        return True
                     continue
                 if required & next_tools:
                     return True
@@ -1291,18 +1288,12 @@ def _side_effect_followup_failures(
                         later_followup_tools.update(_assistant_tool_names(later))
                 if required & later_followup_tools:
                     continue
-                return True
+                continue
         else:
             # Non-mapping helper outputs, such as deterministic timestamp values,
             # do not declare a downstream side-effect contract.
             continue
-        later_tools: set[str] = set()
-        for later in messages[index + 1 :]:
-            if isinstance(later, dict) and later.get("role") == "assistant":
-                later_tools.update(_assistant_tool_names(later))
-        if not (required & later_tools):
-            return True
-    return not saw_helper_result
+    return False
 
 
 @dataclass(frozen=True)
@@ -1324,6 +1315,7 @@ class SageRunConfig:
     manifest_path: Path = Path("")
     reflection_control_rows: dict[str, dict[str, Any]] | None = None
     require_fresh_reflection_control: bool = False
+    reflection_control_channel: Any | None = None
     failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
 
 
@@ -1446,6 +1438,7 @@ def run_sage_with_registry(
                 manifest_path=config.manifest_path,
                 fresh_control_rows=config.reflection_control_rows,
                 require_fresh_control=config.require_fresh_reflection_control,
+                fresh_control_channel=config.reflection_control_channel,
             )
         visible_task_context = visible_task_context_from_scenario(scenario)
         routing_context_text = visible_task_context.routing_text()
@@ -1928,8 +1921,6 @@ def run_sage_with_registry(
             for helper_name in generated_called:
                 entry = loaded_entries_for_check.get(helper_name)
                 if entry is None:
-                    continue
-                if native_action_tool_enabled(entry.tool):
                     continue
                 required = tuple(entry.tool.spec.required_original_tool_calls)
                 if _side_effect_followup_failures(

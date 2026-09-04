@@ -11,9 +11,11 @@ paper.
 This release is intentionally narrower than the development repository. The
 post-campaign custom-task product, CyberGym adapter, and promotion-only or
 test-only runtime paths are not part of the publication implementation. The
-actor, classifier, generator, online-birth, routing, normalization, and
-validation behavior used by the study has not been simplified as part of this
-cleanup. The narrow provenance changes described below are the only exceptions.
+cleanup does not remove or simplify the deferred actor, classifier, generator,
+online-birth, routing, normalization, or validation subsystems. Separate
+correctness changes described below do affect outcome-only trace/lifecycle
+classification, direct generated actions, and the new auto-selection arm; they
+are explicit research-protocol changes rather than cleanup deletions.
 
 ## Evidence status and correction
 
@@ -25,16 +27,21 @@ compatible records for the triplicated tasks. Those hybrid values supplied the
 control rows in all ten online and ten frozen arms, and the online reflection
 controller also read them when making lifecycle decisions.
 
-A sensitivity calculation shows why this is a provenance and intervention
-problem rather than evidence that the reported headline was inflated. The
-hybrid outcome mean was 0.457342; the original one-record-per-task v140 outcome
-mean was 0.452803. Holding the historical SAGE mean of 0.795407 fixed changes
-the relative point estimate from approximately 73.9% to 75.7%. That calculation
-does not repair unequal replication, confidence intervals, randomization
-tests, mechanism attribution, or cache-conditioned online decisions. No final
-hypothesis decision is claimed from the historical campaign.
+The outcome values previously reported for that campaign are also superseded.
+They were produced before every benchmark task had an explicit,
+route-independent outcome contract, and a later audit found that generic state
+checks still depended on route-conditioned benchmark scoring. The independently
+checked v4 rescore now uses route-independent final-state matching and each
+arm's evidenced timezone. Across the preserved terminal trajectories it finds
+333/1,032 exact outcomes (mean 0.4370005023280137) for the original-v140
+reference and 5,981/10,320 exact outcomes across the ten SAGE replications
+(mean of run means 0.6436038062482871); the lowest replication is 584/1,032
+(mean 0.6276863642409402). These are historical engineering references only.
+The rescore cannot repair unequal replication, online feedback, tool-birth,
+routing, lifecycle, or cache provenance, so no final hypothesis decision is
+claimed from the historical campaign.
 
-The corrected Chapter 4 text is in
+The result-free Chapter 4 rerun scaffold is in
 [`docs/sage_protocol/chapter4_results_completed.tex`](docs/sage_protocol/chapter4_results_completed.tex),
 and the full audit is in
 [`docs/sage_protocol/publication_cleanup_audit_20260901.md`](docs/sage_protocol/publication_cleanup_audit_20260901.md).
@@ -42,19 +49,26 @@ A replacement ten-pair campaign will be run only after explicit human approval.
 
 ## Corrected publication protocol
 
-The canonical launcher is
+The publication launcher is
 [`scripts/run_native_action_4omini_ab.sh`](scripts/run_native_action_4omini_ab.sh).
-For an online publication run it enforces the following sequence and checks:
+For an online publication run it enforces the following schedule and checks:
 
-1. Run the complete live control arm first.
+1. Start the live non-learning control and SAGE arms concurrently.
 2. Require exactly one control result for each of the 1,032 ordered benchmark
    tasks.
-3. Supply those same-run control rows to the online reflection controller.
-4. Run the SAGE arm from an empty registry.
+3. Stream each same-run control row to the online reflection controller at the
+   matching task boundary; SAGE waits there if its control task is still running.
+4. Initialize the SAGE arm with an empty registry while the control runs in its
+   own isolated child process.
 5. Keep the baseline-result, SAGE-task, persistent repository whole-response,
    and persistent generated-output caches off.
 6. Verify task identity, one-to-one control/candidate coverage, cache state,
    reflection provenance, and external-fixture integrity after completion.
+7. Generate `dashboard/task_compare.html`, verify that the served bytes belong
+   to the current run, and open it in the external/default browser before the
+   first model request. Selector experiments do this for both live concurrent
+   pairs: fresh control/policy SAGE and independent fresh control/auto SAGE. A
+   third policy/auto causal view opens after both treatment arms complete.
 
 Strict mode does not construct or read the historical control baseline cache.
 Ambiguous duplicate entries in the legacy cache reader fail closed rather than
@@ -80,7 +94,8 @@ schema hiding, and any named `tool_choice` remain active. The experimental
 conversation plus every routed native and generated schema directly to the
 upstream model. It does not run any of those policy-selection interventions.
 
-The comparison is fail-closed and matched per task. A policy donor run captures
+The comparison is fail-closed and matched per task. The first live pair runs a
+fresh non-learning control and policy SAGE concurrently. The policy donor captures
 the exact actor-ready registry and lifecycle bytes after same-task tool birth,
 plus routing decisions, generated entries, tool order, allow-list, source,
 models, environment, clock, benchmark, and fixture hashes. Before each auto
@@ -89,18 +104,31 @@ the first model request. Independent generation, reflection, and lifecycle
 mutation are disabled only in the replay arm because allowing them to run again
 would create a different inventory and confound the selection comparison. Thus
 the estimand is the actor-selection effect conditional on the policy donor's
-exact adaptive tool-birth and lifecycle schedule.
+exact adaptive tool-birth and lifecycle schedule. Once that authority exists,
+the second live pair runs an independent fresh non-learning control and the auto
+replay concurrently. That control has no path into auto's inventory or
+execution; it measures the auto arm's absolute outcome behavior.
 
 Every actor request is linked one-to-one to its model-usage record. The run
 stores exact native/generated schema bundles in a content-addressed catalog and
 asserts that every auto request has mode `auto`, no named `tool_choice`, and the
-complete routed schema bundle. The post-run comparison excludes canonical
-similarity and reports only outcome-evaluator values. It also rejects response
-cache hits, task/order drift, schema drift, terminal runtime exceptions, and
-incomplete generated-tool attempts. The pilot additionally requires zero
-generated-tool execution failures before the full comparison is allowed; the
-full comparison records those failures as outcome-relevant behavior instead of
-silently discarding the arm.
+complete routed schema bundle. The post-run comparison reports only the frozen
+outcome-evaluator values. Freshness, matching inventory, complete task coverage,
+concurrency, schema/choice assertions, and runtime validity are fail-closed
+experiment-integrity requirements. Generated-tool call, failure, and
+unsuccessful-attempt counts remain mechanism diagnostics: they never pass or
+fail the selector experiment, change its process exit, or determine full-run
+pilot eligibility. The selector pilot has no predeclared policy-versus-auto
+performance threshold; complete, valid policy/auto outcomes are compared and
+reported without turning the noisy 30-task difference into an eligibility gate.
+
+A generated tool may be the terminal action when it safely produces the correct
+final state; the actor does not need to make a second, visible native-tool call
+merely to preserve the benchmark's expected route. The underlying allow-listed
+native implementation may still be used inside a validated generated tool as a
+safety boundary. Final state, minefield, and runtime safety checks remain
+mandatory; when a task remains unresolved or the agent abstains, the abstention
+must also be correct.
 
 Runtime recovery is also fail-closed. The one known warning-only ToolSandbox
 case (`search_contacts(person_id=None)`) keeps the original actor request,
@@ -114,19 +142,29 @@ Run the sealed 30-task feasibility pilot first:
 ```bash
 source .venv-publication/bin/activate
 SAGE_RUN_STAMP=selector_pilot_$(date +%Y%m%d_%H%M%S) \
-  ./scripts/run_native_action_4omini_ab.sh pilot 63105 native-only
+  make selector-pilot APPROVE_LIVE_RUN=YES PORT=63105
 ```
 
-The pilot automatically runs a fresh control, policy donor, and matched auto
-arm. Only after its stability gate passes, run one 1,032-task comparison:
+The pilot automatically runs the fresh-control/policy pair and then the
+independent-fresh-control/auto pair. It opens the two live Task Compare views
+before their model processes and the policy/auto view after both treatment arms
+finish. Only after its integrity and complete-outcome checks pass **and the
+researcher explicitly approves**, run one complete comparison:
 
 ```bash
 source .venv-publication/bin/activate
-SAGE_AUTO_SELECTION_EXPERIMENT=1 \
-SAGE_AUTO_SELECTION_PILOT_EVIDENCE=/absolute/path/to/actor_selection_experiment_manifest.json \
 SAGE_RUN_STAMP=selector_full_$(date +%Y%m%d_%H%M%S) \
-  ./scripts/run_native_action_4omini_ab.sh full 63105 native-only
+  make selector-full \
+    APPROVE_LIVE_RUN=YES \
+    APPROVE_SELECTOR_FULL=YES \
+    PORT=63106 \
+    PILOT_EVIDENCE=/absolute/path/to/actor_selection_experiment_manifest.json
 ```
+
+Each selector command starts a detached Task Compare server rooted at that
+command's persistent run directory. Because that root remains bound after the
+launcher exits, the pilot uses port `63105` and the full run uses `63106`; do not
+reuse one port for different run roots while the earlier server is still active.
 
 The normal `full` command remains the original two-arm protocol unless
 `SAGE_AUTO_SELECTION_EXPERIMENT=1` is set. Selector runs add
@@ -154,7 +192,8 @@ has SHA-256
 `eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f`.
 The fixture is a read-only benchmark input that replaces unstable network
 responses; it is not a model, task, prompt, control, or experiment-result
-cache. The launcher refuses a missing, modified, or writable-mode fixture.
+cache. The launcher refuses a missing or modified fixture and permits only
+application mode `read_only`.
 
 ## Installation
 
@@ -164,8 +203,8 @@ transitive version lock is
 SHA-256
 `5c3ea1802331bf45809fd3e3e31fd8352473449e709cd7a443d03d1975477d1f`.
 The hash authenticates the lock file; the lock pins package versions, not wheel
-artifact hashes. The 108 verified external `name==version` entries have
-canonical set SHA-256
+artifact hashes. The 108 verified normalized external `name==version` entries
+have set SHA-256
 `006191cd1efca9e244c6b5d6fb6a8c91fb95c279959cc91c9eada316f904fc9d`.
 This dependency-valid isolated lock defines the new release runtime. It is not
 claimed to reconstruct the July campaign environment, which was not captured,
@@ -228,23 +267,28 @@ without running an experiment or obtaining private/local archives:
 make verify-inputs
 ```
 
-The verifier reads the tracked release chain at
-[`docs/sage_protocol/publication_release_manifest_20260902.json`](docs/sage_protocol/publication_release_manifest_20260902.json).
-That chain content-addresses all three active policy documents: the immutable
-[`P0 input manifest`](docs/sage_protocol/publication_input_manifest_20260901.json)
-and its policy amendment, plus the active outcome-only validation thresholds.
-It verifies the benchmark bytes, count, and ordered task names; the sanitized
-external-service fixture and its credential-safety invariants; the tracked
-historical analysis references; the validation thresholds; and resolution of
-the checkpoint commit to its recorded Git tree. A history-limited shallow clone
-must fetch the checkpoint ancestor before running this check.
+The compact v4 release chain is frozen in the
+[`2026-09-03 release manifest`](docs/sage_protocol/publication_release_manifest_20260903.json).
+`make verify-inputs` verifies the immutable
+[`P0 input manifest`](docs/sage_protocol/publication_input_manifest_20260901.json),
+its amendment, the active execution policy, evaluator and rescorer identities,
+benchmark bytes and order, sanitized fixture,
+[`historical-rescore summary`](docs/sage_protocol/historical_outcome_rescore_v4_summary.json),
+[`outcome-only thresholds`](docs/sage_protocol/publication_validation_thresholds_v4.json),
+and the checkpoint commit/tree. The historical summary re-evaluates preserved
+terminal trajectories using independently inferred per-arm timezones; it does
+not replay the campaign or repair its cache/lifecycle confounding and is not
+confirmatory evidence. A history-limited shallow clone must fetch the checkpoint
+ancestor before running the check.
 
 The content-hashed checkpoint remains immutable. Its statement that generator
 analysis memoization should be removed is explicitly superseded by the
 [`2026-09-02 checkpoint amendment`](docs/sage_protocol/publication_checkpoint_amendment_20260902.json),
-which restores the deferred within-run behavior and records the complete pinned
-execution and outcome-only validation policies without altering the frozen
-checkpoint bytes.
+which restores the deferred within-run behavior without altering the frozen
+checkpoint bytes. The extending 2026-09-03 execution policy adds concurrent-arm,
+external-dashboard, direct generated-action, and outcome-only requirements.
+The evaluator, rescorer, and threshold identities are content-addressed in the
+validated v4 release chain.
 
 Important frozen inputs include:
 
@@ -256,6 +300,16 @@ Important frozen inputs include:
   `5c3ea1802331bf45809fd3e3e31fd8352473449e709cd7a443d03d1975477d1f`;
 - original v140 sensitivity snapshot: 1,032 records, SHA-256
   `4f9db0f186a25a247a31fe6a934c3e87785bc80c65b455f20e677d6315638c88`;
+- v4 outcome evaluator contract/source: SHA-256
+  `4032411fd203ddfd061753e330cee2218d715756950b69d059792de7409efdce` /
+  `c4fd84d9fbc42488c051565a96faf952c2580fca2df9e582817933aeed9e3eab`;
+- historical rescorer source: SHA-256
+  `17d17a2c5ca65f8a0f11d0eadb1d0a6d24a70280d1171ad0f6c722bfe214489f`;
+- compact v4 rescore summary and outcome thresholds: SHA-256
+  `3dc78ec78986b74230971f01b0f40bae74710de2065371c46208061d392f48a7` /
+  `f14d86181b2085afc94df5c8cc39a2892f9e8c4bb44a0ba2b9d418a81d9f39f6`;
+- active release manifest: SHA-256
+  `8e7e2ecd4ca95e2f8484adf5610986f8d15106d6e054967940acd365c346c658`;
 - authoritative local publication manifest: SHA-256
   `9a7c53fb9c305279dd2eedf5bf5af93e98c37f91b71d028eb065524ec381a8b2`.
 
@@ -273,16 +327,20 @@ local audit; it is not required for clean-clone reproduction.
 ## Run one complete fresh-control sample
 
 The following starts one complete online-build sample: a fresh 1,032-task
-control followed by the matched 1,032-task SAGE arm. It uses `gpt-4o-mini`, a
-fixed ToolSandbox clock, the pinned read-only external fixture, an empty SAGE
-registry, and no experiment-result or persistent repository whole-response
-caches. OpenAI's
+non-learning control and the matched 1,032-task SAGE arm in parallel isolated
+child processes. It uses `gpt-4o-mini`, a fixed ToolSandbox clock, the pinned
+read-only external fixture, an empty SAGE registry, and no experiment-result or
+persistent repository whole-response caches. OpenAI's
 automatic prompt-prefix computation cache remains provider-managed and is
 reported separately from response reuse.
 
 ```bash
-make paper-online
+make paper-online APPROVE_LIVE_RUN=YES
 ```
+
+This command is documented for the approved full validation only. It has not
+been run for the current release and must not be invoked until the researcher
+explicitly approves the full run.
 
 The launcher writes to new timestamped directories beneath
 `outputs/publication_validation/` and `artifacts/publication_validation/`; it
@@ -294,24 +352,18 @@ make verify-publication \
   RUN=outputs/publication_validation/<run-stamp>/native_action
 ```
 
-The active one-sample engineering gate is separately frozen in
-[`docs/sage_protocol/publication_validation_thresholds_v2.json`](docs/sage_protocol/publication_validation_thresholds_v2.json).
-It requires complete arms without application result/response replay, zero
-runtime exceptions, the historical ten-run lower envelope for candidate
-outcome, at least 10% outcome lift over the new same-run control, and observed
-accepted/called/reused generated tools. Outcome/task-completion similarity is
-the sole performance endpoint. Canonical/reference similarity is descriptive
-only and can never fail this gate. The superseded v1 threshold remains tracked
-for audit history. The active
-`persistent_generation_output_replay_enabled=false` threshold names the retired
-persistent generated-output cache, not the within-run generator memoization or
-OpenAI's provider prefix cache. The integrity gate also requires complete per-call
-provider-prefix metadata and exact event/task/arm reconciliation. The gate reports
-comparison with the historical mean but never reruns or selects a better sample:
+The frozen v4 one-sample engineering thresholds require an outcome for every
+task, complete concurrent arms without
+application result/response replay, zero terminal runtime failures, and the
+predeclared outcome-only no-regression and same-run comparison rules. Accepted,
+called, and reused tool counts remain mechanism diagnostics and cannot pass or
+fail the release gate. Superseded threshold files remain tracked for audit
+history. Verification requires the explicit current path:
 
 ```bash
 make verify-sample \
-  RUN=outputs/publication_validation/<run-stamp>/native_action
+  RUN=outputs/publication_validation/<run-stamp>/native_action \
+  VALIDATION_THRESHOLDS=docs/sage_protocol/publication_validation_thresholds_v4.json
 ```
 
 Passing one sample is an engineering no-regression check, not confirmatory
@@ -321,65 +373,49 @@ Sample 01 stopped at dependency preflight before creating experiment outputs or
 making model requests; its tracked ledger is
 [`docs/sage_protocol/publication_validation_sample01_preflight_20260901.json`](docs/sage_protocol/publication_validation_sample01_preflight_20260901.json).
 Sample 02 was the first completed strict-intent attempt. It completed both
-1,032-task arms with zero runtime
-exceptions, zero cached control tasks, zero persistently replayed whole model
-responses, and exact same-run reflection mapping. Its candidate outcome score
-(`0.7788122917`) passed the historical lower-envelope gate
-(`0.7760515297`), and its relative outcome lift was `58.04%`. The initial v1
-report incorrectly treated canonical/reference similarity as a release gate;
-that policy is now explicitly superseded and content-addressed. Sample 02 is
-still **configuration-ineligible**. The diagnostic record is
+1,032-task arms, but it predates the target route-independent evaluator and concurrent-arm
+protocol and is **configuration-ineligible**. Its old values must not be used as
+current outcome results. The diagnostic record is
 [`docs/sage_protocol/publication_validation_sample02_report.md`](docs/sage_protocol/publication_validation_sample02_report.md).
 That post-run audit also found and corrected two release drifts: removed
 within-run generator memoization and an omitted historical five-retry setting.
 The replacement launcher now fail-closes all retry layers and request timeouts.
 It also rejects diagnostic force/exposure variables in either publication arm.
 
-Sample 03 is the completed corrected-tree engineering validation. Both arms
-completed all 1,032 tasks with zero runtime exceptions, zero cached control
-tasks, zero repository whole-response replay, and same-run-fresh reflection.
-Across the 800 tasks with an outcome evaluator, outcome increased from
-`0.5087366331780064` to `0.7986035515693737`: an absolute increase of
-`0.2898669183913673` and a relative lift of `56.97779548144769%`. Exact
-outcome successes increased from `220` to `443`; paired outcomes comprised
-`413` gains, `283` preserved results, and `104` regressions. The outcome-only
-sample verifier passed. The tracked record is
-[`docs/sage_protocol/publication_validation_sample03_report.md`](docs/sage_protocol/publication_validation_sample03_report.md).
+Sample 03 completed an earlier engineering validation, but it used a partial
+outcome-evaluator surface and predates the current concurrent-pair requirement.
+It is an archival diagnostic only; none of its values is a current result,
+threshold, or release claim.
 
-The ten-online/ten-frozen manifest has been prepared and verified at
-`artifacts/chapter4_evidence/chapter4_strict_fresh_control_10x_20260902/campaign_manifest.json`.
-Its initial SHA-256 is
-`af5045911ac96e2bfdd67fac5aed3ce5b22cae6389ca94832d340b6d719d4853`.
-The ten online and ten matched frozen runs are queued but unstarted.
-Preparation made no model calls. The campaign has **not** been executed and
-still requires explicit researcher approval. Execution is pinned to validated
-runtime commit `519d6fa3739f4c933487073c5888f7576e2a646a` and tree
-`718ef02a85f0490d7e4dbbec4192567a1bd10b9d`, not the later
-documentation-only commit. The clean public-history runtime checkpoint is
-`5bf1a1a3377bb913cb11fdcd1228f18003300714`; it has that identical validated
-tree while omitting intermediate commits that contained removed experiments.
+The September 2 ten-online/ten-frozen campaign manifest is also superseded and
+was never executed. A new manifest will be prepared only from a passing sample
+under the frozen v4 evaluator, concurrent-arm launcher, and dashboard policy.
+Preparation makes no model calls; execution still requires separate, explicit
+researcher approval.
 
 To evaluate an already-built registry under the same fresh-control protocol:
 
 ```bash
-RESUME_REGISTRY_CHECKPOINT=artifacts/<registry> make paper-frozen
+RESUME_REGISTRY_CHECKPOINT=artifacts/<registry> \
+  make paper-frozen APPROVE_LIVE_RUN=YES
 ```
 
-## Prepared final paper rerun
+## Final paper rerun (not started)
 
-Preparation is deliberately separate from execution. The active manifest was
-created with the following command; preparation did not make model calls:
+Preparation is deliberately separate from execution. After the researcher
+approves and the current full validation sample passes, prepare a new manifest
+with that report:
 
 ```bash
 make prepare-paper-rerun \
-  SAMPLE_REPORT=outputs/publication_validation/publication_validation_20260902_strict_sample03/native_action/online_build_full_20260902_071820/publication_validation_report.json \
-  CAMPAIGN_ARGS='--campaign-id chapter4_strict_fresh_control_10x_20260902 --expected-online-runs 10'
+  SAMPLE_REPORT=outputs/publication_validation/<current-run>/native_action/<protocol-run>/publication_validation_report.json \
+  CAMPAIGN_ARGS='--campaign-id chapter4_strict_fresh_control_10x_<date> --expected-online-runs 10'
 ```
 
-The prepared manifest pins the passing single-sample report, validated Git
-commit/tree, runtime and generation digests, benchmark, fixture, and exactly
-ten online/frozen pairs. This later documentation update does not change the
-pinned runtime identity.
+The manifest will pin the passing single-sample report, validated Git
+commit/tree, evaluator, runtime and generation digests, benchmark, fixture, and
+exactly ten online/frozen pairs. There is no active current-release campaign
+manifest yet, and no full current-release model run has started.
 
 After explicit approval, the guarded campaign runner requires both the
 prepared manifest and `--approve-execution`:

@@ -24,7 +24,10 @@ from sage_ts.evaluation.llm_usage import (
     snapshot_scenario_usage,
     write_llm_usage_artifacts,
 )
-from sage_ts.evaluation.outcome_score import compute_outcome_score
+from sage_ts.evaluation.outcome_score import (
+    compute_outcome_score,
+    outcome_evaluator_manifest,
+)
 from sage_ts.evaluation.retry_provenance import (
     TRANSIENT_EXCEPTION_TYPE_NAMES as _TRANSIENT_EXCEPTION_TYPE_NAMES,
 )
@@ -78,11 +81,13 @@ def write_run_manifest(config: ToolSandboxRunConfig) -> Path:
     payload: dict[str, Any] = {
         **asdict(config),
         "output_dir": str(config.output_dir),
+        "outcome_evaluator": outcome_evaluator_manifest(),
         "scenario_names": list(config.scenario_names),
         "resume_from_dir": str(config.resume_from_dir)
         if config.resume_from_dir
         else None,
         "git_sha": git_sha(),
+        "timezone": os.environ.get("TZ"),
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -302,18 +307,10 @@ def run_one_scenario(
                 output_directory=output_directory,
                 scenario_name=name,
             )
-            canonical_milestone_scores = {
-                int(index): float(score)
-                for index, (
-                    _,
-                    score,
-                ) in result.evaluation_result.milestone_mapping.items()
-            }
             outcome = compute_outcome_score(
                 scenario,
                 result.ending_context,
-                canonical_milestone_scores=canonical_milestone_scores,
-                minefield_similarity=result.evaluation_result.minefield_similarity,
+                scenario_name=name,
             )
             return {
                 "name": name,
@@ -361,6 +358,7 @@ def run_one_scenario(
                 }
             )
             if not should_retry:
+                evaluator_identity = outcome_evaluator_manifest()
                 return {
                     "name": name,
                     "categories": scenario.categories,
@@ -380,6 +378,13 @@ def run_one_scenario(
                     "outcome_minefield_similarity": 0,
                     "outcome_check_count": 0,
                     "outcome_checks": [],
+                    "outcome_evaluator_version": evaluator_identity["version"],
+                    "outcome_evaluator_contract_sha256": evaluator_identity[
+                        "contract_sha256"
+                    ],
+                    "outcome_evaluator_source_sha256": evaluator_identity[
+                        "source_sha256"
+                    ],
                 }
         finally:
             for role in roles.values():
@@ -524,6 +529,16 @@ def run_scenario_sequence(
             result = (
                 result_hook(name, active_scenario, result, output_directory) or result
             )
+        evaluator_identity = outcome_evaluator_manifest()
+        result.update(
+            {
+                "outcome_evaluator_version": evaluator_identity["version"],
+                "outcome_evaluator_contract_sha256": evaluator_identity[
+                    "contract_sha256"
+                ],
+                "outcome_evaluator_source_sha256": evaluator_identity["source_sha256"],
+            }
+        )
         result.update(snapshot_scenario_usage(name))
         clear_scenario_usage(name)
         result_summary.append(result)

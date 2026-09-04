@@ -1,5 +1,9 @@
 # Phase C.1 v2 Report — select_record_by_timestamp_extreme (Affordance Repair)
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This development report is not a current
+> protocol, release gate, or paper result. Its values and decision labels must
+> not be carried forward. See [current_state.md](current_state.md).
+
 **Date:** 2026-05-02
 **Phase:** Phase C.1 v2 — Affordance Repair Re-run
 **Candidate:** `select_record_by_timestamp_extreme`

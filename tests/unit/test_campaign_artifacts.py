@@ -1,7 +1,48 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from sage_ts.campaign.artifacts import append_event
+import pytest
+
+import sage_ts.campaign.artifacts as campaign_artifacts
+from sage_ts.campaign.artifacts import append_event, read_jsonl
+
+
+def test_read_jsonl_tolerates_only_an_unterminated_live_tail(tmp_path: Path) -> None:
+    path = tmp_path / "live.jsonl"
+    path.write_text('{"complete": true}\n{"partial":', encoding="utf-8")
+
+    assert read_jsonl(path) == [{"complete": True}]
+
+    path.write_text('{"complete": true}\nnot-json\n', encoding="utf-8")
+    with pytest.raises(json.JSONDecodeError):
+        read_jsonl(path)
+
+
+def test_concurrent_event_appends_remain_complete_and_consistently_ordered(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(campaign_artifacts, "git_value", lambda *_args: "git")
+
+    def write_event(index: int) -> None:
+        append_event(
+            "scenario_finished",
+            {"sequence": index, "payload": "x" * 50_000},
+            root=tmp_path,
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(write_event, range(40)))
+
+    latest_rows = read_jsonl(tmp_path / "events" / "latest.jsonl")
+    dated_paths = list((tmp_path / "events").glob("[0-9]*.jsonl"))
+    assert len(dated_paths) == 1
+    dated_rows = read_jsonl(dated_paths[0])
+    assert [row["sequence"] for row in latest_rows] == [
+        row["sequence"] for row in dated_rows
+    ]
+    assert sorted(row["sequence"] for row in latest_rows) == list(range(40))
 
 
 def test_duplicate_birth_skip_is_valid_campaign_event(tmp_path: Path) -> None:

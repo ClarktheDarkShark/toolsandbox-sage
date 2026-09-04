@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable
 
+from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 from sage_ts.evaluation.retry_provenance import (
     validate_successful_retry_provenance,
 )
@@ -34,6 +36,11 @@ PERSISTENT_RESPONSE_CACHE_ARTIFACTS = (
     "openai_response_cache_metrics.json",
     "prompt_cache_metrics.json",
 )
+OUTCOME_EVALUATOR_ROW_FIELDS = {
+    "outcome_evaluator_version": "version",
+    "outcome_evaluator_contract_sha256": "contract_sha256",
+    "outcome_evaluator_source_sha256": "source_sha256",
+}
 
 
 class ActorSelectionVerificationError(ValueError):
@@ -509,6 +516,27 @@ def _result_rows(
     return rows
 
 
+def _validate_outcome_evaluator(
+    run_dir: Path,
+    rows: Iterable[dict[str, Any]],
+) -> dict[str, Any]:
+    expected = outcome_evaluator_manifest()
+    run_manifest = _read_json(run_dir.parent / "sage_ts_run_manifest.json")
+    if run_manifest.get("outcome_evaluator") != expected:
+        raise ActorSelectionVerificationError(
+            f"Run manifest has the wrong outcome evaluator: {run_dir}"
+        )
+    for row in rows:
+        scenario = str(row.get("name") or "")
+        _outcome_value(row)
+        for row_field, identity_field in OUTCOME_EVALUATOR_ROW_FIELDS.items():
+            if row.get(row_field) != expected[identity_field]:
+                raise ActorSelectionVerificationError(
+                    f"Outcome evaluator identity mismatch for {scenario!r}: {row_field}"
+                )
+    return expected
+
+
 def validate_live_uncached_run(
     run_dir: Path,
     *,
@@ -518,6 +546,7 @@ def validate_live_uncached_run(
 ) -> dict[str, Any]:
     expected_names = list(expected_scenarios)
     rows = _result_rows(run_dir, expected_names)
+    evaluator_identity = _validate_outcome_evaluator(run_dir, rows)
     live_summary = _read_json(run_dir / "live_result_summary.json")
     if (
         live_summary.get("status") != "complete"
@@ -758,6 +787,7 @@ def validate_live_uncached_run(
         "runtime_exception_scenarios": exception_rows,
         "side_effect_preservation_failure_count": len(side_effect_failure_scenarios),
         "side_effect_preservation_failure_scenarios": side_effect_failure_scenarios,
+        "outcome_evaluator": evaluator_identity,
     }
 
 
@@ -767,17 +797,18 @@ def _required_nonnegative_int(value: object, *, label: str) -> int:
     return value
 
 
-def _outcome_value(row: dict[str, Any]) -> float | None:
+def _outcome_value(row: dict[str, Any]) -> float:
     raw = row.get("outcome_similarity")
     if raw is None:
-        return None
-    try:
-        value = float(raw)
-    except (TypeError, ValueError) as exc:
+        raise ActorSelectionVerificationError(
+            f"Missing outcome value for {row.get('name')!r}"
+        )
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
         raise ActorSelectionVerificationError(
             f"Invalid outcome value for {row.get('name')!r}: {raw!r}"
-        ) from exc
-    if not 0.0 <= value <= 1.0:
+        )
+    value = float(raw)
+    if not math.isfinite(value) or not 0.0 <= value <= 1.0:
         raise ActorSelectionVerificationError(
             f"Out-of-range outcome value for {row.get('name')!r}: {value}"
         )
@@ -795,6 +826,12 @@ def compare_outcome_values(
     expected_names = list(expected_scenarios)
     policy_rows = _result_rows(policy_dir, expected_names)
     auto_rows = _result_rows(auto_dir, expected_names)
+    policy_evaluator = _validate_outcome_evaluator(policy_dir, policy_rows)
+    auto_evaluator = _validate_outcome_evaluator(auto_dir, auto_rows)
+    if policy_evaluator != auto_evaluator:
+        raise ActorSelectionVerificationError(
+            "Policy and auto arms do not share one outcome evaluator identity"
+        )
     paired_rows: list[dict[str, Any]] = []
     policy_values: list[float] = []
     auto_values: list[float] = []
@@ -802,21 +839,15 @@ def compare_outcome_values(
     for name, policy_row, auto_row in zip(expected_names, policy_rows, auto_rows):
         policy_value = _outcome_value(policy_row)
         auto_value = _outcome_value(auto_row)
-        if (policy_value is None) != (auto_value is None):
-            raise ActorSelectionVerificationError(
-                f"Outcome-evaluator availability changed across arms for {name!r}"
-            )
-        delta = None
-        if policy_value is not None and auto_value is not None:
-            policy_values.append(policy_value)
-            auto_values.append(auto_value)
-            delta = auto_value - policy_value
-            if delta > 0:
-                auto_wins += 1
-            elif delta < 0:
-                policy_wins += 1
-            else:
-                ties += 1
+        policy_values.append(policy_value)
+        auto_values.append(auto_value)
+        delta = auto_value - policy_value
+        if delta > 0:
+            auto_wins += 1
+        elif delta < 0:
+            policy_wins += 1
+        else:
+            ties += 1
         paired_rows.append(
             {
                 "scenario": name,
@@ -831,7 +862,7 @@ def compare_outcome_values(
         "canonical_similarity_included": False,
         "scenario_count": len(expected_names),
         "outcome_evaluated_count": evaluated_count,
-        "outcome_not_evaluated_count": len(expected_names) - evaluated_count,
+        "outcome_not_evaluated_count": 0,
         "policy_exact_outcome_successes": sum(value == 1.0 for value in policy_values),
         "auto_exact_outcome_successes": sum(value == 1.0 for value in auto_values),
         "policy_mean_outcome_similarity": (
@@ -1001,7 +1032,15 @@ def verify_matched_actor_selection_experiment(
     authority_path: Path,
     require_zero_generated_tool_failures: bool = False,
 ) -> dict[str, Any]:
-    """Return a complete gate report or raise before claiming a matched comparison."""
+    """Return integrity, outcome, and diagnostic results for a matched comparison.
+
+    Invalid, incomplete, or unmatched experiment/outcome evidence raises before
+    a comparison can be claimed. Runtime validity remains an explicit integrity
+    gate. No selector performance threshold is predeclared, so the frozen
+    outcome comparison is report-only; generated-tool mechanism counts are
+    diagnostic regardless of the legacy
+    ``require_zero_generated_tool_failures`` caller option.
+    """
 
     authority, scenario_names = _validate_authority(authority_path)
     shared_context = authority["shared_context"]
@@ -1084,33 +1123,51 @@ def verify_matched_actor_selection_experiment(
             "toolsandbox_user": expected_user_model,
         },
     )
+    if policy_execution["outcome_evaluator"] != auto_execution["outcome_evaluator"]:
+        raise ActorSelectionVerificationError(
+            "Policy and auto arms do not share one outcome evaluator identity"
+        )
     outcomes = compare_outcome_values(
         policy_dir,
         auto_dir,
         expected_scenarios=scenario_names,
     )
-    gate_reasons: list[str] = []
+    integrity_gate_reasons: list[str] = []
     if policy_execution["runtime_exception_count"]:
-        gate_reasons.append("policy_runtime_exceptions")
+        integrity_gate_reasons.append("policy_runtime_exceptions")
     if auto_execution["runtime_exception_count"]:
-        gate_reasons.append("auto_runtime_exceptions")
-    if policy_selection["generated_tool_called_scenarios"] < 1:
-        gate_reasons.append("policy_generated_tools_not_called")
-    if auto_selection["generated_tool_called_scenarios"] < 1:
-        gate_reasons.append("auto_generated_tools_not_called")
-    if require_zero_generated_tool_failures:
-        if policy_selection["generated_tool_failed_scenarios"]:
-            gate_reasons.append("policy_generated_tool_execution_failures")
-        if auto_selection["generated_tool_failed_scenarios"]:
-            gate_reasons.append("auto_generated_tool_execution_failures")
-        if policy_selection["generated_tool_attempted_without_success_scenarios"]:
-            gate_reasons.append("policy_generated_tool_attempts_without_success")
-        if auto_selection["generated_tool_attempted_without_success_scenarios"]:
-            gate_reasons.append("auto_generated_tool_attempts_without_success")
-        if policy_execution["side_effect_preservation_failure_count"]:
-            gate_reasons.append("policy_side_effect_preservation_failures")
-        if auto_execution["side_effect_preservation_failure_count"]:
-            gate_reasons.append("auto_side_effect_preservation_failures")
+        integrity_gate_reasons.append("auto_runtime_exceptions")
+
+    mechanism_diagnostics = {
+        "affects_experiment_pass_fail": False,
+        "zero_generated_tool_failures_requested_by_caller": (
+            require_zero_generated_tool_failures
+        ),
+        "policy": {
+            "generated_tool_called_scenarios": policy_selection[
+                "generated_tool_called_scenarios"
+            ],
+            "generated_tool_failed_scenarios": policy_selection[
+                "generated_tool_failed_scenarios"
+            ],
+            "generated_tool_attempted_without_success_scenarios": policy_selection[
+                "generated_tool_attempted_without_success_scenarios"
+            ],
+        },
+        "auto": {
+            "generated_tool_called_scenarios": auto_selection[
+                "generated_tool_called_scenarios"
+            ],
+            "generated_tool_failed_scenarios": auto_selection[
+                "generated_tool_failed_scenarios"
+            ],
+            "generated_tool_attempted_without_success_scenarios": auto_selection[
+                "generated_tool_attempted_without_success_scenarios"
+            ],
+        },
+    }
+    integrity_gate_passed = not integrity_gate_reasons
+    experiment_passed = integrity_gate_passed
 
     return {
         "schema_version": 1,
@@ -1133,8 +1190,18 @@ def verify_matched_actor_selection_experiment(
         "auto_execution": auto_execution,
         "routed_schemas_identical_by_scenario": True,
         "persistent_response_cache_reuse": False,
-        "zero_generated_tool_failures_required": (require_zero_generated_tool_failures),
+        "outcome_evaluator": policy_execution["outcome_evaluator"],
+        "mechanism_counts_are_performance_gates": False,
+        "zero_generated_tool_failures_required": False,
+        "mechanism_diagnostics": mechanism_diagnostics,
         "outcomes": outcomes,
-        "stability_gate_passed": not gate_reasons,
-        "stability_gate_reasons": gate_reasons,
+        "outcome_evidence_complete": True,
+        "performance_gate_applied": False,
+        "performance_gate_reason": "no_predeclared_selector_performance_threshold",
+        "integrity_gate_passed": integrity_gate_passed,
+        "integrity_gate_reasons": integrity_gate_reasons,
+        "experiment_passed": experiment_passed,
+        # Compatibility alias for the selector experiment's execution integrity.
+        "stability_gate_passed": integrity_gate_passed,
+        "stability_gate_reasons": integrity_gate_reasons,
     }

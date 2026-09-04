@@ -1,5 +1,9 @@
 # Chapter 3 Working Setup: Current SAGE Methodology
 
+> **SUPERSEDED — ARCHIVAL V061 MATERIAL.** The “current” wording below is
+> historical. Do not use its paths, settings, or values for a publication run.
+> See [current_state.md](current_state.md).
+
 Status: current working setup for the v061 SAGE evidence boundary.
 
 ## Primary Implementation

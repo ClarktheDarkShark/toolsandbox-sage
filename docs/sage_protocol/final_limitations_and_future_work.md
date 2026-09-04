@@ -1,5 +1,9 @@
 # Final Limitations And Future Work
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This document describes an earlier evidence
+> package and is not current publication guidance. See
+> [current_state.md](current_state.md).
+
 ## Limitations
 
 - The frozen best3 portfolio is the broad locked claim portfolio; V2.6 expanded contact-scalar helpers are a safe, current-code-positive candidate portfolio with targeted gap-closure evidence.

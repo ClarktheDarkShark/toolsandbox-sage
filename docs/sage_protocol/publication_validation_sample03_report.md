@@ -1,5 +1,10 @@
 # Corrected-Tree Publication Validation Sample 03 — 2026-09-02
 
+> **SUPERSEDED — ARCHIVAL ONLY.** This sample used the earlier partial evaluator
+> and predates the current concurrent-pair protocol. Its pass label and numeric
+> values are not current release evidence, thresholds, or paper results. See
+> [current_state.md](current_state.md).
+
 ## Decision
 
 **PASS — ENGINEERING RELEASE GATE SATISFIED.** The corrected-tree strict

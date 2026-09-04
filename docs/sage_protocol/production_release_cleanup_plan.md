@@ -1,5 +1,10 @@
 # SAGE Production Release Cleanup Plan
 
+> **SUPERSEDED — ARCHIVAL CLEANUP LEDGER.** This file preserves earlier cleanup
+> decisions and validation observations. Its commands, source inventory, metric
+> values, and release gates are not current policy. See
+> [current_state.md](current_state.md).
+
 Status: preparation plan for sensitive cleanup after removal of unfair retry,
 scenario-name routing, diagnostic force paths, and obsolete bridge-policy docs.
 
@@ -757,7 +762,7 @@ Keep as production or near-production:
 
 - `scripts/run_sage_protocol.py`
 - `scripts/preflight_final_run.py`
-- `scripts/prepare_toolsandbox_full_self_evolving_run.py`
+- retired whole-dataset preflight launcher (removed)
 - `scripts/export_sage_metrics.py`
 - `scripts/cache_llm_usage_by_task.py`
 - `scripts/check_no_secrets.py`
