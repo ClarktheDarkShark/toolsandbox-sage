@@ -1867,6 +1867,7 @@ def test_task_focus_resolves_arm_roots_and_renders_paired_compare(
             {
                 "name": "paired_case",
                 "similarity": 0.5,
+                "outcome_similarity": 0.25,
                 "turn_count": 2,
                 "categories": ["STATE_DEPENDENCY"],
                 "milestone_similarity": 0.5,
@@ -1882,6 +1883,7 @@ def test_task_focus_resolves_arm_roots_and_renders_paired_compare(
             {
                 "name": "paired_case",
                 "similarity": 1.0,
+                "outcome_similarity": 0.75,
                 "turn_count": 3,
                 "categories": ["STATE_DEPENDENCY"],
                 "milestone_similarity": 1.0,
@@ -1946,6 +1948,36 @@ def test_task_focus_resolves_arm_roots_and_renders_paired_compare(
         (index.parent / "task_compare_data.json").read_text(encoding="utf-8")
     )
     assert task_compare["arm_labels"] == task_focus["arm_labels"]
+
+    detached_index = write_protocol_dashboard(
+        run_root / "actor_selection_dashboard",
+        mode="sage_auto_selection",
+        status="complete",
+        phase="policy_vs_auto_outcome_comparison",
+        agent="gpt-5-mini",
+        user="GPT_4_o_2024_05_13",
+        generation_enabled=False,
+        base_tool_policy="all_tools",
+        scenario_count=1,
+        control_dir=control,
+        candidate_dir=candidate,
+        registry_dir=registry,
+        control_label="SAGE policy selection",
+        candidate_label="SAGE auto selection",
+    )
+    detached_compare = json.loads(
+        (detached_index.parent / "task_compare_data.json").read_text(encoding="utf-8")
+    )
+    detached_pair = detached_compare["pairs"][0]
+    assert detached_pair["control"]["phase"] == "control"
+    assert detached_pair["candidate"]["phase"] == "candidate"
+    assert detached_compare["summary"]["balanced_completed"] == 1
+    assert detached_compare["summary"][
+        "balanced_control_mean_outcome_similarity"
+    ] == pytest.approx(0.25)
+    assert detached_compare["summary"][
+        "balanced_candidate_mean_outcome_similarity"
+    ] == pytest.approx(0.75)
 
     html = (index.parent / "task_focus.html").read_text(encoding="utf-8")
     assert "paired-check-grid" in html

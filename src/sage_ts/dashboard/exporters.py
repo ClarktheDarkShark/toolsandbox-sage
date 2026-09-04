@@ -13,7 +13,7 @@ import time
 import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 from urllib.error import URLError
 from urllib.parse import quote
 from urllib.request import urlopen
@@ -1186,6 +1186,8 @@ def _build_evaluation_payload(
 def _task_focus_rows(
     run_root: Path,
     run_dir: Path | None,
+    *,
+    phase: Literal["control", "candidate"],
 ) -> list[dict[str, Any]]:
     run_dir = _resolve_run_dir(run_dir)
     if run_dir is None:
@@ -1229,15 +1231,6 @@ def _task_focus_rows(
             else []
         )
         raw_messages = [m for m in conversation if isinstance(m, dict)]
-        try:
-            relative_parts = run_dir.relative_to(run_root).parts
-        except ValueError:
-            relative_parts = ()
-        if relative_parts:
-            phase = relative_parts[0]
-        else:
-            path_hint = "/".join(run_dir.parts[-3:]).lower()
-            phase = "control" if "control" in path_hint else "candidate"
         milestones = _milestones_from_result(result or {}, raw_messages)
         minefields = _minefields_from_result(result or {}, raw_messages)
         control_cache = (
@@ -1459,8 +1452,16 @@ def _write_task_focus_dashboard(
     control_dir: Path | None,
     candidate_dir: Path | None,
 ) -> dict[str, Any]:
-    control_tasks = _task_focus_rows(run_root, control_dir)
-    candidate_tasks = _task_focus_rows(run_root, candidate_dir)
+    control_tasks = _task_focus_rows(
+        run_root,
+        control_dir,
+        phase="control",
+    )
+    candidate_tasks = _task_focus_rows(
+        run_root,
+        candidate_dir,
+        phase="candidate",
+    )
     tasks = [*control_tasks, *candidate_tasks]
     pair_lookup: dict[str, dict[str, Any]] = {}
     for task in tasks:

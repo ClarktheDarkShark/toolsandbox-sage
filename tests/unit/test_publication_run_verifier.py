@@ -603,6 +603,13 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
         "stability_gate_passed": True,
         "stability_gate_reasons": [],
         "outcome_evaluator": outcome_evaluator,
+        "outcomes": {
+            "policy_exact_outcome_successes": 10,
+            "auto_exact_outcome_successes": 20,
+            "policy_mean_outcome_similarity": 10 / 30,
+            "auto_mean_outcome_similarity": 20 / 30,
+            "auto_minus_policy_mean_outcome_delta": 10 / 30,
+        },
     }
     comparison_path = run_root / "actor_selection_outcome_comparison.json"
     _write_json(comparison_path, comparison)
@@ -633,16 +640,42 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
     )
     policy_auto_dashboard_path.parent.mkdir(parents=True)
     policy_auto_dashboard_path.write_text("dashboard", encoding="utf-8")
-    _write_json(
-        policy_auto_dashboard_path.with_name("task_compare_data.json"),
-        {
-            "arm_labels": {
-                "control": "SAGE policy selection",
-                "candidate": "SAGE auto selection",
-            },
-            "scenario_count": 30,
-        },
+    policy_auto_dashboard_data_path = policy_auto_dashboard_path.with_name(
+        "task_compare_data.json"
     )
+    policy_auto_pairs = [
+        {
+            "scenario": f"scenario_{index}",
+            "control": {
+                "scenario": f"scenario_{index}",
+                "phase": "control",
+                "status": "complete",
+                "outcome_similarity": 1.0 if index < 10 else 0.0,
+            },
+            "candidate": {
+                "scenario": f"scenario_{index}",
+                "phase": "candidate",
+                "status": "complete",
+                "outcome_similarity": 1.0 if index < 20 else 0.0,
+            },
+        }
+        for index in range(30)
+    ]
+    policy_auto_dashboard_data: dict[str, Any] = {
+        "arm_labels": {
+            "control": "SAGE policy selection",
+            "candidate": "SAGE auto selection",
+        },
+        "scenario_count": 30,
+        "pairs": policy_auto_pairs,
+        "summary": {
+            "balanced_completed": 30,
+            "balanced_control_mean_outcome_similarity": 10 / 30,
+            "balanced_candidate_mean_outcome_similarity": 20 / 30,
+            "balanced_outcome_delta": 10 / 30,
+        },
+    }
+    _write_json(policy_auto_dashboard_data_path, policy_auto_dashboard_data)
     policy_auto_dashboard_url = (
         "http://127.0.0.1:63105/actor_selection_dashboard/dashboard/task_compare.html"
     )
@@ -779,6 +812,19 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
         == hashlib.sha256(evidence_path.read_bytes()).hexdigest()
     )
     assert result["timezone"] == publication_verifier.PUBLICATION_TIMEZONE
+
+    first_policy_row = dict(policy_auto_dashboard_data["pairs"][0]["control"])
+    policy_auto_dashboard_data["pairs"][0]["control"] = None
+    _write_json(policy_auto_dashboard_data_path, policy_auto_dashboard_data)
+    with pytest.raises(ValueError, match="has no complete control arm"):
+        publication_verifier.verify_selector_pilot_evidence(evidence_path)
+    policy_auto_dashboard_data["pairs"][0]["control"] = first_policy_row
+    policy_auto_dashboard_data["summary"]["balanced_completed"] = 0
+    _write_json(policy_auto_dashboard_data_path, policy_auto_dashboard_data)
+    with pytest.raises(ValueError, match="balanced outcome count is incomplete"):
+        publication_verifier.verify_selector_pilot_evidence(evidence_path)
+    policy_auto_dashboard_data["summary"]["balanced_completed"] = 30
+    _write_json(policy_auto_dashboard_data_path, policy_auto_dashboard_data)
 
     policy_auto_receipt = json.loads(
         policy_auto_receipt_path.read_text(encoding="utf-8")

@@ -1269,6 +1269,95 @@ def _outcome_only_pair_summary(
     }
 
 
+def _verify_complete_outcome_dashboard(
+    dashboard_data: dict[str, Any],
+    *,
+    expected_tasks: int,
+) -> dict[str, float | int]:
+    """Fail closed unless every displayed task has both finite outcome arms."""
+
+    pairs = dashboard_data.get("pairs")
+    if not isinstance(pairs, list) or len(pairs) != expected_tasks:
+        raise ValueError(
+            "Task Compare does not contain the expected number of outcome pairs."
+        )
+    scenarios: set[str] = set()
+    control_values: list[float] = []
+    candidate_values: list[float] = []
+    for pair in pairs:
+        if not isinstance(pair, dict):
+            raise ValueError("Task Compare contains a non-object outcome pair.")
+        scenario = pair.get("scenario")
+        if not isinstance(scenario, str) or not scenario or scenario in scenarios:
+            raise ValueError(
+                "Task Compare contains a missing or duplicate outcome-pair scenario."
+            )
+        scenarios.add(scenario)
+        for phase, values in (
+            ("control", control_values),
+            ("candidate", candidate_values),
+        ):
+            row = pair.get(phase)
+            if (
+                not isinstance(row, dict)
+                or row.get("scenario") != scenario
+                or row.get("phase") != phase
+                or row.get("status") != "complete"
+            ):
+                raise ValueError(
+                    f"Task Compare outcome pair {scenario!r} has no complete "
+                    f"{phase} arm."
+                )
+            raw_outcome = row.get("outcome_similarity")
+            if (
+                isinstance(raw_outcome, bool)
+                or not isinstance(raw_outcome, (int, float))
+                or not math.isfinite(float(raw_outcome))
+                or not 0.0 <= float(raw_outcome) <= 1.0
+            ):
+                raise ValueError(
+                    f"Task Compare outcome pair {scenario!r} has no valid "
+                    f"{phase} outcome."
+                )
+            values.append(float(raw_outcome))
+
+    control_mean = sum(control_values) / expected_tasks
+    candidate_mean = sum(candidate_values) / expected_tasks
+    outcome_delta = candidate_mean - control_mean
+    summary = dashboard_data.get("summary")
+    expected_summary = {
+        "balanced_completed": expected_tasks,
+        "balanced_control_mean_outcome_similarity": control_mean,
+        "balanced_candidate_mean_outcome_similarity": candidate_mean,
+        "balanced_outcome_delta": outcome_delta,
+    }
+    if not isinstance(summary, dict):
+        raise ValueError("Task Compare has no balanced outcome summary.")
+    for field, expected in expected_summary.items():
+        observed = summary.get(field)
+        if field == "balanced_completed":
+            if observed != expected:
+                raise ValueError("Task Compare balanced outcome count is incomplete.")
+        elif (
+            isinstance(observed, bool)
+            or not isinstance(observed, (int, float))
+            or not math.isfinite(float(observed))
+            or not math.isclose(
+                float(observed), float(expected), rel_tol=0.0, abs_tol=1e-12
+            )
+        ):
+            raise ValueError(
+                f"Task Compare balanced outcome field {field!r} is inconsistent."
+            )
+    return {
+        "control_mean": control_mean,
+        "candidate_mean": candidate_mean,
+        "outcome_delta": outcome_delta,
+        "control_exact_successes": sum(value == 1.0 for value in control_values),
+        "candidate_exact_successes": sum(value == 1.0 for value in candidate_values),
+    }
+
+
 def verify_auto_selection_parallel_pair(
     pair_manifest_path: Path,
     *,
@@ -1801,6 +1890,10 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
         raise ValueError(
             "Selector pilot policy/auto Task Compare does not identify both arms."
         )
+    policy_auto_dashboard_outcomes = _verify_complete_outcome_dashboard(
+        policy_auto_data,
+        expected_tasks=expected_tasks,
+    )
     status_path = run_root / "sage_auto_selection_arm_status.json"
     status = _read_json(status_path)
     status_run_dir = _resolve_declared_path(
@@ -1861,6 +1954,42 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
             "Selector pilot integrity or complete outcome evidence did not pass "
             "revalidation."
         )
+    recomputed_outcomes = recomputed_comparison.get("outcomes")
+    if not isinstance(recomputed_outcomes, dict):
+        raise ValueError("Selector pilot comparison has no outcome summary.")
+    expected_dashboard_outcomes = {
+        "control_mean": recomputed_outcomes.get("policy_mean_outcome_similarity"),
+        "candidate_mean": recomputed_outcomes.get("auto_mean_outcome_similarity"),
+        "outcome_delta": recomputed_outcomes.get(
+            "auto_minus_policy_mean_outcome_delta"
+        ),
+        "control_exact_successes": recomputed_outcomes.get(
+            "policy_exact_outcome_successes"
+        ),
+        "candidate_exact_successes": recomputed_outcomes.get(
+            "auto_exact_outcome_successes"
+        ),
+    }
+    for field, expected in expected_dashboard_outcomes.items():
+        observed = policy_auto_dashboard_outcomes[field]
+        if isinstance(observed, float):
+            if (
+                isinstance(expected, bool)
+                or not isinstance(expected, (int, float))
+                or not math.isfinite(float(expected))
+                or not math.isclose(
+                    observed, float(expected), rel_tol=0.0, abs_tol=1e-12
+                )
+            ):
+                raise ValueError(
+                    "Selector pilot dashboard outcomes do not match the "
+                    "recomputed comparison."
+                )
+        elif observed != expected:
+            raise ValueError(
+                "Selector pilot dashboard outcomes do not match the recomputed "
+                "comparison."
+            )
 
     return {
         "status": "pass",
