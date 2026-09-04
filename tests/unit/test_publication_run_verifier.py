@@ -303,7 +303,7 @@ def _fresh_run(tmp_path: Path) -> Path:
                 "control": "Fresh non-learning control",
                 "candidate": "SAGE policy selection",
             },
-            "scenario_count": 2,
+            "summary": {"scenario_count": 2},
         },
     )
     task_compare_url = "http://127.0.0.1:63105/dashboard/task_compare.html"
@@ -1825,6 +1825,24 @@ def test_verifier_rejects_ambiguous_parallel_dashboard_identity(
     _write_json(path, payload)
 
     with pytest.raises(ValueError, match=expected):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_conflicting_parallel_dashboard_counts(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    path = run_root / "dashboard" / "task_compare_data.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["scenario_count"] = 1
+    _write_json(path, payload)
+
+    with pytest.raises(ValueError, match="unambiguously identify"):
         verify_run(
             run_root.parent,
             expected_tasks=2,

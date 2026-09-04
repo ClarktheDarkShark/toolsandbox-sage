@@ -1523,6 +1523,7 @@ def _write_task_focus_dashboard(
         "agent": data.get("agent"),
         "base_tool_policy": data.get("base_tool_policy"),
         "arm_labels": data.get("arm_labels"),
+        "scenario_count": data.get("scenario_count"),
         "control_cache": data.get("control_cache"),
         "cohort_preflight": data.get("cohort_preflight"),
         "summary": {

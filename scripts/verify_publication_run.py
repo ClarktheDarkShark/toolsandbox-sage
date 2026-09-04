@@ -1014,13 +1014,31 @@ def verify_run(
     dashboard_data = _read_json(
         expected_task_dashboard.with_name("task_compare_data.json")
     )
+    dashboard_summary = dashboard_data.get("summary")
+    dashboard_summary_count = (
+        dashboard_summary.get("scenario_count")
+        if isinstance(dashboard_summary, dict)
+        else None
+    )
+    dashboard_top_level_count = dashboard_data.get("scenario_count")
+    dashboard_scenario_count = (
+        dashboard_top_level_count
+        if dashboard_top_level_count is not None
+        else dashboard_summary_count
+    )
+    dashboard_counts_agree = (
+        dashboard_top_level_count is None
+        or dashboard_summary_count is None
+        or dashboard_top_level_count == dashboard_summary_count
+    )
     if (
         dashboard_data.get("arm_labels")
         != {
             "control": "Fresh non-learning control",
             "candidate": f"SAGE {expected_actor_selection_mode} selection",
         }
-        or dashboard_data.get("scenario_count") != expected_tasks
+        or dashboard_scenario_count != expected_tasks
+        or not dashboard_counts_agree
     ):
         raise ValueError(
             "Task Compare dashboard does not unambiguously identify both "

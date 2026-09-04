@@ -436,6 +436,7 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
     task_focus = json.loads(
         (index.parent / "task_focus_data.json").read_text(encoding="utf-8")
     )
+    assert task_focus["scenario_count"] == 2
     assert task_focus["tasks"][0]["control_cache_source"] == "cached"
     assert task_focus["summary"]["control_llm_call_count"] == 2
     assert task_focus["summary"]["candidate_llm_total_tokens"] == 255
@@ -452,6 +453,7 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
     task_compare = json.loads(
         (index.parent / "task_compare_data.json").read_text(encoding="utf-8")
     )
+    assert task_compare["scenario_count"] == 2
     assert task_compare["summary"]["control_llm_total_tokens"] == 150
     assert task_compare["summary"]["candidate_llm_call_count"] == 3
     assert task_compare["summary"]["control_llm_provider_cached_prompt_tokens"] == 64
