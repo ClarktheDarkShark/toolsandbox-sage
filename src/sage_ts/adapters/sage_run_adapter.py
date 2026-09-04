@@ -1410,6 +1410,7 @@ def run_sage_with_registry(
     reflection_controller: SelfEvolutionReflectionController | None = None
     registry_load_logged = False
     mutate_registry_reuse_counts = generator is not None
+    registry_dir_for_events = str(config.registry_dir)
 
     def transform(name: str, scenario: Scenario, output_directory: Path) -> Scenario:
         nonlocal birth_controller, registry_load_logged, reflection_controller
@@ -1583,7 +1584,7 @@ def run_sage_with_registry(
                     {
                         "scenario": name,
                         "tool_name": tool_name,
-                        "registry_dir": str(config.registry_dir),
+                        "registry_dir": registry_dir_for_events,
                     },
                 )
 

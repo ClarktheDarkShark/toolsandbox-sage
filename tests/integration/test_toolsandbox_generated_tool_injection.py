@@ -1,7 +1,10 @@
+import copy
 import json
 from dataclasses import replace
+from multiprocessing import get_context
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import sage_ts.runtime.toolsandbox_integration as toolsandbox_integration
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
@@ -15,6 +18,7 @@ from sage_ts.runtime.toolsandbox_integration import (
     with_registry_tools,
 )
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
+from scripts.run_sage_protocol import _candidate_protocol_event_hook
 from tool_sandbox.common.execution_context import (
     DatabaseNamespace,
     ExecutionContext,
@@ -160,6 +164,71 @@ def _registry_with_canonicalizer(tmp_path: Path) -> RegistryStore:
     store = RegistryStore(tmp_path)
     store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
     return store
+
+
+def _spawn_deepcopy_generated_tool_contexts(
+    result_channel: Any,
+    registry_root: str,
+    event_root: str,
+) -> None:
+    """Exercise the candidate callback chain after spawn initialization."""
+
+    event_root_path = Path(event_root)
+    params = {
+        "mode": "online_build_full",
+        "run_root": str(event_root_path / "run"),
+        "artifact_root": str(event_root_path / "artifacts"),
+        "reflection_control_channel": result_channel,
+    }
+    event_hook = _candidate_protocol_event_hook(params)
+
+    def record_reuse(tool_name: str) -> None:
+        event_hook(
+            "tool_reused",
+            event_root_path / "candidate",
+            {"tool_name": tool_name},
+        )
+
+    try:
+        copied_contexts = 0
+        store = RegistryStore(Path(registry_root))
+        for _scenario_name in ("scenario_one", "scenario_two"):
+            context = ExecutionContext(tool_allow_list=["end_conversation"])
+            inject_registry_tools_into_context(
+                context,
+                store.load_entries().values(),
+                on_reuse=record_reuse,
+            )
+            copy.deepcopy(context)
+            copied_contexts += 1
+        result_channel.put({"status": "ok", "copied_contexts": copied_contexts})
+    except BaseException as exc:
+        result_channel.put({"status": "error", "error": repr(exc)})
+
+
+def test_spawn_queue_does_not_leak_into_generated_tool_context(
+    tmp_path: Path,
+) -> None:
+    registry = _registry_with_canonicalizer(tmp_path / "registry")
+    spawn_context = get_context("spawn")
+    result_channel = spawn_context.Queue()
+    process = spawn_context.Process(
+        target=_spawn_deepcopy_generated_tool_contexts,
+        args=(result_channel, str(registry.root), str(tmp_path / "events")),
+    )
+
+    try:
+        process.start()
+        result = result_channel.get(timeout=30)
+        process.join(timeout=30)
+        assert result == {"status": "ok", "copied_contexts": 2}
+        assert process.exitcode == 0
+    finally:
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=10)
+        result_channel.cancel_join_thread()
+        result_channel.close()
 
 
 def _registry_with_state_helper(tmp_path: Path) -> RegistryStore:

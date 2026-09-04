@@ -117,8 +117,55 @@ def test_reflection_records_off_track_pulse_without_stopping(tmp_path: Path) -> 
             encoding="utf-8"
         )
     )
+    feedback = json.loads(
+        (tmp_path / "run" / "self_evolution_task_feedback.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
     assert state["completed_count"] == 1
     assert state["cache_hits"] == 1
+    assert state["runtime_exceptions"] == 0
+    assert feedback["exception_type"] is None
+
+
+def test_reflection_propagates_runtime_exception_to_feedback_and_state(
+    tmp_path: Path,
+) -> None:
+    scenario_name = "runtime_failure"
+    controller = _outcome_only_controller(
+        tmp_path,
+        scenario_name=scenario_name,
+        control_similarity=1.0,
+        control_outcome=1.0,
+    )
+
+    controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={
+            "similarity": 0.0,
+            "outcome_similarity": 0.0,
+            "exception_type": "RuntimeError",
+        },
+        selection_record={},
+        side_effect_failures=[],
+    )
+
+    feedback = json.loads(
+        (tmp_path / "run" / "self_evolution_task_feedback.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
+    state = json.loads(
+        (tmp_path / "run" / "self_evolution_reflection_state.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert controller.runtime_exceptions == 1
+    assert feedback["exception_type"] == "RuntimeError"
+    assert state["runtime_exceptions"] == 1
+    assert "runtime_exceptions_present" in state["last_pulse"]["off_track_reasons"]
 
 
 def test_reflection_flags_sparse_positive_tool(tmp_path: Path) -> None:

@@ -1,6 +1,8 @@
 import copy
+import inspect
 import json
 import ssl
+from multiprocessing import get_context
 from pathlib import Path
 from typing import Optional
 
@@ -23,6 +25,7 @@ from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, T
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
+from scripts.run_sage_protocol import _candidate_protocol_event_hook
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
 
@@ -1244,6 +1247,89 @@ def test_generation_enabled_registry_tools_do_not_capture_unpicklable_generator(
         ),
         generator=UnpicklableGenerator(),  # type: ignore[arg-type]
     )
+
+
+def test_spawn_queue_is_absent_from_generated_tool_callback_chain(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Candidate worker/config queues must not enter dill-copied tool closures."""
+
+    store = _registry_with_canonicalizer(tmp_path / "registry")
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text("{}\n", encoding="utf-8")
+    spawn_context = get_context("spawn")
+    reflection_channel = spawn_context.Queue()
+    worker_params = {
+        "mode": "online_build_full",
+        "run_root": str(tmp_path / "protocol_run"),
+        "artifact_root": str(tmp_path / "artifacts"),
+        "reflection_control_channel": reflection_channel,
+    }
+    event_hook = _candidate_protocol_event_hook(worker_params)
+
+    class UnpicklableGenerator:
+        def __init__(self) -> None:
+            self.ssl_context = ssl.create_default_context()
+
+    class StopAfterDeepcopy(Exception):
+        pass
+
+    def fake_sequence(
+        config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / "run"
+        output_dir.mkdir()
+        for scenario_name in config.scenario_names:
+            enhanced = scenario_transform(
+                scenario_name,
+                Scenario(
+                    starting_context=ExecutionContext(
+                        tool_allow_list=["end_conversation"]
+                    )
+                ),
+                output_dir,
+            )
+            wrapper = enhanced.starting_context.name_to_tool[
+                "canonicalize_connectivity_label"
+            ]
+            reuse_callback = inspect.getclosurevars(wrapper).nonlocals["on_reuse"]
+            reuse_freevars = inspect.getclosurevars(reuse_callback).nonlocals
+            assert "config" not in reuse_freevars
+            assert (
+                "params"
+                not in inspect.getclosurevars(reuse_freevars["event_hook"]).nonlocals
+            )
+            copy.deepcopy(enhanced.starting_context)
+        raise StopAfterDeepcopy
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        fake_sequence,
+    )
+
+    try:
+        with pytest.raises(StopAfterDeepcopy):
+            run_sage_with_registry(
+                SageRunConfig(
+                    agent="Unhelpful",
+                    user="GPT_4_o_2024_05_13",
+                    scenario_names=("scenario_one", "scenario_two"),
+                    output_dir=tmp_path / "outputs",
+                    registry_dir=store.root,
+                    manifest_path=manifest_path,
+                    reflection_control_channel=reflection_channel,
+                    require_fresh_reflection_control=True,
+                ),
+                generator=UnpicklableGenerator(),  # type: ignore[arg-type]
+                event_hook=event_hook,
+            )
+    finally:
+        reflection_channel.cancel_join_thread()
+        reflection_channel.close()
 
 
 def test_sage_runner_selection_summary_includes_resumed_rows(

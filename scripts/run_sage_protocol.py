@@ -16,7 +16,7 @@ import traceback
 from datetime import datetime
 from multiprocessing import get_context
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 from sage_ts.adapters.openai_agent_adapter import OpenAIChatAdapter
 from sage_ts.adapters.sage_run_adapter import (
@@ -988,6 +988,32 @@ def _protocol_event(
     )
 
 
+def _candidate_protocol_event_hook(
+    params: dict[str, Any],
+) -> Callable[[str, Path, dict[str, object]], None]:
+    """Build a candidate hook without retaining queue-bearing worker params."""
+
+    mode = str(params["mode"])
+    run_root = Path(params["run_root"])
+    artifact_root = Path(params["artifact_root"])
+
+    def event_hook(
+        event: str,
+        run_dir: Path,
+        payload: dict[str, object],
+    ) -> None:
+        _protocol_event(
+            event=event,
+            mode=mode,
+            run_root=run_root,
+            run_dir=run_dir,
+            payload=payload,
+            artifact_root=artifact_root,
+        )
+
+    return event_hook
+
+
 def _run_control_arm_worker(params: dict[str, Any]) -> None:
     run_root = Path(params["run_root"])
     artifact_root = Path(params["artifact_root"])
@@ -1161,15 +1187,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 scenario_count=scenario_count,
             )
 
-        def event_hook(event: str, run_dir: Path, payload: dict[str, object]) -> None:
-            _protocol_event(
-                event=event,
-                mode=str(params["mode"]),
-                run_root=run_root,
-                run_dir=run_dir,
-                payload=payload,
-                artifact_root=artifact_root,
-            )
+        event_hook = _candidate_protocol_event_hook(params)
 
         run_dir = run_sage_with_registry(
             SageRunConfig(

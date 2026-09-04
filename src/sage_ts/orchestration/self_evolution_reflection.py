@@ -663,6 +663,7 @@ class SelfEvolutionReflectionController:
             "generated_tools_attempted": attempted,
             "generated_tools_failed": failed,
             "side_effect_failures": side_effect_failures,
+            "exception_type": result.get("exception_type"),
             "immediate_actions": immediate_actions,
         }
         self._record_feedback_row(task_feedback)
