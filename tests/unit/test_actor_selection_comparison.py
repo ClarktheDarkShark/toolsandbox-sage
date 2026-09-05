@@ -411,6 +411,10 @@ def test_matched_experiment_verifies_exact_schemas_and_outcomes(tmp_path: Path) 
     assert report["integrity_gate_passed"] is True
     assert report["experiment_passed"] is True
     assert report["stability_gate_passed"] is True
+    assert report["full_comparison_eligibility_gate_applied"] is True
+    assert report["full_comparison_eligibility_gate_passed"] is True
+    assert report["full_comparison_eligibility_gate_reasons"] == []
+    assert report["recommend_full_comparison"] is True
     assert report["routed_schemas_identical_by_scenario"] is True
     assert report["persistent_response_cache_reuse"] is False
     outcomes = report["outcomes"]
@@ -581,7 +585,7 @@ def test_outcome_comparison_rejects_evaluator_identity_drift(
         )
 
 
-def test_generated_tool_execution_failures_are_diagnostic_only(
+def test_pilot_gate_rejects_generated_tool_execution_failure(
     tmp_path: Path,
 ) -> None:
     policy_dir, auto_dir, authority_path = _write_experiment(tmp_path)
@@ -613,16 +617,21 @@ def test_generated_tool_execution_failures_are_diagnostic_only(
     )
 
     assert report["mechanism_counts_are_performance_gates"] is False
-    assert report["mechanism_diagnostics"]["affects_experiment_pass_fail"] is False
+    assert report["mechanism_diagnostics"]["affects_experiment_pass_fail"] is True
     assert report["mechanism_diagnostics"]["auto"] == {
         "generated_tool_called_scenarios": 0,
         "generated_tool_failed_scenarios": 1,
         "generated_tool_attempted_without_success_scenarios": 0,
     }
     assert report["integrity_gate_passed"] is True
-    assert report["experiment_passed"] is True
-    assert report["stability_gate_passed"] is True
-    assert report["stability_gate_reasons"] == []
+    assert report["experiment_passed"] is False
+    assert report["stability_gate_passed"] is False
+    assert report["full_comparison_eligibility_gate_passed"] is False
+    assert report["full_comparison_eligibility_gate_reasons"] == [
+        "auto_generated_tool_not_called",
+        "auto_generated_tool_execution_failures",
+    ]
+    assert report["recommend_full_comparison"] is False
 
 
 def test_pilot_gate_treats_native_followup_preservation_as_diagnostic(
@@ -691,7 +700,7 @@ def test_selection_rows_must_follow_exact_authority_order(tmp_path: Path) -> Non
         )
 
 
-def test_pilot_generated_tool_attempt_without_success_is_diagnostic_only(
+def test_pilot_gate_rejects_generated_tool_attempt_without_success(
     tmp_path: Path,
 ) -> None:
     policy_dir, auto_dir, authority_path = _write_experiment(tmp_path)
@@ -727,9 +736,13 @@ def test_pilot_generated_tool_attempt_without_success_is_diagnostic_only(
         "generated_tool_attempted_without_success_scenarios": 1,
     }
     assert report["integrity_gate_passed"] is True
-    assert report["experiment_passed"] is True
-    assert report["stability_gate_passed"] is True
-    assert report["stability_gate_reasons"] == []
+    assert report["experiment_passed"] is False
+    assert report["stability_gate_passed"] is False
+    assert report["full_comparison_eligibility_gate_passed"] is False
+    assert report["full_comparison_eligibility_gate_reasons"] == [
+        "auto_generated_tool_not_called"
+    ]
+    assert report["recommend_full_comparison"] is False
 
 
 def test_experiment_rejects_incomplete_outcome_evidence(tmp_path: Path) -> None:

@@ -543,6 +543,11 @@ def main() -> None:
             != "no_predeclared_selector_performance_threshold"
             or pilot_evidence.get("experiment_passed") is not True
             or pilot_evidence.get("stability_gate_passed") is not True
+            or pilot_evidence.get("full_comparison_eligibility_gate_applied")
+            is not True
+            or pilot_evidence.get("full_comparison_eligibility_gate_passed") is not True
+            or pilot_evidence.get("full_comparison_eligibility_gate_reasons") != []
+            or pilot_evidence.get("recommend_full_comparison") is not True
             or pilot_evidence.get("scenario_count")
             != STAGE_PINS["pilot"]["scenario_count"]
             or pilot_evidence.get("benchmark_manifest_sha256")
@@ -1112,6 +1117,16 @@ def main() -> None:
             "experiment_passed": experiment_passed,
             "stability_gate_passed": report["stability_gate_passed"],
             "stability_gate_reasons": report["stability_gate_reasons"],
+            "full_comparison_eligibility_gate_applied": report[
+                "full_comparison_eligibility_gate_applied"
+            ],
+            "full_comparison_eligibility_gate_passed": report[
+                "full_comparison_eligibility_gate_passed"
+            ],
+            "full_comparison_eligibility_gate_reasons": report[
+                "full_comparison_eligibility_gate_reasons"
+            ],
+            "recommend_full_comparison": report["recommend_full_comparison"],
         }
         _write_json(experiment_manifest_path, experiment_manifest)
         _write_status(
@@ -1130,6 +1145,7 @@ def main() -> None:
                     "performance_gate_applied": report["performance_gate_applied"],
                     "experiment_passed": experiment_passed,
                     "stability_gate_passed": report["stability_gate_passed"],
+                    "recommend_full_comparison": report["recommend_full_comparison"],
                     "scenario_count": outcome["scenario_count"],
                     "outcome_evaluated_count": outcome["outcome_evaluated_count"],
                     "policy_exact_outcome_successes": outcome[

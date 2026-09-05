@@ -403,7 +403,8 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
         'pin_publication_env SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS "4"' in launcher
     )
     assert (
-        "generator_contract_and_repair_analysis_memoization=within_run_only" in launcher
+        "generator_contract_and_repair_analysis_memoization="
+        "disabled_every_analysis_request_live" in launcher
     )
     assert "openai_provider_prompt_prefix_cache=automatic_implicit" in launcher
     assert "Publication runs forbid active diagnostic force variable" in launcher
@@ -428,6 +429,8 @@ def test_auto_selection_replay_runs_with_fresh_parallel_control() -> None:
     assert '"reflection_control_channel": None' in replay
     assert '"control_cache_mode": "off"' in replay
     assert '"auto_control_delivery": "not_connected"' in replay
+    assert 'pilot_evidence.get("recommend_full_comparison") is not True' in replay
+    assert '"recommend_full_comparison": report["recommend_full_comparison"]' in replay
     assert '"auto_control_output_influences_inventory": False' in replay
     assert '"auto_control_output_influences_execution": False' in replay
     assert "run_sage_with_registry(" not in replay

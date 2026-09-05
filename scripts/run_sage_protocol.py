@@ -2308,12 +2308,13 @@ def main() -> None:
         "openai_response_cache_mode": "off",
         "openai_response_cache_scope": "persistent_repository_whole_response_replay",
         # Legacy field retained for the predeclared sample gate. It refers to
-        # the retired persistent generated-output cache, not either the
-        # generator's within-run contract/repair analysis memoization or OpenAI's
+        # the retired persistent generated-output cache, not OpenAI's
         # provider-managed prompt-prefix/KV cache.
         "prompt_cache_enabled": False,
         "prompt_cache_scope": "persistent_generation_output_replay",
-        "generator_contract_and_repair_analysis_memoization": "within_run_only",
+        "generator_contract_and_repair_analysis_memoization": (
+            "disabled_every_analysis_request_live"
+        ),
         "openai_provider_prompt_prefix_cache_policy": "automatic_implicit",
         "openai_provider_prompt_prefix_cache_reuses_responses": False,
         "sage_task_cache_enabled": False,

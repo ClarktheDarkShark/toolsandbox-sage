@@ -1036,10 +1036,10 @@ def verify_matched_actor_selection_experiment(
 
     Invalid, incomplete, or unmatched experiment/outcome evidence raises before
     a comparison can be claimed. Runtime validity remains an explicit integrity
-    gate. No selector performance threshold is predeclared, so the frozen
-    outcome comparison is report-only; generated-tool mechanism counts are
-    diagnostic regardless of the legacy
-    ``require_zero_generated_tool_failures`` caller option.
+    gate. No selector outcome threshold is predeclared, so the frozen outcome
+    comparison is report-only. When ``require_zero_generated_tool_failures`` is
+    true for the pilot, generated-tool use and execution stability are a
+    mechanism eligibility gate for proceeding to the full comparison.
     """
 
     authority, scenario_names = _validate_authority(authority_path)
@@ -1138,8 +1138,17 @@ def verify_matched_actor_selection_experiment(
     if auto_execution["runtime_exception_count"]:
         integrity_gate_reasons.append("auto_runtime_exceptions")
 
+    full_comparison_eligibility_reasons: list[str] = []
+    if require_zero_generated_tool_failures:
+        if auto_selection["generated_tool_called_scenarios"] <= 0:
+            full_comparison_eligibility_reasons.append("auto_generated_tool_not_called")
+        if auto_selection["generated_tool_failed_scenarios"] != 0:
+            full_comparison_eligibility_reasons.append(
+                "auto_generated_tool_execution_failures"
+            )
+    full_comparison_eligibility_passed = not full_comparison_eligibility_reasons
     mechanism_diagnostics = {
-        "affects_experiment_pass_fail": False,
+        "affects_experiment_pass_fail": require_zero_generated_tool_failures,
         "zero_generated_tool_failures_requested_by_caller": (
             require_zero_generated_tool_failures
         ),
@@ -1167,7 +1176,11 @@ def verify_matched_actor_selection_experiment(
         },
     }
     integrity_gate_passed = not integrity_gate_reasons
-    experiment_passed = integrity_gate_passed
+    experiment_passed = integrity_gate_passed and full_comparison_eligibility_passed
+    stability_gate_reasons = [
+        *integrity_gate_reasons,
+        *full_comparison_eligibility_reasons,
+    ]
 
     return {
         "schema_version": 1,
@@ -1192,8 +1205,18 @@ def verify_matched_actor_selection_experiment(
         "persistent_response_cache_reuse": False,
         "outcome_evaluator": policy_execution["outcome_evaluator"],
         "mechanism_counts_are_performance_gates": False,
-        "zero_generated_tool_failures_required": False,
+        "zero_generated_tool_failures_required": (require_zero_generated_tool_failures),
         "mechanism_diagnostics": mechanism_diagnostics,
+        "full_comparison_eligibility_gate_applied": (
+            require_zero_generated_tool_failures
+        ),
+        "full_comparison_eligibility_gate_passed": (full_comparison_eligibility_passed),
+        "full_comparison_eligibility_gate_reasons": (
+            full_comparison_eligibility_reasons
+        ),
+        "recommend_full_comparison": (
+            require_zero_generated_tool_failures and experiment_passed
+        ),
         "outcomes": outcomes,
         "outcome_evidence_complete": True,
         "performance_gate_applied": False,
@@ -1201,7 +1224,7 @@ def verify_matched_actor_selection_experiment(
         "integrity_gate_passed": integrity_gate_passed,
         "integrity_gate_reasons": integrity_gate_reasons,
         "experiment_passed": experiment_passed,
-        # Compatibility alias for the selector experiment's execution integrity.
-        "stability_gate_passed": integrity_gate_passed,
-        "stability_gate_reasons": integrity_gate_reasons,
+        # Compatibility alias for the pilot's runtime and mechanism stability.
+        "stability_gate_passed": experiment_passed,
+        "stability_gate_reasons": stability_gate_reasons,
     }

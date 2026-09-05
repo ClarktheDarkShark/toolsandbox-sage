@@ -378,7 +378,7 @@ fi
   echo "openai_response_cache=off"
   echo "openai_response_cache_scope=persistent_repository_whole_response_replay"
   echo "persistent_generation_output_cache=off"
-  echo "generator_contract_and_repair_analysis_memoization=within_run_only"
+  echo "generator_contract_and_repair_analysis_memoization=disabled_every_analysis_request_live"
   echo "openai_provider_prompt_prefix_cache=automatic_implicit"
   echo "openai_max_retries=$SAGE_OPENAI_MAX_RETRIES"
   echo "openai_transient_retry_delays_seconds=$SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS"
