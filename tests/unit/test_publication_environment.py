@@ -47,6 +47,17 @@ def _editable_project(repo: Path, metadata_root: Path) -> DistributionRecord:
     )
 
 
+def _repository_import_paths(repo: Path) -> dict[str, str]:
+    paths = {
+        "sage_ts": repo / "src" / "sage_ts" / "__init__.py",
+        "tool_sandbox": repo / "tool_sandbox" / "__init__.py",
+    }
+    for path in paths.values():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    return {name: str(path) for name, path in paths.items()}
+
+
 def test_exact_environment_passes_and_allows_only_repo_metadata(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -61,6 +72,7 @@ def test_exact_environment_passes_and_allows_only_repo_metadata(tmp_path: Path) 
         ),
         _editable_project(repo, tmp_path / "site-packages"),
     )
+    repository_import_paths = _repository_import_paths(repo)
 
     report = verify_environment(
         lock,
@@ -75,6 +87,7 @@ def test_exact_environment_passes_and_allows_only_repo_metadata(tmp_path: Path) 
         platform_machine="arm64",
         installed_distributions=records,
         pip_checker=lambda: "No broken requirements found.",
+        repository_import_checker=lambda _python, _repo: repository_import_paths,
     )
 
     assert report["status"] == "pass"
@@ -95,6 +108,116 @@ def test_exact_environment_passes_and_allows_only_repo_metadata(tmp_path: Path) 
         "toolsandbox-sage",
     ]
     assert report["pip_check"] == "No broken requirements found."
+    assert report["repository_import_provenance"] == {
+        "mode": "isolated_subprocess",
+        "python_isolated_flag": True,
+        "pythonpath_ignored": True,
+        "module_paths": repository_import_paths,
+    }
+
+
+def test_verifier_rejects_repository_import_from_wrong_checkout(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    lock = repo / "requirements-publication-lock.txt"
+    lock_hash = _write_lock(lock)
+    module_paths = _repository_import_paths(repo)
+    foreign_module = tmp_path / "other-checkout" / "src" / "sage_ts" / "__init__.py"
+    foreign_module.parent.mkdir(parents=True)
+    foreign_module.write_text("", encoding="utf-8")
+    module_paths["sage_ts"] = str(foreign_module)
+
+    with pytest.raises(EnvironmentVerificationError, match="provenance mismatch"):
+        verify_environment(
+            lock,
+            repo_root=repo,
+            expected_lock_sha256=lock_hash,
+            python_version=(3, 12, 7),
+            python_executable=str(tmp_path / "venv" / "bin" / "python"),
+            python_prefix=str(tmp_path / "venv"),
+            python_base_prefix=str(tmp_path / "base"),
+            python_implementation="CPython",
+            platform_system="Darwin",
+            platform_machine="arm64",
+            installed_distributions=(
+                _external(tmp_path),
+                _editable_project(repo, tmp_path / "site-packages"),
+            ),
+            pip_checker=lambda: "pass",
+            repository_import_checker=lambda _python, _repo: module_paths,
+        )
+
+
+def test_isolated_import_checker_rejects_missing_import(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def fake_run(
+        command: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=1,
+            stdout="",
+            stderr="ModuleNotFoundError: No module named 'sage_ts'",
+        )
+
+    monkeypatch.setattr(
+        "scripts.verify_publication_environment.subprocess.run",
+        fake_run,
+    )
+
+    with pytest.raises(EnvironmentVerificationError, match="ModuleNotFoundError"):
+        environment_verifier._run_isolated_repository_import_check(
+            "/validated/venv/bin/python",
+            tmp_path,
+        )
+
+
+def test_isolated_import_checker_ignores_cwd_and_pythonpath(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    module_paths = _repository_import_paths(repo)
+    observed: dict[str, object] = {}
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        observed["command"] = command
+        observed.update(kwargs)
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=0,
+            stdout=json.dumps(module_paths),
+            stderr="",
+        )
+
+    monkeypatch.setenv("PYTHONPATH", str(repo))
+    monkeypatch.setenv("PYTHONHOME", str(repo / "fake-home"))
+    monkeypatch.setattr(
+        "scripts.verify_publication_environment.subprocess.run",
+        fake_run,
+    )
+
+    result = environment_verifier._run_isolated_repository_import_check(
+        "/validated/venv/bin/python",
+        repo,
+    )
+
+    assert result == module_paths
+    command = observed["command"]
+    assert isinstance(command, list)
+    assert command[:2] == ["/validated/venv/bin/python", "-I"]
+    assert observed["cwd"] != str(repo)
+    subprocess_env = observed["env"]
+    assert isinstance(subprocess_env, dict)
+    assert "PYTHONPATH" not in subprocess_env
+    assert "PYTHONHOME" not in subprocess_env
 
 
 def test_verifier_requires_exact_python_and_lock_hash(tmp_path: Path) -> None:

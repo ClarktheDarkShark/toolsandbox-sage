@@ -13,10 +13,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import re
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from importlib.metadata import distributions
 from pathlib import Path
@@ -32,6 +34,10 @@ REQUIRED_PLATFORM_SYSTEM = "Darwin"
 REQUIRED_PLATFORM_MACHINE = "arm64"
 REPOSITORY_DISTRIBUTIONS = frozenset({"tool-sandbox", "toolsandbox-sage"})
 REQUIRED_EDITABLE_PROJECT = ("toolsandbox-sage", "0.1.0")
+REQUIRED_REPOSITORY_IMPORT_ROOTS = {
+    "sage_ts": Path("src/sage_ts"),
+    "tool_sandbox": Path("tool_sandbox"),
+}
 _LOCK_LINE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;]+)$")
 
 
@@ -169,6 +175,115 @@ def _run_pip_check() -> str:
     return output or "pip check passed"
 
 
+def _run_isolated_repository_import_check(
+    python_executable: str,
+    repo_root: Path,
+) -> dict[str, str]:
+    """Import repository packages without cwd or environment path assistance."""
+    module_names = tuple(REQUIRED_REPOSITORY_IMPORT_ROOTS)
+    import_script = (
+        "import importlib, json\n"
+        "from pathlib import Path\n"
+        f"module_names = {module_names!r}\n"
+        "module_paths = {}\n"
+        "for module_name in module_names:\n"
+        "    module = importlib.import_module(module_name)\n"
+        "    module_path = getattr(module, '__file__', None)\n"
+        "    if not module_path:\n"
+        "        raise RuntimeError(f'{module_name} has no module file')\n"
+        "    module_paths[module_name] = str(Path(module_path).resolve(strict=True))\n"
+        "print(json.dumps(module_paths, sort_keys=True))\n"
+    )
+    isolated_env = os.environ.copy()
+    isolated_env.pop("PYTHONHOME", None)
+    isolated_env.pop("PYTHONPATH", None)
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix="sage-publication-import-check-"
+        ) as temporary_directory:
+            temporary_path = Path(temporary_directory).resolve()
+            if _is_relative_to(temporary_path, repo_root):
+                raise EnvironmentVerificationError(
+                    "isolated repository import check could not obtain a neutral "
+                    "working directory outside the repository"
+                )
+            completed = subprocess.run(
+                [python_executable, "-I", "-c", import_script],
+                cwd=temporary_path,
+                env=isolated_env,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise EnvironmentVerificationError(
+            f"isolated repository import check could not run: {exc}"
+        ) from exc
+    output = "\n".join(
+        part.strip() for part in (completed.stdout, completed.stderr) if part.strip()
+    )
+    if completed.returncode != 0:
+        detail = output or f"exit status {completed.returncode}"
+        raise EnvironmentVerificationError(
+            f"isolated repository import check failed: {detail}"
+        )
+    try:
+        payload = json.loads(completed.stdout)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise EnvironmentVerificationError(
+            "isolated repository import check returned malformed output"
+        ) from exc
+    if not isinstance(payload, dict) or not all(
+        isinstance(name, str) and isinstance(path, str)
+        for name, path in payload.items()
+    ):
+        raise EnvironmentVerificationError(
+            "isolated repository import check returned malformed module paths"
+        )
+    return payload
+
+
+def _validate_repository_import_paths(
+    module_paths: dict[str, str],
+    repo_root: Path,
+) -> dict[str, str]:
+    """Require every imported module file to resolve under its checkout package."""
+    expected_names = set(REQUIRED_REPOSITORY_IMPORT_ROOTS)
+    observed_names = set(module_paths)
+    missing = sorted(expected_names - observed_names)
+    unexpected = sorted(observed_names - expected_names)
+    if missing:
+        raise EnvironmentVerificationError(
+            "isolated repository import check did not report: " + ", ".join(missing)
+        )
+    if unexpected:
+        raise EnvironmentVerificationError(
+            "isolated repository import check reported unexpected modules: "
+            + ", ".join(unexpected)
+        )
+
+    validated: dict[str, str] = {}
+    for module_name, relative_root in REQUIRED_REPOSITORY_IMPORT_ROOTS.items():
+        raw_path = module_paths[module_name]
+        try:
+            module_path = Path(raw_path).resolve(strict=True)
+            expected_root = (repo_root / relative_root).resolve(strict=True)
+        except OSError as exc:
+            raise EnvironmentVerificationError(
+                "isolated repository import path is missing for "
+                f"{module_name}: {raw_path}"
+            ) from exc
+        if not module_path.is_file() or not _is_relative_to(module_path, expected_root):
+            raise EnvironmentVerificationError(
+                "isolated repository import provenance mismatch for "
+                f"{module_name}: expected a file under {expected_root}, "
+                f"observed {module_path}"
+            )
+        validated[module_name] = str(module_path)
+    return validated
+
+
 def verify_environment(
     lock_path: Path = DEFAULT_LOCK,
     *,
@@ -184,6 +299,7 @@ def verify_environment(
     platform_machine: str | None = None,
     installed_distributions: Iterable[DistributionRecord] | None = None,
     pip_checker: Callable[[], str] | None = None,
+    repository_import_checker: Callable[[str, Path], dict[str, str]] | None = None,
 ) -> dict[str, object]:
     """Verify and describe the active, exact publication runtime."""
 
@@ -306,8 +422,15 @@ def verify_environment(
     if errors:
         raise EnvironmentVerificationError("; ".join(errors))
 
-    pip_check_output = (pip_checker or _run_pip_check)()
     executable = str(Path(python_executable or sys.executable).absolute())
+    pip_check_output = (pip_checker or _run_pip_check)()
+    imported_module_paths = (
+        repository_import_checker or _run_isolated_repository_import_check
+    )(executable, repo_root)
+    repository_import_paths = _validate_repository_import_paths(
+        imported_module_paths,
+        repo_root,
+    )
     version_text = ".".join(str(value) for value in observed_python)
     external_distribution_entries = sorted(
         f"{name}=={record[1]}\n" for name, record in external.items()
@@ -335,6 +458,12 @@ def verify_environment(
             repository_metadata,
             key=lambda item: (item["name"], item["metadata_path"]),
         ),
+        "repository_import_provenance": {
+            "mode": "isolated_subprocess",
+            "python_isolated_flag": True,
+            "pythonpath_ignored": True,
+            "module_paths": repository_import_paths,
+        },
         "pip_check": pip_check_output,
     }
 

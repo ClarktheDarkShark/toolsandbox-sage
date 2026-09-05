@@ -275,6 +275,20 @@ source .venv-publication/bin/activate
 python scripts/verify_publication_environment.py
 ```
 
+For publication runs, prefer a persistent virtual environment on a local,
+non-cloud-synced filesystem:
+
+```bash
+./scripts/bootstrap_env.sh /absolute/non-cloud/path/toolsandbox-sage-publication
+source /absolute/non-cloud/path/toolsandbox-sage-publication/bin/activate
+python scripts/verify_publication_environment.py
+```
+
+Python can skip editable `.pth` files carrying hidden filesystem metadata. The
+verifier therefore imports both repository packages in an isolated subprocess,
+without help from the checkout working directory or `PYTHONPATH`, and rejects a
+missing, skipped, or wrong-checkout editable import.
+
 The bootstrap requires `python3.12` to report exactly 3.12.7, installs the full
 lock, installs only this checkout as an editable package without resolving new
 dependencies, runs `pip check`, and runs the strict environment verifier. The
