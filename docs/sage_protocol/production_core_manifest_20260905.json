@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "manifest_type": "sage_production_scientific_core",
+  "purpose": "Freeze the result-critical SAGE scientific core after the validated outcome-discrepancy repairs while preserving the reduced production application boundary.",
+  "source_checkpoint": {
+    "git_commit": "858a35255407d3d095a55bd4376b468607200230",
+    "git_tree": "796d6008941ccd1570b085c2e0507215d2baa802"
+  },
+  "counting_method": "Physical newline-delimited source lines from the tracked checkpoint; package __init__.py files are excluded.",
+  "physical_lines": 32540,
+  "file_manifest_sha256": "b48510088c31f1bff3dd4e2e4995331f08e6b83bc1d11714c66c2dce046af4fb",
+  "files": [
+    {
+      "path": "src/sage_ts/adapters/openai_toolsandbox_roles.py",
+      "physical_lines": 12645,
+      "sha256": "9024566b8fc91b75c87dd4660168748033115ef638be7a963426ab7c2d51080e"
+    },
+    {
+      "path": "src/sage_ts/adapters/sage_run_adapter.py",
+      "physical_lines": 2189,
+      "sha256": "b64658e0ba6fbcc87273d70ee5c48da8f55ecd5176d1bcf5dd2653596c9accb8"
+    },
+    {
+      "path": "src/sage_ts/adequacy/inadequacy_classifier.py",
+      "physical_lines": 6104,
+      "sha256": "4efd3375b7d8b79de96af1666e2993bcf4c2f42b9ca79bd1819e931b2d504171"
+    },
+    {
+      "path": "src/sage_ts/adequacy/candidate_gate.py",
+      "physical_lines": 487,
+      "sha256": "e82b1893b9a2fe4c741525d0ef1aa4ad09b1ea73edabfcae23b3758a138d78b1"
+    },
+    {
+      "path": "src/sage_ts/generation/tool_generator.py",
+      "physical_lines": 3974,
+      "sha256": "673997b495a01ee7cdf2ee94bb1b2dc011a7d55228e63727c64d727f30b70546"
+    },
+    {
+      "path": "src/sage_ts/orchestration/online_birth.py",
+      "physical_lines": 1872,
+      "sha256": "8e63c8e1ff895ec4f6addc41fd8fef5cd88ec903be91a8cf9af8cd6ce8040602"
+    },
+    {
+      "path": "src/sage_ts/runtime/routing_scorer.py",
+      "physical_lines": 81,
+      "sha256": "b6bde8445417a63b1b81169eacdd2fd639e2355a6084f13f57f24f0ca8d2ce19"
+    },
+    {
+      "path": "src/sage_ts/runtime/toolsandbox_integration.py",
+      "physical_lines": 2528,
+      "sha256": "e559fbc74f3455f3e5aa30b617347829436723e8dda58308c9a1f317637cac04"
+    },
+    {
+      "path": "src/sage_ts/validation/ast_safety.py",
+      "physical_lines": 77,
+      "sha256": "cb5030e2c496ca572d3fbf58372982bd01da90d09b8d53ad06da794a1ae641ad"
+    },
+    {
+      "path": "src/sage_ts/validation/output_normalization.py",
+      "physical_lines": 1498,
+      "sha256": "cf0d038c88f8ce888bb6511bd16e9c1623cb86dc8ca48bc0307aabc99a5a0bff"
+    },
+    {
+      "path": "src/sage_ts/validation/sandbox_validator.py",
+      "physical_lines": 901,
+      "sha256": "b05311fe8b3e79ac84b806779e6b5845328c2261c06ec78f80f032fe774a0c9a"
+    },
+    {
+      "path": "src/sage_ts/validation/schema_check.py",
+      "physical_lines": 184,
+      "sha256": "88ce21f7eee8637ede4322825a0c6c59804f9028f0ad8cc42039535006067128"
+    }
+  ]
+}

@@ -30,7 +30,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BASE_INPUT_MANIFEST = Path(
     "docs/sage_protocol/publication_input_manifest_20260901.json"
 )
-DEFAULT_MANIFEST = Path("docs/sage_protocol/publication_release_manifest_20260903.json")
+DEFAULT_MANIFEST = Path("docs/sage_protocol/publication_release_manifest_20260905.json")
+ACTIVE_PRODUCTION_CORE_DECLARATION = {
+    "path": "docs/sage_protocol/production_core_manifest_20260905.json",
+    "sha256": "51bca58741f9917228e14d472f4e6401af85635457fd7e0af4e3206686c47a53",
+}
 EXPECTED_REPLACEMENT_POLICY = {
     "generator_contract_and_repair_analysis_memoization": "within_run_only",
     "repository_whole_response_replay": "disabled",
@@ -1653,9 +1657,23 @@ def _verify_production_scientific_core(
     }
 
 
+def verify_active_production_scientific_core(
+    repo_root: Path = REPO_ROOT,
+    declaration: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Verify the active core independently of the pending release generation."""
+
+    return _verify_production_scientific_core(
+        repo_root.resolve(),
+        declaration or ACTIVE_PRODUCTION_CORE_DECLARATION,
+    )
+
+
 def verify_inputs(
     repo_root: Path = REPO_ROOT,
     manifest_path: Path = DEFAULT_MANIFEST,
+    *,
+    active_core_declaration: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Verify the content-addressed publication input and policy chain."""
 
@@ -1709,13 +1727,22 @@ def verify_inputs(
         "base publication input manifest",
     )
     result = _verify_base_inputs(root, base_path)
+    release_core_declaration = _object(
+        selected_payload,
+        "production_scientific_core",
+        "publication release manifest",
+    )
+    if active_core_declaration is not None and not _exact_equal(
+        release_core_declaration,
+        active_core_declaration,
+    ):
+        raise InputVerificationError(
+            "Publication release manifest does not bind the active production "
+            "scientific core"
+        )
     result["production_scientific_core"] = _verify_production_scientific_core(
         root,
-        _object(
-            selected_payload,
-            "production_scientific_core",
-            "publication release manifest",
-        ),
+        active_core_declaration or release_core_declaration,
     )
     amendment = _verify_policy_amendment(
         root,
@@ -1798,12 +1825,31 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument(
+        "--core-manifest-only",
+        action="store_true",
+        help=(
+            "Verify the active production scientific core without requiring the "
+            "pending publication release generation."
+        ),
+    )
     args = parser.parse_args()
     try:
-        result = verify_inputs(args.repo_root, args.manifest)
+        if args.core_manifest_only:
+            result = verify_active_production_scientific_core(args.repo_root)
+        else:
+            result = verify_inputs(
+                args.repo_root,
+                args.manifest,
+                active_core_declaration=ACTIVE_PRODUCTION_CORE_DECLARATION,
+            )
     except InputVerificationError as exc:
         raise SystemExit(f"publication_input_verification=failed\n{exc}") from exc
-    print("publication_input_verification=pass")
+    print(
+        "production_scientific_core_verification=pass"
+        if args.core_manifest_only
+        else "publication_input_verification=pass"
+    )
     print(json.dumps(result, indent=2))
 
 

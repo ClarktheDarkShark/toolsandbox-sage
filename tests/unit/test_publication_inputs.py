@@ -13,6 +13,7 @@ from scripts.verify_publication_inputs import (
     EXPECTED_ACTIVE_EXECUTION_POLICY,
     EXPECTED_REPLACEMENT_POLICY,
     InputVerificationError,
+    verify_active_production_scientific_core,
     verify_inputs,
 )
 
@@ -601,9 +602,8 @@ def test_release_verifier_hashes_base_inputs_and_policy_amendment(
         task_compare_policy
         == EXPECTED_ACTIVE_EXECUTION_POLICY["task_compare_dashboard"]
     )
-    assert (
-        result["historical_outcome_rescore_summary"]["outcome_evaluator"]["version"]
-        == "sage_outcome_contracts_v4"
+    assert result["historical_outcome_rescore_summary"]["outcome_evaluator"] == (
+        outcome_evaluator_manifest()
     )
     assert result["superseded_validation_thresholds"]["path"] == (
         "prior_active_thresholds.json"
@@ -620,6 +620,37 @@ def test_release_verifier_rejects_scientific_core_drift(tmp_path: Path) -> None:
 
     with pytest.raises(InputVerificationError, match="core entry 0 hash mismatch"):
         verify_inputs(repo, wrapper_path)
+
+
+def test_active_core_can_be_verified_without_release_generation(
+    tmp_path: Path,
+) -> None:
+    repo, base_manifest_path = _build_public_repo(tmp_path)
+    wrapper_path = _wrap_public_repo(repo, base_manifest_path)
+    release = _read_json(wrapper_path)
+
+    result = verify_active_production_scientific_core(
+        repo,
+        release["production_scientific_core"],
+    )
+
+    assert result["physical_lines"] == 1
+    assert result["file_count"] == 1
+
+
+def test_release_verifier_requires_active_core_binding(tmp_path: Path) -> None:
+    repo, base_manifest_path = _build_public_repo(tmp_path)
+    wrapper_path = _wrap_public_repo(repo, base_manifest_path)
+
+    with pytest.raises(InputVerificationError, match="does not bind the active"):
+        verify_inputs(
+            repo,
+            wrapper_path,
+            active_core_declaration={
+                "path": "different_core_manifest.json",
+                "sha256": "0" * 64,
+            },
+        )
 
 
 def test_make_verify_publication_uses_the_pinned_full_cohort_cli() -> None:

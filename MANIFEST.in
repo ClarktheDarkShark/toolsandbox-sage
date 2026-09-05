@@ -1,0 +1,4 @@
+# Exclude local iCloud conflict copies from source distributions. The pattern's
+# single-character wildcard matches the literal space before the conflict-copy
+# suffix without placing whitespace in MANIFEST.in's tokenized pattern.
+global-exclude *?2.py

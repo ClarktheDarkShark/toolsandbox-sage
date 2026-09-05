@@ -351,7 +351,7 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
     assert "CMD+=(--no-dashboard-open)" not in launcher
     assert "--inventory-authority-capture-dir" in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/run_sage_auto_selection_replay.py' in launcher
-    assert '--cohort "$SIZE"' in launcher
+    assert '--cohort "$VERIFY_COHORT"' in launcher
     assert "--expected-benchmark-sha256" not in launcher
     assert "--expected-scenario-order-sha256" not in launcher
     assert "SAGE_AUTO_SELECTION_PILOT_EVIDENCE" in launcher

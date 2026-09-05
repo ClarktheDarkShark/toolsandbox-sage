@@ -22,7 +22,7 @@ COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
 .PHONY: \
 	compile lint test-core test package \
 	spotcheck paper-online paper-frozen selector-pilot selector-full sample full \
-	prepare-paper-rerun verify-publication verify-sample verify-campaign verify-environment verify-inputs verify-freeze \
+	prepare-paper-rerun verify-publication verify-sample verify-campaign verify-environment verify-core verify-inputs verify-freeze \
 	analyze render-paper \
 	require-run require-sample-report require-campaign-manifest require-analysis-output \
 	require-evidence-data require-table-output require-validation-thresholds \
@@ -175,7 +175,12 @@ verify-campaign: require-campaign-manifest
 verify-environment:
 	$(PYTHON) scripts/verify_publication_environment.py
 
-# Clean-clone check of only the compact inputs published in Git.
+# Independent byte, line-count, and aggregate-hash check of the active core.
+verify-core:
+	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_inputs.py --core-manifest-only
+
+# Full release-chain verification. This remains blocked until the final active
+# release generation binds the independently verified production core.
 verify-inputs:
 	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_inputs.py
 

@@ -19,12 +19,14 @@ are explicit research-protocol changes rather than cleanup deletions.
 
 ### Production code boundary
 
-The result-critical scientific core is exactly 32,260 physical source lines in
-12 files. Its file list, individual hashes, line counts, source checkpoint, and
-combined hash are frozen in
-[`docs/sage_protocol/production_core_manifest_20260904.json`](docs/sage_protocol/production_core_manifest_20260904.json).
-The publication input verifier fails if any byte or line count in that core
-changes. The executable application also retains the smaller supporting surface
+The result-critical scientific core is exactly 32,540 physical source lines in
+the same 12 files retained by the cleanup. Its current file list, individual
+hashes, line counts, source checkpoint, and combined hash are frozen in
+[`docs/sage_protocol/production_core_manifest_20260905.json`](docs/sage_protocol/production_core_manifest_20260905.json).
+The preceding 32,260-line freeze remains immutable in the
+[`2026-09-04 core manifest`](docs/sage_protocol/production_core_manifest_20260904.json).
+`make verify-core` fails if any byte or line count in the current core changes.
+The executable application also retains the smaller supporting surface
 needed for configuration, registry persistence, outcome evaluation, strict
 concurrent orchestration, Task Compare, environment/input verification, and the
 repository launcher.
@@ -276,19 +278,26 @@ make lint
 make package
 ```
 
-The wheel includes the Chapter 4 dashboard HTML and the ToolSandbox role YAML
-used at runtime.
+The wheel includes the Python-rendered Task Compare dashboard template and the
+ToolSandbox role YAML used at runtime. The Chapter 4 evidence-dashboard HTML is
+kept under `scripts/research/` for repository-based paper analysis and is not
+part of the installed production package.
 
-The compact publication inputs shipped in Git can be checked from a clean clone
-without running an experiment or obtaining private/local archives:
+The current production scientific core can be checked independently without
+running an experiment or obtaining private/local archives:
 
 ```bash
-make verify-inputs
+make verify-core
 ```
 
-The compact v4 release chain is frozen in the
+`make verify-inputs` is the full release-chain check. It remains fail-closed
+until the final 2026-09-05 release generation binds this core manifest to the
+corrected evaluator, historical rescore, and outcome-only thresholds.
+
+The compact v4 predecessor chain is frozen in the immutable
 [`2026-09-03 release manifest`](docs/sage_protocol/publication_release_manifest_20260903.json).
-`make verify-inputs` verifies the immutable
+Once the final active release generation is present, `make verify-inputs`
+verifies the immutable
 [`P0 input manifest`](docs/sage_protocol/publication_input_manifest_20260901.json),
 its amendment, the active execution policy, evaluator and rescorer identities,
 benchmark bytes and order, sanitized fixture,
@@ -327,9 +336,11 @@ Important frozen inputs include:
 - compact v4 rescore summary and outcome thresholds: SHA-256
   `3dc78ec78986b74230971f01b0f40bae74710de2065371c46208061d392f48a7` /
   `f14d86181b2085afc94df5c8cc39a2892f9e8c4bb44a0ba2b9d418a81d9f39f6`;
-- active release manifest: SHA-256
-  `5e8d413b5f7bb2907e0b0ef1dc6210517e5a2f695339ce96d3807b7f69423902`;
-- exact 32,260-line scientific-core manifest: SHA-256
+- immutable 2026-09-03 predecessor release manifest: SHA-256
+  `8e7e2ecd4ca95e2f8484adf5610986f8d15106d6e054967940acd365c346c658`;
+- active 32,540-line scientific-core manifest: SHA-256
+  `51bca58741f9917228e14d472f4e6401af85635457fd7e0af4e3206686c47a53`;
+- preserved 32,260-line predecessor core manifest: SHA-256
   `dc46a51032bbf4e7cf09527d6d03ce6877988476ef821bc9883a7861665c1637`;
 - authoritative local publication manifest: SHA-256
   `9a7c53fb9c305279dd2eedf5bf5af93e98c37f91b71d028eb065524ec381a8b2`.
