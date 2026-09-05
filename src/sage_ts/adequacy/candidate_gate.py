@@ -147,6 +147,7 @@ def _requires_negative_applicability(spec: ToolSpec) -> bool:
         ToolFamily.STATE_PRECONDITION_HELPER,
         ToolFamily.SEARCH_FILTER_RANKING_HELPER,
         ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        ToolFamily.VALIDATION_ABSTENTION_HELPER,
     }
 
 
@@ -155,6 +156,7 @@ def _requires_output_schema(spec: ToolSpec) -> bool:
         ToolFamily.STATE_PRECONDITION_HELPER,
         ToolFamily.SEARCH_FILTER_RANKING_HELPER,
         ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        ToolFamily.VALIDATION_ABSTENTION_HELPER,
     }
 
 

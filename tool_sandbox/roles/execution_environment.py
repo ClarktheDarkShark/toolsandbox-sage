@@ -5,10 +5,9 @@
 import code
 import copy
 import io
-import itertools
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
-from typing import List, Optional, Sequence
+from typing import Iterator, List, Optional, Sequence
 
 import polars as pl
 from attrs import evolve
@@ -20,7 +19,10 @@ from tool_sandbox.common.execution_context import (
     get_current_context,
     set_current_context,
 )
-from tool_sandbox.common.message_conversion import Message
+from tool_sandbox.common.message_conversion import (
+    Message,
+    python_code_to_openai_tool_call,
+)
 from tool_sandbox.roles.base_role import BaseRole
 
 _BENIGN_POLARS_NONE_COMPARISON_WARNING = (
@@ -159,6 +161,66 @@ def respond_to_messages(
     return [message for message in response_messages if message is not None]
 
 
+def _execution_equivalent_message_permutations(
+    messages: Sequence[Message],
+) -> Iterator[tuple[Message, ...]]:
+    """Yield each semantically distinct tool-call ordering exactly once.
+
+    OpenAI tool-call IDs distinguish response correlation, not the operation that
+    the execution environment performs. Reordering two otherwise identical calls
+    therefore cannot create a new execution ordering. ``itertools.permutations``
+    nevertheless emitted every identity-level swap, turning ten identical calls
+    into 10! executions. This multiset permutation keeps the original ordering
+    first and removes only those execution-equivalent duplicates.
+    """
+
+    def executable_content(message: Message) -> tuple[str, str] | str:
+        """Remove only the response-correlation ID from a converted tool call."""
+
+        if message.openai_tool_call_id is None:
+            return message.content
+        try:
+            tool_call = python_code_to_openai_tool_call(
+                message.content,
+                agent_facing_tool_name=None,
+            )
+        except (AssertionError, SyntaxError, ValueError):
+            return message.content
+        return tool_call.function.name, tool_call.function.arguments
+
+    def signature(message: Message) -> tuple[object, ...]:
+        return (
+            message.sender,
+            message.recipient,
+            executable_content(message),
+            message.openai_function_name,
+            message.conversation_active,
+        )
+
+    selected: list[Message] = []
+    used = [False] * len(messages)
+
+    def visit() -> Iterator[tuple[Message, ...]]:
+        if len(selected) == len(messages):
+            yield tuple(selected)
+            return
+        seen_at_depth: set[tuple[object, ...]] = set()
+        for index, message in enumerate(messages):
+            if used[index]:
+                continue
+            message_signature = signature(message)
+            if message_signature in seen_at_depth:
+                continue
+            seen_at_depth.add(message_signature)
+            used[index] = True
+            selected.append(message)
+            yield from visit()
+            selected.pop()
+            used[index] = False
+
+    yield from visit()
+
+
 def respond_to_messages_set_all_order_permutations(
     execution_context: ExecutionContext,
     messages: list[Message],
@@ -201,17 +263,19 @@ def respond_to_messages_set_all_order_permutations(
     # failed. Some notes about this design decision:
     #  - It is pessimistic for function calls that may fail non-deterministically
     #    (e.g. a call to a REST API that happens to fail intermittently)
-    #  - The number of permutations is the factorial of the number of function calls,
-    #    which means that the time it takes to execute all possible permutations
-    #    increases rapidly. We expect that the number of tool calls is small so this
-    #    should be okay.
+    #  - The number of distinct permutations can grow factorially. Calls with the
+    #    same executable content are indistinguishable for ordering validation, so
+    #    the iterator below collapses identity-only swaps while retaining every
+    #    semantically distinct call order.
     original_context = copy.deepcopy(execution_context)
     response_messages: list[Message] = []
     # When failure happens, the currently set context is the same as current failure messages
     # When all permutation succeeds, since we want to return original response order,
     # corresponding resulting execution context needs to be reset as well.
     result_context: Optional[ExecutionContext] = None
-    for i, permutated_messages in enumerate(itertools.permutations(messages)):
+    for i, permutated_messages in enumerate(
+        _execution_equivalent_message_permutations(messages)
+    ):
         modifiable_context = copy.deepcopy(original_context)
         set_current_context(modifiable_context)
         current_response_messages = respond_to_messages(
@@ -222,12 +286,12 @@ def respond_to_messages_set_all_order_permutations(
         # If all permutations of the tool call order execute successfully we want
         # to return the responses that match the originally requested tool call
         # order. This original ordering is the first element returned by
-        # `itertools.permutations`.
+        # the ordering iterator.
         if i == 0:
             response_messages = current_response_messages
             result_context = get_current_context()
             # Consistency check. We compare the contents since comparing the list of
-            # messages fails (presumably because `itertools.permutations` copies
+            # messages fails (presumably because permutation generation copies
             # objects or something like that).
             assert [message.content for message in messages] == [
                 message.content for message in permutated_messages

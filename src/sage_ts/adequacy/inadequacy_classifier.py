@@ -74,7 +74,8 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
             "requested_action is a contact or reminder side-effect and "
             "target_identifier is blank, abstain with missing_target_identifier. "
             "If visible_records_count is greater than 1 and the target is not "
-            "unique, abstain for ambiguity. "
+            "unique, abstain with missing_information containing "
+            "unique_target_identifier and abstain_reason ambiguous_target. "
             "If required tools are available and a unique target identifier is "
             "present, set should_abstain false, missing_information empty, "
             "safe_next_action continue_with_original_tool, and blank final answer "
@@ -156,7 +157,6 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
                     ),
                     "abstain_reason": "missing_target_identifier",
                 },
-                negative_applicability=True,
             ),
             ToolExample(
                 {
@@ -180,6 +180,65 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
                         "the available information/tools."
                     ),
                     "abstain_reason": "missing_required_original_tool",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Remove the contact named Alex",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "Alex",
+                    "required_original_tools": ["search_contacts", "remove_contact"],
+                    "available_original_tools": ["search_contacts", "remove_contact"],
+                    "visible_records_count": 2,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["unique_target_identifier"],
+                    "required_original_tools": ["search_contacts", "remove_contact"],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "I found multiple matching contacts and need a unique "
+                        "contact before I can safely remove one."
+                    ),
+                    "abstain_reason": "ambiguous_target",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Send hello to +15550100",
+                    "requested_action": "send_message",
+                    "target_identifier": "+15550100",
+                    "required_original_tools": ["message_send"],
+                    "available_original_tools": ["message_send"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": ["message_send"],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Read the already visible stock symbol",
+                    "requested_action": "read_visible_information",
+                    "target_identifier": "AAPL",
+                    "required_original_tools": [],
+                    "available_original_tools": [],
+                    "visible_records_count": 1,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": [],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
                 },
                 negative_applicability=True,
             ),
@@ -3790,22 +3849,22 @@ def _external_service_answer_extraction_observation(
             ),
             ToolExample(
                 {
-                    "service_payload": {"distance_km": 67.96238310230461},
+                    "service_payload": {"distance_km": 67.97730305839949},
                     "requested_unit": "kilometers",
                     "answer_subject": "Golden Gate Bridge",
                 },
                 {
-                    "answer_value": "67.96238310230461",
+                    "answer_value": "67.97730305839949",
                     "answer_kind": "distance",
                     "answer_unit": "km",
                     "should_call_downstream_tool": False,
                     "downstream_tool_name": "",
                     "downstream_tool_kwargs": {},
                     "exact_final_answer": (
-                        "You are approximately 67.96 kilometers away from Golden Gate Bridge."
+                        "You are approximately 67.98 kilometers away from Golden Gate Bridge."
                     ),
                     "final_answer_recommendation": (
-                        "You are approximately 67.96 kilometers away from Golden Gate Bridge."
+                        "You are approximately 67.98 kilometers away from Golden Gate Bridge."
                     ),
                     "copy_exactly": True,
                     "abstain_reason": "",
@@ -4099,19 +4158,19 @@ def _distance_answer_extraction_observation(
         examples=(
             ToolExample(
                 {
-                    "service_payload": {"result": 67.96238310230461},
+                    "service_payload": {"result": 67.97730305839949},
                     "requested_unit": "kilometers",
                     "answer_subject": "Golden Gate Bridge",
                 },
                 {
-                    "answer_value": "67.96238310230461",
+                    "answer_value": "67.97730305839949",
                     "answer_kind": "distance",
                     "answer_unit": "km",
                     "should_call_downstream_tool": False,
                     "downstream_tool_name": "",
                     "downstream_tool_kwargs": {},
-                    "exact_final_answer": "You are approximately 67.96 kilometers away from Golden Gate Bridge.",
-                    "final_answer_recommendation": "You are approximately 67.96 kilometers away from Golden Gate Bridge.",
+                    "exact_final_answer": "You are approximately 67.98 kilometers away from Golden Gate Bridge.",
+                    "final_answer_recommendation": "You are approximately 67.98 kilometers away from Golden Gate Bridge.",
                     "copy_exactly": True,
                     "abstain_reason": "",
                 },

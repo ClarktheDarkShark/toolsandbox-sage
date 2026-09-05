@@ -17,7 +17,11 @@ from sage_ts.runtime.toolsandbox_integration import (
     route_registry_entries,
     with_registry_tools,
 )
-from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
+from sage_ts.validation.sandbox_validator import (
+    ToolExample,
+    ValidationResult,
+    validate_generated_tool,
+)
 from scripts.run_sage_protocol import _candidate_protocol_event_hook
 from tool_sandbox.common.execution_context import (
     DatabaseNamespace,
@@ -30,6 +34,90 @@ from tool_sandbox.common.message_conversion import Message
 from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_conversion import convert_to_openai_tool
 from tool_sandbox.roles.execution_environment import respond_to_single_message
+
+
+def _strong_safe_action_entry() -> RegistryEntry:
+    spec = ToolSpec(
+        tool_name="prepare_safe_action_or_abstain",
+        family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+        description=(
+            "Decide whether visible contact or message inputs are sufficient for "
+            "a safe original-tool action."
+        ),
+        inputs=(
+            ToolInput("user_request", "str", "Visible user request."),
+            ToolInput("requested_action", "str", "Requested action."),
+            ToolInput("target_identifier", "str", "Visible target identifier."),
+            ToolInput("required_original_tools", "list", "Required tools."),
+            ToolInput("available_original_tools", "list", "Available tools."),
+            ToolInput("visible_records_count", "int", "Matching record count."),
+        ),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "should_abstain": {"type": "boolean"},
+                "missing_information": {"type": "array"},
+                "required_original_tools": {"type": "array"},
+                "safe_next_action": {"type": "string"},
+                "final_answer_recommendation": {"type": "string"},
+                "abstain_reason": {"type": "string"},
+            },
+        },
+        positive_triggers=("insufficient_information", "missing_contact_lookup"),
+        negative_triggers=("complete_safe_request",),
+        preserves_side_effect_tools=(
+            "search_contacts",
+            "remove_contact",
+            "send_message_with_phone_number",
+        ),
+        required_original_tool_calls=(
+            "search_contacts",
+            "remove_contact",
+            "send_message_with_phone_number",
+        ),
+        generalization_rationale=(
+            "Contact and named-recipient actions repeatedly need the same visible "
+            "precondition checks before original tools can run safely."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        # Deliberately over-claim holiday applicability. Routing must use the
+        # persisted validation domains below rather than this model-authored text.
+        applicable_task_families=("safe_abstain", "holiday"),
+        reason_tool_is_decisive=(
+            "The helper prevents unsafe actions when required visible inputs or "
+            "original tool capabilities are missing."
+        ),
+        shortfall_cluster_evidence=("unsafe_action_guess",),
+        known_failure_mechanisms_addressed=("missing_action_precondition",),
+        inadequacy_evidence=(
+            "Actors repeatedly guessed contact identifiers when a lookup was "
+            "missing or returned an ambiguous set of records."
+        ),
+    )
+    tool = GeneratedTool(
+        spec=spec,
+        code=(
+            "def prepare_safe_action_or_abstain(user_request: str, requested_action: str, "
+            "target_identifier: str, required_original_tools: list, "
+            "available_original_tools: list, visible_records_count: int) -> dict:\n"
+            "    return {'should_abstain': False, 'missing_information': [], "
+            "'required_original_tools': required_original_tools, "
+            "'safe_next_action': 'continue_with_original_tool', "
+            "'final_answer_recommendation': '', 'abstain_reason': ''}\n"
+        ),
+    )
+    validation = ValidationResult(
+        accepted=True,
+        errors=(),
+        source_example_count=3,
+        held_out_check_count=2,
+        negative_applicability_count=2,
+        runtime_smoke_passed=True,
+        validated_applicability_domains=("contact", "message"),
+    )
+    return RegistryEntry.accepted(tool, validation, birth_scenario="contact_birth")
 
 
 def test_chained_payload_expands_only_an_exact_visible_subset(monkeypatch) -> None:
@@ -1907,6 +1995,87 @@ def test_timestamp_extreme_selector_hidden_on_insufficient_information_scenarios
     )
 
 
+def test_safe_action_guard_requires_a_validated_concrete_domain() -> None:
+    entry = _strong_safe_action_entry()
+    entries = {entry.tool.spec.tool_name: entry}
+
+    contact_visible, contact_decisions = route_registry_entries(
+        entries,
+        "redacted",
+        task_context_text=(
+            "request=Remove this contact signals=insufficient_information "
+            "contact_lookup family=remove_contact_by_phone"
+        ),
+        task_family_key="remove_contact_by_phone",
+    )
+    holiday_visible, holiday_decisions = route_registry_entries(
+        entries,
+        "redacted",
+        task_context_text=(
+            "request=How many days until Christmas "
+            "signals=insufficient_information holiday family=holiday_distance"
+        ),
+        task_family_key="holiday_distance",
+    )
+
+    assert [item.tool.spec.tool_name for item in contact_visible] == [
+        "prepare_safe_action_or_abstain"
+    ]
+    assert contact_decisions["prepare_safe_action_or_abstain"].visible
+    holiday_decision = holiday_decisions["prepare_safe_action_or_abstain"]
+    assert not holiday_visible
+    assert not holiday_decision.visible
+    assert (
+        holiday_decision.reason
+        == "validation_abstention_requires_validated_domain_match"
+    )
+
+
+def test_one_harm_signal_quarantines_only_the_harmed_task_family() -> None:
+    entry = _strong_safe_action_entry()
+    entries = {entry.tool.spec.tool_name: entry}
+    lifecycle = {
+        "prepare_safe_action_or_abstain": {
+            "decision": "retain_with_route_repair",
+            "harmful_called_count": 1,
+            "helpful_called_count": 20,
+            "harmful_called_families": ["remove_contact_by_phone"],
+            "route_repair_families": ["remove_contact_by_phone"],
+        }
+    }
+
+    contact_visible, contact_decisions = route_registry_entries(
+        entries,
+        "redacted",
+        lifecycle_state=lifecycle,
+        task_context_text=(
+            "request=Remove this contact signals=insufficient_information "
+            "contact_lookup family=remove_contact_by_phone"
+        ),
+        task_family_key="remove_contact_by_phone",
+    )
+    message_visible, message_decisions = route_registry_entries(
+        entries,
+        "redacted",
+        lifecycle_state=lifecycle,
+        task_context_text=(
+            "request=Send a message signals=insufficient_information "
+            "message family=send_message"
+        ),
+        task_family_key="send_message",
+    )
+
+    assert not contact_visible
+    assert (
+        contact_decisions["prepare_safe_action_or_abstain"].reason
+        == "lifecycle_suppressed_harmful_called_family"
+    )
+    assert [item.tool.spec.tool_name for item in message_visible] == [
+        "prepare_safe_action_or_abstain"
+    ]
+    assert message_decisions["prepare_safe_action_or_abstain"].visible
+
+
 def test_lifecycle_hides_negative_called_subset_family(
     tmp_path: Path,
 ) -> None:
@@ -1918,11 +2087,11 @@ def test_lifecycle_hides_negative_called_subset_family(
                 "tool_lifecycle": {
                     "prepare_reminder_creation_args": {
                         "decision": "needs_route_repair",
-                        "harmful_called_count": 2,
+                        "harmful_called_count": 1,
                         "harmful_called_scenarios": [
                             "reminder_create",
-                            "reminder_create_alt",
                         ],
+                        "harmful_called_families": ["reminder_create"],
                     }
                 },
             }
@@ -1950,7 +2119,7 @@ def test_lifecycle_hides_negative_called_subset_family(
     assert "prepare_reminder_creation_args" not in result.starting_context.name_to_tool
 
 
-def test_lifecycle_keeps_mixed_positive_route_repair_visible(
+def test_lifecycle_quarantines_harmed_family_despite_other_successes(
     tmp_path: Path,
 ) -> None:
     store = _registry_with_reminder_creation_args(tmp_path)
@@ -1966,9 +2135,8 @@ def test_lifecycle_keeps_mixed_positive_route_repair_visible(
                         "harmful_called_scenarios": [
                             "add_reminder_content_and_week_delta_and_time"
                         ],
-                        "route_repair_families": [
-                            "add_reminder_content_and_week_delta_and_time"
-                        ],
+                        "harmful_called_families": ["reminder_create"],
+                        "route_repair_families": ["reminder_create"],
                     }
                 },
             }
@@ -1993,7 +2161,7 @@ def test_lifecycle_keeps_mixed_positive_route_repair_visible(
         task_family_key="reminder_create",
     )
 
-    assert "prepare_reminder_creation_args" in result.starting_context.name_to_tool
+    assert "prepare_reminder_creation_args" not in result.starting_context.name_to_tool
 
 
 def test_contact_constraint_helper_is_suppressed_after_low_adoption(

@@ -298,11 +298,6 @@ class ToolGenerationRequest:
 class ToolGenerator:
     def __init__(self, completer: ChatCompleter) -> None:
         self.completer = completer
-        # Preserve the validated generator policy: repeated analysis of an
-        # identical public contract or rejected-code repair within this generator
-        # instance is reused. This state is memory-only and is never loaded from
-        # or written to a prior run.
-        self._contract_analyses: dict[str, str] = {}
 
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
         prompt = _model_authored_generation_prompt(request)
@@ -366,20 +361,17 @@ class ToolGenerator:
         if not _request_complete_tools_enabled(request):
             return ""
         analysis_prompt = _model_authored_contract_analysis_prompt(request)
-        analysis = self._contract_analyses.get(analysis_prompt)
-        if analysis is None:
-            analysis = self.completer.complete(
-                ChatRequest(
-                    system=(
-                        "You analyze public generated-tool validation contracts. "
-                        "Return valid JSON only and do not write code."
-                    ),
-                    user=analysis_prompt,
-                    model=self.completer.model,
-                    response_format_json=True,
-                )
+        analysis = self.completer.complete(
+            ChatRequest(
+                system=(
+                    "You analyze public generated-tool validation contracts. "
+                    "Return valid JSON only and do not write code."
+                ),
+                user=analysis_prompt,
+                model=self.completer.model,
+                response_format_json=True,
             )
-            self._contract_analyses[analysis_prompt] = analysis
+        )
         return (
             " A separate model-authored contract analysis follows. Use it as a "
             "reasoning aid, but the public validation examples remain authoritative. "
@@ -398,21 +390,18 @@ class ToolGenerator:
         analysis_prompt = _model_authored_repair_analysis_prompt(
             request, rejected_tool, errors
         )
-        analysis = self._contract_analyses.get(analysis_prompt)
-        if analysis is None:
-            analysis = self.completer.complete(
-                ChatRequest(
-                    system=(
-                        "You trace rejected generated Python tools against public "
-                        "validation cases. Return valid JSON only and do not write "
-                        "replacement code."
-                    ),
-                    user=analysis_prompt,
-                    model=self.completer.model,
-                    response_format_json=True,
-                )
+        analysis = self.completer.complete(
+            ChatRequest(
+                system=(
+                    "You trace rejected generated Python tools against public "
+                    "validation cases. Return valid JSON only and do not write "
+                    "replacement code."
+                ),
+                user=analysis_prompt,
+                model=self.completer.model,
+                response_format_json=True,
             )
-            self._contract_analyses[analysis_prompt] = analysis
+        )
         return (
             " A separate model-authored trace of the current rejected code follows. "
             "Use its concrete blocking-condition analysis when repairing, but keep "
@@ -1722,6 +1711,9 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "If required_original_tools or available_original_tools is a string, treat it as one capability value, not as an iterable of characters.",
             "If required_original_tools is omitted, malformed, or incomplete, infer required semantic capabilities from requested_action, user_request, and target_identifier before computing missing_information.",
             "The function must never return should_abstain false when the action would require guessing a phone number, person_id, reminder_id, current location, or missing search result.",
+            "For contact or reminder update/remove actions, a blank target_identifier must return should_abstain true with missing_information target_identifier and abstain_reason missing_target_identifier.",
+            "When visible_records_count is greater than one, never choose or guess a record: return should_abstain true, include unique_target_identifier in missing_information, and use abstain_reason ambiguous_target.",
+            "Implement every validation branch in the generated function itself. Runtime output normalization is not part of validation proof and must not be relied on to add missing requirements or reverse should_abstain.",
         )
     if request.suggested_tool_name == "prepare_upcoming_reminder_search_args":
         return (
@@ -2812,7 +2804,11 @@ def _model_authored_tool_specific_guidance(request: ToolGenerationRequest) -> st
             "return continue_with_original_tool for a named-recipient send merely "
             "because message_send is available. Treat string required_original_tools "
             "and available_original_tools values as single capabilities, not "
-            "character lists. "
+            "character lists. A blank contact/reminder action target must abstain with "
+            "missing_target_identifier. More than one visible matching record must "
+            "abstain with unique_target_identifier and ambiguous_target. The generated "
+            "function itself must satisfy these branches without relying on output "
+            "normalization to repair its result. "
         )
     if request.suggested_tool_name == "prepare_reminder_creation_args":
         return (

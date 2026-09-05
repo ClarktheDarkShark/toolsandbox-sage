@@ -1661,6 +1661,18 @@ def _pending_weekday_time_route_allowed(
     return True, families
 
 
+def _validation_abstention_has_supported_domain(
+    entry: RegistryEntry,
+    match_context: str,
+) -> bool:
+    """Require a concrete validated domain in addition to a generic insufficiency tag."""
+
+    if entry.tool.spec.family is not ToolFamily.VALIDATION_ABSTENTION_HELPER:
+        return True
+    validated_domains = set(entry.validation.validated_applicability_domains)
+    return any(domain in match_context for domain in validated_domains)
+
+
 def _visible_context_route_decision(
     entry: RegistryEntry,
     *,
@@ -1706,6 +1718,18 @@ def _visible_context_route_decision(
         for signal in VISIBLE_CONTEXT_TOOL_SIGNALS.get(tool_name, ())
         if signal in match_context
     )
+    if matched_signals and not _validation_abstention_has_supported_domain(
+        entry,
+        match_context,
+    ):
+        return RuntimeRoutingDecision(
+            tool_name,
+            False,
+            "hidden",
+            "validation_abstention_requires_validated_domain_match",
+            -35,
+            matched_task_families=matched_signals,
+        )
     if tool_name in VISIBLE_CONTEXT_TOOL_SIGNALS and not matched_signals:
         pending_weekday_time, pending_weekday_families = (
             _pending_weekday_time_route_allowed(
@@ -2046,60 +2070,26 @@ def _lifecycle_visibility_override(
         harmful_count_int = int(harmful_count)
     except (TypeError, ValueError):
         harmful_count_int = len(harmful_scenarios)
-    helpful_families = [
-        str(item) for item in row.get("helpful_called_families", []) if item
-    ]
     harmful_families_list = [
         str(item) for item in row.get("harmful_called_families", []) if item
     ]
     if not harmful_families_list:
         harmful_families_list = harmful_scenarios
-    if not helpful_families:
-        helpful_families = [
-            str(item) for item in row.get("helpful_called_scenarios", []) if item
-        ]
 
     def same_family(value: str) -> bool:
         family = str(value or "")
         return family == scenario_family or base_task_family(family) == scenario_family
 
     harmful_family_count = sum(1 for item in harmful_families_list if same_family(item))
-    helpful_family_count = sum(1 for item in helpful_families if same_family(item))
-    is_validation_abstention_tool = tool_name == "prepare_safe_action_or_abstain"
-    if is_validation_abstention_tool:
-        try:
-            side_effect_incident_count = int(row.get("side_effect_incident_count") or 0)
-        except (TypeError, ValueError):
-            side_effect_incident_count = 0
-        try:
-            failed_count = int(row.get("failed_count") or 0)
-        except (TypeError, ValueError):
-            failed_count = 0
-        operationally_clean = side_effect_incident_count == 0 and failed_count == 0
-    else:
-        operationally_clean = False
-
     if decision == "retain_with_route_repair":
-        if is_validation_abstention_tool and operationally_clean:
-            return None
         if scenario_name in harmful_scenarios:
             return False, "lifecycle_suppressed_exact_harmful_called_scenario"
-        if (
-            harmful_family_count >= 2
-            and harmful_family_count > helpful_family_count
-            and scenario_family in route_repair_families
-        ):
+        if harmful_family_count >= 1 and scenario_family in route_repair_families:
             return False, "lifecycle_suppressed_harmful_called_family"
         return None
 
     if scenario_family in route_repair_families:
-        if is_validation_abstention_tool and operationally_clean:
-            return None
-        if harmful_family_count < 2 and not (
-            is_validation_abstention_tool and not operationally_clean
-        ):
-            return None
-        if harmful_family_count and harmful_family_count <= helpful_family_count:
+        if harmful_family_count < 1:
             return None
         return False, "lifecycle_suppressed_harmful_called_family"
     if decision not in {
@@ -2110,50 +2100,10 @@ def _lifecycle_visibility_override(
 
     harmful_families = {base_task_family(str(item)) for item in harmful_families_list}
     if scenario_family in harmful_families:
-        if is_validation_abstention_tool and operationally_clean:
-            return None
-        if (
-            harmful_family_count < 2
-            and harmful_count_int < 2
-            and not (is_validation_abstention_tool and not operationally_clean)
-        ):
+        if harmful_family_count < 1 and harmful_count_int < 1:
             return None
         return False, "lifecycle_suppressed_harmful_called_family"
     return None
-
-
-def _visible_signal_can_override_lifecycle_family_suppression(
-    *,
-    tool_name: str,
-    generic_decision: RuntimeRoutingDecision,
-    lifecycle_state: dict[str, dict[str, Any]] | None,
-) -> bool:
-    """Let strict visible-context evidence repair coarse lifecycle suppression.
-
-    Lifecycle feedback is allowed to suppress tools after harmful calls, but a
-    broad family label is intentionally coarse. If a retained tool is validated,
-    operationally clean, and the current task text/tools/signals explicitly
-    match that tool, the visible route is the more specific self-evolution
-    signal. Parked tools and tools needing implementation repair remain hidden.
-    """
-    if not lifecycle_state:
-        return False
-    if not generic_decision.visible:
-        return False
-    if generic_decision.reason != "visible_context_signal_match":
-        return False
-    row = lifecycle_state.get(tool_name)
-    if not row:
-        return False
-    if str(row.get("decision") or "") != "retain_with_route_repair":
-        return False
-    for key in ("failed_count", "side_effect_incident_count"):
-        try:
-            if int(row.get(key) or 0) > 0:
-                return False
-        except (TypeError, ValueError):
-            return False
-    return True
 
 
 def _abstention_guard_call_would_be_scored_as_forbidden_action(
@@ -2307,16 +2257,7 @@ def route_registry_entries(
         )
         if lifecycle_override is not None:
             lifecycle_visible, lifecycle_reason = lifecycle_override
-            if not (
-                task_context_text
-                and lifecycle_reason == "lifecycle_suppressed_harmful_called_family"
-                and _visible_signal_can_override_lifecycle_family_suppression(
-                    tool_name=tool_name,
-                    generic_decision=generic,
-                    lifecycle_state=lifecycle_state,
-                )
-            ):
-                is_visible, reason = lifecycle_visible, lifecycle_reason
+            is_visible, reason = lifecycle_visible, lifecycle_reason
         status = "shown" if is_visible else "hidden"
         score = generic.score
         if generic.status == "hidden" and generic.reason in generic_hard_blocks:

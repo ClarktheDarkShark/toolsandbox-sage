@@ -1,8 +1,11 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from sage_ts.adapters.openai_agent_adapter import ChatRequest
 from sage_ts.adequacy.inadequacy_classifier import (
+    _distance_answer_extraction_observation,
+    _external_service_answer_extraction_observation,
+    _safe_action_or_abstain_observation,
     _temperature_answer_extraction_observation,
 )
 from sage_ts.generation.tool_generator import (
@@ -11,6 +14,14 @@ from sage_ts.generation.tool_generator import (
     ToolGenerator,
     _model_authored_contract_rules,
 )
+from sage_ts.generation.tool_spec import (
+    GeneratedTool,
+    StructuredInadequacyEvidence,
+    ToolFamily,
+    ToolInput,
+    ToolSpec,
+)
+from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 
 
@@ -54,6 +65,139 @@ class FakeCompleter:
         )
 
 
+def _safe_action_tool(code: str) -> GeneratedTool:
+    return GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_safe_action_or_abstain",
+            family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+            description=(
+                "Decide from visible inputs whether an original ToolSandbox action "
+                "can proceed safely or requires an explicit abstention."
+            ),
+            inputs=(
+                ToolInput("user_request", "str", "Visible user request."),
+                ToolInput("requested_action", "str", "Requested action name."),
+                ToolInput("target_identifier", "str", "Visible target identifier."),
+                ToolInput(
+                    "required_original_tools",
+                    "list",
+                    "Original tools required for the action.",
+                ),
+                ToolInput(
+                    "available_original_tools",
+                    "list",
+                    "Original tools available to the actor.",
+                ),
+                ToolInput(
+                    "visible_records_count",
+                    "int",
+                    "Number of matching visible records.",
+                ),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {"type": "array"},
+                    "required_original_tools": {"type": "array"},
+                    "safe_next_action": {"type": "string"},
+                    "final_answer_recommendation": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=(
+                "insufficient_information",
+                "missing_original_tool",
+                "ambiguous_target",
+            ),
+            negative_triggers=("complete_safe_request", "known_unique_record"),
+            preserves_side_effect_tools=(
+                "search_contacts",
+                "remove_contact",
+                "modify_contact",
+                "send_message_with_phone_number",
+            ),
+            required_original_tool_calls=(
+                "search_contacts",
+                "remove_contact",
+                "modify_contact",
+                "send_message_with_phone_number",
+            ),
+            generalization_rationale=(
+                "The same visible precondition checks recur across contact and "
+                "message actions before an irreversible operation."
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary=(
+                    "Actors repeatedly guessed missing or ambiguous action targets "
+                    "instead of abstaining from unsafe original-tool calls."
+                ),
+                signals=("missing_user_information", "unsafe_action_guess"),
+            ),
+        ),
+        code=code,
+    )
+
+
+_INCOMPLETE_SAFE_ACTION_CODE = """
+def prepare_safe_action_or_abstain(user_request: str, requested_action: str,
+                                   target_identifier: str,
+                                   required_original_tools: list,
+                                   available_original_tools: list,
+                                   visible_records_count: int) -> dict:
+    required = [required_original_tools] if isinstance(required_original_tools, str) else list(required_original_tools)
+    available = [available_original_tools] if isinstance(available_original_tools, str) else list(available_original_tools)
+    missing = [name for name in required if name not in available]
+    if not target_identifier and requested_action == "modify_contact":
+        missing.append("target_identifier")
+    should_abstain = bool(missing)
+    return {
+        "should_abstain": should_abstain,
+        "missing_information": missing,
+        "required_original_tools": required,
+        "safe_next_action": "ask_user_or_abstain" if should_abstain else "continue_with_original_tool",
+        "final_answer_recommendation": "Not enough information." if should_abstain else "",
+        "abstain_reason": "missing_required_original_tool" if should_abstain else "",
+    }
+"""
+
+
+_COMPLETE_SAFE_ACTION_CODE = """
+def prepare_safe_action_or_abstain(user_request: str, requested_action: str,
+                                   target_identifier: str,
+                                   required_original_tools: list,
+                                   available_original_tools: list,
+                                   visible_records_count: int) -> dict:
+    required = [required_original_tools] if isinstance(required_original_tools, str) else list(required_original_tools)
+    available = [available_original_tools] if isinstance(available_original_tools, str) else list(available_original_tools)
+    action = str(requested_action or "").strip().lower()
+    target = str(target_identifier or "").strip()
+    digits = "".join(character for character in target if character.isdigit())
+    named_message_target = ("message" in action or action.startswith("send")) and target and len(digits) < 7
+    if named_message_target and "contact_lookup" not in available and "search_contacts" not in available:
+        if "contact_lookup" not in required:
+            required.append("contact_lookup")
+    missing = [name for name in required if name not in available]
+    reason = "missing_required_original_tool" if missing else ""
+    if not target and ("contact" in action or "reminder" in action):
+        missing = ["target_identifier"]
+        reason = "missing_target_identifier"
+    elif visible_records_count > 1:
+        missing = ["unique_target_identifier"]
+        reason = "ambiguous_target"
+    should_abstain = bool(missing)
+    return {
+        "should_abstain": should_abstain,
+        "missing_information": missing,
+        "required_original_tools": required,
+        "safe_next_action": "ask_user_or_abstain" if should_abstain else "continue_with_original_tool",
+        "final_answer_recommendation": "I do not have enough information to complete the action safely." if should_abstain else "",
+        "abstain_reason": reason,
+    }
+"""
+
+
 def test_tool_generator_authors_each_tool_fresh() -> None:
     completer = FakeCompleter()
     generator = ToolGenerator(completer=completer)
@@ -75,7 +219,7 @@ def test_tool_generator_authors_each_tool_fresh() -> None:
     assert completer.calls == 2
 
 
-def test_contract_analysis_is_memoized_only_within_generator_instance(
+def test_contract_analysis_is_live_for_every_request(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
@@ -93,15 +237,15 @@ def test_contract_analysis_is_memoized_only_within_generator_instance(
     generator._contract_analysis_suffix(request)
     generator._contract_analysis_suffix(request)
 
-    assert completer.calls == 1
+    assert completer.calls == 2
 
     second_generator = ToolGenerator(completer=completer)
     second_generator._contract_analysis_suffix(request)
 
-    assert completer.calls == 2
+    assert completer.calls == 3
 
 
-def test_repair_analysis_is_memoized_only_within_generator_instance(
+def test_repair_analysis_is_live_for_every_request(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
@@ -122,12 +266,12 @@ def test_repair_analysis_is_memoized_only_within_generator_instance(
     generator._repair_analysis_suffix(request, rejected_tool, errors)
     generator._repair_analysis_suffix(request, rejected_tool, errors)
 
-    assert completer.calls == calls_before_repair_analysis + 1
+    assert completer.calls == calls_before_repair_analysis + 2
 
     second_generator = ToolGenerator(completer=completer)
     second_generator._repair_analysis_suffix(request, rejected_tool, errors)
 
-    assert completer.calls == calls_before_repair_analysis + 2
+    assert completer.calls == calls_before_repair_analysis + 3
 
 
 def test_generation_request_includes_reusable_name_hint() -> None:
@@ -164,6 +308,26 @@ def test_temperature_generation_contract_finishes_visible_conversion() -> None:
     assert low_case.expected["exact_final_answer"].startswith("The min temperature")
 
 
+def test_distance_generation_contract_uses_the_frozen_fixture_result() -> None:
+    specialized = _distance_answer_extraction_observation("visible_task_context")
+    generic = _external_service_answer_extraction_observation("visible_task_context")
+    cases = [
+        example
+        for observation in (specialized, generic)
+        for example in observation.validation_examples
+        if example.inputs.get("answer_subject") == "Golden Gate Bridge"
+    ]
+
+    assert len(cases) == 2
+    assert all(
+        example.expected["answer_value"] == "67.97730305839949" for example in cases
+    )
+    assert all(
+        "67.98 kilometers" in example.expected["exact_final_answer"]
+        for example in cases
+    )
+
+
 def test_temperature_model_guidance_rejects_nonterminal_conversion_handoff() -> None:
     request = ToolGenerationRequest(
         scenario_name="visible_task_context",
@@ -181,6 +345,103 @@ def test_temperature_model_guidance_rejects_nonterminal_conversion_handoff() -> 
     assert "Never silently use current_temperature" in guidance
     assert "public validation examples as the canonical interface values" in guidance
     assert "without discarding richer named fields" in guidance
+
+
+def test_safe_action_contract_covers_each_safety_critical_branch() -> None:
+    observation = _safe_action_or_abstain_observation("visible_task_context")
+    examples = observation.validation_examples
+
+    assert (
+        sum(not item.held_out and not item.negative_applicability for item in examples)
+        == 3
+    )
+    assert sum(item.held_out for item in examples) == 2
+    assert sum(item.negative_applicability for item in examples) == 2
+    assert any(
+        item.expected.get("abstain_reason") == "ambiguous_target" for item in examples
+    )
+    assert any(
+        item.expected.get("missing_information") == ["contact_lookup"]
+        for item in examples
+    )
+    assert any(
+        item.negative_applicability and not item.expected.get("should_abstain")
+        for item in examples
+    )
+
+
+def test_safe_action_validation_rejects_the_incomplete_historical_behavior() -> None:
+    observation = _safe_action_or_abstain_observation("visible_task_context")
+
+    validation = validate_generated_tool(
+        _safe_action_tool(_INCOMPLETE_SAFE_ACTION_CODE),
+        examples=observation.validation_examples,
+    )
+
+    assert not validation.accepted
+    assert any(
+        "raw_validation_abstention" in error or "mismatch" in error
+        for error in validation.errors
+    )
+
+
+def test_safe_action_validation_accepts_complete_behavior_and_requires_strong_proof() -> (
+    None
+):
+    observation = _safe_action_or_abstain_observation("visible_task_context")
+    tool = _safe_action_tool(_COMPLETE_SAFE_ACTION_CODE)
+
+    validation = validate_generated_tool(
+        tool,
+        examples=observation.validation_examples,
+    )
+
+    assert validation.accepted, validation.errors
+    assert validation.source_example_count == 3
+    assert validation.held_out_check_count == 2
+    assert validation.negative_applicability_count == 2
+    assert validation.validated_applicability_domains == ("contact", "message")
+    entry = RegistryEntry.accepted(tool, validation, birth_scenario="visible_birth")
+    assert has_current_validation_proof(entry)
+    assert RegistryEntry.from_json(
+        entry.to_json()
+    ).validation.validated_applicability_domains == ("contact", "message")
+    legacy_payload = entry.to_json()
+    legacy_payload["validation"].pop("validated_applicability_domains")
+    assert not has_current_validation_proof(RegistryEntry.from_json(legacy_payload))
+
+    weak_historical_proof = replace(
+        entry,
+        validation=replace(
+            validation,
+            source_example_count=1,
+            held_out_check_count=1,
+        ),
+    )
+    assert not has_current_validation_proof(weak_historical_proof)
+
+
+def test_safe_action_validation_rejects_unvalidated_declared_holiday_domain() -> None:
+    observation = _safe_action_or_abstain_observation("visible_task_context")
+    tool = _safe_action_tool(_COMPLETE_SAFE_ACTION_CODE)
+    holiday_declared = replace(
+        tool,
+        spec=replace(
+            tool.spec,
+            applicable_task_families=("safe_abstain", "holiday"),
+        ),
+    )
+
+    validation = validate_generated_tool(
+        holiday_declared,
+        examples=observation.validation_examples,
+    )
+
+    assert not validation.accepted
+    assert (
+        "validation_abstention_unvalidated_declared_domain:holiday" in validation.errors
+    )
+    assert validation.validated_applicability_domains == ("contact", "message")
 
 
 def test_device_sequence_guidance_uses_visible_contract_not_scenario_name() -> None:

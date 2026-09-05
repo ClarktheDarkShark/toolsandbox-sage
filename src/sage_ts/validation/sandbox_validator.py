@@ -44,6 +44,7 @@ class ValidationResult:
     held_out_check_count: int = 0
     negative_applicability_count: int = 0
     runtime_smoke_passed: bool = False
+    validated_applicability_domains: tuple[str, ...] = ()
 
 
 def _json_serializable(value: Any) -> bool:
@@ -142,7 +143,257 @@ def _requires_negative_applicability(tool: GeneratedTool) -> bool:
         ToolFamily.STATE_PRECONDITION_HELPER,
         ToolFamily.SEARCH_FILTER_RANKING_HELPER,
         ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        ToolFamily.VALIDATION_ABSTENTION_HELPER,
     }
+
+
+_VALIDATION_ABSTENTION_OUTPUT_KEYS = {
+    "should_abstain",
+    "missing_information",
+    "required_original_tools",
+    "safe_next_action",
+    "final_answer_recommendation",
+    "abstain_reason",
+}
+
+_VALIDATION_ABSTENTION_DOMAIN_MARKERS = {
+    "contact": (
+        "contact",
+        "contact_lookup",
+        "search_contacts",
+        "add_contact",
+        "modify_contact",
+        "remove_contact",
+    ),
+    "message": (
+        "message",
+        "message_send",
+        "search_messages",
+        "send_message",
+        "text recipient",
+    ),
+    "reminder": (
+        "reminder",
+        "search_reminder",
+        "add_reminder",
+        "modify_reminder",
+        "remove_reminder",
+    ),
+    "location": ("location", "latitude", "longitude", "gps"),
+    "weather": ("weather", "temperature", "forecast"),
+    "holiday": (
+        "holiday",
+        "christmas",
+        "thanksgiving",
+        "easter",
+        "halloween",
+    ),
+    "time": ("timestamp", "current_time", "datetime"),
+}
+
+
+def _string_items(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,) if value.strip() else ()
+    if not isinstance(value, (list, tuple, set)):
+        return ()
+    return tuple(str(item) for item in value if str(item).strip())
+
+
+def _looks_like_phone_number(value: Any) -> bool:
+    text = str(value or "").strip()
+    digits = sum(character.isdigit() for character in text)
+    return digits >= 7 and (
+        text.startswith("+")
+        or any(character in text for character in ("-", " ", "(", ")"))
+        or text.isdigit()
+    )
+
+
+def _validation_abstention_domains_in_text(text: str) -> set[str]:
+    normalized = text.lower()
+    return {
+        domain
+        for domain, markers in _VALIDATION_ABSTENTION_DOMAIN_MARKERS.items()
+        if any(marker in normalized for marker in markers)
+    }
+
+
+def _validation_abstention_example_domains(example: ToolExample) -> set[str]:
+    inputs = example.inputs
+    evidence_parts = [
+        str(inputs.get("user_request") or ""),
+        str(inputs.get("requested_action") or ""),
+        *_string_items(inputs.get("required_original_tools")),
+        *_string_items(inputs.get("available_original_tools")),
+    ]
+    return _validation_abstention_domains_in_text(" ".join(evidence_parts))
+
+
+def _validated_abstention_applicability_domains(
+    examples: tuple[ToolExample, ...],
+) -> tuple[str, ...]:
+    """Return domains tested on both abstain and safe-continue cases."""
+
+    decisions_by_domain: dict[str, set[bool]] = {}
+    for example in examples:
+        expected = example.expected
+        if not isinstance(expected, dict):
+            continue
+        decision = bool(expected.get("should_abstain"))
+        for domain in _validation_abstention_example_domains(example):
+            decisions_by_domain.setdefault(domain, set()).add(decision)
+    return tuple(
+        sorted(
+            domain
+            for domain, decisions in decisions_by_domain.items()
+            if decisions == {False, True}
+        )
+    )
+
+
+def _validation_abstention_semantic_coverage_errors(
+    tool: GeneratedTool,
+    examples: tuple[ToolExample, ...],
+    *,
+    source_count: int,
+    held_out_count: int,
+    negative_count: int,
+) -> tuple[str, ...]:
+    """Require independent evidence for every safety-critical abstention branch."""
+
+    if tool.spec.family is not ToolFamily.VALIDATION_ABSTENTION_HELPER:
+        return ()
+    errors: list[str] = []
+    input_contract = {item.name: item.annotation for item in tool.spec.inputs}
+    required_inputs = {
+        "user_request": "str",
+        "requested_action": "str",
+        "target_identifier": "str",
+        "required_original_tools": "list",
+        "available_original_tools": "list",
+        "visible_records_count": "int",
+    }
+    if input_contract != required_inputs:
+        errors.append("validation_abstention_interface_incomplete")
+    output_schema = tool.spec.output_schema or {}
+    output_properties = output_schema.get("properties", {})
+    if not isinstance(output_properties, dict) or set(output_properties) != (
+        _VALIDATION_ABSTENTION_OUTPUT_KEYS
+    ):
+        errors.append("validation_abstention_output_schema_incomplete")
+    if source_count < 2:
+        errors.append("validation_abstention_requires_two_source_examples")
+    if held_out_count < 2:
+        errors.append("validation_abstention_requires_two_held_out_examples")
+    if negative_count < 2:
+        errors.append("validation_abstention_requires_two_negative_examples")
+    validated_domains = set(_validated_abstention_applicability_domains(examples))
+    if not validated_domains:
+        errors.append("validation_abstention_requires_validated_domain_pair")
+    declared_domains = _validation_abstention_domains_in_text(
+        " ".join(tool.spec.applicable_task_families)
+    )
+    for domain in sorted(declared_domains - validated_domains):
+        errors.append(f"validation_abstention_unvalidated_declared_domain:{domain}")
+
+    def expects_abstention(example: ToolExample) -> bool:
+        return isinstance(example.expected, dict) and bool(
+            example.expected.get("should_abstain")
+        )
+
+    missing_tool = False
+    safe_continue = False
+    missing_target = False
+    ambiguous_target = False
+    named_recipient = False
+    for example in examples:
+        inputs = example.inputs
+        expected_abstain = expects_abstention(example)
+        required = set(_string_items(inputs.get("required_original_tools")))
+        available = set(_string_items(inputs.get("available_original_tools")))
+        target = str(inputs.get("target_identifier") or "").strip()
+        request_text = " ".join(
+            (
+                str(inputs.get("user_request") or ""),
+                str(inputs.get("requested_action") or ""),
+            )
+        ).lower()
+        try:
+            visible_count = int(inputs.get("visible_records_count") or 0)
+        except (TypeError, ValueError):
+            visible_count = 0
+        if required - available and expected_abstain:
+            missing_tool = True
+        if (
+            required <= available
+            and target
+            and visible_count <= 1
+            and not expected_abstain
+        ):
+            safe_continue = True
+        if not target and expected_abstain:
+            missing_target = True
+        if visible_count > 1 and expected_abstain:
+            ambiguous_target = True
+        if (
+            target
+            and not _looks_like_phone_number(target)
+            and any(token in request_text for token in ("send", "text", "message"))
+            and "contact_lookup" not in available
+            and "search_contacts" not in available
+            and expected_abstain
+        ):
+            named_recipient = True
+    for covered, label in (
+        (missing_tool, "missing_tool"),
+        (safe_continue, "safe_continue"),
+        (missing_target, "missing_target"),
+        (ambiguous_target, "ambiguous_target"),
+        (named_recipient, "named_recipient"),
+    ):
+        if not covered:
+            errors.append(f"validation_abstention_missing_semantic_case:{label}")
+    return tuple(errors)
+
+
+def _raw_validation_abstention_errors(
+    label: str,
+    actual: Any,
+    expected: Any,
+) -> tuple[str, ...]:
+    """Ensure generated code passes its contract before runtime normalization."""
+
+    if not isinstance(actual, dict) or not isinstance(expected, dict):
+        return (f"{label}_raw_validation_abstention_output_not_object",)
+    errors: list[str] = []
+    if set(actual) != _VALIDATION_ABSTENTION_OUTPUT_KEYS:
+        errors.append(f"{label}_raw_validation_abstention_output_keys")
+    expected_abstain = bool(expected.get("should_abstain"))
+    if bool(actual.get("should_abstain")) != expected_abstain:
+        errors.append(f"{label}_raw_validation_abstention_decision")
+    if set(_string_items(actual.get("missing_information"))) != set(
+        _string_items(expected.get("missing_information"))
+    ):
+        errors.append(f"{label}_raw_validation_abstention_missing_information")
+    if set(_string_items(actual.get("required_original_tools"))) != set(
+        _string_items(expected.get("required_original_tools"))
+    ):
+        errors.append(f"{label}_raw_validation_abstention_required_tools")
+    expected_next_action = str(expected.get("safe_next_action") or "")
+    if str(actual.get("safe_next_action") or "") != expected_next_action:
+        errors.append(f"{label}_raw_validation_abstention_next_action")
+    actual_recommendation = str(actual.get("final_answer_recommendation") or "").strip()
+    expected_recommendation = str(
+        expected.get("final_answer_recommendation") or ""
+    ).strip()
+    if bool(actual_recommendation) != bool(expected_recommendation):
+        errors.append(f"{label}_raw_validation_abstention_recommendation")
+    actual_reason = str(actual.get("abstain_reason") or "").strip()
+    expected_reason = str(expected.get("abstain_reason") or "").strip()
+    if bool(actual_reason) != bool(expected_reason):
+        errors.append(f"{label}_raw_validation_abstention_reason")
+    return tuple(errors)
 
 
 def _runtime_smoke(
@@ -501,6 +752,11 @@ def validate_generated_tool(
     source_examples, held_out_examples, negative_examples = _partition_examples(
         examples
     )
+    validated_applicability_domains = (
+        _validated_abstention_applicability_domains(examples)
+        if tool.spec.family is ToolFamily.VALIDATION_ABSTENTION_HELPER
+        else ()
+    )
     if not source_examples:
         return ValidationResult(False, ("missing_source_examples",))
     if not held_out_examples:
@@ -515,6 +771,22 @@ def validate_generated_tool(
             ("missing_negative_applicability_examples",),
             source_example_count=len(source_examples),
             held_out_check_count=len(held_out_examples),
+        )
+    abstention_coverage_errors = _validation_abstention_semantic_coverage_errors(
+        tool,
+        examples,
+        source_count=len(source_examples),
+        held_out_count=len(held_out_examples),
+        negative_count=len(negative_examples),
+    )
+    if abstention_coverage_errors:
+        return ValidationResult(
+            False,
+            abstention_coverage_errors,
+            source_example_count=len(source_examples),
+            held_out_check_count=len(held_out_examples),
+            negative_applicability_count=len(negative_examples),
+            validated_applicability_domains=validated_applicability_domains,
         )
 
     gate = evaluate_candidate_gate(tool.spec)
@@ -579,8 +851,9 @@ def validate_generated_tool(
     )
     for label, example in all_examples:
         try:
+            raw_actual = schema.function(**example.inputs)
             actual = normalize_generated_tool_output(
-                tool, schema.function(**example.inputs), inputs=example.inputs
+                tool, raw_actual, inputs=example.inputs
             )
             replay = normalize_generated_tool_output(
                 tool, schema.function(**example.inputs), inputs=example.inputs
@@ -593,6 +866,14 @@ def validate_generated_tool(
             continue
         if actual != replay:
             errors.append(f"{label}_nondeterministic:{actual!r}!={replay!r}")
+        if tool.spec.family is ToolFamily.VALIDATION_ABSTENTION_HELPER:
+            errors.extend(
+                _raw_validation_abstention_errors(
+                    label,
+                    raw_actual,
+                    example.expected,
+                )
+            )
         if (
             actual != expected
             and not _benign_negative_abstain_reason_mismatch(label, actual, expected)
@@ -616,4 +897,5 @@ def validate_generated_tool(
         held_out_check_count=len(held_out_examples),
         negative_applicability_count=len(negative_examples),
         runtime_smoke_passed=runtime_smoke_passed,
+        validated_applicability_domains=validated_applicability_domains,
     )

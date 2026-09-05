@@ -4,6 +4,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from openai.types.chat.chat_completion_message_tool_call import (
+    ChatCompletionMessageToolCall,
+    Function,
+)
 
 import sage_ts.adapters.role_factory as role_factory
 import sage_ts.adapters.toolsandbox_adapter as toolsandbox_adapter
@@ -12,8 +16,15 @@ from sage_ts.adapters.toolsandbox_adapter import (
     run_scenario_sequence,
     write_run_manifest,
 )
-from tool_sandbox.common.execution_context import ExecutionContext
+from tool_sandbox.common.execution_context import ExecutionContext, RoleType
+from tool_sandbox.common.message_conversion import (
+    Message,
+    openai_tool_call_to_python_code,
+)
 from tool_sandbox.common.scenario import Scenario
+from tool_sandbox.roles.execution_environment import (
+    _execution_equivalent_message_permutations,
+)
 
 
 class APIConnectionError(Exception):
@@ -23,6 +34,51 @@ class APIConnectionError(Exception):
 class _NoopRole:
     def teardown(self) -> None:
         pass
+
+
+def _tool_call_message(value: int, call_id: str) -> Message:
+    tool_call = ChatCompletionMessageToolCall(
+        id=call_id,
+        type="function",
+        function=Function(name="generated_helper", arguments=f'{{"value": {value}}}'),
+    )
+    return Message(
+        sender=RoleType.AGENT,
+        recipient=RoleType.EXECUTION_ENVIRONMENT,
+        content=openai_tool_call_to_python_code(
+            tool_call,
+            available_tool_names={"generated_helper"},
+            execution_facing_tool_name=None,
+        ),
+        openai_tool_call_id=call_id,
+        openai_function_name="generated_helper",
+    )
+
+
+def test_parallel_execution_collapses_only_execution_equivalent_permutations() -> None:
+    first_a = _tool_call_message(1, "call_a_1")
+    second_a = _tool_call_message(1, "call_a_2")
+    call_b = _tool_call_message(2, "call_b")
+
+    orderings = list(
+        _execution_equivalent_message_permutations([first_a, second_a, call_b])
+    )
+
+    assert [[message.openai_tool_call_id for message in row] for row in orderings] == [
+        ["call_a_1", "call_a_2", "call_b"],
+        ["call_a_1", "call_b", "call_a_2"],
+        ["call_b", "call_a_1", "call_a_2"],
+    ]
+    assert first_a.content != second_a.content
+    assert orderings[0] == (first_a, second_a, call_b)
+
+
+def test_ten_identical_parallel_calls_have_one_execution_ordering() -> None:
+    messages = [_tool_call_message(1, f"call_{index}") for index in range(10)]
+
+    orderings = list(_execution_equivalent_message_permutations(messages))
+
+    assert orderings == [tuple(messages)]
 
 
 def _patch_run_one_dependencies(monkeypatch) -> None:

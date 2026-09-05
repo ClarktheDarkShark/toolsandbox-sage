@@ -21,15 +21,27 @@ def code_hash(code: str) -> str:
 def has_current_validation_proof(entry: "RegistryEntry") -> bool:
     """Return whether an accepted entry has claim-grade validation metadata."""
     gate = evaluate_candidate_gate(entry.tool.spec)
+    family = entry.tool.spec.family.value
     requires_negative = entry.tool.spec.family.value in {
         "state_precondition_helper",
         "search_filter_ranking_helper",
         "composite_workflow_helper",
+        "validation_abstention_helper",
     }
+    requires_strong_abstention_proof = family == "validation_abstention_helper"
     return (
         entry.validation.accepted
         and entry.validation.held_out_check_count > 0
         and (entry.validation.negative_applicability_count > 0 or not requires_negative)
+        and (
+            not requires_strong_abstention_proof
+            or (
+                entry.validation.source_example_count >= 2
+                and entry.validation.held_out_check_count >= 2
+                and entry.validation.negative_applicability_count >= 2
+                and bool(entry.validation.validated_applicability_domains)
+            )
+        )
         and entry.validation.runtime_smoke_passed
         and not entry.retired
         and entry.schema_version == REGISTRY_SCHEMA_VERSION
@@ -83,6 +95,9 @@ class RegistryEntry:
                 "held_out_check_count": self.validation.held_out_check_count,
                 "negative_applicability_count": self.validation.negative_applicability_count,
                 "runtime_smoke_passed": self.validation.runtime_smoke_passed,
+                "validated_applicability_domains": list(
+                    self.validation.validated_applicability_domains
+                ),
             },
             "birth_scenario": self.birth_scenario,
             "accepted_at": self.accepted_at,
@@ -113,6 +128,13 @@ class RegistryEntry:
                 ),
                 runtime_smoke_passed=bool(
                     payload["validation"].get("runtime_smoke_passed", False)
+                ),
+                validated_applicability_domains=tuple(
+                    str(item)
+                    for item in payload["validation"].get(
+                        "validated_applicability_domains", []
+                    )
+                    if str(item)
                 ),
             ),
             birth_scenario=str(payload["birth_scenario"]),
