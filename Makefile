@@ -65,7 +65,8 @@ test-core:
 		-q
 
 test:
-	$(COMMON_ENV) $(PYTHON) -m pytest tests/unit tests/integration -q
+	$(COMMON_ENV) $(PYTHON) -m pytest tests/unit tests/integration \
+		--ignore-glob='* [0-9].py' -q
 
 package:
 	$(PYTHON) -m build --outdir $(DIST_DIR)

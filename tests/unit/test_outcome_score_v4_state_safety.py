@@ -550,6 +550,16 @@ def test_generic_remove_contact_rejects_wrong_restore_then_target_history() -> N
 def test_generic_pure_answer_rejects_restored_collateral_state() -> None:
     scenario_name = "find_days_till_holiday_3_distraction_tools"
     execution_context = _starting_context(scenario_name)
+    reminders = execution_context.get_database(DatabaseNamespace.REMINDER).to_dicts()
+    baseline_timestamp = (
+        max(float(row["creation_timestamp"]) for row in reminders)
+        + max(float(row["reminder_timestamp"]) for row in reminders)
+    ) / 2
+    baseline_time = dt.datetime.fromtimestamp(baseline_timestamp)
+    christmas = dt.datetime(baseline_time.year, 12, 25)
+    if christmas <= baseline_time:
+        christmas = dt.datetime(baseline_time.year + 1, 12, 25)
+    expected_days = (christmas - baseline_time).days
     contacts = execution_context.get_database(DatabaseNamespace.CONTACT)
     _commit_state(
         execution_context,
@@ -566,7 +576,7 @@ def test_generic_pure_answer_rejects_restored_collateral_state() -> None:
     _add_tool_result(execution_context, "get_current_timestamp", 1777597539.872639)
     _add_agent_message(
         execution_context,
-        "There are 239 days until Christmas Day.",
+        f"There are {expected_days} days until Christmas Day.",
     )
 
     outcome = _score(scenario_name, execution_context)
