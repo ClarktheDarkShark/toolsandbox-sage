@@ -21,6 +21,7 @@ from scripts.run_sage_protocol import (
     _read_arm_status,
     _resolve_sage_policy_preset,
     _restore_registry_after_failed_gate,
+    _select_protocol_gate_decision,
     _snapshot_registry_for_gate,
     _stop_parallel_process,
     _validate_uncached_result_rows,
@@ -381,6 +382,95 @@ def test_protocol_gate_rejects_negative_outcome_even_when_canonical_improves() -
 
     assert passed is False
     assert "non_positive_outcome_delta" in reasons
+
+
+def test_selector_donor_gate_records_negative_outcome_without_blocking() -> None:
+    (
+        passed,
+        reasons,
+        policy,
+        thresholds_applied,
+        diagnostic_passed,
+        diagnostic_reasons,
+    ) = _select_protocol_gate_decision(
+        {
+            "mean_outcome_similarity_delta": -0.30,
+            "outcome_gain_count": 0,
+            "outcome_regression_count": 20,
+            "outcome_scenario_count": 30,
+            "runtime_exception_count": 0,
+        },
+        scenario_count=30,
+        actor_selection_donor_capture=True,
+    )
+
+    assert passed is True
+    assert reasons == []
+    assert policy == "actor_selection_donor_integrity_only"
+    assert thresholds_applied is False
+    assert diagnostic_passed is False
+    assert "non_positive_outcome_delta" in diagnostic_reasons
+    assert "confirmation_outcome_delta_below_0_08" in diagnostic_reasons
+
+
+def test_selector_donor_gate_still_blocks_integrity_failure() -> None:
+    (
+        passed,
+        reasons,
+        policy,
+        thresholds_applied,
+        diagnostic_passed,
+        diagnostic_reasons,
+    ) = _select_protocol_gate_decision(
+        {
+            "mean_outcome_similarity_delta": -0.30,
+            "outcome_gain_count": 0,
+            "outcome_regression_count": 20,
+            "outcome_scenario_count": 29,
+            "runtime_exception_count": 1,
+        },
+        scenario_count=30,
+        actor_selection_donor_capture=True,
+    )
+
+    assert passed is False
+    assert reasons == [
+        "runtime_exceptions_present",
+        "outcome_score_coverage_incomplete",
+    ]
+    assert policy == "actor_selection_donor_integrity_only"
+    assert thresholds_applied is False
+    assert diagnostic_passed is False
+    assert "runtime_exceptions_present" in diagnostic_reasons
+
+
+def test_ordinary_run_keeps_outcome_performance_thresholds() -> None:
+    (
+        passed,
+        reasons,
+        policy,
+        thresholds_applied,
+        diagnostic_passed,
+        diagnostic_reasons,
+    ) = _select_protocol_gate_decision(
+        {
+            "mean_outcome_similarity_delta": -0.30,
+            "outcome_gain_count": 0,
+            "outcome_regression_count": 20,
+            "outcome_scenario_count": 30,
+            "runtime_exception_count": 0,
+        },
+        scenario_count=30,
+        actor_selection_donor_capture=False,
+    )
+
+    assert passed is False
+    assert "non_positive_outcome_delta" in reasons
+    assert "confirmation_outcome_delta_below_0_08" in reasons
+    assert policy == "ordinary_outcome_viability"
+    assert thresholds_applied is True
+    assert diagnostic_passed is passed
+    assert diagnostic_reasons == reasons
 
 
 def test_protocol_gate_rejects_partial_outcome_coverage() -> None:

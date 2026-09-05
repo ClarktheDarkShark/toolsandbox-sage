@@ -912,20 +912,15 @@ def _protocol_gate_decision(
     *,
     scenario_count: int,
 ) -> tuple[bool, list[str]]:
-    """Apply the outcome-only viability gate used by every protocol run."""
-    reasons: list[str] = []
+    """Apply the outcome-only viability gate used by ordinary protocol runs."""
+    _, reasons = _protocol_integrity_gate_decision(
+        comparison,
+        scenario_count=scenario_count,
+    )
     outcome_delta = _optional_float(comparison.get("mean_outcome_similarity_delta"))
     outcome_gains = int(comparison.get("outcome_gain_count", 0) or 0)
     outcome_regressions = int(comparison.get("outcome_regression_count", 0) or 0)
-    outcome_scenario_count = int(comparison.get("outcome_scenario_count", 0) or 0)
-    runtime_exceptions = int(comparison.get("runtime_exception_count", 0) or 0)
-    if runtime_exceptions:
-        reasons.append("runtime_exceptions_present")
-    if outcome_scenario_count != scenario_count:
-        reasons.append("outcome_score_coverage_incomplete")
-    if outcome_delta is None:
-        reasons.append("outcome_score_unavailable")
-    else:
+    if outcome_delta is not None:
         if outcome_delta <= 0:
             reasons.append("non_positive_outcome_delta")
         if outcome_gains <= outcome_regressions:
@@ -942,6 +937,59 @@ def _protocol_gate_decision(
             reasons.append("gain_regression_ratio_below_1_4")
 
     return not reasons, reasons
+
+
+def _protocol_integrity_gate_decision(
+    comparison: dict[str, Any],
+    *,
+    scenario_count: int,
+) -> tuple[bool, list[str]]:
+    """Reject incomplete or malformed comparisons without judging performance."""
+    reasons: list[str] = []
+    outcome_delta = _optional_float(comparison.get("mean_outcome_similarity_delta"))
+    outcome_scenario_count = int(comparison.get("outcome_scenario_count", 0) or 0)
+    runtime_exceptions = int(comparison.get("runtime_exception_count", 0) or 0)
+    if runtime_exceptions:
+        reasons.append("runtime_exceptions_present")
+    if outcome_scenario_count != scenario_count:
+        reasons.append("outcome_score_coverage_incomplete")
+    if outcome_delta is None:
+        reasons.append("outcome_score_unavailable")
+    return not reasons, reasons
+
+
+def _select_protocol_gate_decision(
+    comparison: dict[str, Any],
+    *,
+    scenario_count: int,
+    actor_selection_donor_capture: bool,
+) -> tuple[bool, list[str], str, bool, bool, list[str]]:
+    """Select the explicit gate policy for an ordinary or selector-donor run."""
+    performance_passed, performance_reasons = _protocol_gate_decision(
+        comparison,
+        scenario_count=scenario_count,
+    )
+    if actor_selection_donor_capture:
+        passed, reasons = _protocol_integrity_gate_decision(
+            comparison,
+            scenario_count=scenario_count,
+        )
+        return (
+            passed,
+            reasons,
+            "actor_selection_donor_integrity_only",
+            False,
+            performance_passed,
+            performance_reasons,
+        )
+    return (
+        performance_passed,
+        performance_reasons,
+        "ordinary_outcome_viability",
+        True,
+        performance_passed,
+        performance_reasons,
+    )
 
 
 def _protocol_event(
@@ -2146,12 +2194,30 @@ def main() -> None:
     comparison["model_metadata"] = model_metadata
     comparison["comparison_model_key"] = model_metadata["comparison_key"]
     comparison["outcome_evaluator"] = outcome_evaluator
-    protocol_gate_passed, protocol_gate_reasons = _protocol_gate_decision(
+    (
+        protocol_gate_passed,
+        protocol_gate_reasons,
+        protocol_gate_policy,
+        protocol_performance_thresholds_applied,
+        protocol_performance_diagnostic_passed,
+        protocol_performance_diagnostic_reasons,
+    ) = _select_protocol_gate_decision(
         comparison,
         scenario_count=len(scenario_names),
+        actor_selection_donor_capture=inventory_authority_capture_dir is not None,
     )
     comparison["protocol_gate_passed"] = protocol_gate_passed
     comparison["protocol_gate_reasons"] = protocol_gate_reasons
+    comparison["protocol_gate_policy"] = protocol_gate_policy
+    comparison["protocol_performance_thresholds_applied"] = (
+        protocol_performance_thresholds_applied
+    )
+    comparison["protocol_performance_diagnostic_passed"] = (
+        protocol_performance_diagnostic_passed
+    )
+    comparison["protocol_performance_diagnostic_reasons"] = (
+        protocol_performance_diagnostic_reasons
+    )
     comparison_path = run_root / "paired_comparison.json"
     comparison_path.write_text(
         json.dumps(comparison, indent=2) + "\n", encoding="utf-8"
@@ -2188,6 +2254,16 @@ def main() -> None:
             "outcome_gain_count": comparison.get("outcome_gain_count"),
             "outcome_regression_count": comparison.get("outcome_regression_count"),
             "protocol_gate_reasons": protocol_gate_reasons,
+            "protocol_gate_policy": protocol_gate_policy,
+            "protocol_performance_thresholds_applied": (
+                protocol_performance_thresholds_applied
+            ),
+            "protocol_performance_diagnostic_passed": (
+                protocol_performance_diagnostic_passed
+            ),
+            "protocol_performance_diagnostic_reasons": (
+                protocol_performance_diagnostic_reasons
+            ),
             "registry_gate_restore": registry_gate_restore,
         },
         root=args.artifact_root,
@@ -2396,6 +2472,16 @@ def main() -> None:
         ),
         "protocol_gate_passed": protocol_gate_passed,
         "protocol_gate_reasons": protocol_gate_reasons,
+        "protocol_gate_policy": protocol_gate_policy,
+        "protocol_performance_thresholds_applied": (
+            protocol_performance_thresholds_applied
+        ),
+        "protocol_performance_diagnostic_passed": (
+            protocol_performance_diagnostic_passed
+        ),
+        "protocol_performance_diagnostic_reasons": (
+            protocol_performance_diagnostic_reasons
+        ),
     }
     manifest_path = run_root / "protocol_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -2500,6 +2586,16 @@ def main() -> None:
             ),
             "protocol_gate_passed": protocol_gate_passed,
             "protocol_gate_reasons": protocol_gate_reasons,
+            "protocol_gate_policy": protocol_gate_policy,
+            "protocol_performance_thresholds_applied": (
+                protocol_performance_thresholds_applied
+            ),
+            "protocol_performance_diagnostic_passed": (
+                protocol_performance_diagnostic_passed
+            ),
+            "protocol_performance_diagnostic_reasons": (
+                protocol_performance_diagnostic_reasons
+            ),
         },
         root=args.artifact_root,
     )
