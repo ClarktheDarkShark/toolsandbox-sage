@@ -7,8 +7,8 @@ cd "$ROOT_DIR"
 SIZE="${1:-full}"
 DASHBOARD_PORT="${2:-63105}"
 EXECUTION_MODE="${3:-native-only}"
-if [[ "$SIZE" != "full" && "$SIZE" != "pilot" ]]; then
-  echo "Size must be full or pilot." >&2
+if [[ "$SIZE" != "full" && "$SIZE" != "pilot" && "$SIZE" != "spotcheck" ]]; then
+  echo "Size must be full, pilot, or spotcheck." >&2
   exit 2
 fi
 if [[ "$EXECUTION_MODE" != "native-only" && "$EXECUTION_MODE" != "frozen-only" ]]; then
@@ -20,7 +20,14 @@ if [[ "$AUTO_SELECTION_EXPERIMENT" != "0" && "$AUTO_SELECTION_EXPERIMENT" != "1"
   echo "SAGE_AUTO_SELECTION_EXPERIMENT must be 0 or 1." >&2
   exit 2
 fi
-if [[ "$SIZE" == "pilot" ]]; then
+if [[ "$SIZE" == "spotcheck" ]]; then
+  if [[ "$AUTO_SELECTION_EXPERIMENT" != "0" ]]; then
+    echo "The production-core spot check is policy-only; SAGE_AUTO_SELECTION_EXPERIMENT must be 0." >&2
+    exit 2
+  fi
+  AUTO_SELECTION_EXPERIMENT="0"
+  AUTO_SELECTION_STAGE="off"
+elif [[ "$SIZE" == "pilot" ]]; then
   AUTO_SELECTION_EXPERIMENT="1"
   AUTO_SELECTION_STAGE="pilot"
 elif [[ "$AUTO_SELECTION_EXPERIMENT" == "1" ]]; then
@@ -227,12 +234,14 @@ if [[ "$AUTO_SELECTION_STAGE" == "full" ]]; then
   SELECTOR_PILOT_EVIDENCE_SHA256="$("$PYTHON_EXECUTABLE" -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$SELECTOR_PILOT_EVIDENCE_PATH")"
 fi
 
-if [[ "$SIZE" == "pilot" ]]; then
+if [[ "$SIZE" == "pilot" || "$SIZE" == "spotcheck" ]]; then
   DEFAULT_MANIFEST="docs/sage_protocol/manifests/sage_auto_selection_pilot_30.json"
   PINNED_BENCHMARK_SHA256="$PINNED_PILOT_BENCHMARK_SHA256"
+  VERIFY_COHORT="pilot"
 else
   DEFAULT_MANIFEST="docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json"
   PINNED_BENCHMARK_SHA256="$PINNED_FULL_BENCHMARK_SHA256"
+  VERIFY_COHORT="full"
 fi
 MANIFEST="${SAGE_BENCHMARK_MANIFEST:-$DEFAULT_MANIFEST}"
 if [[ ! -f "$MANIFEST" ]]; then
@@ -397,7 +406,7 @@ echo "[$ARM] log: $LOG_FILE"
 
 "$PYTHON_EXECUTABLE" scripts/verify_publication_run.py \
   --search-root "$ARM_OUTPUT" \
-  --cohort "$SIZE" \
+  --cohort "$VERIFY_COHORT" \
   --expect-reflection "$REFLECTION_EXPECTATION" | tee -a "$LOG_FILE"
 if [[ "$AUTO_SELECTION_EXPERIMENT" == "1" ]]; then
   if [[ "$AUTO_SELECTION_STAGE" == "full" ]]; then

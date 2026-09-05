@@ -20,7 +20,7 @@ COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
 
 .PHONY: \
 	compile lint test-core test package \
-	paper-online paper-frozen selector-pilot selector-full sample full \
+	spotcheck paper-online paper-frozen selector-pilot selector-full sample full \
 	prepare-paper-rerun verify-publication verify-sample verify-campaign verify-environment verify-inputs verify-freeze \
 	analyze render-paper \
 	require-run require-sample-report require-campaign-manifest require-analysis-output \
@@ -66,6 +66,15 @@ test:
 
 package:
 	$(PYTHON) -m build --outdir $(DIST_DIR)
+
+# Outcome-only operational check of the reduced production application. This
+# runs the pinned representative 30-task cohort with the normal policy actor,
+# a fresh non-learning control, concurrent isolated arms, no application-level
+# response/result cache, and the externally opened Task Compare dashboard.
+# It is an operational check, not a substitute for a complete 1,032-task run
+# or an inferential publication replication.
+spotcheck: require-live-run-approval
+	bash scripts/run_native_action_4omini_ab.sh spotcheck $(PORT) native-only
 
 # One complete 1,032-task online-build sample. The launcher runs the live
 # non-learning control and SAGE concurrently, opens the current Task Compare in

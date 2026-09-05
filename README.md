@@ -17,6 +17,25 @@ correctness changes described below do affect outcome-only trace/lifecycle
 classification, direct generated actions, and the new auto-selection arm; they
 are explicit research-protocol changes rather than cleanup deletions.
 
+### Production code boundary
+
+The result-critical scientific core is exactly 32,260 physical source lines in
+12 files. Its file list, individual hashes, line counts, source checkpoint, and
+combined hash are frozen in
+[`docs/sage_protocol/production_core_manifest_20260904.json`](docs/sage_protocol/production_core_manifest_20260904.json).
+The publication input verifier fails if any byte or line count in that core
+changes. The executable application also retains the smaller supporting surface
+needed for configuration, registry persistence, outcome evaluation, strict
+concurrent orchestration, Task Compare, environment/input verification, and the
+repository launcher.
+
+Research analysis and actor-selection comparison code remains reproducible
+under `scripts/research/`, but it is outside the installed production package.
+Tests, paper-analysis scripts, documentation, and frozen inputs are likewise
+retained for verification and reproducibility rather than counted as production
+SAGE application code. The bundled upstream `tool_sandbox` implementation is a
+dependency and is never counted as SAGE code.
+
 ## Evidence status and correction
 
 The July ten-pair campaign is preserved as an archival development result, not
@@ -70,18 +89,18 @@ For an online publication run it enforces the following schedule and checks:
    pairs: fresh control/policy SAGE and independent fresh control/auto SAGE. A
    third policy/auto causal view opens after both treatment arms complete.
 
-Strict mode does not construct or read the historical control baseline cache.
-Ambiguous duplicate entries in the legacy cache reader fail closed rather than
-being averaged.
+The production runner no longer contains a historical control-baseline cache
+implementation. It accepts only the explicit compatibility value
+`--control-cache off`; every control row is produced live in the current paired
+run.
 
-One narrow strict-mode exclusion prevents other runs' history from entering a
-strict run. Strict publication runs disable cross-run failure-memory input;
-nonpublication runs retain that development behavior. The generator's validated
-within-run contract-and-repair-analysis memoization remains unchanged: it can reuse an
-identical public-contract or rejected-code repair analysis during one generator
-lifetime, but it is never persisted or loaded from another run. The launcher
-additionally requires a clean Git tree
-and the exact validated isolated Python environment before it can start either
+The production runner also disables cross-run failure-memory input. The
+generator's validated within-run contract-and-repair-analysis memoization
+remains unchanged: it can reuse an identical public contract or rejected-code
+repair analysis during one generator lifetime, but it is never persisted or
+loaded from another run. The runner has no sequential, cached-control, or
+partial-resume execution fallback. It requires a clean Git tree and the exact
+validated isolated Python environment before it can start either concurrent
 arm.
 
 ### Matched actor-selection arm
@@ -309,7 +328,9 @@ Important frozen inputs include:
   `3dc78ec78986b74230971f01b0f40bae74710de2065371c46208061d392f48a7` /
   `f14d86181b2085afc94df5c8cc39a2892f9e8c4bb44a0ba2b9d418a81d9f39f6`;
 - active release manifest: SHA-256
-  `8e7e2ecd4ca95e2f8484adf5610986f8d15106d6e054967940acd365c346c658`;
+  `5e8d413b5f7bb2907e0b0ef1dc6210517e5a2f695339ce96d3807b7f69423902`;
+- exact 32,260-line scientific-core manifest: SHA-256
+  `dc46a51032bbf4e7cf09527d6d03ce6877988476ef821bc9883a7861665c1637`;
 - authoritative local publication manifest: SHA-256
   `9a7c53fb9c305279dd2eedf5bf5af93e98c37f91b71d028eb065524ec381a8b2`.
 
@@ -323,6 +344,25 @@ commit/tree, public benchmark, sanitized fixture, historical analysis
 references, and validation thresholds. If the full ignored recovery bundle is
 present on the cleanup host, `make verify-freeze` performs the optional deeper
 local audit; it is not required for clean-clone reproduction.
+
+## Run the reduced-core spot check
+
+Before spending a complete benchmark run, use the pinned representative
+30-task cohort to check that the reduced production application still executes
+normally:
+
+```bash
+SAGE_RUN_STAMP=core_cleanup_spotcheck_$(date +%Y%m%d_%H%M%S) \
+  make spotcheck APPROVE_LIVE_RUN=YES PORT=63113
+```
+
+This runs only the normal policy SAGE arm against a fresh non-learning control.
+The two arms run concurrently in isolated processes, all application-level
+response/result caches are off, and the current Task Compare is verified and
+opened externally before either arm makes a model request. The check requires
+complete v4 outcomes and zero runtime-integrity failures. Because 30 live tasks
+are noisy, its outcome is an operational regression signal rather than an
+inferential result or a substitute for the full benchmark.
 
 ## Run one complete fresh-control sample
 
@@ -457,8 +497,10 @@ directory; it does not contain hard-coded result values.
 - `src/sage_ts/registry/`: accepted-tool registry.
 - `src/sage_ts/runtime/`: ToolSandbox injection, base-tool policy, and routing.
 - `src/sage_ts/orchestration/`: online birth and fresh-control reflection.
-- `src/sage_ts/evaluation/`: outcome, lifecycle, usage, and Chapter 4 evidence.
-- `src/sage_ts/dashboard/`: run and publication evidence views.
+- `src/sage_ts/evaluation/`: outcome, lifecycle, and usage evidence.
+- `src/sage_ts/dashboard/`: the live outcome-only Task Compare view.
+- `scripts/research/`: retained Chapter 4 and selector analyses, outside the
+  production package.
 - `tool_sandbox/`: the upstream benchmark environment, scenarios, roles,
   tools, and scoring code.
 
