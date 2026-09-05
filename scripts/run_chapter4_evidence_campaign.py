@@ -97,7 +97,7 @@ GENERATION_SETTINGS_FILES = (
     Path("src/sage_ts/orchestration/online_birth.py"),
     Path("src/sage_ts/orchestration/self_evolution_reflection.py"),
     Path("src/sage_ts/registry/content_identity.py"),
-    Path("docs/sage_protocol/publication_validation_thresholds_v4.json"),
+    Path("docs/sage_protocol/publication_validation_thresholds_v5.json"),
 )
 SAMPLE_RELEASE_IDENTITY_FIELDS = (
     "git_commit",
@@ -164,7 +164,9 @@ def _expected_claim_safeguards() -> dict[str, Any]:
         "openai_response_cache": "disabled",
         "openai_response_cache_scope": "persistent_repository_whole_response_replay",
         "persistent_generation_output_cache": "disabled",
-        "generator_contract_and_repair_analysis_memoization": "within_run_only",
+        "generator_contract_and_repair_analysis_memoization": (
+            "disabled_every_analysis_request_live"
+        ),
         "openai_provider_prompt_prefix_cache": "automatic_implicit",
         "execution_environment": dict(PUBLICATION_EXECUTION_ENV),
         "control_cache": "off",

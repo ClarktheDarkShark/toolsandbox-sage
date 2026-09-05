@@ -49,15 +49,33 @@ control rows in all ten online and ten frozen arms, and the online reflection
 controller also read them when making lifecycle decisions.
 
 The outcome values previously reported for that campaign are also superseded.
-They were produced before every benchmark task had an explicit,
-route-independent outcome contract, and a later audit found that generic state
-checks still depended on route-conditioned benchmark scoring. The independently
-checked v4 rescore now uses route-independent final-state matching and each
-arm's evidenced timezone. Across the preserved terminal trajectories it finds
-333/1,032 exact outcomes (mean 0.4370005023280137) for the original-v140
-reference and 5,981/10,320 exact outcomes across the ten SAGE replications
-(mean of run means 0.6436038062482871); the lowest replication is 584/1,032
-(mean 0.6276863642409402). These are historical engineering references only.
+The paper-era value `0.8095094479761491` used the old evaluator and only 800
+outcome-scored tasks; it is not an all-1,032-task result and must not be compared
+directly with a current full-benchmark value. Those values were produced before
+every benchmark task had an explicit, route-independent outcome contract, and a
+later audit found that generic state checks still depended on route-conditioned
+benchmark scoring. The independently checked v5 rescore now uses repaired
+terminal-answer selection, independently sufficient missing-information
+contracts, the frozen fixture's distance target, route-independent final-state
+matching, and each arm's evidenced timezone. Across the preserved terminal
+trajectories it finds 483/1,032 exact outcomes (mean 0.5318152454780362) for the
+original-v140 reference and 6,513/10,320 exact outcomes across the ten SAGE
+replications (mean of run means 0.6776728036175711); the lowest replication is
+636/1,032 (mean 0.6640826873385013). These are historical engineering
+references only.
+
+The current completed pair rescores to 521/1,032 exact outcomes (mean
+0.5540213178294574) for control and 660/1,032 (mean 0.6920219638242894) for
+SAGE. Under that same final evaluator, paper replication 5 is 649/1,032 (mean
+0.675952842377261), so the current SAGE trajectory is 11 exact successes and
+0.016069121447028323 outcome points higher. On the exact legacy-800 cohort,
+the current trajectory is 575/800 (mean 0.7864583333333333) versus 563/800
+(mean 0.7644791666666667) for paper replication 5. This read-only result
+explains the apparent discrepancy; it is not a new live run. The compact audit
+is [`outcome_discrepancy_resolution_v5_summary.json`](docs/sage_protocol/outcome_discrepancy_resolution_v5_summary.json),
+and its content-addressed raw reports and full 1,032-task crosswalk are shipped
+as deterministic compressed archives.
+
 The rescore cannot repair unequal replication, online feedback, tool-birth,
 routing, lifecycle, or cache provenance, so no final hypothesis decision is
 claimed from the historical campaign.
@@ -96,14 +114,14 @@ implementation. It accepts only the explicit compatibility value
 `--control-cache off`; every control row is produced live in the current paired
 run.
 
-The production runner also disables cross-run failure-memory input. The
-generator's validated within-run contract-and-repair-analysis memoization
-remains unchanged: it can reuse an identical public contract or rejected-code
-repair analysis during one generator lifetime, but it is never persisted or
-loaded from another run. The runner has no sequential, cached-control, or
-partial-resume execution fallback. It requires a clean Git tree and the exact
-validated isolated Python environment before it can start either concurrent
-arm.
+The production runner also disables cross-run failure-memory input. It disables
+generator contract-and-repair analysis memoization as well: every generation
+analysis request is live, including an identical request later in the same run.
+The immutable 2026-09-02 amendment remains preserved for audit history, and the
+2026-09-04 execution policy explicitly supersedes only that memoization setting.
+The runner has no sequential, cached-control, or partial-resume execution
+fallback. It requires a clean Git tree and the exact validated isolated Python
+environment before it can start either concurrent arm.
 
 ### Matched actor-selection arm
 
@@ -114,6 +132,15 @@ schema hiding, and any named `tool_choice` remain active. The experimental
 `auto` mode takes the first branch in actor inference and sends the original
 conversation plus every routed native and generated schema directly to the
 upstream model. It does not run any of those policy-selection interventions.
+
+The auto response is not postprocessed or truncated: every parallel tool call
+returned by the model is preserved. ToolSandbox validates every distinct
+call-content ordering for all arms. It deduplicates only permutations that are
+execution-equivalent because the calls have identical executable content;
+different tool-call IDs alone are response-correlation identities and do not
+create a distinct execution order. This symmetric rule prevents factorial
+identity-only re-execution without changing the model response or favoring an
+actor-selection arm.
 
 The comparison is fail-closed and matched per task. The first live pair runs a
 fresh non-learning control and policy SAGE concurrently. The policy donor captures
@@ -136,12 +163,15 @@ asserts that every auto request has mode `auto`, no named `tool_choice`, and the
 complete routed schema bundle. The post-run comparison reports only the frozen
 outcome-evaluator values. Freshness, matching inventory, complete task coverage,
 concurrency, schema/choice assertions, and runtime validity are fail-closed
-experiment-integrity requirements. Generated-tool call, failure, and
-unsuccessful-attempt counts remain mechanism diagnostics: they never pass or
-fail the selector experiment, change its process exit, or determine full-run
-pilot eligibility. The selector pilot has no predeclared policy-versus-auto
-performance threshold; complete, valid policy/auto outcomes are compared and
-reported without turning the noisy 30-task difference into an eligibility gate.
+experiment-integrity requirements. The selector pilot has one predeclared
+mechanism eligibility gate before SAGE may recommend the 1,032-task comparison:
+the auto arm must call a generated tool in at least one scenario and must have
+zero scenarios with a generated-tool execution failure. Those conditions test
+whether model selection from the routed generated inventory is both exercised
+and stable. They are not outcome-performance gates, do not impose a
+policy-versus-auto outcome threshold, and do not alter the outcomes reported
+for the 30 tasks. Other generated-tool and unsuccessful-attempt counts remain
+mechanism diagnostics only.
 
 A generated tool may be the terminal action when it safely produces the correct
 final state; the actor does not need to make a second, visible native-tool call
@@ -290,33 +320,30 @@ running an experiment or obtaining private/local archives:
 make verify-core
 ```
 
-`make verify-inputs` is the full release-chain check. It remains fail-closed
-until the final 2026-09-05 release generation binds this core manifest to the
-corrected evaluator, historical rescore, and outcome-only thresholds.
-
-The compact v4 predecessor chain is frozen in the immutable
-[`2026-09-03 release manifest`](docs/sage_protocol/publication_release_manifest_20260903.json).
-Once the final active release generation is present, `make verify-inputs`
-verifies the immutable
+The compact v5 release chain is frozen in the
+[`2026-09-05 release manifest`](docs/sage_protocol/publication_release_manifest_20260905.json).
+`make verify-inputs` verifies the immutable
 [`P0 input manifest`](docs/sage_protocol/publication_input_manifest_20260901.json),
 its amendment, the active execution policy, evaluator and rescorer identities,
-benchmark bytes and order, sanitized fixture,
-[`historical-rescore summary`](docs/sage_protocol/historical_outcome_rescore_v4_summary.json),
-[`outcome-only thresholds`](docs/sage_protocol/publication_validation_thresholds_v4.json),
+benchmark bytes and order, sanitized fixture, the 32,540-line production-core
+manifest, the compressed raw rescores and exact-name crosswalk,
+[`historical-rescore summary`](docs/sage_protocol/historical_outcome_rescore_v5_summary.json),
+[`outcome-only thresholds`](docs/sage_protocol/publication_validation_thresholds_v5.json),
 and the checkpoint commit/tree. The historical summary re-evaluates preserved
 terminal trajectories using independently inferred per-arm timezones; it does
 not replay the campaign or repair its cache/lifecycle confounding and is not
 confirmatory evidence. A history-limited shallow clone must fetch the checkpoint
 ancestor before running the check.
 
-The content-hashed checkpoint remains immutable. Its statement that generator
-analysis memoization should be removed is explicitly superseded by the
-[`2026-09-02 checkpoint amendment`](docs/sage_protocol/publication_checkpoint_amendment_20260902.json),
-which restores the deferred within-run behavior without altering the frozen
-checkpoint bytes. The extending 2026-09-03 execution policy adds concurrent-arm,
+The content-hashed checkpoint and its amendment remain immutable. The
+[`2026-09-02 checkpoint amendment`](docs/sage_protocol/publication_checkpoint_amendment_20260902.json)
+preserves the then-validated within-run generator memoization policy. The
+extending 2026-09-04 execution policy explicitly supersedes that one setting
+with `disabled_every_analysis_request_live`, while retaining the amendment as
+an immutable release-history link. It also carries forward concurrent-arm,
 external-dashboard, direct generated-action, and outcome-only requirements.
 The evaluator, rescorer, and threshold identities are content-addressed in the
-validated v4 release chain.
+validated v5 release chain.
 
 Important frozen inputs include:
 
@@ -328,18 +355,22 @@ Important frozen inputs include:
   `5c3ea1802331bf45809fd3e3e31fd8352473449e709cd7a443d03d1975477d1f`;
 - original v140 sensitivity snapshot: 1,032 records, SHA-256
   `4f9db0f186a25a247a31fe6a934c3e87785bc80c65b455f20e677d6315638c88`;
-- v4 outcome evaluator contract/source: SHA-256
-  `4032411fd203ddfd061753e330cee2218d715756950b69d059792de7409efdce` /
-  `c4fd84d9fbc42488c051565a96faf952c2580fca2df9e582817933aeed9e3eab`;
+- v5 outcome evaluator contract/source: SHA-256
+  `568c0e8accb8e155cbe47c41c93157651a2984dd348b5b8533e337517bb3e68e` /
+  `f23c238b4e5a73e5a1db66450188d8bc0dae7a701e01e1fc873ea03bd7323d15`;
 - historical rescorer source: SHA-256
   `17d17a2c5ca65f8a0f11d0eadb1d0a6d24a70280d1171ad0f6c722bfe214489f`;
-- compact v4 rescore summary and outcome thresholds: SHA-256
-  `3dc78ec78986b74230971f01b0f40bae74710de2065371c46208061d392f48a7` /
-  `f14d86181b2085afc94df5c8cc39a2892f9e8c4bb44a0ba2b9d418a81d9f39f6`;
+- compact v5 historical-rescore summary, discrepancy summary, and outcome
+  thresholds: SHA-256
+  `b96958d6fa6df43e5531aebdcb8a58842e65da4c4f49876969672d287648c3a8` /
+  `ac24e5f0f87f7990406f2e3c59433dfd054c2393ae67a6271025c51e2decf98c` /
+  `726c4a41c66b034237727cb6c8d1bf0e6139814c058861af88c21079f7bc8b80`;
+- production scientific-core manifest: 32,540 physical lines, SHA-256
+  `51bca58741f9917228e14d472f4e6401af85635457fd7e0af4e3206686c47a53`;
+- active release manifest: SHA-256
+  `7652bbb0f5cfd9952f57df961cbb43284e5e3cf2d5dcb57d77adfe862a33110a`;
 - immutable 2026-09-03 predecessor release manifest: SHA-256
   `8e7e2ecd4ca95e2f8484adf5610986f8d15106d6e054967940acd365c346c658`;
-- active 32,540-line scientific-core manifest: SHA-256
-  `51bca58741f9917228e14d472f4e6401af85635457fd7e0af4e3206686c47a53`;
 - preserved 32,260-line predecessor core manifest: SHA-256
   `dc46a51032bbf4e7cf09527d6d03ce6877988476ef821bc9883a7861665c1637`;
 - authoritative local publication manifest: SHA-256
@@ -371,7 +402,7 @@ This runs only the normal policy SAGE arm against a fresh non-learning control.
 The two arms run concurrently in isolated processes, all application-level
 response/result caches are off, and the current Task Compare is verified and
 opened externally before either arm makes a model request. The check requires
-complete v4 outcomes and zero runtime-integrity failures. Because 30 live tasks
+complete v5 outcomes and zero runtime-integrity failures. Because 30 live tasks
 are noisy, its outcome is an operational regression signal rather than an
 inferential result or a substitute for the full benchmark.
 
@@ -403,7 +434,7 @@ make verify-publication \
   RUN=outputs/publication_validation/<run-stamp>/native_action
 ```
 
-The frozen v4 one-sample engineering thresholds require an outcome for every
+The frozen v5 one-sample engineering thresholds require an outcome for every
 task, complete concurrent arms without
 application result/response replay, zero terminal runtime failures, and the
 predeclared outcome-only no-regression and same-run comparison rules. Accepted,
@@ -414,7 +445,7 @@ history. Verification requires the explicit current path:
 ```bash
 make verify-sample \
   RUN=outputs/publication_validation/<run-stamp>/native_action \
-  VALIDATION_THRESHOLDS=docs/sage_protocol/publication_validation_thresholds_v4.json
+  VALIDATION_THRESHOLDS=docs/sage_protocol/publication_validation_thresholds_v5.json
 ```
 
 Passing one sample is an engineering no-regression check, not confirmatory
@@ -428,10 +459,12 @@ Sample 02 was the first completed strict-intent attempt. It completed both
 protocol and is **configuration-ineligible**. Its old values must not be used as
 current outcome results. The diagnostic record is
 [`docs/sage_protocol/publication_validation_sample02_report.md`](docs/sage_protocol/publication_validation_sample02_report.md).
-That post-run audit also found and corrected two release drifts: removed
-within-run generator memoization and an omitted historical five-retry setting.
-The replacement launcher now fail-closes all retry layers and request timeouts.
-It also rejects diagnostic force/exposure variables in either publication arm.
+That post-run audit also exposed generator-analysis memoization policy drift and
+an omitted historical five-retry setting. The immutable amendment records the
+intermediate policy; the active v5 policy now explicitly disables within-run
+analysis memoization and preserves five retries. The replacement launcher
+fail-closes all retry layers and request timeouts and rejects diagnostic
+force/exposure variables in either publication arm.
 
 Sample 03 completed an earlier engineering validation, but it used a partial
 outcome-evaluator surface and predates the current concurrent-pair requirement.
@@ -440,7 +473,7 @@ threshold, or release claim.
 
 The September 2 ten-online/ten-frozen campaign manifest is also superseded and
 was never executed. A new manifest will be prepared only from a passing sample
-under the frozen v4 evaluator, concurrent-arm launcher, and dashboard policy.
+under the frozen v5 evaluator, concurrent-arm launcher, and dashboard policy.
 Preparation makes no model calls; execution still requires separate, explicit
 researcher approval.
 

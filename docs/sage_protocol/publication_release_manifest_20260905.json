@@ -1,0 +1,38 @@
+{
+  "schema_version": 2,
+  "manifest_type": "publication_release_input_chain",
+  "created_at": "2026-09-05",
+  "purpose": "Content-address the immutable P0 inputs, preserved checkpoint amendment, strict concurrent no-cache execution policy, final v5 outcome evaluator and denominator crosswalk, reduced production scientific core, and outcome-only validation thresholds for selector-pilot preflight.",
+  "supersedes_release_manifest": {
+    "path": "docs/sage_protocol/publication_release_manifest_20260903.json",
+    "sha256": "8e7e2ecd4ca95e2f8484adf5610986f8d15106d6e054967940acd365c346c658"
+  },
+  "base_input_manifest": {
+    "path": "docs/sage_protocol/publication_input_manifest_20260901.json",
+    "sha256": "3a54888be13143b3bac9dac1b8b542220812d40424c97395e5e3d3448a261fbb"
+  },
+  "checkpoint_policy_amendment": {
+    "path": "docs/sage_protocol/publication_checkpoint_amendment_20260902.json",
+    "sha256": "bac8d45e2d75984a187e5b0dbb9ed59dd07d91eec965ad1440ba4ec898729dab"
+  },
+  "active_execution_policy": {
+    "path": "docs/sage_protocol/publication_execution_policy_20260904.json",
+    "sha256": "0026a9282aa90bf5d6776abce1f6af66595b763bfee2caeaeca75e808250767c"
+  },
+  "historical_outcome_rescore_summary": {
+    "path": "docs/sage_protocol/historical_outcome_rescore_v5_summary.json",
+    "sha256": "b96958d6fa6df43e5531aebdcb8a58842e65da4c4f49876969672d287648c3a8"
+  },
+  "outcome_discrepancy_resolution_summary": {
+    "path": "docs/sage_protocol/outcome_discrepancy_resolution_v5_summary.json",
+    "sha256": "ac24e5f0f87f7990406f2e3c59433dfd054c2393ae67a6271025c51e2decf98c"
+  },
+  "production_scientific_core": {
+    "path": "docs/sage_protocol/production_core_manifest_20260905.json",
+    "sha256": "51bca58741f9917228e14d472f4e6401af85635457fd7e0af4e3206686c47a53"
+  },
+  "active_validation_thresholds": {
+    "path": "docs/sage_protocol/publication_validation_thresholds_v5.json",
+    "sha256": "726c4a41c66b034237727cb6c8d1bf0e6139814c058861af88c21079f7bc8b80"
+  }
+}

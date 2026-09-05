@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
+import lzma
 import math
 import re
 import subprocess
@@ -31,7 +33,7 @@ BASE_INPUT_MANIFEST = Path(
     "docs/sage_protocol/publication_input_manifest_20260901.json"
 )
 DEFAULT_MANIFEST = Path("docs/sage_protocol/publication_release_manifest_20260905.json")
-ACTIVE_PRODUCTION_CORE_DECLARATION = {
+EXPECTED_ACTIVE_PRODUCTION_CORE = {
     "path": "docs/sage_protocol/production_core_manifest_20260905.json",
     "sha256": "51bca58741f9917228e14d472f4e6401af85635457fd7e0af4e3206686c47a53",
 }
@@ -52,6 +54,29 @@ EXPECTED_REPLACEMENT_POLICY = {
         "SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS": "600",
     },
 }
+EXPECTED_AMENDMENT_POLICY_SUPERSESSION = {
+    "field": "generator_contract_and_repair_analysis_memoization",
+    "superseded_value": "within_run_only",
+    "active_value": "disabled_every_analysis_request_live",
+    "scope": "all_live_publication_generation_analysis_requests",
+    "reason": (
+        "The repaired production runner no longer reuses contract or repair "
+        "analysis responses within a run; every generation analysis request is "
+        "live. The immutable 2026-09-02 amendment remains preserved as release "
+        "history and is explicitly superseded only for this active policy."
+    ),
+}
+EXPECTED_PARALLEL_TOOL_CALL_EXECUTION = {
+    "auto_response_postprocessing": "none",
+    "auto_response_truncation": "none",
+    "parallel_model_returned_tool_calls_preserved": True,
+    "all_distinct_call_content_orderings_validated": True,
+    "semantic_permutation_deduplication": (
+        "execution_equivalent_identical_call_contents_only"
+    ),
+    "semantic_permutation_deduplication_applies_to_all_arms": True,
+    "tool_call_ids_alone_create_distinct_execution_order": False,
+}
 EXPECTED_ACTIVE_EXECUTION_POLICY = {
     "execution_environment": {
         "TZ": "America/New_York",
@@ -66,6 +91,9 @@ EXPECTED_ACTIVE_EXECUTION_POLICY = {
         "control_cache_mode": "off",
         "repository_whole_response_replay": "disabled",
         "persistent_generation_output_replay": "disabled",
+        "generator_contract_and_repair_analysis_memoization": (
+            "disabled_every_analysis_request_live"
+        ),
         "sage_task_cache": "disabled",
         "cross_run_failure_memory": "disabled",
         "resume": "disabled",
@@ -141,6 +169,7 @@ EXPECTED_ACTIVE_EXECUTION_POLICY = {
         "final_state_and_safety_checks_required": True,
         "mechanism_counts_are_release_gates": False,
     },
+    "parallel_tool_call_execution": EXPECTED_PARALLEL_TOOL_CALL_EXECUTION,
     "actor_selection_experiment": {
         "pair_1_control_and_policy_sage": "concurrent_isolated_child_processes",
         "pair_2_independent_control_and_auto_sage": (
@@ -148,6 +177,19 @@ EXPECTED_ACTIVE_EXECUTION_POLICY = {
         ),
         "auto_replay_timing": "after_policy_inventory_authority_completion",
         "policy_and_auto_inventory_match_required_per_task": True,
+        "pilot_mechanism_eligibility_gate": {
+            "applies_to": "sage_auto_selection",
+            "minimum_generated_tool_called_scenarios": 1,
+            "maximum_generated_tool_execution_failure_scenarios": 0,
+            "called_scenario_evidence_field": (
+                "auto_selection.generated_tool_called_scenarios"
+            ),
+            "failure_scenario_evidence_field": (
+                "auto_selection.generated_tool_failed_scenarios"
+            ),
+            "required_before_recommending_full_1032_task_comparison": True,
+            "mechanism_eligibility_not_outcome_performance": True,
+        },
         "reason": (
             "The auto arm must replay the policy donor's exact per-task routed "
             "inventory. Once that authority exists, auto runs concurrently with a "
@@ -299,6 +341,216 @@ def _assert_hash(path: Path, expected: str, label: str) -> str:
             f"{label} hash mismatch: expected {expected}, observed {observed}"
         )
     return observed
+
+
+def _canonical_json_sha256(payload: Any) -> str:
+    encoded = (
+        json.dumps(
+            payload,
+            sort_keys=True,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _ordered_names_sha256(names: list[str]) -> str:
+    return hashlib.sha256(("\n".join(names) + "\n").encode("utf-8")).hexdigest()
+
+
+def _verify_measurement_archive(
+    repo_root: Path,
+    source: dict[str, Any],
+    *,
+    label: str,
+) -> dict[str, Any]:
+    expected_source_fields = {
+        "raw_local_path",
+        "raw_available_in_public_release",
+        "raw_file_sha256",
+        "payload_content_address_sha256",
+        "public_archive",
+    }
+    if set(source) != expected_source_fields:
+        raise InputVerificationError(f"{label} source-artifact fields are not exact")
+    _string(source, "raw_local_path", label)
+    if source.get("raw_available_in_public_release") is not False:
+        raise InputVerificationError(f"{label} raw ignored JSON is marked public")
+    raw_sha256 = _hash(source, "raw_file_sha256", label)
+    expected_payload_sha256 = _hash(source, "payload_content_address_sha256", label)
+    archive = _object(source, "public_archive", label)
+    if set(archive) != {
+        "path",
+        "compression",
+        "sha256",
+        "size",
+        "uncompressed_size",
+        "uncompressed_sha256",
+    }:
+        raise InputVerificationError(f"{label} public-archive fields are not exact")
+    archive_path, archive_relative = _tracked_file(
+        repo_root,
+        _string(archive, "path", f"{label} archive"),
+        f"{label} public archive",
+    )
+    archive_sha256 = _assert_hash(
+        archive_path,
+        _hash(archive, "sha256", f"{label} archive"),
+        f"{label} public archive",
+    )
+    archive_size = _integer(archive, "size", f"{label} archive")
+    if archive_size != archive_path.stat().st_size or archive_size >= 500_000:
+        raise InputVerificationError(
+            f"{label} public archive size is wrong or reaches the 500 KB hook limit"
+        )
+    compression = _string(archive, "compression", f"{label} archive")
+    compressed = archive_path.read_bytes()
+    try:
+        if compression == "gzip-9-no-name":
+            if len(compressed) < 10 or compressed[:3] != b"\x1f\x8b\x08":
+                raise InputVerificationError(f"{label} is not a gzip stream")
+            if compressed[3] & 0x08 or compressed[4:8] != b"\x00\x00\x00\x00":
+                raise InputVerificationError(
+                    f"{label} gzip header contains a name or nonzero timestamp"
+                )
+            raw = gzip.decompress(compressed)
+        elif compression == "xz-9e-single-thread-sha256":
+            raw = lzma.decompress(compressed, format=lzma.FORMAT_XZ)
+        else:
+            raise InputVerificationError(f"{label} has unsupported compression")
+    except (OSError, EOFError, lzma.LZMAError) as exc:
+        raise InputVerificationError(f"Cannot decompress {label}: {exc}") from exc
+    raw_size = _integer(archive, "uncompressed_size", f"{label} archive")
+    if len(raw) != raw_size:
+        raise InputVerificationError(f"{label} uncompressed size does not match")
+    archive_raw_sha256 = _hash(archive, "uncompressed_sha256", f"{label} archive")
+    actual_raw_sha256 = hashlib.sha256(raw).hexdigest()
+    if actual_raw_sha256 != raw_sha256 or archive_raw_sha256 != raw_sha256:
+        raise InputVerificationError(f"{label} uncompressed SHA-256 does not match")
+    try:
+        document = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise InputVerificationError(f"{label} archive is not JSON: {exc}") from exc
+    if not isinstance(document, dict):
+        raise InputVerificationError(f"{label} archived document is not an object")
+    address = _object(document, "content_address", f"{label} archived document")
+    payload = _object(document, "payload", f"{label} archived document")
+    if address.get("algorithm") != "sha256(canonical-json(payload))":
+        raise InputVerificationError(f"{label} content-address algorithm changed")
+    recorded_payload_sha256 = _hash(address, "sha256", f"{label} content address")
+    actual_payload_sha256 = _canonical_json_sha256(payload)
+    if (
+        recorded_payload_sha256 != expected_payload_sha256
+        or actual_payload_sha256 != expected_payload_sha256
+    ):
+        raise InputVerificationError(f"{label} payload content address does not match")
+    return {
+        "path": archive_relative,
+        "sha256": archive_sha256,
+        "size": archive_size,
+        "raw_sha256": raw_sha256,
+        "raw_size": raw_size,
+        "payload_content_address_sha256": expected_payload_sha256,
+        "document": document,
+    }
+
+
+def _verify_production_core_manifest(
+    repo_root: Path,
+    declaration: dict[str, Any],
+) -> dict[str, Any]:
+    if not _exact_equal(declaration, EXPECTED_ACTIVE_PRODUCTION_CORE):
+        raise InputVerificationError("Active production core declaration changed")
+    path, relative = _tracked_file(
+        repo_root,
+        _string(declaration, "path", "production_core_manifest"),
+        "production core manifest",
+    )
+    observed_hash = _assert_hash(
+        path,
+        _hash(declaration, "sha256", "production_core_manifest"),
+        "production core manifest",
+    )
+    payload = _read_object(path, "production core manifest")
+    if set(payload) != {
+        "schema_version",
+        "manifest_type",
+        "purpose",
+        "source_checkpoint",
+        "counting_method",
+        "physical_lines",
+        "file_manifest_sha256",
+        "files",
+    }:
+        raise InputVerificationError("Production core manifest fields are not exact")
+    if (
+        payload.get("schema_version") != 1
+        or payload.get("manifest_type") != "sage_production_scientific_core"
+    ):
+        raise InputVerificationError("Unsupported production core manifest schema")
+    source_checkpoint = _object(payload, "source_checkpoint", "production core")
+    if set(source_checkpoint) != {"git_commit", "git_tree"}:
+        raise InputVerificationError("Production core source checkpoint is not exact")
+    _git_oid(source_checkpoint, "git_commit", "production core checkpoint")
+    _git_oid(source_checkpoint, "git_tree", "production core checkpoint")
+    files = payload.get("files")
+    if not isinstance(files, list) or len(files) != 12:
+        raise InputVerificationError("Production core must contain exactly 12 files")
+    normalized: list[dict[str, Any]] = []
+    for index, record in enumerate(files):
+        if not isinstance(record, dict) or set(record) != {
+            "path",
+            "physical_lines",
+            "sha256",
+        }:
+            raise InputVerificationError(f"Production core file {index} is not exact")
+        source_path, source_relative = _tracked_file(
+            repo_root,
+            _string(record, "path", f"production core file {index}"),
+            f"production core source file {index}",
+        )
+        source_sha256 = _assert_hash(
+            source_path,
+            _hash(record, "sha256", f"production core file {index}"),
+            f"production core source file {index}",
+        )
+        physical_lines = _integer(
+            record, "physical_lines", f"production core file {index}"
+        )
+        if physical_lines != len(source_path.read_bytes().splitlines()):
+            raise InputVerificationError(
+                f"Production core source line count changed for {source_relative}"
+            )
+        normalized.append(
+            {
+                "path": source_relative,
+                "physical_lines": physical_lines,
+                "sha256": source_sha256,
+            }
+        )
+    if len({record["path"] for record in normalized}) != len(normalized):
+        raise InputVerificationError("Production core manifest duplicates a file")
+    physical_lines = _integer(payload, "physical_lines", "production core")
+    if physical_lines != sum(record["physical_lines"] for record in normalized):
+        raise InputVerificationError("Production core physical-line total changed")
+    file_manifest_sha256 = _hash(payload, "file_manifest_sha256", "production core")
+    manifest_rows = "".join(
+        f"{record['path']}\t{record['physical_lines']}\t{record['sha256']}\n"
+        for record in normalized
+    ).encode("utf-8")
+    if hashlib.sha256(manifest_rows).hexdigest() != file_manifest_sha256:
+        raise InputVerificationError("Production core file-manifest digest changed")
+    return {
+        "path": relative,
+        "sha256": observed_hash,
+        "physical_lines": physical_lines,
+        "file_count": len(normalized),
+        "file_manifest_sha256": file_manifest_sha256,
+        "source_checkpoint": source_checkpoint,
+    }
 
 
 def _canonical_distribution_name(name: str) -> str:
@@ -775,6 +1027,7 @@ def _verify_active_execution_policy(
         "created_at",
         "purpose",
         "extends",
+        "amendment_policy_supersession",
         *EXPECTED_ACTIVE_EXECUTION_POLICY,
         "immutable_inputs_changed",
     }
@@ -783,7 +1036,7 @@ def _verify_active_execution_policy(
             "Active publication execution policy fields are not exact"
         )
     if (
-        payload.get("schema_version") != 1
+        payload.get("schema_version") != 2
         or payload.get("manifest_type") != "publication_execution_policy"
     ):
         raise InputVerificationError(
@@ -803,6 +1056,25 @@ def _verify_active_execution_policy(
     if not _exact_equal(extends, expected_extends):
         raise InputVerificationError(
             "Active publication execution policy extends a different amendment"
+        )
+    supersession = _object(
+        payload,
+        "amendment_policy_supersession",
+        "active publication execution policy",
+    )
+    if not _exact_equal(supersession, EXPECTED_AMENDMENT_POLICY_SUPERSESSION):
+        raise InputVerificationError(
+            "Active publication execution policy does not exactly supersede the "
+            "amendment's within-run generator memoization policy"
+        )
+    amendment_replacement = cast(dict[str, Any], amendment["replacement_policy"])
+    if (
+        amendment_replacement.get(supersession["field"])
+        != supersession["superseded_value"]
+    ):
+        raise InputVerificationError(
+            "Active execution-policy supersession does not name the frozen "
+            "amendment value"
         )
     performance_endpoint = cast(
         dict[str, Any], EXPECTED_ACTIVE_EXECUTION_POLICY["performance_endpoint"]
@@ -829,10 +1101,12 @@ def _verify_active_execution_policy(
         "performance_endpoint": "outcome_task_completion_similarity",
         "paired_arm_schedule": payload["paired_arm_schedule"],
         "task_compare_dashboard": payload["task_compare_dashboard"],
+        "parallel_tool_call_execution": payload["parallel_tool_call_execution"],
+        "actor_selection_experiment": payload["actor_selection_experiment"],
     }
 
 
-def _verify_superseded_release_manifest(
+def _verify_legacy_superseded_release_manifest(
     repo_root: Path,
     declaration: dict[str, Any],
     *,
@@ -909,6 +1183,141 @@ def _verify_superseded_release_manifest(
         "path": relative,
         "sha256": observed_hash,
         "validation_thresholds": thresholds,
+    }
+
+
+def _verify_superseded_release_manifest(
+    repo_root: Path,
+    declaration: dict[str, Any],
+    *,
+    base_declaration: dict[str, Any],
+    amendment_declaration: dict[str, Any],
+    benchmark: dict[str, Any],
+    fixture: dict[str, Any],
+    analysis: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Verify either the legacy release or a complete chained generation.
+
+    The 2026-09-02 release predates the execution-policy and rescore links. Newer
+    generations carry those links and recursively content-address their
+    predecessor. Prior manifests are never rewritten to fit the newest schema.
+    """
+
+    path, relative = _tracked_file(
+        repo_root,
+        _string(declaration, "path", "superseded_release_manifest"),
+        "superseded publication release manifest",
+    )
+    observed_hash = _assert_hash(
+        path,
+        _hash(declaration, "sha256", "superseded_release_manifest"),
+        "superseded publication release manifest",
+    )
+    payload = _read_object(path, "superseded publication release manifest")
+    legacy_fields = {
+        "schema_version",
+        "manifest_type",
+        "created_at",
+        "purpose",
+        "base_input_manifest",
+        "checkpoint_policy_amendment",
+        "active_validation_thresholds",
+    }
+    complete_fields = {
+        *legacy_fields,
+        "supersedes_release_manifest",
+        "active_execution_policy",
+        "historical_outcome_rescore_summary",
+    }
+    if set(payload) == legacy_fields:
+        return _verify_legacy_superseded_release_manifest(
+            repo_root,
+            declaration,
+            base_declaration=base_declaration,
+            amendment_declaration=amendment_declaration,
+            benchmark=benchmark,
+            fixture=fixture,
+            analysis=analysis,
+        )
+    if set(payload) != complete_fields:
+        raise InputVerificationError(
+            "Superseded publication release manifest fields are not exact"
+        )
+    if (
+        payload.get("schema_version") != 1
+        or payload.get("manifest_type") != "publication_release_input_chain"
+    ):
+        raise InputVerificationError(
+            "Unsupported superseded publication release manifest schema"
+        )
+    if not _exact_equal(payload.get("base_input_manifest"), base_declaration):
+        raise InputVerificationError(
+            "Superseded release names a different base input manifest"
+        )
+    if not _exact_equal(
+        payload.get("checkpoint_policy_amendment"), amendment_declaration
+    ):
+        raise InputVerificationError(
+            "Superseded release names a different checkpoint policy amendment"
+        )
+
+    predecessor = _verify_superseded_release_manifest(
+        repo_root,
+        _object(
+            payload,
+            "supersedes_release_manifest",
+            "superseded publication release manifest",
+        ),
+        base_declaration=base_declaration,
+        amendment_declaration=amendment_declaration,
+        benchmark=benchmark,
+        fixture=fixture,
+        analysis=analysis,
+    )
+    component_records: dict[str, dict[str, Any]] = {}
+    for field, label in (
+        ("active_execution_policy", "superseded active execution policy"),
+        (
+            "historical_outcome_rescore_summary",
+            "superseded historical outcome rescore summary",
+        ),
+        ("active_validation_thresholds", "superseded validation thresholds"),
+    ):
+        component = _object(payload, field, "superseded publication release manifest")
+        component_path, component_relative = _tracked_file(
+            repo_root,
+            _string(component, "path", field),
+            label,
+        )
+        component_hash = _assert_hash(
+            component_path,
+            _hash(component, "sha256", field),
+            label,
+        )
+        component_records[field] = {
+            "path": component_relative,
+            "sha256": component_hash,
+        }
+    threshold_payload = _read_object(
+        repo_root / component_records["active_validation_thresholds"]["path"],
+        "superseded active validation thresholds",
+    )
+    if (
+        threshold_payload.get("schema_version") != 2
+        or threshold_payload.get("performance_endpoint")
+        != "outcome_task_completion_similarity"
+    ):
+        raise InputVerificationError(
+            "Superseded complete release does not identify outcome-only thresholds"
+        )
+    return {
+        "path": relative,
+        "sha256": observed_hash,
+        "predecessor": {
+            "path": predecessor["path"],
+            "sha256": predecessor["sha256"],
+        },
+        "validation_thresholds": component_records["active_validation_thresholds"],
     }
 
 
@@ -1363,6 +1772,519 @@ def _verify_historical_outcome_rescore_summary(
         "baseline_exact_outcome_successes": baseline_exact,
         "candidate_run_count": run_count,
         "provenance_status": payload["provenance_status"],
+        "source_report_content_address_sha256": source_report["content_address_sha256"],
+        "source_report_file_sha256": source_report["file_sha256"],
+    }
+
+
+def _verify_outcome_discrepancy_summary(
+    repo_root: Path,
+    declaration: dict[str, Any],
+    *,
+    benchmark: dict[str, Any],
+    historical_rescore: dict[str, Any],
+) -> dict[str, Any]:
+    path, relative = _tracked_file(
+        repo_root,
+        _string(declaration, "path", "outcome_discrepancy_resolution_summary"),
+        "outcome discrepancy resolution summary",
+    )
+    observed_hash = _assert_hash(
+        path,
+        _hash(declaration, "sha256", "outcome_discrepancy_resolution_summary"),
+        "outcome discrepancy resolution summary",
+    )
+    payload = _read_object(path, "outcome discrepancy resolution summary")
+    expected_fields = {
+        "schema_version",
+        "report_type",
+        "created_at",
+        "purpose",
+        "method",
+        "canonical_toolsandbox_scores_consumed",
+        "source_artifacts",
+        "source_run",
+        "outcome_evaluator",
+        "frozen_cohorts",
+        "current_saved_pair",
+        "historical_final_evaluator_reference",
+        "same_final_evaluator_comparison",
+        "paper_reported_metric_context",
+        "conclusion",
+        "limitation",
+    }
+    if set(payload) != expected_fields:
+        raise InputVerificationError(
+            "Outcome discrepancy resolution summary fields are not exact"
+        )
+    if (
+        payload.get("schema_version") != 2
+        or payload.get("report_type") != "outcome_discrepancy_resolution_summary"
+        or payload.get("canonical_toolsandbox_scores_consumed") is not False
+    ):
+        raise InputVerificationError(
+            "Outcome discrepancy summary schema or outcome-only policy changed"
+        )
+    evaluator = _outcome_evaluator_identity(
+        _object(payload, "outcome_evaluator", "outcome discrepancy summary"),
+        "outcome discrepancy evaluator",
+    )
+    if evaluator != historical_rescore["outcome_evaluator"]:
+        raise InputVerificationError(
+            "Outcome discrepancy summary uses a different final evaluator"
+        )
+    expected_cohorts = {
+        "all_1032": {
+            "count": benchmark["task_count"],
+            "ordered_names_sha256": benchmark["ordered_task_names_sha256"],
+        },
+        "legacy_800": {
+            "count": 800,
+            "ordered_names_sha256": (
+                "e296668682aca636c6812d5d730d52610b97eab65129357cb297d14f4391af8c"
+            ),
+        },
+        "excluded_232": {
+            "count": 232,
+            "ordered_names_sha256": (
+                "620149e549459dd831bfbc84780aaace51e3bd5a3780e01ec712434cc66be816"
+            ),
+        },
+    }
+    if not _exact_equal(payload.get("frozen_cohorts"), expected_cohorts):
+        raise InputVerificationError("Outcome discrepancy cohort identities changed")
+
+    sources = _object(payload, "source_artifacts", "outcome discrepancy summary")
+    if set(sources) != {
+        "historical_rescore",
+        "current_pair_rescore",
+        "outcome_metric_crosswalk",
+        "paper_rep05_metric_bridge",
+    }:
+        raise InputVerificationError(
+            "Outcome discrepancy source artifacts are not exact"
+        )
+    archives = {
+        key: _verify_measurement_archive(
+            repo_root,
+            _object(sources, key, "outcome discrepancy sources"),
+            label=key.replace("_", " "),
+        )
+        for key in (
+            "historical_rescore",
+            "current_pair_rescore",
+            "outcome_metric_crosswalk",
+        )
+    }
+    if (
+        archives["historical_rescore"]["payload_content_address_sha256"]
+        != historical_rescore["source_report_content_address_sha256"]
+        or archives["historical_rescore"]["raw_sha256"]
+        != historical_rescore["source_report_file_sha256"]
+    ):
+        raise InputVerificationError(
+            "Historical compact summary and public archive identify different reports"
+        )
+    paper_bridge = _object(
+        sources, "paper_rep05_metric_bridge", "outcome discrepancy sources"
+    )
+    if set(paper_bridge) != {
+        "raw_local_path",
+        "raw_available_in_public_release",
+        "raw_file_sha256",
+    }:
+        raise InputVerificationError("Paper rep05 bridge provenance is not exact")
+    _string(paper_bridge, "raw_local_path", "paper rep05 bridge")
+    if paper_bridge.get("raw_available_in_public_release") is not False:
+        raise InputVerificationError("Ignored paper rep05 bridge is marked public")
+    paper_bridge_sha256 = _hash(paper_bridge, "raw_file_sha256", "paper rep05 bridge")
+
+    historical_document = archives["historical_rescore"]["document"]
+    current_document = archives["current_pair_rescore"]["document"]
+    crosswalk_document = archives["outcome_metric_crosswalk"]["document"]
+    historical_payload = _object(
+        historical_document, "payload", "archived historical rescore"
+    )
+    current_payload = _object(current_document, "payload", "archived current rescore")
+    crosswalk = _object(crosswalk_document, "payload", "archived outcome crosswalk")
+    if (
+        historical_payload.get("report_type")
+        != "historical_terminal_trajectory_outcome_rescore"
+        or current_payload.get("report_type")
+        != "current_saved_pair_terminal_trajectory_outcome_rescore"
+        or crosswalk.get("report_type") != "final_outcome_metric_crosswalk"
+    ):
+        raise InputVerificationError("An archived measurement report type changed")
+    for label, report in (
+        ("historical rescore", historical_payload),
+        ("current-pair rescore", current_payload),
+        ("metric crosswalk", crosswalk),
+    ):
+        report_evaluator = _outcome_evaluator_identity(
+            _object(report, "outcome_evaluator", label), f"{label} evaluator"
+        )
+        if report_evaluator != evaluator:
+            raise InputVerificationError(f"{label} evaluator identity changed")
+    historical_rescorer = _object(
+        historical_payload, "rescorer", "archived historical rescore"
+    )
+    if historical_rescorer.get("stored_score_fields_consumed") is not False:
+        raise InputVerificationError("Historical rescore consumed stored scores")
+    archived_baseline_results = _object(
+        _object(historical_payload, "baseline", "archived historical rescore"),
+        "results",
+        "archived historical baseline",
+    )
+    archived_candidate_summary = _object(
+        historical_payload, "candidate_summary", "archived historical rescore"
+    )
+    if (
+        archived_baseline_results.get("outcome_mean")
+        != historical_rescore["baseline_outcome_mean"]
+        or archived_baseline_results.get("exact_outcome_successes")
+        != historical_rescore["baseline_exact_outcome_successes"]
+        or archived_candidate_summary.get("mean_of_run_outcome_means")
+        != historical_rescore["candidate_outcome_mean"]
+        or _object(
+            archived_candidate_summary,
+            "lower_envelope",
+            "archived historical candidate summary",
+        ).get("minimum_run_outcome_mean")
+        != historical_rescore["candidate_outcome_minimum"]
+        or archived_candidate_summary.get("total_exact_outcome_successes")
+        != historical_rescore["candidate_total_exact_outcome_successes"]
+    ):
+        raise InputVerificationError(
+            "Historical compact summary values differ from the archived raw report"
+        )
+    current_arms = _object(current_payload, "arms", "archived current rescore")
+    if set(current_arms) != {"control", "candidate"} or any(
+        not isinstance(arm, dict)
+        or arm.get("stored_canonical_similarity_consumed") is not False
+        for arm in current_arms.values()
+    ):
+        raise InputVerificationError("Current rescore consumed canonical similarity")
+    metric = _object(crosswalk, "metric", "archived outcome crosswalk")
+    validation = _object(crosswalk, "validation", "archived outcome crosswalk")
+    if (
+        metric.get("name") != "outcome_task_completion_similarity"
+        or metric.get("canonical_toolsandbox_score_consumed") is not False
+        or validation.get("stored_canonical_scores_consumed") is not False
+    ):
+        raise InputVerificationError("Outcome crosswalk consumed a canonical score")
+    if not _exact_equal(crosswalk.get("cohorts"), expected_cohorts):
+        raise InputVerificationError("Outcome crosswalk cohort identities changed")
+
+    crosswalk_inputs = _object(crosswalk, "inputs", "archived outcome crosswalk")
+    expected_input_links = {
+        "historical_rescore": archives["historical_rescore"],
+        "current_pair_rescore": archives["current_pair_rescore"],
+    }
+    for key, archive in expected_input_links.items():
+        input_record = _object(crosswalk_inputs, key, "crosswalk inputs")
+        file_record = _object(input_record, "file", f"crosswalk {key} input")
+        if (
+            file_record.get("sha256") != archive["raw_sha256"]
+            or file_record.get("size") != archive["raw_size"]
+            or input_record.get("payload_content_address_sha256")
+            != archive["payload_content_address_sha256"]
+        ):
+            raise InputVerificationError(f"Crosswalk {key} input identity changed")
+    bridge_input = _object(
+        crosswalk_inputs, "paper_rep05_metric_bridge", "crosswalk inputs"
+    )
+    if (
+        _object(bridge_input, "file", "crosswalk paper bridge").get("sha256")
+        != paper_bridge_sha256
+    ):
+        raise InputVerificationError("Crosswalk paper bridge input identity changed")
+
+    rows = crosswalk.get("joined_task_rows")
+    if not isinstance(rows, list) or len(rows) != benchmark["task_count"]:
+        raise InputVerificationError("Crosswalk does not contain 1,032 joined rows")
+    if _canonical_json_sha256(rows) != crosswalk.get("joined_task_rows_sha256"):
+        raise InputVerificationError("Crosswalk joined-row content hash changed")
+    names: list[str] = []
+    legacy_names: list[str] = []
+    excluded_names: list[str] = []
+    expected_arm_ids = {
+        "historical_original_v140",
+        *(f"historical_sage_rep{replication:02d}" for replication in range(1, 11)),
+        "current_control",
+        "current_candidate",
+    }
+    raw_joined_values: dict[str, dict[str, float]] = {
+        arm_id: {} for arm_id in expected_arm_ids
+    }
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict) or set(row) != {
+            "task_index",
+            "task",
+            "cohort",
+            "outcomes",
+        }:
+            raise InputVerificationError(f"Crosswalk joined row {index} is not exact")
+        if row.get("task_index") != index:
+            raise InputVerificationError("Crosswalk task indexes are not ordered")
+        name = row.get("task")
+        if (
+            not isinstance(name, str)
+            or not name
+            or name in raw_joined_values["current_candidate"]
+        ):
+            raise InputVerificationError("Crosswalk has a missing or duplicate task")
+        cohort = row.get("cohort")
+        if cohort == "legacy_800":
+            legacy_names.append(name)
+        elif cohort == "excluded_232":
+            excluded_names.append(name)
+        else:
+            raise InputVerificationError("Crosswalk task has an unknown cohort")
+        outcomes = row.get("outcomes")
+        if not isinstance(outcomes, dict) or set(outcomes) != expected_arm_ids:
+            raise InputVerificationError("Crosswalk task has incomplete arm coverage")
+        names.append(name)
+        for arm_id, outcome in outcomes.items():
+            if not isinstance(outcome, dict) or set(outcome) != {
+                "outcome_value",
+                "exact_outcome_success",
+            }:
+                raise InputVerificationError("Crosswalk task outcome is not exact")
+            value = _number(outcome, "outcome_value", f"crosswalk {arm_id}/{name}")
+            if not 0.0 <= value <= 1.0:
+                raise InputVerificationError("Crosswalk outcome is outside [0, 1]")
+            if outcome.get("exact_outcome_success") is not (value == 1.0):
+                raise InputVerificationError("Crosswalk exact-success flag disagrees")
+            raw_joined_values[arm_id][name] = value
+    if (
+        len(names) != len(set(names))
+        or _ordered_names_sha256(names) != benchmark["ordered_task_names_sha256"]
+    ):
+        raise InputVerificationError("Crosswalk all-1,032 order changed")
+    if (
+        _ordered_names_sha256(legacy_names)
+        != expected_cohorts["legacy_800"]["ordered_names_sha256"]
+        or _ordered_names_sha256(excluded_names)
+        != expected_cohorts["excluded_232"]["ordered_names_sha256"]
+    ):
+        raise InputVerificationError("Crosswalk legacy/complement projection changed")
+
+    def report_values(
+        report_rows: Any, *, value_field: str, label: str
+    ) -> dict[str, float]:
+        if not isinstance(report_rows, list) or len(report_rows) != len(names):
+            raise InputVerificationError(f"{label} row coverage is incomplete")
+        result: dict[str, float] = {}
+        for row in report_rows:
+            if not isinstance(row, dict) or not isinstance(row.get("task"), str):
+                raise InputVerificationError(f"{label} contains an invalid task row")
+            value = _number(row, value_field, f"{label}/{row['task']}")
+            result[row["task"]] = value
+        if list(result) != names:
+            raise InputVerificationError(f"{label} task order changed")
+        return result
+
+    historical_candidates = historical_payload.get("candidates")
+    if not isinstance(historical_candidates, list) or len(historical_candidates) != 10:
+        raise InputVerificationError("Historical archive candidate coverage changed")
+    source_value_maps = {
+        "historical_original_v140": report_values(
+            _object(historical_payload, "baseline", "archived historical rescore").get(
+                "task_outcomes"
+            ),
+            value_field="outcome_value",
+            label="historical original-v140",
+        ),
+        **{
+            f"historical_sage_rep{int(candidate['replication']):02d}": report_values(
+                candidate.get("task_outcomes"),
+                value_field="outcome_value",
+                label=f"historical replication {candidate.get('replication')}",
+            )
+            for candidate in historical_candidates
+            if isinstance(candidate, dict)
+        },
+        **{
+            f"current_{arm_name}": report_values(
+                arm.get("task_outcomes"),
+                value_field="new_outcome_value",
+                label=f"current {arm_name}",
+            )
+            for arm_name, arm in current_arms.items()
+            if isinstance(arm, dict)
+        },
+    }
+    if set(source_value_maps) != expected_arm_ids:
+        raise InputVerificationError("Raw reports do not provide all 13 crosswalk arms")
+    if source_value_maps != raw_joined_values:
+        raise InputVerificationError(
+            "Crosswalk values differ from archived raw reports"
+        )
+
+    arm_summaries = crosswalk.get("arm_summaries")
+    if not isinstance(arm_summaries, list) or len(arm_summaries) != 13:
+        raise InputVerificationError("Crosswalk arm summaries are incomplete")
+    summaries_by_id = {
+        summary.get("arm_id"): summary
+        for summary in arm_summaries
+        if isinstance(summary, dict)
+    }
+    if set(summaries_by_id) != expected_arm_ids:
+        raise InputVerificationError("Crosswalk arm summary IDs changed")
+    cohort_names = {
+        "all_1032": names,
+        "legacy_800": legacy_names,
+        "excluded_232": excluded_names,
+    }
+    for arm_id, values_by_name in source_value_maps.items():
+        arm_cohorts = _object(
+            summaries_by_id[arm_id], "cohorts", f"crosswalk summary {arm_id}"
+        )
+        for cohort, cohort_task_names in cohort_names.items():
+            values = [values_by_name[name] for name in cohort_task_names]
+            expected_summary = {
+                "denominator": len(values),
+                "outcome_value_sum": math.fsum(values),
+                "outcome_mean": math.fsum(values) / len(values),
+                "exact_outcome_successes": sum(value == 1.0 for value in values),
+                "exact_outcome_success_rate": sum(value == 1.0 for value in values)
+                / len(values),
+                "non_exact_outcomes": sum(value != 1.0 for value in values),
+            }
+            if not _exact_equal(arm_cohorts.get(cohort), expected_summary):
+                raise InputVerificationError(
+                    f"Crosswalk {arm_id}/{cohort} summary was not recomputed"
+                )
+
+    def compact(arm_id: str, cohort: str) -> dict[str, Any]:
+        full = _object(
+            _object(summaries_by_id[arm_id], "cohorts", f"crosswalk summary {arm_id}"),
+            cohort,
+            f"crosswalk summary {arm_id}",
+        )
+        return {
+            "outcome_mean": full["outcome_mean"],
+            "exact_outcome_successes": full["exact_outcome_successes"],
+            "denominator": full["denominator"],
+        }
+
+    current_summary = _object(
+        payload, "current_saved_pair", "outcome discrepancy summary"
+    )
+    for arm_name in ("control", "candidate"):
+        arm = _object(current_summary, arm_name, "current saved pair summary")
+        for cohort in cohort_names:
+            if not _exact_equal(
+                arm.get(cohort), compact(f"current_{arm_name}", cohort)
+            ):
+                raise InputVerificationError(
+                    f"Current {arm_name}/{cohort} compact result changed"
+                )
+    current_candidate_all = compact("current_candidate", "all_1032")
+    current_control_all = compact("current_control", "all_1032")
+    if (
+        current_summary.get("all_1032_candidate_minus_control_outcome_mean")
+        != current_candidate_all["outcome_mean"] - current_control_all["outcome_mean"]
+        or current_summary.get("all_1032_candidate_minus_control_exact_successes")
+        != current_candidate_all["exact_outcome_successes"]
+        - current_control_all["exact_outcome_successes"]
+    ):
+        raise InputVerificationError("Current compact paired outcome delta changed")
+    historical_summary = _object(
+        payload,
+        "historical_final_evaluator_reference",
+        "outcome discrepancy summary",
+    )
+    for summary_name, arm_id in (
+        ("original_v140", "historical_original_v140"),
+        ("paper_replication_05", "historical_sage_rep05"),
+    ):
+        arm = _object(historical_summary, summary_name, "historical compact summary")
+        for cohort in cohort_names:
+            if not _exact_equal(arm.get(cohort), compact(arm_id, cohort)):
+                raise InputVerificationError(
+                    f"Historical {summary_name}/{cohort} compact result changed"
+                )
+    primary = _object(
+        crosswalk,
+        "primary_same_final_evaluator_comparison",
+        "archived outcome crosswalk",
+    )
+    primary_cohorts = _object(primary, "cohorts", "crosswalk primary comparison")
+    compact_comparison = _object(
+        payload, "same_final_evaluator_comparison", "outcome discrepancy summary"
+    )
+    for cohort in ("all_1032", "legacy_800"):
+        delta = _object(
+            _object(primary_cohorts, cohort, "crosswalk primary comparison"),
+            "current_candidate_minus_historical_paper_rep05",
+            "crosswalk primary comparison",
+        )
+        summary_delta = _object(
+            compact_comparison, cohort, "outcome discrepancy comparison"
+        )
+        if summary_delta.get(
+            "current_candidate_minus_paper_replication_05_outcome_mean"
+        ) != delta.get("outcome_mean_delta") or summary_delta.get(
+            "current_candidate_minus_paper_replication_05_exact_successes"
+        ) != delta.get("exact_outcome_successes_delta"):
+            raise InputVerificationError(
+                f"Outcome discrepancy {cohort} primary delta changed"
+            )
+    aggregate = _object(
+        crosswalk, "historical_candidate_aggregate", "archived outcome crosswalk"
+    )
+    aggregate_cohorts = _object(
+        aggregate, "cohorts", "crosswalk historical candidate aggregate"
+    )
+    compact_aggregate = _object(
+        historical_summary,
+        "ten_run_aggregate",
+        "historical compact summary",
+    )
+    aggregate_expectations = {
+        "all_1032_mean_of_run_outcome_means": _object(
+            aggregate_cohorts, "all_1032", "crosswalk historical aggregate"
+        )["mean_of_run_outcome_means"],
+        "all_1032_minimum_run_outcome_mean": _object(
+            aggregate_cohorts, "all_1032", "crosswalk historical aggregate"
+        )["minimum_run_outcome_mean"],
+        "all_1032_total_exact_outcome_successes": _object(
+            aggregate_cohorts, "all_1032", "crosswalk historical aggregate"
+        )["total_exact_outcome_successes"],
+        "legacy_800_mean_of_run_outcome_means": _object(
+            aggregate_cohorts, "legacy_800", "crosswalk historical aggregate"
+        )["mean_of_run_outcome_means"],
+        "legacy_800_total_exact_outcome_successes": _object(
+            aggregate_cohorts, "legacy_800", "crosswalk historical aggregate"
+        )["total_exact_outcome_successes"],
+        "excluded_232_mean_of_run_outcome_means": _object(
+            aggregate_cohorts, "excluded_232", "crosswalk historical aggregate"
+        )["mean_of_run_outcome_means"],
+        "excluded_232_total_exact_outcome_successes": _object(
+            aggregate_cohorts, "excluded_232", "crosswalk historical aggregate"
+        )["total_exact_outcome_successes"],
+        "run_count": aggregate["run_count"],
+    }
+    if not _exact_equal(compact_aggregate, aggregate_expectations):
+        raise InputVerificationError("Historical compact aggregate changed")
+    return {
+        "path": relative,
+        "sha256": observed_hash,
+        "outcome_evaluator": evaluator,
+        "archives": {
+            key: {
+                field: value for field, value in archive.items() if field != "document"
+            }
+            for key, archive in archives.items()
+        },
+        "current_candidate_outcome_mean": compact("current_candidate", "all_1032")[
+            "outcome_mean"
+        ],
+        "historical_rep05_outcome_mean": compact("historical_sage_rep05", "all_1032")[
+            "outcome_mean"
+        ],
+        "canonical_toolsandbox_scores_consumed": False,
     }
 
 
@@ -1506,6 +2428,9 @@ def _verify_active_validation_thresholds(
         "cached_control_task_count": 0,
         "repository_whole_response_replay_call_count_per_arm": 0,
         "persistent_generation_output_replay_enabled": False,
+        "generator_contract_and_repair_analysis_memoization": (
+            "disabled_every_analysis_request_live"
+        ),
         "sage_task_cache_enabled": False,
         "online_reflection_control_source": "same_run_fresh",
         "parallel_arms": True,
@@ -1548,132 +2473,20 @@ def _verify_active_validation_thresholds(
     }
 
 
-def _verify_production_scientific_core(
-    repo_root: Path,
-    declaration: dict[str, Any],
-) -> dict[str, Any]:
-    """Verify the exact result-critical core preserved during release cleanup."""
-
-    path, relative = _tracked_file(
-        repo_root,
-        _string(declaration, "path", "production_scientific_core"),
-        "production scientific core manifest",
-    )
-    observed_hash = _assert_hash(
-        path,
-        _hash(declaration, "sha256", "production_scientific_core"),
-        "production scientific core manifest",
-    )
-    payload = _read_object(path, "production scientific core manifest")
-    expected_fields = {
-        "schema_version",
-        "manifest_type",
-        "purpose",
-        "source_checkpoint",
-        "counting_method",
-        "physical_lines",
-        "file_manifest_sha256",
-        "files",
-    }
-    if set(payload) != expected_fields:
-        raise InputVerificationError(
-            "Production scientific core manifest fields are not exact"
-        )
-    if payload.get("schema_version") != 1 or payload.get("manifest_type") != (
-        "sage_production_scientific_core"
-    ):
-        raise InputVerificationError("Unsupported production scientific core manifest")
-    checkpoint = _object(payload, "source_checkpoint", "production scientific core")
-    if set(checkpoint) != {"git_commit", "git_tree"} or any(
-        not _HEX_GIT_OBJECT.fullmatch(str(checkpoint.get(field, "")))
-        for field in ("git_commit", "git_tree")
-    ):
-        raise InputVerificationError(
-            "Production scientific core source checkpoint is malformed"
-        )
-    entries = payload.get("files")
-    if not isinstance(entries, list) or not entries:
-        raise InputVerificationError("Production scientific core file list is empty")
-    seen: set[str] = set()
-    total_lines = 0
-    canonical_rows: list[str] = []
-    for index, raw_entry in enumerate(entries):
-        if not isinstance(raw_entry, dict) or set(raw_entry) != {
-            "path",
-            "physical_lines",
-            "sha256",
-        }:
-            raise InputVerificationError(
-                f"Production scientific core entry {index} is malformed"
-            )
-        label = f"production scientific core entry {index}"
-        source_path, source_relative = _tracked_file(
-            repo_root,
-            _string(raw_entry, "path", label),
-            label,
-        )
-        if source_relative in seen:
-            raise InputVerificationError(
-                f"Duplicate production scientific core path: {source_relative}"
-            )
-        seen.add(source_relative)
-        expected_lines = _integer(raw_entry, "physical_lines", label)
-        observed_lines = len(source_path.read_text(encoding="utf-8").splitlines())
-        if observed_lines != expected_lines:
-            raise InputVerificationError(
-                f"Production scientific core line count changed for {source_relative}: "
-                f"expected {expected_lines}, observed {observed_lines}"
-            )
-        source_hash = _assert_hash(
-            source_path,
-            _hash(raw_entry, "sha256", label),
-            label,
-        )
-        total_lines += observed_lines
-        canonical_rows.append(f"{source_relative}\t{observed_lines}\t{source_hash}\n")
-    declared_total = _integer(payload, "physical_lines", "production scientific core")
-    if total_lines != declared_total:
-        raise InputVerificationError(
-            "Production scientific core aggregate line count changed"
-        )
-    observed_manifest_hash = hashlib.sha256(
-        "".join(canonical_rows).encode("utf-8")
-    ).hexdigest()
-    if observed_manifest_hash != _hash(
-        payload,
-        "file_manifest_sha256",
-        "production scientific core",
-    ):
-        raise InputVerificationError(
-            "Production scientific core aggregate file manifest changed"
-        )
-    return {
-        "path": relative,
-        "sha256": observed_hash,
-        "physical_lines": total_lines,
-        "file_count": len(entries),
-        "file_manifest_sha256": observed_manifest_hash,
-        "source_checkpoint": checkpoint,
-    }
-
-
 def verify_active_production_scientific_core(
     repo_root: Path = REPO_ROOT,
-    declaration: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Verify the active core independently of the pending release generation."""
+    """Verify the active core independently of the release chain."""
 
-    return _verify_production_scientific_core(
+    return _verify_production_core_manifest(
         repo_root.resolve(),
-        declaration or ACTIVE_PRODUCTION_CORE_DECLARATION,
+        EXPECTED_ACTIVE_PRODUCTION_CORE,
     )
 
 
 def verify_inputs(
     repo_root: Path = REPO_ROOT,
     manifest_path: Path = DEFAULT_MANIFEST,
-    *,
-    active_core_declaration: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Verify the content-addressed publication input and policy chain."""
 
@@ -1692,21 +2505,31 @@ def verify_inputs(
     selected_payload = _read_object(selected, "publication input manifest")
     if selected_payload.get("manifest_type") != "publication_release_input_chain":
         return _verify_base_inputs(root, selected)
-    if selected_payload.get("schema_version") != 1:
-        raise InputVerificationError("Unsupported publication release manifest schema")
-    if set(selected_payload) != {
+    release_schema_version = selected_payload.get("schema_version")
+    common_release_fields = {
         "schema_version",
         "manifest_type",
         "created_at",
         "purpose",
         "supersedes_release_manifest",
         "base_input_manifest",
-        "production_scientific_core",
         "checkpoint_policy_amendment",
         "active_execution_policy",
         "historical_outcome_rescore_summary",
         "active_validation_thresholds",
-    }:
+    }
+    release_v2_fields = {
+        *common_release_fields,
+        "outcome_discrepancy_resolution_summary",
+        "production_scientific_core",
+    }
+    if release_schema_version == 1:
+        expected_release_fields = common_release_fields
+    elif release_schema_version == 2:
+        expected_release_fields = release_v2_fields
+    else:
+        raise InputVerificationError("Unsupported publication release manifest schema")
+    if set(selected_payload) != expected_release_fields:
         raise InputVerificationError(
             "Publication release manifest fields are not exact"
         )
@@ -1727,23 +2550,6 @@ def verify_inputs(
         "base publication input manifest",
     )
     result = _verify_base_inputs(root, base_path)
-    release_core_declaration = _object(
-        selected_payload,
-        "production_scientific_core",
-        "publication release manifest",
-    )
-    if active_core_declaration is not None and not _exact_equal(
-        release_core_declaration,
-        active_core_declaration,
-    ):
-        raise InputVerificationError(
-            "Publication release manifest does not bind the active production "
-            "scientific core"
-        )
-    result["production_scientific_core"] = _verify_production_scientific_core(
-        root,
-        active_core_declaration or release_core_declaration,
-    )
     amendment = _verify_policy_amendment(
         root,
         _object(
@@ -1801,6 +2607,27 @@ def verify_inputs(
         analysis=result["historical_analysis_inputs"],
     )
     result["historical_outcome_rescore_summary"] = historical_rescore
+    if release_schema_version == 2:
+        result["outcome_discrepancy_resolution_summary"] = (
+            _verify_outcome_discrepancy_summary(
+                root,
+                _object(
+                    selected_payload,
+                    "outcome_discrepancy_resolution_summary",
+                    "publication release manifest",
+                ),
+                benchmark=result["benchmark"],
+                historical_rescore=historical_rescore,
+            )
+        )
+        result["production_scientific_core"] = _verify_production_core_manifest(
+            root,
+            _object(
+                selected_payload,
+                "production_scientific_core",
+                "publication release manifest",
+            ),
+        )
     result["legacy_base_validation_thresholds"] = result["validation_thresholds"]
     superseded_thresholds = superseded_release["validation_thresholds"]
     result["superseded_validation_thresholds"] = superseded_thresholds
@@ -1830,7 +2657,7 @@ def main() -> None:
         action="store_true",
         help=(
             "Verify the active production scientific core without requiring the "
-            "pending publication release generation."
+            "full publication release chain."
         ),
     )
     args = parser.parse_args()
@@ -1838,11 +2665,7 @@ def main() -> None:
         if args.core_manifest_only:
             result = verify_active_production_scientific_core(args.repo_root)
         else:
-            result = verify_inputs(
-                args.repo_root,
-                args.manifest,
-                active_core_declaration=ACTIVE_PRODUCTION_CORE_DECLARATION,
-            )
+            result = verify_inputs(args.repo_root, args.manifest)
     except InputVerificationError as exc:
         raise SystemExit(f"publication_input_verification=failed\n{exc}") from exc
     print(

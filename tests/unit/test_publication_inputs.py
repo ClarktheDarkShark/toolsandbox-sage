@@ -11,6 +11,8 @@ import pytest
 from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 from scripts.verify_publication_inputs import (
     EXPECTED_ACTIVE_EXECUTION_POLICY,
+    EXPECTED_ACTIVE_PRODUCTION_CORE,
+    EXPECTED_AMENDMENT_POLICY_SUPERSESSION,
     EXPECTED_REPLACEMENT_POLICY,
     InputVerificationError,
     verify_active_production_scientific_core,
@@ -56,50 +58,6 @@ def _read_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
     return payload
-
-
-def _write_test_core_manifest(
-    repo: Path,
-    *,
-    checkpoint_commit: str,
-    checkpoint_tree: str,
-) -> dict[str, str]:
-    source_path = repo / "src" / "sage_ts" / "scientific_core.py"
-    source_path.parent.mkdir(parents=True, exist_ok=True)
-    source_path.write_text("CORE = True\n", encoding="utf-8")
-    source_relative = source_path.relative_to(repo).as_posix()
-    source_hash = _sha256(source_path)
-    physical_lines = 1
-    file_manifest_hash = hashlib.sha256(
-        f"{source_relative}\t{physical_lines}\t{source_hash}\n".encode("utf-8")
-    ).hexdigest()
-    manifest_path = repo / "production_core_manifest.json"
-    _write_json(
-        manifest_path,
-        {
-            "schema_version": 1,
-            "manifest_type": "sage_production_scientific_core",
-            "purpose": "test core",
-            "source_checkpoint": {
-                "git_commit": checkpoint_commit,
-                "git_tree": checkpoint_tree,
-            },
-            "counting_method": "test",
-            "physical_lines": physical_lines,
-            "file_manifest_sha256": file_manifest_hash,
-            "files": [
-                {
-                    "path": source_relative,
-                    "physical_lines": physical_lines,
-                    "sha256": source_hash,
-                }
-            ],
-        },
-    )
-    return {
-        "path": manifest_path.relative_to(repo).as_posix(),
-        "sha256": _sha256(manifest_path),
-    }
 
 
 def _build_public_repo(tmp_path: Path) -> tuple[Path, Path]:
@@ -287,11 +245,6 @@ def _wrap_public_repo(repo: Path, base_manifest_path: Path) -> Path:
         "path": amendment_path.relative_to(repo).as_posix(),
         "sha256": _sha256(amendment_path),
     }
-    core_declaration = _write_test_core_manifest(
-        repo,
-        checkpoint_commit=checkpoint["commit"],
-        checkpoint_tree=checkpoint["tree"],
-    )
     _write_json(
         prior_release_path,
         {
@@ -312,14 +265,15 @@ def _wrap_public_repo(repo: Path, base_manifest_path: Path) -> Path:
     _write_json(
         execution_policy_path,
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "manifest_type": "publication_execution_policy",
-            "created_at": "2026-09-03",
+            "created_at": "2026-09-04",
             "purpose": "test",
             "extends": {
                 "path": amendment_path.relative_to(repo).as_posix(),
                 "sha256": _sha256(amendment_path),
             },
+            "amendment_policy_supersession": (EXPECTED_AMENDMENT_POLICY_SUPERSESSION),
             **execution_policy,
             "immutable_inputs_changed": False,
         },
@@ -494,6 +448,9 @@ def _wrap_public_repo(repo: Path, base_manifest_path: Path) -> Path:
                 "cached_control_task_count": 0,
                 "repository_whole_response_replay_call_count_per_arm": 0,
                 "persistent_generation_output_replay_enabled": False,
+                "generator_contract_and_repair_analysis_memoization": (
+                    "disabled_every_analysis_request_live"
+                ),
                 "sage_task_cache_enabled": False,
                 "online_reflection_control_source": "same_run_fresh",
                 "parallel_arms": True,
@@ -521,14 +478,13 @@ def _wrap_public_repo(repo: Path, base_manifest_path: Path) -> Path:
         {
             "schema_version": 1,
             "manifest_type": "publication_release_input_chain",
-            "created_at": "2026-09-03",
+            "created_at": "2026-09-04",
             "purpose": "test current release",
             "supersedes_release_manifest": {
                 "path": prior_release_path.relative_to(repo).as_posix(),
                 "sha256": _sha256(prior_release_path),
             },
             "base_input_manifest": base_declaration,
-            "production_scientific_core": core_declaration,
             "checkpoint_policy_amendment": amendment_declaration,
             "active_execution_policy": {
                 "path": execution_policy_path.relative_to(repo).as_posix(),
@@ -547,6 +503,67 @@ def _wrap_public_repo(repo: Path, base_manifest_path: Path) -> Path:
     _git(repo, "add", ".")
     _git(repo, "commit", "-q", "-m", "publication release chain")
     return wrapper_path
+
+
+def _extend_public_repo(repo: Path, prior_release_path: Path) -> Path:
+    """Add one complete immutable release generation above another."""
+
+    prior_release = _read_json(prior_release_path)
+    prior_policy_path = repo / prior_release["active_execution_policy"]["path"]
+    prior_summary_path = (
+        repo / prior_release["historical_outcome_rescore_summary"]["path"]
+    )
+    prior_thresholds_path = repo / prior_release["active_validation_thresholds"]["path"]
+    policy_path = repo / "execution_policy_next.json"
+    summary_path = repo / "historical_outcome_rescore_summary_next.json"
+    thresholds_path = repo / "active_thresholds_next.json"
+    release_path = repo / "publication_release_next.json"
+    _write_json(policy_path, _read_json(prior_policy_path))
+    _write_json(summary_path, _read_json(prior_summary_path))
+    thresholds = _read_json(prior_thresholds_path)
+    thresholds["supersedes"] = {
+        "path": prior_thresholds_path.relative_to(repo).as_posix(),
+        "sha256": _sha256(prior_thresholds_path),
+    }
+    thresholds["execution_policy"] = {
+        "path": policy_path.relative_to(repo).as_posix(),
+        "sha256": _sha256(policy_path),
+    }
+    thresholds["historical_reference"]["summary_path"] = summary_path.relative_to(
+        repo
+    ).as_posix()
+    thresholds["historical_reference"]["summary_sha256"] = _sha256(summary_path)
+    _write_json(thresholds_path, thresholds)
+    _write_json(
+        release_path,
+        {
+            "schema_version": 1,
+            "manifest_type": "publication_release_input_chain",
+            "created_at": "2026-09-05",
+            "purpose": "test chained release",
+            "supersedes_release_manifest": {
+                "path": prior_release_path.relative_to(repo).as_posix(),
+                "sha256": _sha256(prior_release_path),
+            },
+            "base_input_manifest": prior_release["base_input_manifest"],
+            "checkpoint_policy_amendment": prior_release["checkpoint_policy_amendment"],
+            "active_execution_policy": {
+                "path": policy_path.relative_to(repo).as_posix(),
+                "sha256": _sha256(policy_path),
+            },
+            "historical_outcome_rescore_summary": {
+                "path": summary_path.relative_to(repo).as_posix(),
+                "sha256": _sha256(summary_path),
+            },
+            "active_validation_thresholds": {
+                "path": thresholds_path.relative_to(repo).as_posix(),
+                "sha256": _sha256(thresholds_path),
+            },
+        },
+    )
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "next publication release generation")
+    return release_path
 
 
 def test_compact_verifier_accepts_tracked_inputs_without_local_bundle(
@@ -574,7 +591,6 @@ def test_release_verifier_hashes_base_inputs_and_policy_amendment(
 
     assert result["publication_input_manifest"]["path"] == "publication_inputs.json"
     assert result["publication_release_manifest"]["path"] == "publication_release.json"
-    assert result["production_scientific_core"]["physical_lines"] == 1
     assert result["checkpoint_policy_amendment"]["replacement_policy"] == (
         EXPECTED_REPLACEMENT_POLICY
     )
@@ -591,6 +607,19 @@ def test_release_verifier_hashes_base_inputs_and_policy_amendment(
     assert second_pair["control_output_influences_inventory"] is False
     assert second_pair["control_output_influences_execution"] is False
     assert paired_schedule == EXPECTED_ACTIVE_EXECUTION_POLICY["paired_arm_schedule"]
+    pilot_gate = result["active_execution_policy"]["actor_selection_experiment"][
+        "pilot_mechanism_eligibility_gate"
+    ]
+    assert pilot_gate["minimum_generated_tool_called_scenarios"] == 1
+    assert pilot_gate["maximum_generated_tool_execution_failure_scenarios"] == 0
+    assert pilot_gate["mechanism_eligibility_not_outcome_performance"] is True
+    parallel_calls = result["active_execution_policy"]["parallel_tool_call_execution"]
+    assert (
+        parallel_calls
+        == EXPECTED_ACTIVE_EXECUTION_POLICY["parallel_tool_call_execution"]
+    )
+    assert parallel_calls["auto_response_truncation"] == "none"
+    assert parallel_calls["parallel_model_returned_tool_calls_preserved"] is True
     assert (
         result["active_execution_policy"]["task_compare_dashboard"][
             "external_browser_open_required"
@@ -610,47 +639,30 @@ def test_release_verifier_hashes_base_inputs_and_policy_amendment(
     )
 
 
-def test_release_verifier_rejects_scientific_core_drift(tmp_path: Path) -> None:
-    repo, base_manifest_path = _build_public_repo(tmp_path)
-    wrapper_path = _wrap_public_repo(repo, base_manifest_path)
-    (repo / "src" / "sage_ts" / "scientific_core.py").write_text(
-        "CORE = False\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(InputVerificationError, match="core entry 0 hash mismatch"):
-        verify_inputs(repo, wrapper_path)
-
-
-def test_active_core_can_be_verified_without_release_generation(
+def test_release_verifier_accepts_complete_chained_predecessor(
     tmp_path: Path,
 ) -> None:
     repo, base_manifest_path = _build_public_repo(tmp_path)
-    wrapper_path = _wrap_public_repo(repo, base_manifest_path)
-    release = _read_json(wrapper_path)
+    prior_release_path = _wrap_public_repo(repo, base_manifest_path)
+    release_path = _extend_public_repo(repo, prior_release_path)
 
-    result = verify_active_production_scientific_core(
-        repo,
-        release["production_scientific_core"],
+    result = verify_inputs(repo, release_path)
+
+    assert result["superseded_release_manifest"] == {
+        "path": "publication_release.json",
+        "sha256": _sha256(prior_release_path),
+    }
+    assert result["superseded_validation_thresholds"]["path"] == (
+        "active_thresholds.json"
     )
 
-    assert result["physical_lines"] == 1
-    assert result["file_count"] == 1
 
+def test_active_core_can_be_verified_without_release_generation() -> None:
+    result = verify_active_production_scientific_core()
 
-def test_release_verifier_requires_active_core_binding(tmp_path: Path) -> None:
-    repo, base_manifest_path = _build_public_repo(tmp_path)
-    wrapper_path = _wrap_public_repo(repo, base_manifest_path)
-
-    with pytest.raises(InputVerificationError, match="does not bind the active"):
-        verify_inputs(
-            repo,
-            wrapper_path,
-            active_core_declaration={
-                "path": "different_core_manifest.json",
-                "sha256": "0" * 64,
-            },
-        )
+    assert result["physical_lines"] == 32540
+    assert result["file_count"] == 12
+    assert result["sha256"] == EXPECTED_ACTIVE_PRODUCTION_CORE["sha256"]
 
 
 def test_make_verify_publication_uses_the_pinned_full_cohort_cli() -> None:
@@ -668,11 +680,33 @@ def test_make_verify_publication_uses_the_pinned_full_cohort_cli() -> None:
 def test_tracked_execution_policy_matches_the_exact_verified_schema() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     policy = _read_json(
-        repo_root / "docs/sage_protocol/publication_execution_policy_20260903.json"
+        repo_root / "docs/sage_protocol/publication_execution_policy_20260904.json"
     )
 
     observed = {field: policy[field] for field in EXPECTED_ACTIVE_EXECUTION_POLICY}
     assert observed == EXPECTED_ACTIVE_EXECUTION_POLICY
+
+
+def test_tracked_final_release_verifies_measurement_archives_and_core() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+
+    result = verify_inputs(
+        repo_root,
+        repo_root / "docs/sage_protocol/publication_release_manifest_20260905.json",
+    )
+
+    discrepancy = result["outcome_discrepancy_resolution_summary"]
+    assert discrepancy["canonical_toolsandbox_scores_consumed"] is False
+    assert discrepancy["current_candidate_outcome_mean"] == 0.6920219638242894
+    assert discrepancy["historical_rep05_outcome_mean"] == 0.675952842377261
+    assert discrepancy["archives"]["historical_rescore"]["size"] == 484876
+    assert discrepancy["archives"]["current_pair_rescore"]["size"] == 18079
+    assert discrepancy["archives"]["current_pair_rescore"]["raw_size"] == 823735
+    assert discrepancy["archives"]["outcome_metric_crosswalk"]["size"] == 25374
+    assert discrepancy["archives"]["outcome_metric_crosswalk"]["raw_size"] == 1923437
+    core = result["production_scientific_core"]
+    assert core["physical_lines"] == 32540
+    assert core["file_count"] == 12
 
 
 def test_release_verifier_rejects_rehashed_policy_drift(tmp_path: Path) -> None:
@@ -750,6 +784,23 @@ def test_release_verifier_rejects_rehashed_execution_policy_drift(
     _write_json(wrapper_path, wrapper)
 
     with pytest.raises(InputVerificationError, match="drifted"):
+        verify_inputs(repo, wrapper_path)
+
+
+def test_release_verifier_rejects_rehashed_memoization_supersession_drift(
+    tmp_path: Path,
+) -> None:
+    repo, base_manifest_path = _build_public_repo(tmp_path)
+    wrapper_path = _wrap_public_repo(repo, base_manifest_path)
+    wrapper = _read_json(wrapper_path)
+    policy_path = repo / wrapper["active_execution_policy"]["path"]
+    policy = _read_json(policy_path)
+    policy["amendment_policy_supersession"]["active_value"] = "within_run_only"
+    _write_json(policy_path, policy)
+    wrapper["active_execution_policy"]["sha256"] = _sha256(policy_path)
+    _write_json(wrapper_path, wrapper)
+
+    with pytest.raises(InputVerificationError, match="exactly supersede"):
         verify_inputs(repo, wrapper_path)
 
 
@@ -840,6 +891,43 @@ def test_release_verifier_rejects_type_coerced_execution_policy_value(
                 "policy_and_auto_inventory_match_required_per_task",
             ),
             False,
+        ),
+        (
+            (
+                "actor_selection_experiment",
+                "pilot_mechanism_eligibility_gate",
+                "minimum_generated_tool_called_scenarios",
+            ),
+            0,
+        ),
+        (
+            (
+                "actor_selection_experiment",
+                "pilot_mechanism_eligibility_gate",
+                "maximum_generated_tool_execution_failure_scenarios",
+            ),
+            1,
+        ),
+        (
+            (
+                "parallel_tool_call_execution",
+                "auto_response_truncation",
+            ),
+            "first_call_only",
+        ),
+        (
+            (
+                "parallel_tool_call_execution",
+                "semantic_permutation_deduplication_applies_to_all_arms",
+            ),
+            False,
+        ),
+        (
+            (
+                "parallel_tool_call_execution",
+                "tool_call_ids_alone_create_distinct_execution_order",
+            ),
+            True,
         ),
         (
             (

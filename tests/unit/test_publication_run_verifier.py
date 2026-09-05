@@ -415,7 +415,9 @@ def _fresh_run(tmp_path: Path) -> Path:
             ),
             "prompt_cache_enabled": False,
             "prompt_cache_scope": "persistent_generation_output_replay",
-            "generator_contract_and_repair_analysis_memoization": "within_run_only",
+            "generator_contract_and_repair_analysis_memoization": (
+                "disabled_every_analysis_request_live"
+            ),
             "openai_provider_prompt_prefix_cache_policy": "automatic_implicit",
             "openai_provider_prompt_prefix_cache_reuses_responses": False,
             "sage_task_cache_enabled": False,
@@ -631,6 +633,10 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
         "experiment_passed": True,
         "stability_gate_passed": True,
         "stability_gate_reasons": [],
+        "full_comparison_eligibility_gate_applied": True,
+        "full_comparison_eligibility_gate_passed": True,
+        "full_comparison_eligibility_gate_reasons": [],
+        "recommend_full_comparison": True,
         "outcome_evaluator": outcome_evaluator,
         "outcomes": {
             "policy_exact_outcome_successes": 10,
@@ -768,6 +774,10 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
             "experiment_passed": True,
             "stability_gate_passed": True,
             "stability_gate_reasons": [],
+            "full_comparison_eligibility_gate_applied": True,
+            "full_comparison_eligibility_gate_passed": True,
+            "full_comparison_eligibility_gate_reasons": [],
+            "recommend_full_comparison": True,
             "policy_protocol_manifest_path": str(protocol_path),
             "policy_protocol_manifest_sha256": protocol_sha256,
             "policy_run_dir": str(policy_dir),
@@ -834,6 +844,8 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
     assert result["integrity_gate_passed"] is True
     assert result["experiment_passed"] is True
     assert result["stability_gate_passed"] is True
+    assert result["full_comparison_eligibility_gate_passed"] is True
+    assert result["recommend_full_comparison"] is True
     assert result["outcome_evaluator"] == outcome_evaluator
     assert result["git_commit"] == TEST_GIT_COMMIT
     assert (

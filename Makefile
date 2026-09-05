@@ -30,13 +30,13 @@ COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
 	require-source-registry-identity
 
 compile:
-	$(PYTHON) -m compileall -q -x '(^|/)(__pycache__|build)/' \
+	$(PYTHON) -m compileall -q -x '(^|/)(__pycache__|build)/| [0-9]+\.py$$' \
 		src/sage_ts tool_sandbox scripts
 
 lint:
-	$(PYTHON) -m ruff check --exclude '*.ipynb' \
+	$(PYTHON) -m ruff check --exclude '*.ipynb' --exclude '* [0-9].py' \
 		src/sage_ts tool_sandbox scripts tests
-	$(PYTHON) -m ruff format --check --exclude '*.ipynb' \
+	$(PYTHON) -m ruff format --check --exclude '*.ipynb' --exclude '* [0-9].py' \
 		src/sage_ts tool_sandbox scripts tests
 
 test-core:
@@ -155,7 +155,7 @@ verify-publication: require-run
 
 require-validation-thresholds:
 	@test -n "$(VALIDATION_THRESHOLDS)" || \
-		(echo "Set VALIDATION_THRESHOLDS=docs/sage_protocol/publication_validation_thresholds_v4.json." >&2; exit 2)
+		(echo "Set VALIDATION_THRESHOLDS=docs/sage_protocol/publication_validation_thresholds_v5.json." >&2; exit 2)
 
 verify-sample: require-run require-validation-thresholds
 	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_sample.py \
@@ -179,8 +179,8 @@ verify-environment:
 verify-core:
 	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_inputs.py --core-manifest-only
 
-# Full release-chain verification. This remains blocked until the final active
-# release generation binds the independently verified production core.
+# Full release-chain verification, including the final active release's binding
+# to the independently verified production core.
 verify-inputs:
 	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_inputs.py
 

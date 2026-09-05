@@ -18,7 +18,7 @@ verify_run = _run_verifier.verify_run
 outcome_evaluator_manifest = _run_verifier.outcome_evaluator_manifest
 
 DEFAULT_THRESHOLDS = Path(
-    "docs/sage_protocol/publication_validation_thresholds_v4.json"
+    "docs/sage_protocol/publication_validation_thresholds_v5.json"
 )
 REPO_ROOT = Path(__file__).resolve().parents[1]
 NON_OUTCOME_RELEASE_GATES = frozenset(

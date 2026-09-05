@@ -1,10 +1,10 @@
 # Current Publication State
 
-Last updated: 2026-09-04.
+Last updated: 2026-09-05.
 
 ## Status
 
-The publication cleanup, protocol correction, and v4 release-input chain are
+The publication cleanup, outcome-evaluator repair, and v5 release-input chain are
 complete. No current-release full validation run, selector comparison, or
 confirmatory paper campaign has started. Live execution still requires explicit
 researcher approval.
@@ -16,18 +16,31 @@ thresholds, or control rows. In particular, sample 03 covered only the older
 partial outcome-evaluator surface and did not use the current concurrent-pair
 protocol.
 
-The route-independent v4 evaluator and timezone-aware historical rescore passed
+The route-independent v5 evaluator and timezone-aware historical rescore passed
 independent checks. Their identities and outcome-only engineering floor are
 frozen in the
-[`v4 rescore summary`](historical_outcome_rescore_v4_summary.json),
-[`v4 thresholds`](publication_validation_thresholds_v4.json), and
-[`2026-09-03 release manifest`](publication_release_manifest_20260903.json).
+[`v5 rescore summary`](historical_outcome_rescore_v5_summary.json),
+[`v5 thresholds`](publication_validation_thresholds_v5.json), and
+[`2026-09-05 release manifest`](publication_release_manifest_20260905.json).
 The rescore uses New York for the baseline and replications 6--10 and Los
 Angeles for replications 1--5, as inferred independently from each arm's raw
 valid time-conversion traces. It remains a terminal-trajectory historical
 reference only: it does not repair the superseded campaign's cache, online
 feedback, tool-birth, routing, or lifecycle confounding and is not confirmatory
 evidence.
+
+The paper-era `0.8095094479761491` outcome used the old evaluator and only 800
+outcome-scored tasks. It is not comparable to a full-1,032-task current result.
+Under one final evaluator on all 1,032 tasks, v5 gives the current control
+521 exact outcomes (mean `0.5540213178294574`), the current SAGE candidate 660
+(mean `0.6920219638242894`), paper replication 5 649 (mean
+`0.675952842377261`), the historical ten-run mean `0.6776728036175711`, and
+the historical lower envelope `0.6640826873385013`. The current candidate is
+therefore 11 exact successes and `0.016069121447028323` outcome points above
+paper replication 5. On the exact frozen legacy-800 cohort, it is 575/800
+(mean `0.7864583333333333`) versus 563/800 (mean `0.7644791666666667`).
+The read-only evidence, full exact-name crosswalk, and limitations are frozen in
+[`outcome_discrepancy_resolution_v5_summary.json`](outcome_discrepancy_resolution_v5_summary.json).
 
 ## Active Performance Contract
 
@@ -50,8 +63,8 @@ The sole publication launcher is `scripts/run_native_action_4omini_ab.sh`, backe
 - the pinned benchmark order, fixed clock, environment, and read-only external
   fixture;
 - no control-result cache, task-result cache, stored whole-response replay,
-  persistent generated-output replay, partial-row resume, or cross-run failure
-  memory;
+  persistent generated-output replay, within-run generator-analysis memoization,
+  partial-row resume, or cross-run failure memory;
 - a clean Git tree and the validated publication environment;
 - complete task and model-call provenance; and
 - a Task Compare dashboard whose served root and bytes are verified and opened
@@ -76,10 +89,24 @@ policy, independent control versus auto, and policy versus auto. The first two
 open before their pair's first model request; the causal policy-versus-auto view
 opens after both treatment arms finish.
 
+Before recommending the complete 1,032-task selector comparison, the pilot must
+show that the auto arm called a generated tool in at least one scenario and had
+zero scenarios with a generated-tool execution failure. This is a mechanism
+eligibility gate confirming that the treatment was exercised and stable. It is
+not an outcome-performance gate: the pilot has no required policy-versus-auto
+outcome difference, and all complete outcomes are reported unchanged.
+
+No auto-only response postprocessing or truncation is allowed. All parallel
+tool calls returned by the model are preserved. For every arm, ToolSandbox
+validates all distinct call-content orderings and deduplicates only
+execution-equivalent permutations of identical call contents. Tool-call IDs
+alone identify response correlation and do not create distinct execution
+orders.
+
 ## Next Authorized Steps
 
 1. Complete the final static, focused, packaging, link, and publication-input
-   checks against the frozen v4 chain.
+   checks against the frozen v5 chain.
 2. Present the frozen release and pilot plan for researcher review.
 3. Only after approval, run the sealed representative selector pilot.
 4. Only after a passing pilot and separate explicit approval, run the complete
@@ -93,10 +120,12 @@ interrupted arms are preserved for review and are never silently replaced.
 - `README.md`
 - `docs/sage_protocol/00_global_working_agreement.md`
 - `docs/sage_protocol/README.md`
-- `docs/sage_protocol/publication_execution_policy_20260903.json`
-- `docs/sage_protocol/publication_release_manifest_20260903.json`
-- `docs/sage_protocol/historical_outcome_rescore_v4_summary.json`
-- `docs/sage_protocol/publication_validation_thresholds_v4.json`
+- `docs/sage_protocol/publication_execution_policy_20260904.json`
+- `docs/sage_protocol/publication_release_manifest_20260905.json`
+- `docs/sage_protocol/production_core_manifest_20260905.json`
+- `docs/sage_protocol/historical_outcome_rescore_v5_summary.json`
+- `docs/sage_protocol/publication_validation_thresholds_v5.json`
+- `docs/sage_protocol/outcome_discrepancy_resolution_v5_summary.json`
 - `docs/sage_protocol/publication_input_manifest_20260901.json`
 - `docs/sage_protocol/publication_checkpoint_amendment_20260902.json`
 - `docs/sage_protocol/publication_cleanup_audit_20260901.md` (historical audit

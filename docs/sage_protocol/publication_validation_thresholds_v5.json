@@ -1,0 +1,66 @@
+{
+  "schema_version": 2,
+  "purpose": "Predeclared integrity and outcome-only no-regression gates for the current publication selector pilot and validation sample. The candidate outcome floor is the exact v5 lower envelope across the ten historical terminal-trajectory rescores. Passing one sample is necessary for release readiness but does not replace the pending ten-pair confirmatory campaign.",
+  "performance_endpoint": "outcome_task_completion_similarity",
+  "supersedes": {
+    "path": "docs/sage_protocol/publication_validation_thresholds_v4.json",
+    "sha256": "f14d86181b2085afc94df5c8cc39a2892f9e8c4bb44a0ba2b9d418a81d9f39f6"
+  },
+  "execution_policy": {
+    "path": "docs/sage_protocol/publication_execution_policy_20260904.json",
+    "sha256": "0026a9282aa90bf5d6776abce1f6af66595b763bfee2caeaeca75e808250767c"
+  },
+  "outcome_evaluator": {
+    "version": "sage_outcome_contracts_v5",
+    "contract_sha256": "568c0e8accb8e155cbe47c41c93157651a2984dd348b5b8533e337517bb3e68e",
+    "source_sha256": "f23c238b4e5a73e5a1db66450188d8bc0dae7a701e01e1fc873ea03bd7323d15",
+    "insufficient_information_scenario_count": 224,
+    "scalar_scenario_count": 24
+  },
+  "benchmark": {
+    "task_count": 1032,
+    "outcome_scored_task_count": 1032,
+    "manifest_sha256": "21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec",
+    "ordered_task_name_sha256": "fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176"
+  },
+  "historical_reference": {
+    "status": "historical_terminal_trajectories_timezone_inferred_not_confirmatory",
+    "summary_path": "docs/sage_protocol/historical_outcome_rescore_v5_summary.json",
+    "summary_sha256": "b96958d6fa6df43e5531aebdcb8a58842e65da4c4f49876969672d287648c3a8",
+    "campaign_manifest": "artifacts/publication_cleanup_20260901/analysis/campaign_manifest.json",
+    "campaign_manifest_sha256": "6ec114f15fd5d53283ce9afad12bcf0523217b07325183762d61666e860dd532",
+    "evidence_data": "artifacts/publication_cleanup_20260901/analysis/chapter4_evidence_data.json",
+    "evidence_data_sha256": "590522b8413dd20a67e2db08037cf4339928571292960b0a402e495cfff1d42b",
+    "online_run_count": 10,
+    "candidate_outcome_mean": 0.6776728036175711,
+    "candidate_outcome_minimum": 0.6640826873385013,
+    "original_v140_outcome_mean": 0.5318152454780362
+  },
+  "required_integrity": {
+    "complete_control_and_candidate_arms": true,
+    "identical_ordered_task_sequence": true,
+    "runtime_exception_count_per_arm": 0,
+    "control_cache_mode": "off",
+    "cached_control_task_count": 0,
+    "repository_whole_response_replay_call_count_per_arm": 0,
+    "persistent_generation_output_replay_enabled": false,
+    "generator_contract_and_repair_analysis_memoization": "disabled_every_analysis_request_live",
+    "sage_task_cache_enabled": false,
+    "online_reflection_control_source": "same_run_fresh",
+    "parallel_arms": true,
+    "reflection_control_delivery": "task_synchronous_stream",
+    "external_task_compare_dashboard_required": true,
+    "resume_allowed": false,
+    "diagnostic_force_calls_allowed": false,
+    "validated_external_fixture_mode": "read_only",
+    "validated_external_fixture_sha256": "eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
+  },
+  "required_no_regression": {
+    "candidate_outcome_minimum": 0.6640826873385013,
+    "minimum_relative_outcome_lift_percent_over_same_run_control": 10.0
+  },
+  "report_only": {
+    "compare_candidate_outcome_to_historical_mean": 0.6776728036175711,
+    "mechanism_counts_are_release_gates": false
+  }
+}

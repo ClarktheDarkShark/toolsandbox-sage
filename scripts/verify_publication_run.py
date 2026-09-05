@@ -1022,7 +1022,9 @@ def verify_run(
         "openai_response_cache_scope": "persistent_repository_whole_response_replay",
         "prompt_cache_enabled": False,
         "prompt_cache_scope": "persistent_generation_output_replay",
-        "generator_contract_and_repair_analysis_memoization": "within_run_only",
+        "generator_contract_and_repair_analysis_memoization": (
+            "disabled_every_analysis_request_live"
+        ),
         "openai_provider_prompt_prefix_cache_policy": "automatic_implicit",
         "openai_provider_prompt_prefix_cache_reuses_responses": False,
         "sage_task_cache_enabled": False,
@@ -1728,6 +1730,10 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
         "experiment_passed": True,
         "stability_gate_passed": True,
         "stability_gate_reasons": [],
+        "full_comparison_eligibility_gate_applied": True,
+        "full_comparison_eligibility_gate_passed": True,
+        "full_comparison_eligibility_gate_reasons": [],
+        "recommend_full_comparison": True,
         "benchmark_manifest_sha256": expected_benchmark_sha256,
         "scenario_order_sha256": expected_order_sha256,
         "outcome_evaluator": current_outcome_evaluator,
@@ -2025,6 +2031,12 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
         or recomputed_comparison.get("experiment_passed") is not True
         or recomputed_comparison.get("stability_gate_passed") is not True
         or recomputed_comparison.get("stability_gate_reasons") != []
+        or recomputed_comparison.get("full_comparison_eligibility_gate_applied")
+        is not True
+        or recomputed_comparison.get("full_comparison_eligibility_gate_passed")
+        is not True
+        or recomputed_comparison.get("full_comparison_eligibility_gate_reasons") != []
+        or recomputed_comparison.get("recommend_full_comparison") is not True
         or recomputed_comparison.get("scenario_count") != expected_tasks
         or recomputed_comparison.get("outcome_evaluator") != current_outcome_evaluator
     ):
@@ -2091,6 +2103,8 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
         "integrity_gate_passed": True,
         "experiment_passed": True,
         "stability_gate_passed": True,
+        "full_comparison_eligibility_gate_passed": True,
+        "recommend_full_comparison": True,
     }
 
 

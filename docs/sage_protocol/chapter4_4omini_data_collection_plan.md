@@ -8,9 +8,9 @@ validation samples 01--03 and the July campaign are archival development
 records, not current evidence. Execution of any full run requires explicit
 researcher approval.
 
-The route-independent v4 evaluator, timezone-aware historical rescore,
+The route-independent v5 evaluator, timezone-aware historical rescore,
 outcome-only thresholds, and release-chain hashes have passed independent
-checks and are frozen in `publication_release_manifest_20260903.json`. The
+checks and are frozen in `publication_release_manifest_20260905.json`. The
 historical rescore supplies only a conservative lower-envelope engineering
 reference. It is not confirmatory evidence and does not repair the superseded
 campaign's cache or online-lifecycle confounding.
@@ -48,7 +48,8 @@ Before any model request, the release must bind and verify:
 
 Strict runs prohibit control-result reuse, task-result reuse, stored
 whole-response replay, persistent generated-output replay, partial-row resume,
-and cross-run failure memory. Provider-managed prompt-prefix computation is
+within-run generator-analysis memoization, and cross-run failure memory.
+Provider-managed prompt-prefix computation is
 recorded separately and is not treated as a stored model response.
 
 ## Concurrent Publication Pair
@@ -86,8 +87,17 @@ or execution.
 
 Every auto actor request must record `choice_mode="auto"`, omit a named
 `tool_choice`, and bind the exact native and generated schema bundle sent to the
-model. The pilot must demonstrate at least one generated-tool call and stable
-execution before the complete comparison can be proposed.
+model. Before the complete comparison can be proposed, the pilot auto arm must
+call a generated tool in at least one scenario and must have zero generated-tool
+execution-failure scenarios. This is a mechanism eligibility check that the
+selection treatment was exercised and stable; it is not an outcome-performance
+gate and imposes no policy-versus-auto outcome threshold.
+
+The auto arm preserves every model-returned parallel tool call without
+response postprocessing or truncation. ToolSandbox applies one symmetric
+all-arm ordering rule: validate every distinct call-content order, deduplicate
+only execution-equivalent permutations of identical call contents, and do not
+treat tool-call IDs alone as distinct execution orders.
 
 ## Task Compare Requirement
 

@@ -1,0 +1,191 @@
+{
+  "schema_version": 2,
+  "report_type": "outcome_discrepancy_resolution_summary",
+  "created_at": "2026-09-05",
+  "purpose": "Record the final read-only v5 rescores and denominator-explicit crosswalk used to test whether evaluator and cohort differences explain the apparent current-versus-paper outcome discrepancy without rerunning any trajectory.",
+  "method": "read_only_saved_execution_context_rescore_and_exact_scenario_name_crosswalk_no_model_calls",
+  "canonical_toolsandbox_scores_consumed": false,
+  "source_artifacts": {
+    "historical_rescore": {
+      "raw_local_path": "artifacts/publication_validation/analysis/historical_outcome_rescore_v5_20260905T045818-0400.json",
+      "raw_available_in_public_release": false,
+      "raw_file_sha256": "b4e22388d19a02933ea68ad5b0fc6693924a7f0dcf43dbbd3d680bbf567d9272",
+      "payload_content_address_sha256": "8ac8e0fa27900be58a0effae1267380ac0c689bb732b4f568116f0443a3ba779",
+      "public_archive": {
+        "path": "artifacts/publication_validation/analysis/historical_outcome_rescore_v5_20260905T045818-0400.json.xz",
+        "compression": "xz-9e-single-thread-sha256",
+        "sha256": "72b1b337ad2c672cd1574cac46021ce39d154e778936fcc53a9705a6960add29",
+        "size": 484876,
+        "uncompressed_size": 8369583,
+        "uncompressed_sha256": "b4e22388d19a02933ea68ad5b0fc6693924a7f0dcf43dbbd3d680bbf567d9272"
+      }
+    },
+    "current_pair_rescore": {
+      "raw_local_path": "artifacts/publication_validation/analysis/current_pair_outcome_rescore_v5_20260905T045818-0400.json",
+      "raw_available_in_public_release": false,
+      "raw_file_sha256": "296bd81de757c50cc53029e17bc901dd238fa4946af002f07c66a61680ad96d5",
+      "payload_content_address_sha256": "1bcdb428c096bbcbdcc2c32cefa65dc3a6a2cb485d9389bcda8257433f2642e5",
+      "public_archive": {
+        "path": "artifacts/publication_validation/analysis/current_pair_outcome_rescore_v5_20260905T045818-0400.json.gz",
+        "compression": "gzip-9-no-name",
+        "sha256": "3c39c0dfcd4ecc1df8be5ae5d125145dbee7e2bde371c015dab4316b15beafcd",
+        "size": 18079,
+        "uncompressed_size": 823735,
+        "uncompressed_sha256": "296bd81de757c50cc53029e17bc901dd238fa4946af002f07c66a61680ad96d5"
+      }
+    },
+    "outcome_metric_crosswalk": {
+      "raw_local_path": "artifacts/publication_validation/analysis/outcome_metric_crosswalk_v5_20260905T045818-0400.json",
+      "raw_available_in_public_release": false,
+      "raw_file_sha256": "2deb7841152348cbc5a3bc4622e8220bf62de6b81d401dcaa1757d12b07fdda2",
+      "payload_content_address_sha256": "018218c2ab48ac610f423478fd4bbe212cecd61750d111b6550c34fad83eac7c",
+      "public_archive": {
+        "path": "artifacts/publication_validation/analysis/outcome_metric_crosswalk_v5_20260905T045818-0400.json.gz",
+        "compression": "gzip-9-no-name",
+        "sha256": "dc5017a0e8dbd74afba99c1ff1352f57cbe28e5eeccb07ce6bcd995d9aba6a61",
+        "size": 25374,
+        "uncompressed_size": 1923437,
+        "uncompressed_sha256": "2deb7841152348cbc5a3bc4622e8220bf62de6b81d401dcaa1757d12b07fdda2"
+      }
+    },
+    "paper_rep05_metric_bridge": {
+      "raw_local_path": "artifacts/publication_validation/analysis/paper_rep05_metric_bridge_audit.json",
+      "raw_available_in_public_release": false,
+      "raw_file_sha256": "9de66f19fbc9c87d9fc9dd020dced3bdac72ab3921e812f05ef3bb41faea3f78"
+    }
+  },
+  "source_run": {
+    "path": "outputs/publication_validation/outcome_v4_rep2_20260904_170747/native_action/online_build_full_20260904_170800",
+    "fixed_toolsandbox_timestamp": "1784832588",
+    "timezone": "America/New_York",
+    "task_count_per_arm": 1032
+  },
+  "outcome_evaluator": {
+    "version": "sage_outcome_contracts_v5",
+    "contract_sha256": "568c0e8accb8e155cbe47c41c93157651a2984dd348b5b8533e337517bb3e68e",
+    "source_sha256": "f23c238b4e5a73e5a1db66450188d8bc0dae7a701e01e1fc873ea03bd7323d15",
+    "insufficient_information_scenario_count": 224,
+    "scalar_scenario_count": 24
+  },
+  "frozen_cohorts": {
+    "all_1032": {
+      "count": 1032,
+      "ordered_names_sha256": "fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176"
+    },
+    "legacy_800": {
+      "count": 800,
+      "ordered_names_sha256": "e296668682aca636c6812d5d730d52610b97eab65129357cb297d14f4391af8c"
+    },
+    "excluded_232": {
+      "count": 232,
+      "ordered_names_sha256": "620149e549459dd831bfbc84780aaace51e3bd5a3780e01ec712434cc66be816"
+    }
+  },
+  "current_saved_pair": {
+    "control": {
+      "all_1032": {
+        "outcome_mean": 0.5540213178294574,
+        "exact_outcome_successes": 521,
+        "denominator": 1032
+      },
+      "legacy_800": {
+        "outcome_mean": 0.6171875,
+        "exact_outcome_successes": 443,
+        "denominator": 800
+      },
+      "excluded_232": {
+        "outcome_mean": 0.33620689655172414,
+        "exact_outcome_successes": 78,
+        "denominator": 232
+      }
+    },
+    "candidate": {
+      "all_1032": {
+        "outcome_mean": 0.6920219638242894,
+        "exact_outcome_successes": 660,
+        "denominator": 1032
+      },
+      "legacy_800": {
+        "outcome_mean": 0.7864583333333333,
+        "exact_outcome_successes": 575,
+        "denominator": 800
+      },
+      "excluded_232": {
+        "outcome_mean": 0.36637931034482757,
+        "exact_outcome_successes": 85,
+        "denominator": 232
+      }
+    },
+    "all_1032_candidate_minus_control_outcome_mean": 0.13800064599483197,
+    "all_1032_candidate_minus_control_exact_successes": 139
+  },
+  "historical_final_evaluator_reference": {
+    "original_v140": {
+      "all_1032": {
+        "outcome_mean": 0.5318152454780362,
+        "exact_outcome_successes": 483,
+        "denominator": 1032
+      },
+      "legacy_800": {
+        "outcome_mean": 0.5922916666666667,
+        "exact_outcome_successes": 408,
+        "denominator": 800
+      },
+      "excluded_232": {
+        "outcome_mean": 0.3232758620689655,
+        "exact_outcome_successes": 75,
+        "denominator": 232
+      }
+    },
+    "paper_replication_05": {
+      "all_1032": {
+        "outcome_mean": 0.675952842377261,
+        "exact_outcome_successes": 649,
+        "denominator": 1032
+      },
+      "legacy_800": {
+        "outcome_mean": 0.7644791666666667,
+        "exact_outcome_successes": 563,
+        "denominator": 800
+      },
+      "excluded_232": {
+        "outcome_mean": 0.3706896551724138,
+        "exact_outcome_successes": 86,
+        "denominator": 232
+      }
+    },
+    "ten_run_aggregate": {
+      "all_1032_mean_of_run_outcome_means": 0.6776728036175711,
+      "all_1032_minimum_run_outcome_mean": 0.6640826873385013,
+      "all_1032_total_exact_outcome_successes": 6513,
+      "legacy_800_mean_of_run_outcome_means": 0.7571979166666667,
+      "legacy_800_total_exact_outcome_successes": 5577,
+      "excluded_232_mean_of_run_outcome_means": 0.40344827586206894,
+      "excluded_232_total_exact_outcome_successes": 936,
+      "run_count": 10
+    }
+  },
+  "same_final_evaluator_comparison": {
+    "all_1032": {
+      "current_candidate_minus_paper_replication_05_outcome_mean": 0.016069121447028323,
+      "current_candidate_minus_paper_replication_05_exact_successes": 11,
+      "current_candidate_minus_ten_run_mean": 0.014349160206718281,
+      "current_candidate_minus_ten_run_lower_envelope": 0.02793927648578809
+    },
+    "legacy_800": {
+      "current_candidate_minus_paper_replication_05_outcome_mean": 0.02197916666666655,
+      "current_candidate_minus_paper_replication_05_exact_successes": 12
+    }
+  },
+  "paper_reported_metric_context": {
+    "evaluator": "superseded_paper_era_evaluator",
+    "denominator": 800,
+    "reported_fractional_outcome_mean": 0.8095094479761491,
+    "reported_exact_one_count": 453,
+    "reported_exact_one_rate": 0.56625,
+    "current_candidate_final_legacy_800_minus_reported_paper_mean": -0.02305111464281584,
+    "interpretation": "The reported 0.8095094479761491 is a fractional mean under the superseded evaluator, not an exact-success rate and not an all-1,032 result. It cannot be used as a same-evaluator no-regression threshold."
+  },
+  "conclusion": "The discrepancy does not remain in either frozen denominator after both preserved candidates are evaluated with the same final v5 contract: the current candidate is +0.016069121447028323 on all 1,032 tasks and +0.02197916666666655 on the legacy 800 relative to paper replication 05, with 11 and 12 more exact successes respectively.",
+  "limitation": "These are evaluator-only read-only rescores of preserved execution contexts. They verify the measurement discrepancy but are not new live results and do not replace the approved selector pilot or pending confirmatory campaign. The historical campaign remains non-confirmatory because its cache, feedback, birth, routing, and lifecycle provenance cannot be repaired by offline rescoring."
+}
