@@ -4,8 +4,12 @@ description: Do not suppress dashboard opening after protocol runs; user wants d
 type: feedback
 ---
 
-Do not pass `--no-dashboard-open` to `run_sage_protocol.py`. After each run completes, export dashboard data and open both `index.html` and `task_focus.html` via `open_dashboard`.
+Use the canonical publication launcher for every live run. It must generate and
+serve the run's `dashboard/task_compare.html`, verify the served root and bytes,
+and open that exact Task Compare page in the external/default browser before
+the first model request.
 
 **Why:** User explicitly requested that runs open dashboards.
 
-**How to apply:** Remove `--no-dashboard-open` from run commands. After the run script exits, call `scripts/export_dashboard_data.py --protocol-run-root <run_dir>` and then `open_dashboard` for both dashboard pages.
+**How to apply:** Run through `scripts/run_native_action_4omini_ab.sh` (or the
+guarded Make targets that invoke it) and preserve its dashboard-launch receipt.

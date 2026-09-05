@@ -20,23 +20,27 @@ This file contains durable collaboration rules for coding-agent sessions working
 
 - After editing any core module (generation, validation, registry, runtime, evaluation), run:
   ```bash
-  python scripts/migrate_registry.py --check-only
+  make test-core
   ```
-  This verifies the active registry is claim-safe (no broken manifests, all PASS entries have validation proof).
+  This exercises the publication-critical actor, generation, validation,
+  registry, evaluation, dashboard, and concurrent-run paths.
 
 - Do not assume a refactor works. Run the command; if it fails, fix it and re-run.
 - Type checking (`mypy src/sage_ts/`) is optional per-session but must pass before submission.
 
 ## 4. Registry Integrity
 
-- The active registry at `artifacts/registry_manifest.json` is the source of truth for retained helpers.
+- Strict online publication runs start from an empty run-local registry. Frozen
+  publication inputs are immutable and are checked with `make verify-inputs`.
 - Every PASS entry must have:
   - `held_out_check_count >= 1` and `negative_applicability_count >= 2` (validation proof)
   - `runtime_smoke_passed=true` (runtime verification)
   - `preserves_side_effect_tools` list (if applicable)
   - `code_hash` (immutable reference)
   - `accepted_at` timestamp and `birth_scenario`
-- Any edit to the registry must be via `python scripts/migrate_registry.py`, not direct JSON edits.
+- Do not edit a frozen publication registry or its manifest in place. Create a
+  new run-local candidate and freeze it through the current publication-input
+  process.
 
 ## 5. Frozen Reuse Baseline
 
