@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+import scripts.run_sage_auto_selection_replay as auto_selection_replay
 import scripts.run_sage_protocol as protocol_runner
 import scripts.verify_publication_run as publication_verifier
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
@@ -21,6 +22,17 @@ from scripts.verify_publication_run import verify_run
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TEST_GIT_COMMIT = "1" * 40
 TEST_GIT_TREE = "2" * 40
+POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC = {
+    "protocol_gate_policy": "actor_selection_donor_integrity_only",
+    "protocol_gate_passed": True,
+    "protocol_gate_reasons": [],
+    "protocol_performance_thresholds_applied": False,
+    "protocol_performance_diagnostic_passed": False,
+    "protocol_performance_diagnostic_reasons": [
+        "non_positive_outcome_delta",
+        "confirmation_outcome_delta_below_0_08",
+    ],
+}
 
 
 def _test_environment_identity(repo_root: Path) -> dict[str, object]:
@@ -570,6 +582,57 @@ def test_pinned_run_resolves_pins_without_caller_values(
         )
 
 
+def test_auto_replay_preflight_requires_verified_policy_donor_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "policy_donor"
+    run_root.mkdir()
+    _write_json(
+        run_root / "protocol_manifest.json",
+        POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC,
+    )
+    _write_json(
+        run_root / "paired_comparison.json",
+        POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC,
+    )
+    monkeypatch.setattr(
+        publication_verifier,
+        "verify_pinned_run",
+        lambda *args, **kwargs: {"run_root": str(run_root), "status": "pass"},
+    )
+
+    result = auto_selection_replay._verify_policy_donor(run_root, stage="pilot")
+
+    assert result["policy_donor_gate"] == (POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC)
+
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    protocol["protocol_gate_policy"] = "ordinary_outcome_viability"
+    _write_json(run_root / "protocol_manifest.json", protocol)
+    with pytest.raises(
+        actor_selection_comparison.ActorSelectionVerificationError,
+        match="integrity-only gate policy",
+    ):
+        auto_selection_replay._verify_policy_donor(run_root, stage="pilot")
+
+
+def test_full_replay_policy_donor_record_validation_is_fail_closed() -> None:
+    assert auto_selection_replay._valid_policy_donor_gate_record(
+        POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC
+    )
+    for field, value in (
+        ("protocol_gate_policy", "ordinary_outcome_viability"),
+        ("protocol_gate_passed", False),
+        ("protocol_performance_thresholds_applied", True),
+        ("protocol_performance_diagnostic_reasons", "not-a-list"),
+    ):
+        tampered = copy.deepcopy(POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC)
+        tampered[field] = value
+        assert not auto_selection_replay._valid_policy_donor_gate_record(tampered)
+
+
 def test_selector_full_gate_revalidates_linked_pilot_evidence(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -612,7 +675,12 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
             "candidate_dir": str(policy_dir),
             "timezone": publication_verifier.PUBLICATION_TIMEZONE,
             "outcome_evaluator": outcome_evaluator,
+            **POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC,
         },
+    )
+    _write_json(
+        run_root / "paired_comparison.json",
+        POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC,
     )
     for arm_dir in (policy_dir, auto_dir):
         _write_json(
@@ -798,6 +866,7 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
                 "git_commit": TEST_GIT_COMMIT,
                 "git_tree": TEST_GIT_TREE,
             },
+            "policy_donor_gate": POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC,
             "outcome_evaluator": outcome_evaluator,
             "outcome_comparison_path": str(comparison_path),
             "dashboard_task_compare_path": str(policy_auto_dashboard_path),
@@ -846,6 +915,7 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
     assert result["stability_gate_passed"] is True
     assert result["full_comparison_eligibility_gate_passed"] is True
     assert result["recommend_full_comparison"] is True
+    assert result["policy_donor_gate"] == (POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC)
     assert result["outcome_evaluator"] == outcome_evaluator
     assert result["git_commit"] == TEST_GIT_COMMIT
     assert (
@@ -853,6 +923,53 @@ def test_selector_full_gate_revalidates_linked_pilot_evidence(
         == hashlib.sha256(evidence_path.read_bytes()).hexdigest()
     )
     assert result["timezone"] == publication_verifier.PUBLICATION_TIMEZONE
+
+    def reseal_protocol(payload: dict[str, Any]) -> None:
+        _write_json(protocol_path, payload)
+        sealed_evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        sealed_evidence["policy_protocol_manifest_sha256"] = hashlib.sha256(
+            protocol_path.read_bytes()
+        ).hexdigest()
+        _write_json(evidence_path, sealed_evidence)
+
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    protocol["protocol_gate_policy"] = "ordinary_outcome_viability"
+    reseal_protocol(protocol)
+    with pytest.raises(ValueError, match="integrity-only gate policy"):
+        publication_verifier.verify_selector_pilot_evidence(evidence_path)
+    protocol["protocol_gate_policy"] = "actor_selection_donor_integrity_only"
+    protocol["protocol_performance_thresholds_applied"] = True
+    reseal_protocol(protocol)
+    with pytest.raises(ValueError, match="applied ordinary outcome-performance"):
+        publication_verifier.verify_selector_pilot_evidence(evidence_path)
+    protocol["protocol_performance_thresholds_applied"] = False
+    protocol["protocol_gate_passed"] = False
+    protocol["protocol_gate_reasons"] = ["runtime_exceptions_present"]
+    reseal_protocol(protocol)
+    with pytest.raises(ValueError, match="did not pass its integrity gate"):
+        publication_verifier.verify_selector_pilot_evidence(evidence_path)
+    protocol["protocol_gate_passed"] = True
+    protocol["protocol_gate_reasons"] = []
+    reseal_protocol(protocol)
+
+    paired_comparison_path = run_root / "paired_comparison.json"
+    paired_comparison = json.loads(paired_comparison_path.read_text(encoding="utf-8"))
+    paired_comparison["protocol_performance_diagnostic_passed"] = True
+    _write_json(paired_comparison_path, paired_comparison)
+    with pytest.raises(ValueError, match="protocol and paired comparison gates"):
+        publication_verifier.verify_selector_pilot_evidence(evidence_path)
+    _write_json(
+        paired_comparison_path,
+        POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC,
+    )
+
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    evidence["policy_donor_gate"]["protocol_gate_policy"] = "ordinary_outcome_viability"
+    _write_json(evidence_path, evidence)
+    with pytest.raises(ValueError, match="preserve the verified policy-donor gate"):
+        publication_verifier.verify_selector_pilot_evidence(evidence_path)
+    evidence["policy_donor_gate"] = POLICY_DONOR_GATE_WITH_NEGATIVE_DIAGNOSTIC
+    _write_json(evidence_path, evidence)
 
     first_policy_row = dict(policy_auto_dashboard_data["pairs"][0]["control"])
     policy_auto_dashboard_data["pairs"][0]["control"] = None

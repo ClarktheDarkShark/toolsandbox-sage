@@ -17,7 +17,7 @@
   },
   "active_execution_policy": {
     "path": "docs/sage_protocol/publication_execution_policy_20260904.json",
-    "sha256": "0026a9282aa90bf5d6776abce1f6af66595b763bfee2caeaeca75e808250767c"
+    "sha256": "d09ed81a7aa5ecbfb8764a1ee1f27cec69e3dfe4052c49d8abbba85816cd855e"
   },
   "historical_outcome_rescore_summary": {
     "path": "docs/sage_protocol/historical_outcome_rescore_v5_summary.json",
@@ -33,6 +33,6 @@
   },
   "active_validation_thresholds": {
     "path": "docs/sage_protocol/publication_validation_thresholds_v5.json",
-    "sha256": "726c4a41c66b034237727cb6c8d1bf0e6139814c058861af88c21079f7bc8b80"
+    "sha256": "c81dcda39c2f926903c6fe55574f254861e69928dcfc009e103cb604d0ce348e"
   }
 }

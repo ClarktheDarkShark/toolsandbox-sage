@@ -143,19 +143,24 @@ identity-only re-execution without changing the model response or favoring an
 actor-selection arm.
 
 The comparison is fail-closed and matched per task. The first live pair runs a
-fresh non-learning control and policy SAGE concurrently. The policy donor captures
-the exact actor-ready registry and lifecycle bytes after same-task tool birth,
-plus routing decisions, generated entries, tool order, allow-list, source,
-models, environment, clock, benchmark, and fixture hashes. Before each auto
-task, replay restores that donor state and verifies the routed inventory before
-the first model request. Independent generation, reflection, and lifecycle
-mutation are disabled only in the replay arm because allowing them to run again
-would create a different inventory and confound the selection comparison. Thus
-the estimand is the actor-selection effect conditional on the policy donor's
-exact adaptive tool-birth and lifecycle schedule. Once that authority exists,
-the second live pair runs an independent fresh non-learning control and the auto
-replay concurrently. That control has no path into auto's inventory or
-execution; it measures the auto arm's absolute outcome behavior.
+fresh non-learning control and policy SAGE concurrently. In the selector
+experiment only, this policy arm is the inventory donor: its runtime integrity
+gate must pass, while its control-versus-policy outcome-threshold result and
+reasons are retained as diagnostics rather than used to block the matched auto
+comparison. Ordinary non-donor publication runs continue to apply the frozen
+outcome-performance thresholds. The policy donor captures the exact actor-ready
+registry and lifecycle bytes after same-task tool birth, plus routing decisions,
+generated entries, tool order, allow-list, source, models, environment, clock,
+benchmark, and fixture hashes. Before each auto task, replay restores that donor
+state and verifies the routed inventory before the first model request.
+Independent generation, reflection, and lifecycle mutation are disabled only in
+the replay arm because allowing them to run again would create a different
+inventory and confound the selection comparison. Thus the estimand is the
+actor-selection effect conditional on the policy donor's exact adaptive
+tool-birth and lifecycle schedule. Once that authority exists, the second live
+pair runs an independent fresh non-learning control and the auto replay
+concurrently. That control has no path into auto's inventory or execution; it
+measures the auto arm's absolute outcome behavior.
 
 Every actor request is linked one-to-one to its model-usage record. The run
 stores exact native/generated schema bundles in a content-addressed catalog and
@@ -364,11 +369,11 @@ Important frozen inputs include:
   thresholds: SHA-256
   `b96958d6fa6df43e5531aebdcb8a58842e65da4c4f49876969672d287648c3a8` /
   `ac24e5f0f87f7990406f2e3c59433dfd054c2393ae67a6271025c51e2decf98c` /
-  `726c4a41c66b034237727cb6c8d1bf0e6139814c058861af88c21079f7bc8b80`;
+  `c81dcda39c2f926903c6fe55574f254861e69928dcfc009e103cb604d0ce348e`;
 - production scientific-core manifest: 32,540 physical lines, SHA-256
   `51bca58741f9917228e14d472f4e6401af85635457fd7e0af4e3206686c47a53`;
 - active release manifest: SHA-256
-  `7652bbb0f5cfd9952f57df961cbb43284e5e3cf2d5dcb57d77adfe862a33110a`;
+  `fbbf2b32e9bedbb0a1bc8417625f5077b4b78ce5459fd8277a3099c1aeb51cae`;
 - immutable 2026-09-03 predecessor release manifest: SHA-256
   `8e7e2ecd4ca95e2f8484adf5610986f8d15106d6e054967940acd365c346c658`;
 - preserved 32,260-line predecessor core manifest: SHA-256

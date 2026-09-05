@@ -113,6 +113,12 @@
     "pair_2_independent_control_and_auto_sage": "concurrent_isolated_child_processes",
     "auto_replay_timing": "after_policy_inventory_authority_completion",
     "policy_and_auto_inventory_match_required_per_task": true,
+    "policy_inventory_donor_gate": {
+      "protocol_gate_policy": "actor_selection_donor_integrity_only",
+      "integrity_gate_must_pass": true,
+      "ordinary_outcome_performance_thresholds_applied": false,
+      "ordinary_outcome_performance_result_and_reasons_recorded_diagnostically": true
+    },
     "pilot_mechanism_eligibility_gate": {
       "applies_to": "sage_auto_selection",
       "minimum_generated_tool_called_scenarios": 1,

@@ -79,6 +79,11 @@ SAGE-routed inventory. It contains two live concurrent pairs:
 
 The policy arm captures the exact actor-ready state for each task after
 same-task tool birth, including native and generated schemas and their order.
+For this selector experiment only, the policy arm is an inventory donor. Its
+runtime integrity gate must pass, while the ordinary control-versus-policy
+outcome-threshold result and reasons are recorded as diagnostics rather than
+used to stop the matched auto comparison. Ordinary non-donor publication runs
+continue to apply the frozen outcome-performance thresholds.
 After that authority exists, the auto replay restores and verifies those bytes
 for the matching task. Auto generation, reflection, and lifecycle mutation are
 disabled so that policy and auto receive the same inventory. The second pair's

@@ -77,6 +77,18 @@ EXPECTED_PARALLEL_TOOL_CALL_EXECUTION = {
     "semantic_permutation_deduplication_applies_to_all_arms": True,
     "tool_call_ids_alone_create_distinct_execution_order": False,
 }
+EXPECTED_SELECTOR_POLICY_DONOR_GATE = {
+    "protocol_gate_policy": "actor_selection_donor_integrity_only",
+    "integrity_gate_must_pass": True,
+    "ordinary_outcome_performance_thresholds_applied": False,
+    "ordinary_outcome_performance_result_and_reasons_recorded_diagnostically": True,
+}
+EXPECTED_SELECTOR_POLICY_DONOR_SCOPE = {
+    "protocol_gate_policy": "actor_selection_donor_integrity_only",
+    "required_integrity_applies": True,
+    "required_no_regression_applies": False,
+    "required_no_regression_result_and_reasons_recorded_diagnostically": True,
+}
 EXPECTED_ACTIVE_EXECUTION_POLICY = {
     "execution_environment": {
         "TZ": "America/New_York",
@@ -177,6 +189,7 @@ EXPECTED_ACTIVE_EXECUTION_POLICY = {
         ),
         "auto_replay_timing": "after_policy_inventory_authority_completion",
         "policy_and_auto_inventory_match_required_per_task": True,
+        "policy_inventory_donor_gate": EXPECTED_SELECTOR_POLICY_DONOR_GATE,
         "pilot_mechanism_eligibility_gate": {
             "applies_to": "sage_auto_selection",
             "minimum_generated_tool_called_scenarios": 1,
@@ -2316,6 +2329,7 @@ def _verify_active_validation_thresholds(
         "performance_endpoint",
         "supersedes",
         "execution_policy",
+        "selector_policy_donor_scope",
         "outcome_evaluator",
         "benchmark",
         "historical_reference",
@@ -2334,6 +2348,35 @@ def _verify_active_validation_thresholds(
     if payload.get("performance_endpoint") != "outcome_task_completion_similarity":
         raise InputVerificationError(
             "Active publication validation endpoint is not outcome/task completion"
+        )
+    donor_scope = _object(
+        payload,
+        "selector_policy_donor_scope",
+        "active publication validation thresholds",
+    )
+    if not _exact_equal(donor_scope, EXPECTED_SELECTOR_POLICY_DONOR_SCOPE):
+        raise InputVerificationError(
+            "Active validation selector policy-donor scope is not exact"
+        )
+    policy_donor_gate = cast(
+        dict[str, Any], execution_policy["actor_selection_experiment"]
+    )["policy_inventory_donor_gate"]
+    if (
+        donor_scope["protocol_gate_policy"] != policy_donor_gate["protocol_gate_policy"]
+        or donor_scope["required_integrity_applies"]
+        != policy_donor_gate["integrity_gate_must_pass"]
+        or donor_scope["required_no_regression_applies"]
+        != policy_donor_gate["ordinary_outcome_performance_thresholds_applied"]
+        or donor_scope[
+            "required_no_regression_result_and_reasons_recorded_diagnostically"
+        ]
+        != policy_donor_gate[
+            "ordinary_outcome_performance_result_and_reasons_recorded_diagnostically"
+        ]
+    ):
+        raise InputVerificationError(
+            "Active validation selector policy-donor scope disagrees with the "
+            "execution policy"
         )
     if any(
         "canonical" in str(key).lower() or "reference" in str(key).lower()

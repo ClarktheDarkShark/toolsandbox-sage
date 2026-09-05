@@ -55,6 +55,14 @@ STAGE_PINS: dict[str, dict[str, object]] = {
         ),
     },
 }
+POLICY_DONOR_GATE_FIELDS = (
+    "protocol_gate_policy",
+    "protocol_gate_passed",
+    "protocol_gate_reasons",
+    "protocol_performance_thresholds_applied",
+    "protocol_performance_diagnostic_passed",
+    "protocol_performance_diagnostic_reasons",
+)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -116,9 +124,15 @@ def _verified_environment() -> dict[str, object]:
 
 def _verify_policy_donor(run_root: Path, *, stage: str) -> dict[str, object]:
     try:
-        from scripts.verify_publication_run import verify_pinned_run
+        from scripts.verify_publication_run import (
+            verify_pinned_run,
+            verify_selector_policy_donor_gate,
+        )
     except ModuleNotFoundError:
-        from verify_publication_run import verify_pinned_run
+        from verify_publication_run import (  # type: ignore[no-redef]
+            verify_pinned_run,
+            verify_selector_policy_donor_gate,
+        )
 
     try:
         result = verify_pinned_run(
@@ -126,6 +140,7 @@ def _verify_policy_donor(run_root: Path, *, stage: str) -> dict[str, object]:
             cohort=stage,
             expect_reflection="same-run-fresh",
         )
+        policy_donor_gate = verify_selector_policy_donor_gate(run_root)
     except (OSError, UnicodeError, ValueError) as exc:
         raise ActorSelectionVerificationError(
             f"Policy donor failed strict publication verification: {exc}"
@@ -134,7 +149,25 @@ def _verify_policy_donor(run_root: Path, *, stage: str) -> dict[str, object]:
         raise ActorSelectionVerificationError(
             "Strict publication verification selected a different policy donor."
         )
+    result["policy_donor_gate"] = policy_donor_gate
     return result
+
+
+def _valid_policy_donor_gate_record(raw: object) -> bool:
+    if not isinstance(raw, dict) or set(raw) != set(POLICY_DONOR_GATE_FIELDS):
+        return False
+    diagnostic_passed = raw.get("protocol_performance_diagnostic_passed")
+    diagnostic_reasons = raw.get("protocol_performance_diagnostic_reasons")
+    return bool(
+        raw.get("protocol_gate_policy") == "actor_selection_donor_integrity_only"
+        and raw.get("protocol_gate_passed") is True
+        and raw.get("protocol_gate_reasons") == []
+        and raw.get("protocol_performance_thresholds_applied") is False
+        and type(diagnostic_passed) is bool
+        and isinstance(diagnostic_reasons, list)
+        and all(isinstance(reason, str) for reason in diagnostic_reasons)
+        and diagnostic_passed == (not diagnostic_reasons)
+    )
 
 
 def _required_evidence_hashes(paths: dict[str, Path]) -> dict[str, dict[str, object]]:
@@ -568,6 +601,9 @@ def main() -> None:
             is not False
             or pilot_evidence.get("auto_control_output_influences_execution")
             is not False
+            or not _valid_policy_donor_gate_record(
+                pilot_evidence.get("policy_donor_gate")
+            )
         ):
             raise SystemExit(
                 "Full replay pilot evidence is not valid or source-matched."
@@ -649,6 +685,7 @@ def main() -> None:
         run_root,
         stage=args.stage,
     )
+    policy_donor_gate = policy_publication_verification["policy_donor_gate"]
     if not os.environ.get("OPENAI_API_KEY", "").strip():
         raise SystemExit("OPENAI_API_KEY is required for the live auto-selection arm.")
     os.environ["SAGE_TS_MODEL"] = agent
@@ -1066,6 +1103,7 @@ def main() -> None:
             "benchmark_manifest_sha256": benchmark_manifest_sha256,
             "source_identity": source_identity,
             "policy_publication_verification": policy_publication_verification,
+            "policy_donor_gate": policy_donor_gate,
             "publication_environment_before": environment_before,
             "publication_environment_after": environment_after,
             "publication_environment_sha256": _canonical_sha256(environment_before),

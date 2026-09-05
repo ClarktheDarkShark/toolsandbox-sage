@@ -62,6 +62,14 @@ PUBLICATION_EXECUTION_ENV = {
     "SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS": "600",
 }
 PUBLICATION_TIMEZONE = PUBLICATION_EXECUTION_ENV["TZ"]
+SELECTOR_POLICY_DONOR_GATE_FIELDS = (
+    "protocol_gate_policy",
+    "protocol_gate_passed",
+    "protocol_gate_reasons",
+    "protocol_performance_thresholds_applied",
+    "protocol_performance_diagnostic_passed",
+    "protocol_performance_diagnostic_reasons",
+)
 LLM_USAGE_INTEGER_FIELDS = (
     "llm_call_count",
     "llm_live_call_count",
@@ -1309,6 +1317,49 @@ def verify_pinned_run(
     return result
 
 
+def verify_selector_policy_donor_gate(run_root: Path) -> dict[str, Any]:
+    """Verify and normalize the selector inventory donor's recorded gate."""
+
+    run_root = run_root.resolve()
+    protocol = _read_json(run_root / "protocol_manifest.json")
+    comparison = _read_json(run_root / "paired_comparison.json")
+    if protocol.get("protocol_gate_policy") != ("actor_selection_donor_integrity_only"):
+        raise ValueError(
+            "Selector policy donor does not record the integrity-only gate policy."
+        )
+    if protocol.get("protocol_performance_thresholds_applied") is not False:
+        raise ValueError(
+            "Selector policy donor applied ordinary outcome-performance thresholds."
+        )
+    if (
+        protocol.get("protocol_gate_passed") is not True
+        or protocol.get("protocol_gate_reasons") != []
+    ):
+        raise ValueError("Selector policy donor did not pass its integrity gate.")
+    diagnostic_passed = protocol.get("protocol_performance_diagnostic_passed")
+    diagnostic_reasons = protocol.get("protocol_performance_diagnostic_reasons")
+    if type(diagnostic_passed) is not bool or not isinstance(diagnostic_reasons, list):
+        raise ValueError(
+            "Selector policy donor has malformed outcome-performance diagnostics."
+        )
+    if not all(isinstance(reason, str) for reason in diagnostic_reasons):
+        raise ValueError(
+            "Selector policy donor has malformed outcome-performance reasons."
+        )
+    if diagnostic_passed != (not diagnostic_reasons):
+        raise ValueError(
+            "Selector policy donor outcome-performance result and reasons disagree."
+        )
+    if any(
+        comparison.get(field) != protocol.get(field)
+        for field in SELECTOR_POLICY_DONOR_GATE_FIELDS
+    ):
+        raise ValueError(
+            "Selector policy donor protocol and paired comparison gates disagree."
+        )
+    return {field: protocol[field] for field in SELECTOR_POLICY_DONOR_GATE_FIELDS}
+
+
 def _outcome_only_pair_summary(
     control_rows: dict[str, dict[str, Any]],
     auto_rows: dict[str, dict[str, Any]],
@@ -1775,6 +1826,11 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
         raise ValueError(
             "Selector pilot policy protocol is not the pinned policy-authority donor."
         )
+    policy_donor_gate = verify_selector_policy_donor_gate(run_root)
+    if evidence.get("policy_donor_gate") != policy_donor_gate:
+        raise ValueError(
+            "Selector pilot evidence does not preserve the verified policy-donor gate."
+        )
 
     current_source = _clean_source_identity(REPO_ROOT)
     source_identity = evidence.get("source_identity")
@@ -2098,6 +2154,7 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
         "timezone": PUBLICATION_TIMEZONE,
         "git_commit": current_source["git_commit"],
         "git_tree": current_source["git_tree"],
+        "policy_donor_gate": policy_donor_gate,
         "outcome_evidence_complete": True,
         "performance_gate_applied": False,
         "integrity_gate_passed": True,

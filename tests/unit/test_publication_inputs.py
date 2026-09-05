@@ -14,6 +14,7 @@ from scripts.verify_publication_inputs import (
     EXPECTED_ACTIVE_PRODUCTION_CORE,
     EXPECTED_AMENDMENT_POLICY_SUPERSESSION,
     EXPECTED_REPLACEMENT_POLICY,
+    EXPECTED_SELECTOR_POLICY_DONOR_SCOPE,
     InputVerificationError,
     verify_active_production_scientific_core,
     verify_inputs,
@@ -413,6 +414,7 @@ def _wrap_public_repo(repo: Path, base_manifest_path: Path) -> Path:
                 "path": execution_policy_path.relative_to(repo).as_posix(),
                 "sha256": _sha256(execution_policy_path),
             },
+            "selector_policy_donor_scope": EXPECTED_SELECTOR_POLICY_DONOR_SCOPE,
             "outcome_evaluator": evaluator,
             "benchmark": {
                 "task_count": 2,
@@ -613,6 +615,17 @@ def test_release_verifier_hashes_base_inputs_and_policy_amendment(
     assert pilot_gate["minimum_generated_tool_called_scenarios"] == 1
     assert pilot_gate["maximum_generated_tool_execution_failure_scenarios"] == 0
     assert pilot_gate["mechanism_eligibility_not_outcome_performance"] is True
+    donor_gate = result["active_execution_policy"]["actor_selection_experiment"][
+        "policy_inventory_donor_gate"
+    ]
+    assert donor_gate == {
+        "protocol_gate_policy": "actor_selection_donor_integrity_only",
+        "integrity_gate_must_pass": True,
+        "ordinary_outcome_performance_thresholds_applied": False,
+        "ordinary_outcome_performance_result_and_reasons_recorded_diagnostically": (
+            True
+        ),
+    }
     parallel_calls = result["active_execution_policy"]["parallel_tool_call_execution"]
     assert (
         parallel_calls
@@ -895,6 +908,30 @@ def test_release_verifier_rejects_type_coerced_execution_policy_value(
         (
             (
                 "actor_selection_experiment",
+                "policy_inventory_donor_gate",
+                "protocol_gate_policy",
+            ),
+            "ordinary_outcome_viability",
+        ),
+        (
+            (
+                "actor_selection_experiment",
+                "policy_inventory_donor_gate",
+                "integrity_gate_must_pass",
+            ),
+            False,
+        ),
+        (
+            (
+                "actor_selection_experiment",
+                "policy_inventory_donor_gate",
+                "ordinary_outcome_performance_thresholds_applied",
+            ),
+            True,
+        ),
+        (
+            (
+                "actor_selection_experiment",
                 "pilot_mechanism_eligibility_gate",
                 "minimum_generated_tool_called_scenarios",
             ),
@@ -1057,6 +1094,23 @@ def test_release_verifier_rejects_threshold_rescore_evaluator_mismatch(
     _write_json(wrapper_path, wrapper)
 
     with pytest.raises(InputVerificationError, match="different outcome evaluator"):
+        verify_inputs(repo, wrapper_path)
+
+
+def test_release_verifier_rejects_rehashed_selector_donor_threshold_scope(
+    tmp_path: Path,
+) -> None:
+    repo, base_manifest_path = _build_public_repo(tmp_path)
+    wrapper_path = _wrap_public_repo(repo, base_manifest_path)
+    wrapper = _read_json(wrapper_path)
+    thresholds_path = repo / wrapper["active_validation_thresholds"]["path"]
+    thresholds = _read_json(thresholds_path)
+    thresholds["selector_policy_donor_scope"]["required_no_regression_applies"] = True
+    _write_json(thresholds_path, thresholds)
+    wrapper["active_validation_thresholds"]["sha256"] = _sha256(thresholds_path)
+    _write_json(wrapper_path, wrapper)
+
+    with pytest.raises(InputVerificationError, match="policy-donor scope is not exact"):
         verify_inputs(repo, wrapper_path)
 
 

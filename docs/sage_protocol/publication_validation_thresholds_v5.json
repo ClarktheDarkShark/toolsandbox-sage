@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "purpose": "Predeclared integrity and outcome-only no-regression gates for the current publication selector pilot and validation sample. The candidate outcome floor is the exact v5 lower envelope across the ten historical terminal-trajectory rescores. Passing one sample is necessary for release readiness but does not replace the pending ten-pair confirmatory campaign.",
+  "purpose": "Predeclared integrity and outcome-only no-regression gates for ordinary publication validation samples. The selector experiment's policy inventory donor must pass the same integrity requirements, but its control-versus-policy outcome thresholds are recorded diagnostically rather than applied as a gate. The candidate outcome floor is the exact v5 lower envelope across the ten historical terminal-trajectory rescores. Passing one ordinary sample is necessary for release readiness but does not replace the pending ten-pair confirmatory campaign.",
   "performance_endpoint": "outcome_task_completion_similarity",
   "supersedes": {
     "path": "docs/sage_protocol/publication_validation_thresholds_v4.json",
@@ -8,7 +8,13 @@
   },
   "execution_policy": {
     "path": "docs/sage_protocol/publication_execution_policy_20260904.json",
-    "sha256": "0026a9282aa90bf5d6776abce1f6af66595b763bfee2caeaeca75e808250767c"
+    "sha256": "d09ed81a7aa5ecbfb8764a1ee1f27cec69e3dfe4052c49d8abbba85816cd855e"
+  },
+  "selector_policy_donor_scope": {
+    "protocol_gate_policy": "actor_selection_donor_integrity_only",
+    "required_integrity_applies": true,
+    "required_no_regression_applies": false,
+    "required_no_regression_result_and_reasons_recorded_diagnostically": true
   },
   "outcome_evaluator": {
     "version": "sage_outcome_contracts_v5",
