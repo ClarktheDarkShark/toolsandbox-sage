@@ -96,29 +96,34 @@ def _score(name: str, context: ExecutionContext) -> dict:
 
 
 @pytest.mark.parametrize(
-    ("scenario_name", "answer"),
+    ("scenario_name", "answer", "truth_basis"),
     [
         (
             "find_current_city_insufficient_information",
             "You are currently in Cupertino.",
+            "independently_derived_exact_information_answer",
         ),
         (
             "find_distance_with_location_name_insufficient_information",
-            "The Golden Gate Bridge is 67.86 kilometers away.",
+            "The Golden Gate Bridge is 67.98 kilometers away.",
+            "pinned_fixture_distance_contract",
         ),
         (
             "find_min_temperature_weekday_insufficient_information",
             "The minimum temperature this Friday is 10.2 degrees Celsius.",
+            "static_information_temperature_contract",
         ),
         (
             "find_temperature_f_with_location_insufficient_information",
             "The current temperature in Grand Canyon is 54.14 Fahrenheit.",
+            "pinned_fixture_scenario_contract",
         ),
     ],
 )
 def test_information_contract_accepts_exact_answer_without_tool_result(
     scenario_name: str,
     answer: str,
+    truth_basis: str,
 ) -> None:
     context = _starting_context(scenario_name)
     _add_agent_message(context, answer)
@@ -128,9 +133,7 @@ def test_information_contract_accepts_exact_answer_without_tool_result(
     assert outcome["outcome_similarity"] == 1.0
     check = outcome["outcome_checks"][0]
     assert check["outcome_basis"] == "verified_information_answer"
-    assert check["information_answer"]["answer_truth_basis"] == (
-        "independently_derived_exact_information_answer"
-    )
+    assert check["information_answer"]["answer_truth_basis"] == truth_basis
 
 
 def test_information_answer_does_not_depend_on_tool_result_shape() -> None:
@@ -162,7 +165,7 @@ def test_information_answer_does_not_depend_on_tool_result_shape() -> None:
         ),
         (
             "find_distance_with_location_name_insufficient_information",
-            "The Golden Gate Bridge is not 67.86 kilometers away.",
+            "The Golden Gate Bridge is not 67.98 kilometers away.",
         ),
         (
             "find_temperature_f_with_location_insufficient_information",
@@ -787,22 +790,22 @@ def test_abstention_may_end_with_an_offer_to_assist() -> None:
         ),
         (
             "find_distance_with_location_name_insufficient_information",
-            "The Golden Gate Bridge distance is unknown. My serial is 67.86 km.",
+            "The Golden Gate Bridge distance is unknown. My serial is 67.98 km.",
             0.0,
         ),
         (
             "find_distance_with_location_name_insufficient_information",
-            "The Golden Gate Bridge is 67.86 km away.",
+            "The Golden Gate Bridge is 67.98 km away.",
             1.0,
         ),
         (
             "find_distance_with_location_name_insufficient_information",
-            "The bridge is 67.86 km away.",
+            "The bridge is 67.98 km away.",
             0.0,
         ),
         (
             "find_distance_with_location_name_insufficient_information",
-            "The Golden Gate is 67.86 km away.",
+            "The Golden Gate is 67.98 km away.",
             0.0,
         ),
     ],

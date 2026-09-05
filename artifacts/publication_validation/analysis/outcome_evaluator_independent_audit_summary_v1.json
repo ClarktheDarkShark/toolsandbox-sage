@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-09-05",
+  "verdict": "PASS",
+  "evaluator": {
+    "version": "sage_outcome_contracts_v5",
+    "source_sha256": "f23c238b4e5a73e5a1db66450188d8bc0dae7a701e01e1fc873ea03bd7323d15",
+    "contract_sha256": "568c0e8accb8e155cbe47c41c93157651a2984dd348b5b8533e337517bb3e68e",
+    "source_unchanged_during_each_final_replay": true
+  },
+  "terminal_and_polarity_matrix": {
+    "matrix_path": "artifacts/publication_validation/analysis/outcome_terminal_audit_matrix_v2.json",
+    "matrix_sha256": "745b31c5e0a6b2278dffc17b7ba5bbbdbde15a4df9a2d5758382e67eb9194474",
+    "replay_path": "artifacts/publication_validation/analysis/outcome_terminal_audit_v2_replay_20260905T042937-0400_f23c238.json",
+    "replay_sha256": "c2878c3ea67933360f01dbcc0e7ed0238c8388888a571cef8bbcf1224a5cde40",
+    "replay_compressed_path": "artifacts/publication_validation/analysis/outcome_terminal_audit_v2_replay_20260905T042937-0400_f23c238.json.gz",
+    "replay_compressed_sha256": "2d5a65ee6dc2a7b3aef0311b9c0867c093f6360d86488b03fd3a31f300879ba1",
+    "replay_compressed_size_bytes": 2968,
+    "generic_strict": {
+      "passed": 198,
+      "failed": 0
+    },
+    "generic_normalized": {
+      "passed": 6,
+      "failed": 0
+    },
+    "dynamic_terminal": {
+      "passed": 62,
+      "failed": 0,
+      "preserve": 50,
+      "replace": 12,
+      "historical_preserve": 38,
+      "historical_replace": 10,
+      "current_control_preserve": 8,
+      "current_control_replace": 2,
+      "current_candidate_preserve": 4,
+      "current_candidate_replace": 0
+    },
+    "distance_regressions": {
+      "passed": 8,
+      "failed": 0
+    },
+    "explicit_denial_regressions": {
+      "passed": 2,
+      "failed": 0
+    },
+    "total_passed": 276,
+    "total_failed": 0
+  },
+  "dynamic_numeric_oracle": {
+    "coverage": 1664,
+    "oracle_rule": "Exact evaluator-owned frozen numeric value and compatible semantic slot/unit, with the versioned terminal matrix overriding only the 62 adjudicated post-answer dialogue cases.",
+    "historical": {
+      "total": 1408,
+      "exact": 952,
+      "invalid": 456,
+      "numeric_exact_before_terminal": 914,
+      "terminal_preserve_additions": 38,
+      "oracle_mismatches": 0
+    },
+    "current_control": {
+      "total": 128,
+      "exact": 109,
+      "invalid": 19,
+      "numeric_exact_before_terminal": 101,
+      "terminal_preserve_additions": 8,
+      "oracle_mismatches": 0
+    },
+    "current_candidate": {
+      "total": 128,
+      "exact": 88,
+      "invalid": 40,
+      "numeric_exact_before_terminal": 84,
+      "terminal_preserve_additions": 4,
+      "oracle_mismatches": 0
+    },
+    "exact_status_attribution": {
+      "valid_numeric_additions_vs_partial_helper": {
+        "current_control": 41,
+        "current_candidate": 18,
+        "total": 59
+      },
+      "valid_terminal_preserve_additions": {
+        "historical": 38,
+        "current_control": 8,
+        "current_candidate": 4,
+        "total": 50
+      },
+      "invalid_exact_removals": {
+        "historical_wrong_unit_temperature_claims": 22,
+        "historical_wrong_numeric_claims": 2,
+        "current_control": 4,
+        "current_candidate": 15,
+        "total": 43
+      }
+    }
+  },
+  "scalar_oracle": {
+    "coverage": 312,
+    "exact": 238,
+    "invalid": 74,
+    "historical_exact": 199,
+    "current_control_exact": 20,
+    "current_candidate_exact": 19,
+    "independent_target_hits": 240,
+    "valid_target_hits": 238,
+    "wrong_year_contradictions_rejected": 2,
+    "valid_false_negatives_corrected_vs_pre_v5": 15,
+    "oracle_mismatches": 0
+  },
+  "saved_distance_oracle": {
+    "coverage": 208,
+    "report_path": "artifacts/publication_validation/analysis/saved_distance_family_audit_20260905T042937-0400_f23c238.json",
+    "report_sha256": "950524a4fcb952a5cbce36e0814248efa8befe0ba01562e77eefc53ccb9a68af",
+    "report_compressed_path": "artifacts/publication_validation/analysis/saved_distance_family_audit_20260905T042937-0400_f23c238.json.gz",
+    "report_compressed_sha256": "0da9fd15b7258cef6f7d63195b484556ecacef16a3635f4bc2655408624e37b7",
+    "report_compressed_size_bytes": 38731,
+    "exact": 159,
+    "invalid": 49,
+    "false_positive_count": 0,
+    "false_negative_count": 0,
+    "rejected_responses_with_allowed_numeric_surface": {
+      "explicit_later_same_slot_denial": 5,
+      "wrong_unit_miles": 2,
+      "total": 7
+    },
+    "final_saved_false_negative_corrections": 2
+  },
+  "insufficient_information_regression": {
+    "saved_rows": 2912,
+    "behavior_changes_from_validated_reference": 0,
+    "numeric_answer_subset": 624,
+    "expected_positive_numeric_answers": 0,
+    "observed_positive_numeric_answers": 0
+  },
+  "full_saved_family_replay": {
+    "coverage": 4888,
+    "report_path": "artifacts/publication_validation/analysis/full_family_regression_v2_20260905T042937-0400_f23c238.json",
+    "report_sha256": "f56270417df96fcf28786ec486407d2bed3ad78cfe6ae5ba82f1f8c1d1a02343",
+    "report_compressed_path": "artifacts/publication_validation/analysis/full_family_regression_v2_20260905T042937-0400_f23c238.json.gz",
+    "report_compressed_sha256": "4146d3bd4b3bab8359be98dd6676115ebb6a213f684f00b921c8b5f874c97b47",
+    "report_compressed_size_bytes": 36713,
+    "behavior_reference_sha256": "71f32cb42dd2639d8eb2170d722d7ab4276a8b86e72b2161380974c76e7e77eb",
+    "behavior_delta_count": 0,
+    "unexplained_negative_change_count": 0,
+    "v5_score_changes": {
+      "dynamic_changed": 865,
+      "dynamic_increased": 457,
+      "dynamic_decreased": 408,
+      "scalar_changed": 15,
+      "scalar_increased": 15,
+      "scalar_decreased": 0,
+      "insufficient_changed": 0
+    },
+    "v5_delta_interpretation": "Expected replacement of partial text similarity with binary semantic outcome slots; correctness is established by the independent oracle counts above rather than equality to the pre-strict v5 values."
+  },
+  "dynamic_scalar_detail": {
+    "path": "artifacts/publication_validation/analysis/outcome_dynamic_scalar_oracle_audit_20260905T042937-0400_f23c238.json",
+    "sha256": "3cd8484ede3394c39b4f9687f92a5208fb25a4363a393f66f40cc4aed4813a33",
+    "compressed_path": "artifacts/publication_validation/analysis/outcome_dynamic_scalar_oracle_audit_20260905T042937-0400_f23c238.json.gz",
+    "compressed_sha256": "3c240e7faa9293eb0ba88724b8d14ee7ba0331ba12c89f122ddd8bd0617f6b0c",
+    "compressed_size_bytes": 13711
+  }
+}

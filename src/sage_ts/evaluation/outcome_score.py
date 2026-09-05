@@ -32,7 +32,7 @@ from tool_sandbox.common.execution_context import (
 )
 from tool_sandbox.common.scenario import Scenario
 
-OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v4"
+OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v5"
 
 # These are the seven perturbations present for every base task in the frozen
 # 1,032-scenario publication benchmark. A contract applies only to one of these
@@ -210,6 +210,11 @@ def _insufficient_contract(
 ) -> dict[str, Any]:
     return {
         "reason_groups": reason_groups,
+        # Each group names an independently sufficient fact or capability that
+        # blocks safe completion.  An agent need not enumerate every blocker
+        # once it has identified one that, by itself, makes the task
+        # under-specified or impossible.
+        "reason_group_operator": "any",
         "completion_patterns": completion_patterns,
         "forbidden_tools": forbidden_tools,
         "action_task": action_task,
@@ -499,7 +504,16 @@ _INSUFFICIENT_INFORMATION_BASE_CONTRACTS: dict[str, dict[str, Any]] = {
 # is required. The weather constants are frozen from
 # artifacts/publication_cleanup_20260901/fixtures/rapid_api_cache.sanitized.json:
 # Cupertino's day=1 Friday minimum is 10.2 C, and the benchmark-canonical Grand
-# Canyon/North Rim current value is 12.3 C, converted to 54.14 F.
+# Canyon/North Rim current values are the route-independent union of the exact
+# scenario-valid records in the pinned fixture.  Their independently converted
+# Fahrenheit values are 26.06, 54.14, and 59.18.
+_FROZEN_GOLDEN_GATE_DISTANCE_KM_RAW = 67.97730305839949
+_FROZEN_GOLDEN_GATE_DISTANCE_KM_VALUES = (
+    round(_FROZEN_GOLDEN_GATE_DISTANCE_KM_RAW, 2),
+    round(_FROZEN_GOLDEN_GATE_DISTANCE_KM_RAW, 3),
+    _FROZEN_GOLDEN_GATE_DISTANCE_KM_RAW,
+)
+
 _INFORMATION_ANSWER_BASE_CONTRACTS: dict[str, dict[str, Any]] = {
     "find_current_city_insufficient_information": {
         "kind": "grounded_text",
@@ -528,24 +542,28 @@ _INFORMATION_ANSWER_BASE_CONTRACTS: dict[str, dict[str, Any]] = {
         "absolute_tolerance": 0.0,
     },
     "find_distance_with_location_name_insufficient_information": {
-        "kind": "grounded_number",
-        "expected_value": 67.86,
+        "kind": "frozen_golden_gate_distance",
+        # The frozen location fixture resolves Golden Gate Bridge to
+        # (37.8199109, -122.4785598).  Geodesic distance from the benchmark's
+        # current location (37.334606, -122.009102) is 67.97730305839949 km,
+        # which is 67.98 km at the response precision used by the benchmark.
+        "raw_value": _FROZEN_GOLDEN_GATE_DISTANCE_KM_RAW,
+        "accepted_values": _FROZEN_GOLDEN_GATE_DISTANCE_KM_VALUES,
         "context_groups": (
             ("golden gate",),
             ("bridge",),
             ("km", "kilometer", "kilometers"),
         ),
-        "absolute_tolerance": 0.01,
     },
     "find_distance_with_location_name_insufficient_information_alt": {
-        "kind": "grounded_number",
-        "expected_value": 67.86,
+        "kind": "frozen_golden_gate_distance",
+        "raw_value": _FROZEN_GOLDEN_GATE_DISTANCE_KM_RAW,
+        "accepted_values": _FROZEN_GOLDEN_GATE_DISTANCE_KM_VALUES,
         "context_groups": (
             ("golden gate",),
             ("bridge",),
             ("km", "kilometer", "kilometers"),
         ),
-        "absolute_tolerance": 0.01,
     },
     "find_min_temperature_weekday_insufficient_information": {
         "kind": "grounded_temperature",
@@ -572,18 +590,32 @@ _INFORMATION_ANSWER_BASE_CONTRACTS: dict[str, dict[str, Any]] = {
     "find_temperature_f_with_location_insufficient_information": {
         "kind": "grounded_temperature",
         "required_response_unit": "fahrenheit",
+        "dynamic_temperature_family": ("grand_canyon_current_temperature_fahrenheit"),
         "expected_values_by_unit": {
-            "celsius": {"value": 12.3, "absolute_tolerance": 0.01},
-            "fahrenheit": {"value": 54.14, "absolute_tolerance": 0.05},
+            "celsius": {
+                "values": (-3.3, 12.3, 15.1),
+                "absolute_tolerance": 0.01,
+            },
+            "fahrenheit": {
+                "values": (26.06, 54.14, 59.18),
+                "absolute_tolerance": 0.05,
+            },
         },
         "context_groups": (("grand canyon",),),
     },
     "find_temperature_f_with_location_insufficient_information_alt": {
         "kind": "grounded_temperature",
         "required_response_unit": "fahrenheit",
+        "dynamic_temperature_family": ("grand_canyon_current_temperature_fahrenheit"),
         "expected_values_by_unit": {
-            "celsius": {"value": 12.3, "absolute_tolerance": 0.01},
-            "fahrenheit": {"value": 54.14, "absolute_tolerance": 0.05},
+            "celsius": {
+                "values": (-3.3, 12.3, 15.1),
+                "absolute_tolerance": 0.01,
+            },
+            "fahrenheit": {
+                "values": (26.06, 54.14, 59.18),
+                "absolute_tolerance": 0.05,
+            },
         },
         "context_groups": (("grand canyon",),),
     },
@@ -658,15 +690,55 @@ _SCALAR_OUTCOME_BASE_CONTRACTS: dict[str, dict[str, Any]] = {
     },
 }
 
+# The upstream ToolSandbox answer milestone was authored against an older
+# Golden Gate coordinate/result (67.86 km).  The publication fixture frozen for
+# these runs resolves the bridge to (37.8199109, -122.4785598), and the native
+# distance implementation returns 67.97730305839949 km from the benchmark
+# starting location.  Correct only this exact stale target; numeric matching
+# remains exact everywhere else, including currency and timestamp contracts.
+_FROZEN_ANSWER_TEMPLATE_OVERRIDES = {
+    "You are approximately 67.86 kilometers away from Golden Gate Bridge": (
+        "You are approximately 67.98 kilometers away from Golden Gate Bridge"
+    ),
+}
+
 
 def _contract_manifest_payload() -> dict[str, Any]:
     return {
         "version": OUTCOME_EVALUATOR_VERSION,
         "rollout_scope": "agent_to_user_at_or_after_first_real_user_message",
-        "selection_rule": "last_non_social_task_response_with_later_corrections",
+        "selection_rule": (
+            "chronological_three_way_semantic_slot_reducer:affirm_exact_replaces;"
+            "explicit_same_slot_negative_or_conflict_replaces_with_zero;other_"
+            "does_not_change_state;no_arbitrary_last_message_fallback"
+        ),
         "answer_template_rule": (
             "parallel_targets_are_alternatives; multiple_answer_milestones_are_"
             "aligned_to_distinct_temporal_response_segments"
+        ),
+        "answer_claim_polarity_rule": (
+            "an_exact_rendered_target_under_a_same_clause_search_absence_claim_or_"
+            "followed_by_an_explicit_absence_contradiction_does_not_count; the_"
+            "last_repeated_target_occurrence_controls"
+        ),
+        "unresolved_numeric_answer_placeholder_rule": (
+            "requires_an_explicit_numeric_value_in_the_observed_answer"
+        ),
+        "dynamic_numeric_placeholder_rule": (
+            "protected_values_never_come_from_generated_or_arbitrary_trace_"
+            "payloads; temperature_values_are_numeric_machine_epsilon_matches_"
+            "to_values_derived_from_the_enumerated_location_and_forecast_day_"
+            "matching_"
+            "entries_in_the_hash_pinned_fixture; fixture_capture_dates_are_"
+            "parallel_because_the_fixed_toolsandbox_clock_is_independent_of_"
+            "external_capture_time; days_are_the_exact_datetime_difference_"
+            "from_the_immutable_pre_task_clock_to_the_scenario_holiday; explicit_"
+            "units_must_match_the_claimed_semantic_slot; exact_days_may_coexist_"
+            "with_separate_hour_minute_or_exact_holiday_date_slots; target_"
+            "temperatures_may_coexist_with_the_same_fixture_observation_in_the_"
+            "source_unit_or_a_fixture_consistent_separate_today_slot; same_slot_"
+            "conflicts_fail; bare_correct_values_are_allowed_only_where_the_"
+            "upstream_answer_contract_explicitly_allows_them"
         ),
         "state_rule": (
             "deep_copied_state_only_milestone_dag_with_references_contracted_to_"
@@ -684,12 +756,21 @@ def _contract_manifest_payload() -> dict[str, Any]:
         ),
         "numeric_rule": (
             "exact_and_conflicting_extra_numbers_fail_except_enumerated_context_"
-            "values_and_derived_day_values; frozen_weather_values_require_an_"
-            "explicit_compatible_temperature_unit"
+            "values; explicit_numeric_units_must_be_compatible_while_bare_"
+            "dynamic_answers_remain_valid_when_the_upstream_template_allows_"
+            "them; golden_gate_distance_accepts_only_the_exact_two_and_three_"
+            "decimal_roundings_or_raw_value_derived_from_the_frozen_fixture; a_"
+            "distance_candidate_must_share_a_clause_with_golden_gate_bridge_or_"
+            "use_a_definite_distance_or_structured_distance_label_immediately_"
+            "after_a_golden_gate_bridge_clause; unrelated_numeric_semantic_slots_"
+            "including_coordinates_postal_codes_and_serials_neither_satisfy_nor_"
+            "veto_the_distance; exact_frozen_fixture_answer_overrides_replace_"
+            "only_enumerated_stale_targets"
         ),
         "insufficient_information_rule": (
-            "targeted_abstention_or_exact_collateral_free_state_completion_or_"
-            "independently_derived_exact_information_answer"
+            "any_independently_sufficient_targeted_blocker_or_exact_collateral_"
+            "free_state_completion_or_independently_derived_exact_information_"
+            "answer"
         ),
         "safety_rule": (
             "only_task_specific_directional_setting_prerequisites_are_permitted; "
@@ -706,6 +787,9 @@ def _contract_manifest_payload() -> dict[str, Any]:
         "insufficient_information_base_contracts": _INSUFFICIENT_INFORMATION_BASE_CONTRACTS,
         "information_answer_base_contracts": _INFORMATION_ANSWER_BASE_CONTRACTS,
         "scalar_outcome_base_contracts": _SCALAR_OUTCOME_BASE_CONTRACTS,
+        "frozen_answer_template_overrides": _FROZEN_ANSWER_TEMPLATE_OVERRIDES,
+        "pinned_rapid_api_fixture_sha256": _PINNED_RAPID_API_FIXTURE_SHA256,
+        "dynamic_numeric_scenario_families": _DYNAMIC_NUMERIC_SCENARIO_FAMILIES,
     }
 
 
@@ -811,18 +895,28 @@ def _is_social_closure(content: str) -> bool:
                 r"sorry|i(?:'m| am) sorry|"
                 r"take care|of course|anytime|my pleasure|no worries|"
                 r"you(?:'re| are) (?:very )?welcome|no problem|not a problem|"
-                r"glad (?:i could help|to help|to hear)|happy to help|"
-                r"(?:please )?let me know if .+|feel free to .+|"
+                r"(?:i(?:'m| am) )?glad (?:i could help|to help|to hear|"
+                r"that|it's correct|it is correct)|happy to help|"
+                r"(?:please )?let me know if .+|"
+                r"(?:please )?feel free to (?:ask|reach out|let me know).+|"
                 r"(?:i )?hope (?:that )?helps|is there anything else|"
                 r"would you like anything else|can i help with anything else|"
-                r"anything else i can help with|if you need anything else|"
+                r"anything else i can help with|"
+                r"if (?:there(?:'s| is)|you (?:need|want|would like|have)) .*"
+                r"(?:anything else|further assistance|more questions|other questions).*|"
+                r"if you need (?:anything else|(?:further )?assistance)(?: .*)?|"
+                r"if you have (?:any )?(?:more|other) questions(?: .*)?|"
                 r"i appreciate your understanding|thank you for your understanding|"
-                r"understood|alright|that's okay|that is okay|"
+                r"understood|alright|great|that's okay|that is okay|"
+                r"that's (?:perfectly )?fine|that is (?:perfectly )?fine|"
+                r"that sounds (?:like )?(?:a )?(?:good|great) idea|"
                 r"that's alright|that is alright|exactly|glad you .+|"
                 r"if you (?:change your mind|need anything|think of|recall).*|"
                 r"if you have any more questions.*|"
                 r"(?:have|wishing you) (?:a )?(?:great|nice|good|wonderful) day|"
                 r"(?:please )?just reach out.*|(?:please )?reach out.*|"
+                r"i (?:do not|don't|cannot|can't) (?:have|provide|think of) "
+                r"anything else(?: to add)?|"
                 r"i understand(?: the frustration)?|"
                 r"i(?:'m| am) here to help"
                 r")",
@@ -854,6 +948,38 @@ def _agent_messages(execution_context: ExecutionContext) -> list[_RolloutMessage
                 )
             )
     return messages
+
+
+def _dialogue_text_between(
+    execution_context: ExecutionContext,
+    *,
+    after_message_index: int,
+    before_message_index: int,
+    user_only: bool = False,
+) -> str:
+    """Return visible dialogue text in one answer segment, in rollout order."""
+    contents: list[str] = []
+    for row in _sandbox_rows(execution_context):
+        try:
+            message_index = int(row.get("sandbox_message_index"))
+        except (TypeError, ValueError):
+            continue
+        if not (after_message_index < message_index < before_message_index):
+            continue
+        sender = _role(row.get("sender"))
+        recipient = _role(row.get("recipient"))
+        if user_only:
+            if sender != _role(RoleType.USER) or recipient != _role(RoleType.AGENT):
+                continue
+        elif not (
+            (sender == _role(RoleType.USER) and recipient == _role(RoleType.AGENT))
+            or (sender == _role(RoleType.AGENT) and recipient == _role(RoleType.USER))
+        ):
+            continue
+        content = _as_text(row.get("content")).strip()
+        if content:
+            contents.append(content)
+    return "\n".join(contents)
 
 
 def _parse_tool_trace_value(tool_trace: Any) -> list[dict[str, Any]]:
@@ -972,46 +1098,371 @@ def _expected_holiday_timestamps(
     return timestamps
 
 
-def _placeholder_values(
+_DYNAMIC_NUMERIC_PLACEHOLDERS = frozenset({"days", "temperature", "min_temperature"})
+_PINNED_RAPID_API_FIXTURE_SHA256 = (
+    "eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
+)
+
+# The fixed ToolSandbox clock (2026-07-23 in the publication protocol) is
+# intentionally independent of the external-service fixture capture time.  The
+# pinned fixture contains both 2026-05-01 and 2026-05-06 weather observations,
+# and preserved publication trajectories legitimately address both capture
+# families through different coordinate routes.  Each weather contract below
+# therefore freezes the exact set of fixture entries whose request coordinates
+# are within the upstream scenario's 0.5-degree location tolerance and whose
+# requested forecast day matches the task.  This is a small enumerated answer
+# key, not a tolerance over arbitrary model- or tool-authored values.
+_DYNAMIC_NUMERIC_SCENARIO_FAMILIES: dict[str, dict[str, Any]] = {
+    "local_current_temperature_celsius": {
+        "base_scenarios": (
+            "find_temperature",
+            "find_temperature_low_battery_mode",
+            "find_temperature_low_battery_mode_alt",
+        ),
+        "kind": "temperature",
+        "placeholder": "temperature",
+        "source_field": "current_temperature",
+        "forecast_day": 0,
+        "reference_coordinates": (37.334606, -122.009102),
+        "coordinate_tolerance_degrees": 0.5,
+        "source_unit": "celsius",
+        "target_unit": "celsius",
+        "fixture_observations": (
+            {
+                "request_sha256": (
+                    "255370a816feb4ebfb3a957551c6a6619f6ddef2695374b935a6e6bcb2dae101"
+                ),
+                "capture_date": "2026-05-01",
+                "source_value": 16.1,
+            },
+        ),
+        "target_terms": ("current temperature", "temperature"),
+    },
+    "grand_canyon_current_temperature_fahrenheit": {
+        "base_scenarios": (
+            "find_temperature_f_with_location",
+            "find_temperature_f_with_location_alt",
+            "find_temperature_f_with_location_wifi_off",
+            "find_temperature_f_with_location_wifi_off_alt",
+        ),
+        "kind": "temperature",
+        "placeholder": "temperature",
+        "source_field": "current_temperature",
+        "forecast_day": 0,
+        "reference_coordinates": (36.23686, -112.19147),
+        "coordinate_tolerance_degrees": 0.5,
+        "source_unit": "celsius",
+        "target_unit": "fahrenheit",
+        "fixture_observations": (
+            {
+                "request_sha256": (
+                    "156d706d6ee108d2723e302c3aff21fbaf992cf9c9a9b1e22068ef4d91866e4e"
+                ),
+                "capture_date": "2026-05-01",
+                "source_value": 12.3,
+            },
+            {
+                "request_sha256": (
+                    "8244c4f0764b2eff112ecdf059ee813f82893db4351a257c314f4eaef1d1713f"
+                ),
+                "capture_date": "2026-05-01",
+                "source_value": 15.1,
+            },
+            {
+                "request_sha256": (
+                    "435372201e48a45386709c160efa56381a68350c631c7c07ca41975b410f2242"
+                ),
+                "capture_date": "2026-05-06",
+                "source_value": -3.3,
+            },
+        ),
+        "target_terms": (
+            "grand canyon",
+            "current temperature",
+            "temperature",
+        ),
+    },
+    "grand_canyon_tomorrow_minimum_temperature_fahrenheit": {
+        "base_scenarios": (
+            "find_temperature_f_with_location_and_time_diff_multiple_user_turn",
+            "find_temperature_f_with_location_and_time_diff_wifi_off_multiple_user_turn",
+            "find_temperature_f_with_location_and_time_diff_low_battery_mode_multiple_user_turn",
+        ),
+        "kind": "temperature",
+        "placeholder": "min_temperature",
+        "source_field": "min_temperature",
+        "forecast_day": 1,
+        "reference_coordinates": (36.23686, -112.19147),
+        "coordinate_tolerance_degrees": 0.5,
+        "source_unit": "celsius",
+        "target_unit": "fahrenheit",
+        "fixture_observations": (
+            {
+                "request_sha256": (
+                    "b8eb7b754c3d5dd379f9b9c33ae52c4cad83f4ee1ed6201326e4d0416b2435d2"
+                ),
+                "capture_date": "2026-05-01",
+                "source_value": 8.1,
+                "context_source_value": 6.4,
+            },
+            {
+                "request_sha256": (
+                    "78acc83a0272e39a09d1e85156e2f8de49854fbca80e811650da2794cc9adda4"
+                ),
+                "capture_date": "2026-05-01",
+                "source_value": 8.2,
+                "context_source_value": 8.9,
+            },
+            {
+                "request_sha256": (
+                    "bec484fc797b75193b825520f484522e7a6bcffda548582f29463f0926eeeab5"
+                ),
+                "capture_date": "2026-05-06",
+                "source_value": 9.2,
+                "context_source_value": 4.9,
+            },
+        ),
+        "target_terms": (
+            "grand canyon",
+            "lowest temperature",
+            "minimum temperature",
+            "tomorrow",
+        ),
+    },
+    "days_until_christmas": {
+        "base_scenarios": (
+            "find_days_till_holiday",
+            "find_days_till_holiday_alt",
+            "find_days_till_holiday_wifi_off",
+            "find_days_till_holiday_wifi_off_alt",
+            "find_days_till_holiday_multiple_user_turn",
+            "find_days_till_holiday_wifi_off_multiple_user_turn",
+        ),
+        "kind": "days",
+        "placeholder": "days",
+        "holiday_name": "Christmas Day",
+        "clock_source": (
+            "immutable_pre_task_reminder_fixture_midpoint_or_prior_native_"
+            "get_current_timestamp_when_synthetic_context_has_no_baseline"
+        ),
+        "difference_rule": "datetime.fromtimestamp(end)-datetime.fromtimestamp(start).days",
+        "target_terms": ("christmas day", "christmas", "days"),
+    },
+}
+
+
+def _convert_temperature_value(
+    value: float,
+    *,
+    source_unit: str,
+    target_unit: str,
+) -> float | None:
+    if source_unit == target_unit:
+        return value
+    if source_unit == "celsius" and target_unit == "fahrenheit":
+        return value * 9.0 / 5.0 + 32.0
+    if source_unit == "fahrenheit" and target_unit == "celsius":
+        return (value - 32.0) * 5.0 / 9.0
+    return None
+
+
+def _resolve_dynamic_numeric_contract(
+    scenario_name: str,
+) -> tuple[str, dict[str, Any]] | None:
+    for family_name, contract in _DYNAMIC_NUMERIC_SCENARIO_FAMILIES.items():
+        for base_name in contract["base_scenarios"]:
+            for suffix in _CONTRACT_PERTURBATION_SUFFIXES:
+                if scenario_name == f"{base_name}{suffix}":
+                    return family_name, contract
+    return None
+
+
+def _prior_native_current_timestamps(
+    execution_context: ExecutionContext,
+    *,
+    upper_message_index: int,
+) -> list[float]:
+    timestamps: list[float] = []
+    for message_index, trace in _iter_tool_traces(execution_context):
+        if message_index >= upper_message_index:
+            continue
+        if trace.get("tool_name") != "get_current_timestamp":
+            continue
+        try:
+            timestamp = float(trace.get("result"))
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(timestamp) and timestamp not in timestamps:
+            timestamps.append(timestamp)
+    return timestamps
+
+
+def _temperature_contract_evidence(
+    family_name: str,
+    contract: dict[str, Any],
+) -> dict[str, Any]:
+    source_unit = str(contract["source_unit"])
+    target_unit = str(contract["target_unit"])
+    pairs: list[dict[str, Any]] = []
+    for observation in contract["fixture_observations"]:
+        source_value = float(observation["source_value"])
+        target_value = _convert_temperature_value(
+            source_value,
+            source_unit=source_unit,
+            target_unit=target_unit,
+        )
+        if target_value is None or not math.isfinite(target_value):
+            continue
+        pair = {
+            "source_value": source_value,
+            "source_forms": tuple(_normalize_value(source_value)),
+            "target_value": target_value,
+            "target_forms": tuple(_normalize_value(target_value)),
+        }
+        if source_unit == target_unit:
+            alternate_unit = "fahrenheit" if target_unit == "celsius" else "celsius"
+            alternate_value = _convert_temperature_value(
+                target_value,
+                source_unit=target_unit,
+                target_unit=alternate_unit,
+            )
+            if alternate_value is None or not math.isfinite(alternate_value):
+                continue
+            pair.update(
+                {
+                    "alternate_unit": alternate_unit,
+                    "alternate_value": alternate_value,
+                    "alternate_forms": tuple(_normalize_value(alternate_value)),
+                }
+            )
+        context_source_value = observation.get("context_source_value")
+        if context_source_value is not None:
+            context_source_value = float(context_source_value)
+            context_target_value = _convert_temperature_value(
+                context_source_value,
+                source_unit=source_unit,
+                target_unit=target_unit,
+            )
+            if context_target_value is None or not math.isfinite(context_target_value):
+                continue
+            pair.update(
+                {
+                    "context_source_value": context_source_value,
+                    "context_source_forms": tuple(
+                        _normalize_value(context_source_value)
+                    ),
+                    "context_target_value": context_target_value,
+                    "context_target_forms": tuple(
+                        _normalize_value(context_target_value)
+                    ),
+                }
+            )
+        if pair not in pairs:
+            pairs.append(pair)
+    return {
+        "family": family_name,
+        "kind": "temperature",
+        "placeholder": str(contract["placeholder"]),
+        "source_unit": source_unit,
+        "target_unit": target_unit,
+        "pairs": tuple(pairs),
+        "target_terms": tuple(contract["target_terms"]),
+        "truth_basis": "pinned_fixture_scenario_contract",
+    }
+
+
+def _dynamic_numeric_evidence(
     execution_context: ExecutionContext,
     scenario: Scenario,
+    *,
+    scenario_name: str,
+    upper_message_index: int,
+) -> dict[str, Any] | None:
+    resolved = _resolve_dynamic_numeric_contract(scenario_name)
+    if resolved is None:
+        return None
+    family_name, contract = resolved
+    placeholder = str(contract["placeholder"])
+    if contract["kind"] == "temperature":
+        return _temperature_contract_evidence(family_name, contract)
+
+    baseline_reminders = _database_rows_at(
+        execution_context,
+        DatabaseNamespace.REMINDER,
+        _first_real_user_message_index(execution_context),
+    )
+    inferred = _infer_base_now_and_upcoming_reminder(baseline_reminders)
+    if inferred is not None:
+        current_timestamps = [float(inferred[0])]
+        clock_basis = "immutable_pre_task_reminder_fixture_midpoint"
+    else:
+        current_timestamps = _prior_native_current_timestamps(
+            execution_context,
+            upper_message_index=upper_message_index,
+        )
+        clock_basis = "prior_native_get_current_timestamp"
+    # Multiple distinct fallback clocks are ambiguous.  Publication contexts
+    # always have the immutable baseline clock; this branch exists only for
+    # isolated evaluator tests and fails closed on conflicting observations.
+    if len(current_timestamps) != 1:
+        return {
+            "family": family_name,
+            "kind": "days",
+            "placeholder": placeholder,
+            "target_forms": (),
+            "holiday_years": (),
+            "target_terms": tuple(contract["target_terms"]),
+            "truth_basis": f"{clock_basis}_ambiguous_or_missing",
+        }
+    holiday_timestamps = [
+        timestamp
+        for timestamp in _expected_holiday_timestamps(scenario, current_timestamps)
+        if timestamp > current_timestamps[0]
+    ]
+    if len(holiday_timestamps) != 1:
+        return {
+            "family": family_name,
+            "kind": "days",
+            "placeholder": placeholder,
+            "target_forms": (),
+            "holiday_years": (),
+            "target_terms": tuple(contract["target_terms"]),
+            "truth_basis": "scenario_holiday_target_ambiguous_or_missing",
+        }
+    delta = _dt.datetime.fromtimestamp(
+        holiday_timestamps[0]
+    ) - _dt.datetime.fromtimestamp(current_timestamps[0])
+    if delta.days < 0:
+        day_forms: tuple[str, ...] = ()
+    else:
+        day_forms = (str(delta.days),)
+    return {
+        "family": family_name,
+        "kind": "days",
+        "placeholder": placeholder,
+        "target_forms": day_forms,
+        "holiday_years": (str(_dt.datetime.fromtimestamp(holiday_timestamps[0]).year),),
+        "holiday_month": _dt.datetime.fromtimestamp(holiday_timestamps[0]).month,
+        "holiday_day": _dt.datetime.fromtimestamp(holiday_timestamps[0]).day,
+        "target_terms": tuple(contract["target_terms"]),
+        "truth_basis": f"{clock_basis}_plus_scenario_holiday_target",
+    }
+
+
+def _placeholder_values(
+    execution_context: ExecutionContext,
 ) -> dict[str, list[str]]:
     values: dict[str, list[str]] = {}
-    current_timestamps: list[float] = []
-    holiday_timestamps: list[float] = []
     for _, trace in _iter_tool_traces(execution_context):
-        name = _as_text(trace.get("tool_name"))
         result = trace.get("result")
         if isinstance(result, dict):
             for key, value in result.items():
+                if str(key) in _DYNAMIC_NUMERIC_PLACEHOLDERS:
+                    continue
                 bucket = values.setdefault(str(key), [])
                 for normalized in _normalize_value(value):
                     if normalized not in bucket:
                         bucket.append(normalized)
-        if name == "get_current_timestamp" and isinstance(result, (int, float, str)):
-            try:
-                current_timestamps.append(float(result))
-            except (TypeError, ValueError):
-                pass
-        elif name == "search_holiday" and isinstance(result, (int, float, str)):
-            try:
-                holiday_timestamps.append(float(result))
-            except (TypeError, ValueError):
-                pass
-    for timestamp in _expected_holiday_timestamps(scenario, current_timestamps):
-        if timestamp not in holiday_timestamps:
-            holiday_timestamps.append(timestamp)
-    if "days" not in values and current_timestamps and holiday_timestamps:
-        derived_days: list[str] = []
-        for start, end in itertools.product(current_timestamps, holiday_timestamps):
-            if end <= start:
-                continue
-            delta = _dt.datetime.fromtimestamp(end) - _dt.datetime.fromtimestamp(start)
-            for day in (delta.days - 1, delta.days, delta.days + 1):
-                if day >= 0 and str(day) not in derived_days:
-                    derived_days.append(str(day))
-        if derived_days:
-            values["days"] = derived_days
     return values
 
 
@@ -1068,6 +1519,11 @@ def _content_similarity(expected: str, observed: str) -> float:
     observed = " ".join(observed.split())
     if not expected or not observed:
         return 0.0
+    # Dynamic numeric targets are rendered only from independently grounded
+    # trace evidence. If grounding is absent, do not let template words or an
+    # arbitrary number manufacture the answer key.
+    if _PLACEHOLDER_RE.search(expected):
+        return 0.0
     numeric_score = _numeric_match_score(expected, observed)
     if numeric_score == 0.0:
         return 0.0
@@ -1078,6 +1534,749 @@ def _content_similarity(expected: str, observed: str) -> float:
     if _anchor_coverage(expected, observed) >= 1.0:
         return 1.0
     return float(_ROUGE.score(target=expected, prediction=observed)["rougeL"].fmeasure)
+
+
+_TEMPERATURE_UNIT_AFTER_NUMBER_RE = re.compile(
+    r"^\s*(?:°\s*)?(?:(?:degrees?|deg)\s*)?"
+    r"(?P<unit>celsius|fahrenheit|c|f)\b",
+    re.IGNORECASE,
+)
+_TEMPERATURE_UNIT_BEFORE_NUMBER_RE = re.compile(
+    r"\b(?P<unit>celsius|fahrenheit|c|f)\b\s*"
+    r"(?:degrees?\s*)?(?:temperature\s*)?(?:is|=|:)?\s*$",
+    re.IGNORECASE,
+)
+_DURATION_UNIT_AFTER_NUMBER_RE = re.compile(
+    r"^\s*(?P<unit>days?|hours?|minutes?|seconds?|weeks?|months?|years?)\b",
+    re.IGNORECASE,
+)
+_DURATION_UNIT_BEFORE_NUMBER_RE = re.compile(
+    r"(?P<unit>days?|hours?|minutes?|seconds?|weeks?|months?|years?)\b\s*"
+    r"(?:is|=|:)?\s*$",
+    re.IGNORECASE,
+)
+_DISTANCE_UNIT_AFTER_NUMBER_RE = re.compile(
+    r"^\s*(?P<unit>kilometers?|kms?|km)\b(?!\s*/\s*h)",
+    re.IGNORECASE,
+)
+_TEMPERATURE_TEMPORAL_LABEL_RE = re.compile(
+    r"\b(?P<label>today|tomorrow)(?:['\u2019]s)?\b",
+    re.IGNORECASE,
+)
+_HARD_CLAIM_BOUNDARY_RE = re.compile(r"(?:[!?;\n\r\u2014\u2013]+|(?<!\d)\.+|\.+(?!\d))")
+_DECEMBER_DATE_RE = re.compile(
+    r"\b(?:december|dec\.?)[\s,]+(?P<day>\d{1,2})(?:st|nd|rd|th)?"
+    r"(?:\s*,?\s*(?P<year>\d{4}))?\b",
+    re.IGNORECASE,
+)
+_NUMERIC_HOLIDAY_DATE_RE = re.compile(
+    r"(?<!\d)(?P<month>\d{1,2})\s*[/\-]\s*(?P<day>\d{1,2})"
+    r"(?:\s*[/\-]\s*(?P<year>\d{4}))?(?!\d)"
+)
+_OPERATIVE_NUMERIC_CORRECTION_RE = re.compile(
+    r"\b(?:correction|actually)\b\s*[:,\u2014\u2013-]?",
+    re.IGNORECASE,
+)
+_EXPLICITLY_REJECTED_NUMBER_PREFIX_RE = re.compile(
+    r"\b(?:not|isn't|is not|wasn't|was not|rather than|instead of)\s*$",
+    re.IGNORECASE,
+)
+_EXPLICITLY_REJECTED_NUMERIC_TAIL_RE = re.compile(
+    r"\s*[,;]?\s*(?:but\s+)?not\s+"
+    r"-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?"
+    r"(?:[eE][+-]?\d+)?\s*(?:°\s*)?"
+    r"(?:(?:degrees?|deg)\s*)?(?:celsius|fahrenheit|c|f|days?|hours?)?",
+    re.IGNORECASE,
+)
+_TEMPERATURE_ANCILLARY_NUMBER_RE = re.compile(
+    r"(?:\b(?:zip|postal(?: code)?|humidity|wind(?: speed)?|latitude|longitude)"
+    r"\b[^.!?;]{0,24}$|^\s*(?:%|mph|kph|km/h)\b)",
+    re.IGNORECASE,
+)
+_US_POSTAL_CONTEXT_RE = re.compile(
+    r"\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\s*(?:,\s*(?:USA|US))?\b"
+)
+
+
+def _number_surface(match: re.Match[str]) -> str | None:
+    surface = match.group(0).replace(",", "")
+    try:
+        value = float(surface)
+    except ValueError:
+        return None
+    return surface if math.isfinite(value) else None
+
+
+def _surface_matches_exact_numeric_value(surface: str, expected: float) -> bool:
+    try:
+        observed = float(surface)
+    except ValueError:
+        return False
+    return math.isfinite(observed) and math.isclose(
+        observed,
+        expected,
+        rel_tol=0.0,
+        abs_tol=1e-9,
+    )
+
+
+def _temperature_units_adjacent_to_number(
+    content: str,
+    start: int,
+    end: int,
+) -> set[str]:
+    units: set[str] = set()
+    after = _TEMPERATURE_UNIT_AFTER_NUMBER_RE.search(content[end : end + 32])
+    before = _TEMPERATURE_UNIT_BEFORE_NUMBER_RE.search(
+        content[max(0, start - 40) : start]
+    )
+    # In "8.2 Celsius is 46.76 Fahrenheit", the remote source unit also
+    # matches the permissive unit-before grammar.  The immediately following
+    # unit is the syntactic unit of the number and therefore takes precedence.
+    match = after if after is not None else before
+    if match is not None:
+        unit = match.group("unit").casefold()
+        units.add("celsius" if unit in {"c", "celsius"} else "fahrenheit")
+    return units
+
+
+def _duration_units_adjacent_to_number(
+    content: str,
+    start: int,
+    end: int,
+) -> set[str]:
+    units: set[str] = set()
+    after = _DURATION_UNIT_AFTER_NUMBER_RE.search(content[end : end + 24])
+    before = _DURATION_UNIT_BEFORE_NUMBER_RE.search(content[max(0, start - 24) : start])
+    for match in (before, after):
+        if match is not None:
+            units.add(match.group("unit").casefold().rstrip("s"))
+    return units
+
+
+def _dynamic_target_forms(evidence: dict[str, Any]) -> list[str]:
+    if evidence["kind"] == "days":
+        return list(evidence["target_forms"])
+    forms: list[str] = []
+    for pair in evidence["pairs"]:
+        for form in pair["target_forms"]:
+            if form not in forms:
+                forms.append(form)
+    return forms
+
+
+def _has_bare_dynamic_template(
+    templates: list[str],
+    *,
+    placeholder: str,
+) -> bool:
+    return any(template.strip() == f"{{{placeholder}}}" for template in templates)
+
+
+def _dynamic_claim_has_positive_polarity(
+    content: str,
+    start: int,
+    end: int,
+    *,
+    target_terms: tuple[str, ...],
+) -> bool:
+    """Check the target clause while ignoring a genuinely social-only tail."""
+    left = 0
+    for boundary in _CLAIM_BOUNDARY_RE.finditer(content, 0, start):
+        left = boundary.end()
+    right_boundary = _CLAIM_BOUNDARY_RE.search(content, end)
+    right = len(content) if right_boundary is None else right_boundary.start()
+    local_claim = content[left:right]
+    relative_start = start - left
+    relative_end = end - left
+    # A contrast such as "59.18 F, not 60 F" affirms the target and rejects
+    # the competing value.  Remove only that explicit numeric rejection from
+    # polarity analysis; "59.18 F, not the actual temperature" remains a
+    # retraction and is rejected below.
+    local_claim = local_claim[:relative_end] + _EXPLICITLY_REJECTED_NUMERIC_TAIL_RE.sub(
+        "",
+        local_claim[relative_end:],
+    )
+    if not _claim_span_has_positive_polarity(
+        local_claim,
+        relative_start,
+        relative_end,
+        target_terms=target_terms,
+    ):
+        return False
+
+    # Same-message corrections remain operative.  The generic polarity helper
+    # deliberately treats questions and epistemic clauses conservatively, but
+    # those markers must not let a social sign-off ("If you have any other
+    # questions...") erase an already complete answer.
+    later_clauses = [
+        clause.strip(" ,:-\u2014\u2013")
+        for clause in re.split(r"[.!?;]+", content[right:])
+        if clause.strip(" ,:-\u2014\u2013")
+    ]
+    for clause in later_clauses:
+        if _is_social_closure(clause):
+            continue
+        if (
+            re.match(
+                r"^if\s+you\s+(?:need|want|would\s+like|have)\b[^.!?;]*"
+                r"\b(?:different|another)\s+(?:location|place|city|area|detail)",
+                clause,
+                re.IGNORECASE,
+            )
+            or re.match(
+                r"^if\s+you\s+(?:can|could|are\s+able\s+to)\s+"
+                r"(?:provide|share)\b[^.!?;]{0,100}\b(?:location|coordinates?|address)\b"
+                r"[^.!?;]{0,120}\b(?:help|calculate|check|verify|determine)\b",
+                clause,
+                re.IGNORECASE,
+            )
+            or re.match(
+                r"^if\s+this\s+(?:does\s+not|doesn't)\s+seem\s+accurate\s+"
+                r"(?:for|to)\s+you\b",
+                clause,
+                re.IGNORECASE,
+            )
+        ):
+            continue
+        if _has_later_target_domain_correction(clause, target_terms):
+            return False
+    return True
+
+
+def _temperature_temporal_slot(
+    content: str,
+    *,
+    start: int,
+    end: int,
+    has_today_context: bool,
+) -> str:
+    """Assign a number to the separately stated today or target slot."""
+    if not has_today_context:
+        return "target"
+    segment_start = 0
+    for boundary in _HARD_CLAIM_BOUNDARY_RE.finditer(content, 0, start):
+        segment_start = boundary.end()
+    segment_end_match = _HARD_CLAIM_BOUNDARY_RE.search(content, end)
+    segment_end = (
+        len(content) if segment_end_match is None else segment_end_match.start()
+    )
+    preceding = list(
+        _TEMPERATURE_TEMPORAL_LABEL_RE.finditer(content, segment_start, start)
+    )
+    if preceding:
+        return (
+            "today" if preceding[-1].group("label").casefold() == "today" else "target"
+        )
+    following = _TEMPERATURE_TEMPORAL_LABEL_RE.search(content, end, segment_end)
+    if following is not None:
+        return "today" if following.group("label").casefold() == "today" else "target"
+    return "target"
+
+
+def _temperature_number_matches_slot(
+    *,
+    surface: str,
+    units: set[str],
+    source_forms: set[str],
+    target_forms: set[str],
+    source_value: float,
+    target_value: float,
+    alternate_forms: set[str],
+    alternate_value: float | None,
+    alternate_unit: str | None,
+    source_unit: str,
+    target_unit: str,
+    permit_bare_target: bool,
+) -> tuple[bool, bool]:
+    """Return (valid_for_slot, is_target-unit value)."""
+    target_values = {target_value, *(float(value) for value in target_forms)}
+    source_values = {source_value, *(float(value) for value in source_forms)}
+    if any(
+        _surface_matches_exact_numeric_value(surface, value) for value in target_values
+    ) and (units == {target_unit} or (not units and permit_bare_target)):
+        return True, True
+    if (
+        source_unit != target_unit
+        and any(
+            _surface_matches_exact_numeric_value(surface, value)
+            for value in source_values
+        )
+        and units == {source_unit}
+    ):
+        return True, False
+    if (
+        alternate_unit is not None
+        and alternate_value is not None
+        and any(
+            _surface_matches_exact_numeric_value(surface, value)
+            for value in {
+                alternate_value,
+                *(float(value) for value in alternate_forms),
+            }
+        )
+        and units == {alternate_unit}
+    ):
+        return True, False
+    return False, False
+
+
+def _numeric_correction_cutoff(content: str) -> int:
+    """Return the last explicit correction that introduces a numeric claim."""
+    cutoff = 0
+    for correction in _OPERATIVE_NUMERIC_CORRECTION_RE.finditer(content):
+        if _SCALAR_NUMBER_RE.search(content, correction.end()) is not None:
+            cutoff = correction.end()
+    return cutoff
+
+
+def _number_is_explicitly_rejected(content: str, match: re.Match[str]) -> bool:
+    prefix = content[max(0, match.start() - 32) : match.start()]
+    return bool(_EXPLICITLY_REJECTED_NUMBER_PREFIX_RE.search(prefix))
+
+
+def _frozen_golden_gate_distance_answer_score(content: str) -> float:
+    """Score the pinned Golden Gate distance without treating coordinates as km."""
+    normalized = _normalized_phrase_text(content)
+    if not (
+        _contains_phrase(normalized, "golden gate")
+        and _contains_phrase(normalized, "bridge")
+    ):
+        return 0.0
+    correction_cutoff = _numeric_correction_cutoff(content)
+    accepted_spans: list[tuple[int, int]] = []
+    for match in _SCALAR_NUMBER_RE.finditer(content, correction_cutoff):
+        unit = _DISTANCE_UNIT_AFTER_NUMBER_RE.search(
+            content[match.end() : match.end() + 24]
+        )
+        if unit is None or _number_is_explicitly_rejected(content, match):
+            continue
+        # Numeric truth is candidate-local: a distance-looking serial or
+        # unrelated measurement elsewhere in the response cannot satisfy (or
+        # veto) the Golden Gate outcome.  Both entity terms must occur in the
+        # same asserted clause as the candidate value.
+        prior_boundaries = list(
+            _HARD_CLAIM_BOUNDARY_RE.finditer(content, 0, match.start())
+        )
+        claim_left = prior_boundaries[-1].end() if prior_boundaries else 0
+        next_boundary = _HARD_CLAIM_BOUNDARY_RE.search(content, match.end())
+        claim_right = len(content) if next_boundary is None else next_boundary.start()
+        local_claim = _normalized_phrase_text(content[claim_left:claim_right])
+        previous_claim = ""
+        if prior_boundaries:
+            for boundary_index in range(len(prior_boundaries) - 1, -1, -1):
+                previous_left = (
+                    prior_boundaries[boundary_index - 1].end()
+                    if boundary_index > 0
+                    else 0
+                )
+                candidate = _normalized_phrase_text(
+                    content[previous_left : prior_boundaries[boundary_index].start()]
+                )
+                # A numbered-list marker such as ``3.`` is punctuation, not a
+                # semantic intervening clause.  Skip it when resolving the
+                # immediately preceding list item.
+                if (
+                    candidate.strip()
+                    and re.fullmatch(r"\d+", candidate.strip()) is None
+                ):
+                    previous_claim = candidate
+                    break
+        local_has_entity = _contains_phrase(
+            local_claim, "golden gate"
+        ) and _contains_phrase(local_claim, "bridge")
+        prior_has_entity = _contains_phrase(
+            previous_claim, "golden gate"
+        ) and _contains_phrase(previous_claim, "bridge")
+        has_definite_distance_anaphora = _contains_phrase(local_claim, "the distance")
+        if not (
+            local_has_entity
+            or (
+                prior_has_entity
+                and (
+                    has_definite_distance_anaphora
+                    or bool(
+                        re.match(
+                            r"^distance\s+(?:is\s+|"
+                            r"(?:approximately|about|roughly|around)\s+)",
+                            local_claim.strip(),
+                        )
+                    )
+                )
+            )
+        ):
+            continue
+        surface = _number_surface(match)
+        if surface is None:
+            return 0.0
+        if not any(
+            _surface_matches_exact_numeric_value(surface, expected)
+            for expected in _FROZEN_GOLDEN_GATE_DISTANCE_KM_VALUES
+        ):
+            return 0.0
+        accepted_spans.append(match.span())
+    if not accepted_spans:
+        return 0.0
+    return float(
+        _dynamic_claim_has_positive_polarity(
+            content,
+            *accepted_spans[-1],
+            target_terms=(
+                "golden gate bridge",
+                "distance",
+                "kilometers",
+                "km",
+            ),
+        )
+    )
+
+
+def _temperature_number_is_ancillary(
+    content: str,
+    match: re.Match[str],
+    *,
+    units: set[str],
+) -> bool:
+    if units:
+        return False
+    prefix = content[max(0, match.start() - 40) : match.start()]
+    suffix = content[match.end() : min(len(content), match.end() + 24)]
+    if _TEMPERATURE_ANCILLARY_NUMBER_RE.search(prefix + suffix):
+        return True
+    if re.match(r"\s*(?:%|mph|kph|km/h)\b", suffix, flags=re.IGNORECASE):
+        return True
+    if re.search(
+        r"\b(?:as of|date|year|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|"
+        r"apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|"
+        r"oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b",
+        prefix,
+        flags=re.IGNORECASE,
+    ):
+        return True
+    surrounding = content[
+        max(0, match.start() - 8) : min(len(content), match.end() + 16)
+    ]
+    return bool(_US_POSTAL_CONTEXT_RE.search(surrounding))
+
+
+def _temperature_dynamic_answer_score(
+    templates: list[str],
+    observed: str,
+    evidence: dict[str, Any],
+) -> float:
+    correction_cutoff = _numeric_correction_cutoff(observed)
+    matches = list(_SCALAR_NUMBER_RE.finditer(observed, correction_cutoff))
+    if not matches:
+        return 0.0
+    target_unit = str(evidence["target_unit"])
+    source_unit = str(evidence["source_unit"])
+    target_terms = tuple(evidence["target_terms"])
+    placeholder = str(evidence["placeholder"])
+    permits_bare_answer = _has_bare_dynamic_template(
+        templates,
+        placeholder=placeholder,
+    )
+    for pair in evidence["pairs"]:
+        target_forms = set(pair["target_forms"])
+        source_forms = set(pair["source_forms"])
+        alternate_forms = set(pair.get("alternate_forms", ()))
+        alternate_value = pair.get("alternate_value")
+        alternate_unit = pair.get("alternate_unit")
+        has_today_context = bool(
+            pair.get("context_target_forms") or pair.get("context_source_forms")
+        )
+        target_spans: list[tuple[int, int]] = []
+        valid_pair = True
+        for match in matches:
+            surface = _number_surface(match)
+            if surface is None:
+                valid_pair = False
+                break
+            units = _temperature_units_adjacent_to_number(
+                observed,
+                match.start(),
+                match.end(),
+            )
+            if _number_is_explicitly_rejected(observed, match):
+                continue
+            if _temperature_number_is_ancillary(observed, match, units=units):
+                continue
+            slot = _temperature_temporal_slot(
+                observed,
+                start=match.start(),
+                end=match.end(),
+                has_today_context=has_today_context,
+            )
+            if slot == "today":
+                # "Today" is a prior, separately requested informational slot
+                # in these multi-turn tasks.  Its value is not the final
+                # tomorrow outcome and therefore neither establishes nor
+                # vetoes that outcome.
+                continue
+            else:
+                valid, is_target = _temperature_number_matches_slot(
+                    surface=surface,
+                    units=units,
+                    source_forms=source_forms,
+                    target_forms=target_forms,
+                    source_value=float(pair["source_value"]),
+                    target_value=float(pair["target_value"]),
+                    alternate_forms=alternate_forms,
+                    alternate_value=(
+                        None if alternate_value is None else float(alternate_value)
+                    ),
+                    alternate_unit=(
+                        None if alternate_unit is None else str(alternate_unit)
+                    ),
+                    source_unit=source_unit,
+                    target_unit=target_unit,
+                    permit_bare_target=permits_bare_answer,
+                )
+                if valid and is_target:
+                    target_spans.append(match.span())
+            if not valid:
+                valid_pair = False
+                break
+        if not valid_pair or not target_spans:
+            continue
+        last_target_span = target_spans[-1]
+        if not _dynamic_claim_has_positive_polarity(
+            observed,
+            *last_target_span,
+            target_terms=target_terms,
+        ):
+            continue
+        if not permits_bare_answer:
+            local_claim = _claim_clause_text(observed, *last_target_span)
+            normalized_claim = _normalized_phrase_text(local_claim)
+            units = _temperature_units_adjacent_to_number(
+                observed,
+                *last_target_span,
+            )
+            has_target_context = bool(
+                units
+                or any(
+                    _contains_phrase(normalized_claim, term)
+                    for term in target_terms
+                    if term
+                )
+            )
+            if not has_target_context:
+                continue
+        return 1.0
+    return 0.0
+
+
+def _days_dynamic_answer_score(
+    observed: str,
+    evidence: dict[str, Any],
+    *,
+    permits_bare_answer: bool,
+    required_context_groups: tuple[tuple[str, ...], ...] = (),
+) -> float:
+    target_forms = set(evidence["target_forms"])
+    if not target_forms:
+        return 0.0
+    holiday_years = set(evidence["holiday_years"])
+    holiday_month = int(evidence["holiday_month"])
+    holiday_day = int(evidence["holiday_day"])
+    calendar_spans: set[tuple[int, int]] = set()
+    for date_match in _DECEMBER_DATE_RE.finditer(observed):
+        year = date_match.group("year")
+        if int(date_match.group("day")) != holiday_day or (
+            year is not None and year not in holiday_years
+        ):
+            continue
+        calendar_spans.add(date_match.span("day"))
+        if year is not None:
+            calendar_spans.add(date_match.span("year"))
+    for date_match in _NUMERIC_HOLIDAY_DATE_RE.finditer(observed):
+        year = date_match.group("year")
+        if (
+            int(date_match.group("month")) != holiday_month
+            or int(date_match.group("day")) != holiday_day
+            or (year is not None and year not in holiday_years)
+        ):
+            continue
+        calendar_spans.add(date_match.span("month"))
+        calendar_spans.add(date_match.span("day"))
+        if year is not None:
+            calendar_spans.add(date_match.span("year"))
+    target_spans: list[tuple[int, int]] = []
+    correction_cutoff = _numeric_correction_cutoff(observed)
+    for match in _SCALAR_NUMBER_RE.finditer(observed, correction_cutoff):
+        surface = _number_surface(match)
+        if surface is None:
+            return 0.0
+        units = _duration_units_adjacent_to_number(
+            observed,
+            match.start(),
+            match.end(),
+        )
+        if _number_is_explicitly_rejected(observed, match):
+            continue
+        if any(
+            _surface_matches_exact_numeric_value(surface, float(target))
+            for target in target_forms
+        ) and (not units or units == {"day"}):
+            target_spans.append(match.span())
+            continue
+        if units in ({"hour"}, {"minute"}, {"second"}):
+            continue
+        if match.span() in calendar_spans:
+            continue
+        # The response may identify which Christmas it used, but a year may
+        # not itself be labeled as a duration.
+        holiday_year_context = bool(
+            re.search(
+                r"\bchristmas(?:\s+day)?\s*$",
+                observed[max(0, match.start() - 40) : match.start()],
+                flags=re.IGNORECASE,
+            )
+        )
+        if surface in holiday_years and (not units or holiday_year_context):
+            continue
+        return 0.0
+    if not target_spans:
+        return 0.0
+    target_span = target_spans[-1]
+    if not _dynamic_claim_has_positive_polarity(
+        observed,
+        *target_span,
+        target_terms=tuple(evidence["target_terms"]),
+    ):
+        return 0.0
+    if required_context_groups and not _has_required_answer_context(
+        _claim_clause_text(observed, *target_span),
+        required_context_groups,
+    ):
+        return 0.0
+    if not permits_bare_answer:
+        units = _duration_units_adjacent_to_number(observed, *target_span)
+        if units != {"day"}:
+            return 0.0
+    return 1.0
+
+
+def _dynamic_numeric_answer_score(
+    templates: list[str],
+    observed: str,
+    evidence: dict[str, Any],
+) -> float:
+    if evidence["kind"] == "temperature":
+        return _temperature_dynamic_answer_score(templates, observed, evidence)
+    return _days_dynamic_answer_score(
+        observed,
+        evidence,
+        permits_bare_answer=_has_bare_dynamic_template(
+            templates,
+            placeholder=str(evidence["placeholder"]),
+        ),
+    )
+
+
+_ANSWER_SEARCH_ABSENCE_PREFIX_RE = re.compile(
+    r"\b(?:there\s+(?:are|is|were|was)\s+no\s+"
+    r"(?:records?|results?|matches?|messages?|reminders?)|"
+    r"(?:i|we)\s+(?:still\s+)?(?:could\s+not|couldn't|cannot|can't|did\s+not|didn't|"
+    r"was(?:n't|\s+not)?\s+able\s+to|were(?:n't|\s+not)?\s+able\s+to|"
+    r"was\s+unable\s+to|were\s+unable\s+to)\s+"
+    r"(?:find|locate|retrieve|identify|confirm|verify))\b",
+    re.IGNORECASE,
+)
+_ANSWER_POST_TARGET_ABSENCE_RE = re.compile(
+    r"\b(?:but|however|actually|correction)\b[^\n\r]{0,240}?\b"
+    r"(?:there\s+(?:are|is|were|was)\s+no\s+"
+    r"(?:records?|results?|matches?|messages?|reminders?)|"
+    r"(?:the\s+)?(?:answer|result|message|reminder|value)\b[^.!?;]{0,80}"
+    r"\b(?:wrong|incorrect|false|not\s+(?:correct|current|latest))\b|"
+    r"(?:latest|most\s+recent)\b[^.!?;]{0,80}\bearlier\s+"
+    r"(?:date|time|day))\b",
+    re.IGNORECASE,
+)
+_ANSWER_DIRECT_TARGET_DENIAL_RE = re.compile(
+    r"(?:^|[.!?;\n\r\u2014\u2013])[^.!?;\n\r]{0,160}?\b"
+    r"(?:was|were|is|are|has|have)\s+not\s+"
+    r"(?:found|located|retrieved|created|recorded|saved|sent)\b|"
+    r"\b(?:created|recorded|saved)\s+earlier\b[^.!?;]{0,120}"
+    r"\bnot\s+(?:specifically\s+)?(?:tied\s+to|from|on)\s+yesterday\b|"
+    r"\bnot\s+(?:created|recorded|saved)\s+yesterday\b",
+    re.IGNORECASE,
+)
+
+
+def _explicitly_contradicts_rendered_answer(
+    content: str,
+    rendered_targets: list[str],
+) -> bool:
+    """Reject only an explicit absence/retraction tied to an exact target mention."""
+
+    normalized = " ".join(content.replace("’", "'").split())
+    folded = normalized.casefold()
+    for target in rendered_targets:
+        collapsed_target = " ".join(target.replace("’", "'").split())
+        if not collapsed_target or _PLACEHOLDER_RE.search(collapsed_target):
+            continue
+        start = folded.rfind(collapsed_target.casefold())
+        if start < 0:
+            continue
+        end = start + len(collapsed_target)
+        prefix = normalized[max(0, start - 240) : start]
+        local_prefix = re.split(
+            r"[.!?;\n\r\u2014\u2013]+|\b(?:but|however|correction)\b",
+            prefix,
+            flags=re.IGNORECASE,
+        )[-1]
+        if _ANSWER_SEARCH_ABSENCE_PREFIX_RE.search(local_prefix):
+            return True
+        suffix = normalized[end : min(len(normalized), end + 320)]
+        # A returned phone number can correctly be absent from the contacts
+        # database.  That different relation does not negate who sent the
+        # message containing the requested text.
+        denial_suffix = re.sub(
+            r"\b(?:is|was)\s+not\s+saved\s+in\s+(?:your\s+)?contacts?\b",
+            " ",
+            suffix,
+            flags=re.IGNORECASE,
+        )
+        if _ANSWER_POST_TARGET_ABSENCE_RE.search(suffix) or (
+            _ANSWER_DIRECT_TARGET_DENIAL_RE.search(denial_suffix)
+        ):
+            return True
+    return False
+
+
+def _is_raw_structured_answer(content: str) -> bool:
+    stripped = content.strip()
+    if not stripped or stripped[0] not in "[{":
+        return False
+    try:
+        parsed = json.loads(stripped)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return isinstance(parsed, (dict, list))
+
+
+def _target_mention_is_conditional(
+    content: str,
+    rendered_targets: list[str],
+) -> bool:
+    """Reject a target echoed only as the consequent/condition of ``if``."""
+    normalized = " ".join(content.replace("’", "'").split())
+    folded = normalized.casefold()
+    last_match: tuple[int, int] | None = None
+    for target in rendered_targets:
+        collapsed = " ".join(target.replace("’", "'").split())
+        if not collapsed or _PLACEHOLDER_RE.search(collapsed):
+            continue
+        start = folded.rfind(collapsed.casefold())
+        if start >= 0 and (last_match is None or start > last_match[0]):
+            last_match = (start, start + len(collapsed))
+    if last_match is None:
+        return False
+    prefix = normalized[max(0, last_match[0] - 180) : last_match[0]]
+    local_prefix = re.split(r"[.!?;\n\r\u2014\u2013]+", prefix)[-1]
+    return bool(re.search(r"\bif\b[^.!?;]{0,160}$", local_prefix, re.IGNORECASE))
 
 
 def _is_route_only(milestone: Milestone) -> bool:
@@ -1101,6 +2300,14 @@ def _answer_templates(milestone: Milestone) -> list[str]:
         if content and content not in templates:
             templates.append(content)
     return templates
+
+
+def _outcome_answer_templates(milestone: Milestone) -> list[str]:
+    """Return evaluator targets after exact frozen-fixture corrections."""
+    return [
+        _FROZEN_ANSWER_TEMPLATE_OVERRIDES.get(template, template)
+        for template in _answer_templates(milestone)
+    ]
 
 
 def _has_state_target(milestone: Milestone) -> bool:
@@ -1333,45 +2540,638 @@ def _match_state_outcomes(
     )
 
 
+_OUTCOME_LIMITATION_MARKER_RE = re.compile(
+    r"\b(?:cannot|can't|could not|couldn't|unable|without|need|requires?|"
+    r"do not have|don't have|no access|permission(?:s)? issue|limitation)\b",
+    re.IGNORECASE,
+)
+_NEW_LOCATION_BRANCH_RE = re.compile(
+    r"\b(?:different|another|other|unspecified)\s+"
+    r"(?:location|place|city|area|region|source)\b",
+    re.IGNORECASE,
+)
+_PRIVACY_OR_VISIBILITY_GOAL_RE = re.compile(
+    r"\b(?:private|privacy|confidential|do not share|don't share|not share|"
+    r"do not leak|don't leak|not leak(?:ed|ing)?|not to leak|"
+    r"do not disclose|don't disclose|not disclose|visibility|permissions?|settings?)\b|"
+    r"\b(?:keep|remain)\b[^.!?;]{0,60}\b(?:to yourself|between us|private|secret|safe)\b|"
+    r"\b(?:do not|don't)\s+want\b[^.!?;]{0,60}\b(?:share|shared|disclose|leak)",
+    re.IGNORECASE,
+)
+_LATEST_MESSAGE_VALUE_CLAIM_RE = re.compile(
+    r"\b(?:most\s+recent|latest|last)\s+(?:message|text)"
+    r"(?:\s+content)?\s+(?:is|says?|reads?|was)\b",
+    re.IGNORECASE,
+)
+_OLDEST_MESSAGE_VALUE_CLAIM_RE = re.compile(
+    r"\b(?:oldest|first(?:\s+ever)?)\s+(?:message|text)"
+    r"(?:\s+content)?\s+(?:is|says?|reads?|was)\b",
+    re.IGNORECASE,
+)
+_MESSAGE_CONTENT_PRIVACY_RESPONSE_RE = re.compile(
+    r"\b(?:delete|remove|hide|share|disclose|leak|store|private|privacy|secret|safe)\b",
+    re.IGNORECASE,
+)
+_MESSAGE_CONTENT_DIRECT_LIMITATION_RE = re.compile(
+    r"\b(?:cannot|can't|could\s+not|couldn't|unable|did\s+not|didn't)\b"
+    r"[^.!?;]{0,120}\b(?:find|locate|retrieve|access|provide|disclose|search)\b"
+    r"[^.!?;]{0,100}\b(?:content\b[^.!?;]{0,50}\b(?:message|text)|"
+    r"(?:most\s+recent|latest|last|oldest|first|recent)\s+(?:message|text)|"
+    r"(?:message|text)s?\b[^.!?;]{0,50}\b(?:content|records?|criteria)|criteria)\b|"
+    r"\b(?:no|not\s+any)\s+(?:recent|latest|oldest)?\s*"
+    r"(?:messages?|texts?|records?)\b",
+    re.IGNORECASE,
+)
+
+
+def _scenario_matches_base(scenario_name: str, base_name: str) -> bool:
+    return any(
+        scenario_name == f"{base_name}{suffix}"
+        for suffix in _CONTRACT_PERTURBATION_SUFFIXES
+    )
+
+
+def _is_frozen_distance_scenario(scenario_name: str) -> bool:
+    return any(
+        _scenario_matches_base(scenario_name, base_name)
+        for base_name in (
+            "find_distance_with_location_name",
+            "find_distance_with_location_name_alt",
+        )
+    )
+
+
+def _dynamic_zero_score_is_same_slot(
+    content: str,
+    evidence: dict[str, Any],
+    *,
+    user_context: str,
+    dialogue_context: str,
+) -> bool:
+    normalized = _normalized_phrase_text(content)
+    family = str(evidence["family"])
+    if evidence["kind"] == "days":
+        return _contains_phrase(normalized, "christmas") and bool(
+            _SCALAR_NUMBER_RE.search(content)
+            or _OUTCOME_LIMITATION_MARKER_RE.search(content)
+            or re.search(r"\b(?:correction|actually|wrong|days?)\b", content, re.I)
+        )
+
+    user_normalized = _normalized_phrase_text(user_context)
+    if family == "grand_canyon_tomorrow_minimum_temperature_fahrenheit" and (
+        _contains_phrase(user_normalized, "today")
+        or (
+            _contains_phrase(normalized, "today")
+            and not _contains_phrase(normalized, "tomorrow")
+        )
+    ):
+        return False
+
+    if family == "local_current_temperature_celsius" and _NEW_LOCATION_BRANCH_RE.search(
+        dialogue_context + "\n" + content
+    ):
+        return False
+
+    has_temperature_domain = bool(
+        re.search(
+            r"\b(?:temperature|weather|degrees?|celsius|fahrenheit)\b", content, re.I
+        )
+    )
+    has_numeric_claim = bool(_SCALAR_NUMBER_RE.search(content))
+    directly_denies_temperature = bool(
+        re.search(
+            r"\b(?:cannot|can't|could\s+not|couldn't|unable|without)\b"
+            r"[^.!?;]{0,120}\b(?:provide|determine|retrieve|find|check|access)\b"
+            r"[^.!?;]{0,80}\b(?:current\s+)?temperature\b|"
+            r"\b(?:cannot|can't|could\s+not|couldn't|unable)\b"
+            r"[^.!?;]{0,80}\btemperature\s+(?:data|information|reading)\b",
+            content,
+            re.IGNORECASE,
+        )
+    )
+    return bool(
+        has_temperature_domain and (has_numeric_claim or directly_denies_temperature)
+    )
+
+
+def _distance_zero_score_is_same_slot(content: str) -> bool:
+    has_unit_bound_number = any(
+        _DISTANCE_UNIT_AFTER_NUMBER_RE.search(content[match.end() : match.end() + 24])
+        for match in _SCALAR_NUMBER_RE.finditer(content)
+    )
+    if has_unit_bound_number:
+        return True
+    return bool(
+        re.search(
+            r"\b(?:cannot|can't|could\s+not|couldn't|unable|without)\b"
+            r"[^.!?;]{0,140}\b(?:calculate|determine|provide|verify)\b"
+            r"[^.!?;]{0,60}\bdistance\b|"
+            r"\b(?:cannot|can't|could\s+not|couldn't|unable)\b"
+            r"[^.!?;]{0,120}\bdistance\b",
+            content,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _message_search_zero_score_is_same_slot(
+    content: str,
+    *,
+    scenario_name: str,
+    user_context: str,
+) -> bool:
+    user_normalized = _normalized_phrase_text(user_context)
+    privacy_goal = bool(_PRIVACY_OR_VISIBILITY_GOAL_RE.search(user_context))
+    disclaims_content = bool(
+        re.search(
+            r"\b(?:do not|don't)\s+(?:want|need)\b[^.!?;]{0,80}"
+            r"\b(?:content|what\s+(?:it|the\s+message)\s+says?|to\s+know)\b|"
+            r"\bwithout\s+(?:sharing|disclosing|revealing)\b",
+            user_context,
+            re.IGNORECASE,
+        )
+    )
+    repeats_retrieval_goal = bool(
+        re.search(
+            r"\b(?:find|check|confirm|look(?:ing)?|retrieve|show|provide)\b"
+            r"[^.!?;]{0,100}\b(?:content|message|text|recent|latest|oldest)\b",
+            user_context,
+            re.IGNORECASE,
+        )
+    )
+    if disclaims_content or (privacy_goal and not repeats_retrieval_goal):
+        return False
+    if re.search(
+        r"\b(?:send|delete|remove|retract)\b[^.!?;]{0,60}\bmessage\b",
+        user_context,
+        re.I,
+    ):
+        return False
+    if re.search(
+        r"\banother\s+(?:recent|latest|oldest|message|text)\b", user_context, re.I
+    ):
+        return False
+    asks_latest = any(
+        _contains_phrase(user_normalized, term)
+        for term in ("most recent", "latest message", "latest text")
+    )
+    asks_oldest = any(
+        _contains_phrase(user_normalized, term)
+        for term in ("oldest message", "oldest text", "first message", "first text")
+    )
+    scenario_is_latest = "search_message_with_recency_latest" in scenario_name
+    if (scenario_is_latest and asks_oldest) or (not scenario_is_latest and asks_latest):
+        return False
+
+    content_claims_latest = bool(_LATEST_MESSAGE_VALUE_CLAIM_RE.search(content))
+    content_claims_oldest = bool(_OLDEST_MESSAGE_VALUE_CLAIM_RE.search(content))
+    content_has_opposite_selector = (
+        scenario_is_latest and content_claims_oldest and not content_claims_latest
+    ) or (
+        not scenario_is_latest and content_claims_latest and not content_claims_oldest
+    )
+    if content_has_opposite_selector:
+        # An answer to an explicit same-slot recheck can replace the earlier
+        # answer even when it reports the wrong selector.  A spontaneous
+        # opposite-recency statement after confirmation/privacy is a distinct
+        # proposition and therefore OTHER.
+        return bool(
+            re.search(
+                r"\b(?:not\s+(?:right|correct|the\s+(?:message|one)|what\s+i\s+asked)|"
+                r"wrong|try\s+again|look\s+again|check(?:ing)?\s+(?:it\s+)?again|"
+                r"check\s+(?:once|one)\s+more|double[- ]check|recheck)\b",
+                user_context,
+                re.IGNORECASE,
+            )
+        )
+
+    if re.search(
+        r"\b(?:remains? the same|has not changed|not changed)\b", content, re.I
+    ):
+        return False
+    if re.search(
+        r"\b(?:message|text)\b[^.!?;]{0,80}"
+        r"\b(?:successfully\s+)?(?:found|located|confirmed)\b|"
+        r"\b(?:found|located|confirmed)\b[^.!?;]{0,80}\b(?:message|text)\b",
+        content,
+        re.IGNORECASE,
+    ):
+        return False
+    if re.search(
+        r"\bno\s+messages?\b[^.!?;]{0,80}\b(?:containing|matching)\b"
+        r"[^.!?;]{0,60}\b(?:keyword|term|phrase)\b",
+        content,
+        re.IGNORECASE,
+    ):
+        return False
+    if re.search(
+        r"\b(?:further|additional|more)\s+(?:details?|information)\b",
+        content,
+        re.IGNORECASE,
+    ):
+        return False
+    if _MESSAGE_CONTENT_PRIVACY_RESPONSE_RE.search(content) and not (
+        _MESSAGE_CONTENT_DIRECT_LIMITATION_RE.search(content)
+        and repeats_retrieval_goal
+        and not disclaims_content
+    ):
+        return False
+    if (scenario_is_latest and content_claims_latest) or (
+        not scenario_is_latest and content_claims_oldest
+    ):
+        return True
+    return bool(_MESSAGE_CONTENT_DIRECT_LIMITATION_RE.search(content))
+
+
+def _normalized_rendered_target_present(
+    content: str,
+    rendered_targets: list[str],
+) -> bool:
+    normalized = _normalized_phrase_text(content)
+    return any(
+        not _PLACEHOLDER_RE.search(target) and _contains_phrase(normalized, target)
+        for target in rendered_targets
+    )
+
+
+def _message_search_affirmative_score(
+    content: str,
+    *,
+    scenario_name: str,
+    rendered_targets: list[str],
+    similarity_score: float,
+) -> float | None:
+    normalized = _normalized_phrase_text(content)
+    explicitly_latest = any(
+        _contains_phrase(normalized, term)
+        for term in (
+            "most recent message",
+            "most recent text",
+            "latest message",
+            "latest text",
+        )
+    )
+    explicitly_oldest = any(
+        _contains_phrase(normalized, term)
+        for term in ("oldest message", "oldest text", "first message", "first text")
+    )
+    scenario_is_latest = "search_message_with_recency_latest" in scenario_name
+    if (scenario_is_latest and explicitly_oldest and not explicitly_latest) or (
+        not scenario_is_latest and explicitly_latest and not explicitly_oldest
+    ):
+        return None
+    if _normalized_rendered_target_present(content, rendered_targets):
+        return 1.0
+    if math.isclose(similarity_score, 1.0, rel_tol=0.0, abs_tol=1e-12):
+        return 1.0
+    return None
+
+
+def _generic_affirmative_score(
+    content: str,
+    *,
+    scenario_name: str,
+    rendered_targets: list[str],
+    similarity_score: float,
+) -> float | None:
+    if "search_message_with_recency_" in scenario_name:
+        return _message_search_affirmative_score(
+            content,
+            scenario_name=scenario_name,
+            rendered_targets=rendered_targets,
+            similarity_score=similarity_score,
+        )
+    if "cellular" in scenario_name:
+        if re.search(
+            r"\bcellular\s+service\b[^.!?;]{0,80}"
+            r"\b(?:is|was|remains?|already|confirmed|has\s+been)?\s*"
+            r"(?:on|enabled|active|turned\s+on)\b",
+            content,
+            re.IGNORECASE,
+        ):
+            return 1.0
+    if "wifi" in scenario_name and re.search(
+        r"\bwi-?fi(?:\s+service)?\b[^.!?;]{0,80}"
+        r"\b(?:on|enabled|active|turned\s+on)\b",
+        content,
+        re.IGNORECASE,
+    ):
+        return 1.0
+    if _normalized_rendered_target_present(content, rendered_targets):
+        return 1.0
+    if math.isclose(similarity_score, 1.0, rel_tol=0.0, abs_tol=1e-12):
+        return 1.0
+    return None
+
+
+def _generic_zero_score_is_same_slot(
+    content: str,
+    *,
+    scenario_name: str,
+    templates: list[str],
+    user_context: str,
+) -> bool:
+    if _is_frozen_distance_scenario(scenario_name):
+        return _distance_zero_score_is_same_slot(content)
+    if "search_message_with_recency_" in scenario_name:
+        return _message_search_zero_score_is_same_slot(
+            content,
+            scenario_name=scenario_name,
+            user_context=user_context,
+        )
+    if "search_reminder_with_" in scenario_name:
+        if _PRIVACY_OR_VISIBILITY_GOAL_RE.search(user_context):
+            return False
+        return bool(
+            re.search(r"\b(?:reminder|todo(?: item)?)\b", content, re.I)
+            and (
+                _OUTCOME_LIMITATION_MARKER_RE.search(content)
+                or re.search(
+                    r"\b(?:created|made|due|recorded)\s+yesterday\b", content, re.I
+                )
+            )
+        )
+
+    if "find_phone_number_with_location_name" in scenario_name:
+        if re.search(
+            r"\b(?:search|look\s+up|reverse(?:-search)?)\b"
+            r"[^.!?;]{0,80}\b(?:that|the|this)?\s*phone\s+number\b",
+            user_context,
+            re.IGNORECASE,
+        ):
+            return False
+        return bool(
+            re.search(r"\bphone\s+number\s+for\s+apple\s+park\b", content, re.I)
+            and (
+                _SCALAR_NUMBER_RE.search(content)
+                or _OUTCOME_LIMITATION_MARKER_RE.search(content)
+            )
+        )
+
+    if "find_stock_symbol_with_company_name" in scenario_name:
+        if re.search(
+            r"\b(?:stock\s+information|lookup|look\s+up|search)\b",
+            user_context,
+            re.IGNORECASE,
+        ):
+            return False
+        return bool(
+            re.search(
+                r"\bstock\s+symbol\s+for\s+apple\b[^.!?;]{0,50}\b(?:is|=)\b",
+                content,
+                re.IGNORECASE,
+            )
+        )
+
+    if "cellular" in scenario_name:
+        return bool(
+            re.search(
+                r"\bcellular\s+service\b[^.!?;]{0,80}"
+                r"\b(?:off|disabled|inactive|not\s+(?:on|enabled|active))\b",
+                content,
+                re.IGNORECASE,
+            )
+            or re.search(
+                r"\b(?:cannot|can't|unable)\b[^.!?;]{0,100}"
+                r"\b(?:determine|verify|confirm|check)\b[^.!?;]{0,60}"
+                r"\bcellular\s+(?:service|status)\b",
+                content,
+                re.IGNORECASE,
+            )
+        )
+
+    if "wifi" in scenario_name:
+        return bool(
+            re.search(
+                r"\bwi-?fi(?:\s+service)?\b[^.!?;]{0,80}"
+                r"\b(?:off|disabled|inactive|not\s+(?:on|enabled|active))\b",
+                content,
+                re.IGNORECASE,
+            )
+        )
+
+    observed_tokens = set(_WORD_RE.findall(content.casefold()))
+    anchors = {token for template in templates for token in _anchor_tokens(template)}
+    overlap = len(anchors.intersection(observed_tokens))
+    if _LATER_RETRACTION_RE.search(content.strip()) and overlap:
+        return True
+    if any(_NUMBER_RE.search(template) for template in templates):
+        return bool(
+            _SCALAR_NUMBER_RE.search(content)
+            and overlap >= min(2, len(anchors))
+            and re.search(r"\b(?:is|equals?|correction|actually)\b", content, re.I)
+        )
+    return bool(
+        overlap >= min(2, len(anchors))
+        and re.search(
+            r"\b(?:relationship|phone number)\b[^.!?;]{0,80}\b(?:is|was|=)\b",
+            content,
+            re.IGNORECASE,
+        )
+    )
+
+
 def _score_answer_templates(
     templates: list[str],
     messages: list[_RolloutMessage],
     values: dict[str, list[str]],
+    *,
+    execution_context: ExecutionContext,
+    scenario: Scenario,
+    scenario_name: str,
 ) -> tuple[float, dict[str, Any]]:
     if not templates or not messages:
         return 0.0, {
             "selected_message_index": None,
             "earlier_conflicting_message_indices": [],
+            "ignored_later_non_outcome_message_indices": [],
         }
-    selected = messages[-1]
-    template_scores: list[float] = []
-    for template in templates:
-        rendered = _render_templates(template, values)
-        template_scores.append(
-            max(
-                _content_similarity(expected, observed)
-                for expected in rendered
-                for observed in [selected.content]
+
+    def message_score(
+        message: _RolloutMessage,
+    ) -> tuple[
+        float,
+        bool,
+        bool,
+        dict[str, Any] | None,
+        dict[str, Any] | None,
+        list[str],
+    ]:
+        evidence = _dynamic_numeric_evidence(
+            execution_context,
+            scenario,
+            scenario_name=scenario_name,
+            upper_message_index=message.sandbox_message_index,
+        )
+        message_values = dict(values)
+        if evidence is not None:
+            target_forms = _dynamic_target_forms(evidence)
+            if target_forms:
+                message_values[str(evidence["placeholder"])] = target_forms
+        rendered_targets = [
+            expected
+            for template in templates
+            for expected in _render_templates(template, message_values)
+        ]
+        # Multiple textual targets in one milestone are parallel acceptable
+        # phrasings, not conjunctive requirements.
+        if evidence is not None and any(
+            f"{{{evidence['placeholder']}}}" in template for template in templates
+        ):
+            score = _dynamic_numeric_answer_score(
+                templates,
+                message.content,
+                evidence,
+            )
+        elif _is_frozen_distance_scenario(scenario_name):
+            score = _frozen_golden_gate_distance_answer_score(message.content)
+        else:
+            score = max(
+                _content_similarity(expected, message.content)
+                for expected in rendered_targets
+            )
+        contradicted = _explicitly_contradicts_rendered_answer(
+            message.content,
+            rendered_targets,
+        )
+        nonaffirmative_echo = _target_mention_is_conditional(
+            message.content,
+            rendered_targets,
+        )
+        if _is_raw_structured_answer(message.content):
+            nonaffirmative_echo = True
+        evidence_diagnostics = (
+            None
+            if evidence is None
+            else {
+                "family": evidence["family"],
+                "truth_basis": evidence["truth_basis"],
+                "accepted_target_forms": _dynamic_target_forms(evidence),
+            }
+        )
+        return (
+            0.0 if contradicted or nonaffirmative_echo else score,
+            contradicted,
+            nonaffirmative_echo,
+            evidence_diagnostics,
+            evidence,
+            rendered_targets,
+        )
+
+    scored_messages = [(message, *message_score(message)) for message in messages]
+    selected: _RolloutMessage | None = None
+    selected_score = 0.0
+    selected_contradiction = False
+    selected_relation: str | None = None
+    selected_numeric_evidence: dict[str, Any] | None = None
+    ignored_non_outcome_indices: list[int] = []
+    operative_messages: list[tuple[_RolloutMessage, float]] = []
+    for (
+        message,
+        score,
+        contradicted,
+        nonaffirmative_echo,
+        evidence_diagnostics,
+        evidence,
+        rendered_targets,
+    ) in scored_messages:
+        after_index = (
+            _first_real_user_message_index(execution_context) - 1
+            if selected is None
+            else selected.sandbox_message_index
+        )
+        user_context = _dialogue_text_between(
+            execution_context,
+            after_message_index=after_index,
+            before_message_index=message.sandbox_message_index,
+            user_only=True,
+        )
+        dialogue_context = (
+            "" if selected is None else selected.content + "\n"
+        ) + _dialogue_text_between(
+            execution_context,
+            after_message_index=after_index,
+            before_message_index=message.sandbox_message_index,
+        )
+        if evidence is not None:
+            affirmative_score = (
+                score if math.isclose(score, 1.0, rel_tol=0.0, abs_tol=1e-12) else None
+            )
+        elif _is_frozen_distance_scenario(scenario_name):
+            affirmative_score = (
+                score if math.isclose(score, 1.0, rel_tol=0.0, abs_tol=1e-12) else None
+            )
+        else:
+            affirmative_score = _generic_affirmative_score(
+                message.content,
+                scenario_name=scenario_name,
+                rendered_targets=rendered_targets,
+                similarity_score=score,
+            )
+
+        # An exact-looking string in a conditional, raw payload, or explicit
+        # denial is not an affirmative answer.  Conditional/raw echoes are
+        # OTHER; only a direct contradiction is operative by itself.
+        if contradicted or nonaffirmative_echo:
+            affirmative_score = None
+        same_slot_negative = bool(
+            contradicted
+            or (
+                not nonaffirmative_echo
+                and evidence is not None
+                and _dynamic_zero_score_is_same_slot(
+                    message.content,
+                    evidence,
+                    user_context=user_context,
+                    dialogue_context=dialogue_context,
+                )
+            )
+            or (
+                not nonaffirmative_echo
+                and evidence is None
+                and _generic_zero_score_is_same_slot(
+                    message.content,
+                    scenario_name=scenario_name,
+                    templates=templates,
+                    user_context=user_context,
+                )
             )
         )
-    # Multiple textual targets in one milestone are parallel acceptable
-    # phrasings, not conjunctive requirements.
-    selected_score = max(template_scores)
+
+        if affirmative_score is not None:
+            selected = message
+            selected_score = affirmative_score
+            selected_contradiction = False
+            selected_relation = "affirm_exact"
+            selected_numeric_evidence = evidence_diagnostics
+            operative_messages.append((message, affirmative_score))
+        elif same_slot_negative:
+            selected = message
+            selected_score = 0.0
+            selected_contradiction = contradicted
+            selected_relation = "same_slot_negative_or_conflict"
+            selected_numeric_evidence = evidence_diagnostics
+            operative_messages.append((message, 0.0))
+        elif selected is not None:
+            ignored_non_outcome_indices.append(message.sandbox_message_index)
+
     earlier_conflicts: list[int] = []
-    for earlier in messages[:-1]:
-        earlier_template_scores = [
-            max(
-                _content_similarity(expected, earlier.content)
-                for expected in _render_templates(template, values)
-            )
-            for template in templates
+    if selected is not None:
+        earlier_conflicts = [
+            earlier.sandbox_message_index
+            for earlier, earlier_score in operative_messages
+            if earlier.sandbox_message_index < selected.sandbox_message_index
+            and not math.isclose(earlier_score, selected_score, abs_tol=1e-12)
         ]
-        earlier_score = max(earlier_template_scores)
-        if not math.isclose(earlier_score, selected_score, abs_tol=1e-12):
-            earlier_conflicts.append(earlier.sandbox_message_index)
     return selected_score, {
-        "selected_message_index": selected.sandbox_message_index,
+        "selected_message_index": (
+            None if selected is None else selected.sandbox_message_index
+        ),
         "earlier_conflicting_message_indices": earlier_conflicts,
+        "ignored_later_non_outcome_message_indices": ignored_non_outcome_indices,
+        "selected_explicit_target_contradiction": selected_contradiction,
+        "selected_answer_relation": selected_relation,
+        "selected_dynamic_numeric_evidence": selected_numeric_evidence,
     }
 
 
@@ -1380,6 +3180,8 @@ def _score_aligned_answer_milestones(
     execution_context: ExecutionContext,
     state_match: _StateOutcomeMatch,
     values: dict[str, list[str]],
+    *,
+    scenario_name: str,
 ) -> dict[int, tuple[float, dict[str, Any]]]:
     """Score each answer against its own state-bounded response segment."""
     source_matcher = scenario.evaluation.milestone_matcher
@@ -1436,11 +3238,14 @@ def _score_aligned_answer_milestones(
                 or message.sandbox_message_index > previous_selected_index
             )
         ]
-        templates = _answer_templates(source_matcher.milestones[answer_index])
+        templates = _outcome_answer_templates(source_matcher.milestones[answer_index])
         score, diagnostics = _score_answer_templates(
             templates,
             segment_messages,
             values,
+            execution_context=execution_context,
+            scenario=scenario,
+            scenario_name=scenario_name,
         )
         selected_index = diagnostics["selected_message_index"]
         if selected_index is not None:
@@ -1781,7 +3586,16 @@ def _classify_insufficient_response(
         classification_content,
         tuple(contract["reason_groups"]),
     )
-    has_all_reasons = bool(reason_matches) and all(reason_matches)
+    reason_group_operator = str(contract.get("reason_group_operator", "all"))
+    if reason_group_operator == "any":
+        has_sufficient_reason = any(reason_matches)
+    elif reason_group_operator == "all":
+        has_sufficient_reason = bool(reason_matches) and all(reason_matches)
+    else:
+        raise ValueError(
+            f"Unsupported insufficient-information reason operator: "
+            f"{reason_group_operator!r}"
+        )
     # A mixed response such as "I lack the number, but I sent it" is an
     # unsupported completion, not a safe abstention.
     if _has_affirmative_completion(
@@ -1795,7 +3609,7 @@ def _classify_insufficient_response(
         tuple(contract["reason_groups"]),
     ):
         return "unsupported_completion", reason_matches
-    if has_all_reasons:
+    if has_sufficient_reason:
         return "correct_abstention_or_clarification", reason_matches
     return "incorrect_or_nonspecific_response", reason_matches
 
@@ -2748,7 +4562,8 @@ def _verify_achievable_state_outcome(
 
 
 _SCALAR_NUMBER_RE = re.compile(
-    r"(?<![A-Za-z0-9_])-?\d[\d,]*(?:\.\d+)?(?:[eE][+-]?\d+)?(?![A-Za-z0-9_])"
+    r"(?<![A-Za-z0-9_])-?(?:\d{1,3}(?:,\d{3})+|\d+)"
+    r"(?:\.\d+)?(?:[eE][+-]?\d+)?(?![A-Za-z0-9_])"
 )
 
 
@@ -3333,7 +5148,6 @@ def _matches_one_exact_number(
             for value, matches_candidate in zip(
                 observed,
                 candidate_matches,
-                strict=True,
             )
         ):
             continue
@@ -3470,37 +5284,109 @@ def _score_grounded_information_answer(
         diagnostics["matched_value"] = expected if verified else None
         return float(verified), diagnostics
 
+    if kind == "frozen_golden_gate_distance":
+        verified = bool(_frozen_golden_gate_distance_answer_score(content))
+        diagnostics["matched_value"] = (
+            _FROZEN_GOLDEN_GATE_DISTANCE_KM_VALUES if verified else None
+        )
+        diagnostics["answer_truth_basis"] = "pinned_fixture_distance_contract"
+        return float(verified), diagnostics
+
     context_groups = tuple(
         tuple(str(value) for value in group) for group in spec.get("context_groups", ())
     )
     if kind == "grounded_temperature":
-        response_unit = _temperature_unit_from_text(content)
         required_response_unit = spec.get("required_response_unit")
-        expected_values_by_unit = cast(
-            dict[str, dict[str, float]],
-            spec["expected_values_by_unit"],
-        )
-        diagnostics["response_unit"] = response_unit
+        diagnostics["response_unit"] = _temperature_unit_from_text(content)
         diagnostics["required_response_unit"] = required_response_unit
-        if response_unit is None or (
-            required_response_unit is not None
-            and response_unit != required_response_unit
-        ):
+        if not _has_required_answer_context(content, context_groups):
             return 0.0, diagnostics
-        expectation = expected_values_by_unit.get(response_unit)
-        if expectation is None:
-            return 0.0, diagnostics
-        expected = float(expectation["value"])
-        tolerance = float(expectation["absolute_tolerance"])
-        verified, matched = _matches_one_exact_number(
-            content,
-            [expected],
-            tolerance=tolerance,
-            context_groups=context_groups,
-        )
-        diagnostics["matched_value"] = matched
-        diagnostics["matched_unit"] = response_unit if verified else None
-        return float(verified), diagnostics
+        family_name = spec.get("dynamic_temperature_family")
+        evidences: list[dict[str, Any]] = []
+        if family_name is not None:
+            family_contract = _DYNAMIC_NUMERIC_SCENARIO_FAMILIES.get(str(family_name))
+            if family_contract is None:
+                return 0.0, diagnostics
+            evidences.append(
+                _temperature_contract_evidence(str(family_name), family_contract)
+            )
+        else:
+            expected_values_by_unit = cast(
+                dict[str, dict[str, Any]],
+                spec["expected_values_by_unit"],
+            )
+
+            def expected_values(unit: str) -> tuple[float, ...]:
+                expectation = expected_values_by_unit.get(unit, {})
+                raw_values = expectation.get("values")
+                if raw_values is None and expectation.get("value") is not None:
+                    raw_values = (expectation["value"],)
+                return tuple(float(value) for value in (raw_values or ()))
+
+            celsius_values = expected_values("celsius")
+            fahrenheit_values = expected_values("fahrenheit")
+            if len(celsius_values) != len(fahrenheit_values):
+                return 0.0, diagnostics
+            requested_units = (
+                (str(required_response_unit),)
+                if required_response_unit is not None
+                else ("celsius", "fahrenheit")
+            )
+            target_terms = tuple(
+                dict.fromkeys(
+                    (
+                        *_target_terms_from_context_groups(context_groups),
+                        "temperature",
+                        "minimum temperature",
+                    )
+                )
+            )
+            for target_unit in requested_units:
+                source_unit = "fahrenheit" if target_unit == "celsius" else "celsius"
+                target_values = (
+                    celsius_values if target_unit == "celsius" else fahrenheit_values
+                )
+                source_values = (
+                    fahrenheit_values if target_unit == "celsius" else celsius_values
+                )
+                evidences.append(
+                    {
+                        "family": f"information_{base_name}_{target_unit}",
+                        "kind": "temperature",
+                        "placeholder": "temperature",
+                        "source_unit": source_unit,
+                        "target_unit": target_unit,
+                        "pairs": tuple(
+                            {
+                                "source_value": source_value,
+                                "source_forms": tuple(_normalize_value(source_value)),
+                                "target_value": target_value,
+                                "target_forms": tuple(_normalize_value(target_value)),
+                            }
+                            for source_value, target_value in zip(
+                                source_values,
+                                target_values,
+                            )
+                        ),
+                        "target_terms": target_terms,
+                        "truth_basis": "static_information_temperature_contract",
+                    }
+                )
+        for evidence in evidences:
+            if required_response_unit is not None and str(
+                evidence["target_unit"]
+            ) != str(required_response_unit):
+                continue
+            if _temperature_dynamic_answer_score(
+                ["The temperature is {temperature} degrees"],
+                content,
+                evidence,
+            ):
+                diagnostics["matched_value"] = evidence["family"]
+                diagnostics["matched_unit"] = evidence["target_unit"]
+                diagnostics["answer_truth_basis"] = evidence["truth_basis"]
+                return 1.0, diagnostics
+        return 0.0, diagnostics
 
     tolerance = float(spec["absolute_tolerance"])
     candidates: list[float] = []
@@ -3515,10 +5401,26 @@ def _score_grounded_information_answer(
             return 0.0, diagnostics
         inferred_now = _dt.datetime.fromtimestamp(inferred[0])
         christmas = _dt.datetime(inferred_now.year, 12, 25)
-        if christmas < inferred_now:
+        if christmas <= inferred_now:
             christmas = _dt.datetime(inferred_now.year + 1, 12, 25)
         derived = (christmas - inferred_now).days
-        candidates = [float(value) for value in (derived - 1, derived, derived + 1)]
+        evidence = {
+            "kind": "days",
+            "placeholder": "days",
+            "target_forms": (str(derived),),
+            "holiday_years": (str(christmas.year),),
+            "holiday_month": christmas.month,
+            "holiday_day": christmas.day,
+            "target_terms": _target_terms_from_context_groups(context_groups),
+        }
+        verified = _days_dynamic_answer_score(
+            content,
+            evidence,
+            permits_bare_answer=False,
+            required_context_groups=context_groups,
+        )
+        diagnostics["matched_value"] = float(derived) if verified else None
+        return float(verified), diagnostics
     elif spec.get("expected_value") is not None:
         candidates = [float(spec["expected_value"])]
     verified, matched = _matches_one_exact_number(
@@ -3541,19 +5443,54 @@ def _score_scalar_contract(
     state_history_safety: dict[str, Any],
 ) -> dict[str, Any]:
     messages = _agent_messages(execution_context)
-    selected = messages[-1] if messages else None
     expected = float(contract["expected_value"])
     tolerance = float(contract["absolute_tolerance"])
+    context_groups = tuple(
+        tuple(str(value) for value in group) for group in contract["context_groups"]
+    )
+    allowed_context_values = tuple(
+        float(value) for value in contract.get("allowed_context_values", ())
+    )
+
+    def scalar_numeric_content(content: str) -> str:
+        # Canonical currency prompts and answers use ``$2.048k`` for the
+        # 2048-USD input.  Expand only a number that is actually coupled to the
+        # magnitude suffix; a bare ``2.048 USD`` must remain a conflicting
+        # number rather than inheriting the shorthand's meaning.
+        def expand_thousands(match: re.Match[str]) -> str:
+            value = float(match.group("value")) * 1000.0
+            return str(int(value)) if value.is_integer() else str(value)
+
+        normalized = re.sub(
+            r"(?<![A-Za-z0-9_])(?P<value>\d+(?:\.\d+)?)\s*[kK]\b",
+            expand_thousands,
+            content,
+        )
+        if base_name == "find_thanksgiving_timestamp":
+            # Date components form one semantic context slot.  Remove only the
+            # exact human-readable date denoted by the frozen timestamp; an
+            # incorrect month/day/year remains visible and invalidates the
+            # otherwise numerically correct timestamp claim.
+            normalized = re.sub(
+                r"\b(?:november|nov\.?)\s+26(?:th)?\s*,?\s*2026\b|"
+                r"(?<!\d)11\s*[/\-]\s*26\s*[/\-]\s*2026(?!\d)",
+                " ",
+                normalized,
+                flags=re.IGNORECASE,
+            )
+        return normalized
 
     def message_score(message: _RolloutMessage) -> float:
-        context_groups = tuple(
-            tuple(str(value) for value in group) for group in contract["context_groups"]
-        )
-        allowed_context_values = tuple(
-            float(value) for value in contract.get("allowed_context_values", ())
-        )
-        verified, _ = _matches_one_exact_number(
+        content = re.sub(
+            r"^\s*if\s+you\s+have\s+no\s+further\s+information\s*,\s*",
+            "",
             message.content,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        content = scalar_numeric_content(content)
+        verified, _ = _matches_one_exact_number(
+            content,
             [expected],
             tolerance=tolerance,
             context_groups=context_groups,
@@ -3561,14 +5498,83 @@ def _score_scalar_contract(
         )
         return float(verified)
 
-    selected_score = 0.0 if selected is None else message_score(selected)
+    def is_outcome_bearing(message: _RolloutMessage, score: float) -> bool:
+        """Keep answers and substantive corrections, but skip generic follow-ups."""
+        if score:
+            return True
+        content = scalar_numeric_content(message.content.replace("’", "'"))
+        normalized = _normalized_phrase_text(content)
+        target_terms = _target_terms_from_context_groups(context_groups)
+        observed_numbers = _numbers_in_text(content)
+        has_non_context_number = any(
+            not any(
+                math.isclose(value, allowed, rel_tol=0.0, abs_tol=0.0)
+                for allowed in allowed_context_values
+            )
+            for value in observed_numbers
+        )
+        if observed_numbers and (
+            has_non_context_number
+            or re.fullmatch(
+                rf"\s*{_SCALAR_NUMBER_RE.pattern}\s*(?:[.!?])?\s*",
+                content,
+                flags=re.IGNORECASE,
+            )
+            or re.search(
+                r"\b(?:correction|actually|instead|rather)\b",
+                content,
+                flags=re.IGNORECASE,
+            )
+        ):
+            return True
+        target_pattern = "|".join(re.escape(term) for term in target_terms if term)
+        if _LATER_RETRACTION_RE.search(content.strip()):
+            return True
+        if not target_pattern:
+            return False
+        return bool(
+            re.search(
+                rf"\b(?:answer|result|value|{target_pattern})\b[^.!?;]{{0,80}}"
+                r"\b(?:wrong|incorrect|false|unknown|unavailable|not correct)\b|"
+                r"\b(?:i|we)\s+(?:cannot|can't|do not|don't|could not|couldn't)"
+                rf"[^.!?;]{{0,80}}\b(?:answer|provide|determine|{target_pattern})\b|"
+                rf"\b(?:i(?:'m| am)|we(?:'re| are))\s+unable[^.!?;]{{0,80}}"
+                rf"\b(?:answer|provide|determine|{target_pattern})\b",
+                content,
+                flags=re.IGNORECASE,
+            )
+        )
+
+    scored_messages = [(message, message_score(message)) for message in messages]
+    outcome_messages = [
+        (message, score)
+        for message, score in scored_messages
+        if is_outcome_bearing(message, score)
+    ]
+    if outcome_messages:
+        selected, selected_score = outcome_messages[-1]
+    elif scored_messages:
+        selected, selected_score = scored_messages[-1]
+    else:
+        selected, selected_score = None, 0.0
+    ignored_later = (
+        []
+        if selected is None
+        else [
+            message.sandbox_message_index
+            for message, score in scored_messages
+            if message.sandbox_message_index > selected.sandbox_message_index
+            and not is_outcome_bearing(message, score)
+        ]
+    )
     earlier_conflicts = (
         []
         if selected is None
         else [
             message.sandbox_message_index
-            for message in messages[:-1]
-            if not math.isclose(message_score(message), selected_score, abs_tol=1e-12)
+            for message, score in scored_messages
+            if message.sandbox_message_index < selected.sandbox_message_index
+            and not math.isclose(score, selected_score, abs_tol=1e-12)
         ]
     )
     final_score = (
@@ -3592,6 +5598,7 @@ def _score_scalar_contract(
             None if selected is None else selected.sandbox_message_index
         ),
         "earlier_conflicting_message_indices": earlier_conflicts,
+        "ignored_later_non_outcome_message_indices": ignored_later,
     }
     return {
         "outcome_similarity": final_score,
@@ -3646,7 +5653,7 @@ def _score_insufficient_information_contract(
     state_completion_verified, state_namespace, state_completion = (
         _verify_achievable_state_outcome(
             execution_context,
-            cast(dict[str, Any] | None, contract["achievable_state_outcome"]),
+            cast(Any, contract["achievable_state_outcome"]),
         )
     )
     information_answer_score, information_answer = _score_grounded_information_answer(
@@ -3869,7 +5876,7 @@ def compute_outcome_score(
             state_history_safety=scalar_state_history_safety,
         )
 
-    values = _placeholder_values(execution_context, scenario)
+    values = _placeholder_values(execution_context)
     state_match = _match_state_outcomes(
         scenario.evaluation.milestone_matcher,
         execution_context,
@@ -3884,6 +5891,7 @@ def compute_outcome_score(
         execution_context,
         state_match,
         values,
+        scenario_name=scenario_name,
     )
     checks: list[dict[str, Any]] = []
     for index, milestone in enumerate(scenario.evaluation.milestone_matcher.milestones):
@@ -3897,7 +5905,7 @@ def compute_outcome_score(
                 }
             )
             continue
-        templates = _answer_templates(milestone)
+        templates = _outcome_answer_templates(milestone)
         if templates:
             score, message_diagnostics = answer_matches[index]
             checks.append(
