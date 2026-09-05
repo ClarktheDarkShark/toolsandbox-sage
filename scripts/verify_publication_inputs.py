@@ -1544,6 +1544,115 @@ def _verify_active_validation_thresholds(
     }
 
 
+def _verify_production_scientific_core(
+    repo_root: Path,
+    declaration: dict[str, Any],
+) -> dict[str, Any]:
+    """Verify the exact result-critical core preserved during release cleanup."""
+
+    path, relative = _tracked_file(
+        repo_root,
+        _string(declaration, "path", "production_scientific_core"),
+        "production scientific core manifest",
+    )
+    observed_hash = _assert_hash(
+        path,
+        _hash(declaration, "sha256", "production_scientific_core"),
+        "production scientific core manifest",
+    )
+    payload = _read_object(path, "production scientific core manifest")
+    expected_fields = {
+        "schema_version",
+        "manifest_type",
+        "purpose",
+        "source_checkpoint",
+        "counting_method",
+        "physical_lines",
+        "file_manifest_sha256",
+        "files",
+    }
+    if set(payload) != expected_fields:
+        raise InputVerificationError(
+            "Production scientific core manifest fields are not exact"
+        )
+    if payload.get("schema_version") != 1 or payload.get("manifest_type") != (
+        "sage_production_scientific_core"
+    ):
+        raise InputVerificationError("Unsupported production scientific core manifest")
+    checkpoint = _object(payload, "source_checkpoint", "production scientific core")
+    if set(checkpoint) != {"git_commit", "git_tree"} or any(
+        not _HEX_GIT_OBJECT.fullmatch(str(checkpoint.get(field, "")))
+        for field in ("git_commit", "git_tree")
+    ):
+        raise InputVerificationError(
+            "Production scientific core source checkpoint is malformed"
+        )
+    entries = payload.get("files")
+    if not isinstance(entries, list) or not entries:
+        raise InputVerificationError("Production scientific core file list is empty")
+    seen: set[str] = set()
+    total_lines = 0
+    canonical_rows: list[str] = []
+    for index, raw_entry in enumerate(entries):
+        if not isinstance(raw_entry, dict) or set(raw_entry) != {
+            "path",
+            "physical_lines",
+            "sha256",
+        }:
+            raise InputVerificationError(
+                f"Production scientific core entry {index} is malformed"
+            )
+        label = f"production scientific core entry {index}"
+        source_path, source_relative = _tracked_file(
+            repo_root,
+            _string(raw_entry, "path", label),
+            label,
+        )
+        if source_relative in seen:
+            raise InputVerificationError(
+                f"Duplicate production scientific core path: {source_relative}"
+            )
+        seen.add(source_relative)
+        expected_lines = _integer(raw_entry, "physical_lines", label)
+        observed_lines = len(source_path.read_text(encoding="utf-8").splitlines())
+        if observed_lines != expected_lines:
+            raise InputVerificationError(
+                f"Production scientific core line count changed for {source_relative}: "
+                f"expected {expected_lines}, observed {observed_lines}"
+            )
+        source_hash = _assert_hash(
+            source_path,
+            _hash(raw_entry, "sha256", label),
+            label,
+        )
+        total_lines += observed_lines
+        canonical_rows.append(f"{source_relative}\t{observed_lines}\t{source_hash}\n")
+    declared_total = _integer(payload, "physical_lines", "production scientific core")
+    if total_lines != declared_total:
+        raise InputVerificationError(
+            "Production scientific core aggregate line count changed"
+        )
+    observed_manifest_hash = hashlib.sha256(
+        "".join(canonical_rows).encode("utf-8")
+    ).hexdigest()
+    if observed_manifest_hash != _hash(
+        payload,
+        "file_manifest_sha256",
+        "production scientific core",
+    ):
+        raise InputVerificationError(
+            "Production scientific core aggregate file manifest changed"
+        )
+    return {
+        "path": relative,
+        "sha256": observed_hash,
+        "physical_lines": total_lines,
+        "file_count": len(entries),
+        "file_manifest_sha256": observed_manifest_hash,
+        "source_checkpoint": checkpoint,
+    }
+
+
 def verify_inputs(
     repo_root: Path = REPO_ROOT,
     manifest_path: Path = DEFAULT_MANIFEST,
@@ -1574,6 +1683,7 @@ def verify_inputs(
         "purpose",
         "supersedes_release_manifest",
         "base_input_manifest",
+        "production_scientific_core",
         "checkpoint_policy_amendment",
         "active_execution_policy",
         "historical_outcome_rescore_summary",
@@ -1599,6 +1709,14 @@ def verify_inputs(
         "base publication input manifest",
     )
     result = _verify_base_inputs(root, base_path)
+    result["production_scientific_core"] = _verify_production_scientific_core(
+        root,
+        _object(
+            selected_payload,
+            "production_scientific_core",
+            "publication release manifest",
+        ),
+    )
     amendment = _verify_policy_amendment(
         root,
         _object(

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "manifest_type": "publication_release_input_chain",
   "created_at": "2026-09-03",
-  "purpose": "Content-address the immutable P0 inputs, corrected checkpoint policy, concurrent no-cache execution policy, current outcome evaluator and historical endpoint rescore, and outcome-only validation thresholds.",
+  "purpose": "Content-address the immutable P0 inputs, frozen SAGE scientific core, corrected checkpoint policy, concurrent no-cache execution policy, current outcome evaluator and historical endpoint rescore, and outcome-only validation thresholds.",
   "supersedes_release_manifest": {
     "path": "docs/sage_protocol/publication_release_manifest_20260902.json",
     "sha256": "2aa4db601e2eed5a84648cea38df29791fa6178526eaf0e14d781f3454ba9ddd"
@@ -10,6 +10,10 @@
   "base_input_manifest": {
     "path": "docs/sage_protocol/publication_input_manifest_20260901.json",
     "sha256": "3a54888be13143b3bac9dac1b8b542220812d40424c97395e5e3d3448a261fbb"
+  },
+  "production_scientific_core": {
+    "path": "docs/sage_protocol/production_core_manifest_20260904.json",
+    "sha256": "dc46a51032bbf4e7cf09527d6d03ce6877988476ef821bc9883a7861665c1637"
   },
   "checkpoint_policy_amendment": {
     "path": "docs/sage_protocol/publication_checkpoint_amendment_20260902.json",

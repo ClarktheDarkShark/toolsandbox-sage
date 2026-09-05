@@ -57,6 +57,50 @@ def _read_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _write_test_core_manifest(
+    repo: Path,
+    *,
+    checkpoint_commit: str,
+    checkpoint_tree: str,
+) -> dict[str, str]:
+    source_path = repo / "src" / "sage_ts" / "scientific_core.py"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text("CORE = True\n", encoding="utf-8")
+    source_relative = source_path.relative_to(repo).as_posix()
+    source_hash = _sha256(source_path)
+    physical_lines = 1
+    file_manifest_hash = hashlib.sha256(
+        f"{source_relative}\t{physical_lines}\t{source_hash}\n".encode("utf-8")
+    ).hexdigest()
+    manifest_path = repo / "production_core_manifest.json"
+    _write_json(
+        manifest_path,
+        {
+            "schema_version": 1,
+            "manifest_type": "sage_production_scientific_core",
+            "purpose": "test core",
+            "source_checkpoint": {
+                "git_commit": checkpoint_commit,
+                "git_tree": checkpoint_tree,
+            },
+            "counting_method": "test",
+            "physical_lines": physical_lines,
+            "file_manifest_sha256": file_manifest_hash,
+            "files": [
+                {
+                    "path": source_relative,
+                    "physical_lines": physical_lines,
+                    "sha256": source_hash,
+                }
+            ],
+        },
+    )
+    return {
+        "path": manifest_path.relative_to(repo).as_posix(),
+        "sha256": _sha256(manifest_path),
+    }
+
+
 def _build_public_repo(tmp_path: Path) -> tuple[Path, Path]:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -242,6 +286,11 @@ def _wrap_public_repo(repo: Path, base_manifest_path: Path) -> Path:
         "path": amendment_path.relative_to(repo).as_posix(),
         "sha256": _sha256(amendment_path),
     }
+    core_declaration = _write_test_core_manifest(
+        repo,
+        checkpoint_commit=checkpoint["commit"],
+        checkpoint_tree=checkpoint["tree"],
+    )
     _write_json(
         prior_release_path,
         {
@@ -478,6 +527,7 @@ def _wrap_public_repo(repo: Path, base_manifest_path: Path) -> Path:
                 "sha256": _sha256(prior_release_path),
             },
             "base_input_manifest": base_declaration,
+            "production_scientific_core": core_declaration,
             "checkpoint_policy_amendment": amendment_declaration,
             "active_execution_policy": {
                 "path": execution_policy_path.relative_to(repo).as_posix(),
@@ -523,6 +573,7 @@ def test_release_verifier_hashes_base_inputs_and_policy_amendment(
 
     assert result["publication_input_manifest"]["path"] == "publication_inputs.json"
     assert result["publication_release_manifest"]["path"] == "publication_release.json"
+    assert result["production_scientific_core"]["physical_lines"] == 1
     assert result["checkpoint_policy_amendment"]["replacement_policy"] == (
         EXPECTED_REPLACEMENT_POLICY
     )
@@ -557,6 +608,18 @@ def test_release_verifier_hashes_base_inputs_and_policy_amendment(
     assert result["superseded_validation_thresholds"]["path"] == (
         "prior_active_thresholds.json"
     )
+
+
+def test_release_verifier_rejects_scientific_core_drift(tmp_path: Path) -> None:
+    repo, base_manifest_path = _build_public_repo(tmp_path)
+    wrapper_path = _wrap_public_repo(repo, base_manifest_path)
+    (repo / "src" / "sage_ts" / "scientific_core.py").write_text(
+        "CORE = False\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(InputVerificationError, match="core entry 0 hash mismatch"):
+        verify_inputs(repo, wrapper_path)
 
 
 def test_make_verify_publication_uses_the_pinned_full_cohort_cli() -> None:
