@@ -8,11 +8,11 @@ from typing import Any
 
 import pytest
 
-import sage_ts.evaluation.actor_selection_comparison as actor_selection_comparison
 import scripts.run_sage_protocol as protocol_runner
 import scripts.verify_publication_run as publication_verifier
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
+from scripts.research import actor_selection_comparison
 from scripts.run_chapter4_evidence_campaign import _job_command
 from scripts.verify_publication_run import verify_run
 

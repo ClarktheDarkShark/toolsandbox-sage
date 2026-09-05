@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from sage_ts.evaluation.chapter4_evidence import (
+from scripts.research.chapter4_evidence import (
     build_evidence_data,
     load_run_evidence,
     write_evidence_dashboard,

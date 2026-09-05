@@ -1921,7 +1921,7 @@ def verify_selector_pilot_evidence(evidence_path: Path) -> dict[str, Any]:
             "Selector pilot publication verification used another outcome evaluator."
         )
 
-    from sage_ts.evaluation.actor_selection_comparison import (
+    from scripts.research.actor_selection_comparison import (
         verify_matched_actor_selection_experiment,
     )
 

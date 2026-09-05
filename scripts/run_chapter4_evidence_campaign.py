@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterator, cast
 
-from sage_ts.evaluation.chapter4_evidence import (
+from scripts.research.chapter4_evidence import (
     load_run_evidence,
     write_evidence_dashboard,
 )

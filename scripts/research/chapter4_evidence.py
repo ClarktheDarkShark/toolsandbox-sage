@@ -21,11 +21,7 @@ from typing import Any, Iterable
 
 import numpy as np
 
-EVIDENCE_TEMPLATE = (
-    Path(__file__).resolve().parents[1]
-    / "dashboard"
-    / "chapter4_evidence_template.html"
-)
+EVIDENCE_TEMPLATE = Path(__file__).with_name("chapter4_evidence_template.html")
 EVIDENCE_DATA_NAME = "chapter4_evidence_data.json"
 EVIDENCE_HTML_NAME = "chapter4_evidence.html"
 EVIDENCE_SCHEMA_VERSION = 3

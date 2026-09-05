@@ -7,7 +7,7 @@ import argparse
 import time
 from pathlib import Path
 
-from sage_ts.evaluation.chapter4_evidence import (
+from scripts.research.chapter4_evidence import (
     EVIDENCE_HTML_NAME,
     write_evidence_dashboard,
 )

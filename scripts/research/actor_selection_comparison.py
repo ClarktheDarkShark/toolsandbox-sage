@@ -16,7 +16,7 @@ from sage_ts.evaluation.retry_provenance import (
 
 INVENTORY_AUTHORITY_ARTIFACT = "sage_matched_inventory_authority"
 INVENTORY_AUTHORITY_SCHEMA_VERSION = 2
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 LLM_USAGE_INTEGER_FIELDS = (
     "llm_call_count",
     "llm_live_call_count",

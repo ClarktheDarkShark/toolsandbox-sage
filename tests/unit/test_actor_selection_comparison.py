@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from sage_ts.evaluation.actor_selection_comparison import (
+from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
+from scripts.research.actor_selection_comparison import (
     ActorSelectionVerificationError,
     _schema_bundle_is_exact,
     compare_outcome_values,
     validate_live_uncached_run,
     verify_matched_actor_selection_experiment,
 )
-from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 
 SCENARIOS = ("task_a", "task_b")
 

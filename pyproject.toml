@@ -109,7 +109,6 @@ exclude = [
 namespaces = false
 
 [tool.setuptools.package-data]
-"sage_ts.dashboard" = ["*.html"]
 "tool_sandbox.roles" = ["*.yaml"]
 
 [tool.pytest.ini_options]

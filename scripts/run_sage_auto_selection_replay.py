@@ -19,11 +19,11 @@ from typing import Any, Callable
 
 from sage_ts.dashboard.exporters import open_dashboard, write_protocol_dashboard
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
-from sage_ts.evaluation.actor_selection_comparison import (
+from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
+from scripts.research.actor_selection_comparison import (
     ActorSelectionVerificationError,
     verify_matched_actor_selection_experiment,
 )
-from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 from scripts.run_sage_protocol import (
     _parallel_arm_execution_record,
     _run_candidate_arm_worker,
