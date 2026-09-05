@@ -329,6 +329,11 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
     ).read_text(encoding="utf-8")
 
     assert "scripts/verify_publication_environment.py" in launcher
+    approval_guard = '"${SAGE_APPROVE_LIVE_RUN:-}" != "YES"'
+    assert approval_guard in launcher
+    assert launcher.index(approval_guard) < launcher.index(
+        "scripts/verify_publication_environment.py"
+    )
     assert launcher.index('export PYTHONPATH="src:."') < launcher.index(
         "scripts/verify_publication_environment.py"
     )
@@ -415,6 +420,29 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
         "SAGE_DIAGNOSTIC_FORCE_TOOL_AFTER_BASE_TOOL",
     ):
         assert env_name in launcher
+
+
+def test_publication_launcher_exits_before_work_without_explicit_approval() -> None:
+    launcher = environment_verifier.REPO_ROOT / "scripts/run_native_action_4omini_ab.sh"
+
+    completed = subprocess.run(
+        ["/bin/bash", str(launcher), "full", "63105", "native-only"],
+        cwd=environment_verifier.REPO_ROOT,
+        env={},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    assert "requires explicit approval" in completed.stderr
+
+
+def test_make_live_targets_forward_only_the_checked_approval() -> None:
+    makefile = (environment_verifier.REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert 'test "$(APPROVE_LIVE_RUN)" = "YES"' in makefile
+    assert makefile.count("SAGE_APPROVE_LIVE_RUN=YES") == 4
 
 
 def test_auto_selection_replay_runs_with_fresh_parallel_control() -> None:

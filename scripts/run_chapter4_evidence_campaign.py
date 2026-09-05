@@ -17,6 +17,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterator, cast
 
+from sage_ts.registry.content_identity import (
+    registry_content_identity,
+    validate_registry_content_identity,
+)
 from scripts.research.chapter4_evidence import (
     load_run_evidence,
     write_evidence_dashboard,
@@ -92,6 +96,7 @@ GENERATION_SETTINGS_FILES = (
     Path("src/sage_ts/generation/tool_generator.py"),
     Path("src/sage_ts/orchestration/online_birth.py"),
     Path("src/sage_ts/orchestration/self_evolution_reflection.py"),
+    Path("src/sage_ts/registry/content_identity.py"),
     Path("docs/sage_protocol/publication_validation_thresholds_v4.json"),
 )
 SAMPLE_RELEASE_IDENTITY_FIELDS = (
@@ -107,6 +112,14 @@ SAMPLE_RELEASE_IDENTITY_FIELDS = (
     "external_distribution_count",
     "external_distribution_sha256",
     "execution_environment",
+)
+REGISTRY_LINEAGE_ENTRY_FIELDS = (
+    "registry_content_identity_before_run",
+    "registry_content_identity_after_run",
+    "source_registry_identity_before_copy",
+    "registry_identity_before_run_path",
+    "registry_identity_after_run_path",
+    "source_registry_identity_before_copy_path",
 )
 
 
@@ -309,6 +322,7 @@ def _require_clean_git(repo_root: Path) -> dict[str, Any]:
                     "tool_generator.py",
                     "online_birth.py",
                     "self_evolution_reflection.py",
+                    "content_identity.py",
                 }
             ),
         ),
@@ -950,6 +964,7 @@ def _campaign_prerequisite_errors(
                     "verification_error",
                     "verification_status",
                     "status_reconciled_at",
+                    *REGISTRY_LINEAGE_ENTRY_FIELDS,
                 ):
                     if field in entry:
                         errors.append(
@@ -1186,6 +1201,226 @@ def _entry_complete(
     return bool(evidence and evidence.complete)
 
 
+def _registry_receipt_paths(
+    repo_root: Path,
+    manifest: dict[str, Any],
+    *,
+    replication: int,
+    arm: str,
+) -> dict[str, Path]:
+    artifact_root_raw = (manifest.get("paths") or {}).get("artifact_root")
+    if not isinstance(artifact_root_raw, str) or not artifact_root_raw:
+        raise ValueError("Campaign does not declare its artifact root.")
+    rep_label = f"rep{replication:02d}"
+    if arm == "online":
+        root = (
+            _resolve_repo_path(repo_root, artifact_root_raw)
+            / "online"
+            / rep_label
+            / "native_action_artifacts"
+        )
+        return {"after_run": root / "registry_identity_after_run.json"}
+    if arm == "frozen":
+        root = (
+            _resolve_repo_path(repo_root, artifact_root_raw)
+            / "frozen"
+            / rep_label
+            / "frozen_registry_artifacts"
+        )
+        return {
+            "source_before_copy": root / "source_registry_identity_before_copy.json",
+            "before_run": root / "frozen_registry_identity_before_run.json",
+            "after_run": root / "frozen_registry_identity_after_run.json",
+        }
+    raise ValueError(f"Unsupported campaign arm: {arm}")
+
+
+def _read_registry_identity(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            f"Cannot read registry identity receipt {path}: {exc}"
+        ) from exc
+    try:
+        return validate_registry_content_identity(payload)
+    except ValueError as exc:
+        raise ValueError(f"Invalid registry identity receipt {path}: {exc}") from exc
+
+
+def _entry_registry_identity(
+    repo_root: Path,
+    entry: dict[str, Any],
+) -> dict[str, Any]:
+    registry_raw = entry.get("registry_dir")
+    if not isinstance(registry_raw, str) or not registry_raw:
+        raise ValueError("Campaign entry does not declare a registry_dir.")
+    try:
+        return registry_content_identity(
+            _resolve_repo_path(repo_root, registry_raw),
+            require_complete=True,
+        )
+    except ValueError as exc:
+        raise ValueError(f"Campaign registry bytes are invalid: {exc}") from exc
+
+
+def _owning_pair(
+    manifest: dict[str, Any],
+    entry: dict[str, Any],
+    arm: str,
+) -> dict[str, Any]:
+    matches = [
+        pair
+        for pair in manifest.get("run_pairs") or []
+        if isinstance(pair, dict)
+        and isinstance(pair.get(arm), dict)
+        and (pair[arm] is entry or pair[arm] == entry)
+    ]
+    if len(matches) != 1:
+        raise ValueError(f"Cannot bind {arm} entry to exactly one campaign pair.")
+    return cast(dict[str, Any], matches[0])
+
+
+def _assert_existing_registry_lineage_fields(
+    entry: dict[str, Any],
+    expected: dict[str, Any],
+    *,
+    arm: str,
+) -> None:
+    for field, value in expected.items():
+        if field in entry and entry[field] != value:
+            raise ValueError(f"{arm} campaign registry lineage changed: {field}.")
+
+
+def _bound_online_registry_identity(
+    repo_root: Path,
+    manifest: dict[str, Any],
+    pair: dict[str, Any],
+) -> tuple[dict[str, Any], Path]:
+    entry = pair.get("online")
+    if not isinstance(entry, dict):
+        raise ValueError("Frozen campaign pair has no online entry.")
+    try:
+        stored = validate_registry_content_identity(
+            entry.get("registry_content_identity_after_run")
+        )
+    except ValueError as exc:
+        raise ValueError(
+            "Frozen campaign source lacks a valid online post-run registry identity."
+        ) from exc
+    replication = int(pair.get("replication") or 0)
+    receipt_path = _registry_receipt_paths(
+        repo_root,
+        manifest,
+        replication=replication,
+        arm="online",
+    )["after_run"]
+    expected_receipt = _relative(repo_root, receipt_path)
+    if entry.get("registry_identity_after_run_path") != expected_receipt:
+        raise ValueError("Online registry identity receipt path is not campaign-bound.")
+    receipt = _read_registry_identity(receipt_path)
+    current = _entry_registry_identity(repo_root, entry)
+    if receipt != stored or current != stored:
+        raise ValueError(
+            "Online registry bytes no longer match their persisted post-run identity."
+        )
+    return stored, receipt_path
+
+
+def _campaign_registry_lineage(
+    repo_root: Path,
+    manifest: dict[str, Any],
+    entry: dict[str, Any],
+    arm: str,
+    verification: dict[str, Any],
+) -> dict[str, Any]:
+    pair = _owning_pair(manifest, entry, arm)
+    replication = int(pair.get("replication") or 0)
+    entry_registry_raw = entry.get("registry_dir")
+    verified_registry_raw = verification.get("registry_dir")
+    if (
+        not isinstance(entry_registry_raw, str)
+        or not entry_registry_raw
+        or not isinstance(verified_registry_raw, str)
+        or not verified_registry_raw
+        or _resolve_repo_path(repo_root, verified_registry_raw)
+        != _resolve_repo_path(repo_root, entry_registry_raw)
+    ):
+        raise ValueError(f"{arm} verifier bound a different registry path.")
+    try:
+        protocol_before = validate_registry_content_identity(
+            verification.get("registry_content_identity_before_run")
+        )
+        protocol_after = validate_registry_content_identity(
+            verification.get("registry_content_identity_after_run")
+        )
+    except ValueError as exc:
+        raise ValueError(
+            f"{arm} verifier returned invalid registry lineage: {exc}"
+        ) from exc
+    current = _entry_registry_identity(repo_root, entry)
+    receipts = _registry_receipt_paths(
+        repo_root,
+        manifest,
+        replication=replication,
+        arm=arm,
+    )
+    if arm == "online":
+        receipt_after = _read_registry_identity(receipts["after_run"])
+        if current != protocol_after or receipt_after != protocol_after:
+            raise ValueError(
+                "Online post-run registry bytes, protocol identity, and launcher "
+                "receipt do not match."
+            )
+        lineage = {
+            "registry_content_identity_before_run": protocol_before,
+            "registry_content_identity_after_run": protocol_after,
+            "registry_identity_after_run_path": _relative(
+                repo_root, receipts["after_run"]
+            ),
+        }
+    elif arm == "frozen":
+        online_identity, _ = _bound_online_registry_identity(
+            repo_root,
+            manifest,
+            pair,
+        )
+        source_before_copy = _read_registry_identity(receipts["source_before_copy"])
+        copy_before_run = _read_registry_identity(receipts["before_run"])
+        copy_after_run = _read_registry_identity(receipts["after_run"])
+        identities = (
+            source_before_copy,
+            copy_before_run,
+            copy_after_run,
+            protocol_before,
+            protocol_after,
+            current,
+        )
+        if any(identity != online_identity for identity in identities):
+            raise ValueError(
+                "Frozen registry lineage does not exactly match online post-run, "
+                "source pre-copy, copy pre-run, and copy post-run bytes."
+            )
+        lineage = {
+            "source_registry_identity_before_copy": source_before_copy,
+            "registry_content_identity_before_run": copy_before_run,
+            "registry_content_identity_after_run": copy_after_run,
+            "source_registry_identity_before_copy_path": _relative(
+                repo_root, receipts["source_before_copy"]
+            ),
+            "registry_identity_before_run_path": _relative(
+                repo_root, receipts["before_run"]
+            ),
+            "registry_identity_after_run_path": _relative(
+                repo_root, receipts["after_run"]
+            ),
+        }
+    else:
+        raise ValueError(f"Unsupported campaign arm: {arm}")
+    _assert_existing_registry_lineage_fields(entry, lineage, arm=arm)
+    return lineage
+
+
 def _verify_publication_entry(
     repo_root: Path,
     manifest: dict[str, Any],
@@ -1218,6 +1453,13 @@ def _verify_publication_entry(
         raise ValueError(
             f"{arm} verifier selected a run other than its declared run_root."
         )
+    result["campaign_registry_lineage"] = _campaign_registry_lineage(
+        repo_root,
+        manifest,
+        entry,
+        arm,
+        result,
+    )
     return cast(dict[str, Any], result)
 
 
@@ -1267,6 +1509,7 @@ def _reconcile_completed_entries(
             entry["return_code"] = 0
             entry.setdefault("completed_at", reconciled_at)
             entry["status_reconciled_at"] = reconciled_at
+            entry.update(verified["campaign_registry_lineage"])
 
 
 def _job_command(
@@ -1276,7 +1519,12 @@ def _job_command(
     pair: dict[str, Any],
     arm: str,
     port: int,
+    execution_approved: bool,
 ) -> tuple[list[str], dict[str, str], Path]:
+    if execution_approved is not True:
+        raise ValueError(
+            "Canonical publication launcher command requires explicit campaign approval."
+        )
     replicate = int(pair["replication"])
     rep_label = f"rep{replicate:02d}"
     paths = manifest["paths"]
@@ -1291,6 +1539,7 @@ def _job_command(
             # one-off selector experiment must never leak in from the parent shell.
             "SAGE_AUTO_SELECTION_EXPERIMENT": "0",
             "SAGE_BATCH_NO_DASHBOARD_OPEN": "0",
+            "SAGE_APPROVE_LIVE_RUN": "YES",
             "TOOL_SANDBOX_FIXED_NOW_TIMESTAMP": str(
                 manifest["fixed_toolsandbox_timestamp"]
             ),
@@ -1311,6 +1560,8 @@ def _job_command(
         "RESUME_COMPLETED_LIMIT",
         "RESUME_REGISTRY_CHECKPOINT",
         "SAGE_AUTO_SELECTION_PILOT_EVIDENCE",
+        "SAGE_EXPECTED_SOURCE_REGISTRY_IDENTITY",
+        "SAGE_EXPECTED_SOURCE_REGISTRY_SHA256",
         *DIAGNOSTIC_FORCE_ENV_VARS,
     ):
         env.pop(stale_name, None)
@@ -1320,14 +1571,18 @@ def _job_command(
         mode = "native-only"
     elif arm == "frozen":
         source_registry = repo_root / pair["frozen"]["source_registry_dir"]
-        if not (source_registry / "registry_manifest.json").exists():
-            raise ValueError(
-                f"Frozen replication {replicate} is missing source registry "
-                f"{source_registry}"
-            )
+        online_identity, online_receipt_path = _bound_online_registry_identity(
+            repo_root,
+            manifest,
+            pair,
+        )
         env["SAGE_OUTPUT_ROOT"] = str(output_root / "frozen" / rep_label)
         env["SAGE_ARTIFACT_ROOT"] = str(artifact_root / "frozen" / rep_label)
         env["RESUME_REGISTRY_CHECKPOINT"] = str(source_registry)
+        env["SAGE_EXPECTED_SOURCE_REGISTRY_IDENTITY"] = str(online_receipt_path)
+        env["SAGE_EXPECTED_SOURCE_REGISTRY_SHA256"] = str(
+            online_identity["content_sha256"]
+        )
         mode = "frozen-only"
     else:
         raise ValueError(f"Unsupported campaign arm: {arm}")
@@ -1349,6 +1604,7 @@ def _execute_job(
     pair: dict[str, Any],
     arm: str,
     port: int,
+    execution_approved: bool,
 ) -> dict[str, Any]:
     command, env, log_path = _job_command(
         repo_root=repo_root,
@@ -1356,6 +1612,7 @@ def _execute_job(
         pair=pair,
         arm=arm,
         port=port,
+        execution_approved=execution_approved,
     )
     log_path.parent.mkdir(parents=True, exist_ok=True)
     started_at = _now()
@@ -1372,6 +1629,7 @@ def _execute_job(
         )
         return_code = process.wait()
         verification_error: str | None = None
+        registry_lineage: dict[str, Any] | None = None
         if return_code == 0:
             try:
                 result = _verify_publication_entry(
@@ -1383,6 +1641,9 @@ def _execute_job(
                 handle.write(
                     "publication_campaign_verification=pass "
                     f"run_root={result['run_root']}\n"
+                )
+                registry_lineage = cast(
+                    dict[str, Any], result["campaign_registry_lineage"]
                 )
             except ValueError as exc:
                 verification_error = str(exc)
@@ -1400,6 +1661,7 @@ def _execute_job(
         "completed_at": _now(),
         "log_path": _relative(repo_root, log_path),
         "verification_error": verification_error,
+        "registry_lineage": registry_lineage,
     }
 
 
@@ -1440,7 +1702,10 @@ def _run_wave(
     jobs: list[tuple[int, str]],
     max_parallel: int,
     base_port: int,
+    execution_approved: bool,
 ) -> None:
+    if execution_approved is not True:
+        raise ValueError("Campaign wave execution requires explicit approval.")
     if not jobs:
         return
     if max_parallel > MAX_CONCURRENCY:
@@ -1496,6 +1761,7 @@ def _run_wave(
                     manifest=manifest,
                     pair=pair,
                     arm=arm,
+                    execution_approved=execution_approved,
                     # Bind a replication to the same port on both an initial
                     # wave and a partial-wave resume. Position-based ports can
                     # collide with detached dashboard servers left by already
@@ -1519,6 +1785,8 @@ def _run_wave(
                     entry["return_code"] = result["return_code"]
                     entry["completed_at"] = result["completed_at"]
                     entry["log_path"] = result["log_path"]
+                    if result["registry_lineage"] is not None:
+                        entry.update(result["registry_lineage"])
                     manifest["updated_at"] = _now()
                     manifest.setdefault("execution_events", []).append(
                         {
@@ -1663,6 +1931,7 @@ def _run_claimed_campaign(
             # Detached dashboard servers persist after a wave. Reserve one port
             # per replication so wave 2 never reuses a wave-1 server/root.
             base_port=args.base_port + ((wave - 1) * EXPECTED_REPLICATIONS),
+            execution_approved=args.approve_execution,
         )
 
     manifest = _load_manifest(manifest_path)

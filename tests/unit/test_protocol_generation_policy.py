@@ -577,6 +577,28 @@ def test_protocol_rejects_non_fresh_control_mode(monkeypatch) -> None:
         run_protocol_main()
 
 
+def test_strict_publication_mode_requires_explicit_launcher_approval(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("SAGE_APPROVE_LIVE_RUN", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_sage_protocol.py",
+            "--mode",
+            "full_benchmark",
+            "--manifest",
+            "unused.json",
+            "--require-fresh-control",
+            "--parallel-arms",
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="requires explicit approval"):
+        run_protocol_main()
+
+
 @pytest.mark.parametrize("force_name", DIAGNOSTIC_FORCE_ENV_VARS)
 def test_strict_publication_mode_rejects_diagnostic_force_environment(
     monkeypatch,

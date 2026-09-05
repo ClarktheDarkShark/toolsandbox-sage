@@ -4,6 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ "${SAGE_APPROVE_LIVE_RUN:-}" != "YES" ]]; then
+  echo "Live publication execution requires explicit approval: set SAGE_APPROVE_LIVE_RUN=YES." >&2
+  exit 2
+fi
+
 SIZE="${1:-full}"
 DASHBOARD_PORT="${2:-63105}"
 EXECUTION_MODE="${3:-native-only}"
@@ -281,16 +286,38 @@ mkdir -p "$ARM_ARTIFACTS" "$(dirname "$COMMAND_FILE")" "$ARM_OUTPUT"
 
 if [[ "$EXECUTION_MODE" == "frozen-only" ]]; then
   SOURCE_REGISTRY="${RESUME_REGISTRY_CHECKPOINT:-}"
-  if [[ -z "$SOURCE_REGISTRY" || ! -f "$SOURCE_REGISTRY/registry_manifest.json" ]]; then
-    echo "frozen-only requires RESUME_REGISTRY_CHECKPOINT with a registry manifest." >&2
+  EXPECTED_SOURCE_REGISTRY_IDENTITY="${SAGE_EXPECTED_SOURCE_REGISTRY_IDENTITY:-}"
+  EXPECTED_SOURCE_REGISTRY_SHA256="${SAGE_EXPECTED_SOURCE_REGISTRY_SHA256:-}"
+  if [[ -z "$SOURCE_REGISTRY" ]]; then
+    echo "frozen-only requires RESUME_REGISTRY_CHECKPOINT." >&2
     exit 1
   fi
-  if [[ ! -f "$REGISTRY_DIR/registry_manifest.json" ]]; then
-    mkdir -p "$REGISTRY_DIR"
-    cp -R "$SOURCE_REGISTRY"/. "$REGISTRY_DIR"/
+  if [[ -z "$EXPECTED_SOURCE_REGISTRY_IDENTITY" || ! -f "$EXPECTED_SOURCE_REGISTRY_IDENTITY" ]]; then
+    echo "frozen-only requires SAGE_EXPECTED_SOURCE_REGISTRY_IDENTITY from the paired online run." >&2
+    exit 1
   fi
-elif [[ -f "$REGISTRY_DIR/registry_manifest.json" ]]; then
-  echo "Online publication registry must start empty: $REGISTRY_DIR" >&2
+  SOURCE_REGISTRY_IDENTITY_BEFORE_COPY="$ARM_ARTIFACTS/source_registry_identity_before_copy.json"
+  FROZEN_REGISTRY_IDENTITY_BEFORE_RUN="$ARM_ARTIFACTS/frozen_registry_identity_before_run.json"
+  SOURCE_IDENTITY_ARGS=(
+    --registry-root "$SOURCE_REGISTRY"
+    --output "$SOURCE_REGISTRY_IDENTITY_BEFORE_COPY"
+    --require-complete
+    --expect-identity "$EXPECTED_SOURCE_REGISTRY_IDENTITY"
+  )
+  if [[ -n "$EXPECTED_SOURCE_REGISTRY_SHA256" ]]; then
+    SOURCE_IDENTITY_ARGS+=(--expect-sha256 "$EXPECTED_SOURCE_REGISTRY_SHA256")
+  fi
+  "$PYTHON_EXECUTABLE" -m sage_ts.registry.content_identity \
+    "${SOURCE_IDENTITY_ARGS[@]}"
+  mkdir -p "$REGISTRY_DIR"
+  cp -R "$SOURCE_REGISTRY"/. "$REGISTRY_DIR"/
+  "$PYTHON_EXECUTABLE" -m sage_ts.registry.content_identity \
+    --registry-root "$REGISTRY_DIR" \
+    --output "$FROZEN_REGISTRY_IDENTITY_BEFORE_RUN" \
+    --require-complete \
+    --expect-identity "$SOURCE_REGISTRY_IDENTITY_BEFORE_COPY"
+elif [[ -n "${SAGE_EXPECTED_SOURCE_REGISTRY_IDENTITY:-}" || -n "${SAGE_EXPECTED_SOURCE_REGISTRY_SHA256:-}" ]]; then
+  echo "Online publication execution forbids frozen-source registry expectations." >&2
   exit 1
 fi
 
@@ -393,6 +420,8 @@ fi
   echo "rapid_fixture_path=$TOOLSANDBOX_RAPID_CACHE_PATH"
   echo "rapid_fixture_sha256=$RAPID_FIXTURE_SHA256"
   echo "resume_registry_checkpoint=${RESUME_REGISTRY_CHECKPOINT:-}"
+  echo "expected_source_registry_identity=${SAGE_EXPECTED_SOURCE_REGISTRY_IDENTITY:-}"
+  echo "expected_source_registry_sha256=${SAGE_EXPECTED_SOURCE_REGISTRY_SHA256:-}"
   printf 'command='
   printf '%q ' "${CMD[@]}"
   printf '\n'
@@ -408,6 +437,18 @@ echo "[$ARM] log: $LOG_FILE"
   --search-root "$ARM_OUTPUT" \
   --cohort "$VERIFY_COHORT" \
   --expect-reflection "$REFLECTION_EXPECTATION" | tee -a "$LOG_FILE"
+if [[ "$EXECUTION_MODE" == "native-only" ]]; then
+  "$PYTHON_EXECUTABLE" -m sage_ts.registry.content_identity \
+    --registry-root "$REGISTRY_DIR" \
+    --output "$ARM_ARTIFACTS/registry_identity_after_run.json" \
+    --require-complete
+else
+  "$PYTHON_EXECUTABLE" -m sage_ts.registry.content_identity \
+    --registry-root "$REGISTRY_DIR" \
+    --output "$ARM_ARTIFACTS/frozen_registry_identity_after_run.json" \
+    --require-complete \
+    --expect-identity "$FROZEN_REGISTRY_IDENTITY_BEFORE_RUN"
+fi
 if [[ "$AUTO_SELECTION_EXPERIMENT" == "1" ]]; then
   if [[ "$AUTO_SELECTION_STAGE" == "full" ]]; then
     SELECTOR_PILOT_EVIDENCE_SHA256_AFTER_POLICY="$("$PYTHON_EXECUTABLE" -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$SELECTOR_PILOT_EVIDENCE_PATH")"

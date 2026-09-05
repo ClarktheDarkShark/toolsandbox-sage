@@ -13,6 +13,7 @@ EVIDENCE_DATA ?=
 TABLE_OUTPUT ?=
 VALIDATION_THRESHOLDS ?=
 PILOT_EVIDENCE ?=
+SOURCE_REGISTRY_IDENTITY ?=
 APPROVE_LIVE_RUN ?= NO
 APPROVE_SELECTOR_FULL ?= NO
 
@@ -25,7 +26,8 @@ COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
 	analyze render-paper \
 	require-run require-sample-report require-campaign-manifest require-analysis-output \
 	require-evidence-data require-table-output require-validation-thresholds \
-	require-live-run-approval require-selector-full-approval require-pilot-evidence
+	require-live-run-approval require-selector-full-approval require-pilot-evidence \
+	require-source-registry-identity
 
 compile:
 	$(PYTHON) -m compileall -q -x '(^|/)(__pycache__|build)/' \
@@ -50,6 +52,7 @@ test-core:
 		tests/unit/test_tool_generator.py \
 		tests/unit/test_self_evolution_reflection.py \
 		tests/unit/test_protocol_generation_policy.py \
+		tests/unit/test_registry_content_identity.py \
 		tests/unit/test_publication_run_verifier.py \
 		tests/unit/test_publication_sample_verifier.py \
 		tests/unit/test_publication_campaign.py \
@@ -82,25 +85,28 @@ spotcheck: require-live-run-approval
 # replay, checks the pinned fixture, starts from an empty registry, and verifies
 # the publication run after completion. Invoke only after researcher approval.
 paper-online: require-live-run-approval
-	bash scripts/run_native_action_4omini_ab.sh full $(PORT) native-only
+	SAGE_APPROVE_LIVE_RUN=YES bash scripts/run_native_action_4omini_ab.sh full $(PORT) native-only
 
 # Evaluate one already-built registry with the same strict fresh-control rules.
 # Set RESUME_REGISTRY_CHECKPOINT to the source registry before invoking.
-paper-frozen: require-live-run-approval
-	bash scripts/run_native_action_4omini_ab.sh full $(PORT) frozen-only
+paper-frozen: require-live-run-approval require-source-registry-identity
+	SAGE_APPROVE_LIVE_RUN=YES \
+	SAGE_EXPECTED_SOURCE_REGISTRY_IDENTITY="$(SOURCE_REGISTRY_IDENTITY)" \
+		bash scripts/run_native_action_4omini_ab.sh full $(PORT) frozen-only
 
 # Sealed 30-task policy-vs-auto feasibility pilot. The control and policy SAGE
 # donor run concurrently; after donor inventory exists, an independent fresh
 # control and matched auto replay run concurrently. Both live-pair dashboards
 # open externally before model execution; the policy/auto view opens afterward.
 selector-pilot: require-live-run-approval
-	bash scripts/run_native_action_4omini_ab.sh pilot $(PORT) native-only
+	SAGE_APPROVE_LIVE_RUN=YES bash scripts/run_native_action_4omini_ab.sh pilot $(PORT) native-only
 
 # Complete matched actor-selection comparison. This requires a verified pilot
 # manifest plus a separate, explicit approval for the full selector run.
 selector-full: require-live-run-approval require-selector-full-approval require-pilot-evidence
 	SAGE_AUTO_SELECTION_EXPERIMENT=1 \
 	SAGE_AUTO_SELECTION_PILOT_EVIDENCE="$(PILOT_EVIDENCE)" \
+	SAGE_APPROVE_LIVE_RUN=YES \
 		bash scripts/run_native_action_4omini_ab.sh full $(PORT) native-only
 
 sample: paper-online
@@ -136,6 +142,10 @@ require-selector-full-approval:
 require-pilot-evidence:
 	@test -n "$(PILOT_EVIDENCE)" || \
 		(echo "Set PILOT_EVIDENCE to a passing actor_selection_experiment_manifest.json." >&2; exit 2)
+
+require-source-registry-identity:
+	@test -n "$(SOURCE_REGISTRY_IDENTITY)" || \
+		(echo "Set SOURCE_REGISTRY_IDENTITY to the paired online registry_identity_after_run.json." >&2; exit 2)
 
 verify-publication: require-run
 	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_run.py \

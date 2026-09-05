@@ -49,6 +49,7 @@ from sage_ts.orchestration.self_evolution_reflection import (
     FRESH_CONTROL_ERROR_EVENT,
     FRESH_CONTROL_ROW_EVENT,
 )
+from sage_ts.registry.content_identity import registry_content_identity
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 
 # Run modes are also split names. Keep these explicit so bad campaign labels
@@ -1505,6 +1506,11 @@ def main() -> None:
             f"{', '.join(sorted(active_force_env))}. Unset these variables; "
             "--diagnostic-force-allowed cannot override publication mode."
         )
+    if args.require_fresh_control and os.environ.get("SAGE_APPROVE_LIVE_RUN") != "YES":
+        raise SystemExit(
+            "Strict publication execution requires explicit approval: set "
+            "SAGE_APPROVE_LIVE_RUN=YES through the canonical launcher."
+        )
     try:
         external_fixture = _validated_external_fixture(
             args.validated_external_fixture,
@@ -1589,6 +1595,24 @@ def main() -> None:
     )
     generation_requested = generation_enabled
     frozen_final_run = _is_frozen_transfer_mode(args.mode) and not generation_enabled
+    try:
+        registry_content_identity_before_run = registry_content_identity(
+            registry_dir,
+            require_complete=args.require_fresh_control and frozen_final_run,
+        )
+    except ValueError as exc:
+        raise SystemExit(
+            f"Invalid publication registry before execution: {exc}"
+        ) from exc
+    if (
+        args.require_fresh_control
+        and candidate_generation_enabled
+        and registry_content_identity_before_run["file_count"] != 0
+    ):
+        raise SystemExit(
+            "Strict online publication execution requires a completely empty "
+            "registry root before the first model request."
+        )
     effective_sage_policy = _resolve_sage_policy_preset(
         args.sage_policy,
         generation_enabled=candidate_generation_enabled,
@@ -2188,6 +2212,23 @@ def main() -> None:
             _assert_publication_source_unchanged(publication_provenance)
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
+    try:
+        registry_content_identity_after_run = registry_content_identity(
+            registry_dir,
+            require_complete=args.require_fresh_control,
+        )
+    except ValueError as exc:
+        raise SystemExit(
+            f"Invalid publication registry after execution: {exc}"
+        ) from exc
+    frozen_registry_content_immutable = (
+        not frozen_final_run
+        or registry_content_identity_before_run == registry_content_identity_after_run
+    )
+    if args.require_fresh_control and not frozen_registry_content_immutable:
+        raise SystemExit(
+            "Frozen publication execution mutated the exact registry bytes."
+        )
     inventory_authority_dir = (
         inventory_authority_capture_dir or inventory_authority_replay_dir
     )
@@ -2271,6 +2312,9 @@ def main() -> None:
         "registry_dir": str(registry_dir),
         "registry_gate_snapshot": registry_gate_snapshot,
         "registry_gate_restore": registry_gate_restore,
+        "registry_content_identity_before_run": registry_content_identity_before_run,
+        "registry_content_identity_after_run": registry_content_identity_after_run,
+        "frozen_registry_content_immutable": frozen_registry_content_immutable,
         "registry_manifest_digest_after_run": _digest_file(
             registry_dir / "registry_manifest.json"
         ),
@@ -2409,6 +2453,11 @@ def main() -> None:
             "registry_dir": str(registry_dir),
             "registry_gate_snapshot": registry_gate_snapshot,
             "registry_gate_restore": registry_gate_restore,
+            "registry_content_identity_before_run": (
+                registry_content_identity_before_run
+            ),
+            "registry_content_identity_after_run": registry_content_identity_after_run,
+            "frozen_registry_content_immutable": frozen_registry_content_immutable,
             "registry_manifest_digest_after_run": _digest_file(
                 registry_dir / "registry_manifest.json"
             ),

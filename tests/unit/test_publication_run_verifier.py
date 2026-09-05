@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import shutil
@@ -12,6 +13,7 @@ import scripts.run_sage_protocol as protocol_runner
 import scripts.verify_publication_run as publication_verifier
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
+from sage_ts.registry.content_identity import registry_content_identity
 from scripts.research import actor_selection_comparison
 from scripts.run_chapter4_evidence_campaign import _job_command
 from scripts.verify_publication_run import verify_run
@@ -155,6 +157,26 @@ def _fresh_run(tmp_path: Path) -> Path:
     benchmark_path = tmp_path / "benchmark.json"
     benchmark_path.write_text('{"benchmark": true}\n', encoding="utf-8")
     benchmark_sha256 = hashlib.sha256(benchmark_path.read_bytes()).hexdigest()
+    registry_dir = tmp_path / "registry"
+    _write_json(
+        registry_dir / "registry_manifest.json",
+        {"tools": {"helper": {"tool": {"code": "return 1"}}}},
+    )
+    _write_json(
+        registry_dir / "tool_lifecycle.json",
+        {"tool_lifecycle": {"helper": {"decision": "retain"}}},
+    )
+    helper_artifact = registry_dir / "helper_artifacts" / "helper.txt"
+    helper_artifact.parent.mkdir()
+    helper_artifact.write_text("exact helper artifact bytes\n", encoding="utf-8")
+    registry_before = registry_content_identity(
+        tmp_path / "empty_registry_before_run",
+        require_complete=False,
+    )
+    registry_after = registry_content_identity(
+        registry_dir,
+        require_complete=True,
+    )
     control_rows: list[dict[str, Any]] = [
         {
             "name": "task_a",
@@ -369,6 +391,13 @@ def _fresh_run(tmp_path: Path) -> Path:
             "scenario_order_sha256": hashlib.sha256(b"task_a\ntask_b\n").hexdigest(),
             "control_dir": str(control_dir),
             "candidate_dir": str(candidate_dir),
+            "registry_dir": str(registry_dir),
+            "registry_content_identity_before_run": registry_before,
+            "registry_content_identity_after_run": registry_after,
+            "frozen_registry_content_immutable": True,
+            "registry_manifest_digest_after_run": registry_after[
+                "registry_manifest_sha256"
+            ],
             "candidate_actor_selection_mode": "policy",
             "fresh_control_required": True,
             "publication_performance_endpoint": "outcome_task_completion_similarity",
@@ -888,6 +917,83 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
     assert result["external_distribution_count"] == 108
     assert len(result["external_distribution_sha256"]) == 64
     assert result["outcome_evaluator"] == outcome_evaluator_manifest()
+    assert result["registry_content_identity_before_run"]["file_count"] == 0
+    assert result["registry_content_identity_after_run"]["complete"] is True
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "replacement"),
+    [
+        ("registry_manifest.json", '{"tools":{"different":{}}}\n'),
+        ("tool_lifecycle.json", '{"tool_lifecycle":{"helper":{"decision":"park"}}}\n'),
+        ("helper_artifacts/helper.txt", "substituted helper artifact bytes\n"),
+    ],
+)
+def test_verifier_rejects_registry_byte_mutation_after_protocol_completion(
+    tmp_path: Path,
+    relative_path: str,
+    replacement: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads((run_root / "protocol_manifest.json").read_text())
+    registry_dir = Path(protocol["registry_dir"])
+    (registry_dir / relative_path).write_text(replacement, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Current publication registry bytes"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_registry_path_substitution_with_different_bytes(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    substitute = tmp_path / "substitute_registry"
+    shutil.copytree(Path(protocol["registry_dir"]), substitute)
+    (substitute / "registry_manifest.json").write_text(
+        '{"tools":{"different":{"tool":{"code":"return 2"}}}}\n',
+        encoding="utf-8",
+    )
+    protocol["registry_dir"] = str(substitute)
+    _write_json(protocol_path, protocol)
+
+    with pytest.raises(ValueError, match="Current publication registry bytes"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_frozen_registry_pre_post_identity_mismatch(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    protocol["mode"] = "full_benchmark"
+    protocol["generation_enabled"] = False
+    protocol["sage_policy"] = "none"
+    protocol["registry_content_identity_before_run"] = registry_content_identity(
+        tmp_path / "empty_frozen_registry",
+        require_complete=False,
+    )
+    _write_json(protocol_path, protocol)
+
+    with pytest.raises(ValueError, match="Frozen publication registry bytes changed"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="not-applicable",
+            **_verification_pins(run_root),
+        )
 
 
 @pytest.mark.parametrize(
@@ -1707,6 +1813,9 @@ def test_verifier_rejects_generation_calls_in_frozen_candidate(
     protocol["sage_policy"] = "none"
     protocol["reflection_control_source"] = "not_applicable"
     protocol["reflection_control_delivery"] = "not_applicable_generation_disabled"
+    protocol["registry_content_identity_before_run"] = copy.deepcopy(
+        protocol["registry_content_identity_after_run"]
+    )
     _write_json(protocol_path, protocol)
     for arm in ("control", "candidate"):
         events_path = Path(protocol[f"{arm}_dir"]) / "llm_usage_events.jsonl"
@@ -2509,6 +2618,7 @@ def test_campaign_job_removes_every_baseline_cache_env(
         pair=pair,
         arm="online",
         port=63000,
+        execution_approved=True,
     )
 
     assert command == [
@@ -2522,6 +2632,7 @@ def test_campaign_job_removes_every_baseline_cache_env(
     assert env["SAGE_BENCHMARK_MANIFEST"] == str(tmp_path / "benchmark.json")
     assert env["TOOLSANDBOX_RAPID_CACHE_MODE"] == "read_only"
     assert env["TOOLSANDBOX_RAPID_CACHE_PATH"] == str(tmp_path / "fixtures/rapid.json")
+    assert env["SAGE_APPROVE_LIVE_RUN"] == "YES"
     for name, expected in publication_verifier.PUBLICATION_EXECUTION_ENV.items():
         assert env[name] == expected
     assert all(

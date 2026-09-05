@@ -4,6 +4,7 @@ import argparse
 import copy
 import hashlib
 import json
+import shutil
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -11,6 +12,7 @@ from typing import Any
 import pytest
 
 import scripts.run_chapter4_evidence_campaign as campaign
+from sage_ts.registry.content_identity import registry_content_identity
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -203,6 +205,47 @@ def _valid_campaign(
     return manifest, sample_report, sample_calls
 
 
+def _bind_online_registry(
+    tmp_path: Path,
+    manifest: dict[str, Any],
+    *,
+    replication: int = 1,
+) -> dict[str, Any]:
+    pair = manifest["run_pairs"][replication - 1]
+    entry = pair["online"]
+    registry = tmp_path / entry["registry_dir"]
+    _write_json(
+        registry / "registry_manifest.json",
+        {"tools": {"helper": {"tool": {"code": "return 1"}}}},
+    )
+    _write_json(
+        registry / "tool_lifecycle.json",
+        {"tool_lifecycle": {"helper": {"decision": "retain"}}},
+    )
+    helper_artifact = registry / "helper_artifacts" / "proof.txt"
+    helper_artifact.parent.mkdir()
+    helper_artifact.write_text("helper proof\n", encoding="utf-8")
+    identity = registry_content_identity(registry, require_complete=True)
+    receipt = campaign._registry_receipt_paths(
+        tmp_path,
+        manifest,
+        replication=replication,
+        arm="online",
+    )["after_run"]
+    _write_json(receipt, identity)
+    entry.update(
+        {
+            "registry_content_identity_before_run": registry_content_identity(
+                tmp_path / "empty_before_run",
+                require_complete=False,
+            ),
+            "registry_content_identity_after_run": identity,
+            "registry_identity_after_run_path": campaign._relative(tmp_path, receipt),
+        }
+    )
+    return identity
+
+
 def _set_nested(
     payload: dict[str, Any],
     path: tuple[str | int, ...],
@@ -264,11 +307,146 @@ def test_campaign_job_pins_pair_only_execution_and_dashboard_open(
         pair=manifest["run_pairs"][0],
         arm="online",
         port=63900,
+        execution_approved=True,
     )
 
     assert env["SAGE_AUTO_SELECTION_EXPERIMENT"] == "0"
     assert "SAGE_AUTO_SELECTION_PILOT_EVIDENCE" not in env
     assert env["SAGE_BATCH_NO_DASHBOARD_OPEN"] == "0"
+    assert env["SAGE_APPROVE_LIVE_RUN"] == "YES"
+
+
+def test_campaign_job_command_requires_explicit_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+
+    with pytest.raises(ValueError, match="requires explicit campaign approval"):
+        campaign._job_command(
+            repo_root=tmp_path,
+            manifest=manifest,
+            pair=manifest["run_pairs"][0],
+            arm="online",
+            port=63900,
+            execution_approved=False,
+        )
+
+
+def test_frozen_job_binds_source_to_online_post_run_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+    identity = _bind_online_registry(tmp_path, manifest)
+    pair = manifest["run_pairs"][0]
+
+    _command, env, _log = campaign._job_command(
+        repo_root=tmp_path,
+        manifest=manifest,
+        pair=pair,
+        arm="frozen",
+        port=63910,
+        execution_approved=True,
+    )
+
+    assert env["SAGE_APPROVE_LIVE_RUN"] == "YES"
+    assert env["SAGE_EXPECTED_SOURCE_REGISTRY_SHA256"] == identity["content_sha256"]
+    assert Path(env["SAGE_EXPECTED_SOURCE_REGISTRY_IDENTITY"]).is_file()
+
+    source = tmp_path / pair["frozen"]["source_registry_dir"]
+    (source / "tool_lifecycle.json").write_text(
+        '{"tool_lifecycle":{"helper":{"decision":"park"}}}\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="no longer match"):
+        campaign._job_command(
+            repo_root=tmp_path,
+            manifest=manifest,
+            pair=pair,
+            arm="frozen",
+            port=63910,
+            execution_approved=True,
+        )
+
+
+def test_frozen_lineage_requires_online_source_and_both_copy_boundaries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+    identity = _bind_online_registry(tmp_path, manifest)
+    pair = manifest["run_pairs"][0]
+    frozen = pair["frozen"]
+    source = tmp_path / frozen["source_registry_dir"]
+    target = tmp_path / frozen["registry_dir"]
+    shutil.copytree(source, target)
+    receipts = campaign._registry_receipt_paths(
+        tmp_path,
+        manifest,
+        replication=1,
+        arm="frozen",
+    )
+    for receipt in receipts.values():
+        _write_json(receipt, identity)
+    verification = {
+        "registry_dir": str(target),
+        "registry_content_identity_before_run": identity,
+        "registry_content_identity_after_run": identity,
+    }
+
+    lineage = campaign._campaign_registry_lineage(
+        tmp_path,
+        manifest,
+        frozen,
+        "frozen",
+        verification,
+    )
+
+    assert lineage["source_registry_identity_before_copy"] == identity
+    assert lineage["registry_content_identity_before_run"] == identity
+    assert lineage["registry_content_identity_after_run"] == identity
+
+    (target / "helper_artifacts" / "proof.txt").write_text(
+        "mutated frozen helper proof\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="Frozen registry lineage"):
+        campaign._campaign_registry_lineage(
+            tmp_path,
+            manifest,
+            frozen,
+            "frozen",
+            verification,
+        )
+
+
+def test_campaign_rejects_same_byte_source_path_substitution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+    identity = _bind_online_registry(tmp_path, manifest)
+    pair = manifest["run_pairs"][0]
+    online = pair["online"]
+    source = tmp_path / online["registry_dir"]
+    substitute = tmp_path / "substitute_registry"
+    shutil.copytree(source, substitute)
+
+    with pytest.raises(ValueError, match="different registry path"):
+        campaign._campaign_registry_lineage(
+            tmp_path,
+            manifest,
+            online,
+            "online",
+            {
+                "registry_dir": str(substitute),
+                "registry_content_identity_before_run": online[
+                    "registry_content_identity_before_run"
+                ],
+                "registry_content_identity_after_run": identity,
+            },
+        )
 
 
 def test_campaign_dashboard_port_is_stable_for_partial_wave_resume() -> None:

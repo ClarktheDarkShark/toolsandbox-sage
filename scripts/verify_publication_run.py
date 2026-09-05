@@ -18,6 +18,10 @@ from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 from sage_ts.evaluation.retry_provenance import (
     validate_successful_retry_provenance,
 )
+from sage_ts.registry.content_identity import (
+    registry_content_identity,
+    validate_registry_content_identity,
+)
 
 PINNED_RAPID_FIXTURE_SHA256 = (
     "eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
@@ -449,6 +453,72 @@ def _completed_run_roots(search_root: Path) -> list[Path]:
         },
         key=lambda path: path.stat().st_mtime,
     )
+
+
+def _verify_registry_content_lineage(
+    run_root: Path,
+    protocol: dict[str, Any],
+    *,
+    expected_generation: bool,
+) -> dict[str, Any]:
+    """Verify exact registry bytes before, after, and at verification time."""
+
+    try:
+        before = validate_registry_content_identity(
+            protocol.get("registry_content_identity_before_run")
+        )
+        after = validate_registry_content_identity(
+            protocol.get("registry_content_identity_after_run")
+        )
+    except ValueError as exc:
+        raise ValueError(
+            f"Protocol registry content identity is invalid: {exc}"
+        ) from exc
+    registry_dir = _resolve_declared_path(
+        run_root,
+        protocol.get("registry_dir"),
+        "registry_dir",
+    )
+    try:
+        current = registry_content_identity(registry_dir, require_complete=True)
+    except ValueError as exc:
+        raise ValueError(f"Current publication registry is invalid: {exc}") from exc
+    if current != after:
+        raise ValueError(
+            "Current publication registry bytes do not match the protocol's "
+            "post-run identity."
+        )
+    if (
+        after.get("complete") is not True
+        or protocol.get("registry_manifest_digest_after_run")
+        != after.get("registry_manifest_sha256")
+        or protocol.get("frozen_registry_content_immutable") is not True
+    ):
+        raise ValueError(
+            "Protocol post-run registry identity is incomplete or invalid."
+        )
+    if expected_generation:
+        if (
+            before.get("complete") is not False
+            or before.get("file_count") != 0
+            or before.get("files") != []
+            or before.get("helper_entry_count") is not None
+            or before.get("registry_manifest_sha256") is not None
+            or before.get("tool_lifecycle_sha256") is not None
+        ):
+            raise ValueError(
+                "Online publication registry was not exactly empty before execution."
+            )
+    elif before != after:
+        raise ValueError(
+            "Frozen publication registry bytes changed between pre-run and post-run."
+        )
+    return {
+        "registry_dir": str(registry_dir),
+        "before_run": before,
+        "after_run": after,
+        "current": current,
+    }
 
 
 def _verify_run_manifest_timezone(run_dir: Path, *, arm: str) -> dict[str, Any]:
@@ -910,6 +980,11 @@ def verify_run(
     expected_sage_policy = "self-evolving-praxis" if expected_generation else "none"
     if protocol.get("sage_policy") != expected_sage_policy:
         raise ValueError(f"Protocol sage_policy is not {expected_sage_policy!r}.")
+    registry_content_lineage = _verify_registry_content_lineage(
+        run_root,
+        protocol,
+        expected_generation=expected_generation,
+    )
     if int(protocol.get("scenario_count") or 0) != expected_tasks:
         raise ValueError(
             "Protocol scenario count does not match the publication cohort."
@@ -1201,6 +1276,9 @@ def verify_run(
         "fixed_toolsandbox_timestamp": publication_provenance[
             "fixed_toolsandbox_timestamp"
         ],
+        "registry_dir": registry_content_lineage["registry_dir"],
+        "registry_content_identity_before_run": registry_content_lineage["before_run"],
+        "registry_content_identity_after_run": registry_content_lineage["after_run"],
         "publication_provenance": publication_provenance,
     }
 
