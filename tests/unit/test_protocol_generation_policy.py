@@ -224,15 +224,6 @@ def test_protocol_cli_rejects_unknown_actor_selection_mode(monkeypatch) -> None:
             "replay-dir requires --actor-selection-mode auto",
         ),
         (
-            [
-                "--inventory-authority-capture-dir",
-                "authority",
-                "--resume-run-root",
-                "prior-run",
-            ],
-            "capture/replay forbids --resume-run-root",
-        ),
-        (
             ["--inventory-authority-capture-dir", "authority"],
             "capture/replay requires --freeze-toolsandbox-clock",
         ),
@@ -550,29 +541,6 @@ def test_strict_fresh_rows_require_exact_uncached_task_mapping(tmp_path) -> None
     assert mapped["task_a"]["outcome_similarity"] == 0.5
 
 
-def test_strict_publication_mode_rejects_every_partial_resume(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "run_sage_protocol.py",
-            "--mode",
-            "full_benchmark",
-            "--manifest",
-            "unused.json",
-            "--require-fresh-control",
-            "--parallel-arms",
-            "--resume-run-root",
-            "old-run",
-        ],
-    )
-
-    with pytest.raises(SystemExit, match="forbids --resume-run-root"):
-        run_protocol_main()
-
-
 def test_strict_publication_mode_requires_concurrent_arms(monkeypatch) -> None:
     monkeypatch.setattr(
         sys,
@@ -588,6 +556,24 @@ def test_strict_publication_mode_requires_concurrent_arms(monkeypatch) -> None:
     )
 
     with pytest.raises(SystemExit, match="requires --parallel-arms"):
+        run_protocol_main()
+
+
+def test_protocol_rejects_non_fresh_control_mode(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_sage_protocol.py",
+            "--mode",
+            "full_benchmark",
+            "--manifest",
+            "unused.json",
+            "--parallel-arms",
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="--require-fresh-control is mandatory"):
         run_protocol_main()
 
 

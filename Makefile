@@ -48,7 +48,6 @@ test-core:
 		tests/unit/test_historical_outcome_rescore.py \
 		tests/unit/test_online_birth.py \
 		tests/unit/test_tool_generator.py \
-		tests/unit/test_control_baseline_cache.py \
 		tests/unit/test_self_evolution_reflection.py \
 		tests/unit/test_protocol_generation_policy.py \
 		tests/unit/test_publication_run_verifier.py \

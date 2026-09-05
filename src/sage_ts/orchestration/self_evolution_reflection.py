@@ -1,30 +1,18 @@
-"""Online reflection and lifecycle policy for self-evolving SAGE runs.
-
-Publication runs compare against exact same-run live control rows. The legacy
-cache comparator remains available only to non-publication callers. Neither
-path reads labels, expected answers, or prior SAGE traces.
-"""
+"""Online reflection and lifecycle policy using same-run live control rows."""
 
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from queue import Empty
 from typing import Any
 
-from sage_ts.evaluation.control_baseline_cache import (
-    CACHE_ROOT,
-    ControlBaselineCache,
-    compatibility_context,
-)
 from sage_ts.evaluation.task_strata import base_task_family
 from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.registry.store import RegistryStore
 from tool_sandbox.common.scenario import Scenario
 
-REFLECTION_CONTROL_CACHE_ROOT_ENV = "SAGE_SELF_EVOLVING_CONTROL_CACHE_ROOT"
 FRESH_CONTROL_ROW_EVENT = "fresh_control_row"
 FRESH_CONTROL_COMPLETE_EVENT = "fresh_control_complete"
 FRESH_CONTROL_ERROR_EVENT = "fresh_control_error"
@@ -106,7 +94,6 @@ class SelfEvolutionReflectionController:
     user: str
     base_tool_policy: str
     manifest_path: Path
-    control_cache: ControlBaselineCache | None
     fresh_control_rows: dict[str, dict[str, Any]] | None = None
     require_fresh_control: bool = False
     fresh_control_channel: Any | None = field(default=None, repr=False)
@@ -189,12 +176,10 @@ class SelfEvolutionReflectionController:
                 "Strict fresh-control reflection requires same-run control rows or "
                 "a streaming channel."
             )
-        control_cache: ControlBaselineCache | None = None
         if not require_fresh_control:
-            cache_root = Path(
-                os.environ.get(REFLECTION_CONTROL_CACHE_ROOT_ENV, "") or CACHE_ROOT
+            raise ValueError(
+                "SAGE reflection requires same-run fresh control observations."
             )
-            control_cache = ControlBaselineCache(cache_root)
         controller = cls(
             store=store,
             output_dir=output_dir,
@@ -202,7 +187,6 @@ class SelfEvolutionReflectionController:
             user=user,
             base_tool_policy=base_tool_policy,
             manifest_path=manifest_path,
-            control_cache=control_cache,
             fresh_control_rows=(
                 {name: dict(row) for name, row in fresh_control_rows.items()}
                 if fresh_control_rows is not None
@@ -580,28 +564,11 @@ class SelfEvolutionReflectionController:
     ) -> None:
         """Record feedback and update lifecycle state at pulse boundaries."""
 
-        if self.require_fresh_control:
-            control_row = self._fresh_control_row(scenario_name)
-            control_source = "same_run_fresh"
-            control_available = True
-            control_reason = "exact_same_run_task_match"
-        else:
-            if self.control_cache is None:
-                raise ValueError("Legacy reflection requires a control baseline cache.")
-            lookup = self.control_cache.lookup(
-                compatibility_context(
-                    scenario_key=scenario_name,
-                    scenario=baseline_scenario,
-                    agent=self.agent,
-                    user=self.user,
-                    base_tool_policy=self.base_tool_policy,
-                    manifest_path=self.manifest_path,
-                )
-            )
-            control_row = lookup.row
-            control_source = "legacy_control_cache"
-            control_available = bool(lookup.eligible and lookup.row is not None)
-            control_reason = lookup.reason
+        del baseline_scenario  # Retained for call-site compatibility.
+        control_row = self._fresh_control_row(scenario_name)
+        control_source = "same_run_fresh"
+        control_available = True
+        control_reason = "exact_same_run_task_match"
         control_score = None
         control_outcome = None
         candidate_score = _optional_float(result.get("similarity"))
@@ -645,12 +612,8 @@ class SelfEvolutionReflectionController:
             "completed_count": self.completed_count + 1,
             "control_source": control_source,
             "control_baseline_available": control_available,
-            "control_cache_eligible": (
-                control_available if control_source == "legacy_control_cache" else False
-            ),
-            "control_cache_hit": (
-                control_available if control_source == "legacy_control_cache" else False
-            ),
+            "control_cache_eligible": False,
+            "control_cache_hit": False,
             "control_cache_reason": control_reason,
             "control_score": control_score,
             "candidate_score": candidate_score,

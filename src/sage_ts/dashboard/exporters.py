@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import difflib
 import json
 import os
 import re
@@ -24,8 +23,6 @@ from sage_ts.dashboard.server import (
     DASHBOARD_SERVER_PROTOCOL,
 )
 from sage_ts.dashboard.task_compare_template import TASK_COMPARE_HTML
-from sage_ts.dashboard.task_focus_template import TASK_FOCUS_HTML
-from sage_ts.dashboard.template import DASHBOARD_HTML
 from sage_ts.evaluation.run_metrics import compare_runs, summarize_run
 
 
@@ -235,55 +232,6 @@ def _generated_tool_events(
     }
 
 
-def _cached_control_transcript(
-    control_cache: dict[str, Any],
-) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
-    load_transcripts = os.environ.get(
-        "SAGE_DASHBOARD_LOAD_CACHED_CONTROL_TRANSCRIPTS", ""
-    ).strip().lower() in {"1", "true", "yes", "on"}
-    record_ids = control_cache.get("record_ids")
-    if not isinstance(record_ids, list):
-        return [], None
-    records_dir = (
-        _repo_root() / "artifacts" / "baselines" / "control_task_baselines" / "records"
-    )
-    for record_id in record_ids:
-        if not isinstance(record_id, str) or not re.fullmatch(
-            r"[0-9a-f]{64}", record_id
-        ):
-            continue
-        record_path = records_dir / f"{record_id}.json"
-        if not load_transcripts:
-            return [], {
-                "source": "control_task_baseline_cache",
-                "record_id": record_id,
-                "record_path": str(record_path),
-                "transcript_loaded": False,
-                "transcript_load_policy": "disabled_for_live_dashboard",
-            }
-        record = _read_json(record_path)
-        transcript_path = record.get("transcript_path")
-        if not isinstance(transcript_path, str) or not transcript_path:
-            continue
-        transcript = Path(transcript_path)
-        if not transcript.is_absolute():
-            transcript = _repo_root() / transcript
-        source = {
-            "source": "control_task_baseline_cache",
-            "record_id": record_id,
-            "record_path": str(record_path),
-            "transcript_path": transcript_path,
-            "transcript_hash": record.get("transcript_hash"),
-            "transcript_loaded": False,
-        }
-        conversation = _read_json_value(transcript, [])
-        raw_messages = [m for m in conversation if isinstance(m, dict)]
-        if raw_messages:
-            source["transcript_loaded"] = True
-            return raw_messages, source
-    return [], None
-
-
 def _dashboard_load_task_messages() -> bool:
     return os.environ.get(
         "SAGE_DASHBOARD_LOAD_TASK_MESSAGES", "1"
@@ -296,11 +244,6 @@ def _compact_content(value: Any, *, limit: int = 10000) -> str:
     text = value if isinstance(value, str) else json.dumps(value, indent=2, default=str)
     text = text.strip()
     return text if len(text) <= limit else text[:limit] + "\n... [truncated]"
-
-
-def _one_line(value: Any, *, limit: int = 180) -> str:
-    text = " ".join(_compact_content(value, limit=max(limit * 4, 1000)).split())
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
 def _message_label(message: dict[str, Any]) -> str:
@@ -350,840 +293,7 @@ def _serialize_message(
     }
 
 
-def _message_observation_content(message: dict[str, Any], *, limit: int = 10000) -> str:
-    tool_calls = message.get("tool_calls") or []
-    call_text = "\n\n".join(
-        (
-            f"{call.get('function', {}).get('name', 'tool')}("
-            f"{call.get('function', {}).get('arguments', '')})"
-        )
-        for call in tool_calls
-        if isinstance(call, dict)
-    )
-    content = _compact_content(message.get("content"), limit=limit)
-    if call_text:
-        if not content:
-            return call_text
-        if content.strip() == call_text.strip():
-            return content
-        return f"{content}\n\n{call_text}"
-    return content
-
-
-def _value_preview(value: Any) -> str:
-    if isinstance(value, float):
-        return f"{value:.3f}".rstrip("0").rstrip(".")
-    if isinstance(value, str):
-        return value
-    return json.dumps(value, ensure_ascii=True, default=str)
-
-
-def _compact_row(
-    namespace: str,
-    row: dict[str, Any],
-    *,
-    preferred_keys: list[str] | None = None,
-) -> str:
-    hidden_keys = {"sandbox_message_index", "reminder_id", "person_id", "message_id"}
-    keys = (
-        preferred_keys
-        if preferred_keys is not None
-        else [
-            key
-            for key, value in row.items()
-            if key not in hidden_keys and value not in (None, "", [])
-        ]
-    )
-    parts = []
-    for key in keys:
-        if key not in row:
-            continue
-        value = row[key]
-        if value in ("", []):
-            continue
-        if preferred_keys is None and value is None:
-            continue
-        parts.append(f"{key}={_value_preview(value)}")
-    if namespace == "SANDBOX":
-        sender = row.get("sender")
-        recipient = row.get("recipient")
-        content = row.get("content")
-        if content and sender and recipient:
-            return f"{sender} -> {recipient}: {_value_preview(content)}"
-    if len(parts) == 1 and keys == ["content"]:
-        return parts[0][len("content=") :]
-    prefix = f"{namespace}: " if namespace and namespace != "SANDBOX" else ""
-    return prefix + ", ".join(parts)
-
-
-def _tool_trace_lines(trace: Any) -> list[str]:
-    try:
-        parsed = json.loads(trace) if isinstance(trace, str) else trace
-    except Exception:
-        return []
-    calls = (
-        parsed
-        if isinstance(parsed, list)
-        else [parsed]
-        if isinstance(parsed, dict)
-        else []
-    )
-    lines: list[str] = []
-    for call in calls:
-        if not isinstance(call, dict):
-            continue
-        name = str(call.get("tool_name") or "tool")
-        arguments = call.get("arguments") or {}
-        if isinstance(arguments, dict) and arguments:
-            arg_text = ", ".join(
-                f"{key}={json.dumps(value, ensure_ascii=True, default=str)}"
-                for key, value in arguments.items()
-            )
-            lines.append(f"{name}({arg_text})")
-        else:
-            lines.append(f"{name}()")
-    return lines
-
-
-def _milestone_desc(constraints: list[dict[str, Any]]) -> str:
-    parts: list[str] = []
-    for c in constraints:
-        ns = str(c.get("database_namespace", ""))
-        rows = c.get("target_dataframe") or []
-        if not rows:
-            continue
-        if ns == "SANDBOX":
-            tool_lines = _tool_trace_lines(
-                (rows[0] if rows else {}).get("tool_trace", "")
-            )
-            if tool_lines:
-                parts.append(
-                    _one_line(f"Tool trace: {'; '.join(tool_lines)}", limit=120)
-                )
-                continue
-            row = rows[0] if isinstance(rows[0], dict) else {}
-            content = _compact_content(row.get("content"), limit=240)
-            sender = row.get("sender")
-            recipient = row.get("recipient")
-            if content and sender and recipient:
-                parts.append(
-                    _one_line(f"{sender} -> {recipient}: {content}", limit=120)
-                )
-        else:
-            row = rows[0] if isinstance(rows[0], dict) else {}
-            fields = [k for k in row if k not in ("sender", "recipient", "tool_trace")]
-            if fields:
-                parts.append(f"{ns}: {', '.join(fields)}")
-    return " · ".join(parts) if parts else "Milestone check"
-
-
-def _milestone_target_lines(constraints: list[dict[str, Any]]) -> list[str]:
-    lines: list[str] = []
-    for c in constraints:
-        ns = str(c.get("database_namespace", ""))
-        rows = c.get("target_dataframe") or []
-        if not rows:
-            continue
-        if ns == "SANDBOX":
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                tool_lines = _tool_trace_lines(row.get("tool_trace", ""))
-                if tool_lines:
-                    lines.extend(tool_lines)
-                    continue
-                content = _compact_content(row.get("content"), limit=3000)
-                sender = row.get("sender")
-                recipient = row.get("recipient")
-                if content and sender and recipient:
-                    lines.append(_compact_row(ns, row, preferred_keys=["content"]))
-        else:
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                preferred = [
-                    key
-                    for key, _value in row.items()
-                    if key not in ("sender", "recipient", "tool_trace")
-                    and row[key] != ""
-                    and row[key] != []
-                ]
-                if preferred:
-                    lines.append(_compact_row(ns, row, preferred_keys=preferred[:4]))
-    return lines
-
-
-def _row_match_score(
-    candidate: dict[str, Any], target: dict[str, Any]
-) -> tuple[int, int]:
-    exact = 0
-    partial = 0
-    for key, value in target.items():
-        if key not in candidate:
-            continue
-        current = candidate.get(key)
-        if current == value:
-            exact += 1
-            continue
-        if isinstance(current, str) and isinstance(value, str):
-            current_norm = current.lower()
-            value_norm = value.lower()
-            if current_norm in value_norm or value_norm in current_norm:
-                partial += 1
-    return exact, partial
-
-
-def _database_update_observed_lines(
-    message: dict[str, Any],
-    *,
-    constraints: list[dict[str, Any]],
-) -> list[str]:
-    lines: list[str] = []
-    details = [
-        message.get("assistant_details") or {},
-        message.get("tool_details") or {},
-    ]
-    for constraint in constraints:
-        namespace = str(constraint.get("database_namespace", ""))
-        if namespace in {"", "SANDBOX"}:
-            continue
-        target_rows = [
-            row
-            for row in (constraint.get("target_dataframe") or [])
-            if isinstance(row, dict)
-        ]
-        if not target_rows:
-            continue
-        for detail in details:
-            database_update = detail.get("database_update", {}).get(namespace)
-            if not isinstance(database_update, list) or not database_update:
-                continue
-            candidate_rows = [row for row in database_update if isinstance(row, dict)]
-            for target_row in target_rows:
-                preferred = [
-                    key
-                    for key, value in target_row.items()
-                    if value is not None and value != "" and value != []
-                ]
-                if not preferred:
-                    continue
-                ranked = sorted(
-                    candidate_rows,
-                    key=lambda row: _row_match_score(row, target_row),
-                    reverse=True,
-                )
-                if ranked:
-                    line = _compact_row(
-                        namespace, ranked[0], preferred_keys=preferred[:4]
-                    )
-                    if line not in lines:
-                        lines.append(line)
-    return lines
-
-
-def _database_update_observed_lines_across_messages(
-    messages: list[dict[str, Any]],
-    *,
-    constraints: list[dict[str, Any]],
-) -> list[str]:
-    lines: list[str] = []
-    details_with_order: list[tuple[int, dict[str, Any]]] = []
-    for message_index, message in enumerate(messages):
-        for detail in (
-            message.get("assistant_details") or {},
-            message.get("tool_details") or {},
-        ):
-            details_with_order.append((message_index, detail))
-
-    for constraint in constraints:
-        namespace = str(constraint.get("database_namespace", ""))
-        if namespace in {"", "SANDBOX"}:
-            continue
-        target_rows = [
-            row
-            for row in (constraint.get("target_dataframe") or [])
-            if isinstance(row, dict)
-        ]
-        if not target_rows:
-            continue
-        for target_row in target_rows:
-            preferred = [
-                key for key, value in target_row.items() if value != "" and value != []
-            ]
-            if not preferred:
-                continue
-            ranked_rows: list[tuple[tuple[int, int, int], dict[str, Any]]] = []
-            for message_index, detail in details_with_order:
-                database_update = detail.get("database_update", {}).get(namespace)
-                if not isinstance(database_update, list):
-                    continue
-                for row in database_update:
-                    if not isinstance(row, dict):
-                        continue
-                    exact, partial = _row_match_score(row, target_row)
-                    ranked_rows.append(((exact, partial, message_index), row))
-            if not ranked_rows:
-                continue
-            _score, best_row = max(ranked_rows, key=lambda item: item[0])
-            line = _compact_row(namespace, best_row, preferred_keys=preferred[:4])
-            if line not in lines:
-                lines.append(line)
-    return lines
-
-
-def _observed_lines_for_message(
-    messages: list[dict[str, Any]],
-    index: int,
-    *,
-    constraints: list[dict[str, Any]] | None = None,
-) -> list[str]:
-    if index < 0 or index >= len(messages):
-        return []
-    lines: list[str] = []
-    message = messages[index]
-    constraint_namespaces = {
-        str(constraint.get("database_namespace", ""))
-        for constraint in (constraints or [])
-        if isinstance(constraint, dict)
-    }
-    if constraints:
-        for line in _database_update_observed_lines(message, constraints=constraints):
-            if line not in lines:
-                lines.append(line)
-    if lines and constraint_namespaces - {"", "SANDBOX"}:
-        return lines
-    if message.get("role") == "tool" and index > 0:
-        previous = messages[index - 1]
-        prev_content = _message_observation_content(previous, limit=1200)
-        if prev_content:
-            lines.append(prev_content)
-    content = _message_observation_content(message, limit=1200)
-    if content:
-        if message.get("role") == "tool":
-            name = str(message.get("name") or "tool")
-            lines.append(f"{name}: {content}")
-        else:
-            lines.append(content)
-    deduped: list[str] = []
-    for line in lines:
-        if line and line not in deduped:
-            deduped.append(line)
-    return deduped
-
-
-def _expected_check_fallback_lines(
-    expected_lines: list[Any],
-    messages: list[dict[str, Any]],
-    *,
-    limit: int = 2,
-) -> list[str]:
-    fragments: list[str] = []
-    for expected in expected_lines:
-        text = str(expected)
-        if not text:
-            continue
-        lowered = text.lower()
-        fragments.append(lowered)
-        if ":" in text:
-            after_colon = text.split(":", 1)[1].strip().lower()
-            if after_colon:
-                fragments.append(after_colon)
-        for quoted_text in re.findall(r"'([^']+)'", text):
-            if quoted_text.strip():
-                fragments.append(quoted_text.strip().lower())
-        match = re.match(r"([a-z_][a-z0-9_]*)\(", lowered)
-        if match:
-            fragments.append(f"{match.group(1)}(")
-    fragments = [
-        fragment
-        for i, fragment in enumerate(fragments)
-        if len(fragment) >= 4 and fragment not in fragments[:i]
-    ]
-    if not fragments:
-        return []
-
-    deduped: list[str] = []
-    for msg_index, message in enumerate(messages):
-        if message.get("role") != "assistant":
-            continue
-        content = _message_observation_content(message, limit=1200)
-        if not content:
-            continue
-        lowered = content.lower()
-        attempt: list[str] = []
-        if any(fragment in lowered for fragment in fragments):
-            attempt.append(content)
-        else:
-            for fragment in fragments:
-                ratio = difflib.SequenceMatcher(
-                    None,
-                    fragment,
-                    lowered,
-                ).quick_ratio()
-                if ratio >= 0.55:
-                    attempt.append(content)
-                    break
-        if not attempt:
-            continue
-        if msg_index + 1 < len(messages):
-            tool_message = messages[msg_index + 1]
-            if tool_message.get("role") == "tool":
-                tool_content = _message_observation_content(tool_message, limit=1200)
-                if tool_content:
-                    attempt.append(
-                        f"{tool_message.get('name', 'tool')}: {tool_content}"
-                    )
-        for line in attempt:
-            if line and line not in deduped:
-                deduped.append(line)
-        if len(deduped) >= limit:
-            break
-    return deduped[:limit]
-
-
-def _matched_check_details(
-    messages: list[dict[str, Any]],
-    *,
-    match_key: str,
-    index_key: str,
-    payload_key: str,
-    score_key: str,
-) -> dict[int, dict[str, Any]]:
-    details_by_idx: dict[int, dict[str, Any]] = {}
-    for message_index, message in enumerate(messages):
-        for detail_key in ("tool_details", "assistant_details"):
-            detail = message.get(detail_key) or {}
-            for match in detail.get(match_key, []) or []:
-                if not isinstance(match, dict):
-                    continue
-                idx = match.get(index_key)
-                if idx is None:
-                    continue
-                idx_int = int(idx)
-                payload = match.get(payload_key) or {}
-                constraints = payload.get("snapshot_constraints", [])
-                entry = details_by_idx.setdefault(
-                    idx_int,
-                    {
-                        "description": _milestone_desc(constraints),
-                        "target_lines": _milestone_target_lines(constraints),
-                        "observed_lines": [],
-                        "constraints": constraints,
-                        "score": None,
-                    },
-                )
-                if not entry.get("description"):
-                    entry["description"] = _milestone_desc(constraints)
-                if not entry.get("target_lines"):
-                    entry["target_lines"] = _milestone_target_lines(constraints)
-                if not entry.get("constraints"):
-                    entry["constraints"] = constraints
-                for line in _observed_lines_for_message(
-                    messages, message_index, constraints=constraints
-                ):
-                    if line not in entry["observed_lines"]:
-                        entry["observed_lines"].append(line)
-                sim = match.get(score_key)
-                if sim is not None:
-                    entry["score"] = float(sim)
-    return details_by_idx
-
-
-def _milestones_from_result(
-    result: dict[str, Any],
-    messages: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    targets_by_idx = _matched_check_details(
-        messages,
-        match_key="milestone_matches",
-        index_key="milestone_index",
-        payload_key="milestone",
-        score_key="milestone_similarity",
-    )
-    mapping = result.get("milestone_mapping") or {}
-    if mapping:
-        milestones: list[dict[str, Any]] = []
-        for idx_str in sorted(mapping.keys(), key=int):
-            idx = int(idx_str)
-            entry = mapping[idx_str]
-            score = (
-                float(entry[1])
-                if isinstance(entry, (list, tuple)) and len(entry) >= 2
-                else 0.0
-            )
-            info = targets_by_idx.get(idx, {})
-            observed_lines = list(info.get("observed_lines", []))
-            state_lines = _database_update_observed_lines_across_messages(
-                messages,
-                constraints=info.get("constraints", []),
-            )
-            if state_lines:
-                observed_lines = state_lines
-            milestones.append(
-                {
-                    "passed": score >= 0.999,
-                    "score": score,
-                    "description": info.get("description", f"Milestone {idx + 1}"),
-                    "target_lines": info.get("target_lines", []),
-                    "observed_lines": observed_lines,
-                }
-            )
-        return milestones
-    seen: dict[int, dict[str, Any]] = {}
-    for idx, info in targets_by_idx.items():
-        sim = info.get("score")
-        observed_lines = list(info.get("observed_lines", []))
-        state_lines = _database_update_observed_lines_across_messages(
-            messages,
-            constraints=info.get("constraints", []),
-        )
-        if state_lines:
-            observed_lines = state_lines
-        seen[idx] = {
-            "passed": bool(float(sim) >= 0.999) if sim is not None else None,
-            "score": float(sim) if sim is not None else None,
-            "description": info.get("description", f"Milestone {idx + 1}"),
-            "target_lines": info.get("target_lines", []),
-            "observed_lines": observed_lines,
-        }
-    return [seen[k] for k in sorted(seen.keys())]
-
-
-def _minefields_from_result(
-    result: dict[str, Any],
-    messages: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    details_by_idx = _matched_check_details(
-        messages,
-        match_key="minefield_matches",
-        index_key="minefield_index",
-        payload_key="minefield",
-        score_key="minefield_similarity",
-    )
-    mapping = result.get("minefield_mapping") or {}
-    if mapping:
-        minefields: list[dict[str, Any]] = []
-        for idx_str in sorted(mapping.keys(), key=int):
-            idx = int(idx_str)
-            entry = mapping[idx_str]
-            score = (
-                float(entry[1])
-                if isinstance(entry, (list, tuple)) and len(entry) >= 2
-                else 0.0
-            )
-            info = details_by_idx.get(idx, {})
-            minefields.append(
-                {
-                    "triggered": score > 0,
-                    "score": score,
-                    "description": info.get("description", f"Guardrail {idx + 1}"),
-                    "target_lines": info.get("target_lines", []),
-                    "observed_lines": info.get("observed_lines", []),
-                }
-            )
-        return minefields
-    minefields = []
-    for idx, info in sorted(details_by_idx.items()):
-        score = float(info["score"]) if info.get("score") is not None else 0.0
-        minefields.append(
-            {
-                "triggered": score > 0,
-                "score": score if info.get("score") is not None else None,
-                "description": info.get("description", f"Guardrail {idx + 1}"),
-                "target_lines": info.get("target_lines", []),
-                "observed_lines": info.get("observed_lines", []),
-            }
-        )
-    return minefields
-
-
-def _agent_action_summary(messages: list[dict[str, Any]]) -> str:
-    prefixes = (
-        "modify_",
-        "set_",
-        "add_",
-        "update_",
-        "delete_",
-        "remove_",
-        "create_",
-        "send_",
-    )
-    skip_keys = {"reminder_id", "contact_id", "message_id", "event_id"}
-    actions: list[str] = []
-    for message in messages:
-        if message.get("role") != "assistant":
-            continue
-        for call in message.get("tool_calls") or []:
-            if not isinstance(call, dict):
-                continue
-            fn = call.get("function", {})
-            name = str(fn.get("name", ""))
-            if not any(name.startswith(p) for p in prefixes):
-                continue
-            try:
-                args = json.loads(fn.get("arguments", "{}"))
-                key_args = {
-                    k: v
-                    for k, v in args.items()
-                    if k not in skip_keys and v is not None
-                }
-                kv = ", ".join(f"{k}={v}" for k, v in list(key_args.items())[:4])
-                actions.append(f"{name}({kv})" if kv else name)
-            except Exception:
-                actions.append(name)
-    if actions:
-        return "\n".join(actions[-3:])
-    for message in reversed(messages):
-        if message.get("role") == "assistant":
-            content = _compact_content(message.get("content"), limit=400)
-            if content:
-                return content
-    return "—"
-
-
-def _expected_answers_from_messages(messages: list[dict[str, Any]]) -> list[str]:
-    answers: list[str] = []
-    for message in messages:
-        details = [
-            message.get("assistant_details") or {},
-            message.get("tool_details") or {},
-        ]
-        for detail in details:
-            for match in detail.get("milestone_matches", []):
-                milestone = (
-                    match.get("milestone", {}) if isinstance(match, dict) else {}
-                )
-                for constraint in milestone.get("snapshot_constraints", []):
-                    rows = constraint.get("target_dataframe") or []
-                    for row in rows:
-                        if not isinstance(row, dict):
-                            continue
-                        if (
-                            row.get("sender") == "AGENT"
-                            and row.get("recipient") == "USER"
-                        ):
-                            content = _compact_content(row.get("content"), limit=3000)
-                            if content and content not in answers:
-                                answers.append(content)
-    return answers
-
-
-def _summarize_tool_messages(messages: list[dict[str, Any]]) -> str:
-    tool_bits: list[str] = []
-    for message in messages:
-        if message.get("role") != "tool":
-            continue
-        name = str(message.get("name") or "tool")
-        content = _compact_content(message.get("content"), limit=900)
-        if content.lower() in {"", "none", "null"}:
-            content = "no visible state change"
-        tool_bits.append(f"{name}: {_one_line(content, limit=80)}")
-    return _one_line("; ".join(tool_bits[-3:]), limit=220)
-
-
-def _task_outcome(
-    messages: list[dict[str, Any]],
-    result: dict[str, Any] | None,
-    scenario: str,
-    milestones: list[dict[str, Any]],
-    minefields: list[dict[str, Any]],
-) -> dict[str, Any]:
-    final_index: int | None = None
-    for index, message in enumerate(messages):
-        if message.get("role") == "assistant" and message.get("assistant_details"):
-            final_index = index
-    if final_index is None:
-        for index, message in enumerate(messages):
-            if message.get("role") == "assistant" and _compact_content(
-                message.get("content")
-            ):
-                final_index = index
-    final_answer = (
-        ""
-        if final_index is None
-        else _compact_content(messages[final_index].get("content"), limit=4000)
-    )
-    similarity = None if result is None else result.get("similarity")
-    exact = bool(similarity is not None and float(similarity) >= 0.999)
-    tool_summary = _summarize_tool_messages(messages)
-    result_parts = []
-    if final_answer:
-        result_parts.append(f"Answer: {_one_line(final_answer, limit=130)}")
-    if tool_summary:
-        result_parts.append(f"Tools: {tool_summary}")
-    if similarity is not None and float(similarity) < 0.999:
-        result_parts.append(f"Score: {float(similarity):.3f}")
-    observed_lines: list[str] = []
-    expected_lines: list[str] = []
-    for index, milestone in enumerate(milestones, start=1):
-        for line in milestone.get("observed_lines", [])[:2]:
-            observed_lines.append(f"Milestone {index} observed: {line}")
-        targets = milestone.get("target_lines", [])
-        expected_lines.append(
-            f"Milestone {index}: {'; '.join(targets) if targets else milestone.get('description', 'Milestone check')}"
-        )
-    for index, minefield in enumerate(minefields, start=1):
-        for line in minefield.get("observed_lines", [])[:2]:
-            observed_lines.append(f"Guardrail {index} triggered: {line}")
-        targets = minefield.get("target_lines", [])
-        expected_lines.append(
-            f"Guardrail {index}: avoid {'; '.join(targets) if targets else minefield.get('description', 'Guardrail violation')}"
-        )
-    deduped_observed: list[str] = []
-    for line in observed_lines:
-        if line not in deduped_observed:
-            deduped_observed.append(line)
-    deduped_expected: list[str] = []
-    for line in expected_lines:
-        if line not in deduped_expected:
-            deduped_expected.append(line)
-    return {
-        "agent_final_answer": final_answer,
-        "agent_actions": _agent_action_summary(messages),
-        "agent_result_summary": "\n".join(result_parts),
-        "expected_answers": _expected_answers_from_messages(messages),
-        "expected_note": (
-            "State/tool milestone-scored target; inspect messages and tool evidence."
-        ),
-        "similarity": similarity,
-        "exact_correct": exact,
-        "correctness_label": (
-            "pending" if result is None else "correct" if exact else "not exact"
-        ),
-        "observed_evidence": (
-            "\n".join(deduped_observed)
-            or "\n".join(result_parts)
-            or final_answer
-            or "—"
-        ),
-        "expected_truth": (
-            "\n".join(deduped_expected)
-            or "\n".join(_expected_answers_from_messages(messages))
-            or "State/tool milestone-scored target; inspect messages and tool evidence."
-        ),
-        "scenario": scenario,
-    }
-
-
-def _build_evaluation_payload(
-    result: dict[str, Any] | None,
-    milestones: list[dict[str, Any]],
-    minefields: list[dict[str, Any]],
-    messages: list[dict[str, Any]],
-) -> dict[str, Any]:
-    required_score = None if result is None else result.get("milestone_similarity")
-    forbidden_score = None if result is None else result.get("minefield_similarity")
-    final_score = None if result is None else result.get("similarity")
-    checks: list[dict[str, Any]] = []
-    for index, milestone in enumerate(milestones, start=1):
-        score = milestone.get("score")
-        if score is None:
-            status = "pending"
-        elif float(score) >= 0.999:
-            status = "matched"
-        elif float(score) > 0:
-            status = "partial"
-        else:
-            status = "missed"
-        checks.append(
-            {
-                "kind": "required",
-                "index": index,
-                "status": status,
-                "score": score,
-                "label": milestone.get("description") or f"Required {index}",
-                "observed": milestone.get("observed_lines") or ["No matching evidence"],
-                "expected": milestone.get("target_lines")
-                or [milestone.get("description") or f"Required {index}"],
-            }
-        )
-    for index, minefield in enumerate(minefields, start=1):
-        triggered = bool(minefield.get("triggered"))
-        checks.append(
-            {
-                "kind": "forbidden",
-                "index": index,
-                "status": "triggered" if triggered else "clear",
-                "score": minefield.get("score"),
-                "label": minefield.get("description") or f"Forbidden {index}",
-                "observed": minefield.get("observed_lines")
-                or (
-                    ["No forbidden state observed"]
-                    if not triggered
-                    else ["Forbidden match observed"]
-                ),
-                "expected": minefield.get("target_lines")
-                or [minefield.get("description") or f"Forbidden {index}"],
-            }
-        )
-    for check in checks:
-        if check["kind"] != "required":
-            continue
-        expected_tool_names: list[str] = []
-        for line in check["expected"]:
-            match = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\(", str(line))
-            if match:
-                expected_tool_names.append(match.group(1))
-        # Try to preserve existing tool-attempt evidence for tool-expected milestones.
-        if check["status"] == "missed" and expected_tool_names:
-            fallback_observed: list[str] = []
-            for msg_index, message in enumerate(messages):
-                content = str(message.get("content") or "")
-                if message.get("role") == "assistant" and any(
-                    f"{tool_name}(" in content for tool_name in expected_tool_names
-                ):
-                    current_attempt: list[str] = []
-                    if "\n\n" in content:
-                        first, second = content.split("\n\n", 1)
-                        if first.strip() == second.strip():
-                            content = first
-                    current_attempt.append(content)
-                    if msg_index + 1 < len(messages):
-                        tool_message = messages[msg_index + 1]
-                        if (
-                            tool_message.get("role") == "tool"
-                            and tool_message.get("name") in expected_tool_names
-                        ):
-                            current_attempt.append(
-                                f"{tool_message['name']}: {tool_message.get('content') or '[empty]'}"
-                            )
-                    fallback_observed = current_attempt
-            if fallback_observed:
-                check["observed"] = fallback_observed
-                continue
-        # If the scorer gave a non-zero score but no line evidence was captured,
-        # try recovering assistant/tool traces that match the expected payload
-        # text closely.
-        if (
-            check["status"] in {"partial", "matched"}
-            and check["score"] is not None
-            and float(check["score"]) > 0
-            and check["observed"] == ["No matching evidence"]
-        ):
-            fallback_observed = _expected_check_fallback_lines(
-                check["expected"], messages
-            )
-            check["observed"] = fallback_observed or ["No matching evidence"]
-    return {
-        "final_score": final_score,
-        "required_score": required_score,
-        "forbidden_score": forbidden_score,
-        "required_passed": sum(
-            1 for milestone in milestones if milestone.get("passed") is True
-        ),
-        "required_total": len(milestones),
-        "forbidden_triggered": sum(
-            1 for minefield in minefields if minefield.get("triggered")
-        ),
-        "forbidden_total": len(minefields),
-        "blocked_by_guardrail": bool(
-            forbidden_score is not None and float(forbidden_score) > 0
-        ),
-        "checks": checks,
-    }
-
-
-def _task_focus_rows(
+def _task_compare_rows(
     run_root: Path,
     run_dir: Path | None,
     *,
@@ -1231,20 +341,6 @@ def _task_focus_rows(
             else []
         )
         raw_messages = [m for m in conversation if isinstance(m, dict)]
-        milestones = _milestones_from_result(result or {}, raw_messages)
-        minefields = _minefields_from_result(result or {}, raw_messages)
-        control_cache = (
-            result.get("control_cache", {}) if isinstance(result, dict) else {}
-        )
-        control_cache_source = (
-            result.get("control_cache_source") if isinstance(result, dict) else None
-        ) or (control_cache.get("source") if isinstance(control_cache, dict) else None)
-        transcript_source = None
-        if not raw_messages and control_cache_source == "cached":
-            raw_messages, transcript_source = _cached_control_transcript(control_cache)
-            if raw_messages:
-                milestones = _milestones_from_result(result or {}, raw_messages)
-                minefields = _minefields_from_result(result or {}, raw_messages)
         generated_tools = usage.get(scenario, [])
         generated_events = tool_events.get(scenario, [])
         generated_set = set(generated_tools) | {
@@ -1270,10 +366,6 @@ def _task_focus_rows(
                 else int(order[scenario]) + 1,
                 "generated_tools": generated_tools,
                 "generated_tool_events": generated_events,
-                "control_cache_source": control_cache_source,
-                "control_cache": control_cache,
-                "transcript_source": transcript_source,
-                "similarity": None if result is None else result.get("similarity"),
                 "outcome_similarity": None
                 if result is None
                 else result.get("outcome_similarity"),
@@ -1286,7 +378,6 @@ def _task_focus_rows(
                 "outcome_checks": []
                 if result is None
                 else result.get("outcome_checks", []),
-                "score": None if result is None else result.get("similarity"),
                 "turn_count": None if result is None else result.get("turn_count"),
                 "llm_usage_recorded": False
                 if result is None
@@ -1333,24 +424,6 @@ def _task_focus_rows(
                     _serialize_message(index, message, generated_set)
                     for index, message in enumerate(raw_messages)
                 ],
-                "milestones": milestones,
-                "minefields": minefields,
-                "evaluation": _build_evaluation_payload(
-                    result,
-                    milestones,
-                    minefields,
-                    [
-                        _serialize_message(index, message, generated_set)
-                        for index, message in enumerate(raw_messages)
-                    ],
-                ),
-                "outcome": _task_outcome(
-                    raw_messages,
-                    result,
-                    scenario,
-                    milestones,
-                    minefields,
-                ),
             }
         )
     return tasks
@@ -1364,8 +437,8 @@ def _arm_progress_status(
 ) -> dict[str, Any]:
     """Return explicit arm progress for live paired dashboards.
 
-    The Task Focus dashboard needs to show baseline and SAGE progress
-    separately. During active runs, the runner writes arm status files before a
+    Task Compare shows baseline and SAGE progress separately. During active
+    runs, the runner writes arm status files before a
     final result summary exists; after completion, the summary is the fallback.
     """
     status_path = run_root / f"{arm}_arm_status.json"
@@ -1416,48 +489,34 @@ def _balanced_pair_summary(pairs: list[dict[str, Any]]) -> dict[str, Any]:
                     continue
         return sum(values) / len(values) if values else None
 
-    control_mean = mean_value(0, "similarity")
-    candidate_mean = mean_value(1, "similarity")
     control_outcome_mean = mean_value(0, "outcome_similarity")
     candidate_outcome_mean = mean_value(1, "outcome_similarity")
-    delta = (
-        candidate_mean - control_mean
-        if control_mean is not None and candidate_mean is not None
-        else None
-    )
     outcome_delta = (
         candidate_outcome_mean - control_outcome_mean
         if control_outcome_mean is not None and candidate_outcome_mean is not None
         else None
     )
-    lift_percent = None
-    if delta is not None and control_mean is not None and control_mean != 0:
-        lift_percent = (delta / control_mean) * 100
     return {
         "balanced_completed": len(complete_pairs),
-        "balanced_control_mean_similarity": control_mean,
-        "balanced_candidate_mean_similarity": candidate_mean,
-        "balanced_delta": delta,
-        "balanced_lift_percent": lift_percent,
         "balanced_control_mean_outcome_similarity": control_outcome_mean,
         "balanced_candidate_mean_outcome_similarity": candidate_outcome_mean,
         "balanced_outcome_delta": outcome_delta,
     }
 
 
-def _write_task_focus_dashboard(
+def _task_compare_payload(
     dashboard_dir: Path,
     run_root: Path,
     data: dict[str, Any],
     control_dir: Path | None,
     candidate_dir: Path | None,
 ) -> dict[str, Any]:
-    control_tasks = _task_focus_rows(
+    control_tasks = _task_compare_rows(
         run_root,
         control_dir,
         phase="control",
     )
-    candidate_tasks = _task_focus_rows(
+    candidate_tasks = _task_compare_rows(
         run_root,
         candidate_dir,
         phase="candidate",
@@ -1525,12 +584,10 @@ def _write_task_focus_dashboard(
         "base_tool_policy": data.get("base_tool_policy"),
         "arm_labels": data.get("arm_labels"),
         "scenario_count": data.get("scenario_count"),
-        "control_cache": data.get("control_cache"),
         "cohort_preflight": data.get("cohort_preflight"),
         "summary": {
             "scenario_count": data.get("scenario_count"),
             "control_completed": data.get("control", {}).get("scenario_count"),
-            "control_mean_similarity": data.get("control", {}).get("mean_similarity"),
             "control_mean_outcome_similarity": data.get("control", {}).get(
                 "mean_outcome_similarity"
             ),
@@ -1570,9 +627,6 @@ def _write_task_focus_dashboard(
                 "wall_time_resume_offset_seconds"
             ),
             "candidate_completed": data.get("candidate", {}).get("scenario_count"),
-            "candidate_mean_similarity": data.get("candidate", {}).get(
-                "mean_similarity"
-            ),
             "candidate_mean_outcome_similarity": data.get("candidate", {}).get(
                 "mean_outcome_similarity"
             ),
@@ -1625,7 +679,6 @@ def _write_task_focus_dashboard(
                 "generated_tool_failed_scenarios", 0
             ),
             "current_completed": current.get("scenario_count"),
-            "current_mean_similarity": current.get("mean_similarity"),
             "current_turns": current.get("total_turns"),
             "current_exceptions": current.get("exception_count"),
             **balanced_summary,
@@ -1638,10 +691,6 @@ def _write_task_focus_dashboard(
         "tasks": tasks,
         "pairs": pairs,
     }
-    (dashboard_dir / "task_focus_data.json").write_text(
-        json.dumps(payload, indent=2) + "\n", encoding="utf-8"
-    )
-    (dashboard_dir / "task_focus.html").write_text(TASK_FOCUS_HTML, encoding="utf-8")
     return payload
 
 
@@ -1758,9 +807,8 @@ def _live_called_tool_delta_stats(data: dict[str, Any]) -> dict[str, dict[str, A
         if not isinstance(tools, list) or not tools:
             continue
         scenario = str(row.get("scenario") or "")
-        canonical_delta = _optional_float(row.get("delta"))
         outcome_delta = _optional_float(row.get("outcome_delta"))
-        if canonical_delta is None and outcome_delta is None:
+        if outcome_delta is None:
             continue
         for tool in tools:
             tool_name = str(tool)
@@ -1768,27 +816,18 @@ def _live_called_tool_delta_stats(data: dict[str, Any]) -> dict[str, dict[str, A
                 tool_name,
                 {
                     "scenarios": set(),
-                    "canonical_deltas": [],
                     "outcome_deltas": [],
                 },
             )
             entry["scenarios"].add(scenario)
-            if canonical_delta is not None:
-                entry["canonical_deltas"].append(canonical_delta)
-            if outcome_delta is not None:
-                entry["outcome_deltas"].append(outcome_delta)
+            entry["outcome_deltas"].append(outcome_delta)
 
     result: dict[str, dict[str, Any]] = {}
     for tool, raw in stats.items():
-        canonical = list(raw["canonical_deltas"])
         outcome = list(raw["outcome_deltas"])
         result[tool] = {
             "scenario_count": len(raw["scenarios"]),
-            "mean_canonical_delta": _mean_float(canonical),
             "mean_outcome_delta": _mean_float(outcome),
-            "canonical_gains": sum(1 for value in canonical if value > 0),
-            "canonical_regressions": sum(1 for value in canonical if value < 0),
-            "canonical_preserved": sum(1 for value in canonical if value == 0),
             "outcome_gains": sum(1 for value in outcome if value > 0),
             "outcome_regressions": sum(1 for value in outcome if value < 0),
             "outcome_preserved": sum(1 for value in outcome if value == 0),
@@ -1930,14 +969,9 @@ def _task_compare_tool_summary(
                     raw, "failed_attempt_count", "failed_attempt_scenarios"
                 ),
                 "called_subset_scenario_count": called_subset.get("scenario_count"),
-                "called_subset_mean_canonical_delta": called_subset.get(
-                    "mean_canonical_delta"
-                ),
                 "called_subset_mean_outcome_delta": called_subset.get(
                     "mean_outcome_delta"
                 ),
-                "canonical_gains": called_subset.get("canonical_gains"),
-                "canonical_regressions": called_subset.get("canonical_regressions"),
                 "outcome_gains": called_subset.get("outcome_gains"),
                 "outcome_regressions": called_subset.get("outcome_regressions"),
                 "outcome_preserved": called_subset.get("outcome_preserved"),
@@ -2002,12 +1036,7 @@ def _task_compare_tool_summary(
                     "visible_not_called_count": counts.get("visible_not_called_count"),
                     "failed_attempt_count": counts.get("failed_attempt_count", 0),
                     "called_subset_scenario_count": stats.get("scenario_count", 0),
-                    "called_subset_mean_canonical_delta": stats.get(
-                        "mean_canonical_delta"
-                    ),
                     "called_subset_mean_outcome_delta": stats.get("mean_outcome_delta"),
-                    "canonical_gains": stats.get("canonical_gains"),
-                    "canonical_regressions": stats.get("canonical_regressions"),
                     "outcome_gains": stats.get("outcome_gains")
                     if outcome_known
                     else None,
@@ -2175,9 +1204,9 @@ def _is_task_compare_performance_field(key: str) -> bool:
 def _sanitize_task_compare_payload(value: Any) -> Any:
     """Remove non-outcome performance data from the Task Compare export.
 
-    Task Focus and the underlying run artifacts intentionally retain the legacy
-    evaluator diagnostics. Task Compare is publication-facing and must expose
-    only outcome performance, alongside its routing and transcript evidence.
+    Underlying run artifacts retain legacy evaluator diagnostics. Task Compare
+    is publication-facing and exposes only outcome performance alongside its
+    routing and transcript evidence.
     """
     if isinstance(value, dict):
         sanitized: dict[str, Any] = {}
@@ -2203,11 +1232,11 @@ def _write_task_compare_dashboard(
     dashboard_dir: Path,
     run_root: Path,
     data: dict[str, Any],
-    focus_payload: dict[str, Any],
+    task_payload: dict[str, Any],
 ) -> None:
     payload = _sanitize_task_compare_payload(
         {
-            **focus_payload,
+            **task_payload,
             "tool_summary": _task_compare_tool_summary(run_root, data),
         }
     )
@@ -2238,40 +1267,27 @@ def _scenario_table(
     for name in names:
         c_row = control.get(name, {})
         s_row = candidate.get(name, {})
-        c_score = float(c_row.get("similarity", 0.0)) if c_row else None
-        s_score = float(s_row.get("similarity", 0.0)) if s_row else None
         c_outcome = _optional_float(c_row.get("outcome_similarity")) if c_row else None
         s_outcome = _optional_float(s_row.get("outcome_similarity")) if s_row else None
-        c_cache = c_row.get("control_cache") if isinstance(c_row, dict) else {}
-        c_cache_source = c_row.get("control_cache_source") or (
-            c_cache.get("source") if isinstance(c_cache, dict) else None
-        )
-        delta = (
-            (s_score - c_score) if c_score is not None and s_score is not None else None
-        )
         outcome_delta = (
             s_outcome - c_outcome
             if c_outcome is not None and s_outcome is not None
             else None
         )
-        status = (
-            "gain"
-            if delta is not None and delta > 0
-            else "regression"
-            if delta is not None and delta < 0
-            else "preserved"
-        )
         rows.append(
             {
                 "scenario": name,
                 "categories": c_row.get("categories") or s_row.get("categories") or [],
-                "control_similarity": c_score,
-                "candidate_similarity": s_score,
-                "delta": delta,
                 "control_outcome_similarity": c_outcome,
                 "candidate_outcome_similarity": s_outcome,
                 "outcome_delta": outcome_delta,
-                "status": status,
+                "status": (
+                    "gain"
+                    if outcome_delta is not None and outcome_delta > 0
+                    else "regression"
+                    if outcome_delta is not None and outcome_delta < 0
+                    else "preserved"
+                ),
                 "control_turns": c_row.get("turn_count"),
                 "candidate_turns": s_row.get("turn_count"),
                 "control_llm_call_count": c_row.get("llm_call_count"),
@@ -2280,8 +1296,6 @@ def _scenario_table(
                 "candidate_llm_total_tokens": s_row.get("llm_total_tokens"),
                 "control_exception": c_row.get("exception_type"),
                 "candidate_exception": s_row.get("exception_type"),
-                "control_cache_source": c_cache_source,
-                "control_cache": c_cache,
                 "reused_tools": sorted(reuse_by_scenario.get(name, set())),
                 "control_trace_url": _trace_url(dashboard_dir, control_dir, name),
                 "candidate_trace_url": _trace_url(dashboard_dir, candidate_dir, name),
@@ -2308,17 +1322,11 @@ def _partial_comparison(
         if candidate_dir is not None
         else {},
         "scenario_count": 0,
-        "mean_similarity_delta": 0.0,
         "outcome_scenario_count": 0,
         "mean_outcome_similarity_delta": None,
-        "gain_count": 0,
-        "regression_count": 0,
-        "preserved_count": 0,
         "outcome_gain_count": 0,
         "outcome_regression_count": 0,
         "outcome_preserved_count": 0,
-        "gains": [],
-        "regressions": [],
         "outcome_gains": [],
         "outcome_regressions": [],
         "deltas": [],
@@ -2374,7 +1382,6 @@ def write_protocol_dashboard(
         },
         "scenario_count": scenario_count,
         "cohort_preflight": _read_json(run_root / "cohort_preflight_report.json"),
-        "control_cache": _read_json(run_root / "control_cache_report.json"),
         "started_at": started_at,
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "control": comparison.get("control", {}),
@@ -2382,15 +1389,11 @@ def write_protocol_dashboard(
         "comparison": {
             key: comparison.get(key)
             for key in (
-                "gain_count",
-                "regression_count",
-                "preserved_count",
                 "outcome_gain_count",
                 "outcome_regression_count",
                 "outcome_preserved_count",
             )
         },
-        "mean_similarity_delta": comparison.get("mean_similarity_delta", 0.0),
         "mean_outcome_similarity_delta": comparison.get(
             "mean_outcome_similarity_delta"
         ),
@@ -2409,35 +1412,23 @@ def write_protocol_dashboard(
         if registry_dir
         else {},
     }
-    (dashboard_dir / "data.json").write_text(
-        json.dumps(data, indent=2) + "\n", encoding="utf-8"
-    )
-    (dashboard_dir / "index.html").write_text(DASHBOARD_HTML, encoding="utf-8")
-    task_focus_payload = _write_task_focus_dashboard(
+    task_payload = _task_compare_payload(
         dashboard_dir,
         run_root,
         data,
         control_dir,
         candidate_dir,
     )
-    _write_task_compare_dashboard(dashboard_dir, run_root, data, task_focus_payload)
+    _write_task_compare_dashboard(dashboard_dir, run_root, data, task_payload)
     _write_latest_pointer(
         dashboard_dir / "task_compare.html",
         name="latest_sage_ts.html",
     )
     _write_latest_pointer(
-        dashboard_dir / "task_focus.html",
-        name="latest_sage_ts_task_focus.html",
-    )
-    _write_latest_pointer(
-        dashboard_dir / "index.html",
-        name="latest_sage_ts_standard.html",
-    )
-    _write_latest_pointer(
         dashboard_dir / "task_compare.html",
         name="latest_sage_ts_task_compare.html",
     )
-    return dashboard_dir / "index.html"
+    return dashboard_dir / "task_compare.html"
 
 
 def _repo_root() -> Path:
@@ -2622,11 +1613,7 @@ def _write_latest_pointer(index_path: Path, *, name: str) -> None:
     latest_dir = _repo_root() / "outputs" / "dashboard"
     latest_dir.mkdir(parents=True, exist_ok=True)
     rel = os.path.relpath(index_path, latest_dir)
-    label = (
-        "Open latest ToolSandbox SAGE dashboard"
-        if "task_focus" not in name
-        else "Open latest ToolSandbox SAGE task-focus dashboard"
-    )
+    label = "Open latest ToolSandbox SAGE Task Compare dashboard"
     (latest_dir / name).write_text(
         f"""<!doctype html>
 <meta charset="utf-8">

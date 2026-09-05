@@ -95,27 +95,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       margin-top: 10px;
       max-width: 960px;
     }
-    .cache-panel {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-      max-width: 960px;
-    }
-    .cache-pill {
-      border: 1px solid var(--line);
-      background: var(--panel2);
-      color: var(--muted);
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 750;
-      font-variant-numeric: tabular-nums;
-    }
-	    .cache-pill strong {
-	      color: var(--text);
-	      margin-right: 4px;
-	    }
 	    .live-tool-panel {
 	      display: none;
 	      max-width: 960px;
@@ -1137,11 +1116,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <div class="subtitle" id="subtitle">Loading run data...</div>
         <div class="subtitle runtime-line" id="runtimeLine"></div>
       </div>
-      <select id="dashboardSwitch" class="dashboard-switch" aria-label="Switch dashboard">
-        <option value="index.html">Overview</option>
-        <option value="task_focus.html">Task Focus</option>
-        <option value="task_compare.html">Task Compare</option>
-      </select>
     </div>
     <div class="sage-thinking-box" id="sageThinkingBox">
       <div class="sage-thinking-title">Agent Actions</div>
@@ -1152,7 +1126,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <div class="run-progress" id="runProgress"></div>
         <div class="metrics" id="metrics"></div>
         <div class="metrics tool-metrics" id="toolMetrics"></div>
-        <div class="cache-panel" id="cachePanel"></div>
         <div class="live-tool-panel" id="liveToolPanel"></div>
       </div>
       <div class="sage-status-stack">
@@ -1266,21 +1239,13 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       return Boolean(rowOrSummary?.[key]) || finite(rowOrSummary?.[callsKey]) || finite(rowOrSummary?.[tokensKey]);
     };
     const llmPairValue = (controlValue, candidateValue, formatter) => `${formatter(controlValue)} / ${formatter(candidateValue)}`;
-    const baselineCacheUsed = () => {
-      const cache = payload?.control_cache || {};
-      const pairedCached = pairs.filter((pair) => pair?.control?.control_cache_source === "cached").length;
-      return pairedCached > 0 || Number(cache.cached_control_tasks || 0) > 0 || String(cache.control_source || cache.source || "").toLowerCase() === "cached";
-    };
     const totalTimePairValue = (summary) => {
-      const baseline = baselineCacheUsed() ? "N/A" : durationText(summary.control_wall_time_seconds);
-      return `${baseline} / ${durationText(summary.candidate_wall_time_seconds)}`;
+      return `${durationText(summary.control_wall_time_seconds)} / ${durationText(summary.candidate_wall_time_seconds)}`;
     };
     const totalTimeHint = (summary) => {
-      const baselineNote = baselineCacheUsed()
-        ? "baseline served from cache"
-        : finite(summary.control_wall_time_seconds)
-          ? "baseline wall time"
-          : "baseline time not recorded";
+      const baselineNote = finite(summary.control_wall_time_seconds)
+        ? "baseline wall time"
+        : "baseline time not recorded";
       const sageNote = finite(summary.candidate_wall_time_seconds)
         ? finite(summary.candidate_wall_time_resume_offset_seconds) && Number(summary.candidate_wall_time_resume_offset_seconds) > 0
           ? "SAGE wall time including checkpoint"
@@ -1330,16 +1295,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       payload?.arm_labels?.[arm]
         || (arm === "control" ? "Non-learning" : "SAGE")
     );
-    function initDashboardSwitch() {
-      const select = document.getElementById("dashboardSwitch");
-      if (!select) return;
-      const current = location.pathname.split("/").pop() || "index.html";
-      select.value = current;
-      select.addEventListener("change", () => {
-        if (select.value && select.value !== current) location.href = select.value;
-      });
-    }
-    const completeStatus = (row) => row?.status === "complete" || row?.status === "cached" || row?.status === "done";
+    const completeStatus = (row) => row?.status === "complete" || row?.status === "done";
     const toolEvents = (pair) => pair?.candidate?.generated_tool_events || pair?.candidate?.generated_tools?.map((tool) => ({kind: "called", tool})) || [];
     const toolEventLabel = (event) => `${event.kind || "tool"}: ${event.tool || ""}`;
     const compactToolName = (name) => String(name || "").replace(/^.*:/, "").replace(/_/g, " ");
@@ -1389,44 +1345,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         <div class="hint">${esc(hint)}</div>
       </div>`;
     }
-
-    function cachePill(label, value) {
-      if (value === null || value === undefined || value === "") return "";
-      return `<span class="cache-pill"><strong>${esc(label)}</strong>${esc(value)}</span>`;
-    }
-
-	    function renderCachePanel() {
-	      const cache = payload?.control_cache || {};
-	      const hasCacheReport = Object.keys(cache).length > 0;
-      if (!hasCacheReport && !(payload?.summary || payload?.arm_progress)) {
-        document.getElementById("cachePanel").innerHTML = "";
-        return;
-      }
-      const progress = payload?.arm_progress?.control || {};
-      const summary = payload?.summary || {};
-      const completed = progress.completed ?? summary.control_completed ?? 0;
-      const total = progress.total ?? summary.scenario_count ?? 0;
-      const misses = cache.cache_misses || {};
-      const missText = Object.entries(misses)
-        .filter(([, value]) => Number(value || 0) > 0)
-        .map(([key, value]) => `${value} ${key.replaceAll("_", " ")}`)
-        .join(" · ");
-      const hash = cache.cache_manifest_hash ? String(cache.cache_manifest_hash).slice(0, 12) : "";
-      const rowCached = pairs.filter((pair) => pair?.control?.control_cache_source === "cached").length;
-      const rowFresh = pairs.filter((pair) => pair?.control && pair?.control?.control_cache_source !== "cached").length;
-      const cached = cache.cached_control_tasks ?? rowCached;
-      const fresh = cache.fresh_control_tasks ?? (rowCached ? rowFresh : (total || completed || 0));
-      const mode = cache.mode || (rowCached ? "use-if-eligible" : "off");
-      const source = cache.control_source || cache.source || (rowCached ? "cached row summaries" : "fresh baseline");
-      document.getElementById("cachePanel").innerHTML = [
-        cachePill("Control cache", `${cached} cached / ${fresh} fresh`),
-        cachePill("Mode", mode),
-        cachePill("Source", source),
-        cachePill("Misses", missText),
-        cachePill("Manifest", hash),
-	        cache.live_dashboard_seeded_from_preflight ? cachePill("Live note", "seeded from preflight until runner finalizes report") : "",
-	      ].filter(Boolean).join("");
-	    }
 
 	    function renderToolSummaryPanel() {
 	      const panel = document.getElementById("liveToolPanel");
@@ -2161,7 +2079,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
 	      cell?.addEventListener("keydown", (event) => {
 	        if (event.key === "Enter" || event.key === " ") openTools();
 	      });
-	      renderCachePanel();
 	      renderToolSummaryPanel();
 	    }
 
@@ -2342,10 +2259,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
 
     function transcriptFallback(row) {
-      if (row?.control_cache_source === "cached") {
-        const ids = row?.control_cache?.record_ids || [];
-        return `Cached control row has no local transcript export in this run.${ids.length ? "\\nCache record IDs: " + ids.join(", ") : ""}`;
-      }
       const checks = row?.outcome_checks || [];
       const observed = checks.flatMap((check) => check.observed_messages || []).slice(-3);
       return observed.join("\\n\\n") || "No transcript messages exported.";
@@ -2492,7 +2405,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
             <div class="mini"><div class="label">Turns B / S</div><div class="value">${esc(control.turn_count ?? "-")} / ${esc(candidate.turn_count ?? "-")}</div></div>
             <div class="mini"><div class="label">LLM Calls B / S</div><div class="value">${esc(llmPairValue(control.llm_call_count, candidate.llm_call_count, intNum))}</div><div class="hint">live ${esc(llmPairValue(control.llm_live_call_count, candidate.llm_live_call_count, intNum))}</div></div>
             <div class="mini"><div class="label">Tokens B / S</div><div class="value">${esc(llmPairValue(control.llm_total_tokens, candidate.llm_total_tokens, tokenNum))}</div><div class="hint">prompt ${esc(llmPairValue(control.llm_prompt_tokens, candidate.llm_prompt_tokens, tokenNum))} · provider-prefix cached ${esc(llmPairValue(control.llm_provider_cached_prompt_tokens, candidate.llm_provider_cached_prompt_tokens, tokenNum))} · provider metadata ${esc(llmPairValue(control.llm_provider_cached_prompt_tokens_available_count, candidate.llm_provider_cached_prompt_tokens_available_count, intNum))} calls</div></div>
-            <div class="mini"><div class="label">Control Cache</div><div class="value">${esc(control.control_cache_source || "-")}</div></div>
             <div class="mini"><div class="label">SAGE Tool Events</div><div class="value">${esc(toolEvents(pair).length)}</div></div>
           </div>
         </div>
@@ -2676,7 +2588,6 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       await refresh();
       if (!handlersBound) {
         handlersBound = true;
-        initDashboardSwitch();
         document.getElementById("search").addEventListener("input", renderList);
         document.getElementById("closeTools").addEventListener("click", closeTools);
         document.getElementById("closeToolCode").addEventListener("click", closeToolCode);

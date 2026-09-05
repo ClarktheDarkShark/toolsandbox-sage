@@ -35,19 +35,10 @@ from sage_ts.campaign.artifacts import (
 from sage_ts.config.models import DEFAULT_MODEL, paired_model_metadata
 from sage_ts.config.splits import load_split_names, scenario_records
 from sage_ts.dashboard.exporters import (
-    dashboard_url as make_dashboard_url,
-)
-from sage_ts.dashboard.exporters import (
     open_dashboard,
     write_protocol_dashboard,
 )
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
-from sage_ts.evaluation.control_baseline_cache import (
-    ControlBaselineCache,
-    build_control_cache_report,
-    plan_control_cache,
-    write_synthetic_control_run,
-)
 from sage_ts.evaluation.helper_contribution import write_helper_contribution_summary
 from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 from sage_ts.evaluation.run_metrics import compare_runs
@@ -952,21 +943,6 @@ def _protocol_gate_decision(
     return not reasons, reasons
 
 
-def _resume_arm_dir(
-    resume_run_root: Path | None,
-    arm: str,
-    *,
-    directory_name: str | None = None,
-) -> Path | None:
-    if resume_run_root is None:
-        return None
-    return _status_run_dir(
-        resume_run_root,
-        arm,
-        resume_run_root / (directory_name or arm),
-    )
-
-
 def _protocol_event(
     *,
     event: str,
@@ -1086,10 +1062,6 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
                 run_type=f"{params['mode']}_control",
                 base_tool_policy=str(params["base_tool_policy"]),
                 actor_selection_mode="policy",
-                resume_from_dir=Path(params["control_resume_dir"])
-                if params.get("control_resume_dir")
-                else None,
-                resume_completed_limit=params.get("resume_completed_limit"),
             ),
             progress_hook=progress,
             event_hook=event_hook,
@@ -1211,21 +1183,12 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                     if params.get("inventory_authority_replay_dir")
                     else None
                 ),
-                resume_from_dir=Path(params["candidate_resume_dir"])
-                if params.get("candidate_resume_dir")
-                else None,
-                resume_completed_limit=params.get("resume_completed_limit"),
                 manifest_path=Path(params["manifest"]),
                 reflection_control_channel=params.get("reflection_control_channel"),
                 require_fresh_reflection_control=(
                     require_fresh_control and candidate_generation_enabled
                 ),
-                failure_memory_path=(
-                    None
-                    if require_fresh_control
-                    or params.get("inventory_authority_replay_dir")
-                    else Path("artifacts/summaries/failure_memory.json")
-                ),
+                failure_memory_path=None,
             ),
             generator=generator,
             progress_hook=progress,
@@ -1419,29 +1382,25 @@ def main() -> None:
     parser.add_argument(
         "--parallel-arms",
         action="store_true",
-        help="Run the matched control and SAGE arms concurrently in isolated processes.",
+        help=(
+            "Required compatibility flag: run the matched control and SAGE arms "
+            "concurrently in isolated processes."
+        ),
     )
     parser.add_argument(
         "--control-cache",
-        choices=("off", "collect", "use-if-eligible", "refresh", "strict"),
-        default=os.environ.get("CONTROL_CACHE", "off"),
-        help="Control-arm baseline cache mode. Never applies to the SAGE/candidate arm.",
-    )
-    parser.add_argument(
-        "--control-cache-root",
-        type=Path,
-        default=Path("artifacts/baselines/control_task_baselines"),
-        help="Authoritative completed-control baseline cache root.",
+        choices=("off",),
+        default="off",
+        help="Compatibility flag; SAGE always executes a fresh control arm.",
     )
     parser.add_argument(
         "--require-fresh-control",
         action="store_true",
         help=(
-            "Publication fail-closed mode: require exactly one live uncached "
+            "Required compatibility flag: require exactly one live uncached "
             "control row per task and supply those same-run rows to online "
             "reflection. Requires --parallel-arms so rows are streamed to SAGE at "
-            "each matched task boundary. Incompatible with every --control-cache "
-            "mode except off."
+            "each matched task boundary."
         ),
     )
     parser.add_argument(
@@ -1464,19 +1423,6 @@ def main() -> None:
         "--diagnostic-force-allowed",
         action="store_true",
         help="Allow SAGE_DIAGNOSTIC_FORCE_* env vars for explicit diagnostic runs only.",
-    )
-    parser.add_argument(
-        "--resume-run-root",
-        type=Path,
-        help="Seed each arm from a prior interrupted paired protocol run root.",
-    )
-    parser.add_argument(
-        "--resume-completed-limit",
-        type=int,
-        help=(
-            "When resuming, copy only the first N completed rows from each prior "
-            "arm. This resumes before a known bad checkpoint after a framework fix."
-        ),
     )
     parser.add_argument(
         "--allow-empty-birth-preflight",
@@ -1528,14 +1474,6 @@ def main() -> None:
         raise SystemExit(
             "--inventory-authority-replay-dir requires --actor-selection-mode auto."
         )
-    if (
-        args.inventory_authority_capture_dir is not None
-        or args.inventory_authority_replay_dir is not None
-    ) and (args.resume_run_root is not None or args.resume_completed_limit is not None):
-        raise SystemExit(
-            "Matched-inventory capture/replay forbids --resume-run-root and "
-            "--resume-completed-limit."
-        )
     matched_inventory_requested = (
         args.inventory_authority_capture_dir is not None
         or args.inventory_authority_replay_dir is not None
@@ -1544,31 +1482,23 @@ def main() -> None:
         raise SystemExit(
             "Matched-inventory capture/replay requires --freeze-toolsandbox-clock."
         )
-    if args.require_fresh_control and args.control_cache != "off":
+    if not args.require_fresh_control:
         raise SystemExit(
-            "--require-fresh-control requires --control-cache off; cache lookup "
-            "and collection are prohibited in publication runs."
+            "--require-fresh-control is mandatory; cached or cross-run controls "
+            "are not supported."
         )
-    if args.require_fresh_control and not args.parallel_arms:
+    if not args.parallel_arms:
         raise SystemExit(
             "--require-fresh-control requires --parallel-arms; every strict "
             "publication control/SAGE pair must run concurrently."
         )
-    if args.require_fresh_control and args.no_dashboard_open:
+    if args.no_dashboard_open:
         raise SystemExit(
             "Strict publication runs require the Task Compare dashboard to open "
             "in the external browser; --no-dashboard-open is forbidden."
         )
-    if args.require_fresh_control and (
-        args.resume_run_root is not None or args.resume_completed_limit is not None
-    ):
-        raise SystemExit(
-            "--require-fresh-control forbids --resume-run-root and "
-            "--resume-completed-limit; every publication task row must execute "
-            "from the clean checkpoint."
-        )
     active_force_env = _active_diagnostic_force_env()
-    if args.require_fresh_control and active_force_env:
+    if active_force_env:
         raise SystemExit(
             "Diagnostic force-call environment is forbidden during a strict "
             "publication run: "
@@ -1646,18 +1576,6 @@ def main() -> None:
     registry_gate_snapshot = _snapshot_registry_for_gate(run_root, registry_dir)
     control_dir: Path | None = None
     candidate_dir: Path | None = None
-    fresh_control_dir: Path | None = None
-    control_resume_dir = _resume_arm_dir(args.resume_run_root, "control")
-    candidate_resume_dir = _resume_arm_dir(
-        args.resume_run_root,
-        "candidate",
-        directory_name=candidate_arm_name,
-    )
-    resume_completed_limit = (
-        max(0, args.resume_completed_limit)
-        if args.resume_completed_limit is not None
-        else None
-    )
     generation_enabled = _generation_enabled_by_default(args.mode, manifest_type)
     if args.generation == "on":
         generation_enabled = True
@@ -1701,23 +1619,17 @@ def main() -> None:
             f"{', '.join(sorted(active_force_env))}. Unset these variables or pass "
             "--diagnostic-force-allowed only for explicit diagnostics."
         )
-    control_cache: ControlBaselineCache | None = None
-    if args.control_cache != "off":
-        control_cache = ControlBaselineCache(args.control_cache_root)
-    control_cache_plan: dict[str, Any] | None = None
     control_cache_report: dict[str, Any] = {
-        "mode": args.control_cache,
+        "mode": "off",
         "control_source": "fresh",
         "cached_control_tasks": 0,
         "fresh_control_tasks": len(scenario_names),
         "cached_scenarios": [],
         "fresh_scenarios": list(scenario_names),
         "cache_misses": {},
-        "cache_manifest_hash": (
-            control_cache.manifest_hash() if control_cache is not None else None
-        ),
-        "cache_accessed": control_cache is not None,
-        "fresh_control_enforced": args.require_fresh_control,
+        "cache_manifest_hash": None,
+        "cache_accessed": False,
+        "fresh_control_enforced": True,
         "baseline_count_and_variance_per_cached_task": {},
         "estimated_token_time_savings": {
             "cached_tasks_skipped": 0,
@@ -1728,44 +1640,11 @@ def main() -> None:
         "confidence_intervals_account_for_cached_control_variance": False,
         "cohort_selection_influenced_by_cache": False,
     }
-    if args.control_cache in {"use-if-eligible", "strict"}:
-        if control_cache is None:
-            raise AssertionError("Control cache was not initialized for cache mode.")
-        control_cache_plan = plan_control_cache(
-            cache=control_cache,
-            scenario_names=scenario_names,
-            agent=args.agent,
-            user=args.user,
-            base_tool_policy=UPSTREAM_POLICY,
-            manifest_path=args.manifest,
-        )
-        control_cache_report = build_control_cache_report(
-            mode=args.control_cache,
-            cache=control_cache,
-            scenario_names=scenario_names,
-            cached_scenarios=list(control_cache_plan["cached_scenarios"]),
-            fresh_scenarios=list(control_cache_plan["fresh_scenarios"]),
-            miss_reasons=dict(control_cache_plan["miss_reasons"]),
-            lookups=dict(control_cache_plan["lookups"]),
-        )
-        if args.control_cache == "strict" and control_cache_plan["fresh_scenarios"]:
-            raise SystemExit(
-                "Control cache strict mode blocked this run: ineligible control "
-                f"baselines for {len(control_cache_plan['fresh_scenarios'])} tasks."
-            )
-    effective_parallel_arms = args.parallel_arms and not (
-        control_cache_plan is not None and control_cache_plan["cached_scenarios"]
-    )
+    effective_parallel_arms = True
     reflection_control_delivery = (
         "task_synchronous_stream"
-        if args.require_fresh_control
-        and candidate_generation_enabled
-        and effective_parallel_arms
-        else "preloaded_complete_map"
-        if args.require_fresh_control and candidate_generation_enabled
+        if candidate_generation_enabled
         else "not_applicable_generation_disabled"
-        if args.require_fresh_control
-        else "not_applicable"
     )
     cohort_preflight = _write_cohort_preflight(
         run_root,
@@ -1941,42 +1820,26 @@ def main() -> None:
         scenario_count=len(scenario_names),
         registry_dir=registry_dir,
         artifact_root=args.artifact_root,
-        control_label="Fresh non-learning control"
-        if args.require_fresh_control
-        else "Non-learning",
+        control_label="Fresh non-learning control",
         candidate_label=f"SAGE {args.actor_selection_mode} selection",
     )
     # Dashboard visibility is part of the experiment surface. Keep it on by
     # default for every run; only the explicit CLI flag should suppress it.
     should_open_dashboard = not args.no_dashboard_open
-    dashboard_url = dashboard_standard_url = dashboard_task_focus_url = (
-        dashboard_task_compare_url
-    ) = None
+    dashboard_url = dashboard_task_compare_url = None
     dashboard_open_receipt_path: Path | None = None
     if should_open_dashboard:
         dashboard_task_compare_url = open_dashboard(
-            dashboard_index.with_name("task_compare.html"),
-            port=args.dashboard_port,
-            server_root=run_root,
-        )
-        dashboard_opened_monotonic_ns = time.monotonic_ns()
-        dashboard_standard_url = make_dashboard_url(
             dashboard_index,
             port=args.dashboard_port,
             server_root=run_root,
         )
+        dashboard_opened_monotonic_ns = time.monotonic_ns()
         dashboard_url = dashboard_task_compare_url
-        dashboard_task_focus_url = make_dashboard_url(
-            dashboard_index.with_name("task_focus.html"),
-            port=args.dashboard_port,
-            server_root=run_root,
-        )
         (run_root / "dashboard_urls.json").write_text(
             json.dumps(
                 {
                     "dashboard_url": dashboard_task_compare_url,
-                    "dashboard_standard_url": dashboard_standard_url,
-                    "dashboard_task_focus_url": dashboard_task_focus_url,
                     "dashboard_task_compare_url": dashboard_task_compare_url,
                     "default_dashboard": "task_compare",
                 },
@@ -1993,9 +1856,7 @@ def main() -> None:
                     "comparison": (
                         f"fresh_control_vs_sage_{args.actor_selection_mode}_selection"
                     ),
-                    "path": str(
-                        dashboard_index.with_name("task_compare.html").resolve()
-                    ),
+                    "path": str(dashboard_index.resolve()),
                     "url": dashboard_task_compare_url,
                     "external_browser_opened": True,
                     "http_verified_before_open": True,
@@ -2027,9 +1888,7 @@ def main() -> None:
             candidate_dir=candidate_dir,
             registry_dir=registry_dir,
             artifact_root=args.artifact_root,
-            control_label="Fresh non-learning control"
-            if args.require_fresh_control
-            else "Non-learning",
+            control_label="Fresh non-learning control",
             candidate_label=f"SAGE {args.actor_selection_mode} selection",
         )
 
@@ -2049,7 +1908,6 @@ def main() -> None:
             root=args.artifact_root,
         )
 
-    reflection_control_rows: dict[str, dict[str, Any]] | None = None
     parallel_arm_execution: dict[str, Any] | None = None
     if effective_parallel_arms:
         append_event(
@@ -2064,9 +1922,7 @@ def main() -> None:
         )
         ctx = get_context("spawn")
         reflection_control_channel = (
-            ctx.Queue()
-            if args.require_fresh_control and candidate_generation_enabled
-            else None
+            ctx.Queue() if candidate_generation_enabled else None
         )
         base_params: dict[str, Any] = {
             "mode": args.mode,
@@ -2080,13 +1936,6 @@ def main() -> None:
             "registry_dir": str(registry_dir),
             "scenario_names": list(scenario_names),
             "manifest": str(args.manifest),
-            "control_resume_dir": str(control_resume_dir)
-            if control_resume_dir
-            else None,
-            "candidate_resume_dir": str(candidate_resume_dir)
-            if candidate_resume_dir
-            else None,
-            "resume_completed_limit": resume_completed_limit,
             "actor_selection_mode": args.actor_selection_mode,
             "candidate_arm_name": candidate_arm_name,
             "inventory_authority_capture_dir": str(inventory_authority_capture_dir)
@@ -2095,7 +1944,7 @@ def main() -> None:
             "inventory_authority_replay_dir": str(inventory_authority_replay_dir)
             if inventory_authority_replay_dir
             else None,
-            "require_fresh_control": args.require_fresh_control,
+            "require_fresh_control": True,
             "reflection_control_channel": reflection_control_channel,
         }
         control_process = ctx.Process(
@@ -2227,209 +2076,29 @@ def main() -> None:
             },
             root=args.artifact_root,
         )
-        fresh_control_dir = control_dir
-        if args.control_cache in {"collect", "use-if-eligible", "refresh"}:
-            if control_cache is None:
-                raise AssertionError("Control cache collection was not initialized.")
-            collected = control_cache.collect_run(
-                run_dir=fresh_control_dir,
-                config=ToolSandboxRunConfig(
-                    agent=args.agent,
-                    user=args.user,
-                    scenario_names=scenario_names,
-                    output_dir=control_root,
-                    processes=1,
-                    run_type=f"{args.mode}_control",
-                    base_tool_policy=UPSTREAM_POLICY,
-                    actor_selection_mode="policy",
-                ),
-                manifest_path=args.manifest,
-            )
-            control_cache_report["collected_control_records"] = len(collected)
-    else:
-
-        def control_progress(
-            run_dir: Path,
-            _rows: list[dict[str, object]],
-            status: str,
-            _scenario_count: int,
-        ) -> None:
-            nonlocal control_dir
-            control_dir = run_dir
-            refresh_dashboard("control", status)
-
-        cached_rows_by_name: dict[str, dict[str, Any]] = {}
-        fresh_control_scenarios = scenario_names
-        if control_cache_plan is not None:
-            cached_rows_by_name = {
-                name: control_cache_plan["lookups"][name].row
-                for name in control_cache_plan["cached_scenarios"]
-                if control_cache_plan["lookups"][name].row is not None
-            }
-            fresh_control_scenarios = tuple(control_cache_plan["fresh_scenarios"])
-        if fresh_control_scenarios:
-            fresh_control_dir = run_toolsandbox(
-                ToolSandboxRunConfig(
-                    agent=args.agent,
-                    user=args.user,
-                    scenario_names=fresh_control_scenarios,
-                    output_dir=control_root,
-                    processes=1,
-                    run_type=f"{args.mode}_control",
-                    base_tool_policy=UPSTREAM_POLICY,
-                    actor_selection_mode="policy",
-                    resume_from_dir=control_resume_dir
-                    if fresh_control_scenarios == scenario_names
-                    else None,
-                    resume_completed_limit=resume_completed_limit
-                    if fresh_control_scenarios == scenario_names
-                    else None,
-                ),
-                progress_hook=control_progress,
-                event_hook=campaign_event,
-            )
-            control_dir = fresh_control_dir
-            if args.control_cache in {"collect", "use-if-eligible", "refresh"}:
-                if control_cache is None:
-                    raise AssertionError(
-                        "Control cache collection was not initialized."
-                    )
-                collected = control_cache.collect_run(
-                    run_dir=fresh_control_dir,
-                    config=ToolSandboxRunConfig(
-                        agent=args.agent,
-                        user=args.user,
-                        scenario_names=fresh_control_scenarios,
-                        output_dir=control_root,
-                        processes=1,
-                        run_type=f"{args.mode}_control",
-                        base_tool_policy=UPSTREAM_POLICY,
-                        actor_selection_mode="policy",
-                    ),
-                    manifest_path=args.manifest,
-                )
-                control_cache_report["collected_control_records"] = len(collected)
-        if cached_rows_by_name:
-            control_dir = write_synthetic_control_run(
-                output_root=control_root,
-                run_type=args.mode,
-                agent=args.agent,
-                user=args.user,
-                scenario_names=scenario_names,
-                cached_rows_by_name=cached_rows_by_name,
-                fresh_run_dir=fresh_control_dir,
-                cache_report=control_cache_report,
-            )
-            control_progress(control_dir, [], "complete", len(scenario_names))
-        append_event(
-            "phase_completed",
-            {
-                "mode": args.mode,
-                "phase": "control",
-                "run_dir": str(control_dir),
-                "control_cache_mode": args.control_cache,
-                "control_cache_source": control_cache_report.get("control_source"),
-                "cached_control_tasks": control_cache_report.get(
-                    "cached_control_tasks"
-                ),
-                "fresh_control_tasks": control_cache_report.get("fresh_control_tasks"),
-            },
-            root=args.artifact_root,
+    if control_dir is None:
+        raise SystemExit("Strict fresh-control run did not produce a control arm.")
+    if candidate_dir is None:
+        raise SystemExit("Strict fresh-control run did not produce a SAGE arm.")
+    try:
+        _validate_uncached_result_rows(
+            control_dir,
+            expected_scenarios=scenario_names,
+            arm="control",
+            require_complete=True,
         )
-        if args.require_fresh_control:
-            if control_dir is None:
-                raise SystemExit(
-                    "Strict fresh-control run did not produce a control arm."
-                )
-            try:
-                reflection_control_rows = _validate_uncached_result_rows(
-                    control_dir,
-                    expected_scenarios=scenario_names,
-                    arm="control",
-                    require_complete=True,
-                )
-                _assert_strict_fresh_report(
-                    control_cache_report,
-                    scenario_count=len(scenario_names),
-                )
-            except ValueError as exc:
-                raise SystemExit(str(exc)) from exc
-        refresh_dashboard("candidate", "running")
-
-        generator = (
-            ToolGenerator(completer=OpenAIChatAdapter(model=args.generation_model))
-            if candidate_generation_enabled
-            else None
+        _validate_uncached_result_rows(
+            candidate_dir,
+            expected_scenarios=scenario_names,
+            arm="candidate",
+            require_complete=True,
         )
-
-        def candidate_progress(
-            run_dir: Path,
-            _rows: list[dict[str, object]],
-            status: str,
-            _scenario_count: int,
-        ) -> None:
-            nonlocal candidate_dir
-            candidate_dir = run_dir
-            refresh_dashboard("candidate", status)
-
-        candidate_dir = run_sage_with_registry(
-            SageRunConfig(
-                agent=args.agent,
-                user=args.user,
-                scenario_names=scenario_names,
-                output_dir=candidate_root,
-                registry_dir=registry_dir,
-                generation_model=args.generation_model,
-                run_type=f"{args.mode}_{candidate_arm_name}",
-                recurrence_threshold=args.recurrence_threshold,
-                base_tool_policy=UPSTREAM_POLICY,
-                actor_selection_mode=args.actor_selection_mode,
-                inventory_authority_capture_dir=inventory_authority_capture_dir,
-                inventory_authority_replay_dir=inventory_authority_replay_dir,
-                resume_from_dir=candidate_resume_dir,
-                resume_completed_limit=resume_completed_limit,
-                manifest_path=args.manifest,
-                reflection_control_rows=reflection_control_rows,
-                require_fresh_reflection_control=(
-                    args.require_fresh_control and candidate_generation_enabled
-                ),
-                # Publication runs must not inherit conclusions from earlier
-                # campaigns. Non-publication runs retain the historical
-                # failure-memory behavior through SageRunConfig's default.
-                failure_memory_path=(
-                    Path("artifacts/summaries/failure_memory.json")
-                    if candidate_generation_enabled and not args.require_fresh_control
-                    else None
-                ),
-            ),
-            generator=generator,
-            progress_hook=candidate_progress,
-            event_hook=campaign_event,
+        _assert_strict_fresh_report(
+            control_cache_report,
+            scenario_count=len(scenario_names),
         )
-    if args.require_fresh_control:
-        if control_dir is None:
-            raise SystemExit("Strict fresh-control run did not produce a control arm.")
-        if candidate_dir is None:
-            raise SystemExit("Strict fresh-control run did not produce a SAGE arm.")
-        try:
-            _validate_uncached_result_rows(
-                control_dir,
-                expected_scenarios=scenario_names,
-                arm="control",
-                require_complete=True,
-            )
-            _validate_uncached_result_rows(
-                candidate_dir,
-                expected_scenarios=scenario_names,
-                arm="candidate",
-                require_complete=True,
-            )
-            _assert_strict_fresh_report(
-                control_cache_report,
-                scenario_count=len(scenario_names),
-            )
-        except ValueError as exc:
-            raise SystemExit(str(exc)) from exc
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     control_cache_report_path = run_root / "control_cache_report.json"
     control_cache_report_path.write_text(
         json.dumps(control_cache_report, indent=2) + "\n", encoding="utf-8"
@@ -2612,12 +2281,10 @@ def main() -> None:
             "quality_gate_failures", []
         ),
         "external_fixture": external_fixture,
-        "resume_run_root": str(args.resume_run_root) if args.resume_run_root else None,
-        "resume_completed_limit": resume_completed_limit,
-        "control_resume_dir": str(control_resume_dir) if control_resume_dir else None,
-        "candidate_resume_dir": str(candidate_resume_dir)
-        if candidate_resume_dir
-        else None,
+        "resume_run_root": None,
+        "resume_completed_limit": None,
+        "control_resume_dir": None,
+        "candidate_resume_dir": None,
         "comparison_path": str(comparison_path),
         "control_cache_mode": args.control_cache,
         "control_source": control_cache_report.get("control_source"),
@@ -2625,27 +2292,17 @@ def main() -> None:
         "fresh_control_tasks": control_cache_report.get("fresh_control_tasks"),
         "control_cache_report_path": str(control_cache_report_path),
         "control_cache_manifest_hash": control_cache_report.get("cache_manifest_hash"),
-        "fresh_control_required": args.require_fresh_control,
-        "cross_run_failure_memory_enabled": (
-            candidate_generation_enabled and not args.require_fresh_control
-        ),
-        "cross_run_failure_memory_path": (
-            "artifacts/summaries/failure_memory.json"
-            if candidate_generation_enabled and not args.require_fresh_control
-            else None
-        ),
+        "fresh_control_required": True,
+        "cross_run_failure_memory_enabled": False,
+        "cross_run_failure_memory_path": None,
         "reflection_control_source": (
             "inventory_authority_replay"
             if inventory_authority_replay_dir is not None
             else "same_run_fresh"
-            if args.require_fresh_control and candidate_generation_enabled
+            if candidate_generation_enabled
             else "not_applicable"
-            if not candidate_generation_enabled
-            else "legacy_control_cache"
         ),
-        "publication_performance_endpoint": (
-            "outcome_task_completion_similarity" if args.require_fresh_control else None
-        ),
+        "publication_performance_endpoint": "outcome_task_completion_similarity",
         "outcome_evaluator": outcome_evaluator,
         "openai_response_cache_enabled": False,
         "openai_response_cache_mode": "off",
@@ -2676,10 +2333,8 @@ def main() -> None:
         ),
         "dashboard_path": str(dashboard_index),
         "dashboard_url": dashboard_url,
-        "dashboard_standard_url": dashboard_standard_url,
-        "dashboard_task_focus_url": dashboard_task_focus_url,
         "dashboard_task_compare_url": dashboard_task_compare_url,
-        "dashboard_open_required": args.require_fresh_control,
+        "dashboard_open_required": True,
         "dashboard_open_receipt_path": str(dashboard_open_receipt_path)
         if dashboard_open_receipt_path
         else None,
@@ -2772,7 +2427,7 @@ def main() -> None:
             "control_cache_manifest_hash": control_cache_report.get(
                 "cache_manifest_hash"
             ),
-            "fresh_control_required": args.require_fresh_control,
+            "fresh_control_required": True,
             "outcome_evaluator": outcome_evaluator,
             "timezone": run_timezone,
             "helper_contribution_summary_path": str(helper_contribution_path),
@@ -2782,10 +2437,8 @@ def main() -> None:
             ),
             "dashboard_path": str(dashboard_index),
             "dashboard_url": dashboard_url,
-            "dashboard_standard_url": dashboard_standard_url,
-            "dashboard_task_focus_url": dashboard_task_focus_url,
             "dashboard_task_compare_url": dashboard_task_compare_url,
-            "dashboard_open_required": args.require_fresh_control,
+            "dashboard_open_required": True,
             "dashboard_open_receipt_path": str(dashboard_open_receipt_path)
             if dashboard_open_receipt_path
             else None,
