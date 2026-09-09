@@ -23,8 +23,9 @@ Current repo context:
 - Chapter 3 LaTeX draft: `docs/sage_protocol/chapter3_sage_methodology_latex_draft.tex`
 - Current figure inventory: `docs/sage_protocol/chapter3_methodology_figures.md`
 - Current figure assets: `docs/sage_protocol/figures/`
-- Current regeneration command in README: `python scripts/render_chapter3_sage_figures.py`
-- Current publication-loop renderer: `python3 scripts/render_sage_self_evolution_loop_publication.py`
+- Historical figure assets must not be treated as current mechanism evidence;
+  their retired generators described natural rather than policy-directed tool
+  selection.
 
 ## Source Base Surveyed
 

@@ -24,7 +24,16 @@ from sage_ts.evaluation.llm_usage import (
     snapshot_scenario_usage,
     write_llm_usage_artifacts,
 )
-from sage_ts.evaluation.outcome_score import compute_outcome_score
+from sage_ts.evaluation.online_feedback_score import (
+    ONLINE_FEEDBACK_EVALUATOR_VERSION,
+)
+from sage_ts.evaluation.online_feedback_score import (
+    compute_outcome_score as compute_online_feedback_score,
+)
+from sage_ts.evaluation.outcome_score import (
+    compute_outcome_score,
+    outcome_evaluator_manifest,
+)
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY, apply_base_tool_policy
 from tool_sandbox.cli import write_result_summary
 from tool_sandbox.cli.utils import (
@@ -71,6 +80,10 @@ def write_run_manifest(config: ToolSandboxRunConfig) -> Path:
     payload: dict[str, Any] = {
         **asdict(config),
         "output_dir": str(config.output_dir),
+        "actor_selection_mode": "policy",
+        "outcome_evaluator": outcome_evaluator_manifest(),
+        "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
+        "timezone": os.environ.get("TZ"),
         "scenario_names": list(config.scenario_names),
         "resume_from_dir": str(config.resume_from_dir)
         if config.resume_from_dir
@@ -297,11 +310,22 @@ def run_one_scenario(
                     score,
                 ) in result.evaluation_result.milestone_mapping.items()
             }
-            outcome = compute_outcome_score(
+            online_feedback = compute_online_feedback_score(
                 scenario,
                 result.ending_context,
                 canonical_milestone_scores=canonical_milestone_scores,
                 minefield_similarity=result.evaluation_result.minefield_similarity,
+            )
+            outcome = compute_outcome_score(
+                scenario,
+                result.ending_context,
+                scenario_name=name,
+            )
+            outcome["online_feedback_outcome_similarity"] = online_feedback.get(
+                "outcome_similarity"
+            )
+            outcome["online_feedback_evaluator_version"] = (
+                ONLINE_FEEDBACK_EVALUATOR_VERSION
             )
             return {
                 "name": name,
@@ -332,6 +356,7 @@ def run_one_scenario(
                 if archive:
                     transient_retry_archives.append(archive)
             else:
+                evaluator_identity = outcome_evaluator_manifest()
                 return {
                     "name": name,
                     "categories": scenario.categories,
@@ -350,6 +375,17 @@ def run_one_scenario(
                     "outcome_minefield_similarity": 0,
                     "outcome_check_count": 0,
                     "outcome_checks": [],
+                    "outcome_evaluator_version": evaluator_identity["version"],
+                    "outcome_evaluator_contract_sha256": evaluator_identity[
+                        "contract_sha256"
+                    ],
+                    "outcome_evaluator_source_sha256": evaluator_identity[
+                        "source_sha256"
+                    ],
+                    "online_feedback_outcome_similarity": 0,
+                    "online_feedback_evaluator_version": (
+                        ONLINE_FEEDBACK_EVALUATOR_VERSION
+                    ),
                 }
         finally:
             for role in roles.values():
@@ -483,6 +519,16 @@ def run_scenario_sequence(
             result = (
                 result_hook(name, active_scenario, result, output_directory) or result
             )
+        evaluator_identity = outcome_evaluator_manifest()
+        result.update(
+            {
+                "outcome_evaluator_version": evaluator_identity["version"],
+                "outcome_evaluator_contract_sha256": evaluator_identity[
+                    "contract_sha256"
+                ],
+                "outcome_evaluator_source_sha256": evaluator_identity["source_sha256"],
+            }
+        )
         result.update(snapshot_scenario_usage(name))
         clear_scenario_usage(name)
         result_summary.append(result)

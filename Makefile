@@ -36,10 +36,16 @@ lint:
 test-core:
 	$(COMMON_ENV) $(PYTHON) -m pytest \
 		tests/unit/test_sage_run_adapter.py \
+		tests/unit/test_toolsandbox_adapter.py \
+		tests/unit/test_openai_toolsandbox_roles.py \
 		tests/unit/test_online_birth.py \
 		tests/unit/test_tool_generator.py \
 		tests/unit/test_control_baseline_cache.py \
 		tests/unit/test_self_evolution_reflection.py \
+		tests/unit/test_online_feedback_score.py \
+		tests/unit/test_outcome_score.py \
+		tests/unit/test_outcome_score_v4_evidence.py \
+		tests/unit/test_outcome_score_v4_state_safety.py \
 		tests/unit/test_protocol_generation_policy.py \
 		tests/unit/test_publication_run_verifier.py \
 		tests/unit/test_publication_sample_verifier.py \
@@ -48,6 +54,7 @@ test-core:
 		tests/unit/test_publication_inputs.py \
 		tests/unit/test_publication_freeze.py \
 		tests/unit/test_rapid_api_cache.py \
+		tests/unit/test_dashboard_exporters.py \
 		tests/integration/test_toolsandbox_generated_tool_injection.py \
 		-q
 
@@ -55,12 +62,12 @@ test:
 	$(COMMON_ENV) $(PYTHON) -m pytest tests/unit tests/integration -q
 
 package:
-	$(PYTHON) -m build --outdir $(DIST_DIR)
+	$(PYTHON) -m pip wheel --no-deps --wheel-dir $(DIST_DIR) .
 
-# One complete 1,032-task online-build sample. The launcher enforces a live,
-# same-run control, disables application response/task/persistent-output replay,
-# checks the pinned read-only external-service fixture, starts from an empty
-# registry, and runs the publication verifier after completion.
+# One complete 1,032-task online-build sample. The launcher starts the control
+# and policy-directed SAGE in isolated concurrent processes, streams each fresh
+# control row at the matched task boundary, disables task/result replay, opens
+# the verified Task Compare dashboard, and verifies the completed pair.
 paper-online:
 	bash scripts/run_native_action_4omini_ab.sh full $(PORT) native-only
 

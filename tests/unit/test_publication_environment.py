@@ -47,6 +47,17 @@ def _editable_project(repo: Path, metadata_root: Path) -> DistributionRecord:
     )
 
 
+def _repository_import_paths(repo: Path) -> dict[str, str]:
+    paths = {
+        "sage_ts": repo / "src" / "sage_ts" / "__init__.py",
+        "tool_sandbox": repo / "tool_sandbox" / "__init__.py",
+    }
+    for path in paths.values():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    return {name: str(path) for name, path in paths.items()}
+
+
 def test_exact_environment_passes_and_allows_only_repo_metadata(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -61,6 +72,7 @@ def test_exact_environment_passes_and_allows_only_repo_metadata(tmp_path: Path) 
         ),
         _editable_project(repo, tmp_path / "site-packages"),
     )
+    repository_import_paths = _repository_import_paths(repo)
 
     report = verify_environment(
         lock,
@@ -75,6 +87,7 @@ def test_exact_environment_passes_and_allows_only_repo_metadata(tmp_path: Path) 
         platform_machine="arm64",
         installed_distributions=records,
         pip_checker=lambda: "No broken requirements found.",
+        repository_import_checker=lambda _python, _repo: repository_import_paths,
     )
 
     assert report["status"] == "pass"
@@ -95,6 +108,43 @@ def test_exact_environment_passes_and_allows_only_repo_metadata(tmp_path: Path) 
         "toolsandbox-sage",
     ]
     assert report["pip_check"] == "No broken requirements found."
+    repository_import_provenance = report["repository_import_provenance"]
+    assert isinstance(repository_import_provenance, dict)
+    assert repository_import_provenance["module_paths"] == repository_import_paths
+
+
+def test_verifier_rejects_repository_import_from_wrong_checkout(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    lock = repo / "requirements-publication-lock.txt"
+    lock_hash = _write_lock(lock)
+    module_paths = _repository_import_paths(repo)
+    foreign_module = tmp_path / "other" / "src" / "sage_ts" / "__init__.py"
+    foreign_module.parent.mkdir(parents=True)
+    foreign_module.write_text("", encoding="utf-8")
+    module_paths["sage_ts"] = str(foreign_module)
+
+    with pytest.raises(EnvironmentVerificationError, match="provenance mismatch"):
+        verify_environment(
+            lock,
+            repo_root=repo,
+            expected_lock_sha256=lock_hash,
+            python_version=(3, 12, 7),
+            python_executable=str(tmp_path / "venv" / "bin" / "python"),
+            python_prefix=str(tmp_path / "venv"),
+            python_base_prefix=str(tmp_path / "base"),
+            python_implementation="CPython",
+            platform_system="Darwin",
+            platform_machine="arm64",
+            installed_distributions=(
+                _external(tmp_path),
+                _editable_project(repo, tmp_path / "site-packages"),
+            ),
+            pip_checker=lambda: "pass",
+            repository_import_checker=lambda _python, _repo: module_paths,
+        )
 
 
 def test_verifier_requires_exact_python_and_lock_hash(tmp_path: Path) -> None:

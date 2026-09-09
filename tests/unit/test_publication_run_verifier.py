@@ -251,6 +251,78 @@ def _fresh_run(tmp_path: Path) -> Path:
         "".join(json.dumps(row) + "\n" for row in feedback),
         encoding="utf-8",
     )
+    dashboard_path = run_root / "dashboard" / "task_compare.html"
+    dashboard_path.parent.mkdir(parents=True, exist_ok=True)
+    dashboard_path.write_text("<!doctype html>\n", encoding="utf-8")
+    control_status = {
+        "arm": "control",
+        "status": "complete",
+        "process_pid": 101,
+        "started_at": "2026-09-08T10:00:00-04:00",
+        "completed_at": "2026-09-08T10:01:00-04:00",
+        "started_monotonic_ns": 200,
+        "completed_monotonic_ns": 500,
+    }
+    candidate_status = {
+        "arm": "candidate",
+        "status": "complete",
+        "process_pid": 202,
+        "started_at": "2026-09-08T10:00:01-04:00",
+        "completed_at": "2026-09-08T10:01:01-04:00",
+        "started_monotonic_ns": 210,
+        "completed_monotonic_ns": 600,
+    }
+    _write_json(run_root / "control_arm_status.json", control_status)
+    _write_json(run_root / "candidate_arm_status.json", candidate_status)
+    parallel_execution = {
+        "unit": "isolated_child_process",
+        "arms": {
+            "control": {
+                key: control_status[key]
+                for key in (
+                    "status",
+                    "process_pid",
+                    "started_at",
+                    "completed_at",
+                    "started_monotonic_ns",
+                    "completed_monotonic_ns",
+                )
+            },
+            "candidate": {
+                key: candidate_status[key]
+                for key in (
+                    "status",
+                    "process_pid",
+                    "started_at",
+                    "completed_at",
+                    "started_monotonic_ns",
+                    "completed_monotonic_ns",
+                )
+            },
+        },
+        "positive_overlap_asserted": True,
+        "overlap_monotonic_ns": 290,
+        "overlap_seconds": 0.00000029,
+    }
+    dashboard_url = "http://127.0.0.1:63105/dashboard/task_compare.html"
+    dashboard_receipt_path = run_root / "dashboard_open_receipt.json"
+    _write_json(
+        dashboard_receipt_path,
+        {
+            "dashboard": "task_compare",
+            "comparison": "fresh_control_vs_policy_sage",
+            "path": str(dashboard_path.resolve()),
+            "url": dashboard_url,
+            "external_browser_opened": True,
+            "http_verified_before_open": True,
+            "dashboard_server_protocol": (
+                publication_verifier.DASHBOARD_SERVER_PROTOCOL  # type: ignore[attr-defined]
+            ),
+            "dashboard_server_root": str(run_root.resolve()),
+            "opened_before_model_processes": True,
+            "opened_monotonic_ns": 100,
+        },
+    )
     _write_json(
         run_root / "protocol_manifest.json",
         {
@@ -268,6 +340,14 @@ def _fresh_run(tmp_path: Path) -> Path:
             "candidate_dir": str(candidate_dir),
             "fresh_control_required": True,
             "publication_performance_endpoint": "outcome_task_completion_similarity",
+            "actor_selection_mode": "policy",
+            "reporting_outcome_evaluator": (
+                publication_verifier.outcome_evaluator_manifest()  # type: ignore[attr-defined]
+            ),
+            "online_feedback_evaluator_version": (
+                publication_verifier.ONLINE_FEEDBACK_EVALUATOR_VERSION  # type: ignore[attr-defined]
+            ),
+            "timezone": publication_verifier.PUBLICATION_TIMEZONE,
             "control_cache_mode": "off",
             "control_source": "fresh",
             "cached_control_tasks": 0,
@@ -288,7 +368,12 @@ def _fresh_run(tmp_path: Path) -> Path:
             "cross_run_failure_memory_path": None,
             "diagnostic_force_allowed": False,
             "active_diagnostic_force_env": [],
-            "parallel_arms": False,
+            "parallel_arms": True,
+            "parallel_arm_execution": parallel_execution,
+            "reflection_control_delivery": "task_synchronous_stream",
+            "dashboard_open_required": True,
+            "dashboard_open_receipt_path": str(dashboard_receipt_path),
+            "dashboard_task_compare_url": dashboard_url,
             "run_affecting_sage_env": dict(
                 publication_verifier.PUBLICATION_EXECUTION_ENV
             ),
@@ -824,6 +909,7 @@ def test_verifier_rejects_generation_calls_in_frozen_candidate(
     protocol["generation_enabled"] = False
     protocol["sage_policy"] = "none"
     protocol["reflection_control_source"] = "not_applicable"
+    protocol["reflection_control_delivery"] = "not_applicable_generation_disabled"
     _write_json(protocol_path, protocol)
     for arm in ("control", "candidate"):
         events_path = Path(protocol[f"{arm}_dir"]) / "llm_usage_events.jsonl"
@@ -1144,6 +1230,7 @@ def test_campaign_job_removes_every_baseline_cache_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for name in (
+        "SAGE_BATCH_NO_DASHBOARD_OPEN",
         "CONTROL_CACHE_ROOT",
         "SAGE_SELF_EVOLVING_CONTROL_CACHE_ROOT",
         "SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY",
@@ -1194,11 +1281,13 @@ def test_campaign_job_removes_every_baseline_cache_env(
     assert env["SAGE_BENCHMARK_MANIFEST"] == str(tmp_path / "benchmark.json")
     assert env["TOOLSANDBOX_RAPID_CACHE_MODE"] == "read_only"
     assert env["TOOLSANDBOX_RAPID_CACHE_PATH"] == str(tmp_path / "fixtures/rapid.json")
+    assert "SAGE_BATCH_NO_DASHBOARD_OPEN" not in env
     for name, expected in publication_verifier.PUBLICATION_EXECUTION_ENV.items():
         assert env[name] == expected
     assert all(
         env.get(name) is None
         for name in (
+            "SAGE_BATCH_NO_DASHBOARD_OPEN",
             "CONTROL_CACHE_ROOT",
             "SAGE_SELF_EVOLVING_CONTROL_CACHE_ROOT",
             "SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY",

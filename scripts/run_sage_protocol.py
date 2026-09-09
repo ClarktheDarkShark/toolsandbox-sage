@@ -16,7 +16,7 @@ import traceback
 from datetime import datetime
 from multiprocessing import get_context
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 from sage_ts.adapters.openai_agent_adapter import OpenAIChatAdapter
 from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
@@ -37,6 +37,7 @@ from sage_ts.dashboard.exporters import (
     open_dashboard,
     write_protocol_dashboard,
 )
+from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.control_baseline_cache import (
     ControlBaselineCache,
     build_control_cache_report,
@@ -44,9 +45,18 @@ from sage_ts.evaluation.control_baseline_cache import (
     write_synthetic_control_run,
 )
 from sage_ts.evaluation.helper_contribution import write_helper_contribution_summary
+from sage_ts.evaluation.online_feedback_score import (
+    ONLINE_FEEDBACK_EVALUATOR_VERSION,
+)
+from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 from sage_ts.evaluation.run_metrics import compare_runs
 from sage_ts.evaluation.task_strata import cohort_policy_report
 from sage_ts.generation.tool_generator import ToolGenerator
+from sage_ts.orchestration.self_evolution_reflection import (
+    FRESH_CONTROL_COMPLETE_EVENT,
+    FRESH_CONTROL_ERROR_EVENT,
+    FRESH_CONTROL_ROW_EVENT,
+)
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 
 # Run modes are also split names. Keep these explicit so bad campaign labels
@@ -80,6 +90,7 @@ MODES = (
 SAGE_POLICY_NONE = "none"
 SAGE_POLICY_AUTO = "auto"
 SAGE_POLICY_SELF_EVOLVING_PRAXIS = "self-evolving-praxis"
+ACTOR_SELECTION_MODE = "policy"
 SAGE_POLICIES = (
     SAGE_POLICY_AUTO,
     SAGE_POLICY_NONE,
@@ -95,6 +106,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP = 1784832588
 PUBLICATION_ENVIRONMENT_LOCK = "requirements-publication-lock.txt"
 PUBLICATION_EXECUTION_ENV = {
+    "TZ": "America/New_York",
     "SAGE_OPENAI_MAX_RETRIES": "5",
     "SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
     "SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
@@ -242,7 +254,7 @@ def _redacted_run_affecting_sage_env() -> dict[str, str]:
     blocked_tokens = ("API", "KEY", "TOKEN", "SECRET")
     values: dict[str, str] = {}
     for name, value in sorted(os.environ.items()):
-        if not name.startswith("SAGE_"):
+        if not name.startswith("SAGE_") and name != "TZ":
             continue
         if any(token in name.upper() for token in blocked_tokens):
             values[name] = "<redacted>"
@@ -288,6 +300,13 @@ def _arm_status_path(run_root: Path, arm: str) -> Path:
     return run_root / f"{arm}_arm_status.json"
 
 
+def _atomic_write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
 def _write_arm_status(
     run_root: Path,
     arm: str,
@@ -297,11 +316,19 @@ def _write_arm_status(
     completed_count: int | None = None,
     scenario_count: int | None = None,
     error: str | None = None,
+    process_pid: int | None = None,
 ) -> None:
+    path = _arm_status_path(run_root, arm)
+    prior = _read_arm_status(run_root, arm)
+    now = datetime.now().astimezone().isoformat()
+    now_monotonic_ns = time.monotonic_ns()
     payload: dict[str, object] = {
         "arm": arm,
         "status": status,
-        "updated_at": datetime.now().isoformat(),
+        "process_pid": prior.get("process_pid") or process_pid or os.getpid(),
+        "started_at": prior.get("started_at") or now,
+        "started_monotonic_ns": prior.get("started_monotonic_ns") or now_monotonic_ns,
+        "updated_at": now,
     }
     if run_dir is not None:
         payload["run_dir"] = str(run_dir)
@@ -311,16 +338,85 @@ def _write_arm_status(
         payload["scenario_count"] = scenario_count
     if error is not None:
         payload["error"] = error
-    _arm_status_path(run_root, arm).write_text(
-        json.dumps(payload, indent=2) + "\n", encoding="utf-8"
-    )
+    if status not in {"starting", "running"}:
+        payload["completed_at"] = now
+        payload["completed_monotonic_ns"] = now_monotonic_ns
+    _atomic_write_json(path, payload)
 
 
 def _read_arm_status(run_root: Path, arm: str) -> dict[str, Any]:
     path = _arm_status_path(run_root, arm)
     if not path.exists():
         return {}
-    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
+
+
+def _parallel_arm_execution_record(run_root: Path) -> dict[str, Any]:
+    statuses = {
+        arm: _read_arm_status(run_root, arm) for arm in ("control", "candidate")
+    }
+    intervals: dict[str, tuple[int, int]] = {}
+    arms: dict[str, dict[str, Any]] = {}
+    for arm, status in statuses.items():
+        if status.get("status") != "complete":
+            raise ValueError(
+                f"Parallel {arm} arm did not preserve complete terminal status."
+            )
+        pid = status.get("process_pid")
+        started = status.get("started_monotonic_ns")
+        completed = status.get("completed_monotonic_ns")
+        if (
+            isinstance(pid, bool)
+            or not isinstance(pid, int)
+            or pid <= 0
+            or isinstance(started, bool)
+            or not isinstance(started, int)
+            or isinstance(completed, bool)
+            or not isinstance(completed, int)
+            or completed <= started
+        ):
+            raise ValueError(f"Parallel {arm} arm timing/PID evidence is invalid.")
+        intervals[arm] = (started, completed)
+        arms[arm] = {
+            key: status.get(key)
+            for key in (
+                "status",
+                "process_pid",
+                "started_at",
+                "completed_at",
+                "started_monotonic_ns",
+                "completed_monotonic_ns",
+            )
+        }
+    if arms["control"]["process_pid"] == arms["candidate"]["process_pid"]:
+        raise ValueError("Parallel arms recorded the same process PID.")
+    overlap_ns = min(interval[1] for interval in intervals.values()) - max(
+        interval[0] for interval in intervals.values()
+    )
+    if overlap_ns <= 0:
+        raise ValueError("Control and SAGE process intervals did not overlap.")
+    return {
+        "unit": "isolated_child_process",
+        "arms": arms,
+        "positive_overlap_asserted": True,
+        "overlap_monotonic_ns": overlap_ns,
+        "overlap_seconds": overlap_ns / 1_000_000_000,
+    }
+
+
+def _stop_parallel_process(process: Any, *, timeout_seconds: float = 10.0) -> None:
+    if process.is_alive():
+        process.terminate()
+    process.join(timeout=timeout_seconds)
+    if process.is_alive():
+        kill = getattr(process, "kill", None)
+        if callable(kill):
+            kill()
+            process.join(timeout=timeout_seconds)
 
 
 def _latest_run_dir(root: Path) -> Path | None:
@@ -901,11 +997,39 @@ def _protocol_event(
     )
 
 
+def _candidate_protocol_event_hook(
+    params: dict[str, Any],
+) -> Callable[[str, Path, dict[str, object]], None]:
+    """Build a candidate hook without retaining queue-bearing worker params."""
+
+    mode = str(params["mode"])
+    run_root = Path(params["run_root"])
+    artifact_root = Path(params["artifact_root"])
+
+    def event_hook(
+        event: str,
+        run_dir: Path,
+        payload: dict[str, object],
+    ) -> None:
+        _protocol_event(
+            event=event,
+            mode=mode,
+            run_root=run_root,
+            run_dir=run_dir,
+            payload=payload,
+            artifact_root=artifact_root,
+        )
+
+    return event_hook
+
+
 def _run_control_arm_worker(params: dict[str, Any]) -> None:
     run_root = Path(params["run_root"])
     artifact_root = Path(params["artifact_root"])
     control_root = Path(params["control_root"])
     scenario_names = tuple(params["scenario_names"])
+    reflection_control_channel = params.get("reflection_control_channel")
+    published_count = 0
     _write_arm_status(
         run_root,
         "control",
@@ -921,6 +1045,27 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
             status: str,
             scenario_count: int,
         ) -> None:
+            nonlocal published_count
+            if len(rows) < published_count:
+                raise ValueError("Live control progress rows moved backwards.")
+            for index in range(published_count, len(rows)):
+                row = rows[index]
+                expected_scenario = scenario_names[index]
+                observed_scenario = str(row.get("name") or "")
+                if observed_scenario != expected_scenario:
+                    raise ValueError(
+                        "Live control stream is out of order: expected "
+                        f"{expected_scenario!r}, observed {observed_scenario!r}."
+                    )
+                if reflection_control_channel is not None:
+                    reflection_control_channel.put(
+                        {
+                            "event": FRESH_CONTROL_ROW_EVENT,
+                            "scenario": expected_scenario,
+                            "row": dict(row),
+                        }
+                    )
+            published_count = len(rows)
             _write_arm_status(
                 run_root,
                 "control",
@@ -957,6 +1102,18 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
             progress_hook=progress,
             event_hook=event_hook,
         )
+        if published_count != len(scenario_names):
+            raise ValueError(
+                "Live control stream ended before every task row was published: "
+                f"{published_count}/{len(scenario_names)}."
+            )
+        if reflection_control_channel is not None:
+            reflection_control_channel.put(
+                {
+                    "event": FRESH_CONTROL_COMPLETE_EVENT,
+                    "scenario_count": len(scenario_names),
+                }
+            )
         append_event(
             "phase_completed",
             {
@@ -977,6 +1134,10 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
         )
     except Exception:
         error = traceback.format_exc()
+        if reflection_control_channel is not None:
+            reflection_control_channel.put(
+                {"event": FRESH_CONTROL_ERROR_EVENT, "error": error}
+            )
         _write_arm_status(run_root, "control", status="failed", error=error)
         append_event(
             "blocker_detected",
@@ -998,6 +1159,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
     registry_dir = Path(params["registry_dir"])
     scenario_names = tuple(params["scenario_names"])
     generation_enabled = bool(params["generation_enabled"])
+    require_fresh_control = bool(params.get("require_fresh_control"))
     _write_arm_status(
         run_root,
         "candidate",
@@ -1029,15 +1191,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 scenario_count=scenario_count,
             )
 
-        def event_hook(event: str, run_dir: Path, payload: dict[str, object]) -> None:
-            _protocol_event(
-                event=event,
-                mode=str(params["mode"]),
-                run_root=run_root,
-                run_dir=run_dir,
-                payload=payload,
-                artifact_root=artifact_root,
-            )
+        event_hook = _candidate_protocol_event_hook(params)
 
         run_dir = run_sage_with_registry(
             SageRunConfig(
@@ -1054,6 +1208,15 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 else None,
                 resume_completed_limit=params.get("resume_completed_limit"),
                 manifest_path=Path(params["manifest"]),
+                reflection_control_channel=params.get("reflection_control_channel"),
+                require_fresh_reflection_control=(
+                    require_fresh_control and generation_enabled
+                ),
+                failure_memory_path=(
+                    None
+                    if require_fresh_control
+                    else Path("artifacts/summaries/failure_memory.json")
+                ),
             ),
             generator=generator,
             progress_hook=progress,
@@ -1238,10 +1401,9 @@ def main() -> None:
         "--require-fresh-control",
         action="store_true",
         help=(
-            "Publication fail-closed mode: run control first, require exactly one "
-            "live uncached control row per task, and supply those same-run rows to "
-            "online reflection. Incompatible with --parallel-arms and every "
-            "--control-cache mode except off."
+            "Publication fail-closed mode: require exactly one live uncached "
+            "control row per task and stream each row to SAGE at the matched task "
+            "boundary. Requires --parallel-arms and control cache off."
         ),
     )
     parser.add_argument(
@@ -1319,10 +1481,15 @@ def main() -> None:
             "--require-fresh-control requires --control-cache off; cache lookup "
             "and collection are prohibited in publication runs."
         )
-    if args.require_fresh_control and args.parallel_arms:
+    if args.require_fresh_control and not args.parallel_arms:
         raise SystemExit(
-            "--require-fresh-control is incompatible with --parallel-arms because "
-            "the complete live control arm must precede SAGE reflection."
+            "--require-fresh-control requires --parallel-arms; strict validation "
+            "streams each same-task control row to SAGE at the matched boundary."
+        )
+    if args.require_fresh_control and args.no_dashboard_open:
+        raise SystemExit(
+            "Strict publication runs require Task Compare to open before model "
+            "execution; --no-dashboard-open is forbidden."
         )
     if args.require_fresh_control and (
         args.resume_run_root is not None or args.resume_completed_limit is not None
@@ -1379,6 +1546,7 @@ def main() -> None:
         generation_model=args.generation_model,
         user_model=args.user,
     )
+    reporting_outcome_evaluator = outcome_evaluator_manifest()
     os.environ["SAGE_TS_MODEL"] = args.agent
     run_root = args.output_root / f"{args.mode}_{_timestamp()}"
     control_root = run_root / "control"
@@ -1488,6 +1656,17 @@ def main() -> None:
     effective_parallel_arms = args.parallel_arms and not (
         control_cache_plan is not None and control_cache_plan["cached_scenarios"]
     )
+    reflection_control_delivery = (
+        "task_synchronous_stream"
+        if args.require_fresh_control and generation_enabled and effective_parallel_arms
+        else "preloaded_complete_map"
+        if args.require_fresh_control and generation_enabled
+        else "not_applicable_generation_disabled"
+        if args.require_fresh_control
+        else "legacy_control_cache"
+        if generation_enabled
+        else "not_applicable"
+    )
     cohort_preflight = _write_cohort_preflight(
         run_root,
         scenario_names=scenario_names,
@@ -1514,6 +1693,12 @@ def main() -> None:
             "sage_policy": effective_sage_policy,
             "sage_policy_requested": args.sage_policy,
             "sage_policy_env": sage_policy_env,
+            "actor_selection_mode": ACTOR_SELECTION_MODE,
+            "reporting_outcome_evaluator": reporting_outcome_evaluator,
+            "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
+            "parallel_arms": effective_parallel_arms,
+            "reflection_control_delivery": reflection_control_delivery,
+            "timezone": os.environ.get("TZ"),
             "toolsandbox_clock_policy": "frozen"
             if args.freeze_toolsandbox_clock
             else "wall_clock",
@@ -1615,6 +1800,12 @@ def main() -> None:
             "external_fixture": external_fixture,
             "sage_policy": effective_sage_policy,
             "sage_policy_requested": args.sage_policy,
+            "actor_selection_mode": ACTOR_SELECTION_MODE,
+            "reporting_outcome_evaluator": reporting_outcome_evaluator,
+            "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
+            "parallel_arms": effective_parallel_arms,
+            "reflection_control_delivery": reflection_control_delivery,
+            "timezone": os.environ.get("TZ"),
         },
         root=args.artifact_root,
     )
@@ -1638,18 +1829,24 @@ def main() -> None:
     dashboard_url = dashboard_standard_url = dashboard_task_focus_url = (
         dashboard_task_compare_url
     ) = None
+    dashboard_open_receipt_path: Path | None = None
     if should_open_dashboard:
         dashboard_task_compare_url = open_dashboard(
             dashboard_index.with_name("task_compare.html"),
             port=args.dashboard_port,
+            server_root=run_root,
         )
+        dashboard_opened_monotonic_ns = time.monotonic_ns()
         dashboard_standard_url = make_dashboard_url(
-            dashboard_index, port=args.dashboard_port
+            dashboard_index,
+            port=args.dashboard_port,
+            server_root=run_root,
         )
         dashboard_url = dashboard_task_compare_url
         dashboard_task_focus_url = make_dashboard_url(
             dashboard_index.with_name("task_focus.html"),
             port=args.dashboard_port,
+            server_root=run_root,
         )
         (run_root / "dashboard_urls.json").write_text(
             json.dumps(
@@ -1664,6 +1861,25 @@ def main() -> None:
             )
             + "\n",
             encoding="utf-8",
+        )
+        dashboard_open_receipt_path = run_root / "dashboard_open_receipt.json"
+        _atomic_write_json(
+            dashboard_open_receipt_path,
+            {
+                "dashboard": "task_compare",
+                "comparison": "fresh_control_vs_policy_sage"
+                if args.require_fresh_control
+                else "historical_control_vs_policy_sage",
+                "path": str(dashboard_index.with_name("task_compare.html").resolve()),
+                "url": dashboard_task_compare_url,
+                "external_browser_opened": True,
+                "http_verified_before_open": True,
+                "dashboard_server_protocol": DASHBOARD_SERVER_PROTOCOL,
+                "dashboard_server_root": str(run_root.resolve()),
+                "opened_at": datetime.now().astimezone().isoformat(),
+                "opened_monotonic_ns": dashboard_opened_monotonic_ns,
+                "opened_before_model_processes": True,
+            },
         )
 
     def refresh_dashboard(phase: str, status: str) -> None:
@@ -1701,6 +1917,7 @@ def main() -> None:
         )
 
     reflection_control_rows: dict[str, dict[str, Any]] | None = None
+    parallel_arm_execution: dict[str, Any] | None = None
     if effective_parallel_arms:
         append_event(
             "subtask_started",
@@ -1711,6 +1928,10 @@ def main() -> None:
                 "parallel_cache_policy": "per_arm",
             },
             root=args.artifact_root,
+        )
+        ctx = get_context("spawn")
+        reflection_control_channel = (
+            ctx.Queue() if args.require_fresh_control and generation_enabled else None
         )
         base_params: dict[str, Any] = {
             "mode": args.mode,
@@ -1731,8 +1952,9 @@ def main() -> None:
             if candidate_resume_dir
             else None,
             "resume_completed_limit": resume_completed_limit,
+            "require_fresh_control": args.require_fresh_control,
+            "reflection_control_channel": reflection_control_channel,
         }
-        ctx = get_context("spawn")
         control_process = ctx.Process(
             target=_run_control_arm_worker,
             args=(
@@ -1754,40 +1976,100 @@ def main() -> None:
             ),
             name="sage_ts_candidate_arm",
         )
-        control_process.start()
-        candidate_process.start()
-        while control_process.is_alive() or candidate_process.is_alive():
+        started = {"control": False, "candidate": False}
+        detected_failed_arm: str | None = None
+        processes = {
+            "control": control_process,
+            "candidate": candidate_process,
+        }
+        try:
+            control_process.start()
+            started["control"] = True
+            candidate_process.start()
+            started["candidate"] = True
+            while control_process.is_alive() or candidate_process.is_alive():
+                if control_process.exitcode not in (None, 0):
+                    detected_failed_arm = "control"
+                    break
+                if candidate_process.exitcode not in (None, 0):
+                    detected_failed_arm = "candidate"
+                    break
+                control_dir = _status_run_dir(run_root, "control", control_root)
+                candidate_dir = _status_run_dir(run_root, "candidate", candidate_root)
+                refresh_dashboard("parallel", "running")
+                time.sleep(5)
+            if detected_failed_arm is not None:
+                peer = "candidate" if detected_failed_arm == "control" else "control"
+                _stop_parallel_process(processes[peer])
+                raise RuntimeError(
+                    f"{detected_failed_arm} arm exited with code "
+                    f"{processes[detected_failed_arm].exitcode}."
+                )
+            control_process.join()
+            candidate_process.join()
+            if control_process.exitcode != 0 or candidate_process.exitcode != 0:
+                raise RuntimeError("One or more parallel arms exited unsuccessfully.")
             control_dir = _status_run_dir(run_root, "control", control_root)
             candidate_dir = _status_run_dir(run_root, "candidate", candidate_root)
+            if control_dir is None or candidate_dir is None:
+                raise RuntimeError(
+                    "Parallel arms finished but run directories were not found."
+                )
+            parallel_arm_execution = _parallel_arm_execution_record(run_root)
             refresh_dashboard("parallel", "running")
-            time.sleep(5)
-        control_process.join()
-        candidate_process.join()
-        control_dir = _status_run_dir(run_root, "control", control_root)
-        candidate_dir = _status_run_dir(run_root, "candidate", candidate_root)
-        refresh_dashboard("parallel", "running")
-        failed = {
-            "control": control_process.exitcode,
-            "candidate": candidate_process.exitcode,
-        }
-        if control_process.exitcode != 0 or candidate_process.exitcode != 0:
-            append_event(
-                "blocker_detected",
-                {
-                    "mode": args.mode,
-                    "run_root": str(run_root),
-                    "parallel_arms": True,
-                    "exitcodes": failed,
-                    "control_status": _read_arm_status(run_root, "control"),
-                    "candidate_status": _read_arm_status(run_root, "candidate"),
-                },
-                root=args.artifact_root,
-            )
-            raise SystemExit(f"Parallel arm failure: {failed}")
-        if control_dir is None or candidate_dir is None:
-            raise SystemExit(
-                "Parallel arms finished but run directories were not found"
-            )
+        except BaseException as exc:
+            for arm, process in processes.items():
+                if not started[arm]:
+                    continue
+                _stop_parallel_process(process)
+                status = _read_arm_status(run_root, arm)
+                if status.get("status") in {"complete", "failed"}:
+                    continue
+                failure_status = (
+                    "failed"
+                    if arm == detected_failed_arm
+                    else "aborted_peer_failure"
+                    if detected_failed_arm is not None
+                    else "aborted_orchestrator_failure"
+                )
+                _write_arm_status(
+                    run_root,
+                    arm,
+                    status=failure_status,
+                    error=str(exc),
+                    process_pid=process.pid,
+                )
+            failed = {arm: process.exitcode for arm, process in processes.items()}
+            try:
+                refresh_dashboard("parallel", "failed")
+            except Exception:
+                pass
+            try:
+                append_event(
+                    "blocker_detected",
+                    {
+                        "mode": args.mode,
+                        "run_root": str(run_root),
+                        "parallel_arms": True,
+                        "exitcodes": failed,
+                        "control_status": _read_arm_status(run_root, "control"),
+                        "candidate_status": _read_arm_status(run_root, "candidate"),
+                        "orchestrator_error": repr(exc),
+                    },
+                    root=args.artifact_root,
+                )
+            except Exception:
+                pass
+            if isinstance(exc, KeyboardInterrupt):
+                raise
+            raise SystemExit(f"Parallel arm failure: {failed}; {exc}") from exc
+        finally:
+            if reflection_control_channel is not None:
+                try:
+                    reflection_control_channel.cancel_join_thread()
+                    reflection_control_channel.close()
+                except (OSError, ValueError):
+                    pass
         append_event(
             "subtask_completed",
             {
@@ -1796,6 +2078,7 @@ def main() -> None:
                 "run_root": str(run_root),
                 "control_dir": str(control_dir),
                 "candidate_dir": str(candidate_dir),
+                "parallel_arm_execution": parallel_arm_execution,
                 "control_cache_mode": args.control_cache,
                 "control_cache_source": control_cache_report.get("control_source"),
             },
@@ -1972,9 +2255,17 @@ def main() -> None:
             event_hook=campaign_event,
         )
     if args.require_fresh_control:
+        if control_dir is None:
+            raise SystemExit("Strict fresh-control run did not produce a control arm.")
         if candidate_dir is None:
             raise SystemExit("Strict fresh-control run did not produce a SAGE arm.")
         try:
+            _validate_uncached_result_rows(
+                control_dir,
+                expected_scenarios=scenario_names,
+                arm="control",
+                require_complete=True,
+            )
             _validate_uncached_result_rows(
                 candidate_dir,
                 expected_scenarios=scenario_names,
@@ -2095,6 +2386,10 @@ def main() -> None:
         "sage_policy": effective_sage_policy,
         "sage_policy_requested": args.sage_policy,
         "sage_policy_env": sage_policy_env,
+        "actor_selection_mode": ACTOR_SELECTION_MODE,
+        "reporting_outcome_evaluator": reporting_outcome_evaluator,
+        "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
+        "timezone": os.environ.get("TZ"),
         "scenario_count": len(scenario_names),
         "benchmark_manifest_path": str(benchmark_manifest_path),
         "benchmark_manifest_sha256": benchmark_manifest_sha256,
@@ -2175,7 +2470,13 @@ def main() -> None:
         "dashboard_standard_url": dashboard_standard_url,
         "dashboard_task_focus_url": dashboard_task_focus_url,
         "dashboard_task_compare_url": dashboard_task_compare_url,
-        "parallel_arms": args.parallel_arms,
+        "dashboard_open_required": args.require_fresh_control,
+        "dashboard_open_receipt_path": str(dashboard_open_receipt_path)
+        if dashboard_open_receipt_path
+        else None,
+        "parallel_arms": effective_parallel_arms,
+        "parallel_arm_execution": parallel_arm_execution,
+        "reflection_control_delivery": reflection_control_delivery,
         "model_authored_generation_enabled": True,
         "native_action_tools_enabled": True,
         "scenario_name_birth_enabled": False,
@@ -2229,6 +2530,10 @@ def main() -> None:
                 "cache_manifest_hash"
             ),
             "fresh_control_required": args.require_fresh_control,
+            "actor_selection_mode": ACTOR_SELECTION_MODE,
+            "reporting_outcome_evaluator": reporting_outcome_evaluator,
+            "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
+            "timezone": os.environ.get("TZ"),
             "helper_contribution_summary_path": str(helper_contribution_path),
             "helper_contribution_artifact_path": str(helper_contribution_artifact_path),
             "accepted_but_uncalled_tools": helper_contribution.get(
@@ -2239,7 +2544,13 @@ def main() -> None:
             "dashboard_standard_url": dashboard_standard_url,
             "dashboard_task_focus_url": dashboard_task_focus_url,
             "dashboard_task_compare_url": dashboard_task_compare_url,
-            "parallel_arms": args.parallel_arms,
+            "dashboard_open_required": args.require_fresh_control,
+            "dashboard_open_receipt_path": str(dashboard_open_receipt_path)
+            if dashboard_open_receipt_path
+            else None,
+            "parallel_arms": effective_parallel_arms,
+            "parallel_arm_execution": parallel_arm_execution,
+            "reflection_control_delivery": reflection_control_delivery,
             "mean_similarity_delta": comparison.get("mean_similarity_delta"),
             "mean_outcome_similarity_delta": comparison.get(
                 "mean_outcome_similarity_delta"

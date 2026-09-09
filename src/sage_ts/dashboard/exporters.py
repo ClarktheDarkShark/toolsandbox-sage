@@ -9,13 +9,20 @@ import re
 import socket
 import subprocess
 import sys
+import time
 import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
+from urllib.error import URLError
 from urllib.parse import quote
+from urllib.request import urlopen
 
 from sage_ts.campaign.artifacts import ARTIFACT_ROOT, read_jsonl
+from sage_ts.dashboard.server import (
+    DASHBOARD_SERVER_IDENTITY_PATH,
+    DASHBOARD_SERVER_PROTOCOL,
+)
 from sage_ts.dashboard.task_compare_template import TASK_COMPARE_HTML
 from sage_ts.dashboard.task_focus_template import TASK_FOCUS_HTML
 from sage_ts.dashboard.template import DASHBOARD_HTML
@@ -2362,17 +2369,53 @@ def dashboard_url(
     return f"http://127.0.0.1:{port}/{quote(str(rel))}"
 
 
+def _dashboard_port_is_open(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.2)
+        return probe.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _dashboard_server_identity(port: int) -> dict[str, Any] | None:
+    url = f"http://127.0.0.1:{port}{DASHBOARD_SERVER_IDENTITY_PATH}"
+    try:
+        with urlopen(url, timeout=1.0) as response:  # noqa: S310
+            if response.status != 200:
+                return None
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, UnicodeError, ValueError, URLError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _assert_dashboard_server_identity(port: int, server_root: Path) -> None:
+    expected_root = str(server_root.resolve())
+    identity = _dashboard_server_identity(port)
+    if identity is None:
+        raise RuntimeError(
+            f"Port {port} is occupied by a server that does not expose the "
+            "SAGE dashboard identity endpoint."
+        )
+    if (
+        identity.get("protocol") != DASHBOARD_SERVER_PROTOCOL
+        or identity.get("root") != expected_root
+    ):
+        raise RuntimeError(
+            f"Port {port} is serving a different dashboard root: "
+            f"expected {expected_root!r}, observed {identity.get('root')!r}."
+        )
+
+
 def ensure_dashboard_server(
     *,
     port: int = 5520,
     server_root: Path | None = None,
 ) -> None:
     """Start a static file server for the dashboard output root."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-        probe.settimeout(0.2)
-        if probe.connect_ex(("127.0.0.1", port)) == 0:
-            return
     repo_root = _repo_root().resolve()
+    root = (server_root or repo_root).resolve()
+    if _dashboard_port_is_open(port):
+        _assert_dashboard_server_identity(port, root)
+        return
     environment = dict(os.environ)
     environment["PYTHONPATH"] = os.pathsep.join(
         [
@@ -2391,7 +2434,7 @@ def ensure_dashboard_server(
             "--host",
             "127.0.0.1",
             "--root",
-            str((server_root or repo_root).resolve()),
+            str(root),
         ],
         cwd=repo_root,
         env=environment,
@@ -2400,28 +2443,80 @@ def ensure_dashboard_server(
         start_new_session=True,
     )
 
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline:
+        identity = _dashboard_server_identity(port)
+        if identity is not None:
+            _assert_dashboard_server_identity(port, root)
+            return
+        time.sleep(0.1)
+    raise RuntimeError(
+        f"Dashboard server on port {port} did not publish its root identity."
+    )
 
-def open_dashboard(index_path: Path, *, port: int = 5520) -> str:
+
+def open_dashboard(
+    index_path: Path,
+    *,
+    port: int = 5520,
+    server_root: Path | None = None,
+) -> str:
     resolved_index = index_path.resolve()
-    repo_root = _repo_root().resolve()
-    try:
-        resolved_index.relative_to(repo_root)
-        server_root = repo_root
-    except ValueError:
-        server_root = resolved_index.parent
-    ensure_dashboard_server(port=port, server_root=server_root)
-    url = dashboard_url(index_path, port=port, server_root=server_root)
-    webbrowser.open_new_tab(url)
-    # In non-interactive benchmark shells, webbrowser can return True even when
-    # no visible browser tab is surfaced. On macOS, also hand the URL to the OS
-    # opener so run dashboards reliably appear during campaign runs.
+    if not resolved_index.is_file():
+        raise FileNotFoundError(f"Dashboard file does not exist: {resolved_index}")
+    if server_root is None:
+        repo_root = _repo_root().resolve()
+        try:
+            resolved_index.relative_to(repo_root)
+            resolved_server_root = repo_root
+        except ValueError:
+            resolved_server_root = resolved_index.parent
+    else:
+        resolved_server_root = server_root.resolve()
+        try:
+            resolved_index.relative_to(resolved_server_root)
+        except ValueError as exc:
+            raise ValueError(
+                f"Dashboard file {resolved_index} is outside server root "
+                f"{resolved_server_root}."
+            ) from exc
+    ensure_dashboard_server(port=port, server_root=resolved_server_root)
+    url = dashboard_url(index_path, port=port, server_root=resolved_server_root)
+
+    deadline = time.monotonic() + 10.0
+    last_error: BaseException | None = None
+    while time.monotonic() < deadline:
+        try:
+            expected_body = resolved_index.read_bytes()
+            with urlopen(url, timeout=1.0) as response:  # noqa: S310
+                response_body = response.read()
+                if response.status == 200 and response_body == expected_body:
+                    break
+                if response.status == 200:
+                    raise RuntimeError(
+                        f"Dashboard URL served bytes from a different file/root: {url}"
+                    )
+                last_error = RuntimeError(
+                    f"dashboard server returned HTTP {response.status}"
+                )
+        except (OSError, URLError) as exc:
+            last_error = exc
+        time.sleep(0.1)
+    else:
+        raise RuntimeError(
+            f"Dashboard URL was not reachable before browser open: {url}"
+        ) from last_error
+
     if sys.platform == "darwin":
-        subprocess.Popen(
+        subprocess.run(
             ["open", url],
+            check=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True,
+            timeout=10,
         )
+    elif not webbrowser.open_new_tab(url):
+        raise RuntimeError(f"The default browser refused the dashboard URL: {url}")
     return url
 
 

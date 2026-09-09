@@ -37,7 +37,7 @@ These rules apply throughout all phases and all coding-agent sessions.
 
 ## 6. Live Verification
 
-- **Verify after every material change.** Do not assume a refactor, config change, or code fix works — run a focused verification command (e.g., `python scripts/migrate_registry.py --check-only`).
+- **Verify after every material change.** Do not assume a refactor, config change, or code fix works — run focused tests for the changed path (use `make test-core` for the publication-critical surface).
 - **Report blockers transparently.** If a test fails, a dependency is missing, or a prerequisite is unmet, stop and report exactly what blocks progress (file path, line number, error message).
 
 ## 7. Codebase Coherence

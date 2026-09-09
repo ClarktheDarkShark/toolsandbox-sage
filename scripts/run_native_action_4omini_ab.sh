@@ -147,6 +147,7 @@ pin_publication_env SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS "1,3"
 pin_publication_env SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS "4"
 pin_publication_env SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS "120"
 pin_publication_env SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS "600"
+pin_publication_env TZ "America/New_York"
 export TOOLSANDBOX_RAPID_CACHE_MODE="read_only"
 export TOOLSANDBOX_RAPID_CACHE_PATH="${TOOLSANDBOX_RAPID_CACHE_PATH:-artifacts/publication_cleanup_20260901/fixtures/rapid_api_cache.sanitized.json}"
 PINNED_RAPID_FIXTURE_SHA256="eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
@@ -229,6 +230,7 @@ CMD=(
   --generation "$GENERATION"
   --control-cache off
   --require-fresh-control
+  --parallel-arms
   --validated-external-fixture "$TOOLSANDBOX_RAPID_CACHE_PATH"
   --validated-external-fixture-sha256 "$PINNED_RAPID_FIXTURE_SHA256"
   --freeze-toolsandbox-clock
@@ -236,14 +238,12 @@ CMD=(
   --output-root "$ARM_OUTPUT"
   --artifact-root "$ARM_ARTIFACTS"
 )
-if [[ "${SAGE_BATCH_NO_DASHBOARD_OPEN:-0}" == "1" ]]; then
-  CMD+=(--no-dashboard-open)
-fi
 {
   echo "study_id=full_$RUN_STAMP"
   echo "arm=$ARM"
   echo "generation=$GENERATION"
   echo "sage_policy=$SAGE_POLICY"
+  echo "actor_selection_mode=policy"
   echo "run_mode=$RUN_MODE"
   echo "model=gpt-4o-mini"
   echo "python_executable=$PYTHON_EXECUTABLE"
@@ -277,6 +277,7 @@ fi
   echo "transient_scenario_retry_attempts=$SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS"
   echo "openai_request_timeout_seconds=$SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS"
   echo "generation_openai_request_timeout_seconds=$SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS"
+  echo "timezone=$TZ"
   echo "sage_task_cache=off"
   echo "cross_run_failure_memory=off"
   echo "diagnostic_force_calls=off"

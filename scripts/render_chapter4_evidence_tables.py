@@ -289,7 +289,7 @@ def _claim_safeguards(campaign: dict) -> str:
     ):
         labels.append("metadata routing off")
     if safeguards.get("diagnostic_force_calls_disabled"):
-        labels.append("force-calls off")
+        labels.append("diagnostic overrides off")
     summary = "; ".join(labels) or "see campaign evidence manifest"
     return summary[0].upper() + summary[1:]
 
@@ -598,8 +598,8 @@ def build_tables(data: dict) -> list[dict]:
                 [
                     "Called-task subset",
                     f"{h3['sample_size']:,} observations",
-                    "Generated tool naturally called",
-                    "Uses only tasks where SAGE selected a generated tool without force-call diagnostics.",
+                    "Generated tool selected by SAGE policy",
+                    "Uses tasks where the declared production actor policy selected a generated tool; diagnostic overrides remain disabled.",
                 ],
                 [
                     "Baseline outcome on subset",
@@ -626,7 +626,7 @@ def build_tables(data: dict) -> list[dict]:
                     "The effect remains large after paired uncertainty estimation.",
                 ],
             ],
-            "caption": "Hypothesis 3 does not claim every SAGE component is causal; it tests the subset where generated tools were naturally used.",
+            "caption": "Hypothesis 3 describes the generated-tool pathway under the production actor policy; it is not evidence of natural base-model tool selection.",
         },
         {
             "filename": "table_4_6_generated_tool_lifecycle.png",
@@ -651,9 +651,9 @@ def build_tables(data: dict) -> list[dict]:
                     "Share of accepted tools that were reused after birth.",
                 ],
                 [
-                    "Natural tool calls",
-                    metric_value(metrics, "Natural tool calls"),
-                    "Scenarios where SAGE selected and called a generated tool without diagnostic force-call settings.",
+                    "Policy-directed tool calls",
+                    metric_value(metrics, "Policy-directed tool calls"),
+                    "Scenarios where the production SAGE actor policy selected and called a generated tool, without diagnostic overrides.",
                 ],
                 [
                     "Attributed gains",
@@ -713,7 +713,7 @@ def build_tables(data: dict) -> list[dict]:
                 ],
                 [
                     "H3",
-                    "Generated tools account for the strongest accuracy gains when naturally called.",
+                    "The policy-directed generated-tool pathway is associated with the strongest accuracy gains.",
                     (
                         f"{_threshold(h3['threshold_percent'])} called-tool lift; "
                         "no shortcut violations"
@@ -751,9 +751,9 @@ def build_tables(data: dict) -> list[dict]:
                     "Synthetic bridge completions were disabled and did not solve tasks for SAGE.",
                 ],
                 [
-                    "Forced generated-tool call checks",
+                    "Diagnostic tool-call override checks",
                     f"{integrity['forced_call_violations']:,} violations",
-                    "Generated tools counted for attribution were naturally selected, not forced by diagnostics.",
+                    "No ad hoc diagnostic override was used; named choices from the declared production actor policy are part of the intervention.",
                 ],
                 [
                     "Tool side-effect audit flags",

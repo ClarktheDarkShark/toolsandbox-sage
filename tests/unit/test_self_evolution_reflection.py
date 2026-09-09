@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from queue import Queue
 
 import pytest
 
@@ -488,3 +489,95 @@ def test_strict_reflection_rejects_duplicate_fresh_control_use(
     controller.assess_scenario(**kwargs)
     with pytest.raises(ValueError, match="Duplicate same-run fresh control"):
         controller.assess_scenario(**kwargs)
+
+
+def test_reflection_uses_paper_feedback_signal_not_reporting_outcome(
+    tmp_path: Path,
+) -> None:
+    scenario_name = "search_phone_number_with_name"
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            scenario_name: {
+                "name": scenario_name,
+                "similarity": 0.25,
+                "outcome_similarity": 1.0,
+                "online_feedback_outcome_similarity": 0.25,
+            }
+        },
+        require_fresh_control=True,
+    )
+
+    controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={
+            "similarity": 0.75,
+            "outcome_similarity": 0.0,
+            "online_feedback_outcome_similarity": 0.75,
+        },
+        selection_record={},
+        side_effect_failures=[],
+    )
+
+    feedback = json.loads(
+        (tmp_path / "run" / "self_evolution_task_feedback.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
+    assert feedback["control_outcome"] == 0.25
+    assert feedback["candidate_outcome"] == 0.75
+    assert feedback["outcome_delta"] == 0.5
+
+
+def test_strict_reflection_consumes_ordered_streamed_control_rows(
+    tmp_path: Path,
+) -> None:
+    scenario_name = "search_phone_number_with_name"
+    channel: Queue[dict[str, object]] = Queue()
+    channel.put(
+        {
+            "event": "fresh_control_row",
+            "scenario": scenario_name,
+            "row": {
+                "name": scenario_name,
+                "similarity": 0.25,
+                "outcome_similarity": 0.5,
+                "online_feedback_outcome_similarity": 0.5,
+                "llm_cached_call_count": 0,
+            },
+        }
+    )
+    channel.put({"event": "fresh_control_complete", "scenario_count": 1})
+    controller = SelfEvolutionReflectionController.from_env(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        require_fresh_control=True,
+        fresh_control_channel=channel,
+    )
+
+    controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={
+            "similarity": 0.75,
+            "outcome_similarity": 1.0,
+            "online_feedback_outcome_similarity": 1.0,
+        },
+        selection_record={},
+        side_effect_failures=[],
+    )
+    controller.assert_fresh_control_complete((scenario_name,))
+
+    assert controller.fresh_control_stream_complete is True
+    assert controller.fresh_control_consumed == {scenario_name}

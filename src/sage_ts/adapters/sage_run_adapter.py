@@ -741,6 +741,7 @@ class SageRunConfig:
     manifest_path: Path = Path("")
     reflection_control_rows: dict[str, dict[str, Any]] | None = None
     require_fresh_reflection_control: bool = False
+    reflection_control_channel: Any | None = None
     failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
 
 
@@ -764,6 +765,7 @@ def run_sage_with_registry(
     reflection_controller: SelfEvolutionReflectionController | None = None
     registry_load_logged = False
     mutate_registry_reuse_counts = generator is not None
+    registry_dir_for_events = str(config.registry_dir)
 
     def transform(name: str, scenario: Scenario, output_directory: Path) -> Scenario:
         nonlocal birth_controller, registry_load_logged, reflection_controller
@@ -791,6 +793,7 @@ def run_sage_with_registry(
                 manifest_path=config.manifest_path,
                 fresh_control_rows=config.reflection_control_rows,
                 require_fresh_control=config.require_fresh_reflection_control,
+                fresh_control_channel=config.reflection_control_channel,
             )
         visible_task_context = visible_task_context_from_scenario(scenario)
         routing_context_text = visible_task_context.routing_text()
@@ -867,7 +870,7 @@ def run_sage_with_registry(
                     {
                         "scenario": name,
                         "tool_name": tool_name,
-                        "registry_dir": str(config.registry_dir),
+                        "registry_dir": registry_dir_for_events,
                     },
                 )
 
@@ -1181,13 +1184,20 @@ def run_sage_with_registry(
                     },
                 )
             return result
-        trace_result = result
+        # Tool birth used the paper-era outcome signal in the validated policy
+        # runtime. Reporting now uses the audited v5 evaluator, so give the
+        # inadequacy classifier an isolated compatibility view instead of
+        # changing the published result row or the historical birth behavior.
+        trace_result = dict(result)
+        if "online_feedback_outcome_similarity" in result:
+            trace_result["outcome_similarity"] = result[
+                "online_feedback_outcome_similarity"
+            ]
         visible_messages = _visible_conversation_messages_for_observation(
             output_directory,
             name,
         )
         if visible_messages:
-            trace_result = dict(result)
             trace_result["messages"] = visible_messages
         visible_task_context_processed = (
             name in birth_controller.pre_scenario_visible_observations

@@ -50,8 +50,8 @@ DIRECTORY_DIGEST_ALGORITHM = (
 STATIC_ANALYSIS_INPUTS = (
     Path("scripts/run_chapter4_evidence_campaign.py"),
     Path("scripts/build_chapter4_evidence_dashboard.py"),
-    Path("src/sage_ts/evaluation/chapter4_evidence.py"),
-    Path("src/sage_ts/dashboard/chapter4_evidence_template.html"),
+    Path("scripts/research/chapter4_evidence.py"),
+    Path("scripts/research/chapter4_evidence_template.html"),
     Path("scripts/render_chapter4_evidence_tables.py"),
     Path("docs/sage_protocol/chapter4_4omini_data_collection_plan.md"),
     Path("docs/sage_protocol/chapter4_results_completed.tex"),

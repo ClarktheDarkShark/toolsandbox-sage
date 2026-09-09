@@ -11,12 +11,12 @@ This file contains guidance for background and scheduled agents executing SAGE p
 
 ## 2. Scheduled Tasks (Recurring)
 
-If a task is scheduled to run on a cadence (e.g., "check registry health weekly"):
+If a task is scheduled to run on a cadence (e.g., "check publication inputs weekly"):
 
 - Define the task as a cron entry or `schedule` skill call.
-- Include the command to run (e.g., `python scripts/migrate_registry.py --check-only`).
-- Log output to a file (e.g., `artifacts/weekly_registry_health_<date>.log`).
-- If health check fails, escalate to human review (do not auto-patch).
+- Include the command to run (e.g., `make verify-inputs`).
+- Log output to a file (e.g., `artifacts/weekly_publication_inputs_<date>.log`).
+- If the integrity check fails, escalate to human review (do not auto-patch).
 
 Example:
 ```bash

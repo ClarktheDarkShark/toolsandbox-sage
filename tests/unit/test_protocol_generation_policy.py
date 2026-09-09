@@ -373,6 +373,7 @@ def test_strict_publication_mode_rejects_every_partial_resume(
             "--manifest",
             "unused.json",
             "--require-fresh-control",
+            "--parallel-arms",
             "--resume-run-root",
             "old-run",
         ],
@@ -398,6 +399,7 @@ def test_strict_publication_mode_rejects_diagnostic_force_environment(
             "--manifest",
             "unused.json",
             "--require-fresh-control",
+            "--parallel-arms",
             "--diagnostic-force-allowed",
         ],
     )

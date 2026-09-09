@@ -12,6 +12,12 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
+from sage_ts.evaluation.online_feedback_score import (
+    ONLINE_FEEDBACK_EVALUATOR_VERSION,
+)
+from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
+
 PINNED_RAPID_FIXTURE_SHA256 = (
     "eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
 )
@@ -27,7 +33,9 @@ PINNED_PUBLICATION_ENVIRONMENT_LOCK_SHA256 = (
 PUBLICATION_ENVIRONMENT_LOCK = "requirements-publication-lock.txt"
 PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP = 1784832588
 PUBLICATION_MODEL = "gpt-4o-mini"
+PUBLICATION_TIMEZONE = "America/New_York"
 PUBLICATION_EXECUTION_ENV = {
+    "TZ": PUBLICATION_TIMEZONE,
     "SAGE_OPENAI_MAX_RETRIES": "5",
     "SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
     "SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
@@ -299,6 +307,70 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"Expected a JSON object: {path}")
     return payload
+
+
+def _verify_parallel_arm_execution(
+    run_root: Path,
+    protocol: dict[str, Any],
+) -> dict[str, Any]:
+    record = protocol.get("parallel_arm_execution")
+    if not isinstance(record, dict):
+        raise ValueError("Protocol has no parallel child-process execution evidence.")
+    if (
+        record.get("unit") != "isolated_child_process"
+        or record.get("positive_overlap_asserted") is not True
+    ):
+        raise ValueError("Parallel execution evidence has invalid process metadata.")
+    recorded_arms = record.get("arms")
+    if not isinstance(recorded_arms, dict):
+        raise ValueError("Parallel execution evidence has no arm records.")
+    intervals: dict[str, tuple[int, int]] = {}
+    pids: set[int] = set()
+    fields = (
+        "status",
+        "process_pid",
+        "started_at",
+        "completed_at",
+        "started_monotonic_ns",
+        "completed_monotonic_ns",
+    )
+    for arm in ("control", "candidate"):
+        arm_record = recorded_arms.get(arm)
+        if not isinstance(arm_record, dict):
+            raise ValueError(f"Parallel execution evidence is missing {arm!r}.")
+        status = _read_json(run_root / f"{arm}_arm_status.json")
+        if any(arm_record.get(field) != status.get(field) for field in fields):
+            raise ValueError(
+                f"Parallel {arm} execution evidence differs from its arm status."
+            )
+        pid = arm_record.get("process_pid")
+        started = arm_record.get("started_monotonic_ns")
+        completed = arm_record.get("completed_monotonic_ns")
+        if (
+            arm_record.get("status") != "complete"
+            or isinstance(pid, bool)
+            or not isinstance(pid, int)
+            or pid <= 0
+            or pid in pids
+            or isinstance(started, bool)
+            or not isinstance(started, int)
+            or isinstance(completed, bool)
+            or not isinstance(completed, int)
+            or completed <= started
+        ):
+            raise ValueError(f"Parallel {arm} process timing/PID evidence is invalid.")
+        pids.add(pid)
+        intervals[arm] = (started, completed)
+    overlap_ns = min(interval[1] for interval in intervals.values()) - max(
+        interval[0] for interval in intervals.values()
+    )
+    if (
+        overlap_ns <= 0
+        or record.get("overlap_monotonic_ns") != overlap_ns
+        or record.get("overlap_seconds") != overlap_ns / 1_000_000_000
+    ):
+        raise ValueError("Control and SAGE process intervals do not prove overlap.")
+    return record
 
 
 def _resolve_declared_path(
@@ -703,7 +775,11 @@ def _verify_reflection(
             raise ValueError(f"Reflection task {name!r} has no matched live control.")
         if row.get("control_score") != control.get("similarity"):
             raise ValueError(f"Reflection control score mismatch for {name!r}.")
-        if row.get("control_outcome") != control.get("outcome_similarity"):
+        expected_feedback_outcome = control.get(
+            "online_feedback_outcome_similarity",
+            control.get("outcome_similarity"),
+        )
+        if row.get("control_outcome") != expected_feedback_outcome:
             raise ValueError(f"Reflection control outcome mismatch for {name!r}.")
         feedback[name] = row
     if set(feedback) != set(control_rows):
@@ -729,6 +805,7 @@ def verify_run(
     run_root = runs[-1]
     protocol = _read_json(run_root / "protocol_manifest.json")
     cache_report = _read_json(run_root / "control_cache_report.json")
+    current_outcome_evaluator = outcome_evaluator_manifest()
     publication_provenance = _verify_publication_provenance(protocol)
     for model_field in ("agent", "user", "generation_model"):
         if protocol.get(model_field) != PUBLICATION_MODEL:
@@ -777,6 +854,10 @@ def verify_run(
     required_protocol = {
         "fresh_control_required": True,
         "publication_performance_endpoint": "outcome_task_completion_similarity",
+        "actor_selection_mode": "policy",
+        "reporting_outcome_evaluator": current_outcome_evaluator,
+        "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
+        "timezone": PUBLICATION_TIMEZONE,
         "control_cache_mode": "off",
         "control_source": "fresh",
         "cached_control_tasks": 0,
@@ -794,7 +875,13 @@ def verify_run(
         "cross_run_failure_memory_path": None,
         "diagnostic_force_allowed": False,
         "active_diagnostic_force_env": [],
-        "parallel_arms": False,
+        "parallel_arms": True,
+        "reflection_control_delivery": (
+            "task_synchronous_stream"
+            if expected_generation
+            else "not_applicable_generation_disabled"
+        ),
+        "dashboard_open_required": True,
     }
     for field, expected in required_protocol.items():
         if protocol.get(field) != expected:
@@ -802,6 +889,42 @@ def verify_run(
                 f"Protocol field {field!r} is {protocol.get(field)!r}; "
                 f"expected {expected!r}."
             )
+    parallel_execution = _verify_parallel_arm_execution(run_root, protocol)
+    dashboard_receipt_path = _resolve_declared_path(
+        run_root,
+        protocol.get("dashboard_open_receipt_path"),
+        "dashboard_open_receipt_path",
+        required_parent=run_root,
+    )
+    dashboard_receipt = _read_json(dashboard_receipt_path)
+    expected_task_dashboard = (run_root / "dashboard" / "task_compare.html").resolve()
+    opened_monotonic_ns = dashboard_receipt.get("opened_monotonic_ns")
+    first_model_process_start = min(
+        int(parallel_execution["arms"][arm]["started_monotonic_ns"])
+        for arm in ("control", "candidate")
+    )
+    if (
+        dashboard_receipt.get("dashboard") != "task_compare"
+        or dashboard_receipt.get("comparison") != "fresh_control_vs_policy_sage"
+        or Path(str(dashboard_receipt.get("path") or "")).resolve()
+        != expected_task_dashboard
+        or dashboard_receipt.get("url") != protocol.get("dashboard_task_compare_url")
+        or dashboard_receipt.get("external_browser_opened") is not True
+        or dashboard_receipt.get("http_verified_before_open") is not True
+        or dashboard_receipt.get("dashboard_server_protocol")
+        != DASHBOARD_SERVER_PROTOCOL
+        or Path(str(dashboard_receipt.get("dashboard_server_root") or "")).resolve()
+        != run_root.resolve()
+        or dashboard_receipt.get("opened_before_model_processes") is not True
+        or isinstance(opened_monotonic_ns, bool)
+        or not isinstance(opened_monotonic_ns, int)
+        or opened_monotonic_ns <= 0
+        or opened_monotonic_ns >= first_model_process_start
+    ):
+        raise ValueError(
+            "Task Compare dashboard receipt does not prove the exact run dashboard "
+            "opened externally before either model process."
+        )
     run_env = protocol.get("run_affecting_sage_env")
     if not isinstance(run_env, dict):
         raise ValueError("Publication run did not record its execution environment.")
@@ -939,6 +1062,10 @@ def verify_run(
             ],
         },
         "reflection_control_source": protocol.get("reflection_control_source"),
+        "reflection_control_delivery": protocol.get("reflection_control_delivery"),
+        "parallel_arm_execution": parallel_execution,
+        "reporting_outcome_evaluator": current_outcome_evaluator,
+        "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
         "external_fixture_sha256": observed_fixture_sha256,
         "git_commit": publication_provenance["git_commit"],
         "git_tree": publication_provenance["git_tree"],

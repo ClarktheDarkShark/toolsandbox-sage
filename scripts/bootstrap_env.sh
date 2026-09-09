@@ -43,6 +43,16 @@ fi
 ENV_PYTHON="$ENV_DIR/bin/python"
 "$ENV_PYTHON" -m pip install --requirement "$LOCK_FILE"
 "$ENV_PYTHON" -m pip install --no-deps --editable "$ROOT_DIR"
+
+# On macOS, virtual environments created inside a hidden/iCloud-synchronized
+# directory can propagate UF_HIDDEN through the environment tree. CPython then
+# skips editable-install .pth files, silently disabling the package outside
+# PYTHONPATH. Normalize only this explicitly selected virtual environment before
+# the isolated import provenance check.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  /usr/bin/chflags -R nohidden "$ENV_DIR"
+fi
+
 "$ENV_PYTHON" -m pip check
 "$ENV_PYTHON" "$ROOT_DIR/scripts/verify_publication_environment.py" \
   --lock "$LOCK_FILE"

@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterator, cast
 
-from sage_ts.evaluation.chapter4_evidence import (
+from scripts.research.chapter4_evidence import (
     load_run_evidence,
     write_evidence_dashboard,
 )
@@ -61,6 +61,7 @@ EXPECTED_TASKS_PER_RUN = 1032
 EXPECTED_OUTCOME_SCORED_TASKS_PER_RUN = 800
 PUBLICATION_MODEL = "gpt-4o-mini"
 PUBLICATION_EXECUTION_ENV = {
+    "TZ": "America/New_York",
     "SAGE_OPENAI_MAX_RETRIES": "5",
     "SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
     "SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
@@ -1246,7 +1247,6 @@ def _job_command(
     env = os.environ.copy()
     env.update(
         {
-            "SAGE_BATCH_NO_DASHBOARD_OPEN": "1",
             "SAGE_RUN_STAMP": f"{model_stamp}_{rep_label}_{arm}",
             "TOOL_SANDBOX_FIXED_NOW_TIMESTAMP": str(
                 manifest["fixed_toolsandbox_timestamp"]
@@ -1261,6 +1261,7 @@ def _job_command(
         }
     )
     for stale_name in (
+        "SAGE_BATCH_NO_DASHBOARD_OPEN",
         "CONTROL_CACHE_ROOT",
         "SAGE_SELF_EVOLVING_CONTROL_CACHE_ROOT",
         "SAGE_EXPERIMENTAL_CONTROL_CACHE_TASK_ONLY",

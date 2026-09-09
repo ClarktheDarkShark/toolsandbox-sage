@@ -92,8 +92,28 @@ def test_cached_control_transcript_loading_is_opt_in(
     assert source["transcript_loaded"] is True
 
 
-def test_open_dashboard_falls_back_to_macos_open(tmp_path: Path, monkeypatch) -> None:
+class _DashboardResponse:
+    def __init__(self, body: bytes, *, status: int = 200) -> None:
+        self._body = body
+        self.status = status
+
+    def __enter__(self) -> "_DashboardResponse":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def test_open_dashboard_verifies_bytes_then_uses_checked_macos_open(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     calls: list[tuple[str, object]] = []
+    index_path = tmp_path / "index.html"
+    index_path.write_text("dashboard", encoding="utf-8")
 
     monkeypatch.setattr(
         exporters,
@@ -107,48 +127,32 @@ def test_open_dashboard_falls_back_to_macos_open(tmp_path: Path, monkeypatch) ->
             f"http://127.0.0.1:{port}/dashboard/index.html"
         ),
     )
-    monkeypatch.setattr(exporters.webbrowser, "open_new_tab", lambda url: False)
+    monkeypatch.setattr(
+        exporters,
+        "urlopen",
+        lambda url, **_kwargs: _DashboardResponse(b"dashboard"),
+    )
     monkeypatch.setattr(exporters.sys, "platform", "darwin")
     monkeypatch.setattr(
         exporters.subprocess,
-        "Popen",
-        lambda args, **_kwargs: calls.append(("open", args)),
+        "run",
+        lambda args, **kwargs: calls.append(("open", (args, kwargs))),
     )
 
-    url = exporters.open_dashboard(tmp_path / "index.html", port=5520)
+    url = exporters.open_dashboard(index_path, port=5520)
 
     assert url == "http://127.0.0.1:5520/dashboard/index.html"
     assert ("server", 5520) in calls
-    assert ("open", ["open", url]) in calls
+    open_call = next(value for kind, value in calls if kind == "open")
+    args, kwargs = open_call
+    assert args == ["open", url]
+    assert kwargs["check"] is True
+    assert kwargs["timeout"] == 10
 
 
-def test_open_dashboard_always_uses_macos_open(tmp_path: Path, monkeypatch) -> None:
-    calls: list[tuple[str, object]] = []
-
-    monkeypatch.setattr(
-        exporters,
-        "ensure_dashboard_server",
-        lambda *, port, server_root: calls.append(("server", port)),
-    )
-    monkeypatch.setattr(
-        exporters,
-        "dashboard_url",
-        lambda index_path, *, port, server_root: (
-            f"http://127.0.0.1:{port}/dashboard/index.html"
-        ),
-    )
-    monkeypatch.setattr(exporters.webbrowser, "open_new_tab", lambda url: True)
-    monkeypatch.setattr(exporters.sys, "platform", "darwin")
-    monkeypatch.setattr(
-        exporters.subprocess,
-        "Popen",
-        lambda args, **_kwargs: calls.append(("open", args)),
-    )
-
-    url = exporters.open_dashboard(tmp_path / "index.html", port=5520)
-
-    assert url == "http://127.0.0.1:5520/dashboard/index.html"
-    assert ("open", ["open", url]) in calls
+def test_open_dashboard_requires_existing_file(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="Dashboard file does not exist"):
+        exporters.open_dashboard(tmp_path / "index.html", port=5520)
 
 
 def test_dashboard_url_supports_output_outside_repo(tmp_path: Path) -> None:

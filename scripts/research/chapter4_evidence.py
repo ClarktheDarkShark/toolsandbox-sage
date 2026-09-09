@@ -19,11 +19,7 @@ from typing import Any, Iterable
 
 import numpy as np
 
-EVIDENCE_TEMPLATE = (
-    Path(__file__).resolve().parents[1]
-    / "dashboard"
-    / "chapter4_evidence_template.html"
-)
+EVIDENCE_TEMPLATE = Path(__file__).with_name("chapter4_evidence_template.html")
 EVIDENCE_DATA_NAME = "chapter4_evidence_data.json"
 EVIDENCE_HTML_NAME = "chapter4_evidence.html"
 EVIDENCE_SCHEMA_VERSION = 2
@@ -544,7 +540,7 @@ def _tool_records(
     accepted_total = 0
     reused_tool_total = 0
     reuse_events = 0
-    natural_calls = 0
+    policy_directed_calls = 0
     gains = 0
     regressions = 0
     preserved = 0
@@ -553,7 +549,7 @@ def _tool_records(
     for replicate, run in online_runs:
         accepted_total += run.accepted_tools
         reuse_events += run.reuse_events
-        natural_calls += run.generated_tool_called_scenarios
+        policy_directed_calls += run.generated_tool_called_scenarios
         runtime_failures += run.generated_tool_failed_scenarios
         for name, registry_entry in run.registry_tools.items():
             if not isinstance(registry_entry, dict) or registry_entry.get("retired"):
@@ -627,7 +623,7 @@ def _tool_records(
                         "heading": "Contribution",
                         "rows": _rows(
                             [
-                                ("Natural calls", record["calls"]),
+                                ("Policy-directed calls", record["calls"]),
                                 ("Later-task reuse events", record["later_calls"]),
                                 ("Outcome gains", record["gains"]),
                                 ("Outcome regressions", record["regressions"]),
@@ -686,7 +682,11 @@ def _tool_records(
         "accepted": accepted_total,
         "reused_tools": reused_tool_total,
         "reuse_events": reuse_events,
-        "natural_calls": natural_calls,
+        # Keep the historical key for evidence-file compatibility; these calls
+        # were selected by the production actor policy, not naturally by the
+        # base model.
+        "natural_calls": policy_directed_calls,
+        "policy_directed_calls": policy_directed_calls,
         "gains": gains,
         "regressions": regressions,
         "preserved": preserved,
@@ -1428,15 +1428,15 @@ def build_evidence_data(
             "decision": h3_status,
             "decision_label": _decision_label(h3_status),
             "value_label": _percent(called_lift, signed=True),
-            "primary_label": "Lift is measured only where SAGE naturally called generated tools.",
+            "primary_label": "Lift is measured on tasks where the SAGE actor policy called generated tools.",
             "claim_label": (
-                "The strongest gains occur on tasks where SAGE naturally selects "
-                "and calls a tool it generated."
+                "The strongest gains occur on tasks where the SAGE actor policy "
+                "selects and sequences a generated tool."
             ),
             "evidence_label": (
-                "Uses only generated-tool-called tasks, with force-call "
-                "diagnostics, scenario-name routing, and synthetic bridge "
-                "completions disabled."
+                "Uses generated-tool-called tasks under the declared production "
+                "policy; diagnostic overrides, scenario-name routing, and "
+                "synthetic bridge completions are disabled."
             ),
             "observed_label": f"Observed {_percent(called_lift, signed=True)}",
             "threshold_label": f"Target >= {h3_threshold:g}%",
@@ -1445,7 +1445,7 @@ def build_evidence_data(
             "status": h3_status,
             **_detail(
                 "hypothesis:h3",
-                "Hypothesis 3: Naturally called generated-tool lift",
+                "Hypothesis 3: Policy-directed generated-tool pathway",
                 [
                     {
                         "heading": "Definition and result",
@@ -1487,8 +1487,9 @@ def build_evidence_data(
                             ]
                         ),
                         "note": (
-                            "Diagnostic force-call variables must be absent for "
-                            "these calls to count as natural selection evidence."
+                            "Diagnostic override variables must be absent. The "
+                            "production actor policy and its named tool choices "
+                            "remain part of the SAGE intervention."
                         ),
                     }
                 ],
@@ -1638,7 +1639,7 @@ def build_evidence_data(
         },
         {"label": "Benchmark-metadata shortcut checks", "value": metadata_violations},
         {"label": "Code-based answer shortcut checks", "value": bridge_violations},
-        {"label": "Forced generated-tool call checks", "value": force_violations},
+        {"label": "Diagnostic tool-call override checks", "value": force_violations},
         {"label": "Tool side-effect audit flags", "value": side_effect_incidents},
     ]
     integrity = {
@@ -1665,7 +1666,7 @@ def build_evidence_data(
                             "Run",
                             "Visible-context routing",
                             "Bridge disabled",
-                            "Force-call variables",
+                            "Diagnostic override variables",
                             "SAGE digests",
                             "Runtime exceptions",
                             "Side effects",
@@ -1705,10 +1706,10 @@ def build_evidence_data(
         ),
         (
             "calls",
-            "Natural tool calls",
-            f"{tool_totals['natural_calls']:,}",
+            "Policy-directed tool calls",
+            f"{tool_totals['policy_directed_calls']:,}",
             "",
-            "Matched task scenarios containing a recorded generated-tool call with force-call diagnostics disabled.",
+            "Matched task scenarios containing a generated-tool call selected by the production actor policy, with diagnostic overrides disabled.",
         ),
         (
             "gains",

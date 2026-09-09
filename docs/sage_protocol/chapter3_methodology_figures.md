@@ -2,9 +2,9 @@
 
 This figure set documents the current SAGE evidence boundary used for Chapter 3:
 autonomous tool generation, validation/repair, registry retention, visible-context
-routing, natural generated-tool use, lifecycle feedback, contribution accounting,
-and matched baseline comparison. It does not describe retired synthetic
-completion paths.
+routing, policy-directed generated-tool use, lifecycle feedback, contribution
+accounting, and matched baseline comparison. It does not describe retired
+synthetic completion paths or the later natural-selection experiments.
 
 Current source-of-truth methodology document:
 
@@ -20,12 +20,10 @@ Current primary figure assets:
 | SAGE self-evolution publication loop | Publication-oriented visual of the same tool-generation lifecycle. | `docs/sage_protocol/figures/sage_self_evolution_loop_publication.svg`, `docs/sage_protocol/figures/sage_self_evolution_loop_publication.png`, `docs/sage_protocol/figures/sage_self_evolution_loop_publication.html` |
 | SAGE design loop | Editable design companion for the high-level loop. | `docs/sage_protocol/figures/sage_self_evolution_loop_design.html`, `docs/sage_protocol/figures/sage_self_evolution_loop_design.png`, `docs/sage_protocol/figures/sage_self_evolution_loop_design.pdf` |
 
-Regeneration scripts:
-
-```bash
-python3 scripts/render_sage_self_evolution_loop_publication.py
-python3 scripts/export_sage_self_evolution_loop_design.py
-```
+The old figure generators were removed from the production branch because they
+encoded superseded natural-selection claims. The checked-in assets are
+historical references; publication figures must be re-authored from the current
+policy-directed methodology before reuse.
 
 Release note: older methodology figures that mention retired synthetic
 completion paths, force-call promotion, or generated-helper terminology are

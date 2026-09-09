@@ -210,8 +210,11 @@ evidence. Original ToolSandbox tools remain responsible for state mutation.
 The active implementation surface is:
 
 - `scripts/run_sage_protocol.py`
-- `scripts/prepare_toolsandbox_full_self_evolving_run.py`
-- `scripts/render_chapter3_sage_figures.py`
+- `scripts/run_native_action_4omini_ab.sh`
+- `scripts/verify_publication_environment.py`
+- `scripts/verify_publication_inputs.py`
+- `scripts/verify_publication_run.py`
+- `scripts/run_chapter4_evidence_campaign.py`
 - `src/sage_ts/` reusable SAGE core
 - `tool_sandbox/`
 - focused `tests/unit/` and `tests/integration/`
