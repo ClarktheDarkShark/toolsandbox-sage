@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import math
 import re
 import subprocess
 from pathlib import Path
@@ -14,9 +15,11 @@ from typing import Any
 
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.online_feedback_score import (
-    ONLINE_FEEDBACK_EVALUATOR_VERSION,
+    ONLINE_FEEDBACK_EVALUATOR_VERSION as ONLINE_FEEDBACK_EVALUATOR_VERSION,
 )
-from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
+from sage_ts.evaluation.outcome_score import (
+    outcome_evaluator_manifest as outcome_evaluator_manifest,
+)
 
 PINNED_RAPID_FIXTURE_SHA256 = (
     "eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
@@ -34,6 +37,7 @@ PUBLICATION_ENVIRONMENT_LOCK = "requirements-publication-lock.txt"
 PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP = 1784832588
 PUBLICATION_MODEL = "gpt-4o-mini"
 PUBLICATION_TIMEZONE = "America/New_York"
+PUBLICATION_OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v8"
 PUBLICATION_EXECUTION_ENV = {
     "TZ": PUBLICATION_TIMEZONE,
     "SAGE_OPENAI_MAX_RETRIES": "5",
@@ -424,6 +428,7 @@ def _uncached_rows(
     *,
     expected_tasks: int,
     arm: str,
+    expected_outcome_evaluator: dict[str, Any],
 ) -> tuple[dict[str, dict[str, Any]], list[str], dict[str, int]]:
     summary_path = run_dir / "result_summary.json"
     payload = _read_json(summary_path)
@@ -440,6 +445,31 @@ def _uncached_rows(
             raise ValueError(f"{arm} result summary contains an unnamed task.")
         if name in by_name:
             raise ValueError(f"{arm} result summary duplicates task {name!r}.")
+        outcome_similarity = item.get("outcome_similarity")
+        if outcome_similarity is not None:
+            if (
+                isinstance(outcome_similarity, bool)
+                or not isinstance(outcome_similarity, (int, float))
+                or not math.isfinite(float(outcome_similarity))
+                or not 0.0 <= float(outcome_similarity) <= 1.0
+            ):
+                raise ValueError(
+                    f"{arm} task {name!r} has an invalid outcome similarity."
+                )
+            evaluator_fields = {
+                "outcome_evaluator_version": "version",
+                "outcome_evaluator_contract_sha256": "contract_sha256",
+                "outcome_evaluator_source_sha256": "source_sha256",
+            }
+            for result_field, manifest_field in evaluator_fields.items():
+                if result_field not in item or item[
+                    result_field
+                ] != expected_outcome_evaluator.get(manifest_field):
+                    raise ValueError(
+                        f"{arm} task {name!r} outcome evaluator field "
+                        f"{result_field!r} does not match the exact publication "
+                        "evaluator identity."
+                    )
         cache_source = str(item.get("control_cache_source") or "").lower()
         cache_detail = item.get("control_cache")
         if cache_source and cache_source != "fresh":
@@ -750,15 +780,59 @@ def _verify_llm_usage_artifacts(
         raise ValueError(f"{arm} LLM usage source summary does not match raw events.")
 
 
+def _optional_feedback_metric(value: Any, *, label: str) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be numeric or null.")
+    numeric = float(value)
+    if not math.isfinite(numeric):
+        raise ValueError(f"{label} must be finite.")
+    return numeric
+
+
+def _feedback_outcome_with_source(
+    row: dict[str, Any],
+    *,
+    label: str,
+) -> tuple[float | None, str]:
+    paper_feedback = _optional_feedback_metric(
+        row.get("online_feedback_outcome_similarity"),
+        label=f"{label} paper-era online feedback outcome",
+    )
+    if paper_feedback is not None:
+        return paper_feedback, "paper_era_online_feedback"
+    audited_outcome = _optional_feedback_metric(
+        row.get("outcome_similarity"),
+        label=f"{label} audited outcome",
+    )
+    if audited_outcome is not None:
+        return audited_outcome, "audited_outcome_fallback"
+    return None, "unavailable"
+
+
+def _require_reflection_field(
+    row: dict[str, Any],
+    *,
+    field: str,
+    expected: Any,
+    label: str,
+) -> None:
+    if field not in row or row[field] != expected:
+        raise ValueError(f"Reflection {label} mismatch for {row.get('scenario')!r}.")
+
+
 def _verify_reflection(
     candidate_dir: Path,
     *,
     control_rows: dict[str, dict[str, Any]],
+    candidate_rows: dict[str, dict[str, Any]],
 ) -> None:
     feedback_path = candidate_dir / "self_evolution_task_feedback.jsonl"
     if not feedback_path.is_file():
         raise ValueError(f"Missing same-run reflection feedback: {feedback_path}")
     feedback: dict[str, dict[str, Any]] = {}
+    feedback_order: list[str] = []
     for line in feedback_path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
@@ -768,26 +842,160 @@ def _verify_reflection(
         name = str(row.get("scenario") or "")
         if not name or name in feedback:
             raise ValueError(f"Duplicate or unnamed reflection task {name!r}.")
+        completed_count = row.get("completed_count")
+        expected_completed_count = len(feedback_order) + 1
+        if (
+            isinstance(completed_count, bool)
+            or not isinstance(completed_count, int)
+            or completed_count != expected_completed_count
+        ):
+            raise ValueError(
+                f"Reflection completed_count mismatch for {name!r}; expected "
+                f"{expected_completed_count}."
+            )
         if row.get("control_source") != "same_run_fresh":
             raise ValueError(f"Reflection task {name!r} is not same-run fresh.")
         control = control_rows.get(name)
         if control is None:
             raise ValueError(f"Reflection task {name!r} has no matched live control.")
-        if row.get("control_score") != control.get("similarity"):
-            raise ValueError(f"Reflection control score mismatch for {name!r}.")
-        expected_feedback_outcome = control.get(
-            "online_feedback_outcome_similarity",
-            control.get("outcome_similarity"),
+        candidate = candidate_rows.get(name)
+        if candidate is None:
+            raise ValueError(f"Reflection task {name!r} has no matched candidate.")
+        control_score = _optional_feedback_metric(
+            control.get("similarity"), label=f"control task {name!r} score"
         )
-        if row.get("control_outcome") != expected_feedback_outcome:
-            raise ValueError(f"Reflection control outcome mismatch for {name!r}.")
+        candidate_score = _optional_feedback_metric(
+            candidate.get("similarity"), label=f"candidate task {name!r} score"
+        )
+        control_outcome, control_outcome_source = _feedback_outcome_with_source(
+            control, label=f"control task {name!r}"
+        )
+        candidate_outcome, candidate_outcome_source = _feedback_outcome_with_source(
+            candidate, label=f"candidate task {name!r}"
+        )
+        score_delta = (
+            candidate_score - control_score
+            if control_score is not None and candidate_score is not None
+            else None
+        )
+        outcome_delta = (
+            candidate_outcome - control_outcome
+            if control_outcome is not None and candidate_outcome is not None
+            else None
+        )
+        for field, expected, label in (
+            ("control_score", control_score, "control score"),
+            ("candidate_score", candidate_score, "candidate score"),
+            ("score_delta", score_delta, "score delta"),
+            ("control_outcome", control_outcome, "control outcome"),
+            (
+                "control_outcome_source",
+                control_outcome_source,
+                "control outcome source",
+            ),
+            ("candidate_outcome", candidate_outcome, "candidate outcome"),
+            (
+                "candidate_outcome_source",
+                candidate_outcome_source,
+                "candidate outcome source",
+            ),
+            ("outcome_delta", outcome_delta, "outcome delta"),
+        ):
+            _require_reflection_field(
+                row,
+                field=field,
+                expected=expected,
+                label=label,
+            )
         feedback[name] = row
+        feedback_order.append(name)
     if set(feedback) != set(control_rows):
         raise ValueError(
             "Reflection/control task sets differ "
             f"(missing={sorted(set(control_rows) - set(feedback))!r}, "
             f"extra={sorted(set(feedback) - set(control_rows))!r})."
         )
+    if set(feedback) != set(candidate_rows):
+        raise ValueError(
+            "Reflection/candidate task sets differ "
+            f"(missing={sorted(set(candidate_rows) - set(feedback))!r}, "
+            f"extra={sorted(set(feedback) - set(candidate_rows))!r})."
+        )
+    if feedback_order != list(control_rows) or feedback_order != list(candidate_rows):
+        raise ValueError(
+            "Reflection task order does not exactly match control and candidate order."
+        )
+
+
+def _verify_paired_outcome_aggregates(
+    comparison: dict[str, Any],
+    *,
+    control_rows: dict[str, dict[str, Any]],
+    candidate_rows: dict[str, dict[str, Any]],
+) -> None:
+    paired_outcomes: list[tuple[float, float, float]] = []
+    for name in control_rows:
+        control_outcome = _optional_feedback_metric(
+            control_rows[name].get("outcome_similarity"),
+            label=f"control task {name!r} audited outcome",
+        )
+        candidate_outcome = _optional_feedback_metric(
+            candidate_rows[name].get("outcome_similarity"),
+            label=f"candidate task {name!r} audited outcome",
+        )
+        if control_outcome is None or candidate_outcome is None:
+            continue
+        paired_outcomes.append(
+            (control_outcome, candidate_outcome, candidate_outcome - control_outcome)
+        )
+
+    count = len(paired_outcomes)
+    deltas = [values[2] for values in paired_outcomes]
+    expected: dict[str, int | float | None] = {
+        "scenario_count": len(control_rows),
+        "outcome_scenario_count": count,
+        "control_mean_outcome_similarity": (
+            sum(values[0] for values in paired_outcomes) / count if count else None
+        ),
+        "candidate_mean_outcome_similarity": (
+            sum(values[1] for values in paired_outcomes) / count if count else None
+        ),
+        "mean_outcome_similarity_delta": (sum(deltas) / count if count else None),
+        "outcome_gain_count": sum(delta > 0 for delta in deltas),
+        "outcome_regression_count": sum(delta < 0 for delta in deltas),
+        "outcome_preserved_count": sum(delta == 0 for delta in deltas),
+    }
+    integer_fields = {
+        "scenario_count",
+        "outcome_scenario_count",
+        "outcome_gain_count",
+        "outcome_regression_count",
+        "outcome_preserved_count",
+    }
+    for field, expected_value in expected.items():
+        if field not in comparison:
+            raise ValueError(f"Paired comparison is missing outcome field {field!r}.")
+        observed = comparison[field]
+        if field in integer_fields:
+            matches = (
+                not isinstance(observed, bool)
+                and isinstance(observed, int)
+                and observed == expected_value
+            )
+        elif expected_value is None:
+            matches = observed is None
+        else:
+            matches = (
+                not isinstance(observed, bool)
+                and isinstance(observed, (int, float))
+                and math.isfinite(float(observed))
+                and float(observed) == expected_value
+            )
+        if not matches:
+            raise ValueError(
+                f"Paired comparison outcome field {field!r} does not match "
+                "the scored result rows."
+            )
 
 
 def verify_run(
@@ -806,6 +1014,14 @@ def verify_run(
     protocol = _read_json(run_root / "protocol_manifest.json")
     cache_report = _read_json(run_root / "control_cache_report.json")
     current_outcome_evaluator = outcome_evaluator_manifest()
+    if (
+        current_outcome_evaluator.get("version")
+        != PUBLICATION_OUTCOME_EVALUATOR_VERSION
+    ):
+        raise ValueError(
+            "The installed reporting outcome evaluator is not the exact "
+            f"{PUBLICATION_OUTCOME_EVALUATOR_VERSION} publication evaluator."
+        )
     publication_provenance = _verify_publication_provenance(protocol)
     for model_field in ("agent", "user", "generation_model"):
         if protocol.get(model_field) != PUBLICATION_MODEL:
@@ -999,11 +1215,13 @@ def verify_run(
         control_dir,
         expected_tasks=expected_tasks,
         arm="control",
+        expected_outcome_evaluator=current_outcome_evaluator,
     )
     candidate_rows, candidate_order, candidate_llm_usage = _uncached_rows(
         candidate_dir,
         expected_tasks=expected_tasks,
         arm="candidate",
+        expected_outcome_evaluator=current_outcome_evaluator,
     )
     _verify_llm_usage_artifacts(
         control_dir,
@@ -1030,8 +1248,17 @@ def verify_run(
         raise ValueError(
             "Result rows do not preserve the pinned publication task order."
         )
+    _verify_paired_outcome_aggregates(
+        _read_json(run_root / "paired_comparison.json"),
+        control_rows=control_rows,
+        candidate_rows=candidate_rows,
+    )
     if expect_reflection == "same-run-fresh":
-        _verify_reflection(candidate_dir, control_rows=control_rows)
+        _verify_reflection(
+            candidate_dir,
+            control_rows=control_rows,
+            candidate_rows=candidate_rows,
+        )
     return {
         "status": "pass",
         "run_root": str(run_root),

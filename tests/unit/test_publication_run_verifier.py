@@ -69,6 +69,130 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
 
+def _feedback_outcome_with_source(
+    row: dict[str, Any],
+) -> tuple[float | None, str]:
+    paper_feedback = row.get("online_feedback_outcome_similarity")
+    if paper_feedback is not None:
+        return float(paper_feedback), "paper_era_online_feedback"
+    audited_outcome = row.get("outcome_similarity")
+    if audited_outcome is not None:
+        return float(audited_outcome), "audited_outcome_fallback"
+    return None, "unavailable"
+
+
+def _reflection_feedback_row(
+    control: dict[str, Any],
+    candidate: dict[str, Any],
+    *,
+    completed_count: int,
+) -> dict[str, Any]:
+    control_score = float(control["similarity"])
+    candidate_score = float(candidate["similarity"])
+    control_outcome, control_source = _feedback_outcome_with_source(control)
+    candidate_outcome, candidate_source = _feedback_outcome_with_source(candidate)
+    return {
+        "event": "self_evolution_task_assessed",
+        "scenario": control["name"],
+        "completed_count": completed_count,
+        "control_source": "same_run_fresh",
+        "control_score": control_score,
+        "candidate_score": candidate_score,
+        "score_delta": candidate_score - control_score,
+        "control_outcome": control_outcome,
+        "control_outcome_source": control_source,
+        "candidate_outcome": candidate_outcome,
+        "candidate_outcome_source": candidate_source,
+        "outcome_delta": (
+            candidate_outcome - control_outcome
+            if control_outcome is not None and candidate_outcome is not None
+            else None
+        ),
+    }
+
+
+@pytest.mark.parametrize(
+    (
+        "online_feedback_outcome",
+        "audited_outcome",
+        "feedback_outcome",
+        "feedback_source",
+    ),
+    [
+        (None, 0.0, 0.0, "audited_outcome_fallback"),
+        (0.0, 1.0, 0.0, "paper_era_online_feedback"),
+        (None, None, None, "unavailable"),
+    ],
+)
+def test_reflection_verifier_uses_null_aware_outcome_fallback(
+    tmp_path: Path,
+    online_feedback_outcome: float | None,
+    audited_outcome: float | None,
+    feedback_outcome: float | None,
+    feedback_source: str,
+) -> None:
+    candidate_dir = tmp_path / "candidate"
+    candidate_dir.mkdir()
+    control = {
+        "name": "task_a",
+        "similarity": 0.25,
+        "outcome_similarity": audited_outcome,
+        "online_feedback_outcome_similarity": online_feedback_outcome,
+    }
+    candidate = {
+        "name": "task_a",
+        "similarity": 0.75,
+        "outcome_similarity": audited_outcome,
+        "online_feedback_outcome_similarity": online_feedback_outcome,
+    }
+    feedback = _reflection_feedback_row(control, candidate, completed_count=1)
+    assert feedback["control_outcome"] == feedback_outcome
+    assert feedback["control_outcome_source"] == feedback_source
+    feedback_path = candidate_dir / "self_evolution_task_feedback.jsonl"
+    feedback_path.write_text(
+        json.dumps(feedback) + "\n",
+        encoding="utf-8",
+    )
+    control_rows = {"task_a": control}
+    candidate_rows = {"task_a": candidate}
+
+    publication_verifier._verify_reflection(
+        candidate_dir,
+        control_rows=control_rows,
+        candidate_rows=candidate_rows,
+    )
+
+
+def test_reflection_verifier_rejects_audited_outcome_mismatch(tmp_path: Path) -> None:
+    candidate_dir = tmp_path / "candidate"
+    candidate_dir.mkdir()
+    control = {
+        "name": "task_a",
+        "similarity": 0.25,
+        "outcome_similarity": 0.0,
+        "online_feedback_outcome_similarity": None,
+    }
+    candidate = {
+        "name": "task_a",
+        "similarity": 0.75,
+        "outcome_similarity": 0.5,
+        "online_feedback_outcome_similarity": None,
+    }
+    feedback = _reflection_feedback_row(control, candidate, completed_count=1)
+    feedback["control_outcome"] = 1.0
+    (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
+        json.dumps(feedback) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Reflection control outcome mismatch"):
+        publication_verifier._verify_reflection(
+            candidate_dir,
+            control_rows={"task_a": control},
+            candidate_rows={"task_a": candidate},
+        )
+
+
 def _write_llm_usage_artifacts(
     run_dir: Path,
     rows: list[dict[str, Any]],
@@ -151,11 +275,19 @@ def _fresh_run(tmp_path: Path) -> Path:
     benchmark_path = tmp_path / "benchmark.json"
     benchmark_path.write_text('{"benchmark": true}\n', encoding="utf-8")
     benchmark_sha256 = hashlib.sha256(benchmark_path.read_bytes()).hexdigest()
+    outcome_evaluator = publication_verifier.outcome_evaluator_manifest()
+    outcome_evaluator_fields = {
+        "outcome_evaluator_version": outcome_evaluator["version"],
+        "outcome_evaluator_contract_sha256": outcome_evaluator["contract_sha256"],
+        "outcome_evaluator_source_sha256": outcome_evaluator["source_sha256"],
+    }
     control_rows = [
         {
             "name": "task_a",
             "similarity": 0.25,
             "outcome_similarity": 0.5,
+            "online_feedback_outcome_similarity": None,
+            **outcome_evaluator_fields,
             "llm_usage_recorded": True,
             "llm_cached_call_count": 0,
             "llm_call_count": 2,
@@ -190,6 +322,8 @@ def _fresh_run(tmp_path: Path) -> Path:
             "name": "task_a",
             "similarity": 0.75,
             "outcome_similarity": 1.0,
+            "online_feedback_outcome_similarity": None,
+            **outcome_evaluator_fields,
             "llm_usage_recorded": True,
             "llm_cached_call_count": 0,
             "llm_call_count": 3,
@@ -238,14 +372,15 @@ def _fresh_run(tmp_path: Path) -> Path:
         event_arm="online_build_full_candidate",
     )
     feedback = [
-        {
-            "event": "self_evolution_task_assessed",
-            "scenario": row["name"],
-            "control_source": "same_run_fresh",
-            "control_score": row["similarity"],
-            "control_outcome": row["outcome_similarity"],
-        }
-        for row in control_rows
+        _reflection_feedback_row(
+            control,
+            candidate,
+            completed_count=completed_count,
+        )
+        for completed_count, (control, candidate) in enumerate(
+            zip(control_rows, candidate_rows, strict=True),
+            start=1,
+        )
     ]
     (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
         "".join(json.dumps(row) + "\n" for row in feedback),
@@ -342,10 +477,10 @@ def _fresh_run(tmp_path: Path) -> Path:
             "publication_performance_endpoint": "outcome_task_completion_similarity",
             "actor_selection_mode": "policy",
             "reporting_outcome_evaluator": (
-                publication_verifier.outcome_evaluator_manifest()  # type: ignore[attr-defined]
+                publication_verifier.outcome_evaluator_manifest()
             ),
             "online_feedback_evaluator_version": (
-                publication_verifier.ONLINE_FEEDBACK_EVALUATOR_VERSION  # type: ignore[attr-defined]
+                publication_verifier.ONLINE_FEEDBACK_EVALUATOR_VERSION
             ),
             "timezone": publication_verifier.PUBLICATION_TIMEZONE,
             "control_cache_mode": "off",
@@ -434,7 +569,20 @@ def _fresh_run(tmp_path: Path) -> Path:
             "fresh_control_enforced": True,
         },
     )
-    _write_json(run_root / "paired_comparison.json", {"deltas": []})
+    _write_json(
+        run_root / "paired_comparison.json",
+        {
+            "scenario_count": 2,
+            "outcome_scenario_count": 1,
+            "control_mean_outcome_similarity": 0.5,
+            "candidate_mean_outcome_similarity": 1.0,
+            "mean_outcome_similarity_delta": 0.5,
+            "outcome_gain_count": 1,
+            "outcome_regression_count": 0,
+            "outcome_preserved_count": 0,
+            "deltas": [],
+        },
+    )
     return run_root
 
 
@@ -490,6 +638,173 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
     assert result["platform_machine"] == "arm64"
     assert result["external_distribution_count"] == 108
     assert len(result["external_distribution_sha256"]) == 64
+
+
+@pytest.mark.parametrize(
+    ("field", "tampered", "message"),
+    [
+        ("candidate_score", 0.5, "Reflection candidate score mismatch"),
+        ("score_delta", 0.0, "Reflection score delta mismatch"),
+        ("candidate_outcome", 0.0, "Reflection candidate outcome mismatch"),
+        (
+            "candidate_outcome_source",
+            "unavailable",
+            "Reflection candidate outcome source mismatch",
+        ),
+        ("outcome_delta", 0.0, "Reflection outcome delta mismatch"),
+    ],
+)
+def test_verifier_rejects_tampered_candidate_reflection_signal(
+    tmp_path: Path,
+    field: str,
+    tampered: object,
+    message: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    feedback_path = (
+        Path(protocol["candidate_dir"]) / "self_evolution_task_feedback.jsonl"
+    )
+    feedback = [
+        json.loads(line)
+        for line in feedback_path.read_text(encoding="utf-8").splitlines()
+    ]
+    feedback[0][field] = tampered
+    feedback_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in feedback),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=message):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_reflection_completed_count_drift(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    feedback_path = (
+        Path(protocol["candidate_dir"]) / "self_evolution_task_feedback.jsonl"
+    )
+    feedback = [
+        json.loads(line)
+        for line in feedback_path.read_text(encoding="utf-8").splitlines()
+    ]
+    feedback[1]["completed_count"] = 3
+    feedback_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in feedback),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Reflection completed_count mismatch"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_reflection_task_reordering(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    feedback_path = (
+        Path(protocol["candidate_dir"]) / "self_evolution_task_feedback.jsonl"
+    )
+    feedback = [
+        json.loads(line)
+        for line in feedback_path.read_text(encoding="utf-8").splitlines()
+    ][::-1]
+    for completed_count, row in enumerate(feedback, start=1):
+        row["completed_count"] = completed_count
+    feedback_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in feedback),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Reflection task order"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "tampered"),
+    [
+        ("outcome_evaluator_version", "sage_outcome_contracts_v7"),
+        ("outcome_evaluator_contract_sha256", "0" * 64),
+        ("outcome_evaluator_source_sha256", "f" * 64),
+    ],
+)
+@pytest.mark.parametrize("arm", ("control", "candidate"))
+def test_verifier_rejects_scored_row_outcome_evaluator_identity_drift(
+    tmp_path: Path,
+    field: str,
+    tampered: str,
+    arm: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol[f"{arm}_dir"]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["per_scenario_results"][0][field] = tampered
+    _write_json(summary_path, summary)
+
+    with pytest.raises(ValueError, match="outcome evaluator field"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "tampered"),
+    [
+        ("scenario_count", 3),
+        ("outcome_scenario_count", 0),
+        ("control_mean_outcome_similarity", 0.0),
+        ("candidate_mean_outcome_similarity", 0.0),
+        ("mean_outcome_similarity_delta", 0.0),
+        ("outcome_gain_count", 0),
+        ("outcome_regression_count", 1),
+        ("outcome_preserved_count", 1),
+    ],
+)
+def test_verifier_rejects_paired_outcome_aggregate_drift(
+    tmp_path: Path,
+    field: str,
+    tampered: int | float,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    comparison_path = run_root / "paired_comparison.json"
+    comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+    comparison[field] = tampered
+    _write_json(comparison_path, comparison)
+
+    with pytest.raises(ValueError, match="Paired comparison outcome field"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
 
 
 def test_verifier_rejects_hybrid_control_report(tmp_path: Path) -> None:
