@@ -11,7 +11,7 @@ SAMPLE_REPORT ?=
 ANALYSIS_OUTPUT ?=
 EVIDENCE_DATA ?=
 TABLE_OUTPUT ?=
-VALIDATION_THRESHOLDS ?= docs/sage_protocol/publication_validation_thresholds_v2.json
+VALIDATION_THRESHOLDS ?= docs/sage_protocol/publication_validation_thresholds_v3.json
 
 COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
 

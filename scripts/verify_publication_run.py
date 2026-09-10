@@ -37,7 +37,7 @@ PUBLICATION_ENVIRONMENT_LOCK = "requirements-publication-lock.txt"
 PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP = 1784832588
 PUBLICATION_MODEL = "gpt-4o-mini"
 PUBLICATION_TIMEZONE = "America/New_York"
-PUBLICATION_OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v8"
+PUBLICATION_OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v9"
 PUBLICATION_EXECUTION_ENV = {
     "TZ": PUBLICATION_TIMEZONE,
     "SAGE_OPENAI_MAX_RETRIES": "5",
@@ -445,6 +445,13 @@ def _uncached_rows(
             raise ValueError(f"{arm} result summary contains an unnamed task.")
         if name in by_name:
             raise ValueError(f"{arm} result summary duplicates task {name!r}.")
+        exception_type = item.get("exception_type")
+        traceback_text = item.get("traceback")
+        if exception_type not in (None, "") or traceback_text not in (None, ""):
+            raise ValueError(
+                f"{arm} task {name!r} contains a runtime exception "
+                f"({exception_type or 'traceback recorded'})."
+            )
         outcome_similarity = item.get("outcome_similarity")
         if outcome_similarity is not None:
             if (
@@ -1013,6 +1020,7 @@ def verify_run(
     run_root = runs[-1]
     protocol = _read_json(run_root / "protocol_manifest.json")
     cache_report = _read_json(run_root / "control_cache_report.json")
+    comparison = _read_json(run_root / "paired_comparison.json")
     current_outcome_evaluator = outcome_evaluator_manifest()
     if (
         current_outcome_evaluator.get("version")
@@ -1068,6 +1076,8 @@ def verify_run(
             "Protocol ordered scenario names do not match the publication pin."
         )
     required_protocol = {
+        "protocol_gate_passed": True,
+        "protocol_gate_reasons": [],
         "fresh_control_required": True,
         "publication_performance_endpoint": "outcome_task_completion_similarity",
         "actor_selection_mode": "policy",
@@ -1105,6 +1115,33 @@ def verify_run(
                 f"Protocol field {field!r} is {protocol.get(field)!r}; "
                 f"expected {expected!r}."
             )
+    if comparison.get("protocol_gate_passed") is not True:
+        raise ValueError("Paired comparison protocol gate did not pass.")
+    if comparison.get("protocol_gate_reasons") != []:
+        raise ValueError("Paired comparison contains protocol gate failure reasons.")
+    runtime_exception_count = comparison.get("runtime_exception_count")
+    if (
+        isinstance(runtime_exception_count, bool)
+        or not isinstance(runtime_exception_count, int)
+        or runtime_exception_count != 0
+    ):
+        raise ValueError("Paired comparison contains runtime exceptions.")
+    for arm_name in ("control", "candidate"):
+        arm_summary = comparison.get(arm_name)
+        if not isinstance(arm_summary, dict):
+            raise ValueError(f"Paired comparison is missing {arm_name} summary.")
+        required_arm_summary = {
+            "run_status": "complete",
+            "scenario_count": expected_tasks,
+            "planned_scenario_count": expected_tasks,
+            "exception_count": 0,
+        }
+        for field, expected in required_arm_summary.items():
+            if arm_summary.get(field) != expected:
+                raise ValueError(
+                    f"Paired comparison {arm_name} field {field!r} is "
+                    f"{arm_summary.get(field)!r}; expected {expected!r}."
+                )
     parallel_execution = _verify_parallel_arm_execution(run_root, protocol)
     dashboard_receipt_path = _resolve_declared_path(
         run_root,
@@ -1211,6 +1248,32 @@ def verify_run(
         "candidate_dir",
         required_parent=run_root / "candidate",
     )
+    if expected_generation:
+        registry_dir = _resolve_declared_path(
+            run_root,
+            protocol.get("registry_dir"),
+            "registry_dir",
+        )
+        registry_manifest = registry_dir / "registry_manifest.json"
+        if not registry_manifest.is_file():
+            raise ValueError(
+                "Completed online SAGE run is missing its final registry manifest: "
+                f"{registry_manifest}"
+            )
+        recorded_registry_digest = protocol.get("registry_manifest_digest_after_run")
+        if not isinstance(recorded_registry_digest, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", recorded_registry_digest
+        ):
+            raise ValueError(
+                "Protocol does not record a valid final registry manifest digest."
+            )
+        observed_registry_digest = hashlib.sha256(
+            registry_manifest.read_bytes()
+        ).hexdigest()
+        if observed_registry_digest != recorded_registry_digest:
+            raise ValueError(
+                "Final registry manifest does not match the protocol digest."
+            )
     control_rows, control_order, control_llm_usage = _uncached_rows(
         control_dir,
         expected_tasks=expected_tasks,
@@ -1249,7 +1312,7 @@ def verify_run(
             "Result rows do not preserve the pinned publication task order."
         )
     _verify_paired_outcome_aggregates(
-        _read_json(run_root / "paired_comparison.json"),
+        comparison,
         control_rows=control_rows,
         candidate_rows=candidate_rows,
     )

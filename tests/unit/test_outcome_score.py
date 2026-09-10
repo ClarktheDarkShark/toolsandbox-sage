@@ -1980,6 +1980,66 @@ def test_generic_terminal_selector_keeps_correct_answer_across_new_task() -> Non
     assert answer_check["ignored_later_non_outcome_message_indices"]
 
 
+def test_generic_terminal_selector_reports_ignored_messages_only_after_final_answer() -> (
+    None
+):
+    context = _rollout_context("The phone number for Apple Park is +14089961010")
+    _add_agent_message(context, "I searched the directory as requested.")
+    earlier_non_outcome_index = context.max_sandbox_message_index
+    _add_agent_message(context, "The phone number for Apple Park is +14089961010")
+    final_selected_index = context.max_sandbox_message_index
+    _add_agent_message(context, "The search operation has finished.")
+    later_non_outcome_index = context.max_sandbox_message_index
+    _add_user_message(context, "Thanks.")
+
+    outcome = _score("find_phone_number_with_location_name", context)
+    answer_check = next(
+        check for check in outcome["outcome_checks"] if check["kind"] == "answer"
+    )
+
+    assert outcome["outcome_similarity"] == 1.0
+    assert answer_check["selected_message_index"] == final_selected_index
+    assert answer_check["ignored_later_non_outcome_message_indices"] == [
+        later_non_outcome_index
+    ]
+    assert (
+        earlier_non_outcome_index
+        not in answer_check["ignored_later_non_outcome_message_indices"]
+    )
+
+
+def test_generic_terminal_selector_reports_ignored_messages_only_after_final_conflict() -> (
+    None
+):
+    context = _rollout_context("Your most recent message says 'Good, keep me posted'.")
+    _add_agent_message(context, "I consulted the available records.")
+    earlier_non_outcome_index = context.max_sandbox_message_index
+    _add_user_message(context, "That is not right. Please check again.")
+    _add_agent_message(
+        context,
+        "Your most recent message says 'Things are proceeding as expected'.",
+    )
+    final_selected_index = context.max_sandbox_message_index
+    _add_agent_message(context, "The search operation has finished.")
+    later_non_outcome_index = context.max_sandbox_message_index
+    _add_user_message(context, "Understood.")
+
+    outcome = _score("search_message_with_recency_latest", context)
+    answer_check = next(
+        check for check in outcome["outcome_checks"] if check["kind"] == "answer"
+    )
+
+    assert outcome["outcome_similarity"] < 1.0
+    assert answer_check["selected_message_index"] == final_selected_index
+    assert answer_check["ignored_later_non_outcome_message_indices"] == [
+        later_non_outcome_index
+    ]
+    assert (
+        earlier_non_outcome_index
+        not in answer_check["ignored_later_non_outcome_message_indices"]
+    )
+
+
 def test_generic_terminal_selector_applies_same_slot_distance_retraction() -> None:
     context = _rollout_context(
         "You are approximately 67.98 kilometers away from Golden Gate Bridge."
@@ -2033,11 +2093,22 @@ def test_generic_terminal_selector_applies_same_slot_message_conflict() -> None:
     assert answer_check["selected_message_index"] == context.max_sandbox_message_index
 
 
-def test_generic_terminal_selector_keeps_oldest_after_explicit_new_recency() -> None:
+@pytest.mark.parametrize(
+    "new_recency_request",
+    [
+        "Can you find another recent message instead?",
+        "Please show me a different recent message instead.",
+        "Wrong contact—show me a different recent message instead.",
+        "The weather was wrong. Show me a different recent message instead.",
+    ],
+)
+def test_generic_terminal_selector_keeps_oldest_after_explicit_new_recency(
+    new_recency_request: str,
+) -> None:
     context = _rollout_context(
         "Your oldest message says 'Hey kid, you want some GPU?'."
     )
-    _add_user_message(context, "Can you find another recent message instead?")
+    _add_user_message(context, new_recency_request)
     _add_agent_message(
         context,
         "Your most recent message says 'Good, keep me posted'.",
@@ -2067,9 +2138,22 @@ def test_generic_terminal_selector_ignores_opposite_recency_after_confirmation()
     )
 
 
-def test_generic_terminal_selector_applies_opposite_recency_to_recheck() -> None:
+@pytest.mark.parametrize(
+    "correction_request",
+    [
+        "That is not the message I want. Please check again.",
+        "That's not it. Can you try looking for a different message?",
+        "That isn't the correct one; please find a different result.",
+        "This result is wrong; try another message.",
+        "No, not that one. Keep looking.",
+        "That does not match what I asked for. Please retry.",
+    ],
+)
+def test_generic_terminal_selector_applies_opposite_recency_to_recheck(
+    correction_request: str,
+) -> None:
     context = _rollout_context("Your most recent message says 'Good, keep me posted'.")
-    _add_user_message(context, "That is not the message I want. Please check again.")
+    _add_user_message(context, correction_request)
     _add_agent_message(
         context,
         "Your oldest message says 'Hey kid, you want some GPU?'.",

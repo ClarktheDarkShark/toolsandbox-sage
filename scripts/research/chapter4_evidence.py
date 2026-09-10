@@ -6,10 +6,13 @@ artifacts. It does not alter or rescore either experimental arm.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import math
-import shutil
+import os
+import tempfile
+import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -22,7 +25,12 @@ import numpy as np
 EVIDENCE_TEMPLATE = Path(__file__).with_name("chapter4_evidence_template.html")
 EVIDENCE_DATA_NAME = "chapter4_evidence_data.json"
 EVIDENCE_HTML_NAME = "chapter4_evidence.html"
-EVIDENCE_SCHEMA_VERSION = 2
+EVIDENCE_SCHEMA_VERSION = 3
+
+AUDITED_ENDPOINT_NAME = "audited_current_all_tasks"
+PAPER_ENDPOINT_NAME = "paper_comparable_historical_subset"
+OUTCOME_EVALUATOR_SOURCE = Path("src/sage_ts/evaluation/outcome_score.py")
+_DASHBOARD_WRITE_LOCK = threading.Lock()
 
 H1_THRESHOLD_PERCENT = 80.0
 H2_THRESHOLD_PERCENT = 10.0
@@ -42,6 +50,9 @@ class RunEvidence:
     control_outcome: float | None
     candidate_outcome: float | None
     task_rows: tuple[dict[str, Any], ...]
+    paper_control_outcome: float | None
+    paper_candidate_outcome: float | None
+    paper_task_rows: tuple[dict[str, Any], ...]
     called_scenarios: frozenset[str]
     accepted_tools: int
     reuse_events: int
@@ -53,6 +64,17 @@ class RunEvidence:
     registry_tools: dict[str, dict[str, Any]]
     protocol_manifest: dict[str, Any]
     dashboard_url: str
+
+
+@dataclass(frozen=True)
+class DualEndpointSpec:
+    """Content-addressed declarations for the two non-interchangeable endpoints."""
+
+    thresholds_path: Path
+    thresholds_sha256: str
+    audited: dict[str, Any]
+    paper: dict[str, Any]
+    historical: dict[str, Any]
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -70,6 +92,31 @@ def _load_json(path: Path) -> dict[str, Any]:
             raise ValueError(f"Expected a JSON object in {path}")
         return payload
     raise RuntimeError(f"Unable to read JSON from {path}: {last_error!r}")
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    """Atomically replace one dashboard artifact via a unique same-dir temp file."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 
 def _safe_float(value: Any) -> float | None:
@@ -146,6 +193,7 @@ def _decision_label(status: str) -> str:
     return {
         "supported": "Supported",
         "observed_pass": "Observed pass",
+        "descriptive_only": "Descriptive only",
         "not_supported": "Not supported",
         "pending": "Pending",
     }.get(status, status.replace("_", " ").title())
@@ -167,35 +215,216 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _repo_relative_url(repo_root: Path, path: Path) -> str:
+def _ordered_name_sha256(names: Iterable[str]) -> str:
+    return hashlib.sha256(("\n".join(names) + "\n").encode("utf-8")).hexdigest()
+
+
+def _required_string(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{label} must be a non-empty string.")
+    return value
+
+
+def _required_integer(value: Any, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{label} must be an integer.")
+    return value
+
+
+def _required_unit_float(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be numeric.")
+    result = float(value)
+    if not math.isfinite(result) or not 0.0 <= result <= 1.0:
+        raise ValueError(f"{label} must be finite and within [0, 1].")
+    return result
+
+
+def _resolve_repo_path(repo_root: Path, raw: Any, label: str) -> Path:
+    value = _required_string(raw, label)
+    candidate = Path(value)
+    resolved = (
+        candidate if candidate.is_absolute() else repo_root / candidate
+    ).resolve()
     try:
-        relative = path.resolve().relative_to(repo_root.resolve())
-    except ValueError:
-        return ""
-    return "/" + relative.as_posix()
+        resolved.relative_to(repo_root.resolve())
+    except ValueError as exc:
+        raise ValueError(f"{label} escapes the repository root.") from exc
+    return resolved
+
+
+def _load_dual_endpoint_spec(
+    repo_root: Path,
+    campaign_manifest: dict[str, Any],
+) -> DualEndpointSpec | None:
+    """Load the exact endpoint declarations pinned by the approved sample report."""
+
+    statistical_plan = campaign_manifest.get("statistical_plan") or {}
+    plan_endpoints = statistical_plan.get("performance_endpoints")
+    if plan_endpoints in (None, {}):
+        return None
+    if not isinstance(plan_endpoints, dict) or set(plan_endpoints) != {
+        AUDITED_ENDPOINT_NAME,
+        PAPER_ENDPOINT_NAME,
+    }:
+        raise ValueError("Campaign performance endpoint declarations are not exact.")
+
+    sample = campaign_manifest.get("sample_validation")
+    if not isinstance(sample, dict) or sample.get("status") != "pass":
+        raise ValueError("Dual-endpoint evidence requires a passing sample report.")
+    sample_path = _resolve_repo_path(
+        repo_root,
+        sample.get("path"),
+        "campaign sample-validation path",
+    )
+    if not sample_path.is_file():
+        raise ValueError(f"Campaign sample-validation report is missing: {sample_path}")
+    expected_sample_hash = _required_string(
+        sample.get("sha256"), "campaign sample-validation SHA-256"
+    )
+    if _sha256(sample_path) != expected_sample_hash:
+        raise ValueError("Campaign sample-validation report bytes changed.")
+    sample_report = _load_json(sample_path)
+    if sample_report.get("status") != "pass":
+        raise ValueError("Campaign sample-validation report is not passing.")
+    thresholds_path = _resolve_repo_path(
+        repo_root,
+        sample_report.get("thresholds_path"),
+        "sample-report thresholds path",
+    )
+    expected_thresholds_hash = _required_string(
+        sample_report.get("thresholds_sha256"), "sample-report thresholds SHA-256"
+    )
+    if (
+        not thresholds_path.is_file()
+        or _sha256(thresholds_path) != expected_thresholds_hash
+    ):
+        raise ValueError("Sample-report validation threshold bytes changed.")
+    thresholds = _load_json(thresholds_path)
+    if (
+        thresholds.get("schema_version") != 3
+        or thresholds.get("performance_endpoint_policy")
+        != "dual_scoped_outcome_endpoints"
+        or thresholds.get("canonical_metric_policy")
+        != "descriptive_only_never_a_release_gate"
+    ):
+        raise ValueError("Sample report does not pin the dual-endpoint v3 policy.")
+    endpoints = thresholds.get("performance_endpoints")
+    historical = thresholds.get("historical_reference")
+    benchmark = thresholds.get("benchmark")
+    if (
+        not isinstance(endpoints, dict)
+        or set(endpoints) != {AUDITED_ENDPOINT_NAME, PAPER_ENDPOINT_NAME}
+        or not isinstance(historical, dict)
+        or not isinstance(benchmark, dict)
+    ):
+        raise ValueError("Pinned threshold endpoint inputs are incomplete.")
+    audited = endpoints[AUDITED_ENDPOINT_NAME]
+    paper = endpoints[PAPER_ENDPOINT_NAME]
+    if not isinstance(audited, dict) or not isinstance(paper, dict):
+        raise ValueError("Pinned endpoint declarations must be objects.")
+
+    expected_tasks = _required_integer(
+        campaign_manifest.get("expected_tasks_per_run"),
+        "campaign expected tasks per run",
+    )
+    expected_online_runs = _required_integer(
+        campaign_manifest.get("expected_online_runs"),
+        "campaign expected online runs",
+    )
+    if benchmark.get("task_count") != expected_tasks or benchmark.get(
+        "manifest_sha256"
+    ) != campaign_manifest.get("benchmark_sha256"):
+        raise ValueError("Campaign benchmark and pinned endpoint benchmark disagree.")
+
+    for endpoint_name, declaration in (
+        (AUDITED_ENDPOINT_NAME, audited),
+        (PAPER_ENDPOINT_NAME, paper),
+    ):
+        planned = plan_endpoints.get(endpoint_name)
+        if not isinstance(planned, dict):
+            raise ValueError(f"Campaign endpoint {endpoint_name!r} is not an object.")
+        if (
+            set(planned)
+            != {
+                "metric_field",
+                "evaluator_version",
+                "task_count_per_run",
+                "expected_matched_pairs",
+                "aggregate_statistics",
+            }
+            or planned.get("aggregate_statistics") is not None
+        ):
+            raise ValueError(
+                f"Campaign endpoint {endpoint_name!r} fields are not exact."
+            )
+        task_count = _required_integer(
+            declaration.get("task_count"), f"{endpoint_name} task count"
+        )
+        expected_pairs = expected_online_runs * task_count
+        expected_plan = {
+            "metric_field": declaration.get("metric_field"),
+            "evaluator_version": declaration.get("evaluator_version"),
+            "task_count_per_run": task_count,
+            "expected_matched_pairs": expected_pairs,
+        }
+        for field, expected in expected_plan.items():
+            if planned.get(field) != expected:
+                raise ValueError(
+                    f"Campaign {endpoint_name}.{field} disagrees with pinned thresholds."
+                )
+
+    audited_source = (repo_root / OUTCOME_EVALUATOR_SOURCE).resolve()
+    if not audited_source.is_file() or _sha256(audited_source) != audited.get(
+        "evaluator_source_sha256"
+    ):
+        raise ValueError("Audited outcome evaluator source bytes changed.")
+    paper_source = _resolve_repo_path(
+        repo_root,
+        paper.get("evaluator_source_path"),
+        "paper-comparable evaluator source path",
+    )
+    if not paper_source.is_file() or _sha256(paper_source) != paper.get(
+        "evaluator_source_sha256"
+    ):
+        raise ValueError("Paper-comparable evaluator source bytes changed.")
+    return DualEndpointSpec(
+        thresholds_path=thresholds_path,
+        thresholds_sha256=expected_thresholds_hash,
+        audited=audited,
+        paper=paper,
+        historical=historical,
+    )
+
+
+def _task_compare_url(protocol_manifest: dict[str, Any], path: Path) -> str:
+    declared = str(protocol_manifest.get("dashboard_task_compare_url") or "")
+    if declared.startswith(
+        ("http://127.0.0.1:", "http://localhost:", "http://[::1]:")
+    ) and declared.endswith("/dashboard/task_compare.html"):
+        return declared
+    return path.resolve().as_uri() if path.is_file() else ""
 
 
 def resolve_run_root(repo_root: Path, entry: dict[str, Any]) -> Path | None:
     """Resolve a manifest run entry to its active or completed protocol root."""
 
+    search_root_raw = str(entry.get("search_root") or "").strip()
+    search_root = (
+        _resolve_repo_path(repo_root, search_root_raw, "campaign search_root")
+        if search_root_raw
+        else None
+    )
     explicit = str(entry.get("run_root") or "").strip()
     if explicit:
-        path = (
-            (repo_root / explicit).resolve()
-            if not Path(explicit).is_absolute()
-            else Path(explicit)
-        )
+        path = _resolve_repo_path(repo_root, explicit, "campaign run_root")
+        if search_root is not None and not path.is_relative_to(search_root):
+            raise ValueError("Campaign run_root escapes its declared search_root.")
         if path.exists():
             return path
 
-    search_root_raw = str(entry.get("search_root") or "").strip()
-    if not search_root_raw:
+    if search_root is None:
         return None
-    search_root = (
-        (repo_root / search_root_raw).resolve()
-        if not Path(search_root_raw).is_absolute()
-        else Path(search_root_raw)
-    )
     if not search_root.exists():
         return None
     candidates = {
@@ -220,6 +449,236 @@ def resolve_run_root(repo_root: Path, entry: dict[str, Any]) -> Path | None:
             ),
             default=0.0,
         ),
+    )
+
+
+def _declared_arm_directory(
+    *,
+    repo_root: Path,
+    run_root: Path,
+    protocol_manifest: dict[str, Any],
+    paired: dict[str, Any],
+    arm: str,
+) -> Path:
+    required_parent = (run_root / arm).resolve()
+    protocol_dir = _resolve_repo_path(
+        repo_root,
+        protocol_manifest.get(f"{arm}_dir"),
+        f"protocol {arm}_dir",
+    )
+    paired_arm = paired.get(arm)
+    if not isinstance(paired_arm, dict):
+        raise ValueError(f"Paired comparison is missing its {arm} arm.")
+    paired_dir = _resolve_repo_path(
+        repo_root,
+        paired_arm.get("run_dir"),
+        f"paired comparison {arm}.run_dir",
+    )
+    if (
+        not protocol_dir.is_dir()
+        or not protocol_dir.is_relative_to(required_parent)
+        or paired_dir != protocol_dir
+    ):
+        raise ValueError(
+            f"{arm} result directory is outside or disagrees with the protocol."
+        )
+    return protocol_dir
+
+
+def _result_rows(run_dir: Path, arm: str) -> list[dict[str, Any]]:
+    summary_path = run_dir / "result_summary.json"
+    if not summary_path.is_file():
+        raise ValueError(f"{arm} result summary is missing: {summary_path}")
+    raw_rows = _load_json(summary_path).get("per_scenario_results")
+    if not isinstance(raw_rows, list):
+        raise ValueError(f"{arm} result summary has no scenario result list.")
+    rows: list[dict[str, Any]] = []
+    for index, row in enumerate(raw_rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"{arm} scenario result {index} is not an object.")
+        rows.append(row)
+    return rows
+
+
+def _identity_values(rows: Iterable[dict[str, Any]], field: str) -> set[Any]:
+    return {row.get(field) for row in rows}
+
+
+def _load_dual_task_rows(
+    *,
+    repo_root: Path,
+    run_root: Path,
+    protocol_manifest: dict[str, Any],
+    paired: dict[str, Any],
+    endpoint_spec: DualEndpointSpec,
+) -> tuple[
+    tuple[dict[str, Any], ...],
+    tuple[dict[str, Any], ...],
+    float,
+    float,
+    float,
+    float,
+]:
+    """Load and fail-closed validate both raw per-task outcome endpoints."""
+
+    arm_rows: dict[str, list[dict[str, Any]]] = {}
+    for arm in ("control", "candidate"):
+        run_dir = _declared_arm_directory(
+            repo_root=repo_root,
+            run_root=run_root,
+            protocol_manifest=protocol_manifest,
+            paired=paired,
+            arm=arm,
+        )
+        arm_rows[arm] = _result_rows(run_dir, arm)
+
+    audited = endpoint_spec.audited
+    paper = endpoint_spec.paper
+    audited_count = _required_integer(
+        audited.get("task_count"), "audited endpoint task count"
+    )
+    paper_count = _required_integer(
+        paper.get("task_count"), "paper-comparable endpoint task count"
+    )
+    audited_names: dict[str, list[str]] = {}
+    paper_names: dict[str, list[str]] = {}
+    audited_values: dict[str, list[float]] = {}
+    paper_values: dict[str, list[float]] = {}
+
+    for arm, rows in arm_rows.items():
+        if len(rows) != audited_count:
+            raise ValueError(
+                f"{arm} audited endpoint has {len(rows)} rows; expected {audited_count}."
+            )
+        names = [
+            _required_string(row.get("name"), f"{arm} task {index} name")
+            for index, row in enumerate(rows)
+        ]
+        if len(set(names)) != len(names):
+            raise ValueError(f"{arm} audited endpoint task names are not unique.")
+        if _ordered_name_sha256(names) != audited.get("ordered_task_name_sha256"):
+            raise ValueError(f"{arm} audited endpoint task order changed.")
+        if _identity_values(rows, "outcome_evaluator_version") != {
+            audited.get("evaluator_version")
+        }:
+            raise ValueError(f"{arm} audited evaluator version is not exact.")
+        if _identity_values(rows, "outcome_evaluator_contract_sha256") != {
+            audited.get("evaluator_contract_sha256")
+        }:
+            raise ValueError(f"{arm} audited evaluator contract hash is not exact.")
+        if _identity_values(rows, "outcome_evaluator_source_sha256") != {
+            audited.get("evaluator_source_sha256")
+        }:
+            raise ValueError(f"{arm} audited evaluator source hash is not exact.")
+        values = [
+            _required_unit_float(
+                row.get("outcome_similarity"), f"{arm} audited task {name}"
+            )
+            for name, row in zip(names, rows, strict=True)
+        ]
+        selected_paper_rows = [
+            row
+            for row in rows
+            if row.get("online_feedback_outcome_similarity") is not None
+        ]
+        selected_paper_names = [
+            _required_string(row.get("name"), f"{arm} paper-comparable task name")
+            for row in selected_paper_rows
+        ]
+        if len(selected_paper_rows) != paper_count:
+            raise ValueError(
+                f"{arm} paper-comparable endpoint has {len(selected_paper_rows)} "
+                f"rows; expected {paper_count}."
+            )
+        if len(set(selected_paper_names)) != len(selected_paper_names):
+            raise ValueError(f"{arm} paper-comparable task names are not unique.")
+        if _ordered_name_sha256(selected_paper_names) != paper.get(
+            "ordered_task_name_sha256"
+        ):
+            raise ValueError(f"{arm} paper-comparable task subset or order changed.")
+        if _identity_values(
+            selected_paper_rows, "online_feedback_evaluator_version"
+        ) != {paper.get("evaluator_version")}:
+            raise ValueError(f"{arm} paper-comparable evaluator version is not exact.")
+        selected_paper_values = [
+            _required_unit_float(
+                row.get("online_feedback_outcome_similarity"),
+                f"{arm} paper-comparable task {name}",
+            )
+            for name, row in zip(selected_paper_names, selected_paper_rows, strict=True)
+        ]
+        audited_names[arm] = names
+        paper_names[arm] = selected_paper_names
+        audited_values[arm] = values
+        paper_values[arm] = selected_paper_values
+
+    if audited_names["control"] != audited_names["candidate"]:
+        raise ValueError("Audited endpoint control/candidate task order differs.")
+    if paper_names["control"] != paper_names["candidate"]:
+        raise ValueError("Paper-comparable control/candidate subset or order differs.")
+
+    paired_deltas = paired.get("deltas")
+    if not isinstance(paired_deltas, list) or len(paired_deltas) != audited_count:
+        raise ValueError("Paired comparison does not contain the audited task set.")
+    normalized_rows: list[dict[str, Any]] = []
+    for index, (name, control_row, candidate_row) in enumerate(
+        zip(
+            audited_names["control"],
+            arm_rows["control"],
+            arm_rows["candidate"],
+            strict=True,
+        )
+    ):
+        delta_row = paired_deltas[index]
+        if not isinstance(delta_row, dict) or delta_row.get("scenario") != name:
+            raise ValueError(
+                "Paired comparison task order differs from result summaries."
+            )
+        control_outcome = audited_values["control"][index]
+        candidate_outcome = audited_values["candidate"][index]
+        for field, expected in (
+            ("control_outcome_similarity", control_outcome),
+            ("candidate_outcome_similarity", candidate_outcome),
+            ("outcome_delta", candidate_outcome - control_outcome),
+        ):
+            observed = _safe_float(delta_row.get(field))
+            if observed is None or not math.isclose(
+                observed, expected, rel_tol=0.0, abs_tol=1e-12
+            ):
+                raise ValueError(f"Paired comparison {field} disagrees for {name}.")
+        normalized_rows.append(
+            {
+                "scenario": name,
+                "control_score": _safe_float(control_row.get("similarity")),
+                "candidate_score": _safe_float(candidate_row.get("similarity")),
+                "score_delta": _safe_float(delta_row.get("delta")),
+                "control_outcome": control_outcome,
+                "candidate_outcome": candidate_outcome,
+                "outcome_delta": candidate_outcome - control_outcome,
+            }
+        )
+
+    normalized_paper_rows = tuple(
+        {
+            "scenario": name,
+            "control_outcome": control,
+            "candidate_outcome": candidate,
+            "outcome_delta": candidate - control,
+        }
+        for name, control, candidate in zip(
+            paper_names["control"],
+            paper_values["control"],
+            paper_values["candidate"],
+            strict=True,
+        )
+    )
+    return (
+        tuple(normalized_rows),
+        normalized_paper_rows,
+        float(np.mean(audited_values["control"])),
+        float(np.mean(audited_values["candidate"])),
+        float(np.mean(paper_values["control"])),
+        float(np.mean(paper_values["candidate"])),
     )
 
 
@@ -259,6 +718,8 @@ def _side_effect_incident_count(helpers: dict[str, dict[str, Any]]) -> int:
 def load_run_evidence(
     repo_root: Path,
     entry: dict[str, Any],
+    *,
+    endpoint_spec: DualEndpointSpec | None = None,
 ) -> RunEvidence | None:
     """Load one run without requiring it to be complete."""
 
@@ -295,24 +756,49 @@ def load_run_evidence(
         and completed_tasks >= scenario_count
     )
 
-    task_rows: list[dict[str, Any]] = []
-    for row in paired.get("deltas") or []:
-        if not isinstance(row, dict):
-            continue
-        scenario = str(row.get("scenario") or "")
-        task_rows.append(
-            {
-                "scenario": scenario,
-                "control_score": _safe_float(row.get("control_similarity")),
-                "candidate_score": _safe_float(row.get("candidate_similarity")),
-                "score_delta": _safe_float(row.get("delta")),
-                "control_outcome": _safe_float(row.get("control_outcome_similarity")),
-                "candidate_outcome": _safe_float(
-                    row.get("candidate_outcome_similarity")
-                ),
-                "outcome_delta": _safe_float(row.get("outcome_delta")),
-            }
+    task_rows: tuple[dict[str, Any], ...]
+    paper_task_rows: tuple[dict[str, Any], ...] = ()
+    paper_control_outcome: float | None = None
+    paper_candidate_outcome: float | None = None
+    raw_control_outcome: float | None = None
+    raw_candidate_outcome: float | None = None
+    if endpoint_spec is not None and paired_path.exists():
+        (
+            task_rows,
+            paper_task_rows,
+            raw_control_outcome,
+            raw_candidate_outcome,
+            paper_control_outcome,
+            paper_candidate_outcome,
+        ) = _load_dual_task_rows(
+            repo_root=repo_root,
+            run_root=run_root,
+            protocol_manifest=protocol_manifest,
+            paired=paired,
+            endpoint_spec=endpoint_spec,
         )
+    else:
+        legacy_rows: list[dict[str, Any]] = []
+        for row in paired.get("deltas") or []:
+            if not isinstance(row, dict):
+                continue
+            scenario = str(row.get("scenario") or "")
+            legacy_rows.append(
+                {
+                    "scenario": scenario,
+                    "control_score": _safe_float(row.get("control_similarity")),
+                    "candidate_score": _safe_float(row.get("candidate_similarity")),
+                    "score_delta": _safe_float(row.get("delta")),
+                    "control_outcome": _safe_float(
+                        row.get("control_outcome_similarity")
+                    ),
+                    "candidate_outcome": _safe_float(
+                        row.get("candidate_outcome_similarity")
+                    ),
+                    "outcome_delta": _safe_float(row.get("outcome_delta")),
+                }
+            )
+        task_rows = tuple(legacy_rows)
 
     called_scenarios: set[str] = set()
     for pair in dashboard.get("pairs") or []:
@@ -343,18 +829,22 @@ def load_run_evidence(
         if summary
         else paired.get("candidate_mean_similarity")
     )
-    control_outcome = _safe_float(
-        summary.get("balanced_control_mean_outcome_similarity")
-        if summary
-        else paired.get("control_mean_outcome_similarity")
-    )
-    candidate_outcome = _safe_float(
-        summary.get("balanced_candidate_mean_outcome_similarity")
-        if summary
-        else paired.get("candidate_mean_outcome_similarity")
-    )
-    dashboard_url = _repo_relative_url(
-        repo_root,
+    control_outcome = raw_control_outcome
+    if control_outcome is None:
+        control_outcome = _safe_float(
+            summary.get("balanced_control_mean_outcome_similarity")
+            if summary
+            else paired.get("control_mean_outcome_similarity")
+        )
+    candidate_outcome = raw_candidate_outcome
+    if candidate_outcome is None:
+        candidate_outcome = _safe_float(
+            summary.get("balanced_candidate_mean_outcome_similarity")
+            if summary
+            else paired.get("candidate_mean_outcome_similarity")
+        )
+    dashboard_url = _task_compare_url(
+        protocol_manifest,
         run_root / "dashboard" / "task_compare.html",
     )
     return RunEvidence(
@@ -366,7 +856,10 @@ def load_run_evidence(
         candidate_score=candidate_score,
         control_outcome=control_outcome,
         candidate_outcome=candidate_outcome,
-        task_rows=tuple(task_rows),
+        task_rows=task_rows,
+        paper_control_outcome=paper_control_outcome,
+        paper_candidate_outcome=paper_candidate_outcome,
+        paper_task_rows=paper_task_rows,
         called_scenarios=frozenset(called_scenarios),
         accepted_tools=_safe_int(summary.get("accepted_tools") or len(registry_tools)),
         reuse_events=_safe_int(summary.get("reuse_count")),
@@ -385,6 +878,204 @@ def load_run_evidence(
         protocol_manifest=protocol_manifest,
         dashboard_url=dashboard_url,
     )
+
+
+def verify_run_endpoint_measurements(
+    *,
+    repo_root: Path,
+    campaign_manifest: dict[str, Any],
+    entry: dict[str, Any],
+) -> dict[str, Any]:
+    """Fail closed unless one completed run has both exact endpoint measurements.
+
+    This is an availability, identity, scope, order, and numeric-validity check.
+    It intentionally applies no performance floor and never examines canonical
+    similarity as a release criterion.
+    """
+
+    endpoint_spec = _load_dual_endpoint_spec(repo_root, campaign_manifest)
+    if endpoint_spec is None:
+        raise ValueError("Campaign does not declare dual-scoped outcome endpoints.")
+    evidence = load_run_evidence(
+        repo_root,
+        entry,
+        endpoint_spec=endpoint_spec,
+    )
+    if evidence is None or not evidence.complete:
+        raise ValueError("Run is incomplete or lacks final paired outcome artifacts.")
+    audited_count = _required_integer(
+        endpoint_spec.audited.get("task_count"), "audited endpoint task count"
+    )
+    paper_count = _required_integer(
+        endpoint_spec.paper.get("task_count"),
+        "paper-comparable endpoint task count",
+    )
+    if len(evidence.task_rows) != audited_count:
+        raise ValueError("Run audited endpoint count changed after validation.")
+    if len(evidence.paper_task_rows) != paper_count:
+        raise ValueError(
+            "Run paper-comparable endpoint count changed after validation."
+        )
+    return {
+        "status": "pass",
+        "run_root": str(evidence.run_root),
+        "performance_endpoint_policy": "dual_scoped_outcome_endpoints",
+        "audited_current_all_tasks": {
+            "metric_field": endpoint_spec.audited.get("metric_field"),
+            "evaluator_version": endpoint_spec.audited.get("evaluator_version"),
+            "evaluator_contract_sha256": endpoint_spec.audited.get(
+                "evaluator_contract_sha256"
+            ),
+            "evaluator_source_sha256": endpoint_spec.audited.get(
+                "evaluator_source_sha256"
+            ),
+            "task_count": audited_count,
+            "ordered_task_name_sha256": endpoint_spec.audited.get(
+                "ordered_task_name_sha256"
+            ),
+            "control_mean": evidence.control_outcome,
+            "candidate_mean": evidence.candidate_outcome,
+        },
+        "paper_comparable_historical_subset": {
+            "metric_field": endpoint_spec.paper.get("metric_field"),
+            "evaluator_version": endpoint_spec.paper.get("evaluator_version"),
+            "task_count": paper_count,
+            "ordered_task_name_sha256": endpoint_spec.paper.get(
+                "ordered_task_name_sha256"
+            ),
+            "control_mean": evidence.paper_control_outcome,
+            "candidate_mean": evidence.paper_candidate_outcome,
+        },
+        "performance_floors_applied": False,
+        "canonical_metric_checked_as_gate": False,
+    }
+
+
+def _entry_is_inference_eligible(
+    *,
+    repo_root: Path,
+    entry: dict[str, Any],
+    evidence: RunEvidence | None,
+    endpoint_spec: DualEndpointSpec | None,
+) -> bool:
+    if evidence is None or not evidence.complete:
+        return False
+    if endpoint_spec is None:
+        return True
+    if (
+        entry.get("execution_status") != "completed"
+        or type(entry.get("return_code")) is not int
+        or entry.get("return_code") != 0
+        or entry.get("verification_status") != "pass"
+    ):
+        return False
+    try:
+        declared_root = _resolve_repo_path(
+            repo_root,
+            entry.get("run_root"),
+            "completed campaign entry run_root",
+        )
+    except ValueError:
+        return False
+    if declared_root != evidence.run_root.resolve():
+        return False
+
+    attestation = entry.get("endpoint_measurements")
+    if not isinstance(attestation, dict) or set(attestation) != {
+        "status",
+        "run_root",
+        "performance_endpoint_policy",
+        AUDITED_ENDPOINT_NAME,
+        PAPER_ENDPOINT_NAME,
+        "performance_floors_applied",
+        "canonical_metric_checked_as_gate",
+    }:
+        return False
+    if (
+        attestation.get("status") != "pass"
+        or attestation.get("performance_endpoint_policy")
+        != "dual_scoped_outcome_endpoints"
+        or attestation.get("performance_floors_applied") is not False
+        or attestation.get("canonical_metric_checked_as_gate") is not False
+    ):
+        return False
+    try:
+        attested_root = _resolve_repo_path(
+            repo_root,
+            attestation.get("run_root"),
+            "endpoint attestation run_root",
+        )
+    except ValueError:
+        return False
+    if attested_root != evidence.run_root.resolve():
+        return False
+
+    audited = attestation.get(AUDITED_ENDPOINT_NAME)
+    paper = attestation.get(PAPER_ENDPOINT_NAME)
+    if not isinstance(audited, dict) or set(audited) != {
+        "metric_field",
+        "evaluator_version",
+        "evaluator_contract_sha256",
+        "evaluator_source_sha256",
+        "task_count",
+        "ordered_task_name_sha256",
+        "control_mean",
+        "candidate_mean",
+    }:
+        return False
+    if not isinstance(paper, dict) or set(paper) != {
+        "metric_field",
+        "evaluator_version",
+        "task_count",
+        "ordered_task_name_sha256",
+        "control_mean",
+        "candidate_mean",
+    }:
+        return False
+    for observed, declaration, fields in (
+        (
+            audited,
+            endpoint_spec.audited,
+            (
+                "metric_field",
+                "evaluator_version",
+                "evaluator_contract_sha256",
+                "evaluator_source_sha256",
+                "task_count",
+                "ordered_task_name_sha256",
+            ),
+        ),
+        (
+            paper,
+            endpoint_spec.paper,
+            (
+                "metric_field",
+                "evaluator_version",
+                "task_count",
+                "ordered_task_name_sha256",
+            ),
+        ),
+    ):
+        if any(observed.get(field) != declaration.get(field) for field in fields):
+            return False
+    for observed, expected in (
+        (audited.get("control_mean"), evidence.control_outcome),
+        (audited.get("candidate_mean"), evidence.candidate_outcome),
+        (paper.get("control_mean"), evidence.paper_control_outcome),
+        (paper.get("candidate_mean"), evidence.paper_candidate_outcome),
+    ):
+        try:
+            value = _required_unit_float(observed, "endpoint attestation mean")
+        except ValueError:
+            return False
+        if expected is None or not math.isclose(
+            value,
+            expected,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            return False
+    return True
 
 
 def _bootstrap_mean_ci(
@@ -411,6 +1102,84 @@ def _bootstrap_mean_ci(
     samples = np.concatenate(means)
     low, high = np.quantile(samples, [0.025, 0.975])
     return (float(low), float(high))
+
+
+def _two_way_paired_outcome_bootstrap(
+    control_rows: list[list[float]],
+    candidate_rows: list[list[float]],
+    *,
+    threshold_percent: float,
+    iterations: int,
+    seed: int,
+) -> dict[str, tuple[float | None, float | None]]:
+    """Resample independent runs and the common matched-task order.
+
+    The threshold contrast is ``candidate - (1 + threshold) * control``. Its
+    zero boundary therefore tests the predeclared relative-lift threshold
+    directly, instead of testing only whether the arm difference is positive.
+    """
+
+    empty = {
+        "absolute_difference": (None, None),
+        "relative_lift_percent": (None, None),
+        "threshold_contrast": (None, None),
+    }
+    if not control_rows or not candidate_rows:
+        return empty
+    if len(control_rows) != len(candidate_rows):
+        raise ValueError("Two-way bootstrap arm run counts differ.")
+    task_counts = {len(row) for row in [*control_rows, *candidate_rows]}
+    if len(task_counts) != 1 or not next(iter(task_counts), 0):
+        raise ValueError("Two-way bootstrap requires one common non-empty task order.")
+    control = np.asarray(control_rows, dtype=float)
+    candidate = np.asarray(candidate_rows, dtype=float)
+    if control.shape != candidate.shape or control.ndim != 2:
+        raise ValueError("Two-way bootstrap arm matrices differ.")
+    if not np.isfinite(control).all() or not np.isfinite(candidate).all():
+        raise ValueError("Two-way bootstrap inputs must be finite.")
+
+    rng = np.random.default_rng(seed)
+    run_count, task_count = control.shape
+    multiplier = 1.0 + threshold_percent / 100.0
+    delta_samples: list[np.ndarray] = []
+    lift_samples: list[np.ndarray] = []
+    contrast_samples: list[np.ndarray] = []
+    remaining = iterations
+    batch_size = min(128, iterations)
+    while remaining:
+        size = min(batch_size, remaining)
+        run_indices = rng.integers(0, run_count, size=(size, run_count))
+        task_indices = rng.integers(0, task_count, size=(size, task_count))
+        control_sample = control[
+            run_indices[:, :, None],
+            task_indices[:, None, :],
+        ].mean(axis=(1, 2))
+        candidate_sample = candidate[
+            run_indices[:, :, None],
+            task_indices[:, None, :],
+        ].mean(axis=(1, 2))
+        delta_samples.append(candidate_sample - control_sample)
+        contrast_samples.append(candidate_sample - multiplier * control_sample)
+        valid = np.abs(control_sample) > 1e-12
+        if np.any(valid):
+            lift_samples.append(
+                (candidate_sample[valid] - control_sample[valid])
+                / control_sample[valid]
+                * 100.0
+            )
+        remaining -= size
+
+    def interval(samples: list[np.ndarray]) -> tuple[float | None, float | None]:
+        if not samples:
+            return (None, None)
+        low, high = np.quantile(np.concatenate(samples), [0.025, 0.975])
+        return (float(low), float(high))
+
+    return {
+        "absolute_difference": interval(delta_samples),
+        "relative_lift_percent": interval(lift_samples),
+        "threshold_contrast": interval(contrast_samples),
+    }
 
 
 def _bootstrap_retention_ci(
@@ -492,6 +1261,36 @@ def _hypothesis_status(
     if value >= threshold:
         return "observed_pass"
     return "not_supported"
+
+
+def _h2_confirmatory_status(
+    *,
+    lift_percent: float | None,
+    threshold_percent: float,
+    two_way_threshold_contrast_ci: tuple[float | None, float | None],
+    run_threshold_contrast_ci: tuple[float | None, float | None],
+    run_threshold_sign_flip_p: float | None,
+    complete: bool,
+    alpha: float,
+) -> str:
+    """Apply the run/task-cluster-aware H2 decision rule."""
+
+    if lift_percent is None or not complete:
+        return "pending"
+    if lift_percent < threshold_percent:
+        return "not_supported"
+    two_way_low, _ = two_way_threshold_contrast_ci
+    run_low, _ = run_threshold_contrast_ci
+    if (
+        two_way_low is not None
+        and two_way_low > 0.0
+        and run_low is not None
+        and run_low > 0.0
+        and run_threshold_sign_flip_p is not None
+        and run_threshold_sign_flip_p < alpha
+    ):
+        return "supported"
+    return "observed_pass"
 
 
 def _detail(
@@ -700,6 +1499,9 @@ def _run_detail(
     replicate: int,
     online: RunEvidence | None,
     frozen: RunEvidence | None,
+    online_inference_eligible: bool = False,
+    frozen_inference_eligible: bool = False,
+    historical_paper_candidate_mean: float | None = None,
 ) -> dict[str, Any]:
     protocol = online.protocol_manifest if online else {}
     env = protocol.get("run_affecting_sage_env") or {}
@@ -717,9 +1519,26 @@ def _run_detail(
         if online
         else None
     )
+    paper_lift = (
+        _relative_lift(
+            online.paper_candidate_outcome,
+            online.paper_control_outcome,
+        )
+        if online
+        else None
+    )
+    paper_historical_delta = (
+        online.paper_candidate_outcome - historical_paper_candidate_mean
+        if online
+        and online.paper_candidate_outcome is not None
+        and historical_paper_candidate_mean is not None
+        else None
+    )
     retention = None
     if (
-        online
+        online_inference_eligible
+        and frozen_inference_eligible
+        and online
         and frozen
         and online.control_outcome is not None
         and online.candidate_outcome is not None
@@ -733,16 +1552,18 @@ def _run_detail(
         )
     status_label = (
         "Online + frozen complete"
-        if online and online.complete and frozen and frozen.complete
+        if online_inference_eligible and frozen_inference_eligible
         else "Online complete"
-        if online and online.complete
+        if online_inference_eligible
+        else "Excluded from inference"
+        if (online and online.complete) or (frozen and frozen.complete)
         else "Running"
         if online or frozen
         else "Queued"
     )
     sections = [
         {
-            "heading": "Replication metrics",
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
             "rows": _rows(
                 [
                     (
@@ -772,6 +1593,35 @@ def _run_detail(
                     ),
                     ("Frozen gain retention", _percent(retention)),
                 ]
+            ),
+        },
+        {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": _rows(
+                [
+                    (
+                        "Fresh baseline outcome",
+                        f"{online.paper_control_outcome:.3f}"
+                        if online and online.paper_control_outcome is not None
+                        else "-",
+                    ),
+                    (
+                        "Online-build SAGE outcome",
+                        f"{online.paper_candidate_outcome:.3f}"
+                        if online and online.paper_candidate_outcome is not None
+                        else "-",
+                    ),
+                    ("Same-run relative lift", _percent(paper_lift, signed=True)),
+                    (
+                        "SAGE minus historical SAGE mean",
+                        _signed(paper_historical_delta, 4),
+                    ),
+                ]
+            ),
+            "note": (
+                "This v1 subset is used only for an apples-to-apples descriptive "
+                "comparison with the archived paper campaign. It is not mixed "
+                "with the v9 all-task hypothesis analysis."
             ),
         },
         {
@@ -871,12 +1721,45 @@ def _run_detail(
         "label": f"Replication {replicate:02d}",
         "short_label": f"R{replicate}",
         "status_label": status_label,
+        "online_inference_eligible": online_inference_eligible,
+        "frozen_inference_eligible": frozen_inference_eligible,
         "dashboard_url": online.dashboard_url if online else "",
-        "baseline_outcome": online.control_outcome if online else None,
-        "online_sage_outcome": online.candidate_outcome if online else None,
-        "frozen_sage_outcome": frozen.candidate_outcome if frozen else None,
-        "online_outcome_lift_percent": online_lift,
-        "frozen_gain_retention_percent": retention,
+        "baseline_outcome": (
+            online.control_outcome if online and online_inference_eligible else None
+        ),
+        "online_sage_outcome": (
+            online.candidate_outcome if online and online_inference_eligible else None
+        ),
+        "frozen_sage_outcome": (
+            frozen.candidate_outcome if frozen and frozen_inference_eligible else None
+        ),
+        "audited_current_outcome_lift_percent": (
+            online_lift if online_inference_eligible else None
+        ),
+        "online_outcome_lift_percent": (
+            online_lift if online_inference_eligible else None
+        ),
+        "paper_comparable_baseline_outcome": (
+            online.paper_control_outcome
+            if online and online_inference_eligible
+            else None
+        ),
+        "paper_comparable_sage_outcome": (
+            online.paper_candidate_outcome
+            if online and online_inference_eligible
+            else None
+        ),
+        "paper_comparable_outcome_lift_percent": (
+            paper_lift if online_inference_eligible else None
+        ),
+        "paper_comparable_candidate_minus_historical_mean": (
+            paper_historical_delta if online_inference_eligible else None
+        ),
+        "frozen_gain_retention_percent": (
+            retention
+            if online_inference_eligible and frozen_inference_eligible
+            else None
+        ),
         **_detail(
             f"run:{replicate}",
             f"Replication {replicate:02d}",
@@ -896,12 +1779,16 @@ def build_evidence_data(
 ) -> dict[str, Any]:
     """Build the complete JSON payload consumed by the evidence dashboard."""
 
+    endpoint_spec = _load_dual_endpoint_spec(repo_root, campaign_manifest)
     pair_entries = campaign_manifest.get("run_pairs") or []
     expected_online = _safe_int(
         campaign_manifest.get("expected_online_runs") or len(pair_entries)
     )
+    declared_expected_frozen = campaign_manifest.get("expected_frozen_runs")
     expected_frozen = _safe_int(
-        campaign_manifest.get("expected_frozen_runs") or len(pair_entries)
+        len(pair_entries)
+        if declared_expected_frozen is None
+        else declared_expected_frozen
     )
     statistical_plan = campaign_manifest.get("statistical_plan") or {}
     h1_threshold = _safe_float(statistical_plan.get("hypothesis_1_threshold_percent"))
@@ -912,39 +1799,84 @@ def build_evidence_data(
     h3_threshold = H3_THRESHOLD_PERCENT if h3_threshold is None else h3_threshold
 
     loaded_pairs: list[tuple[int, RunEvidence | None, RunEvidence | None]] = []
+    entries_by_replication: dict[int, dict[str, dict[str, Any]]] = {}
     for entry in pair_entries:
         if not isinstance(entry, dict):
             continue
         replicate = _safe_int(entry.get("replication"))
         online_entry = entry.get("online") or {}
         frozen_entry = entry.get("frozen") or {}
+        if endpoint_spec is not None and replicate in entries_by_replication:
+            raise ValueError("Campaign replication identifiers are not unique.")
+        entries_by_replication[replicate] = {
+            "online": online_entry if isinstance(online_entry, dict) else {},
+            "frozen": frozen_entry if isinstance(frozen_entry, dict) else {},
+        }
         online = (
-            load_run_evidence(repo_root, online_entry)
+            load_run_evidence(
+                repo_root,
+                online_entry,
+                endpoint_spec=endpoint_spec,
+            )
             if isinstance(online_entry, dict)
             else None
         )
         frozen = (
-            load_run_evidence(repo_root, frozen_entry)
+            load_run_evidence(
+                repo_root,
+                frozen_entry,
+                endpoint_spec=endpoint_spec,
+            )
             if isinstance(frozen_entry, dict)
             else None
         )
         loaded_pairs.append((replicate, online, frozen))
 
+    online_eligibility = {
+        replicate: _entry_is_inference_eligible(
+            repo_root=repo_root,
+            entry=entries_by_replication[replicate]["online"],
+            evidence=run,
+            endpoint_spec=endpoint_spec,
+        )
+        for replicate, run, _ in loaded_pairs
+    }
+    frozen_eligibility = {
+        replicate: _entry_is_inference_eligible(
+            repo_root=repo_root,
+            entry=entries_by_replication[replicate]["frozen"],
+            evidence=run,
+            endpoint_spec=endpoint_spec,
+        )
+        for replicate, _, run in loaded_pairs
+    }
     completed_online = [
         (replicate, run)
         for replicate, run, _ in loaded_pairs
-        if run is not None and run.complete
+        if run is not None and online_eligibility[replicate]
     ]
     completed_frozen = [
         (replicate, run)
         for replicate, _, run in loaded_pairs
-        if run is not None and run.complete
+        if run is not None and frozen_eligibility[replicate]
     ]
     completed_frozen_by_rep = dict(completed_frozen)
-    online_complete = len(completed_online) >= expected_online
-    frozen_complete = len(completed_frozen) >= expected_frozen
+    declared_campaign_complete = campaign_manifest.get("status") == "complete"
+    online_complete = len(completed_online) == expected_online
+    frozen_complete = len(completed_frozen) == expected_frozen
+    if endpoint_spec is not None:
+        online_complete = online_complete and declared_campaign_complete
+        frozen_complete = frozen_complete and declared_campaign_complete
+    else:
+        # Legacy artifacts remain readable for diagnosis, but cannot become
+        # confirmatory evidence without the exact dual-endpoint attestations.
+        online_complete = False
+        frozen_complete = False
 
     online_task_rows = [row for _, run in completed_online for row in run.task_rows]
+    paper_online_task_rows = [
+        row for _, run in completed_online for row in run.paper_task_rows
+    ]
     control_outcomes = [
         row["control_outcome"]
         for row in online_task_rows
@@ -965,6 +1897,22 @@ def build_evidence_data(
     ]
     baseline_outcome = _mean(control_outcomes)
     sage_outcome = _mean(candidate_outcomes)
+    paper_control_outcomes = [row["control_outcome"] for row in paper_online_task_rows]
+    paper_candidate_outcomes = [
+        row["candidate_outcome"] for row in paper_online_task_rows
+    ]
+    paper_outcome_deltas = [row["outcome_delta"] for row in paper_online_task_rows]
+    paper_baseline_outcome = _mean(paper_control_outcomes)
+    paper_sage_outcome = _mean(paper_candidate_outcomes)
+    paper_outcome_delta = (
+        paper_sage_outcome - paper_baseline_outcome
+        if paper_sage_outcome is not None and paper_baseline_outcome is not None
+        else None
+    )
+    paper_outcome_lift = _relative_lift(
+        paper_sage_outcome,
+        paper_baseline_outcome,
+    )
     frozen_sage_outcome = _mean(run.candidate_outcome for _, run in completed_frozen)
     overall_outcome_delta = (
         sage_outcome - baseline_outcome
@@ -972,6 +1920,37 @@ def build_evidence_data(
         else None
     )
     overall_outcome_lift = _relative_lift(sage_outcome, baseline_outcome)
+    historical_paper_candidate_mean: float | None = None
+    historical_paper_candidate_minimum: float | None = None
+    historical_paper_hybrid_control_mean: float | None = None
+    historical_paper_original_control_mean: float | None = None
+    if endpoint_spec is not None:
+        historical_paper_candidate_mean = _required_unit_float(
+            endpoint_spec.historical.get("paper_comparable_candidate_outcome_mean"),
+            "historical paper-comparable SAGE mean",
+        )
+        historical_paper_candidate_minimum = _required_unit_float(
+            endpoint_spec.historical.get("paper_comparable_candidate_outcome_minimum"),
+            "historical paper-comparable SAGE minimum",
+        )
+        historical_paper_hybrid_control_mean = _required_unit_float(
+            endpoint_spec.historical.get(
+                "paper_comparable_hybrid_control_outcome_mean"
+            ),
+            "historical paper-comparable hybrid-control mean",
+        )
+        historical_paper_original_control_mean = _required_unit_float(
+            endpoint_spec.historical.get(
+                "paper_comparable_pure_original_v140_control_outcome_mean"
+            ),
+            "historical paper-comparable original-control mean",
+        )
+    paper_candidate_minus_historical_mean = (
+        paper_sage_outcome - historical_paper_candidate_mean
+        if paper_sage_outcome is not None
+        and historical_paper_candidate_mean is not None
+        else None
+    )
     baseline_score = _mean(
         row["control_score"]
         for row in online_task_rows
@@ -984,34 +1963,98 @@ def build_evidence_data(
     )
     canonical_lift = _relative_lift(sage_score, baseline_score)
 
-    task_ci = _bootstrap_mean_ci(
+    task_iid_ci = _bootstrap_mean_ci(
         outcome_deltas,
         iterations=bootstrap_iterations,
         seed=seed,
     )
-    online_run_mean_deltas: list[float] = []
-    for _, run in completed_online:
-        run_deltas = [
-            row["outcome_delta"]
-            for row in run.task_rows
-            if row["outcome_delta"] is not None
-        ]
-        if run_deltas:
-            online_run_mean_deltas.append(float(np.mean(run_deltas)))
-    run_cluster_ci = _bootstrap_mean_ci(
-        online_run_mean_deltas,
+    h2_multiplier = 1.0 + h2_threshold / 100.0
+    task_threshold_contrasts = [
+        float(row["candidate_outcome"]) - h2_multiplier * float(row["control_outcome"])
+        for row in online_task_rows
+        if row["control_outcome"] is not None and row["candidate_outcome"] is not None
+    ]
+    task_iid_threshold_contrast_ci = _bootstrap_mean_ci(
+        task_threshold_contrasts,
         iterations=bootstrap_iterations,
         seed=seed + 1,
+    )
+    online_run_mean_deltas: list[float] = []
+    online_run_threshold_contrasts: list[float] = []
+    online_run_control_rows: list[list[float]] = []
+    online_run_candidate_rows: list[list[float]] = []
+    for _, run in completed_online:
+        run_pairs = [
+            (float(row["control_outcome"]), float(row["candidate_outcome"]))
+            for row in run.task_rows
+            if row["control_outcome"] is not None
+            and row["candidate_outcome"] is not None
+        ]
+        if run_pairs:
+            run_control = [pair[0] for pair in run_pairs]
+            run_candidate = [pair[1] for pair in run_pairs]
+            online_run_control_rows.append(run_control)
+            online_run_candidate_rows.append(run_candidate)
+            online_run_mean_deltas.append(
+                float(np.mean(np.asarray(run_candidate) - np.asarray(run_control)))
+            )
+            online_run_threshold_contrasts.append(
+                float(
+                    np.mean(
+                        np.asarray(run_candidate)
+                        - h2_multiplier * np.asarray(run_control)
+                    )
+                )
+            )
+    common_task_counts = {
+        len(row) for row in [*online_run_control_rows, *online_run_candidate_rows]
+    }
+    if len(common_task_counts) == 1:
+        two_way_bootstrap = _two_way_paired_outcome_bootstrap(
+            online_run_control_rows,
+            online_run_candidate_rows,
+            threshold_percent=h2_threshold,
+            iterations=bootstrap_iterations,
+            seed=seed + 2,
+        )
+    else:
+        two_way_bootstrap = {
+            "absolute_difference": (None, None),
+            "relative_lift_percent": (None, None),
+            "threshold_contrast": (None, None),
+        }
+    two_way_delta_ci = two_way_bootstrap["absolute_difference"]
+    h2_lift_ci = two_way_bootstrap["relative_lift_percent"]
+    two_way_threshold_contrast_ci = two_way_bootstrap["threshold_contrast"]
+    run_delta_ci = _bootstrap_mean_ci(
+        online_run_mean_deltas,
+        iterations=bootstrap_iterations,
+        seed=seed + 3,
+    )
+    run_threshold_contrast_ci = _bootstrap_mean_ci(
+        online_run_threshold_contrasts,
+        iterations=bootstrap_iterations,
+        seed=seed + 4,
     )
     task_p = _randomization_p(
         outcome_deltas,
         iterations=randomization_iterations,
-        seed=seed + 2,
+        seed=seed + 5,
     )
-    run_p = _randomization_p(
+    task_threshold_p = _randomization_p(
+        task_threshold_contrasts,
+        iterations=randomization_iterations,
+        seed=seed + 6,
+    )
+    run_delta_p = _randomization_p(
         online_run_mean_deltas,
         iterations=randomization_iterations,
-        seed=seed + 3,
+        seed=seed + 7,
+    )
+    run_threshold_p = _randomization_p(
+        online_run_threshold_contrasts,
+        iterations=randomization_iterations,
+        seed=seed + 8,
     )
 
     called_rows: list[dict[str, Any]] = []
@@ -1046,11 +2089,11 @@ def build_evidence_data(
     called_delta_ci = _bootstrap_mean_ci(
         called_deltas,
         iterations=bootstrap_iterations,
-        seed=seed + 4,
+        seed=seed + 9,
     )
     called_lift_samples: list[float] = []
     if called_rows:
-        rng = np.random.default_rng(seed + 5)
+        rng = np.random.default_rng(seed + 10)
         control_array = np.asarray(
             [float(row["control_outcome"]) for row in called_rows],
             dtype=float,
@@ -1113,7 +2156,7 @@ def build_evidence_data(
     retention_ci = _bootstrap_retention_ci(
         retention_rows,
         iterations=bootstrap_iterations,
-        seed=seed + 6,
+        seed=seed + 11,
     )
 
     h1_status = _hypothesis_status(
@@ -1122,26 +2165,21 @@ def build_evidence_data(
         ci=retention_ci,
         complete=online_complete and frozen_complete,
     )
-    h2_lift_ci = (
-        (task_ci[0] / baseline_outcome * 100.0)
-        if task_ci[0] is not None and baseline_outcome not in (None, 0.0)
-        else None,
-        (task_ci[1] / baseline_outcome * 100.0)
-        if task_ci[1] is not None and baseline_outcome not in (None, 0.0)
-        else None,
+    h2_threshold_contrast = (
+        sage_outcome - h2_multiplier * baseline_outcome
+        if sage_outcome is not None and baseline_outcome is not None
+        else None
     )
-    h2_status = _hypothesis_status(
-        value=overall_outcome_lift,
-        threshold=h2_threshold,
-        ci=h2_lift_ci,
+    h2_status = _h2_confirmatory_status(
+        lift_percent=overall_outcome_lift,
+        threshold_percent=h2_threshold,
+        two_way_threshold_contrast_ci=two_way_threshold_contrast_ci,
+        run_threshold_contrast_ci=run_threshold_contrast_ci,
+        run_threshold_sign_flip_p=run_threshold_p,
         complete=online_complete,
+        alpha=0.05,
     )
-    h3_status = _hypothesis_status(
-        value=called_lift,
-        threshold=h3_threshold,
-        ci=called_lift_ci,
-        complete=online_complete,
-    )
+    h3_status = "descriptive_only" if called_lift is not None else "pending"
 
     tools, tool_totals = _tool_records(completed_online)
     tool_totals["gains"] = called_unique_gains
@@ -1216,7 +2254,18 @@ def build_evidence_data(
         )
 
     run_cards = [
-        _run_detail(replicate=replicate, online=online, frozen=frozen)
+        _run_detail(
+            replicate=replicate,
+            online=online,
+            frozen=frozen,
+            online_inference_eligible=(
+                endpoint_spec is not None and online_eligibility[replicate]
+            ),
+            frozen_inference_eligible=(
+                endpoint_spec is not None and frozen_eligibility[replicate]
+            ),
+            historical_paper_candidate_mean=historical_paper_candidate_mean,
+        )
         for replicate, online, frozen in loaded_pairs
     ]
     complete_run_count = len(completed_online) + len(completed_frozen)
@@ -1240,11 +2289,35 @@ def build_evidence_data(
         for run in (online, frozen)
         if run is not None and not run.complete
     )
+    excluded_completed_artifact_count = sum(
+        1
+        for replicate, online, frozen in loaded_pairs
+        for run, eligible in (
+            (online, online_eligibility[replicate]),
+            (frozen, frozen_eligibility[replicate]),
+        )
+        if run is not None and run.complete and not eligible
+    )
+    campaign_inference_complete = (
+        online_complete
+        and frozen_complete
+        and len(loaded_pairs) == expected_online
+        and active_run_count == 0
+        and excluded_completed_artifact_count == 0
+    )
+    manifest_status = str(campaign_manifest.get("status") or "")
     status_label = (
-        "Complete"
-        if complete_run_count >= expected_run_count
+        "Legacy / non-confirmatory"
+        if endpoint_spec is None
+        and any(online or frozen for _, online, frozen in loaded_pairs)
+        else "Complete"
+        if campaign_inference_complete
+        else "Incomplete"
+        if manifest_status in {"complete", "incomplete"}
+        or excluded_completed_artifact_count
         else "Running"
-        if any(online or frozen for _, online, frozen in loaded_pairs)
+        if manifest_status == "running"
+        or any(online or frozen for _, online, frozen in loaded_pairs)
         else "Ready"
     )
     now = datetime.now(UTC)
@@ -1260,6 +2333,14 @@ def build_evidence_data(
         {
             "id": "Hypothesis 1",
             "title": "Reusable generated tools preserve online-build gains",
+            "analysis_role": "confirmatory_run_paired",
+            "decision_rule": {
+                "estimate_requirement": f"gain_retention_percent >= {h1_threshold:g}",
+                "uncertainty_requirement": (
+                    f"run_paired_bootstrap_95_ci_lower >= {h1_threshold:g}"
+                ),
+                "replication_unit": "paired_online_and_frozen_registry_run",
+            },
             "estimate_percent": retention,
             "confidence_interval": _confidence_interval(
                 retention_ci,
@@ -1277,8 +2358,9 @@ def build_evidence_data(
                 "registry."
             ),
             "evidence_label": (
-                "Compares each online-build run with a paired frozen-registry "
-                "run where generation and repair are disabled."
+                "Uses the audited v9 all-1,032-task endpoint to compare each "
+                "online-build run with a paired frozen-registry run where "
+                "generation and repair are disabled."
             ),
             "observed_label": f"Observed {_percent(retention)}",
             "threshold_label": f"Target >= {h1_threshold:g}%",
@@ -1328,16 +2410,46 @@ def build_evidence_data(
         },
         {
             "id": "Hypothesis 2",
-            "title": "SAGE improves task-completion accuracy over baseline",
+            "title": "SAGE improves audited all-task outcome over baseline",
+            "analysis_role": "confirmatory_two_way_run_task_clustered",
+            "decision_rule": {
+                "target_contrast": (
+                    f"candidate_mean - {h2_multiplier:.6g} * control_mean"
+                ),
+                "estimate_requirement": (
+                    f"audited_relative_outcome_lift_percent >= {h2_threshold:g}"
+                ),
+                "two_way_uncertainty_requirement": (
+                    "two_way_run_task_bootstrap_95_ci_lower_for_target_contrast > 0"
+                ),
+                "run_cluster_requirement": (
+                    "run_cluster_bootstrap_95_ci_lower_for_target_contrast > 0"
+                ),
+                "run_sign_flip_requirement": "two_sided_exact_p < 0.05",
+                "replication_unit": "independently_evolved_registry_run",
+                "task_unit": "fixed_matched_benchmark_task",
+                "iid_task_analysis_role": "descriptive_only",
+            },
             "estimate_percent": overall_outcome_lift,
             "confidence_interval": _confidence_interval(
                 h2_lift_ci,
                 unit="percent",
             ),
             "threshold_percent": h2_threshold,
-            "sample_size": len(outcome_deltas),
+            "sample_size": len(completed_online),
+            "matched_task_observations": len(outcome_deltas),
             "baseline_mean": baseline_outcome,
             "sage_mean": sage_outcome,
+            "threshold_contrast": h2_threshold_contrast,
+            "two_way_threshold_contrast_ci": _confidence_interval(
+                two_way_threshold_contrast_ci,
+                unit="score",
+            ),
+            "run_threshold_contrast_ci": _confidence_interval(
+                run_threshold_contrast_ci,
+                unit="score",
+            ),
+            "run_threshold_sign_flip_p": run_threshold_p,
             "decision": h2_status,
             "decision_label": _decision_label(h2_status),
             "value_label": _percent(overall_outcome_lift, signed=True),
@@ -1347,8 +2459,8 @@ def build_evidence_data(
                 "same LLM agent without autonomous tool generation."
             ),
             "evidence_label": (
-                "Compares matched baseline and SAGE outcomes for the same task "
-                "order across all complete replications."
+                "Compares audited v9 baseline and SAGE outcomes for the same "
+                "1,032-task order across all complete replications."
             ),
             "observed_label": f"Observed {_percent(overall_outcome_lift, signed=True)}",
             "threshold_label": f"Target >= {h2_threshold:g}%",
@@ -1357,7 +2469,7 @@ def build_evidence_data(
             "status": h2_status,
             **_detail(
                 "hypothesis:h2",
-                "Hypothesis 2: Overall task-completion lift",
+                "Hypothesis 2: Audited v9 all-task outcome lift",
                 [
                     {
                         "heading": "Definition and result",
@@ -1384,29 +2496,79 @@ def build_evidence_data(
                                     _percent(overall_outcome_lift, signed=True),
                                 ),
                                 (
-                                    "Lift 95% paired bootstrap CI",
+                                    "Lift 95% two-way run/task bootstrap CI",
                                     _percent_interval(h2_lift_ci),
+                                ),
+                                (
+                                    "10% target contrast",
+                                    _signed(h2_threshold_contrast, 4),
                                 ),
                                 (
                                     "Decision threshold",
                                     f">= {h2_threshold:g}%",
                                 ),
+                                ("Independent registry runs", len(completed_online)),
                                 ("Matched task observations", len(outcome_deltas)),
+                            ]
+                        ),
+                        "note": (
+                            "Support requires the point estimate to reach the target, "
+                            "both cluster-aware 95% lower bounds for the target "
+                            "contrast to exceed zero, and the two-sided run-level "
+                            "sign-flip p-value to be below .05."
+                        ),
+                    },
+                    {
+                        "heading": "Confirmatory clustered inference",
+                        "rows": _rows(
+                            [
+                                (
+                                    "Two-way target-contrast CI",
+                                    _interval(two_way_threshold_contrast_ci),
+                                ),
+                                (
+                                    "Run-cluster target-contrast CI",
+                                    _interval(run_threshold_contrast_ci),
+                                ),
+                                (
+                                    "Run-level target-contrast sign flip",
+                                    _p_label(run_threshold_p),
+                                ),
+                                (
+                                    "Two-way absolute-difference CI",
+                                    _interval(two_way_delta_ci),
+                                ),
                             ]
                         ),
                     },
                     {
-                        "heading": "Inference sensitivity",
+                        "heading": "Descriptive task-IID analysis",
                         "rows": _rows(
                             [
-                                ("Task-paired difference CI", _interval(task_ci)),
+                                ("Task-IID difference CI", _interval(task_iid_ci)),
+                                ("Task-IID sign flip", _p_label(task_p)),
                                 (
-                                    "Run-cluster mean difference CI",
-                                    _interval(run_cluster_ci),
+                                    "Task-IID target-contrast CI",
+                                    _interval(task_iid_threshold_contrast_ci),
                                 ),
-                                ("Task-paired randomization", _p_label(task_p)),
-                                ("Run-level randomization", _p_label(run_p)),
+                                (
+                                    "Task-IID target-contrast sign flip",
+                                    _p_label(task_threshold_p),
+                                ),
+                                (
+                                    "Run-level raw-difference CI",
+                                    _interval(run_delta_ci),
+                                ),
+                                (
+                                    "Run-level raw-difference sign flip",
+                                    _p_label(run_delta_p),
+                                ),
                             ]
+                        ),
+                        "note": (
+                            "These rows describe task-level precision and the raw "
+                            "positive-difference contrast. They do not determine "
+                            "the confirmatory H2 decision."
                         ),
                     },
                 ],
@@ -1415,7 +2577,17 @@ def build_evidence_data(
         },
         {
             "id": "Hypothesis 3",
-            "title": "Generated tools account for the accuracy gain",
+            "title": "Outcome lift among generated-tool-called tasks",
+            "analysis_role": "selection_conditioned_descriptive_only",
+            "causal_attribution_allowed": False,
+            "decision_rule": {
+                "classification": "descriptive_only_no_hypothesis_support_decision",
+                "reason": (
+                    "generated-tool-called status is selected after treatment and "
+                    "there is no randomized tool-use ablation"
+                ),
+                "threshold_role": "predeclared_descriptive_reference_only",
+            },
             "estimate_percent": called_lift,
             "confidence_interval": _confidence_interval(
                 called_lift_ci,
@@ -1430,22 +2602,23 @@ def build_evidence_data(
             "value_label": _percent(called_lift, signed=True),
             "primary_label": "Lift is measured on tasks where the SAGE actor policy called generated tools.",
             "claim_label": (
-                "The strongest gains occur on tasks where the SAGE actor policy "
-                "selects and sequences a generated tool."
+                "This is a selection-conditioned description of tasks where the "
+                "SAGE actor policy selected and called a generated tool."
             ),
             "evidence_label": (
-                "Uses generated-tool-called tasks under the declared production "
-                "policy; diagnostic overrides, scenario-name routing, and "
-                "synthetic bridge completions are disabled."
+                "Uses audited v9 outcomes on generated-tool-called tasks under "
+                "the declared production policy; diagnostic overrides, "
+                "scenario-name routing, and synthetic bridge completions are disabled. "
+                "It does not establish causal attribution."
             ),
             "observed_label": f"Observed {_percent(called_lift, signed=True)}",
-            "threshold_label": f"Target >= {h3_threshold:g}%",
+            "threshold_label": f"Descriptive reference: {h3_threshold:g}%",
             "fill_position": min(max(called_lift or 0.0, 0.0), 100.0),
             "target_position": h3_threshold,
             "status": h3_status,
             **_detail(
                 "hypothesis:h3",
-                "Hypothesis 3: Policy-directed generated-tool pathway",
+                "Generated-tool-called task association",
                 [
                     {
                         "heading": "Definition and result",
@@ -1480,23 +2653,163 @@ def build_evidence_data(
                                     _interval(called_delta_ci),
                                 ),
                                 (
-                                    "Decision threshold",
-                                    f">= {h3_threshold:g}%",
+                                    "Descriptive reference",
+                                    f"{h3_threshold:g}% (not a causal gate)",
                                 ),
                                 ("Called-task observations", len(called_rows)),
                             ]
                         ),
                         "note": (
-                            "Diagnostic override variables must be absent. The "
-                            "production actor policy and its named tool choices "
-                            "remain part of the SAGE intervention."
+                            "Generated-tool-called status is observed after the SAGE "
+                            "intervention. Without a randomized tool-use ablation, "
+                            "this selected subset can show association but cannot "
+                            "identify the generated call as the cause of the outcome."
                         ),
                     }
                 ],
-                eyebrow="Primary hypothesis metric",
+                eyebrow="Selection-conditioned descriptive analysis",
             ),
         },
     ]
+
+    audited_declaration = endpoint_spec.audited if endpoint_spec is not None else {}
+    paper_declaration = endpoint_spec.paper if endpoint_spec is not None else {}
+    audited_endpoint = {
+        "metric_field": audited_declaration.get("metric_field", "outcome_similarity"),
+        "evaluator_version": audited_declaration.get("evaluator_version"),
+        "task_scope": audited_declaration.get("task_scope", "matched_tasks"),
+        "task_count_per_run": audited_declaration.get("task_count"),
+        "matched_task_observations": len(outcome_deltas),
+        "baseline": baseline_outcome,
+        "sage": sage_outcome,
+        "absolute_difference": overall_outcome_delta,
+        "relative_lift_percent": overall_outcome_lift,
+        "delta_label": _signed(overall_outcome_delta),
+        "lift_label": _percent(overall_outcome_lift, signed=True),
+        "analysis_role": "current_same_run_hypothesis_endpoint",
+        **_detail(
+            "endpoint:audited-current-all-tasks",
+            "Audited current endpoint: v9 on all 1,032 tasks",
+            [
+                {
+                    "heading": "Exact endpoint identity",
+                    "rows": _rows(
+                        [
+                            ("Metric field", audited_declaration.get("metric_field")),
+                            (
+                                "Evaluator version",
+                                audited_declaration.get("evaluator_version"),
+                            ),
+                            (
+                                "Tasks per replication",
+                                audited_declaration.get("task_count"),
+                            ),
+                            ("Matched observations", len(outcome_deltas)),
+                        ]
+                    ),
+                    "note": (
+                        "This complete-benchmark endpoint supplies the current "
+                        "same-run lift, confirmatory H1/H2 analyses, and the "
+                        "selection-conditioned descriptive called-task analysis."
+                    ),
+                },
+                {
+                    "heading": "Observed current results",
+                    "rows": _rows(
+                        [
+                            ("Fresh baseline mean", baseline_outcome),
+                            ("SAGE mean", sage_outcome),
+                            ("Absolute difference", _signed(overall_outcome_delta, 4)),
+                            (
+                                "Relative lift",
+                                _percent(overall_outcome_lift, signed=True),
+                            ),
+                        ]
+                    ),
+                },
+            ],
+            eyebrow="Audited outcome endpoint",
+        ),
+    }
+    paper_endpoint = {
+        "metric_field": paper_declaration.get(
+            "metric_field", "online_feedback_outcome_similarity"
+        ),
+        "evaluator_version": paper_declaration.get("evaluator_version"),
+        "task_scope": paper_declaration.get("task_scope"),
+        "task_count_per_run": paper_declaration.get("task_count"),
+        "matched_task_observations": len(paper_outcome_deltas),
+        "baseline": paper_baseline_outcome,
+        "sage": paper_sage_outcome,
+        "absolute_difference": paper_outcome_delta,
+        "relative_lift_percent": paper_outcome_lift,
+        "historical_sage_mean": historical_paper_candidate_mean,
+        "historical_sage_minimum": historical_paper_candidate_minimum,
+        "historical_hybrid_control_mean": historical_paper_hybrid_control_mean,
+        "historical_original_control_mean": historical_paper_original_control_mean,
+        "candidate_minus_historical_mean": paper_candidate_minus_historical_mean,
+        "delta_label": _signed(paper_outcome_delta),
+        "lift_label": _percent(paper_outcome_lift, signed=True),
+        "historical_delta_label": _signed(
+            paper_candidate_minus_historical_mean,
+            4,
+        ),
+        "analysis_role": "apples_to_apples_historical_comparison_only",
+        **_detail(
+            "endpoint:paper-comparable-historical-subset",
+            "Paper-comparable endpoint: v1 on the exact 800-task subset",
+            [
+                {
+                    "heading": "Exact endpoint identity",
+                    "rows": _rows(
+                        [
+                            ("Metric field", paper_declaration.get("metric_field")),
+                            (
+                                "Evaluator version",
+                                paper_declaration.get("evaluator_version"),
+                            ),
+                            (
+                                "Tasks per replication",
+                                paper_declaration.get("task_count"),
+                            ),
+                            ("Matched observations", len(paper_outcome_deltas)),
+                        ]
+                    ),
+                    "note": (
+                        "Only the exact non-null v1 subset in frozen benchmark "
+                        "order is included. Values are never mixed with v9."
+                    ),
+                },
+                {
+                    "heading": "Apples-to-apples historical comparison",
+                    "rows": _rows(
+                        [
+                            ("Current fresh baseline mean", paper_baseline_outcome),
+                            ("Current SAGE mean", paper_sage_outcome),
+                            (
+                                "Archived paper SAGE mean",
+                                historical_paper_candidate_mean,
+                            ),
+                            (
+                                "Current minus archived SAGE mean",
+                                _signed(paper_candidate_minus_historical_mean, 4),
+                            ),
+                        ]
+                    ),
+                    "note": (
+                        "The archived campaign remains provenance-invalid for final "
+                        "inference. This is a descriptive comparison under the same "
+                        "v1 evaluator and exact ordered 800-task subset."
+                    ),
+                },
+            ],
+            eyebrow="Historical-comparison endpoint",
+        ),
+    }
+    performance_endpoints = {
+        AUDITED_ENDPOINT_NAME: audited_endpoint,
+        PAPER_ENDPOINT_NAME: paper_endpoint,
+    }
 
     performance = {
         "baseline": baseline_outcome,
@@ -1516,7 +2829,7 @@ def build_evidence_data(
             "Overall matched performance",
             [
                 {
-                    "heading": "Outcome/task-completion score",
+                    "heading": "Audited v9 outcome (all 1,032 tasks per run)",
                     "rows": _rows(
                         [
                             (
@@ -1570,38 +2883,81 @@ def build_evidence_data(
     sage_successes = sum(value >= 1.0 - 1e-12 for value in candidate_outcomes)
     statistics = {
         "mean_delta": overall_outcome_delta,
-        "paired_bootstrap_ci": _confidence_interval(task_ci, unit="score"),
-        "paired_randomization_p": task_p,
+        "analysis_role": "confirmatory_two_way_run_task_clustered",
+        "decision_rule": {
+            "target_contrast": f"candidate_mean - {h2_multiplier:.6g} * control_mean",
+            "two_way_bootstrap_lower_must_exceed": 0.0,
+            "run_cluster_bootstrap_lower_must_exceed": 0.0,
+            "run_sign_flip_p_must_be_below": 0.05,
+            "iid_task_analysis_role": "descriptive_only",
+        },
+        "h2_threshold_percent": h2_threshold,
+        "h2_threshold_multiplier": h2_multiplier,
+        "h2_threshold_contrast": h2_threshold_contrast,
+        "two_way_run_task_bootstrap_delta_ci": _confidence_interval(
+            two_way_delta_ci,
+            unit="score",
+        ),
+        "two_way_run_task_bootstrap_lift_ci": _confidence_interval(
+            h2_lift_ci,
+            unit="percent",
+        ),
+        "two_way_run_task_bootstrap_threshold_contrast_ci": _confidence_interval(
+            two_way_threshold_contrast_ci,
+            unit="score",
+        ),
+        "run_cluster_threshold_contrast_ci": _confidence_interval(
+            run_threshold_contrast_ci,
+            unit="score",
+        ),
+        "run_threshold_contrast_sign_flip_p": run_threshold_p,
+        "task_iid_bootstrap_ci": _confidence_interval(task_iid_ci, unit="score"),
+        "task_iid_sign_flip_p": task_p,
+        "task_iid_threshold_contrast_ci": _confidence_interval(
+            task_iid_threshold_contrast_ci,
+            unit="score",
+        ),
+        "task_iid_threshold_contrast_sign_flip_p": task_threshold_p,
+        "run_raw_difference_bootstrap_ci": _confidence_interval(
+            run_delta_ci,
+            unit="score",
+        ),
+        "run_raw_difference_sign_flip_p": run_delta_p,
         "bootstrap_iterations": bootstrap_iterations,
         "randomization_iterations": randomization_iterations,
         "matched_task_observations": len(outcome_deltas),
         "baseline_successes": baseline_successes,
         "sage_successes": sage_successes,
         "independent_online_runs": len(completed_online),
-        "run_cluster_bootstrap_ci": _confidence_interval(
-            run_cluster_ci,
-            unit="score",
-        ),
-        "run_sign_flip_p": run_p,
         "significance_alpha": 0.05,
         "mean_delta_label": _signed(overall_outcome_delta),
-        "ci_label": _interval(task_ci),
-        "p_label": _p_label(task_p),
+        "ci_label": _interval(two_way_threshold_contrast_ci),
+        "p_label": _p_label(run_threshold_p),
         "successes_label": f"{baseline_successes:,} / {sage_successes:,}",
         **_detail(
             "panel:statistics",
-            "Paired statistical evidence",
+            "Paired audited-v9 statistical evidence",
             [
                 {
-                    "heading": "Primary paired analysis",
+                    "heading": "Confirmatory H2 clustered analysis",
                     "rows": _rows(
                         [
                             (
-                                "Mean paired outcome difference",
-                                _signed(overall_outcome_delta, 4),
+                                f"Threshold contrast (SAGE - {h2_multiplier:.3g} x baseline)",
+                                _signed(h2_threshold_contrast, 4),
                             ),
-                            ("Paired bootstrap 95% CI", _interval(task_ci, 4)),
-                            ("Paired randomization test", _p_label(task_p)),
+                            (
+                                "Two-way run/task contrast 95% CI",
+                                _interval(two_way_threshold_contrast_ci, 4),
+                            ),
+                            (
+                                "Run-cluster contrast 95% CI",
+                                _interval(run_threshold_contrast_ci, 4),
+                            ),
+                            (
+                                "Run-level contrast sign flip",
+                                _p_label(run_threshold_p),
+                            ),
                             ("Bootstrap iterations", f"{bootstrap_iterations:,}"),
                             (
                                 "Randomization iterations",
@@ -1610,22 +2966,48 @@ def build_evidence_data(
                             ("Matched task observations", f"{len(outcome_deltas):,}"),
                         ]
                     ),
+                    "note": (
+                        "The contrast tests the predeclared relative-lift target "
+                        "directly. H2 support requires both cluster-aware lower "
+                        "bounds above zero and the two-sided run-level sign-flip "
+                        "p-value below .05."
+                    ),
                 },
                 {
-                    "heading": "Replication sensitivity",
+                    "heading": "Descriptive analyses (not decision criteria)",
                     "rows": _rows(
                         [
                             ("Independent online-build runs", len(completed_online)),
                             (
-                                "Run-cluster bootstrap 95% CI",
-                                _interval(run_cluster_ci, 4),
+                                "Two-way raw-difference 95% CI",
+                                _interval(two_way_delta_ci, 4),
                             ),
-                            ("Run-level sign-flip test", _p_label(run_p)),
+                            (
+                                "Task-IID difference 95% CI",
+                                _interval(task_iid_ci, 4),
+                            ),
+                            ("Task-IID sign-flip test", _p_label(task_p)),
+                            (
+                                "Task-IID target-contrast 95% CI",
+                                _interval(task_iid_threshold_contrast_ci, 4),
+                            ),
+                            (
+                                "Task-IID target-contrast sign flip",
+                                _p_label(task_threshold_p),
+                            ),
+                            (
+                                "Run-level raw-difference 95% CI",
+                                _interval(run_delta_ci, 4),
+                            ),
+                            (
+                                "Run-level raw-difference sign flip",
+                                _p_label(run_delta_p),
+                            ),
                         ]
                     ),
                     "note": (
-                        "The run-cluster sensitivity treats each independently "
-                        "generated registry as the unit of replication."
+                        "The task-IID rows do not treat repeated benchmark tasks "
+                        "across registries as independent confirmatory evidence."
                     ),
                 },
             ],
@@ -1713,10 +3095,10 @@ def build_evidence_data(
         ),
         (
             "gains",
-            "Attributed gains",
+            "Called-task gains",
             f"{tool_totals['gains']:,}",
             "green",
-            "Called generated-tool scenarios with positive matched outcome difference.",
+            "Generated-tool-called scenarios with positive matched outcome difference; descriptive association only.",
         ),
         (
             "preserved",
@@ -1727,10 +3109,10 @@ def build_evidence_data(
         ),
         (
             "regressions",
-            "Attributed regressions",
+            "Called-task regressions",
             f"{tool_totals['regressions']:,}",
             "amber",
-            "Called generated-tool scenarios with negative matched outcome difference.",
+            "Generated-tool-called scenarios with negative matched outcome difference; descriptive association only.",
         ),
         (
             "failures",
@@ -1804,18 +3186,31 @@ def build_evidence_data(
         "expected_runs": expected_run_count,
         "completed_online_runs": len(completed_online),
         "completed_frozen_runs": len(completed_frozen),
+        "excluded_completed_artifacts": excluded_completed_artifact_count,
+        "inference_complete": campaign_inference_complete,
+        "manifest_status": manifest_status,
         "progress_percent": (
             min(100.0, recorded_task_progress / expected_task_progress * 100.0)
             if expected_task_progress
             else 0.0
         ),
         "progress_label": (
-            f"{complete_run_count} of {expected_run_count} full runs complete"
+            "Legacy artifacts loaded for diagnosis only; dual-endpoint "
+            "attestations are absent"
+            if endpoint_spec is None
+            else f"{complete_run_count} of {expected_run_count} verified runs included"
             + (f" · {active_run_count} active" if active_run_count else "")
+            + (
+                f" · {excluded_completed_artifact_count} completed artifact(s) excluded"
+                if excluded_completed_artifact_count
+                else ""
+            )
         ),
         "recorded_task_progress": recorded_task_progress,
         "expected_task_progress": expected_task_progress,
         "paired_observations": len(online_task_rows),
+        "audited_current_matched_observations": len(online_task_rows),
+        "paper_comparable_matched_observations": len(paper_online_task_rows),
         "tasks_per_run": expected_tasks_per_run,
         "updated_at": now.isoformat(),
         "updated_at_label": now.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
@@ -1825,11 +3220,28 @@ def build_evidence_data(
             campaign_manifest.get("baseline_cache_policy") or ""
         ),
         "claim_safeguards": dict(campaign_manifest.get("claim_safeguards") or {}),
+        "endpoint_policy": (
+            "dual_scoped_outcome_endpoints"
+            if endpoint_spec is not None
+            else "legacy_single_endpoint"
+        ),
+        "inference_exclusion_reason": (
+            None
+            if endpoint_spec is not None
+            else "missing_dual_endpoint_sample_and_run_attestations"
+        ),
+        "thresholds_path": (
+            str(endpoint_spec.thresholds_path) if endpoint_spec is not None else ""
+        ),
+        "thresholds_sha256": (
+            endpoint_spec.thresholds_sha256 if endpoint_spec is not None else ""
+        ),
     }
     return {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "campaign": campaign,
         "hypotheses": hypotheses,
+        "performance_endpoints": performance_endpoints,
         "performance": performance,
         "statistics": statistics,
         "integrity": integrity,
@@ -1860,9 +3272,16 @@ def write_evidence_dashboard(
         seed=seed,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(EVIDENCE_TEMPLATE, output_dir / EVIDENCE_HTML_NAME)
-    (output_dir / EVIDENCE_DATA_NAME).write_text(
-        json.dumps(data, indent=2, sort_keys=False) + "\n",
-        encoding="utf-8",
-    )
+    template = EVIDENCE_TEMPLATE.read_text(encoding="utf-8")
+    marker = "__CHAPTER4_EVIDENCE_BASE64__"
+    if template.count(marker) != 1:
+        raise ValueError("Chapter 4 evidence template embed marker is not exact.")
+    embedded = base64.b64encode(
+        json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).decode("ascii")
+    html = template.replace(marker, embedded)
+    payload = json.dumps(data, indent=2, sort_keys=False) + "\n"
+    with _DASHBOARD_WRITE_LOCK:
+        _atomic_write_text(output_dir / EVIDENCE_DATA_NAME, payload)
+        _atomic_write_text(output_dir / EVIDENCE_HTML_NAME, html)
     return data

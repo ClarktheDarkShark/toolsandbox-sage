@@ -1,5 +1,11 @@
 # Final-Task Success Audit
 
+> **Superseded evaluator note.** Sections 2–4 describe an older answer selector.
+> Audited v9 scores the last task-outcome-bearing answer within the applicable
+> state-bounded segment, ignores later social/non-outcome messages, and lets an
+> explicit same-slot correction replace an earlier answer. This file is retained
+> only for the historical audit trail.
+
 ## 1) What does canonical ToolSandbox score measure?
 Canonical score (`canonical_score.json`) is route- and benchmark-task milestone score at task level. It summarizes base-task similarity/success behavior from task result summaries (not final answer quality), and is compared between control and candidate runs.
 

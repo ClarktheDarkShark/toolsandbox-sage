@@ -1,5 +1,11 @@
 # Chapter 4 Evidence Correction and Rerun Readiness — 2026-09-01
 
+> **Superseded protocol note (2026-09-10).** The historical diagnosis remains
+> valid, but the v2/sequential-arm rerun gate below has been replaced by the v3
+> dual-endpoint, parallel-arm protocol. Audited v9 covers all 1,032 tasks per
+> pair; paper-v1 covers the exact ordered 800-task historical subset. See
+> `publication_validation_thresholds_v3.json` and the repository README.
+
 ## Decision
 
 The July 2026 ten-online/ten-frozen campaign is preserved as an archival

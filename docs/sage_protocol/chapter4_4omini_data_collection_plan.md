@@ -1,5 +1,16 @@
 # Chapter 4 Strict Fresh-Control Evidence Collection Plan
 
+> **Superseded 2026-09-10.** This natural-selection, sequential-arm,
+> online-plus-frozen plan is retained for provenance only. The active release is
+> policy-directed; control and SAGE run concurrently; the default confirmatory
+> campaign contains ten online-build pairs; and it reports audited v9 on all
+> 10,320 task pairs plus paper-v1 on the exact 8,000 paper-comparable pairs. See
+> `publication_validation_thresholds_v3.json` and the repository README. The
+> default campaign does not assess frozen-registry H1, and generated-tool-called
+> H3 is now a selection-conditioned descriptive analysis rather than a causal
+> hypothesis decision. Do not use the superseded procedures or claims below as
+> the final study design.
+
 ## Status and Superseded Campaign
 
 This plan supersedes the control policy used by the July 2026 campaign

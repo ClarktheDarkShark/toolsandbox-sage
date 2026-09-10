@@ -27,7 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BASE_INPUT_MANIFEST = Path(
     "docs/sage_protocol/publication_input_manifest_20260901.json"
 )
-DEFAULT_MANIFEST = Path("docs/sage_protocol/publication_release_manifest_20260902.json")
+DEFAULT_MANIFEST = Path("docs/sage_protocol/publication_release_manifest_20260910.json")
 EXPECTED_REPLACEMENT_POLICY = {
     "generator_contract_and_repair_analysis_memoization": "within_run_only",
     "repository_whole_response_replay": "disabled",
@@ -44,6 +44,38 @@ EXPECTED_REPLACEMENT_POLICY = {
         "SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS": "120",
         "SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS": "600",
     },
+}
+AUDITED_OUTCOME_EVALUATOR_SOURCE_PATH = "src/sage_ts/evaluation/outcome_score.py"
+EXPECTED_AUDITED_OUTCOME_ENDPOINT = {
+    "metric_field": "outcome_similarity",
+    "task_scope": "all_benchmark_tasks",
+    "task_count": 1032,
+    "ordered_task_name_sha256": (
+        "fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176"
+    ),
+    "evaluator_version": "sage_outcome_contracts_v9",
+    "evaluator_contract_sha256": (
+        "d6a7598e708b24e40823278c228c895c387ef1a4d116e3b92173885967ad1955"
+    ),
+    "evaluator_source_sha256": (
+        "8ed1595b3eb050004ba2cc161836fb78906e58d3c0127b2c421df03400f14c63"
+    ),
+    "release_gate_role": "same_run_relative_outcome_lift",
+}
+EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT = {
+    "metric_field": "online_feedback_outcome_similarity",
+    "task_scope": "non_null_metric_rows_in_full_benchmark_order",
+    "subset_derivation": "sage_paper_outcome_contracts_v1_static_applicability",
+    "task_count": 800,
+    "ordered_task_name_sha256": (
+        "e296668682aca636c6812d5d730d52610b97eab65129357cb297d14f4391af8c"
+    ),
+    "evaluator_version": "sage_paper_outcome_contracts_v1",
+    "evaluator_source_path": "src/sage_ts/evaluation/online_feedback_score.py",
+    "evaluator_source_sha256": (
+        "ae2bf3c52d48e05c3951c871006a9931288d556021f1e2d7876c50564c3c6381"
+    ),
+    "release_gate_role": "historical_floor_and_mean_comparison",
 }
 _HEX_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _HEX_GIT_OBJECT = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
@@ -608,7 +640,7 @@ def _verify_policy_amendment(
     }
 
 
-def _verify_active_validation_thresholds(
+def _verify_active_validation_thresholds_v2(
     repo_root: Path,
     declaration: dict[str, Any],
     *,
@@ -721,6 +753,214 @@ def _verify_active_validation_thresholds(
     }
 
 
+def _verify_active_validation_thresholds_v3(
+    repo_root: Path,
+    declaration: dict[str, Any],
+    *,
+    benchmark: dict[str, Any],
+    fixture: dict[str, Any],
+    analysis: dict[str, dict[str, Any]],
+    superseded: dict[str, Any],
+) -> dict[str, Any]:
+    """Verify the dual-endpoint amendment without modifying frozen v2 bytes."""
+    verified = _verify_thresholds(
+        repo_root,
+        declaration,
+        benchmark=benchmark,
+        fixture=fixture,
+        analysis=analysis,
+    )
+    path = repo_root / verified["path"]
+    payload = _read_object(path, "active publication validation thresholds")
+    if payload.get("schema_version") != 3:
+        raise InputVerificationError(
+            "Active publication validation thresholds schema version is not 3"
+        )
+    if payload.get("performance_endpoint_policy") != "dual_scoped_outcome_endpoints":
+        raise InputVerificationError(
+            "Active publication validation does not declare dual scoped endpoints"
+        )
+    if (
+        payload.get("canonical_metric_policy")
+        != "descriptive_only_never_a_release_gate"
+    ):
+        raise InputVerificationError(
+            "Active publication validation does not make canonical report-only"
+        )
+
+    supersedes = _object(payload, "supersedes", "active validation thresholds")
+    if supersedes.get("path") != superseded["path"] or supersedes.get(
+        "sha256"
+    ) != superseded.get("sha256"):
+        raise InputVerificationError(
+            "Active validation thresholds do not identify frozen schema v2"
+        )
+    superseded_payload = _read_object(
+        repo_root / superseded["path"],
+        "superseded publication validation thresholds",
+    )
+    if superseded_payload.get("schema_version") != 2:
+        raise InputVerificationError("Superseded validation thresholds are not v2")
+    superseded_historical = _object(
+        superseded_payload,
+        "historical_reference",
+        "superseded validation thresholds",
+    )
+
+    active_benchmark = _object(payload, "benchmark", "active thresholds")
+    if active_benchmark.get("path") != benchmark["path"]:
+        raise InputVerificationError(
+            "Active validation thresholds disagree with the benchmark path"
+        )
+
+    endpoints = _object(payload, "performance_endpoints", "active thresholds")
+    expected_endpoints = {
+        "audited_current_all_tasks": EXPECTED_AUDITED_OUTCOME_ENDPOINT,
+        "paper_comparable_historical_subset": (
+            EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT
+        ),
+    }
+    if set(endpoints) != set(expected_endpoints):
+        raise InputVerificationError("Active performance endpoint names are not exact")
+    for endpoint_name, expected in expected_endpoints.items():
+        observed = _object(endpoints, endpoint_name, "performance_endpoints")
+        if set(observed) != set(expected) or any(
+            type(observed[field]) is not type(value) or observed[field] != value
+            for field, value in expected.items()
+        ):
+            raise InputVerificationError(
+                f"Active {endpoint_name} declaration is not exact"
+            )
+    audited_source_path, audited_source_relative = _tracked_file(
+        repo_root,
+        AUDITED_OUTCOME_EVALUATOR_SOURCE_PATH,
+        "audited outcome evaluator source",
+    )
+    if audited_source_relative != AUDITED_OUTCOME_EVALUATOR_SOURCE_PATH:
+        raise InputVerificationError(
+            "Audited outcome evaluator source path is not canonical"
+        )
+    _assert_hash(
+        audited_source_path,
+        str(EXPECTED_AUDITED_OUTCOME_ENDPOINT["evaluator_source_sha256"]),
+        "audited outcome evaluator source",
+    )
+    paper_source_path, paper_source_relative = _tracked_file(
+        repo_root,
+        str(EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT["evaluator_source_path"]),
+        "paper-comparable evaluator source",
+    )
+    if paper_source_relative != EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT.get(
+        "evaluator_source_path"
+    ):
+        raise InputVerificationError(
+            "Paper-comparable evaluator source path is not canonical"
+        )
+    _assert_hash(
+        paper_source_path,
+        str(EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT["evaluator_source_sha256"]),
+        "paper-comparable evaluator source",
+    )
+    if EXPECTED_AUDITED_OUTCOME_ENDPOINT["task_count"] != benchmark["task_count"]:
+        raise InputVerificationError(
+            "Audited endpoint task count disagrees with the benchmark"
+        )
+    if (
+        EXPECTED_AUDITED_OUTCOME_ENDPOINT["ordered_task_name_sha256"]
+        != benchmark["ordered_task_names_sha256"]
+    ):
+        raise InputVerificationError(
+            "Audited endpoint ordered task names disagree with the benchmark"
+        )
+    if (
+        superseded_payload.get("benchmark", {}).get("outcome_scored_task_count")
+        != EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT["task_count"]
+    ):
+        raise InputVerificationError(
+            "Paper-comparable endpoint count changed from frozen schema v2"
+        )
+
+    historical = _object(payload, "historical_reference", "active thresholds")
+    historical_field_map = {
+        "paper_comparable_candidate_outcome_minimum": "candidate_outcome_minimum",
+        "paper_comparable_candidate_outcome_mean": "candidate_outcome_mean",
+        "paper_comparable_hybrid_control_outcome_mean": ("hybrid_control_outcome_mean"),
+        "paper_comparable_pure_original_v140_control_outcome_mean": (
+            "pure_original_v140_control_outcome_mean"
+        ),
+    }
+    for active_field, superseded_field in historical_field_map.items():
+        if historical.get(active_field) != superseded_historical.get(superseded_field):
+            raise InputVerificationError(
+                f"Active historical paper-comparable reference changed: {active_field}"
+            )
+
+    no_regression = _object(
+        payload,
+        "required_no_regression",
+        "active validation thresholds",
+    )
+    expected_no_regression = {
+        "paper_comparable_candidate_outcome_minimum": (
+            superseded_historical.get("candidate_outcome_minimum")
+        ),
+        "audited_current_minimum_relative_outcome_lift_percent_over_same_run_control": (  # noqa: E501
+            10.0
+        ),
+        "minimum_accepted_tool_count": 1,
+        "minimum_tool_reuse_event_count": 1,
+        "minimum_generated_tool_called_scenario_count": 1,
+    }
+    if set(no_regression) != set(expected_no_regression) or any(
+        type(no_regression[field]) is not type(expected)
+        or no_regression[field] != expected
+        for field, expected in expected_no_regression.items()
+    ):
+        raise InputVerificationError(
+            "Active dual-endpoint no-regression policy is not exact"
+        )
+
+    expected_integrity = {
+        "complete_control_and_candidate_arms": True,
+        "identical_ordered_task_sequence": True,
+        "runtime_exception_count_per_arm": 0,
+        "control_cache_mode": "off",
+        "cached_control_task_count": 0,
+        "repository_whole_response_replay_call_count_per_arm": 0,
+        "persistent_generation_output_replay_enabled": False,
+        "sage_task_cache_enabled": False,
+        "online_reflection_control_source": "same_run_fresh",
+        "parallel_arms": True,
+        "resume_allowed": False,
+        "diagnostic_force_calls_allowed": False,
+        "validated_external_fixture_mode": "read_only",
+        "validated_external_fixture_sha256": fixture["sha256"],
+    }
+    integrity = _object(payload, "required_integrity", "active thresholds")
+    if set(integrity) != set(expected_integrity) or any(
+        type(integrity[field]) is not type(expected) or integrity[field] != expected
+        for field, expected in expected_integrity.items()
+    ):
+        raise InputVerificationError(
+            "Active dual-endpoint validation integrity policy is not exact"
+        )
+
+    report_only = _object(payload, "report_only", "active thresholds")
+    if report_only.get(
+        "paper_comparable_candidate_outcome_historical_mean"
+    ) != superseded_historical.get("candidate_outcome_mean"):
+        raise InputVerificationError(
+            "Active report-only paper outcome mean changed from the frozen reference"
+        )
+    return {
+        **verified,
+        "performance_endpoint_policy": "dual_scoped_outcome_endpoints",
+        "canonical_metric_policy": "descriptive_only_never_a_release_gate",
+        "audited_current_endpoint": EXPECTED_AUDITED_OUTCOME_ENDPOINT,
+        "paper_comparable_endpoint": EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT,
+    }
+
+
 def verify_inputs(
     repo_root: Path = REPO_ROOT,
     manifest_path: Path = DEFAULT_MANIFEST,
@@ -742,7 +982,8 @@ def verify_inputs(
     selected_payload = _read_object(selected, "publication input manifest")
     if selected_payload.get("manifest_type") != "publication_release_input_chain":
         return _verify_base_inputs(root, selected)
-    if selected_payload.get("schema_version") != 1:
+    release_schema_version = selected_payload.get("schema_version")
+    if release_schema_version not in {1, 2}:
         raise InputVerificationError("Unsupported publication release manifest schema")
 
     base_declaration = _object(
@@ -775,9 +1016,38 @@ def verify_inputs(
         "sha256": _sha256(selected),
     }
     result["checkpoint_policy_amendment"] = amendment
-    superseded_thresholds = result["validation_thresholds"]
-    result["superseded_validation_thresholds"] = superseded_thresholds
-    result["validation_thresholds"] = _verify_active_validation_thresholds(
+    base_thresholds = result["validation_thresholds"]
+    if release_schema_version == 1:
+        result["superseded_validation_thresholds"] = base_thresholds
+        result["validation_thresholds"] = _verify_active_validation_thresholds_v2(
+            root,
+            _object(
+                selected_payload,
+                "active_validation_thresholds",
+                "publication release manifest",
+            ),
+            benchmark=result["benchmark"],
+            fixture=result["rapidapi_fixture"],
+            analysis=result["historical_analysis_inputs"],
+            superseded=base_thresholds,
+        )
+        return result
+
+    frozen_v2 = _verify_active_validation_thresholds_v2(
+        root,
+        _object(
+            selected_payload,
+            "superseded_validation_thresholds",
+            "publication release manifest",
+        ),
+        benchmark=result["benchmark"],
+        fixture=result["rapidapi_fixture"],
+        analysis=result["historical_analysis_inputs"],
+        superseded=base_thresholds,
+    )
+    result["base_validation_thresholds"] = base_thresholds
+    result["superseded_validation_thresholds"] = frozen_v2
+    result["validation_thresholds"] = _verify_active_validation_thresholds_v3(
         root,
         _object(
             selected_payload,
@@ -787,7 +1057,7 @@ def verify_inputs(
         benchmark=result["benchmark"],
         fixture=result["rapidapi_fixture"],
         analysis=result["historical_analysis_inputs"],
-        superseded=superseded_thresholds,
+        superseded=frozen_v2,
     )
     return result
 

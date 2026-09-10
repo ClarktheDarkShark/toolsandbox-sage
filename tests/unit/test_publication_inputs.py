@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+import scripts.verify_publication_inputs as publication_inputs
 from scripts.verify_publication_inputs import (
     EXPECTED_REPLACEMENT_POLICY,
     InputVerificationError,
@@ -223,6 +224,10 @@ def _wrap_public_repo(repo: Path, base_manifest_path: Path) -> Path:
         active_thresholds_path,
         {
             **base_thresholds,
+            "benchmark": {
+                **base_thresholds["benchmark"],
+                "outcome_scored_task_count": 2,
+            },
             "schema_version": 2,
             "performance_endpoint": "outcome_task_completion_similarity",
             "canonical_metric_policy": "descriptive_only_never_a_release_gate",
@@ -287,6 +292,115 @@ def _wrap_public_repo(repo: Path, base_manifest_path: Path) -> Path:
     return wrapper_path
 
 
+def _wrap_public_repo_v3(repo: Path, release_v2_path: Path) -> Path:
+    release_v2 = _read_json(release_v2_path)
+    v2_declaration = release_v2["active_validation_thresholds"]
+    v2_path = repo / v2_declaration["path"]
+    v2 = _read_json(v2_path)
+    benchmark = v2["benchmark"]
+    order_hash = benchmark["ordered_task_name_sha256"]
+    paper_evaluator_path = repo / "paper_evaluator.py"
+    paper_evaluator_path.write_text("PAPER_EVALUATOR_VERSION = 'test_v1'\n")
+    audited_evaluator_path = (
+        repo / publication_inputs.AUDITED_OUTCOME_EVALUATOR_SOURCE_PATH
+    )
+    audited_evaluator_path.parent.mkdir(parents=True, exist_ok=True)
+    audited_evaluator_path.write_text("OUTCOME_EVALUATOR_VERSION = 'test_v9'\n")
+    audited_endpoint = {
+        "metric_field": "outcome_similarity",
+        "task_scope": "all_benchmark_tasks",
+        "task_count": 2,
+        "ordered_task_name_sha256": order_hash,
+        "evaluator_version": "test_outcome_v8",
+        "evaluator_contract_sha256": "a" * 64,
+        "evaluator_source_sha256": _sha256(audited_evaluator_path),
+        "release_gate_role": "same_run_relative_outcome_lift",
+    }
+    paper_endpoint = {
+        "metric_field": "online_feedback_outcome_similarity",
+        "task_scope": "non_null_metric_rows_in_full_benchmark_order",
+        "subset_derivation": "sage_paper_outcome_contracts_v1_static_applicability",
+        "task_count": 2,
+        "ordered_task_name_sha256": order_hash,
+        "evaluator_version": "test_paper_v1",
+        "evaluator_source_path": "paper_evaluator.py",
+        "evaluator_source_sha256": _sha256(paper_evaluator_path),
+        "release_gate_role": "historical_floor_and_mean_comparison",
+    }
+    v3_path = repo / "active_thresholds_v3.json"
+    _write_json(
+        v3_path,
+        {
+            "schema_version": 3,
+            "performance_endpoint_policy": "dual_scoped_outcome_endpoints",
+            "canonical_metric_policy": "descriptive_only_never_a_release_gate",
+            "supersedes": {
+                "path": v2_declaration["path"],
+                "sha256": _sha256(v2_path),
+            },
+            "benchmark": {
+                **benchmark,
+                "path": "benchmark.json",
+            },
+            "performance_endpoints": {
+                "audited_current_all_tasks": audited_endpoint,
+                "paper_comparable_historical_subset": paper_endpoint,
+            },
+            "historical_reference": {
+                **{
+                    key: value
+                    for key, value in v2["historical_reference"].items()
+                    if key
+                    not in {
+                        "candidate_outcome_mean",
+                        "candidate_outcome_minimum",
+                        "hybrid_control_outcome_mean",
+                        "pure_original_v140_control_outcome_mean",
+                    }
+                },
+                "paper_comparable_candidate_outcome_mean": 0.75,
+                "paper_comparable_candidate_outcome_minimum": 0.7,
+                "paper_comparable_hybrid_control_outcome_mean": None,
+                "paper_comparable_pure_original_v140_control_outcome_mean": None,
+            },
+            "required_integrity": {
+                **v2["required_integrity"],
+                "parallel_arms": True,
+            },
+            "required_no_regression": {
+                "paper_comparable_candidate_outcome_minimum": 0.7,
+                "audited_current_minimum_relative_outcome_lift_percent_over_same_run_control": (  # noqa: E501
+                    10.0
+                ),
+                "minimum_accepted_tool_count": 1,
+                "minimum_tool_reuse_event_count": 1,
+                "minimum_generated_tool_called_scenario_count": 1,
+            },
+            "report_only": {
+                "paper_comparable_candidate_outcome_historical_mean": 0.75,
+            },
+        },
+    )
+    release_v3_path = repo / "publication_release_v3.json"
+    _write_json(
+        release_v3_path,
+        {
+            "schema_version": 2,
+            "manifest_type": "publication_release_input_chain",
+            "base_input_manifest": release_v2["base_input_manifest"],
+            "checkpoint_policy_amendment": release_v2["checkpoint_policy_amendment"],
+            "superseded_validation_thresholds": v2_declaration,
+            "active_validation_thresholds": {
+                "path": v3_path.relative_to(repo).as_posix(),
+                "sha256": _sha256(v3_path),
+            },
+        },
+    )
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "dual endpoint release chain")
+    return release_v3_path
+
+
 def test_compact_verifier_accepts_tracked_inputs_without_local_bundle(
     tmp_path: Path,
 ) -> None:
@@ -319,6 +433,104 @@ def test_release_verifier_hashes_base_inputs_and_policy_amendment(
         "outcome_task_completion_similarity"
     )
     assert result["superseded_validation_thresholds"]["path"] == "thresholds.json"
+
+
+def test_release_verifier_accepts_content_addressed_dual_endpoint_amendment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, base_manifest_path = _build_public_repo(tmp_path)
+    release_v2_path = _wrap_public_repo(repo, base_manifest_path)
+    release_v3_path = _wrap_public_repo_v3(repo, release_v2_path)
+    active_v3 = _read_json(repo / "active_thresholds_v3.json")
+    monkeypatch.setattr(
+        publication_inputs,
+        "EXPECTED_AUDITED_OUTCOME_ENDPOINT",
+        active_v3["performance_endpoints"]["audited_current_all_tasks"],
+    )
+    monkeypatch.setattr(
+        publication_inputs,
+        "EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT",
+        active_v3["performance_endpoints"]["paper_comparable_historical_subset"],
+    )
+
+    result = verify_inputs(repo, release_v3_path)
+
+    assert result["base_validation_thresholds"]["path"] == "thresholds.json"
+    assert result["superseded_validation_thresholds"]["path"] == (
+        "active_thresholds.json"
+    )
+    assert result["validation_thresholds"]["performance_endpoint_policy"] == (
+        "dual_scoped_outcome_endpoints"
+    )
+    assert (
+        result["validation_thresholds"]["paper_comparable_endpoint"]["task_count"] == 2
+    )
+
+
+def test_dual_endpoint_release_requires_parallel_arms_true(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, base_manifest_path = _build_public_repo(tmp_path)
+    release_v2_path = _wrap_public_repo(repo, base_manifest_path)
+    release_v3_path = _wrap_public_repo_v3(repo, release_v2_path)
+    release_v3 = _read_json(release_v3_path)
+    v3_path = repo / release_v3["active_validation_thresholds"]["path"]
+    active_v3 = _read_json(v3_path)
+    monkeypatch.setattr(
+        publication_inputs,
+        "EXPECTED_AUDITED_OUTCOME_ENDPOINT",
+        active_v3["performance_endpoints"]["audited_current_all_tasks"],
+    )
+    monkeypatch.setattr(
+        publication_inputs,
+        "EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT",
+        active_v3["performance_endpoints"]["paper_comparable_historical_subset"],
+    )
+    active_v3["required_integrity"]["parallel_arms"] = False
+    _write_json(v3_path, active_v3)
+    release_v3["active_validation_thresholds"]["sha256"] = _sha256(v3_path)
+    _write_json(release_v3_path, release_v3)
+
+    with pytest.raises(
+        InputVerificationError,
+        match="dual-endpoint validation integrity policy is not exact",
+    ):
+        verify_inputs(repo, release_v3_path)
+
+
+def test_dual_endpoint_release_rejects_changed_audited_evaluator_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, base_manifest_path = _build_public_repo(tmp_path)
+    release_v2_path = _wrap_public_repo(repo, base_manifest_path)
+    release_v3_path = _wrap_public_repo_v3(repo, release_v2_path)
+    active_v3 = _read_json(repo / "active_thresholds_v3.json")
+    monkeypatch.setattr(
+        publication_inputs,
+        "EXPECTED_AUDITED_OUTCOME_ENDPOINT",
+        active_v3["performance_endpoints"]["audited_current_all_tasks"],
+    )
+    monkeypatch.setattr(
+        publication_inputs,
+        "EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT",
+        active_v3["performance_endpoints"]["paper_comparable_historical_subset"],
+    )
+    audited_evaluator_path = (
+        repo / publication_inputs.AUDITED_OUTCOME_EVALUATOR_SOURCE_PATH
+    )
+    audited_evaluator_path.write_text(
+        "OUTCOME_EVALUATOR_VERSION = 'silently_changed'\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        InputVerificationError,
+        match="audited outcome evaluator source hash mismatch",
+    ):
+        verify_inputs(repo, release_v3_path)
 
 
 def test_release_verifier_rejects_rehashed_policy_drift(tmp_path: Path) -> None:

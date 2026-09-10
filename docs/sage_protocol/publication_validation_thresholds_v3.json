@@ -1,0 +1,80 @@
+{
+  "schema_version": 3,
+  "purpose": "Predeclared integrity and outcome-only no-regression gates for the final publication validation sample. This amendment separates the complete 1,032-task audited v9 endpoint from the exact 800-task paper-comparable historical endpoint; passing remains necessary for release readiness but does not replace the pending 10-pair confirmatory campaign.",
+  "performance_endpoint_policy": "dual_scoped_outcome_endpoints",
+  "canonical_metric_policy": "descriptive_only_never_a_release_gate",
+  "supersedes": {
+    "path": "docs/sage_protocol/publication_validation_thresholds_v2.json",
+    "sha256": "911594684433c4ff748e02d099977a318d3a23c70ed33e70ae2826e5a1e94f15",
+    "reason": "Schema v2 accidentally compared the 1,032-task audited v8 aggregate with historical results from the different 800-task paper evaluator subset and therefore produced a false sample-gate failure. The frozen thresholds and historical values are unchanged; only their endpoint scopes are made explicit."
+  },
+  "benchmark": {
+    "path": "docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json",
+    "task_count": 1032,
+    "manifest_sha256": "21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec",
+    "ordered_task_name_sha256": "fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176"
+  },
+  "performance_endpoints": {
+    "audited_current_all_tasks": {
+      "metric_field": "outcome_similarity",
+      "task_scope": "all_benchmark_tasks",
+      "task_count": 1032,
+      "ordered_task_name_sha256": "fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176",
+      "evaluator_version": "sage_outcome_contracts_v9",
+      "evaluator_contract_sha256": "d6a7598e708b24e40823278c228c895c387ef1a4d116e3b92173885967ad1955",
+      "evaluator_source_sha256": "8ed1595b3eb050004ba2cc161836fb78906e58d3c0127b2c421df03400f14c63",
+      "release_gate_role": "same_run_relative_outcome_lift"
+    },
+    "paper_comparable_historical_subset": {
+      "metric_field": "online_feedback_outcome_similarity",
+      "task_scope": "non_null_metric_rows_in_full_benchmark_order",
+      "subset_derivation": "sage_paper_outcome_contracts_v1_static_applicability",
+      "task_count": 800,
+      "ordered_task_name_sha256": "e296668682aca636c6812d5d730d52610b97eab65129357cb297d14f4391af8c",
+      "evaluator_version": "sage_paper_outcome_contracts_v1",
+      "evaluator_source_path": "src/sage_ts/evaluation/online_feedback_score.py",
+      "evaluator_source_sha256": "ae2bf3c52d48e05c3951c871006a9931288d556021f1e2d7876c50564c3c6381",
+      "release_gate_role": "historical_floor_and_mean_comparison"
+    }
+  },
+  "historical_reference": {
+    "status": "provenance-invalid_for_final_inference_but_retained_as_a_prespecified_outcome_no-regression_reference",
+    "campaign_manifest": "artifacts/publication_cleanup_20260901/analysis/campaign_manifest.json",
+    "campaign_manifest_sha256": "6ec114f15fd5d53283ce9afad12bcf0523217b07325183762d61666e860dd532",
+    "evidence_data": "artifacts/publication_cleanup_20260901/analysis/chapter4_evidence_data.json",
+    "evidence_data_sha256": "590522b8413dd20a67e2db08037cf4339928571292960b0a402e495cfff1d42b",
+    "online_run_count": 10,
+    "paper_comparable_candidate_outcome_mean": 0.7954070629777463,
+    "paper_comparable_candidate_outcome_minimum": 0.776051529737963,
+    "paper_comparable_hybrid_control_outcome_mean": 0.4573418739172569,
+    "paper_comparable_pure_original_v140_control_outcome_mean": 0.4528026204750015
+  },
+  "required_integrity": {
+    "complete_control_and_candidate_arms": true,
+    "identical_ordered_task_sequence": true,
+    "runtime_exception_count_per_arm": 0,
+    "control_cache_mode": "off",
+    "cached_control_task_count": 0,
+    "repository_whole_response_replay_call_count_per_arm": 0,
+    "persistent_generation_output_replay_enabled": false,
+    "sage_task_cache_enabled": false,
+    "online_reflection_control_source": "same_run_fresh",
+    "parallel_arms": true,
+    "resume_allowed": false,
+    "diagnostic_force_calls_allowed": false,
+    "validated_external_fixture_mode": "read_only",
+    "validated_external_fixture_sha256": "eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
+  },
+  "required_no_regression": {
+    "paper_comparable_candidate_outcome_minimum": 0.776051529737963,
+    "audited_current_minimum_relative_outcome_lift_percent_over_same_run_control": 10.0,
+    "minimum_accepted_tool_count": 1,
+    "minimum_tool_reuse_event_count": 1,
+    "minimum_generated_tool_called_scenario_count": 1
+  },
+  "report_only": {
+    "paper_comparable_candidate_outcome_historical_mean": 0.7954070629777463,
+    "canonical_metric": "Raw canonical/reference similarity may be retained for audit compatibility but is not compared with a floor, included in failed_gates, or used to authorize a rerun.",
+    "rationale": "The exact 800-task sage_paper_outcome_contracts_v1 subset is gated against the lower envelope of the prior 10 online paper-comparable outcome values. The complete 1,032-task sage_outcome_contracts_v9 endpoint supplies the same-run control lift gate. Historical-mean distance and canonical/reference similarity are report-only. Final paper inference requires the new 10-pair campaign."
+  }
+}

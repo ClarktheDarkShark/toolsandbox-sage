@@ -32,7 +32,7 @@ from tool_sandbox.common.execution_context import (
 )
 from tool_sandbox.common.scenario import Scenario
 
-OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v8"
+OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v9"
 
 # These are the seven perturbations present for every base task in the frozen
 # 1,032-scenario publication benchmark. A contract applies only to one of these
@@ -2820,6 +2820,34 @@ _MESSAGE_CONTENT_DIRECT_LIMITATION_RE = re.compile(
     r"(?:messages?|texts?|records?)\b",
     re.IGNORECASE,
 )
+_EXPLICIT_SAME_SLOT_CORRECTION_RE = re.compile(
+    r"\b(?:that|this|it)(?:'s|\s+(?:is|was))\s+not\s+"
+    r"(?:it|right|correct|the\s+(?:(?:right|correct)\s+)?"
+    r"(?:message|text|answer|result|one)|"
+    r"what\s+i\s+(?:asked|wanted|meant|was\s+looking\s+for))\b|"
+    r"\b(?:that|this|it)\s+(?:isn't|wasn't)\s+"
+    r"(?:it|right|correct|the\s+(?:(?:right|correct)\s+)?"
+    r"(?:message|text|answer|result|one))\b|"
+    r"\b(?:(?:that|this|the)\s+(?:message|text|answer|result|one)|"
+    r"that|this|it)\s*"
+    r"(?:is|was|'s)\s+(?:wrong|incorrect)\b|"
+    r"\bnot\s+(?:the\s+)?(?:right|correct)\s+"
+    r"(?:message|text|answer|result|one)\b|"
+    r"\b(?:no[,;:]?\s+)?not\s+that\s+(?:message|text|answer|result|one)\b|"
+    r"\b(?:does(?:n't|\s+not)|did(?:n't|\s+not))\s+match\b|"
+    r"\bnot\s+what\s+i\s+"
+    r"(?:asked|wanted|meant|was\s+looking\s+for)\b|"
+    r"\b(?:try|check|look|search|find|retrieve)\s+(?:it\s+)?"
+    r"(?:again|one\s+more\s+time|once\s+more)\b|"
+    r"\b(?:retry|recheck|double[- ]check|keep\s+(?:checking|looking|searching))\b",
+    re.IGNORECASE,
+)
+
+
+def _requests_same_slot_correction(user_context: str) -> bool:
+    """Return whether the user explicitly rejects or retries the prior outcome."""
+    normalized = user_context.replace("’", "'")
+    return bool(_EXPLICIT_SAME_SLOT_CORRECTION_RE.search(normalized))
 
 
 def _scenario_matches_base(scenario_name: str, base_name: str) -> bool:
@@ -2919,6 +2947,7 @@ def _message_search_zero_score_is_same_slot(
     user_context: str,
 ) -> bool:
     user_normalized = _normalized_phrase_text(user_context)
+    requests_same_slot_correction = _requests_same_slot_correction(user_context)
     privacy_goal = bool(_PRIVACY_OR_VISIBILITY_GOAL_RE.search(user_context))
     disclaims_content = bool(
         re.search(
@@ -2945,8 +2974,14 @@ def _message_search_zero_score_is_same_slot(
         re.I,
     ):
         return False
-    if re.search(
-        r"\banother\s+(?:recent|latest|oldest|message|text)\b", user_context, re.I
+    if (
+        re.search(
+            r"\b(?:another|different)\s+"
+            r"(?:(?:recent|latest|oldest)\s+)?(?:message|text|answer|result|one)\b",
+            user_context,
+            re.IGNORECASE,
+        )
+        and not requests_same_slot_correction
     ):
         return False
     asks_latest = any(
@@ -2973,15 +3008,7 @@ def _message_search_zero_score_is_same_slot(
         # answer even when it reports the wrong selector.  A spontaneous
         # opposite-recency statement after confirmation/privacy is a distinct
         # proposition and therefore OTHER.
-        return bool(
-            re.search(
-                r"\b(?:not\s+(?:right|correct|the\s+(?:message|one)|what\s+i\s+asked)|"
-                r"wrong|try\s+again|look\s+again|check(?:ing)?\s+(?:it\s+)?again|"
-                r"check\s+(?:once|one)\s+more|double[- ]check|recheck)\b",
-                user_context,
-                re.IGNORECASE,
-            )
-        )
+        return requests_same_slot_correction
 
     if re.search(
         r"\b(?:remains? the same|has not changed|not changed)\b", content, re.I
@@ -3395,6 +3422,11 @@ def _score_answer_templates(
 
     earlier_conflicts: list[int] = []
     if selected is not None:
+        ignored_non_outcome_indices = [
+            index
+            for index in ignored_non_outcome_indices
+            if index > selected.sandbox_message_index
+        ]
         earlier_conflicts = [
             earlier.sandbox_message_index
             for earlier, earlier_score in operative_messages

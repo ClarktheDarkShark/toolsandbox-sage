@@ -1,5 +1,12 @@
 # Methodology
 
+> **Archived natural-selection draft.** This document does not describe the
+> restored publication runtime. The production intervention is policy-directed:
+> its deterministic selector cascade, schema filtering, and named
+> `tool_choice` requests are part of the disclosed treatment. Do not use the
+> natural-selection or forced-call-exclusion claims below in the paper without
+> rewriting them to match the production release.
+
 This chapter describes the methodology used to evaluate SAGE, a self-evolving AI agent system that adapts through autonomous tool generation rather than model-weight training. SAGE identifies recurring capability gaps during task execution, synthesizes deterministic tools for those gaps, validates and repairs the tools before use, stores accepted tools in a registry, routes relevant tools into later tasks, and measures whether natural tool use improves task outcomes.
 
 The methodological claim is narrower than open-ended agent learning: SAGE evolves at the system level through tool creation, validation, registry retention, routing, and reuse. It does not update the underlying LLM parameters.

@@ -1,8 +1,11 @@
 """Online reflection and lifecycle policy for self-evolving SAGE runs.
 
-Publication runs compare against exact same-run live control rows. The legacy
-cache comparator remains available only to non-publication callers. Neither
-path reads labels, expected answers, or prior SAGE traces.
+Publication runs compare post-task evaluator-derived scalars with exact
+same-run live control rows. The legacy cache comparator remains available only
+to non-publication callers. This controller does not receive raw expected
+answers, target state, or evaluator traces, but its outcome signals are computed
+upstream from benchmark contracts; it is therefore reward-feedback-driven, not
+globally label-free.
 """
 
 from __future__ import annotations

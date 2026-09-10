@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -353,6 +354,9 @@ def _fresh_run(tmp_path: Path) -> Path:
             "llm_usage_available_count": 1,
         },
     ]
+    for row in (*control_rows, *candidate_rows):
+        row["traceback"] = None
+        row["exception_type"] = None
     _write_json(
         control_dir / "result_summary.json",
         {"per_scenario_results": control_rows},
@@ -458,9 +462,17 @@ def _fresh_run(tmp_path: Path) -> Path:
             "opened_monotonic_ns": 100,
         },
     )
+    registry_dir = tmp_path / "artifacts" / "native_action_registry"
+    registry_manifest = registry_dir / "registry_manifest.json"
+    _write_json(registry_manifest, {"schema_version": 1, "tools": {}})
+    registry_manifest_sha256 = hashlib.sha256(
+        registry_manifest.read_bytes()
+    ).hexdigest()
     _write_json(
         run_root / "protocol_manifest.json",
         {
+            "protocol_gate_passed": True,
+            "protocol_gate_reasons": [],
             "agent": publication_verifier.PUBLICATION_MODEL,
             "user": publication_verifier.PUBLICATION_MODEL,
             "generation_model": publication_verifier.PUBLICATION_MODEL,
@@ -473,6 +485,8 @@ def _fresh_run(tmp_path: Path) -> Path:
             "scenario_order_sha256": hashlib.sha256(b"task_a\ntask_b\n").hexdigest(),
             "control_dir": str(control_dir),
             "candidate_dir": str(candidate_dir),
+            "registry_dir": str(registry_dir),
+            "registry_manifest_digest_after_run": registry_manifest_sha256,
             "fresh_control_required": True,
             "publication_performance_endpoint": "outcome_task_completion_similarity",
             "actor_selection_mode": "policy",
@@ -572,6 +586,9 @@ def _fresh_run(tmp_path: Path) -> Path:
     _write_json(
         run_root / "paired_comparison.json",
         {
+            "protocol_gate_passed": True,
+            "protocol_gate_reasons": [],
+            "runtime_exception_count": 0,
             "scenario_count": 2,
             "outcome_scenario_count": 1,
             "control_mean_outcome_similarity": 0.5,
@@ -580,6 +597,18 @@ def _fresh_run(tmp_path: Path) -> Path:
             "outcome_gain_count": 1,
             "outcome_regression_count": 0,
             "outcome_preserved_count": 0,
+            "control": {
+                "run_status": "complete",
+                "scenario_count": 2,
+                "planned_scenario_count": 2,
+                "exception_count": 0,
+            },
+            "candidate": {
+                "run_status": "complete",
+                "scenario_count": 2,
+                "planned_scenario_count": 2,
+                "exception_count": 0,
+            },
             "deltas": [],
         },
     )
@@ -638,6 +667,112 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
     assert result["platform_machine"] == "arm64"
     assert result["external_distribution_count"] == 108
     assert len(result["external_distribution_sha256"]) == 64
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("protocol_gate_passed", False, "protocol_gate_passed"),
+        (
+            "protocol_gate_reasons",
+            ["runtime_exceptions_present"],
+            "protocol_gate_reasons",
+        ),
+    ],
+)
+def test_verifier_rejects_failed_protocol_manifest_gate(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    protocol[field] = value
+    _write_json(protocol_path, protocol)
+
+    with pytest.raises(ValueError, match=message):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_paired_runtime_exception_gate(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    comparison_path = run_root / "paired_comparison.json"
+    comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+    comparison["protocol_gate_passed"] = False
+    comparison["protocol_gate_reasons"] = ["runtime_exceptions_present"]
+    comparison["runtime_exception_count"] = 1
+    comparison["control"]["exception_count"] = 1
+    _write_json(comparison_path, comparison)
+
+    with pytest.raises(ValueError, match="protocol gate did not pass"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_runtime_exception_result_row(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol["control_dir"]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["per_scenario_results"][0]["exception_type"] = "AssertionError"
+    summary["per_scenario_results"][0]["traceback"] = "Traceback ..."
+    _write_json(summary_path, summary)
+
+    with pytest.raises(ValueError, match="contains a runtime exception"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_missing_final_online_registry(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    (Path(protocol["registry_dir"]) / "registry_manifest.json").unlink()
+
+    with pytest.raises(ValueError, match="missing its final registry manifest"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_final_online_registry_digest_drift(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    _write_json(
+        Path(protocol["registry_dir"]) / "registry_manifest.json",
+        {"schema_version": 1, "tools": {"tampered": {}}},
+    )
+
+    with pytest.raises(ValueError, match="does not match the protocol digest"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
 
 
 @pytest.mark.parametrize(
@@ -1555,6 +1690,10 @@ def test_campaign_job_removes_every_baseline_cache_env(
         *protocol_runner.DIAGNOSTIC_FORCE_ENV_VARS,
     ):
         monkeypatch.setenv(name, "should-not-survive")
+    publication_python = tmp_path / ".venv-publication" / "bin" / "python"
+    publication_python.parent.mkdir(parents=True)
+    publication_python.write_text("#!/bin/sh\n", encoding="utf-8")
+    publication_python.chmod(0o755)
     manifest = {
         "campaign_id": "fresh_campaign",
         "fixed_toolsandbox_timestamp": 123,
@@ -1563,6 +1702,11 @@ def test_campaign_job_removes_every_baseline_cache_env(
             "path": "fixtures/rapid.json",
             "sha256": "fixture-sha",
             "mode": "read_only",
+        },
+        "configuration_identity": {
+            "runtime_digest": "runtime-sha",
+            "generation_settings_digest": "generation-sha",
+            "prompt_policy_digest": "prompt-policy-sha",
         },
         "paths": {
             "output_root": "outputs/campaign",
@@ -1596,6 +1740,10 @@ def test_campaign_job_removes_every_baseline_cache_env(
     assert env["SAGE_BENCHMARK_MANIFEST"] == str(tmp_path / "benchmark.json")
     assert env["TOOLSANDBOX_RAPID_CACHE_MODE"] == "read_only"
     assert env["TOOLSANDBOX_RAPID_CACHE_PATH"] == str(tmp_path / "fixtures/rapid.json")
+    assert env["SAGE_TS_RUNTIME_DIGEST"] == "runtime-sha"
+    assert env["SAGE_TS_GENERATION_SETTINGS_DIGEST"] == "generation-sha"
+    assert env["SAGE_TS_PROMPT_POLICY_DIGEST"] == "prompt-policy-sha"
+    assert env["PATH"].split(os.pathsep)[0] == str(publication_python.parent)
     assert "SAGE_BATCH_NO_DASHBOARD_OPEN" not in env
     for name, expected in publication_verifier.PUBLICATION_EXECUTION_ENV.items():
         assert env[name] == expected

@@ -1,31 +1,38 @@
 # Current State
 
-Last updated: 2026-09-02.
+Last updated: 2026-09-10.
 
 ## Publication Release Status
 
-The July 2026 ten-online/ten-frozen campaign is archival development evidence,
-not final inference: its reported “v140” control was the verified hybrid cache.
-Sample 01 stopped at dependency preflight without an experiment run. Sample 02,
-the first completed strict-intent validation attempt, passed both outcome
-performance gates but is ineligible because cleanup had removed validated
-within-run generator contract-and-repair-analysis memoization and its
-launcher omitted the historical five-retry SDK setting. Both drifts are restored
-and pinned on the corrected tree. The earlier canonical gate is superseded:
-outcome/task-completion similarity is the only release performance endpoint,
-and canonical/reference similarity is descriptive only. A replacement
-1,032-task validation sample is
-required before campaign preparation. The final ten-pair campaign has not been
-started and still requires explicit researcher approval. See
-`chapter4_evidence_correction_and_rerun_readiness_20260901.md`.
+The production release is the restored **policy-directed** SAGE intervention.
+The July 2026 campaign remains archival development evidence, not final
+inference, because its reported “v140” control was a hybrid cache and its source
+tree was dirty. A later strict, fully uncached 1,032-task pair completed with
+parallel fresh control and SAGE arms and no runtime exceptions. Exact v9 replay
+of that pair gives audited all-task outcomes `0.586240 -> 0.779393`; the
+unchanged paper-v1 endpoint on the exact ordered 800-task subset gives
+`0.503964 -> 0.799612`.
+
+Canonical/reference score is descriptive only and is not a release or paper
+gate. The active validation contract uses audited v9 over all 1,032 tasks for
+current same-run lift, and paper-v1 over the same 800 tasks used historically
+for the historical floor/mean comparison. The final ten-pair campaign has not
+started. The completed live pair predates the final v9 evaluator correction, so
+its exact v9 values are an offline replay, not a clean final-tree v9 execution.
+One fresh, fully uncached 1,032-task pair from the committed final tree remains
+the last execution gate before the ten confirmatory pairs; no final campaign
+result should be inferred from the single engineering sample.
 
 ## Canonical SAGE Implementation
 
 SAGE is the native ToolSandbox self-evolving Praxis system in this repository.
-From this point forward, "SAGE" refers to the v061 evidence-line configuration:
+For the publication release, "SAGE" refers to the policy-directed production
+configuration:
 
 - runner: `scripts/run_sage_protocol.py`;
 - policy: `--sage-policy self-evolving-praxis`;
+- actor selection: deterministic policy cascade with named `tool_choice` where
+  the policy covers the step;
 - actor/user/generation model: `gpt-4o-mini`;
 - generation: on;
 - SAGE task cache: off;
@@ -33,14 +40,23 @@ From this point forward, "SAGE" refers to the v061 evidence-line configuration:
   computation is a distinct OpenAI-managed mechanism);
 - baseline/control cache: historically allowed when explicitly reported, but
   prohibited in new publication runs;
-- dashboard: Task Compare;
+- execution: fresh non-learning control and SAGE run concurrently, with the
+  matching control row streamed to SAGE at each task boundary;
+- dashboard: Task Compare, externally opened before model execution;
 - synthetic bridge completions: removed from the active runtime;
 - scenario-name birth/routing: disabled;
 - gap detection and routing use visible task text, tool schemas, and tool results;
 - generated-tool guidance: minimal;
 - generated-tool docstrings: compact;
 - runtime generated-tool bundle cap: `4`;
-- online reflection: enabled as explicit task-feedback for lifecycle decisions.
+- online reflection: enabled with post-task evaluator-derived scalar feedback;
+  paper-v1 supplies the signal on 800 tasks and audited v9 is the fallback on
+  the other 232. Raw benchmark targets are not exposed to the actor or generated
+  tools during the task.
+
+The sections below preserve dated development results for provenance. Their
+natural-selection descriptions and older evaluator numbers are not statements
+of the current production intervention or directly comparable final metrics.
 
 ## Validated Production Cleanup Checkpoint (2026-08-02 Historical)
 
@@ -57,7 +73,7 @@ pre-cleanup floors. The final 1,032-task run completed with:
 - score: `0.733488 -> 0.798621`, lift `+8.88%`;
 - outcome: `0.457342 -> 0.789970`, lift `+72.73%`;
 - accepted tools: `30`;
-- naturally called tools/scenarios: `29 / 768`;
+- policy-selected generated tools/scenarios: `29 / 768`;
 - reuse events: `1,878`;
 - runtime exceptions: `0`;
 - harmful side-effect incidents after audit: `0`.
@@ -106,10 +122,11 @@ paths remain only as historical methodology and portability context.
 - Baseline LLM tokens: `10,465,294`
 - SAGE LLM tokens: `17,245,671`
 
-The primary claim supported by v061 is outcome improvement through autonomous
-tool generation, validation/repair, registry retention, routing/reuse, natural
-tool calls, and contribution accounting. Canonical/reference score also
-improved, but the strongest result is the final-task/outcome lift.
+The primary historical claim supported by v061 concerned outcome improvement
+through autonomous tool generation, validation/repair, registry retention,
+routing/reuse, natural tool calls, and contribution accounting. That
+natural-selection configuration is not the restored policy-directed production
+intervention and is retained here only as historical evidence.
 
 ## Native-Action SAGE Status
 
@@ -126,9 +143,9 @@ The leading completed full-dataset outcome run in July was:
   `0.373165 -> 0.809496` (`+116.93%`).
 - Runtime exceptions: `0`.
 
-The run used model-authored `gpt-4o-mini` generation and repair, an empty
-starting registry, visible task text and schemas, validation, registry reuse,
-natural calls, and native actions. Bridge behavior, scenario-name birth and
+The historical run used model-authored `gpt-4o-mini` generation and repair, an
+empty starting registry, visible task text and schemas, validation, registry
+reuse, generated-tool calls, and native actions. Bridge behavior, scenario-name birth and
 routing, diagnostic force calls, persistent repository whole-response replay, SAGE task caching,
 and SAGE-only extra actor turns were disabled.
 
@@ -137,9 +154,11 @@ call-schema enums and projects generated action sequences onto native actions
 available in the current tool surface. This is a generated-tool interface
 method, not a task-name or answer-specific rule.
 
-The strongest attribution result is that called-generated-tool rows produced
-the lift. Rows with no visible generated tool were effectively tied with the
-baseline, and visible-but-not-called rows regressed.
+The strongest descriptive association is that generated-tool-called rows had
+the largest lift. Rows with no visible generated tool were effectively tied
+with the baseline, and visible-but-not-called rows regressed. Because tool-call
+status is selected after treatment, this subset does not by itself establish
+that the generated call caused the outcome; that would require an ablation.
 
 The run recorded 43 failed tool calls: 42 from
 `apply_single_device_state_action` and one from `extract_distance_result`.
@@ -191,14 +210,18 @@ Analysis-ready exports and inferential statistics are in:
 
 ## Evidence Boundary
 
-Primary SAGE evidence must not enable synthetic bridge completions,
-route-around answer policies, hidden label access, generated tools that encode
-scenario IDs or expected answers, SAGE-only extra retry turns, or scenario-name
-tool birth/routing.
+Primary SAGE evidence must not enable synthetic bridge completions, hidden label
+access, generated tools that encode scenario IDs or expected answers, SAGE-only
+extra retry turns, scenario-name tool birth/routing, or diagnostic force-call
+environment variables. The restored actor policy's deterministic selector,
+schema filtering, and named `tool_choice` are part of the disclosed treatment;
+they are not diagnostic calls and cannot be described as natural model choice.
 
 SAGE may use visible task text, visible tool schemas, visible tool outputs,
-generated-tool validation results, official task feedback/control deltas for
-online lifecycle decisions, registry metadata, and contribution/safety logs.
+generated-tool validation results, post-task evaluator-derived scalar
+feedback/control deltas for online lifecycle decisions, registry metadata, and
+contribution/safety logs. Evaluators use benchmark answer/state targets, but the
+actor and generated tools do not receive those raw targets during the task.
 
 Generated tools are deterministic Python tools. They prepare action arguments,
 normalize timestamps or units, select records from visible evidence, detect

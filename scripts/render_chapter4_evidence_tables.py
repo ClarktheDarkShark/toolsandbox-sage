@@ -10,7 +10,7 @@ from typing import Iterable, Sequence
 
 from PIL import Image, ImageDraw, ImageFont
 
-MINIMUM_SCHEMA_VERSION = 2
+MINIMUM_SCHEMA_VERSION = 3
 
 SYSTEM_FONT_CANDIDATES = {
     False: (
@@ -274,6 +274,14 @@ def _percent_interval(interval: dict[str, object]) -> str:
     return f"[{float(low):+.1f}%, {float(high):+.1f}%]"
 
 
+def _number_interval(interval: dict[str, object], *, digits: int = 4) -> str:
+    low = interval.get("lower")
+    high = interval.get("upper")
+    if low is None or high is None:
+        return "-"
+    return f"[{float(low):+.{digits}f}, {float(high):+.{digits}f}]"
+
+
 def _threshold(value: object, *, signed: bool = False) -> str:
     prefix = "+" if signed else ""
     return f">= {prefix}{float(value):g}%"
@@ -377,29 +385,280 @@ def build_tables(data: dict) -> list[dict]:
             "Regenerate it with write_evidence_dashboard()."
         )
     campaign = data["campaign"]
-    performance = data["performance"]
+    publication_gate_errors = []
+    if campaign.get("status_label") != "Complete":
+        publication_gate_errors.append("status_label is not Complete")
+    if campaign.get("manifest_status") != "complete":
+        publication_gate_errors.append("manifest_status is not complete")
+    if campaign.get("inference_complete") is not True:
+        publication_gate_errors.append("inference_complete is not true")
+    if campaign.get("endpoint_policy") != "dual_scoped_outcome_endpoints":
+        publication_gate_errors.append("dual endpoint policy is not active")
+    for field, expected in (
+        ("excluded_completed_artifacts", 0),
+        ("completed_online_runs", 10),
+        ("audited_current_matched_observations", 10_320),
+        ("paper_comparable_matched_observations", 8_000),
+    ):
+        if type(campaign.get(field)) is not int or campaign.get(field) != expected:
+            publication_gate_errors.append(f"{field} is not exactly {expected:,}")
+    if publication_gate_errors:
+        raise ValueError(
+            "Paper tables require complete, inference-eligible, exact dual-endpoint "
+            "publication evidence: " + "; ".join(publication_gate_errors)
+        )
     hypotheses = {item["id"]: item for item in data["hypotheses"]}
     statistics = data["statistics"]
     integrity = data["integrity"]["counts"]
     metrics = data["tool_metrics"]
     failure_summary = data["tool_failure_summary"]
 
-    h1 = hypotheses["Hypothesis 1"]
+    h1 = hypotheses.get("Hypothesis 1")
     h2 = hypotheses["Hypothesis 2"]
     h3 = hypotheses["Hypothesis 3"]
-    h1_threshold = _threshold(h1["threshold_percent"])
     h2_threshold = _threshold(h2["threshold_percent"], signed=True)
     h3_threshold = _threshold(h3["threshold_percent"], signed=True)
     benchmark_name = str(campaign["benchmark_label"]).split(maxsplit=1)[0]
-    rounded_frozen_values = [
-        round(float(run["frozen_sage_outcome"]), 3)
-        for run in data["runs"]
-        if run["frozen_sage_outcome"] is not None
+    eligible_online_runs = [
+        run for run in data["runs"] if run.get("online_inference_eligible") is True
     ]
-    displayed_frozen_mean = (
-        sum(rounded_frozen_values) / len(rounded_frozen_values)
-        if rounded_frozen_values
+    if len(eligible_online_runs) != 10:
+        raise ValueError(
+            "Paper tables require exactly 10 inference-eligible online runs."
+        )
+    has_frozen_evidence = int(campaign.get("completed_frozen_runs") or 0) > 0
+    eligible_paired_runs = [
+        run
+        for run in eligible_online_runs
+        if run.get("frozen_inference_eligible") is True
+    ]
+    if has_frozen_evidence and (
+        campaign.get("completed_frozen_runs") != 10 or len(eligible_paired_runs) != 10
+    ):
+        raise ValueError(
+            "Frozen-registry paper tables require exactly 10 inference-eligible "
+            "paired runs."
+        )
+    replication_runs = (
+        eligible_paired_runs if has_frozen_evidence else eligible_online_runs
+    )
+    required_result_fields = ["baseline_outcome", "online_sage_outcome"]
+    if has_frozen_evidence:
+        required_result_fields.append("frozen_sage_outcome")
+    if any(
+        run.get(field) is None
+        for run in replication_runs
+        for field in required_result_fields
+    ):
+        raise ValueError(
+            "An inference-eligible replication lacks a required outcome value."
+        )
+
+    def displayed_mean(field: str) -> float:
+        values = [round(float(run[field]), 3) for run in replication_runs]
+        return sum(values) / len(values)
+
+    displayed_baseline_mean = displayed_mean("baseline_outcome")
+    displayed_online_mean = displayed_mean("online_sage_outcome")
+    displayed_online_lift = (
+        (displayed_online_mean - displayed_baseline_mean)
+        / displayed_baseline_mean
+        * 100.0
+        if displayed_baseline_mean
         else None
+    )
+    displayed_frozen_mean = (
+        displayed_mean("frozen_sage_outcome") if has_frozen_evidence else None
+    )
+
+    if has_frozen_evidence:
+        if not isinstance(h1, dict):
+            raise ValueError("Frozen-registry evidence requires Hypothesis 1 results.")
+        h1_threshold = _threshold(h1["threshold_percent"])
+        replication_table = {
+            "filename": "table_4_2_replication_results.png",
+            "title": (
+                "Table 4.2 - Replication-Level Online-Build And Frozen-Registry Results"
+            ),
+            "subtitle": (
+                f"Each row is a complete {campaign['tasks_per_run']:,}-task "
+                "replication with paired online-build and frozen-registry evidence."
+            ),
+            "columns": [
+                "Run",
+                "Baseline",
+                "Online SAGE",
+                "Online lift",
+                "Frozen SAGE",
+                "Retained",
+            ],
+            "widths": [0.10, 0.17, 0.21, 0.17, 0.20, 0.15],
+            "rows": [
+                [
+                    run["short_label"],
+                    _number(run["baseline_outcome"], digits=3),
+                    _number(run["online_sage_outcome"], digits=3),
+                    _percent(run["online_outcome_lift_percent"], signed=True),
+                    _number(run["frozen_sage_outcome"], digits=3),
+                    _percent(run["frozen_gain_retention_percent"]),
+                ]
+                for run in replication_runs
+            ]
+            + [
+                [
+                    "Mean",
+                    _number(displayed_baseline_mean),
+                    _number(displayed_online_mean),
+                    _percent(displayed_online_lift, signed=True),
+                    _number(displayed_frozen_mean),
+                    _percent(h1["estimate_percent"]),
+                ]
+            ],
+            "caption": (
+                "Only inference-eligible paired runs are included. Frozen-registry "
+                "runs reused the registry from their paired online-build run with "
+                "generation and repair disabled."
+            ),
+            "compact": True,
+        }
+        h1_table: dict | None = {
+            "filename": "table_4_3_h1_frozen_registry_retention.png",
+            "title": "Table 4.3 - Hypothesis 1 Evidence",
+            "subtitle": (
+                "Reusable generated tools preserve online-build gains after tool "
+                "creation stops."
+            ),
+            "columns": [
+                "Claim component",
+                "Observed evidence",
+                "Decision rule",
+                "Interpretation",
+            ],
+            "widths": [0.25, 0.25, 0.20, 0.30],
+            "rows": [
+                [
+                    "Gain retention",
+                    _percent(h1["estimate_percent"]),
+                    h1_threshold,
+                    (
+                        f"{h1['decision_label']}: "
+                        + (
+                            "the run-paired lower confidence bound met the "
+                            f"{h1['threshold_percent']:g} percent retention target."
+                            if h1["decision"] == "supported"
+                            else "the confirmatory retention rule was not satisfied."
+                        )
+                    ),
+                ],
+                [
+                    "Confidence interval",
+                    _percent_interval(h1["confidence_interval"]),
+                    f"Lower bound above {h1['threshold_percent']:g}%",
+                    (
+                        "The run-paired uncertainty range met the required retention "
+                        "threshold."
+                        if h1["decision"] == "supported"
+                        else "No affirmative retention conclusion is permitted because "
+                        "the confirmatory rule was not satisfied."
+                    ),
+                ],
+                [
+                    "Replication design",
+                    f"{h1['sample_size']:,} paired online/frozen runs",
+                    "Complete pairs only",
+                    "Each frozen run reused tools born in the matched online-build run.",
+                ],
+                [
+                    "Generation during reuse",
+                    "Disabled",
+                    "No new tool creation",
+                    "Frozen-registry performance reflects reuse rather than additional online learning.",
+                ],
+            ],
+            "caption": (
+                "Hypothesis 1 is a persistence claim: SAGE-generated tools remain "
+                "useful after the build phase."
+            ),
+        }
+    else:
+        replication_table = {
+            "filename": "table_4_2_replication_results.png",
+            "title": "Table 4.2 - Replication-Level Online-Build Results",
+            "subtitle": (
+                f"Each row is a complete {campaign['tasks_per_run']:,}-task "
+                "online-build replication."
+            ),
+            "columns": ["Run", "Baseline", "SAGE", "Outcome lift"],
+            "widths": [0.16, 0.25, 0.25, 0.34],
+            "rows": [
+                [
+                    run["short_label"],
+                    _number(run["baseline_outcome"], digits=3),
+                    _number(run["online_sage_outcome"], digits=3),
+                    _percent(run["online_outcome_lift_percent"], signed=True),
+                ]
+                for run in replication_runs
+            ]
+            + [
+                [
+                    "Mean",
+                    _number(displayed_baseline_mean),
+                    _number(displayed_online_mean),
+                    _percent(displayed_online_lift, signed=True),
+                ]
+            ],
+            "caption": "Only runs explicitly marked inference-eligible are included.",
+            "compact": True,
+        }
+        h1_table = None
+
+    hypothesis_summary_rows = []
+    if h1_table is not None and isinstance(h1, dict):
+        hypothesis_summary_rows.append(
+            [
+                "H1",
+                "Generated tools remain useful when reused from a frozen registry.",
+                f"{h1_threshold} of online-build gain retained",
+                (
+                    f"{_percent(h1['estimate_percent'])} retained; 95% CI "
+                    f"{_percent_interval(h1['confidence_interval']).replace('+', '')}"
+                ),
+                h1["decision_label"],
+            ]
+        )
+    hypothesis_summary_rows.extend(
+        [
+            [
+                "H2",
+                "SAGE improves task-completion accuracy over the baseline.",
+                f"{_threshold(h2['threshold_percent'])} outcome lift",
+                (
+                    f"{_percent(displayed_online_lift)} lift; baseline "
+                    f"{_number(displayed_baseline_mean)}, SAGE "
+                    f"{_number(displayed_online_mean)}"
+                ),
+                h2["decision_label"],
+            ],
+            [
+                "H3",
+                "Outcome lift among tasks where the SAGE policy called a generated tool.",
+                f"{_threshold(h3['threshold_percent'])} descriptive reference",
+                (
+                    f"{_percent(h3['estimate_percent'])} called-tool lift; "
+                    f"{integrity['shortcut_violations']:,} shortcut violations"
+                ),
+                h3["decision_label"],
+            ],
+        ]
+    )
+    hypothesis_summary_caption = (
+        "H1 and H2 use confirmatory clustered decision rules. H3 is a "
+        "selection-conditioned descriptive association and receives no causal "
+        "support decision."
+        if h1_table is not None
+        else "H2 uses its predeclared confirmatory clustered decision rule. H3 is "
+        "a selection-conditioned descriptive association and receives no causal "
+        "support decision."
     )
 
     return [
@@ -426,9 +685,9 @@ def build_tables(data: dict) -> list[dict]:
                     "Replicated full-benchmark evidence.",
                 ],
                 [
-                    "Baseline cache",
+                    "Control execution",
                     campaign["baseline_cache_policy"],
-                    "Fixed matched baseline values.",
+                    "Fresh same-run matched controls; no task or result replay.",
                 ],
                 [
                     "SAGE safeguards",
@@ -449,89 +708,8 @@ def build_tables(data: dict) -> list[dict]:
             "caption": f"Benchmark manifest hash: {campaign['benchmark_sha256']}.",
             "compact": True,
         },
-        {
-            "filename": "table_4_2_replication_results.png",
-            "title": "Table 4.2 - Replication-Level Online-Build And Frozen-Registry Results",
-            "subtitle": (
-                f"Each row is a complete {campaign['tasks_per_run']:,}-task "
-                "replication with paired online-build and frozen-registry evidence."
-            ),
-            "columns": [
-                "Run",
-                "Baseline",
-                "Online SAGE",
-                "Online lift",
-                "Frozen SAGE",
-                "Retained",
-            ],
-            "widths": [0.10, 0.17, 0.21, 0.17, 0.20, 0.15],
-            "rows": [
-                [
-                    run["short_label"],
-                    _number(run["baseline_outcome"], digits=3),
-                    _number(run["online_sage_outcome"], digits=3),
-                    _percent(run["online_outcome_lift_percent"], signed=True),
-                    _number(run["frozen_sage_outcome"], digits=3),
-                    _percent(run["frozen_gain_retention_percent"]),
-                ]
-                for run in data["runs"]
-            ]
-            + [
-                [
-                    "Mean",
-                    _number(performance["baseline"]),
-                    _number(performance["sage"]),
-                    _percent(h2["estimate_percent"], signed=True),
-                    _number(displayed_frozen_mean),
-                    _percent(h1["estimate_percent"]),
-                ]
-            ],
-            "caption": "Frozen-registry runs reused the registry from their paired online-build run with generation and repair disabled.",
-            "compact": True,
-        },
-        {
-            "filename": "table_4_3_h1_frozen_registry_retention.png",
-            "title": "Table 4.3 - Hypothesis 1 Evidence",
-            "subtitle": "Reusable generated tools preserve online-build gains after tool creation stops.",
-            "columns": [
-                "Claim component",
-                "Observed evidence",
-                "Decision rule",
-                "Interpretation",
-            ],
-            "widths": [0.25, 0.25, 0.20, 0.30],
-            "rows": [
-                [
-                    "Gain retention",
-                    _percent(h1["estimate_percent"]),
-                    h1_threshold,
-                    (
-                        f"{h1['decision_label']}: frozen-registry reuse retained "
-                        f"at least {h1['threshold_percent']:g} percent of the "
-                        "online-build gain."
-                    ),
-                ],
-                [
-                    "Confidence interval",
-                    _percent_interval(h1["confidence_interval"]),
-                    f"Lower bound above {h1['threshold_percent']:g}%",
-                    "The uncertainty range remains above the required retention threshold.",
-                ],
-                [
-                    "Replication design",
-                    f"{h1['sample_size']:,} paired online/frozen runs",
-                    "Complete pairs only",
-                    "Each frozen run reused tools born in the matched online-build run.",
-                ],
-                [
-                    "Generation during reuse",
-                    "Disabled",
-                    "No new tool creation",
-                    "Frozen-registry performance reflects reuse rather than additional online learning.",
-                ],
-            ],
-            "caption": "Hypothesis 1 is a persistence claim: SAGE-generated tools remain useful after the build phase.",
-        },
+        replication_table,
+        *([h1_table] if h1_table is not None else []),
         {
             "filename": "table_4_4_h2_overall_task_completion.png",
             "title": "Table 4.4 - Hypothesis 2 Evidence",
@@ -547,27 +725,36 @@ def build_tables(data: dict) -> list[dict]:
             "rows": [
                 [
                     "Outcome / task completion",
-                    _number(h2["baseline_mean"]),
-                    _number(h2["sage_mean"]),
-                    _percent(h2["estimate_percent"], signed=True),
+                    _number(displayed_baseline_mean),
+                    _number(displayed_online_mean),
+                    _percent(displayed_online_lift, signed=True),
                     h2_threshold,
                 ],
                 [
-                    "Absolute paired difference",
+                    "10% target contrast",
                     "",
                     "",
-                    statistics["mean_delta_label"],
-                    "Positive paired gain",
+                    _number(statistics["h2_threshold_contrast"], digits=4),
+                    "SAGE - 1.10 x baseline > 0",
                 ],
                 [
-                    "95% paired bootstrap CI",
+                    "Two-way run/task 95% CI",
                     "",
                     "",
-                    statistics["ci_label"],
-                    "CI above zero",
+                    _number_interval(
+                        statistics["two_way_run_task_bootstrap_threshold_contrast_ci"]
+                    ),
+                    "Lower bound > 0",
                 ],
                 [
-                    "Permutation test",
+                    "Run-cluster 95% CI",
+                    "",
+                    "",
+                    _number_interval(statistics["run_cluster_threshold_contrast_ci"]),
+                    "Lower bound > 0",
+                ],
+                [
+                    "Run-level sign-flip test",
                     "",
                     "",
                     statistics["p_label"],
@@ -581,17 +768,17 @@ def build_tables(data: dict) -> list[dict]:
                     "SAGE count exceeds baseline",
                 ],
             ],
-            "caption": "Outcome/task completion is the sole performance endpoint because it evaluates whether the requested final result was achieved; canonical/reference similarity is descriptive only.",
+            "caption": "Outcome/task completion is the sole performance endpoint. H2 is supported only when the point lift reaches 10%, both the two-way run/task and run-cluster 95% lower bounds for SAGE - 1.10 x baseline exceed zero, and the two-sided run-level sign-flip p-value is below .05. Task-IID inference is descriptive only; canonical/reference similarity is not a performance criterion.",
         },
         {
             "filename": "table_4_5_h3_generated_tool_attribution.png",
-            "title": "Table 4.5 - Hypothesis 3 Evidence",
-            "subtitle": "Generated-tool-called tasks isolate whether autonomous tools account for the observed accuracy gain.",
+            "title": "Table 4.5 - Generated-Tool-Called Task Association",
+            "subtitle": "Outcome lift among tasks where the production SAGE policy called a generated tool.",
             "columns": [
-                "Attribution measure",
+                "Descriptive measure",
                 "Observed value",
-                "Decision rule",
-                "Why it supports the claim",
+                "Reference",
+                "Interpretation boundary",
             ],
             "widths": [0.27, 0.20, 0.20, 0.33],
             "rows": [
@@ -599,39 +786,39 @@ def build_tables(data: dict) -> list[dict]:
                     "Called-task subset",
                     f"{h3['sample_size']:,} observations",
                     "Generated tool selected by SAGE policy",
-                    "Uses tasks where the declared production actor policy selected a generated tool; diagnostic overrides remain disabled.",
+                    "Post-treatment, policy-selected subset; diagnostic overrides remain disabled.",
                 ],
                 [
                     "Baseline outcome on subset",
                     _number(h3["baseline_mean"]),
                     "Matched baseline rows",
-                    "Defines how the same tasks performed without generated tools.",
+                    "Describes baseline outcomes on the selected task identities.",
                 ],
                 [
                     "SAGE outcome on subset",
                     _number(h3["sage_mean"]),
                     "Matched SAGE rows",
-                    "Shows substantially higher completion after generated-tool use.",
+                    "Describes SAGE outcomes on the same selected task identities.",
                 ],
                 [
                     "Relative outcome lift",
                     _percent(h3["estimate_percent"], signed=True),
-                    h3_threshold,
-                    "The called-tool subset exceeds the attribution threshold by a wide margin.",
+                    f"{h3_threshold} descriptive reference",
+                    "Association only; the subset was selected after treatment.",
                 ],
                 [
                     "95% paired bootstrap CI",
                     _percent_interval(h3["confidence_interval"]),
-                    f"Lower bound above +{h3['threshold_percent']:g}%",
-                    "The effect remains large after paired uncertainty estimation.",
+                    "Exploratory interval",
+                    "No causal support decision is made without a randomized tool-use ablation.",
                 ],
             ],
-            "caption": "Hypothesis 3 describes the generated-tool pathway under the production actor policy; it is not evidence of natural base-model tool selection.",
+            "caption": "Generated-tool-called status is observed after the SAGE intervention. This selection-conditioned subset is descriptive and cannot establish that the generated call caused the outcome.",
         },
         {
             "filename": "table_4_6_generated_tool_lifecycle.png",
             "title": "Table 4.6 - Generated-Tool Lifecycle And Contribution Evidence",
-            "subtitle": "Lifecycle metrics show that tools were created, retained, selected, and reused across later tasks.",
+            "subtitle": "Lifecycle metrics show that tools were created, accepted, selected, and reused across later tasks.",
             "columns": ["Lifecycle metric", "Observed value", "What it means"],
             "widths": [0.32, 0.20, 0.48],
             "rows": [
@@ -656,9 +843,9 @@ def build_tables(data: dict) -> list[dict]:
                     "Scenarios where the production SAGE actor policy selected and called a generated tool, without diagnostic overrides.",
                 ],
                 [
-                    "Attributed gains",
-                    metric_value(metrics, "Attributed gains"),
-                    "Generated-tool-called scenarios with positive matched outcome difference.",
+                    "Called-task gains",
+                    metric_value(metrics, "Called-task gains"),
+                    "Generated-tool-called scenarios with positive matched outcome difference; descriptive association only.",
                 ],
                 [
                     "Preserved outcomes",
@@ -666,9 +853,9 @@ def build_tables(data: dict) -> list[dict]:
                     "Generated-tool-called scenarios with no matched outcome loss.",
                 ],
                 [
-                    "Attributed regressions",
-                    metric_value(metrics, "Attributed regressions"),
-                    "Generated-tool-called scenarios with negative matched outcome difference.",
+                    "Called-task regressions",
+                    metric_value(metrics, "Called-task regressions"),
+                    "Generated-tool-called scenarios with negative matched outcome difference; descriptive association only.",
                 ],
                 [
                     "Tool-call failure scenarios",
@@ -690,42 +877,8 @@ def build_tables(data: dict) -> list[dict]:
                 "Decision",
             ],
             "widths": [0.12, 0.34, 0.21, 0.23, 0.10],
-            "rows": [
-                [
-                    "H1",
-                    "Generated tools remain useful when reused from a frozen registry.",
-                    f"{h1_threshold} of online-build gain retained",
-                    (
-                        f"{_percent(h1['estimate_percent'])} retained; 95% CI "
-                        f"{_percent_interval(h1['confidence_interval']).replace('+', '')}"
-                    ),
-                    h1["decision_label"],
-                ],
-                [
-                    "H2",
-                    "SAGE improves task-completion accuracy over the baseline.",
-                    f"{_threshold(h2['threshold_percent'])} outcome lift",
-                    (
-                        f"{_percent(h2['estimate_percent'])} lift; baseline "
-                        f"{_number(h2['baseline_mean'])}, SAGE {_number(h2['sage_mean'])}"
-                    ),
-                    h2["decision_label"],
-                ],
-                [
-                    "H3",
-                    "The policy-directed generated-tool pathway is associated with the strongest accuracy gains.",
-                    (
-                        f"{_threshold(h3['threshold_percent'])} called-tool lift; "
-                        "no shortcut violations"
-                    ),
-                    (
-                        f"{_percent(h3['estimate_percent'])} called-tool lift; "
-                        f"{integrity['shortcut_violations']:,} shortcut violations"
-                    ),
-                    h3["decision_label"],
-                ],
-            ],
-            "caption": "The decision table summarizes the threshold, observed result, and support decision for each hypothesis.",
+            "rows": hypothesis_summary_rows,
+            "caption": hypothesis_summary_caption,
             "compact": True,
         },
         {

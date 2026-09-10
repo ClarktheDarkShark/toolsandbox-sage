@@ -1,5 +1,12 @@
 # Chapter 3 Working Draft: SAGE Methodology and System Architecture
 
+> **Archived v061 draft.** This document predates the restored policy-directed
+> publication runtime. Any statement below that the actor naturally chooses
+> generated tools, or that named/forced tool choices are excluded, is not valid
+> for the production release and must not be used as its methods description.
+> Its direct-attribution H3 language is also historical: generated-tool-called
+> status is post-treatment and is descriptive without a randomized ablation.
+
 Status: editable praxis draft for the current v061 evidence line
 Prepared: 2026-06-14
 Scope: SAGE methodology, SAGE system architecture, and the current v061 measurement package

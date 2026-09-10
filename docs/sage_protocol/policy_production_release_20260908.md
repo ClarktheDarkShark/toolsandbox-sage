@@ -2,15 +2,16 @@
 
 Date: 2026-09-08
 
-Branch: `codex/paper-policy-production`
+Branch: `codex/paper-policy-production-final`
 
 ## Release decision
 
-This branch restores the policy-directed SAGE intervention responsible for the
+This branch restores the policy-directed SAGE configuration associated with the
 large ToolSandbox outcomes reported in the paper. It does not claim natural
-base-model selection of generated tools. The policy controller's instructions,
-schema filtering, deterministic selector cascade, and named `tool_choice`
-requests are part of the intervention and must be disclosed as such.
+base-model selection of generated tools or causal isolation of any one retained
+component. The policy controller's instructions, schema filtering,
+deterministic selector cascade, and named `tool_choice` requests are part of the
+intervention and must be disclosed as such.
 
 ## Historical provenance
 
@@ -45,19 +46,28 @@ The retained mechanism comprises:
 7. output normalization and reuse accounting; and
 8. separate behavioral-feedback and reporting outcome evaluators.
 
-Eighteen of the twenty lift-producing mechanism files are byte-identical to the
-clean donor. `online_feedback_score.py` is the donor evaluator plus a two-line
-identity tag. `self_evolution_reflection.py` adds the fresh same-task control
-stream and reads that explicit compatibility signal. The actor, classifier,
-generator, online-birth, routing, ToolSandbox integration, normalization, and
-validation implementations remain byte-identical to the donor.
+Fourteen of the twenty lift-producing mechanism files are byte-identical to the
+clean donor. The six changed mechanism files are the actor, classifier,
+generator, lifecycle reflection, output-normalization, and online-feedback
+evaluator modules. Their post-donor changes include restored policy behavior,
+fresh same-task control feedback, evaluator identity and feedback handling, and
+the audited repairs documented in this branch. Online birth, routing,
+ToolSandbox integration, and validation remain byte-identical to the donor.
 
 ## Measurement and protocol corrections
 
 The paper-era evaluator remains internal because it affected tool birth and
-lifecycle decisions. The audited v5 evaluator is used for reported outcomes.
-This preserves the reconstructed algorithm while preventing known evaluator
-false negatives from being published as final results.
+lifecycle decisions. The 2026-09-10 measurement amendment uses two explicit
+outcome scopes: audited v9 on all 1,032 tasks for current same-run lift, and the
+unchanged paper-v1 evaluator on the exact ordered 800-task subset for historical
+paper comparisons. Lifecycle feedback uses paper-v1 when available and audited
+v9 as the fallback on the other 232 tasks. Canonical similarity is descriptive
+only and is never a release or paper-result gate.
+
+Lifecycle feedback is a post-task scalar computed by evaluators from benchmark
+answer/state contracts. The actor and generated tools do not receive raw
+expected answers, target state, or evaluator traces during the task. This is a
+reward-feedback-driven system and must not be described as globally label-free.
 
 The July campaign also used a strict hybrid control cache for both comparison
 rows and online reflection. That condition is preserved in source for archival
@@ -86,10 +96,13 @@ deliberately deferred.
 Counts use `wc -l`, include comments and blank lines, and exclude all dashboard
 code/templates and all native `tool_sandbox` code.
 
-- lift-producing scientific mechanism: **32,955** lines;
-- installed non-dashboard `sage_ts` package: **43,851** lines;
+- lift-producing scientific mechanism: **33,231** lines;
+- installed non-dashboard `sage_ts` package: **45,373** lines;
 - runnable and verified single-pair production surface (package plus canonical
-  runner, launcher, and three publication verifiers): **49,145** lines.
+  runner, launcher, and three publication verifiers): **51,227** lines; and
+- executable ten-pair campaign surface, adding the campaign runner, sample
+  verifier, and evidence aggregator: **58,066** lines before optional paper
+  rendering/bootstrap utilities.
 
 The earlier `32,260` figure was a narrower natural-selection-branch manifest,
 not a total production-application count. It also omitted behavior-changing
@@ -98,7 +111,10 @@ reported as total SAGE.
 
 ## Remaining execution gate
 
-This release may be used to prepare the final ten-pair campaign only after the
-tree is committed, clean, packaged, and passes the publication environment,
-input, unit, integration, and no-secret checks. A live 1,032-task pair is not
-part of code restoration and requires separate execution approval.
+The completed strict live pair predates the final v9 evaluator correction; its
+v9 result is an exact offline replay, not a clean final-tree v9 execution. After
+this tree is committed, clean, packaged, and passes the publication environment,
+input, unit, integration, and no-secret checks, one fresh fully uncached
+1,032-task pair from that exact tree remains the last execution gate. The final
+ten-pair campaign should be prepared only after that pair passes the frozen v3
+dual-endpoint gates. Both live execution stages require researcher approval.

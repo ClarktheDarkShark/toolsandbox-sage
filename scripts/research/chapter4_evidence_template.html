@@ -961,40 +961,40 @@
         </div>
       </div>
       <div class="paired-count">
-        <div class="eyebrow">Paired observations</div>
+        <div class="eyebrow">Audited v9 / paper v1 pairs</div>
         <strong id="pairedCount">0</strong>
       </div>
     </section>
 
     <div class="section-head">
       <h2>Hypothesis Evidence</h2>
-      <p>Outcome is the sole performance endpoint; canonical score is descriptive route-compatibility output only.</p>
+      <p>H1 and H2 use audited v9 confirmatory analyses on all 1,032 tasks. The called-task analysis is selection-conditioned and descriptive; v1 on the exact 800-task subset is historical comparison only.</p>
     </div>
     <section class="hypothesis-grid" id="hypothesisGrid"></section>
 
     <div class="section-head">
       <h2>Matched Performance And Tool Evidence</h2>
-      <p>Values are calculated only from tasks observed in both arms.</p>
+      <p>Endpoint identities, task scopes, and evaluator versions remain separate.</p>
     </div>
     <section class="evidence-grid" id="evidenceGrid"></section>
     <section class="tool-row" id="toolMetrics" aria-label="Generated tool metrics"></section>
 
     <div class="section-head">
-      <h2>Replication Stability And Tool Contribution</h2>
+      <h2>Replication Stability And Called-Task Association</h2>
       <p>Run-level variation remains visible instead of being hidden by the aggregate.</p>
     </div>
     <section class="lower-grid">
       <article class="panel">
         <div class="panel-title">
           <strong>Outcome Lift Across Full Runs</strong>
-          <span>Mean and hypothesis threshold</span>
+          <span>Audited v9 all-task mean and H2 threshold</span>
         </div>
         <div id="replicationChart"></div>
       </article>
       <article class="panel">
         <div class="panel-title">
-          <strong>Top Generated-Tool Contributions</strong>
-          <span>Natural calls only</span>
+          <strong>Top Generated-Tool Called-Task Results</strong>
+          <span>Selection-conditioned; descriptive only</span>
         </div>
         <div id="toolTable"></div>
       </article>
@@ -1017,6 +1017,7 @@
 
   <script>
     const DATA_URL = "chapter4_evidence_data.json";
+    const EMBEDDED_EVIDENCE_BASE64 = "__CHAPTER4_EVIDENCE_BASE64__";
     let evidence = null;
     let detailIndex = {};
 
@@ -1042,6 +1043,7 @@
     const statusClass = (status) => {
       if (status === "supported") return "";
       if (status === "observed_pass") return "observed";
+      if (status === "descriptive_only") return "observed";
       if (status === "not_supported") return "failed";
       return "pending";
     };
@@ -1049,6 +1051,7 @@
     const statusLabel = (status) => ({
       supported: "Supported",
       observed_pass: "Point target met",
+      descriptive_only: "Descriptive only",
       not_supported: "Not met",
       pending: "Pending"
     }[status] || "Pending");
@@ -1121,7 +1124,7 @@
         campaign.progress_label ||
         `${campaign.completed_runs} of ${campaign.expected_runs} full runs complete`;
       document.getElementById("pairedCount").textContent =
-        Number(campaign.paired_observations || 0).toLocaleString();
+        `${Number(campaign.audited_current_matched_observations || 0).toLocaleString()} / ${Number(campaign.paper_comparable_matched_observations || 0).toLocaleString()}`;
       document.getElementById("footerNote").textContent =
         `Updated ${campaign.updated_at_label}. Baseline cache provenance, run configuration, and statistical definitions are available in the metric drilldowns.`;
 
@@ -1169,50 +1172,65 @@
 
     function renderEvidence(data) {
       const performance = data.performance;
+      const endpoints = data.performance_endpoints || {};
+      const audited = endpoints.audited_current_all_tasks || performance;
+      const paper = endpoints.paper_comparable_historical_subset || {};
       const statistics = data.statistics;
       const integrity = data.integrity;
-      [performance, statistics, integrity].forEach(registerDetail);
+      [performance, audited, paper, statistics, integrity].forEach(registerDetail);
       document.getElementById("evidenceGrid").innerHTML = `
-        <button class="panel metric-button" data-detail="${escapeHtml(performance.detail_id)}">
-          <div class="panel-title"><strong>Overall Task Completion</strong><span>Performance endpoint</span></div>
+        <button class="panel metric-button" data-detail="${escapeHtml(audited.detail_id)}">
+          <div class="panel-title"><strong>Audited Current Outcome</strong><span>v9 · all 1,032 tasks per run</span></div>
           <div class="outcome-pair">
-            <div class="outcome-value"><span>Baseline</span><strong>${fmt(performance.baseline)}</strong></div>
+            <div class="outcome-value"><span>Fresh baseline</span><strong>${fmt(audited.baseline)}</strong></div>
             <div class="arrow">-&gt;</div>
-            <div class="outcome-value sage"><span>SAGE</span><strong>${fmt(performance.sage)}</strong></div>
+            <div class="outcome-value sage"><span>SAGE</span><strong>${fmt(audited.sage)}</strong></div>
           </div>
           <div class="secondary-line">
-            <span>Absolute difference <strong>${performance.delta_label}</strong></span>
-            <span>Relative outcome lift <strong>${performance.outcome_lift_label}</strong></span>
+            <span>Absolute difference <strong>${escapeHtml(audited.delta_label)}</strong></span>
+            <span>Same-run lift <strong>${escapeHtml(audited.lift_label)}</strong></span>
+          </div>
+        </button>
+        <button class="panel metric-button" data-detail="${escapeHtml(paper.detail_id)}">
+          <div class="panel-title"><strong>Paper-Comparable Outcome</strong><span>v1 · exact ordered 800-task subset</span></div>
+          <div class="outcome-pair">
+            <div class="outcome-value"><span>Fresh baseline</span><strong>${fmt(paper.baseline)}</strong></div>
+            <div class="arrow">-&gt;</div>
+            <div class="outcome-value sage"><span>SAGE</span><strong>${fmt(paper.sage)}</strong></div>
+          </div>
+          <div class="secondary-line">
+            <span>Archived paper SAGE mean <strong>${fmt(paper.historical_sage_mean)}</strong></span>
+            <span>Current minus archived <strong>${escapeHtml(paper.historical_delta_label)}</strong></span>
           </div>
         </button>
         <button class="panel metric-button" data-detail="${escapeHtml(statistics.detail_id)}">
-          <div class="panel-title"><strong>Paired Statistical Evidence</strong><span>Across completed runs</span></div>
+          <div class="panel-title"><strong>Cluster-Aware Statistical Evidence</strong><span>Audited v9 · all tasks</span></div>
           <ul class="stat-list">
             <li>
               <span class="row-copy">
-                <span class="metric-name">Mean paired outcome difference</span>
-                <span class="metric-help">Average task-by-task outcome gain for SAGE over baseline.</span>
+                <span class="metric-name">Mean audited-v9 difference</span>
+                <span class="metric-help">Average outcome gain for SAGE over baseline; the H2 test below evaluates the 10% target directly.</span>
               </span>
               <strong>${escapeHtml(statistics.mean_delta_label)}</strong>
             </li>
             <li>
               <span class="row-copy">
-                <span class="metric-name">Paired bootstrap 95% CI</span>
-                <span class="metric-help">Estimated range where the true average gain likely falls.</span>
+                <span class="metric-name">Two-way target-contrast 95% CI</span>
+                <span class="metric-help">Resamples independent runs and matched tasks for SAGE minus 1.10 times baseline.</span>
               </span>
               <strong>${escapeHtml(statistics.ci_label)}</strong>
             </li>
             <li>
               <span class="row-copy">
-                <span class="metric-name">Permutation test</span>
-                <span class="metric-help">Checks whether the observed gain is unlikely under random arm assignment.</span>
+                <span class="metric-name">Run-level target sign-flip test</span>
+                <span class="metric-help">Tests the 10% target contrast across independent registry replications.</span>
               </span>
               <strong>${escapeHtml(statistics.p_label)}</strong>
             </li>
             <li>
               <span class="row-copy">
-                <span class="metric-name">Full-outcome successes B / S</span>
-                <span class="metric-help">Count of fully successful tasks: baseline first, then SAGE.</span>
+                <span class="metric-name">Audited-v9 full successes B / S</span>
+                <span class="metric-help">Count across all 1,032 tasks per run: baseline first, then SAGE.</span>
               </span>
               <strong>${escapeHtml(statistics.successes_label)}</strong>
             </li>
@@ -1239,7 +1257,7 @@
         "Same SAGE settings across runs": "Confirms completed runs used the approved claim-grade configuration.",
         "Benchmark-metadata shortcut checks": "Confirms SAGE did not use scenario names to create or route tools.",
         "Code-based answer shortcut checks": "Confirms the bridge did not complete tasks using code rules.",
-        "Forced generated-tool call checks": "Confirms generated tools were selected naturally, not forced.",
+        "Diagnostic tool-call override checks": "Confirms no ad hoc diagnostic override was used; named choices from the declared production actor policy remain part of SAGE.",
         "Tool side-effect audit flags": "Reports validated tool calls flagged for side-effect review.",
       };
       return explanations[label] || "Validity check count for the completed claim runs.";
@@ -1255,25 +1273,28 @@
     }
 
     function renderChart(data) {
-      const runs = (data.runs || []).filter((run) => run.online_outcome_lift_percent !== null);
+      const runs = (data.runs || []).filter((run) =>
+        run.online_inference_eligible === true &&
+        run.audited_current_outcome_lift_percent !== null
+      );
       if (!runs.length) {
         document.getElementById("replicationChart").innerHTML =
-          '<div class="empty-state">Run-level outcome lift appears as full runs complete.</div>';
+          '<div class="empty-state">Run-level audited-v9 outcome lift appears as full runs complete.</div>';
         return;
       }
       runs.forEach(registerDetail);
-      const values = runs.map((run) => Number(run.online_outcome_lift_percent));
+      const values = runs.map((run) => Number(run.audited_current_outcome_lift_percent));
       const chartMax = Math.max(40, Math.ceil((Math.max(...values, 10) + 10) / 20) * 20);
       const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
       const dots = runs.map((run, index) => {
         const x = runs.length === 1 ? 50 : 5 + (index / (runs.length - 1)) * 90;
-        const y = Math.max(0, Math.min(100, Number(run.online_outcome_lift_percent) / chartMax * 100));
+        const y = Math.max(0, Math.min(100, Number(run.audited_current_outcome_lift_percent) / chartMax * 100));
         return `<button class="chart-dot" style="--x:${x}%;--y:${y}%" data-detail="${escapeHtml(run.detail_id)}"
-          aria-label="${escapeHtml(run.label)} outcome lift ${pct(run.online_outcome_lift_percent, true)}"></button>`;
+          aria-label="${escapeHtml(run.label)} audited v9 outcome lift ${pct(run.audited_current_outcome_lift_percent, true)}"></button>`;
       }).join("");
       const labels = runs.map((run) => `<span>${escapeHtml(run.short_label)}</span>`).join("");
       document.getElementById("replicationChart").innerHTML = `
-        <div class="replication-chart" aria-label="Run-level outcome lift chart">
+        <div class="replication-chart" aria-label="Run-level audited v9 outcome lift chart">
           <div class="axis-labels">
             <span>${chartMax}%</span><span>${Math.round(chartMax * .75)}%</span>
             <span>${Math.round(chartMax * .5)}%</span><span>${Math.round(chartMax * .25)}%</span><span>0%</span>
@@ -1307,7 +1328,7 @@
             </tr>`).join("")}
           </tbody>
         </table>
-        <div class="footer-note">G / R reports matched gains and regressions on tasks where the generated tool was naturally called. Select a row for validation, reuse, and provenance details.</div>`;
+        <div class="footer-note">G / R reports called-task gains and regressions on the post-treatment subset where the production actor policy called a generated tool. This is descriptive association, not causal attribution. Select a row for validation, reuse, and provenance details.</div>`;
     }
 
     function bindDetails() {
@@ -1336,6 +1357,14 @@
 
     async function loadEvidence() {
       try {
+        if (window.location.protocol === "file:") {
+          const bytes = Uint8Array.from(
+            atob(EMBEDDED_EVIDENCE_BASE64),
+            (character) => character.charCodeAt(0)
+          );
+          render(JSON.parse(new TextDecoder().decode(bytes)));
+          return;
+        }
         const response = await fetch(`${DATA_URL}?t=${Date.now()}`, {cache: "no-store"});
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         render(await response.json());
@@ -1358,7 +1387,14 @@
     });
 
     loadEvidence();
-    setInterval(loadEvidence, 30000);
+    if (window.location.protocol === "file:") {
+      // Keep checking even after a Complete render. A later fail-closed
+      // verification can archive the canonical file, so a stale in-memory final
+      // view must not remain silently displayed for the rest of the browser session.
+      setInterval(() => window.location.reload(), 30000);
+    } else {
+      setInterval(loadEvidence, 30000);
+    }
   </script>
 </body>
 </html>

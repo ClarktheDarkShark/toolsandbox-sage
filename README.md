@@ -29,15 +29,18 @@ in this branch instead uses commit
 first clean, policy-only reconstruction validated against the paper runtime. Its
 complete 1,032-task validation produced a paper-era-evaluator SAGE outcome of
 0.7900, within the paper campaign's 0.7761–0.8095 range. That establishes
-distributional behavioral equivalence on the historical measurement; it is not
-presented as an audited-v5 outcome. New runs report v5 outcomes, whose corrected
-coverage and contracts make their numerical scale non-interchangeable with the
-paper values.
+that the restored behavior is consistent with the historical range in one
+engineering spot check; it does not establish replicated distributional
+equivalence and is not presented as a current audited outcome. New runs report
+two explicitly scoped outcome measurements: audited v9 over all 1,032 tasks and
+the unchanged paper-era v1 evaluator over the exact ordered 800-task subset.
+Only the latter is compared with historical paper values.
 
 The accurate description for this release is therefore:
 
-> Clean, behavior-equivalent reconstruction of the policy-directed paper
-> runtime, with separately audited measurement and fail-closed run provenance.
+> Clean policy-runtime reconstruction validated by an in-range engineering
+> spot check, with separately audited measurement and fail-closed run
+> provenance.
 
 The detailed historical audit is in
 [`docs/sage_protocol/publication_cleanup_audit_20260901.md`](docs/sage_protocol/publication_cleanup_audit_20260901.md).
@@ -45,10 +48,10 @@ The final restoration boundary, mechanism inventory, and reproducible line
 counts are recorded in
 [`docs/sage_protocol/policy_production_release_20260908.md`](docs/sage_protocol/policy_production_release_20260908.md).
 
-## Why the paper system succeeded
+## Restored high-lift configuration
 
-The principal lift mechanism was an external actor policy, not natural model
-selection. On each actor request the policy can:
+The restored high-lift configuration uses an external actor policy rather than
+natural model selection. On each actor request the policy can:
 
 1. add workflow-specific instructions derived from the visible conversation;
 2. filter the routed generated-tool schemas to a small relevant set;
@@ -80,18 +83,34 @@ under `scripts/research/`, outside the installed `sage_ts` package.
 
 The paper-era outcome evaluator influenced online tool birth and lifecycle
 decisions. Replacing it in place would change later registry contents and would
-not restore the validated algorithm. This release therefore separates the two
-roles:
+not restore the validated algorithm. This release therefore keeps the feedback
+and reporting roles distinct:
 
-- `outcome_similarity` is computed by the audited v5 evaluator and is the only
-  reported performance endpoint;
-- `online_feedback_outcome_similarity` is computed by the paper-era evaluator
-  and is used only inside the restored classifier/lifecycle feedback loop.
+- `outcome_similarity` is computed by audited v9 for all 1,032 tasks. It is the
+  current same-run outcome endpoint and supplies the control-to-SAGE lift gate;
+- `online_feedback_outcome_similarity` is computed by paper-era v1 on its exact
+  ordered 800-task applicability subset. It is the only endpoint compared with
+  the historical paper range and is also the preferred lifecycle feedback
+  signal on those tasks; and
+- on the other 232 tasks, lifecycle feedback falls back to the audited v9
+  outcome. Canonical score deltas can inform internal lifecycle decisions but
+  are never a release or paper-result gate.
 
-Both evaluator identities are written to every run manifest. The compatibility
-signal is never presented as the final outcome result. This split preserves the
-studied policy behavior without recovering favorable paper numbers through a
-known measurement defect.
+These are post-task, evaluator-derived scalar feedback signals. Benchmark
+answer and state targets are used by the evaluators, but raw targets, expected
+answers, and evaluator traces are not provided to the actor or generated tools
+before or during that task. Both evaluator identities and hashes are written to
+the run artifacts. This split preserves the studied policy behavior without
+comparing incompatible task sets or evaluator versions.
+
+The latest complete strict pair, executed immediately before the v9 selector
+correction, produced `0.586240 -> 0.780362` on audited v8. Exact offline v9
+replay of all potentially affected message-recency trajectories changed one
+SAGE task from `1` to `0`, giving `0.586240 -> 0.779393` across 1,032 tasks
+(`+0.193152` absolute; `+32.95%` relative). On the exact paper-comparable 800
+tasks, the unchanged v1 endpoint was `0.503964 -> 0.799612`, above both the
+historical mean (`0.795407`) and minimum (`0.776052`). This is a successful
+engineering sample, not a substitute for the final ten-run inference.
 
 ## Historical cache limitation
 
@@ -124,11 +143,20 @@ a live run. A local `.secrets/env.sh` is supported and must not be committed.
 
 ## Verify the code and frozen inputs
 
+The frozen publication environment intentionally contains only run-time
+dependencies. Use a separate development environment for pytest and Ruff so
+installing test tools cannot change the environment used for publication runs:
+
 ```bash
-make compile
-make test-core
-make package
-make verify-inputs
+python3.12 -m venv .venv-dev
+.venv-dev/bin/python -m pip install -e '.[dev]'
+make compile PYTHON=.venv-dev/bin/python
+make test-core PYTHON=.venv-dev/bin/python
+make lint PYTHON=.venv-dev/bin/python
+make package PYTHON=.venv-dev/bin/python
+
+.venv-publication/bin/python scripts/verify_publication_environment.py
+make verify-inputs PYTHON=.venv-publication/bin/python
 ```
 
 Important frozen inputs include:
@@ -186,7 +214,7 @@ Preparation writes a plan and does not make model calls:
 ```bash
 make prepare-paper-rerun \
   SAMPLE_REPORT=outputs/publication_validation/<sample>/native_action/<run>/publication_validation_report.json \
-  CAMPAIGN_ARGS='--campaign-id chapter4_policy_10x_<date> --expected-online-runs 10'
+  CAMPAIGN_ARGS='--campaign-id chapter4_policy_10x_<date> --scope online-only --expected-online-runs 10'
 ```
 
 Execution remains explicitly gated:
@@ -198,9 +226,14 @@ PYTHONPATH=src:. python scripts/run_chapter4_evidence_campaign.py run \
   --approve-execution
 ```
 
-Use a distinct dashboard port for every concurrently launched pair. Verify and
-analyze completed campaign artifacts with `make verify-campaign`, `make analyze`,
-and `make render-paper`.
+The publication default launches ten isolated online-build pairs concurrently;
+inside every pair, the non-learning control and policy-directed SAGE processes
+also run concurrently. Every pair receives a distinct preflighted dashboard
+port and opens Task Compare in the external browser. The aggregate campaign
+dashboard is opened externally before jobs start. Frozen-registry reuse is an
+optional, explicitly requested second scope and is not part of the default
+ten-pair run. Verify and analyze completed campaign artifacts with
+`make verify-campaign`, `make analyze`, and `make render-paper`.
 
 ## Source layout
 
