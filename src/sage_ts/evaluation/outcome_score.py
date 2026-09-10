@@ -32,7 +32,7 @@ from tool_sandbox.common.execution_context import (
 )
 from tool_sandbox.common.scenario import Scenario
 
-OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v6"
+OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v7"
 
 # These are the seven perturbations present for every base task in the frozen
 # 1,032-scenario publication benchmark. A contract applies only to one of these
@@ -137,6 +137,8 @@ _MESSAGE_IDENTITY_REASON_GROUP = (
 )
 _TEMPORAL_REMINDER_REASON_GROUP = (
     *_CURRENT_TIME_REASON_GROUP,
+    "date and time",
+    "date or time",
     "today's time",
     "today’s time",
     "when today",
@@ -775,10 +777,11 @@ def _contract_manifest_payload() -> dict[str, Any]:
         ),
         "safety_rule": (
             "only_task_specific_directional_setting_prerequisites_are_permitted; "
-            "unexpected_or_reversed_domain_mutation_forces_zero; verified_action_"
-            "state_overrides_route_capability_minefields; every_target_namespace_"
-            "snapshot_must_be_baseline_or_the_exact_target_and_the_transition_is_"
-            "irreversible"
+            "unexpected_or_reversed_domain_mutation_forces_zero; verified_task_"
+            "outcomes_including_targeted_abstention_state_completion_and_exact_"
+            "information_answers_override_route_capability_minefields_and_"
+            "forbidden_tool_routing; every_target_namespace_snapshot_must_be_"
+            "baseline_or_the_exact_target_and_the_transition_is_irreversible"
         ),
         "permitted_prerequisite_namespaces": ["SETTING"],
         "permitted_setting_transitions_by_contract": (
@@ -882,7 +885,7 @@ def _is_social_closure(content: str) -> bool:
     normalized = " ".join(content.lower().replace("’", "'").strip().split())
     clauses = [
         clause.strip(" ,:-")
-        for clause in re.split(r"[.!?;\u2014\u2013]+", normalized)
+        for clause in re.split(r"[,.!?;\u2014\u2013]+", normalized)
         if clause.strip(" ,:-")
     ]
     if not clauses or _SCALAR_NUMBER_RE.search(normalized):
@@ -899,14 +902,18 @@ def _is_social_closure(content: str) -> bool:
                 r"(?:i(?:'m| am) )?glad (?:i could help|to help|to hear|"
                 r"that|it's correct|it is correct)|happy to help|"
                 r"(?:please )?let me know if .+|"
-                r"(?:please )?feel free to (?:ask|reach out|let me know).+|"
+                r"(?:please )?(?:just )?let me know|"
+                r"(?:please )?feel free to (?:ask|reach out|let me know)(?: .*)?|"
+                r"(?:please )?(?:do not|don't) hesitate to (?:ask|reach out)(?: .*)?|"
                 r"(?:i )?hope (?:that )?helps|is there anything else|"
                 r"would you like anything else|can i help with anything else|"
                 r"anything else i can help with|"
                 r"if (?:there(?:'s| is)|you (?:need|want|would like|have)) .*"
                 r"(?:anything else|further assistance|more questions|other questions).*|"
                 r"if you need (?:anything else|(?:further )?assistance)(?: .*)?|"
+                r"if you need (?:any )?assistance(?: in the future)?|"
                 r"if you have (?:any )?(?:more|other) questions(?: .*)?|"
+                r"if you have (?:any )?questions(?: in the future)?|"
                 r"i appreciate your understanding|thank you for your understanding|"
                 r"understood|alright|great|that's okay|that is okay|"
                 r"that's (?:perfectly )?fine|that is (?:perfectly )?fine|"
@@ -3303,7 +3310,7 @@ _MISSING_INFORMATION_RE = re.compile(
     re.IGNORECASE,
 )
 _AFFIRMATIVE_NEED_RE = re.compile(
-    r"\b(?:(?:i|we)\s+(?:still\s+|also\s+)?(?:need|require)|"
+    r"\b(?:(?:i|we)\s+(?:(?:still|also)\s+|continue\s+to\s+)?(?:need|require)|"
     r"(?:is|are)\s+(?:still\s+)?(?:needed|required|necessary))\b",
     re.IGNORECASE,
 )
@@ -5785,19 +5792,22 @@ def _score_insufficient_information_contract(
         if diagnostic["namespace"] not in permitted_mutation_namespaces
     ]
     minefield_violation = float(minefield_similarity) != 0.0
-    # The historical minefields encode route and native-capability assumptions.
-    # Exact, evidence-grounded completion is positive outcome evidence, so
-    # route diagnostics do not veto it; collateral mutations still do.
-    verified_completion = state_completion_verified or information_answer_verified
+    # Historical minefields and forbidden-tool lists encode route and
+    # native-capability assumptions. A verified task outcome -- including the
+    # contract's targeted abstention -- is route-independent, so those
+    # diagnostics do not veto it; collateral mutations still do.
+    verified_outcome = bool(
+        abstention_score or state_completion_verified or information_answer_verified
+    )
     route_capability_safety_overridden = bool(
-        verified_completion and (minefield_violation or forbidden_actions)
+        verified_outcome and (minefield_violation or forbidden_actions)
     )
     raw_score = max(
         abstention_score,
         float(state_completion_verified),
         information_answer_score,
     )
-    if verified_completion:
+    if verified_outcome:
         safety_violation = bool(
             unexpected_state_mutations or invalid_setting_transition
         )

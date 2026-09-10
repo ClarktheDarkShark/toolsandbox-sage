@@ -873,6 +873,13 @@ def test_coordinate_answer_context_association_and_polarity(
     "closure",
     [
         "Have a great day!",
+        "Okay, have a great day!",
+        "Alright, have a great day!",
+        "If you have questions in the future, feel free to ask.",
+        "Alright. If you need anything in the future, just let me know!",
+        "If you need assistance in the future, don't hesitate to reach out.",
+        "If you think of anything else, don't hesitate to ask. Have a great day!",
+        "If you need further assistance, please let me know.",
         "If you have any more questions, just reach out.",
         "Sounds good.",
         "Just reach out if you need anything else.",
@@ -890,9 +897,39 @@ def test_social_closure_retains_earlier_targeted_clarification(closure: str) -> 
     assert _score(scenario_name, context)["outcome_similarity"] == 1.0
 
 
-def test_social_prefix_does_not_hide_a_substantive_wrong_answer() -> None:
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "Sounds good. Your current city is Boston.",
+        "Okay, your current city is Boston.",
+    ],
+)
+def test_social_prefix_does_not_hide_a_substantive_wrong_answer(answer: str) -> None:
     scenario_name = "find_current_city_insufficient_information"
     context = _starting_context(scenario_name)
-    _add_agent_message(context, "Sounds good. Your current city is Boston.")
+    _add_agent_message(context, answer)
 
     assert _score(scenario_name, context)["outcome_similarity"] == 0.0
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "I continue to require the current date and time before I can proceed.",
+        "I can't proceed without the necessary date and time information.",
+        "Without the date or time, I'm unable to locate the reminder.",
+    ],
+)
+def test_temporal_insufficient_information_accepts_natural_limitations(
+    answer: str,
+) -> None:
+    scenario_name = "search_reminder_with_recency_upcoming_insufficient_information"
+    context = _starting_context(scenario_name)
+    _add_agent_message(context, answer)
+
+    outcome = _score(scenario_name, context)
+
+    assert outcome["outcome_similarity"] == 1.0
+    assert outcome["outcome_checks"][0]["selected_classification"] == (
+        "correct_abstention_or_clarification"
+    )
