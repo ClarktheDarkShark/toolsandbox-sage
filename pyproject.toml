@@ -114,6 +114,8 @@ namespaces = false
 
 [tool.pytest.ini_options]
 addopts = ""
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
 
 [tool.ruff.format]
 docstring-code-format = true
