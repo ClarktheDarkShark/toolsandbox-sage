@@ -1725,7 +1725,7 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "Never treat message_send alone as sufficient for a named recipient. message_send alone is sufficient only when target_identifier already looks like a concrete phone number.",
             "If required_original_tools or available_original_tools is a string, treat it as one capability value, not as an iterable of characters.",
             "If required_original_tools is omitted, malformed, or incomplete, infer required semantic capabilities from requested_action, user_request, and target_identifier before computing missing_information.",
-            "A reminder or message search whose meaning depends on yesterday, today, tomorrow, upcoming, or another relative current-time anchor requires current_time unless the visible request supplies an explicit absolute date. If current_time is unavailable, abstain and ask for current date/time or an explicit date; never invent a timestamp. If current_time is available, return continue_with_original_tool so the caller can use the normal recency flow.",
+            "A reminder or message search whose meaning depends on yesterday, today, tomorrow, upcoming, later, or another relative current-time anchor requires current_time unless the visible request supplies an explicit absolute date. If current_time is unavailable, abstain and ask for current date/time or an explicit date; never invent a timestamp. If current_time is available, return continue_with_original_tool so the caller can use the normal recency flow.",
             "A blank target_identifier is valid for a read-only relative_time_search and must not by itself cause abstention.",
             "The function must never return should_abstain false when the action would require guessing a phone number, person_id, reminder_id, current location, or missing search result.",
         )
@@ -2820,7 +2820,7 @@ def _model_authored_tool_specific_guidance(request: ToolGenerationRequest) -> st
             "and available_original_tools values as single capabilities, not "
             "character lists. Normalize get_current_timestamp to current_time. "
             "Relative-time reminder/message searches using yesterday, today, "
-            "tomorrow, upcoming, or a comparable current-time anchor require "
+            "tomorrow, upcoming, later, or a comparable current-time anchor require "
             "current_time unless an explicit absolute date is visible. If that "
             "capability is unavailable, abstain and ask for the current date/time "
             "or an explicit date rather than inventing a timestamp. If it is "

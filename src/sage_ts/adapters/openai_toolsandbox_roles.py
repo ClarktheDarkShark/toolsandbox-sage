@@ -1553,6 +1553,7 @@ def _recency_search_window_requested(openai_messages: object) -> bool:
             "tomorrow",
             "tonight",
             "upcoming",
+            "later",
             "later today",
             "next reminder",
             "next todo",
@@ -1617,7 +1618,7 @@ def _relative_time_search_missing_current_time(
         return False
     return bool(
         re.search(
-            r"\b(?:yesterday|today|tomorrow|tonight|upcoming|later\s+today|"
+            r"\b(?:yesterday|today|tomorrow|tonight|upcoming|later(?:\s+today)?|"
             r"next\s+(?:reminder|todo|to-do|message))\b",
             request,
         )
@@ -8952,7 +8953,7 @@ def _safe_abstention_helper_actor_policy_message(
             "a side-effect action or record search when the request may be missing "
             "a required original tool, concrete search criteria, a concrete visible "
             "target id, or a unique visible target. For recency-only searches such "
-            "as latest, oldest, recent, upcoming, yesterday, today, or tomorrow "
+            "as latest, oldest, recent, upcoming, later, yesterday, today, or tomorrow "
             "without a concrete record name, content phrase, or visible record "
             "set, call this generated tool before repeating original searches. "
             "For required_original_tools, pass semantic capability labels rather "
@@ -8970,7 +8971,7 @@ def _safe_abstention_helper_actor_policy_message(
             "kind of scalar. If the helper says to abstain or provides a final "
             "answer recommendation, do not perform the side effect. For a reminder "
             "or message search whose meaning depends on yesterday, today, tomorrow, "
-            "upcoming, or another relative current-time anchor, include current_time "
+            "upcoming, later, or another relative current-time anchor, include current_time "
             "in required_original_tools. If current_time is absent from the visible "
             "available_original_tools list, call this helper instead of inventing a "
             "timestamp or manually constructing temporal search bounds. If "
@@ -11959,6 +11960,60 @@ def _safe_action_capability(value: str) -> str:
     return mapping.get(text, mapping.get(normalized_text, text))
 
 
+def _ground_safe_abstention_available_tools(
+    completion: ChatCompletion,
+    openai_tools: object,
+) -> ChatCompletion:
+    """Bind abstention-helper availability to the routed original schemas.
+
+    ``available_original_tools`` describes host state, not a model judgment.  A
+    model can still author the requested action and semantic requirements, but
+    it must not be able to invent a prerequisite tool that is absent from its
+    routed inventory.  This host-owned inventory is independent of task labels
+    and evaluator targets, so reconciliation adds no hidden outcome information.
+    """
+
+    if openai_tools is NOT_GIVEN:
+        return completion
+    helper_names = _validation_abstention_tool_names(openai_tools)
+    if not helper_names:
+        return completion
+    helper_execution_names = {
+        _execution_facing_tool_name(name) for name in helper_names
+    }
+    available_capabilities = sorted(
+        {
+            _safe_action_capability(name)
+            for name in (
+                _tool_names_execution_facing(openai_tools)
+                & ORIGINAL_TOOLSANDBOX_TOOL_NAMES
+            )
+        }
+    )
+    for choice in completion.choices:
+        for tool_call in choice.message.tool_calls or []:
+            function = tool_call.function
+            name = str(function.name or "")
+            if (
+                name not in helper_names
+                and _execution_facing_tool_name(name) not in helper_execution_names
+            ):
+                continue
+            try:
+                arguments = json.loads(str(function.arguments or "{}"))
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(arguments, dict):
+                continue
+            arguments["available_original_tools"] = available_capabilities
+            function.arguments = json.dumps(
+                arguments,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+    return completion
+
+
 def _text_contains_lat_lon_pair(text: str) -> bool:
     lower = text.lower()
     numbers: list[float] = []
@@ -12573,8 +12628,12 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
                 prompt_openai_tools,
             )
 
-        return _with_transient_openai_retries(
+        response = _with_transient_openai_retries(
             lambda: call_with_optional_retry_tool_choice(prompted_messages)
+        )
+        return _ground_safe_abstention_available_tools(
+            response,
+            openai_tools,
         )
 
 

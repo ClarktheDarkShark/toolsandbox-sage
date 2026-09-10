@@ -705,6 +705,35 @@ def test_safe_abstention_normalization_requires_clock_for_relative_search() -> N
     )
 
 
+def test_safe_abstention_normalization_requires_clock_for_standalone_later() -> None:
+    normalized = normalize_generated_tool_output(
+        _relative_time_safe_abstention_tool(),
+        {
+            "should_abstain": False,
+            "missing_information": [],
+            "required_original_tools": [],
+            "safe_next_action": "continue_with_original_tool",
+            "final_answer_recommendation": "",
+            "abstain_reason": "",
+        },
+        inputs={
+            "user_request": "What's on my todo later?",
+            "requested_action": "relative_time_search",
+            "target_identifier": "",
+            "required_original_tools": [],
+            "available_original_tools": ["search_reminder"],
+            "visible_records_count": 0,
+        },
+    )
+
+    assert normalized["should_abstain"] is True
+    assert normalized["missing_information"] == ["current_time"]
+    assert normalized["final_answer_recommendation"] == (
+        "I need the current date and time, or an explicit date, to resolve the "
+        "relative time in that request."
+    )
+
+
 def test_safe_abstention_allows_blank_target_when_relative_search_has_clock() -> None:
     normalized = normalize_generated_tool_output(
         _relative_time_safe_abstention_tool(),

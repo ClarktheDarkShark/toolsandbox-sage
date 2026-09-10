@@ -5328,7 +5328,7 @@ def _visible_task_signals(
         and not has_absolute_date_signal
         and bool(
             re.search(
-                r"\b(?:yesterday|today|tomorrow|tonight|upcoming|later\s+today|"
+                r"\b(?:yesterday|today|tomorrow|tonight|upcoming|later(?:\s+today)?|"
                 r"next\s+(?:reminder|todo|to-do|message))\b",
                 text,
             )

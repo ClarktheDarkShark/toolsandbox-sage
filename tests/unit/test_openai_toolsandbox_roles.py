@@ -1168,6 +1168,219 @@ def test_relative_time_search_routes_to_abstention_without_clock() -> None:
     )
 
 
+def test_relative_time_search_treats_standalone_later_as_clock_dependent() -> None:
+    safe_helper = {
+        "type": "function",
+        "function": {
+            "name": "prepare_safe_action_or_abstain",
+            "description": "Prepare a safe action or abstain decision.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_request": {"type": "string"},
+                    "requested_action": {"type": "string"},
+                    "target_identifier": {"type": "string"},
+                    "required_original_tools": {"type": "array"},
+                    "available_original_tools": {"type": "array"},
+                    "visible_records_count": {"type": "integer"},
+                },
+            },
+        },
+    }
+    tools = [
+        safe_helper,
+        {"type": "function", "function": {"name": "search_reminder"}},
+    ]
+
+    assert (
+        toolsandbox_roles._first_attempt_generated_tool_choice(
+            [{"role": "user", "content": "What's on my todo later?"}],
+            tools,
+        )
+        == "prepare_safe_action_or_abstain"
+    )
+
+
+def test_safe_abstention_call_uses_host_grounded_available_inventory() -> None:
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "prepare_safe_action_or_abstain",
+                "description": "Prepare a safe action or abstain decision.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "user_request": {"type": "string"},
+                        "requested_action": {"type": "string"},
+                        "required_original_tools": {"type": "array"},
+                        "available_original_tools": {"type": "array"},
+                    },
+                },
+            },
+        },
+        {"type": "function", "function": {"name": "search_reminder"}},
+        {
+            "type": "function",
+            "function": {"name": "timestamp_to_datetime_info"},
+        },
+    ]
+    completion = toolsandbox_roles.ChatCompletion.model_validate(
+        {
+            "id": "grounded-safe-helper",
+            "choices": [
+                {
+                    "finish_reason": "tool_calls",
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {
+                                    "name": "prepare_safe_action_or_abstain",
+                                    "arguments": json.dumps(
+                                        {
+                                            "user_request": (
+                                                "Which reminder was due yesterday?"
+                                            ),
+                                            "requested_action": (
+                                                "relative_time_search"
+                                            ),
+                                            "required_original_tools": [
+                                                "reminder_lookup",
+                                                "current_time",
+                                            ],
+                                            "available_original_tools": [
+                                                "reminder_lookup",
+                                                "current_time",
+                                            ],
+                                        }
+                                    ),
+                                },
+                            }
+                        ],
+                    },
+                }
+            ],
+            "created": 0,
+            "model": "gpt-4o-mini",
+            "object": "chat.completion",
+        }
+    )
+
+    grounded = toolsandbox_roles._ground_safe_abstention_available_tools(
+        completion,
+        tools,
+    )
+    arguments = json.loads(grounded.choices[0].message.tool_calls[0].function.arguments)
+
+    assert arguments["available_original_tools"] == [
+        "reminder_lookup",
+        "timestamp_to_datetime_info",
+    ]
+    assert arguments["required_original_tools"] == [
+        "reminder_lookup",
+        "current_time",
+    ]
+
+    tools.append({"type": "function", "function": {"name": "get_current_timestamp"}})
+    grounded.choices[0].message.tool_calls[0].function.arguments = json.dumps(
+        {
+            **arguments,
+            "available_original_tools": ["reminder_lookup"],
+        }
+    )
+    grounded_with_clock = toolsandbox_roles._ground_safe_abstention_available_tools(
+        grounded,
+        tools,
+    )
+    arguments_with_clock = json.loads(
+        grounded_with_clock.choices[0].message.tool_calls[0].function.arguments
+    )
+
+    assert arguments_with_clock["available_original_tools"] == [
+        "current_time",
+        "reminder_lookup",
+        "timestamp_to_datetime_info",
+    ]
+
+
+def test_safe_abstention_inventory_grounding_supports_scrambled_names(
+    monkeypatch,
+) -> None:
+    aliases = {
+        "generated_tools_0": "prepare_safe_action_or_abstain",
+        "reminder_3": "search_reminder",
+    }
+    monkeypatch.setattr(
+        toolsandbox_roles,
+        "get_current_context",
+        lambda: SimpleNamespace(
+            get_execution_facing_tool_name=lambda name: aliases.get(name, name)
+        ),
+    )
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "generated_tools_0",
+                "description": "Prepare a safe action or abstain decision.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "user_request": {"type": "string"},
+                        "requested_action": {"type": "string"},
+                        "required_original_tools": {"type": "array"},
+                        "available_original_tools": {"type": "array"},
+                    },
+                },
+            },
+        },
+        {"type": "function", "function": {"name": "reminder_3"}},
+    ]
+    completion = toolsandbox_roles.ChatCompletion.model_validate(
+        {
+            "id": "grounded-scrambled-safe-helper",
+            "choices": [
+                {
+                    "finish_reason": "tool_calls",
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {
+                                    "name": "generated_tools_0",
+                                    "arguments": json.dumps(
+                                        {"available_original_tools": ["current_time"]}
+                                    ),
+                                },
+                            }
+                        ],
+                    },
+                }
+            ],
+            "created": 0,
+            "model": "gpt-4o-mini",
+            "object": "chat.completion",
+        }
+    )
+
+    grounded = toolsandbox_roles._ground_safe_abstention_available_tools(
+        completion,
+        tools,
+    )
+    arguments = json.loads(grounded.choices[0].message.tool_calls[0].function.arguments)
+
+    assert arguments["available_original_tools"] == ["reminder_lookup"]
+
+
 def test_relative_time_search_with_clock_preserves_clock_then_window_flow() -> None:
     safe_helper = {
         "type": "function",

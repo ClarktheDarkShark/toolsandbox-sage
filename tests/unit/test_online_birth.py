@@ -954,6 +954,17 @@ def test_relative_time_search_without_clock_births_safe_abstention_helper() -> N
     assert "derived_value:resolve_search_window_or_bounds" in keys
 
 
+def test_standalone_later_without_clock_births_safe_abstention_helper() -> None:
+    signals = _visible_task_signals(
+        "What's on my todo later?",
+        ("search_reminder", "end_conversation"),
+    )
+
+    assert "recency_search" in signals
+    assert "missing_current_time_prerequisite" in signals
+    assert "safe_abstain_needed" in signals
+
+
 def test_relative_time_search_with_clock_preserves_recency_birth() -> None:
     signals = _visible_task_signals(
         "Which reminder was due yesterday?",

@@ -495,7 +495,7 @@ def _normalize_validation_abstention_output(
             for token in ("reminder", "todo", "to-do", "message")
         )
         and re.search(
-            r"\b(?:yesterday|today|tomorrow|tonight|upcoming|later\s+today|"
+            r"\b(?:yesterday|today|tomorrow|tonight|upcoming|later(?:\s+today)?|"
             r"next\s+(?:reminder|todo|to-do|message))\b",
             user_request_lower,
         )
