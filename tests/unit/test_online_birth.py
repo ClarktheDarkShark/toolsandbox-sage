@@ -931,6 +931,40 @@ def test_visible_context_oldest_message_with_send_tool_is_read_only() -> None:
     assert "safe_abstain_needed" not in signals
 
 
+def test_relative_time_search_without_clock_births_safe_abstention_helper() -> None:
+    context = ExecutionContext(tool_allow_list=["search_reminder", "end_conversation"])
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.USER,
+                "recipient": RoleType.AGENT,
+                "content": "Which reminder was due yesterday?",
+            }
+        ],
+    )
+
+    observations = classify_visible_task_observations(
+        "opaque_scenario_name",
+        Scenario(starting_context=context),
+    )
+    keys = {observation.canonical_key for observation in observations}
+
+    assert "validation:prepare_safe_action_or_abstain" in keys
+    assert "derived_value:resolve_search_window_or_bounds" in keys
+
+
+def test_relative_time_search_with_clock_preserves_recency_birth() -> None:
+    signals = _visible_task_signals(
+        "Which reminder was due yesterday?",
+        ("search_reminder", "get_current_timestamp", "end_conversation"),
+    )
+
+    assert "recency_search" in signals
+    assert "missing_current_time_prerequisite" not in signals
+    assert "safe_abstain_needed" not in signals
+
+
 def test_visible_context_explicit_text_request_still_marks_send_intent() -> None:
     signals = _visible_task_signals(
         "Text Alice that I am running late",

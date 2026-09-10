@@ -10,6 +10,8 @@ from sage_ts.evaluation.control_baseline_cache import (
 )
 from sage_ts.orchestration.self_evolution_reflection import (
     SelfEvolutionReflectionController,
+    _online_feedback_outcome,
+    _online_feedback_outcome_with_source,
 )
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
@@ -24,6 +26,60 @@ def _single_record_legacy_cache(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _scenario() -> Scenario:
     return Scenario(starting_context=ExecutionContext())
+
+
+@pytest.mark.parametrize(
+    ("row", "expected", "expected_source"),
+    [
+        pytest.param(
+            {
+                "outcome_similarity": 0.75,
+                "online_feedback_outcome_similarity": None,
+            },
+            0.75,
+            "audited_outcome_fallback",
+            id="null-paper-feedback-falls-back",
+        ),
+        pytest.param(
+            {"outcome_similarity": 0.75},
+            0.75,
+            "audited_outcome_fallback",
+            id="missing-paper-feedback-falls-back",
+        ),
+        pytest.param(
+            {
+                "outcome_similarity": 0.75,
+                "online_feedback_outcome_similarity": 0.0,
+            },
+            0.0,
+            "paper_era_online_feedback",
+            id="zero-paper-feedback-is-preserved",
+        ),
+        pytest.param(
+            {
+                "outcome_similarity": 0.25,
+                "online_feedback_outcome_similarity": 0.75,
+            },
+            0.75,
+            "paper_era_online_feedback",
+            id="nonzero-paper-feedback-is-preserved",
+        ),
+        pytest.param(
+            {
+                "outcome_similarity": None,
+                "online_feedback_outcome_similarity": None,
+            },
+            None,
+            "unavailable",
+            id="both-outcomes-unavailable",
+        ),
+    ],
+)
+def test_online_feedback_outcome_fallback(
+    row: dict[str, object], expected: object, expected_source: str
+) -> None:
+    assert _online_feedback_outcome(row) == expected
+    assert _online_feedback_outcome_with_source(row) == (expected, expected_source)
 
 
 def _add_cached_baseline(
@@ -532,8 +588,100 @@ def test_reflection_uses_paper_feedback_signal_not_reporting_outcome(
         .splitlines()[0]
     )
     assert feedback["control_outcome"] == 0.25
+    assert feedback["control_outcome_source"] == "paper_era_online_feedback"
     assert feedback["candidate_outcome"] == 0.75
+    assert feedback["candidate_outcome_source"] == "paper_era_online_feedback"
     assert feedback["outcome_delta"] == 0.5
+
+
+def test_reflection_records_audited_fallback_outcome_sources(tmp_path: Path) -> None:
+    scenario_name = "search_phone_number_with_name"
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            scenario_name: {
+                "name": scenario_name,
+                "similarity": 0.25,
+                "outcome_similarity": 0.25,
+                "online_feedback_outcome_similarity": None,
+            }
+        },
+        require_fresh_control=True,
+    )
+
+    controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={
+            "similarity": 0.75,
+            "outcome_similarity": 0.75,
+            "online_feedback_outcome_similarity": None,
+        },
+        selection_record={},
+        side_effect_failures=[],
+    )
+
+    feedback = json.loads(
+        (tmp_path / "run" / "self_evolution_task_feedback.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
+    assert feedback["control_outcome"] == 0.25
+    assert feedback["control_outcome_source"] == "audited_outcome_fallback"
+    assert feedback["candidate_outcome"] == 0.75
+    assert feedback["candidate_outcome_source"] == "audited_outcome_fallback"
+    assert feedback["outcome_delta"] == 0.5
+
+
+def test_reflection_records_unavailable_outcome_sources(tmp_path: Path) -> None:
+    scenario_name = "search_phone_number_with_name"
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            scenario_name: {
+                "name": scenario_name,
+                "similarity": 0.25,
+                "outcome_similarity": None,
+                "online_feedback_outcome_similarity": None,
+            }
+        },
+        require_fresh_control=True,
+    )
+
+    controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={
+            "similarity": 0.75,
+            "outcome_similarity": None,
+            "online_feedback_outcome_similarity": None,
+        },
+        selection_record={},
+        side_effect_failures=[],
+    )
+
+    feedback = json.loads(
+        (tmp_path / "run" / "self_evolution_task_feedback.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
+    assert feedback["control_outcome"] is None
+    assert feedback["control_outcome_source"] == "unavailable"
+    assert feedback["candidate_outcome"] is None
+    assert feedback["candidate_outcome_source"] == "unavailable"
+    assert feedback["outcome_delta"] is None
 
 
 def test_strict_reflection_consumes_ordered_streamed_control_rows(

@@ -86,14 +86,25 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
             "If required tools are available and a unique target identifier is "
             "present, set should_abstain false, missing_information empty, "
             "safe_next_action continue_with_original_tool, and blank final answer "
-            "recommendation. The helper must never call, select, modify, remove, "
+            "recommendation. Treat current-time access as a semantic capability "
+            "named current_time. A request whose meaning depends on a relative "
+            "temporal anchor such as yesterday, today, tomorrow, or upcoming must "
+            "require current_time unless the user supplied an explicit absolute "
+            "date. When current_time is unavailable, abstain with current_time in "
+            "missing_information and ask for the current date/time or an explicit "
+            "date instead of inventing a timestamp. When current_time is available, "
+            "do not block the normal relative-time workflow. A blank "
+            "target_identifier is valid for a read-only relative_time_search and "
+            "must not by itself cause abstention. The helper must never call, "
+            "select, modify, remove, "
             "send, create, or guess records; it only prepares a final abstention "
             "or safe-continue recommendation. The spec must list the original "
             "ToolSandbox calls it protects in both required_original_tool_calls "
             "and preserves_side_effect_tools, including search_contacts, "
             "remove_contact, modify_contact, search_messages, search_reminder, "
             "remove_reminder, modify_reminder, add_reminder, and "
-            "send_message_with_phone_number when those actions are supported. "
+            "send_message_with_phone_number when those actions are supported, and "
+            "get_current_timestamp when relative-time actions are supported. "
             "Include positive triggers for "
             "insufficient_information, missing original tool, missing precondition, "
             "missing target, unavailable search tool, and ambiguous target. "
@@ -168,6 +179,49 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
             ),
             ToolExample(
                 {
+                    "user_request": "Which reminder was due yesterday?",
+                    "requested_action": "relative_time_search",
+                    "target_identifier": "",
+                    "required_original_tools": ["reminder_lookup", "current_time"],
+                    "available_original_tools": ["reminder_lookup"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["current_time"],
+                    "required_original_tools": ["reminder_lookup", "current_time"],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "I need the current date and time, or an explicit date, "
+                        "to resolve the relative time in that request."
+                    ),
+                    "abstain_reason": "missing_required_original_tool",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Which reminder was due yesterday?",
+                    "requested_action": "relative_time_search",
+                    "target_identifier": "",
+                    "required_original_tools": ["reminder_lookup", "current_time"],
+                    "available_original_tools": [
+                        "reminder_lookup",
+                        "current_time",
+                    ],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": ["reminder_lookup", "current_time"],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
                     "user_request": (
                         "Send a message to Fredrik Thordendal saying: "
                         '"How\'s the new album coming along."'
@@ -197,6 +251,7 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
         inadequacy_signals=(
             "missing_user_information",
             "missing_original_tool_precondition",
+            "missing_current_time_prerequisite",
             "unsafe_guess_before_side_effect",
         ),
         planner_failures=("abstain_or_clarify_instead_of_guessing",),
@@ -5187,6 +5242,12 @@ def _visible_task_signals(
             r"\b(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b",
             text,
         )
+        or re.search(
+            r"\b(?:january|february|march|april|may|june|july|august|"
+            r"september|october|november|december)\s+\d{1,2}(?:st|nd|rd|th)?"
+            r"(?:,?\s+\d{4})?\b",
+            text,
+        )
     )
     add("relative_time", has_relative_time_signal)
     add("weekday_time", has_weekday_time_signal)
@@ -5261,6 +5322,23 @@ def _visible_task_signals(
             ),
         ),
     )
+    relative_anchor_requires_current_time = (
+        "recency_search" in signals
+        and "get_current_timestamp" not in tools
+        and not has_absolute_date_signal
+        and bool(
+            re.search(
+                r"\b(?:yesterday|today|tomorrow|tonight|upcoming|later\s+today|"
+                r"next\s+(?:reminder|todo|to-do|message))\b",
+                text,
+            )
+        )
+    )
+    add(
+        "missing_current_time_prerequisite",
+        relative_anchor_requires_current_time,
+    )
+    add("safe_abstain_needed", relative_anchor_requires_current_time)
     add(
         "upcoming_reminder_search",
         "recency_search" in signals

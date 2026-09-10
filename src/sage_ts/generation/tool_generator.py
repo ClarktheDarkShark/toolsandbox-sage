@@ -648,6 +648,9 @@ MODEL_AUTHORED_DEFAULT_ORIGINAL_CALLS_BY_TOOL: dict[str, tuple[str, ...]] = {
         "remove_contact",
         "modify_contact",
         "send_message_with_phone_number",
+        "search_reminder",
+        "search_messages",
+        "get_current_timestamp",
     ),
     "extract_service_answer_field": (
         "search_location_around_lat_lon",
@@ -1716,11 +1719,14 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
         return (
             "Return exactly these output keys on every branch: should_abstain, missing_information, required_original_tools, safe_next_action, final_answer_recommendation, and abstain_reason.",
             "Normalize required_original_tools and available_original_tools from concrete ToolSandbox names to semantic capabilities: search_contacts becomes contact_lookup and send_message_with_phone_number becomes message_send.",
+            "Normalize get_current_timestamp to the semantic capability current_time.",
             "For requested_action message_send, send_message, or any send/text/message action, a target_identifier that is not a phone number is a named recipient and requires contact_lookup before message_send.",
             "If a named-recipient message send lacks contact_lookup in available_original_tools, return should_abstain true, include contact_lookup in missing_information, set safe_next_action ask_user_or_abstain, and recommend that the message cannot be sent safely because the recipient cannot be resolved to a phone number.",
             "Never treat message_send alone as sufficient for a named recipient. message_send alone is sufficient only when target_identifier already looks like a concrete phone number.",
             "If required_original_tools or available_original_tools is a string, treat it as one capability value, not as an iterable of characters.",
             "If required_original_tools is omitted, malformed, or incomplete, infer required semantic capabilities from requested_action, user_request, and target_identifier before computing missing_information.",
+            "A reminder or message search whose meaning depends on yesterday, today, tomorrow, upcoming, or another relative current-time anchor requires current_time unless the visible request supplies an explicit absolute date. If current_time is unavailable, abstain and ask for current date/time or an explicit date; never invent a timestamp. If current_time is available, return continue_with_original_tool so the caller can use the normal recency flow.",
+            "A blank target_identifier is valid for a read-only relative_time_search and must not by itself cause abstention.",
             "The function must never return should_abstain false when the action would require guessing a phone number, person_id, reminder_id, current location, or missing search result.",
         )
     if request.suggested_tool_name == "prepare_upcoming_reminder_search_args":
@@ -2812,7 +2818,15 @@ def _model_authored_tool_specific_guidance(request: ToolGenerationRequest) -> st
             "return continue_with_original_tool for a named-recipient send merely "
             "because message_send is available. Treat string required_original_tools "
             "and available_original_tools values as single capabilities, not "
-            "character lists. "
+            "character lists. Normalize get_current_timestamp to current_time. "
+            "Relative-time reminder/message searches using yesterday, today, "
+            "tomorrow, upcoming, or a comparable current-time anchor require "
+            "current_time unless an explicit absolute date is visible. If that "
+            "capability is unavailable, abstain and ask for the current date/time "
+            "or an explicit date rather than inventing a timestamp. If it is "
+            "available, allow the normal original-clock and recency-helper flow. "
+            "A blank target_identifier is valid for a read-only "
+            "relative_time_search and must not itself cause abstention. "
         )
     if request.suggested_tool_name == "prepare_reminder_creation_args":
         return (

@@ -41,6 +41,21 @@ from sage_ts.runtime.toolsandbox_integration import (
 from tool_sandbox.common.scenario import Scenario
 
 
+def _online_birth_feedback_result(result: dict[str, object]) -> dict[str, object]:
+    """Select the best available outcome signal for post-task tool birth."""
+
+    trace_result = dict(result)
+    paper_feedback = result.get("online_feedback_outcome_similarity")
+    if paper_feedback is not None:
+        trace_result["outcome_similarity"] = paper_feedback
+        trace_result["online_birth_outcome_source"] = "paper_era_online_feedback"
+    elif result.get("outcome_similarity") is not None:
+        trace_result["online_birth_outcome_source"] = "audited_outcome_fallback"
+    else:
+        trace_result["online_birth_outcome_source"] = "unavailable"
+    return trace_result
+
+
 def _reuse_log_tools(output_directory: Path, scenario_name: str) -> list[str]:
     path = output_directory / "reuse_events.jsonl"
     if not path.exists():
@@ -1184,15 +1199,10 @@ def run_sage_with_registry(
                     },
                 )
             return result
-        # Tool birth used the paper-era outcome signal in the validated policy
-        # runtime. Reporting now uses the audited v5 evaluator, so give the
-        # inadequacy classifier an isolated compatibility view instead of
-        # changing the published result row or the historical birth behavior.
-        trace_result = dict(result)
-        if "online_feedback_outcome_similarity" in result:
-            trace_result["outcome_similarity"] = result[
-                "online_feedback_outcome_similarity"
-            ]
+        # Prefer the validated paper-era feedback when it exists. New explicit
+        # contracts may not have that legacy signal, so fall back to their
+        # audited outcome instead of making those failures invisible to birth.
+        trace_result = _online_birth_feedback_result(result)
         visible_messages = _visible_conversation_messages_for_observation(
             output_directory,
             name,

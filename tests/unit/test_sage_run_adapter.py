@@ -8,6 +8,7 @@ import pytest
 
 from sage_ts.adapters.sage_run_adapter import (
     SageRunConfig,
+    _online_birth_feedback_result,
     _side_effect_followup_failures,
     _side_effect_followup_failures_from_trace_events,
     _snapshot_registry_checkpoint,
@@ -24,6 +25,55 @@ from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
+
+
+@pytest.mark.parametrize(
+    ("result", "expected_outcome", "expected_source"),
+    [
+        pytest.param(
+            {
+                "outcome_similarity": 0.75,
+                "online_feedback_outcome_similarity": 0.0,
+            },
+            0.0,
+            "paper_era_online_feedback",
+            id="paper-zero-remains-authoritative",
+        ),
+        pytest.param(
+            {
+                "outcome_similarity": 0.75,
+                "online_feedback_outcome_similarity": None,
+            },
+            0.75,
+            "audited_outcome_fallback",
+            id="null-paper-feedback-falls-back",
+        ),
+        pytest.param(
+            {"outcome_similarity": 0.75},
+            0.75,
+            "audited_outcome_fallback",
+            id="missing-paper-feedback-falls-back",
+        ),
+        pytest.param(
+            {
+                "outcome_similarity": None,
+                "online_feedback_outcome_similarity": None,
+            },
+            None,
+            "unavailable",
+            id="no-outcome-is-unavailable",
+        ),
+    ],
+)
+def test_online_birth_feedback_result_uses_audited_null_fallback(
+    result: dict[str, object],
+    expected_outcome: float | None,
+    expected_source: str,
+) -> None:
+    selected = _online_birth_feedback_result(result)
+
+    assert selected["outcome_similarity"] == expected_outcome
+    assert selected["online_birth_outcome_source"] == expected_source
 
 
 def canonicalizer_tool() -> GeneratedTool:

@@ -551,6 +551,18 @@ def test_generic_pure_answer_rejects_restored_collateral_state() -> None:
     scenario_name = "find_days_till_holiday_3_distraction_tools"
     execution_context = _starting_context(scenario_name)
     contacts = execution_context.get_database(DatabaseNamespace.CONTACT)
+    reminders = execution_context.get_database(DatabaseNamespace.REMINDER).to_dicts()
+    fixture_now = dt.datetime.fromtimestamp(
+        (
+            max(float(row["creation_timestamp"]) for row in reminders)
+            + max(float(row["reminder_timestamp"]) for row in reminders)
+        )
+        / 2
+    )
+    christmas = dt.datetime(fixture_now.year, 12, 25)
+    if christmas <= fixture_now:
+        christmas = dt.datetime(fixture_now.year + 1, 12, 25)
+    expected_days = (christmas - fixture_now).days
     _commit_state(
         execution_context,
         DatabaseNamespace.CONTACT,
@@ -566,7 +578,7 @@ def test_generic_pure_answer_rejects_restored_collateral_state() -> None:
     _add_tool_result(execution_context, "get_current_timestamp", 1777597539.872639)
     _add_agent_message(
         execution_context,
-        "There are 107 days until Christmas Day.",
+        f"There are {expected_days} days until Christmas Day.",
     )
 
     outcome = _score(scenario_name, execution_context)
@@ -586,8 +598,20 @@ def test_generic_two_state_contact_progression_remains_valid() -> None:
     execution_context = _starting_context(scenario_name)
     contacts = execution_context.get_database(DatabaseNamespace.CONTACT)
     target_names = ["Fredrik Thordendal", "John Petrucci"]
-    enemies = contacts.with_columns(
-        pl.when(pl.col("name").is_in(target_names))
+    partial_enemies = contacts.with_columns(
+        pl.when(pl.col("name") == target_names[0])
+        .then(pl.lit("enemy"))
+        .otherwise(pl.col("relationship"))
+        .alias("relationship")
+    )
+    _commit_state(
+        execution_context,
+        DatabaseNamespace.CONTACT,
+        partial_enemies,
+        "generated_set_first_relationship_enemy()",
+    )
+    enemies = partial_enemies.with_columns(
+        pl.when(pl.col("name") == target_names[1])
         .then(pl.lit("enemy"))
         .otherwise(pl.col("relationship"))
         .alias("relationship")
@@ -596,15 +620,27 @@ def test_generic_two_state_contact_progression_remains_valid() -> None:
         execution_context,
         DatabaseNamespace.CONTACT,
         enemies,
-        "generated_set_relationship_enemy()",
+        "generated_set_second_relationship_enemy()",
     )
     _add_agent_message(
         execution_context,
         "Fredrik Thordendal and John Petrucci are now your enemies",
     )
     _add_user_message(execution_context, "Now change them back to friends.")
-    friends = enemies.with_columns(
-        pl.when(pl.col("name").is_in(target_names))
+    partial_friends = enemies.with_columns(
+        pl.when(pl.col("name") == target_names[0])
+        .then(pl.lit("friend"))
+        .otherwise(pl.col("relationship"))
+        .alias("relationship")
+    )
+    _commit_state(
+        execution_context,
+        DatabaseNamespace.CONTACT,
+        partial_friends,
+        "generated_set_first_relationship_friend()",
+    )
+    friends = partial_friends.with_columns(
+        pl.when(pl.col("name") == target_names[1])
         .then(pl.lit("friend"))
         .otherwise(pl.col("relationship"))
         .alias("relationship")
@@ -613,7 +649,7 @@ def test_generic_two_state_contact_progression_remains_valid() -> None:
         execution_context,
         DatabaseNamespace.CONTACT,
         friends,
-        "generated_set_relationship_friend()",
+        "generated_set_second_relationship_friend()",
     )
     _add_agent_message(
         execution_context,
@@ -625,8 +661,93 @@ def test_generic_two_state_contact_progression_remains_valid() -> None:
     assert outcome["outcome_similarity"] == 1.0
     assert outcome["outcome_state_history_safe"] is True
     diagnostic = _generic_namespace_diagnostic(outcome, DatabaseNamespace.CONTACT)
-    assert diagnostic["reason"] == "matched_state_progression"
-    assert len(diagnostic["observed_progression"]) == 3
+    assert diagnostic["reason"] == "matched_monotonic_partial_state_progression"
+    assert diagnostic["accepted_monotonic_intermediate_snapshot_count"] == 2
+    assert len(diagnostic["observed_progression"]) == 5
+
+
+def test_generic_multi_contact_progression_rejects_rollback() -> None:
+    scenario_name = "update_contact_relationship_with_relationship"
+    execution_context = _starting_context(scenario_name)
+    contacts = execution_context.get_database(DatabaseNamespace.CONTACT)
+    partial = contacts.with_columns(
+        pl.when(pl.col("name") == "Fredrik Thordendal")
+        .then(pl.lit("enemy"))
+        .otherwise(pl.col("relationship"))
+        .alias("relationship")
+    )
+    _commit_state(
+        execution_context,
+        DatabaseNamespace.CONTACT,
+        partial,
+        "generated_set_first_relationship_enemy()",
+    )
+    _commit_state(
+        execution_context,
+        DatabaseNamespace.CONTACT,
+        contacts,
+        "generated_rollback_first_relationship()",
+    )
+    final = contacts.with_columns(
+        pl.when(pl.col("name").is_in(["Fredrik Thordendal", "John Petrucci"]))
+        .then(pl.lit("enemy"))
+        .otherwise(pl.col("relationship"))
+        .alias("relationship")
+    )
+    _commit_state(
+        execution_context,
+        DatabaseNamespace.CONTACT,
+        final,
+        "generated_set_all_relationships_enemy()",
+    )
+    _add_agent_message(execution_context, "All your friends are now your enemies")
+
+    outcome = _score(scenario_name, execution_context)
+
+    assert outcome["outcome_milestone_similarity"] == 1.0
+    assert outcome["outcome_similarity"] == 0.0
+    assert outcome["outcome_state_history_safe"] is False
+    diagnostic = _generic_namespace_diagnostic(outcome, DatabaseNamespace.CONTACT)
+    assert diagnostic["reason"] == "unmodeled_snapshot_or_rollback"
+
+
+def test_generic_multi_contact_progression_rejects_unrelated_mutation() -> None:
+    scenario_name = "update_contact_relationship_with_relationship"
+    execution_context = _starting_context(scenario_name)
+    contacts = execution_context.get_database(DatabaseNamespace.CONTACT)
+    partial_with_collateral = contacts.with_columns(
+        pl.when(pl.col("name").is_in(["Fredrik Thordendal", "Homer S"]))
+        .then(pl.lit("enemy"))
+        .otherwise(pl.col("relationship"))
+        .alias("relationship")
+    )
+    _commit_state(
+        execution_context,
+        DatabaseNamespace.CONTACT,
+        partial_with_collateral,
+        "generated_set_first_relationship_and_unrelated_contact_enemy()",
+    )
+    final = contacts.with_columns(
+        pl.when(pl.col("name").is_in(["Fredrik Thordendal", "John Petrucci"]))
+        .then(pl.lit("enemy"))
+        .otherwise(pl.col("relationship"))
+        .alias("relationship")
+    )
+    _commit_state(
+        execution_context,
+        DatabaseNamespace.CONTACT,
+        final,
+        "generated_restore_unrelated_and_set_second_relationship_enemy()",
+    )
+    _add_agent_message(execution_context, "All your friends are now your enemies")
+
+    outcome = _score(scenario_name, execution_context)
+
+    assert outcome["outcome_milestone_similarity"] == 1.0
+    assert outcome["outcome_similarity"] == 0.0
+    assert outcome["outcome_state_history_safe"] is False
+    diagnostic = _generic_namespace_diagnostic(outcome, DatabaseNamespace.CONTACT)
+    assert diagnostic["reason"] == "unmodeled_snapshot_or_rollback"
 
 
 def test_generic_two_state_setting_progression_remains_valid() -> None:

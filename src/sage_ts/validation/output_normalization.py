@@ -423,6 +423,9 @@ def _normalize_validation_abstention_output(
             "remove_reminder": "reminder_removal",
             "modify_reminder": "reminder_update",
             "add_reminder": "reminder_creation",
+            "get_current_timestamp": "current_time",
+            "current_timestamp": "current_time",
+            "current_time": "current_time",
             "get_current_location": "location_lookup",
             "get_current_city": "location_lookup",
             "find_current_city": "location_lookup",
@@ -486,6 +489,33 @@ def _normalize_validation_abstention_output(
     ):
         action = "location_lookup"
         required_original_tools.append("location_lookup")
+    relative_time_search_request = bool(
+        any(
+            token in user_request_lower
+            for token in ("reminder", "todo", "to-do", "message")
+        )
+        and re.search(
+            r"\b(?:yesterday|today|tomorrow|tonight|upcoming|later\s+today|"
+            r"next\s+(?:reminder|todo|to-do|message))\b",
+            user_request_lower,
+        )
+        and not re.search(
+            r"\b(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}" r"(?:[/-]\d{2,4})?)\b",
+            user_request_lower,
+        )
+        and not re.search(
+            r"\b(?:january|february|march|april|may|june|july|august|"
+            r"september|october|november|december)\s+\d{1,2}(?:st|nd|rd|th)?"
+            r"(?:,?\s+\d{4})?\b",
+            user_request_lower,
+        )
+    )
+    if relative_time_search_request:
+        if any(token in user_request_lower for token in ("reminder", "todo", "to-do")):
+            _append_unique(required_original_tools, "reminder_lookup")
+        elif "message" in user_request_lower:
+            _append_unique(required_original_tools, "message_lookup")
+        _append_unique(required_original_tools, "current_time")
     missing_required_tools = [
         tool for tool in required_original_tools if tool not in available_original_tools
     ]
@@ -547,6 +577,11 @@ def _normalize_validation_abstention_output(
             final_answer_recommendation = (
                 "The recipient cannot be resolved to a phone number with the "
                 "available information/tools."
+            )
+        elif "current_time" in missing_lower:
+            final_answer_recommendation = (
+                "I need the current date and time, or an explicit date, to "
+                "resolve the relative time in that request."
             )
         normalized["final_answer_recommendation"] = (
             final_answer_recommendation

@@ -1550,7 +1550,10 @@ def _recency_search_window_requested(openai_messages: object) -> bool:
         for token in (
             "yesterday",
             "today",
+            "tomorrow",
+            "tonight",
             "upcoming",
+            "later today",
             "next reminder",
             "next todo",
             "next to-do",
@@ -1576,6 +1579,51 @@ def _recency_search_window_requested(openai_messages: object) -> bool:
     return True
 
 
+def _relative_time_search_missing_current_time(
+    openai_messages: object,
+    openai_tools: object,
+) -> bool:
+    """Detect a visible relative-time search with no usable clock producer."""
+
+    if not _recency_search_window_requested(openai_messages):
+        return False
+    available_names = _tool_names_execution_facing(openai_tools)
+    if (
+        "get_current_timestamp" in available_names
+        or _latest_current_timestamp(openai_messages) is not None
+    ):
+        return False
+    request = " ".join(
+        _latest_user_request_text(openai_messages)
+        .lower()
+        .replace("\u2019", "'")
+        .split()
+    )
+    if not request:
+        return False
+    explicit_absolute_date = bool(
+        re.search(
+            r"\b(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}" r"(?:[/-]\d{2,4})?)\b",
+            request,
+        )
+        or re.search(
+            r"\b(?:january|february|march|april|may|june|july|august|"
+            r"september|october|november|december)\s+\d{1,2}(?:st|nd|rd|th)?"
+            r"(?:,?\s+\d{4})?\b",
+            request,
+        )
+    )
+    if explicit_absolute_date:
+        return False
+    return bool(
+        re.search(
+            r"\b(?:yesterday|today|tomorrow|tonight|upcoming|later\s+today|"
+            r"next\s+(?:reminder|todo|to-do|message))\b",
+            request,
+        )
+    )
+
+
 def _generated_tool_prerequisite_choice(
     openai_messages: object,
     openai_tools: object,
@@ -1586,6 +1634,13 @@ def _generated_tool_prerequisite_choice(
     generated_names = _generated_tool_names_execution_facing(openai_tools)
     if not generated_names:
         return None
+    if _relative_time_search_missing_current_time(
+        openai_messages,
+        openai_tools,
+    ):
+        for helper_name in sorted(_validation_abstention_tool_names(openai_tools)):
+            if not _called_tool_after_latest_user(openai_messages, helper_name):
+                return _tool_name_for_call(openai_tools, helper_name)
     message_record_tools_requiring_self = [
         tool_name
         for tool_name in generated_names
@@ -8904,7 +8959,8 @@ def _safe_abstention_helper_actor_policy_message(
             "than original side-effect tool names: contact_lookup, "
             "contact_update, contact_removal, message_lookup, message_send, "
             "reminder_lookup, reminder_update, reminder_removal, "
-            "reminder_creation, or location_lookup. For available_original_tools, "
+            "reminder_creation, current_time, or location_lookup. Map original "
+            "get_current_timestamp to current_time. For available_original_tools, "
             "use the same labels corresponding to visible original tools: "
             f"{visible_original_tools or '(none)'}. For target_identifier, pass "
             "a concrete id only if that id was supplied by the user or returned "
@@ -8912,7 +8968,16 @@ def _safe_abstention_helper_actor_policy_message(
             "number, name, ordinal phrase, or natural-language description as a "
             "record id unless the target original tool schema accepts that exact "
             "kind of scalar. If the helper says to abstain or provides a final "
-            "answer recommendation, do not perform the side effect."
+            "answer recommendation, do not perform the side effect. For a reminder "
+            "or message search whose meaning depends on yesterday, today, tomorrow, "
+            "upcoming, or another relative current-time anchor, include current_time "
+            "in required_original_tools. If current_time is absent from the visible "
+            "available_original_tools list, call this helper instead of inventing a "
+            "timestamp or manually constructing temporal search bounds. If "
+            "current_time is available, preserve the normal flow: call original "
+            "get_current_timestamp and then the relevant generated recency helper. "
+            "A blank target_identifier is valid for a read-only "
+            "relative_time_search and must not itself cause abstention."
         ),
     }
 
@@ -11866,6 +11931,9 @@ def _safe_action_capability(value: str) -> str:
         "remove_reminder": "reminder_removal",
         "modify_reminder": "reminder_update",
         "add_reminder": "reminder_creation",
+        "get_current_timestamp": "current_time",
+        "current_timestamp": "current_time",
+        "current_time": "current_time",
         "get_current_location": "location_lookup",
         "get_current_city": "location_lookup",
         "find_current_city": "location_lookup",

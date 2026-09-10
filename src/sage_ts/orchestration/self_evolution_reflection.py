@@ -40,19 +40,31 @@ def _optional_float(value: Any) -> float | None:
         return None
 
 
+def _online_feedback_outcome_with_source(
+    row: dict[str, Any],
+) -> tuple[float | None, str]:
+    """Return the lifecycle outcome and the signal that supplied it."""
+
+    paper_feedback = _optional_float(row.get("online_feedback_outcome_similarity"))
+    if paper_feedback is not None:
+        return paper_feedback, "paper_era_online_feedback"
+    audited_outcome = _optional_float(row.get("outcome_similarity"))
+    if audited_outcome is not None:
+        return audited_outcome, "audited_outcome_fallback"
+    return None, "unavailable"
+
+
 def _online_feedback_outcome(row: dict[str, Any]) -> float | None:
-    """Return the paper-era outcome signal used only by lifecycle feedback.
+    """Return the outcome signal used only by lifecycle feedback.
 
     New runs also carry the audited reporting outcome in ``outcome_similarity``.
     Keeping this signal separate preserves the validated policy/lifecycle behavior
     without publishing the legacy evaluator as the final performance endpoint.
-    Historical cached rows predate the explicit field and therefore fall back to
-    their original ``outcome_similarity`` value.
+    Rows with unavailable paper-era feedback, including historical cached rows
+    that predate the explicit field, fall back to ``outcome_similarity``.
     """
 
-    return _optional_float(
-        row.get("online_feedback_outcome_similarity", row.get("outcome_similarity"))
-    )
+    return _online_feedback_outcome_with_source(row)[0]
 
 
 def _mean(values: list[float]) -> float | None:
@@ -611,13 +623,18 @@ class SelfEvolutionReflectionController:
             control_reason = lookup.reason
         control_score = None
         control_outcome = None
+        control_outcome_source = "unavailable"
         candidate_score = _optional_float(result.get("similarity"))
-        candidate_outcome = _online_feedback_outcome(result)
+        candidate_outcome, candidate_outcome_source = (
+            _online_feedback_outcome_with_source(result)
+        )
         score_delta = None
         outcome_delta = None
         if control_available and control_row is not None:
             control_score = _optional_float(control_row.get("similarity"))
-            control_outcome = _online_feedback_outcome(control_row)
+            control_outcome, control_outcome_source = (
+                _online_feedback_outcome_with_source(control_row)
+            )
             if control_score is not None and candidate_score is not None:
                 score_delta = candidate_score - control_score
             if control_outcome is not None and candidate_outcome is not None:
@@ -659,7 +676,9 @@ class SelfEvolutionReflectionController:
             "candidate_score": candidate_score,
             "score_delta": score_delta,
             "control_outcome": control_outcome,
+            "control_outcome_source": control_outcome_source,
             "candidate_outcome": candidate_outcome,
+            "candidate_outcome_source": candidate_outcome_source,
             "outcome_delta": outcome_delta,
             "generated_tools_visible": visible,
             "generated_tools_called": called,

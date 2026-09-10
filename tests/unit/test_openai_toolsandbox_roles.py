@@ -1119,6 +1119,116 @@ def test_search_window_tool_requires_visible_recency_search_intent() -> None:
     )
 
 
+def test_relative_time_search_routes_to_abstention_without_clock() -> None:
+    safe_helper = {
+        "type": "function",
+        "function": {
+            "name": "prepare_safe_action_or_abstain",
+            "description": "Prepare a safe action or abstain decision.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_request": {"type": "string"},
+                    "requested_action": {"type": "string"},
+                    "target_identifier": {"type": "string"},
+                    "required_original_tools": {"type": "array"},
+                    "available_original_tools": {"type": "array"},
+                    "visible_records_count": {"type": "integer"},
+                },
+            },
+        },
+    }
+    window_helper = {
+        "type": "function",
+        "function": {
+            "name": "resolve_search_window_or_bounds",
+            "description": "Prepare bounded search kwargs from a recency phrase.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "current_timestamp": {"type": "number"},
+                    "phrase": {"type": "string"},
+                    "target_domain": {"type": "string"},
+                    "timestamp_intent": {"type": "string"},
+                    "direction": {"type": "string"},
+                },
+            },
+        },
+    }
+    messages = [{"role": "user", "content": "Which reminder was due yesterday?"}]
+    tools = [
+        safe_helper,
+        window_helper,
+        {"type": "function", "function": {"name": "search_reminder"}},
+    ]
+
+    assert (
+        toolsandbox_roles._first_attempt_generated_tool_choice(messages, tools)
+        == "prepare_safe_action_or_abstain"
+    )
+
+
+def test_relative_time_search_with_clock_preserves_clock_then_window_flow() -> None:
+    safe_helper = {
+        "type": "function",
+        "function": {
+            "name": "prepare_safe_action_or_abstain",
+            "description": "Prepare a safe action or abstain decision.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_request": {"type": "string"},
+                    "requested_action": {"type": "string"},
+                    "target_identifier": {"type": "string"},
+                    "required_original_tools": {"type": "array"},
+                    "available_original_tools": {"type": "array"},
+                },
+            },
+        },
+    }
+    window_helper = {
+        "type": "function",
+        "function": {
+            "name": "resolve_search_window_or_bounds",
+            "description": "Prepare bounded search kwargs from a recency phrase.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "current_timestamp": {"type": "number"},
+                    "phrase": {"type": "string"},
+                    "target_domain": {"type": "string"},
+                    "timestamp_intent": {"type": "string"},
+                    "direction": {"type": "string"},
+                },
+            },
+        },
+    }
+    tools = [
+        safe_helper,
+        window_helper,
+        {"type": "function", "function": {"name": "search_reminder"}},
+        {"type": "function", "function": {"name": "get_current_timestamp"}},
+    ]
+    messages = [{"role": "user", "content": "Which reminder was due yesterday?"}]
+
+    assert (
+        toolsandbox_roles._first_attempt_generated_tool_choice(messages, tools)
+        == "get_current_timestamp"
+    )
+
+    messages.append(
+        {
+            "role": "tool",
+            "name": "get_current_timestamp",
+            "content": "1788955200.0",
+        }
+    )
+    assert (
+        toolsandbox_roles._first_attempt_generated_tool_choice(messages, tools)
+        == "resolve_search_window_or_bounds"
+    )
+
+
 def test_device_repair_status_routes_generated_sequence_before_single_action() -> None:
     tools = [
         {

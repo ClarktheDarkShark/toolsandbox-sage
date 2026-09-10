@@ -1,0 +1,104 @@
+{
+  "manifest_type": "post700_targeted_regression_32",
+  "strategy": "Targeted, order-preserving regression cohort for relative-time reminder searches. It covers valid and insufficient-information creation-time, upcoming, and due-time requests across plain, tool-name-scrambled, and all-tools variants. This is a diagnostic gate, not a claim cohort.",
+  "splits": {
+    "full_benchmark": [
+      {
+        "name": "search_reminder_with_creation_recency_yesterday"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_all_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_implicit_all_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_all_tools"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_implicit_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_upcoming_insufficient_information_implicit_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_implicit_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_all_tools"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_3_distraction_tools_tool_name_scrambled"
+      },
+      {
+        "name": "search_reminder_with_recency_yesterday_insufficient_information_implicit_all_tools"
+      }
+    ]
+  }
+}

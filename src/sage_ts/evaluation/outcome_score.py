@@ -32,7 +32,7 @@ from tool_sandbox.common.execution_context import (
 )
 from tool_sandbox.common.scenario import Scenario
 
-OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v5"
+OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v6"
 
 # These are the seven perturbations present for every base task in the frozen
 # 1,032-scenario publication benchmark. A contract applies only to one of these
@@ -747,9 +747,10 @@ def _contract_manifest_payload() -> dict[str, Any]:
         ),
         "generic_state_history_rule": (
             "every_non_sandbox_namespace_follows_baseline_then_actual_verified_"
-            "matched_milestone_snapshots_in_dag_monotonic_order_with_no_"
-            "unmodeled_snapshot_or_unmodeled_rollback; pure_answer_tasks_are_"
-            "state_immutable"
+            "matched_milestone_snapshots_in_dag_monotonic_order; intermediate_"
+            "snapshots_are_allowed_only_when_each_row_count_moves_monotonically_"
+            "between_adjacent_verified_states_and_no_unmodeled_row_or_rollback_"
+            "appears; pure_answer_tasks_are_state_immutable"
         ),
         "historical_evaluation_input_rule": (
             "canonical_milestone_and_minefield_values_are_not_accepted_inputs"
@@ -3892,6 +3893,89 @@ def _milestone_target_namespaces(milestone: Milestone) -> set[DatabaseNamespace]
     }
 
 
+def _is_monotonic_partial_transition_state(
+    *,
+    source: tuple[str, ...],
+    target: tuple[str, ...],
+    previous: tuple[str, ...],
+    current: tuple[str, ...],
+) -> bool:
+    """Return whether ``current`` is safe partial progress toward ``target``.
+
+    Fingerprint entries are complete serialized database rows.  A modeled
+    multi-row update can therefore move rows from their source representation
+    to their target representation one at a time.  Intermediate states may use
+    only rows from those two endpoint states, every row count must move in the
+    endpoint direction without reversing, and the total row count cannot leave
+    the range spanned by the endpoints.  These constraints admit a sequential
+    batch update while rejecting collateral rows, delete/recreate shortcuts,
+    and rollback before the verified milestone is reached.
+    """
+    source_counts = Counter(source)
+    target_counts = Counter(target)
+    previous_counts = Counter(previous)
+    current_counts = Counter(current)
+    modeled_rows = set(source_counts) | set(target_counts)
+    if set(current_counts) - modeled_rows:
+        return False
+    if not (
+        min(len(source), len(target)) <= len(current) <= max(len(source), len(target))
+    ):
+        return False
+
+    for row in modeled_rows:
+        source_count = source_counts[row]
+        target_count = target_counts[row]
+        previous_count = previous_counts[row]
+        current_count = current_counts[row]
+        lower = min(source_count, target_count)
+        upper = max(source_count, target_count)
+        if not lower <= current_count <= upper:
+            return False
+        if target_count > source_count and current_count < previous_count:
+            return False
+        if target_count < source_count and current_count > previous_count:
+            return False
+        if target_count == source_count and current_count != source_count:
+            return False
+    return True
+
+
+def _matches_monotonic_milestone_progression(
+    observed: list[tuple[str, ...]],
+    expected: list[tuple[str, ...]],
+) -> tuple[bool, int]:
+    """Match history to milestone states, admitting constrained intermediates."""
+    if not observed or not expected or observed[0] != expected[0]:
+        return False, 0
+
+    observed_position = 0
+    accepted_intermediate_count = 0
+    for source, target in zip(expected, expected[1:]):
+        if observed[observed_position] != source:
+            return False, accepted_intermediate_count
+        previous = source
+        while observed_position + 1 < len(observed):
+            current = observed[observed_position + 1]
+            if current == target:
+                observed_position += 1
+                break
+            if not _is_monotonic_partial_transition_state(
+                source=source,
+                target=target,
+                previous=previous,
+                current=current,
+            ):
+                return False, accepted_intermediate_count
+            accepted_intermediate_count += 1
+            observed_position += 1
+            previous = current
+        else:
+            return False, accepted_intermediate_count
+
+    return observed_position == len(observed) - 1, accepted_intermediate_count
+
+
 def _verify_generic_state_history(
     source_matcher: Any,
     execution_context: ExecutionContext,
@@ -3978,15 +4062,21 @@ def _verify_generic_state_history(
 
         observed_fingerprints = [fingerprint for _, fingerprint in observed]
         expected_fingerprints = [item["fingerprint"] for item in expected]
-        progression_matches = observed_fingerprints == expected_fingerprints
+        progression_matches, accepted_intermediate_count = (
+            _matches_monotonic_milestone_progression(
+                observed_fingerprints,
+                expected_fingerprints,
+            )
+        )
         represented = bool(milestone_states)
         verified = dag_monotonic and progression_matches
         if verified:
-            reason = (
-                "matched_state_progression"
-                if represented
-                else "unmodeled_namespace_unchanged"
-            )
+            if not represented:
+                reason = "unmodeled_namespace_unchanged"
+            elif accepted_intermediate_count:
+                reason = "matched_monotonic_partial_state_progression"
+            else:
+                reason = "matched_state_progression"
         elif not represented:
             reason = "unmodeled_namespace_mutation"
         elif not dag_monotonic:
@@ -4001,6 +4091,9 @@ def _verify_generic_state_history(
                 "changed": len(observed) > 1,
                 "represented_by_verified_state_milestone": represented,
                 "reason": reason,
+                "accepted_monotonic_intermediate_snapshot_count": (
+                    accepted_intermediate_count
+                ),
                 "observed_progression": [
                     {
                         "snapshot_index": snapshot_index,
