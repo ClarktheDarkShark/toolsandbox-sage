@@ -30,6 +30,8 @@ EVIDENCE_SCHEMA_VERSION = 3
 AUDITED_ENDPOINT_NAME = "audited_current_all_tasks"
 PAPER_ENDPOINT_NAME = "paper_comparable_historical_subset"
 OUTCOME_EVALUATOR_SOURCE = Path("src/sage_ts/evaluation/outcome_score.py")
+RESEARCHER_SAMPLE_WAIVER_STATUS = "waived_by_researcher"
+RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION = "explicit_prepare_cli"
 _DASHBOARD_WRITE_LOCK = threading.Lock()
 
 H1_THRESHOLD_PERCENT = 80.0
@@ -257,7 +259,7 @@ def _load_dual_endpoint_spec(
     repo_root: Path,
     campaign_manifest: dict[str, Any],
 ) -> DualEndpointSpec | None:
-    """Load the exact endpoint declarations pinned by the approved sample report."""
+    """Load exact endpoint declarations pinned by a sample or explicit waiver."""
 
     statistical_plan = campaign_manifest.get("statistical_plan") or {}
     plan_endpoints = statistical_plan.get("performance_endpoints")
@@ -270,36 +272,64 @@ def _load_dual_endpoint_spec(
         raise ValueError("Campaign performance endpoint declarations are not exact.")
 
     sample = campaign_manifest.get("sample_validation")
-    if not isinstance(sample, dict) or sample.get("status") != "pass":
-        raise ValueError("Dual-endpoint evidence requires a passing sample report.")
-    sample_path = _resolve_repo_path(
-        repo_root,
-        sample.get("path"),
-        "campaign sample-validation path",
-    )
-    if not sample_path.is_file():
-        raise ValueError(f"Campaign sample-validation report is missing: {sample_path}")
-    expected_sample_hash = _required_string(
-        sample.get("sha256"), "campaign sample-validation SHA-256"
-    )
-    if _sha256(sample_path) != expected_sample_hash:
-        raise ValueError("Campaign sample-validation report bytes changed.")
-    sample_report = _load_json(sample_path)
-    if sample_report.get("status") != "pass":
-        raise ValueError("Campaign sample-validation report is not passing.")
+    if not isinstance(sample, dict):
+        raise ValueError(
+            "Dual-endpoint evidence requires a passing sample report or explicit "
+            "researcher waiver."
+        )
+    if sample.get("status") == "pass":
+        sample_path = _resolve_repo_path(
+            repo_root,
+            sample.get("path"),
+            "campaign sample-validation path",
+        )
+        if not sample_path.is_file():
+            raise ValueError(
+                f"Campaign sample-validation report is missing: {sample_path}"
+            )
+        expected_sample_hash = _required_string(
+            sample.get("sha256"), "campaign sample-validation SHA-256"
+        )
+        if _sha256(sample_path) != expected_sample_hash:
+            raise ValueError("Campaign sample-validation report bytes changed.")
+        endpoint_input = _load_json(sample_path)
+        if endpoint_input.get("status") != "pass":
+            raise ValueError("Campaign sample-validation report is not passing.")
+    elif sample.get("status") == RESEARCHER_SAMPLE_WAIVER_STATUS:
+        if sample.get("authorization") != RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION:
+            raise ValueError("Campaign sample-validation waiver is not authorized.")
+        reason = sample.get("reason")
+        if not isinstance(reason, str) or not reason or reason != reason.strip():
+            raise ValueError("Campaign sample-validation waiver reason is invalid.")
+        if sample.get("required_gate") != "release-sample":
+            raise ValueError(
+                "Campaign sample-validation waiver does not identify release-sample."
+            )
+        authorized_at = sample.get("authorized_at")
+        if not isinstance(authorized_at, str) or not authorized_at:
+            raise ValueError(
+                "Campaign sample-validation waiver authorization time is missing."
+            )
+        endpoint_input = sample
+    else:
+        raise ValueError(
+            "Dual-endpoint evidence requires a passing sample report or explicit "
+            "researcher waiver."
+        )
     thresholds_path = _resolve_repo_path(
         repo_root,
-        sample_report.get("thresholds_path"),
-        "sample-report thresholds path",
+        endpoint_input.get("thresholds_path"),
+        "sample-validation thresholds path",
     )
     expected_thresholds_hash = _required_string(
-        sample_report.get("thresholds_sha256"), "sample-report thresholds SHA-256"
+        endpoint_input.get("thresholds_sha256"),
+        "sample-validation thresholds SHA-256",
     )
     if (
         not thresholds_path.is_file()
         or _sha256(thresholds_path) != expected_thresholds_hash
     ):
-        raise ValueError("Sample-report validation threshold bytes changed.")
+        raise ValueError("Sample-validation threshold bytes changed.")
     thresholds = _load_json(thresholds_path)
     if (
         thresholds.get("schema_version") != 3

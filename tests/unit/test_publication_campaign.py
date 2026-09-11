@@ -293,6 +293,103 @@ def test_campaign_prerequisites_accept_default_online_only_plan(
     ]
 
 
+def test_sample_validation_declaration_requires_exactly_one_gate_disposition(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="Declare exactly one"):
+        campaign._sample_validation_declaration(
+            tmp_path,
+            {},
+            report_path=None,
+            waiver_requested=False,
+            waiver_reason=None,
+        )
+    with pytest.raises(ValueError, match="Declare exactly one"):
+        campaign._sample_validation_declaration(
+            tmp_path,
+            {},
+            report_path=Path("sample.json"),
+            waiver_requested=True,
+            waiver_reason="explicit direction",
+        )
+
+
+def test_sample_validation_waiver_requires_a_nonempty_reason(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="requires a nonempty"):
+        campaign._sample_validation_declaration(
+            tmp_path,
+            {},
+            report_path=None,
+            waiver_requested=True,
+            waiver_reason="   ",
+        )
+
+
+def test_sample_validation_waiver_is_explicit_hashed_and_never_a_fake_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+    thresholds = tmp_path / "thresholds.json"
+    _write_json(thresholds, {"schema_version": 3})
+    monkeypatch.setattr(
+        campaign._sample_verifier,
+        "DEFAULT_THRESHOLDS",
+        thresholds.relative_to(tmp_path),
+    )
+
+    declaration = campaign._sample_validation_declaration(
+        tmp_path,
+        manifest["configuration_identity"],
+        report_path=None,
+        waiver_requested=True,
+        waiver_reason="  Researcher directed immediate confirmatory campaign.  ",
+    )
+
+    assert declaration["status"] == campaign.RESEARCHER_SAMPLE_WAIVER_STATUS
+    assert declaration["status"] != "pass"
+    assert declaration["authorization"] == (
+        campaign.RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION
+    )
+    assert declaration["reason"] == (
+        "Researcher directed immediate confirmatory campaign."
+    )
+    assert declaration["thresholds_path"] == "thresholds.json"
+    assert declaration["thresholds_sha256"] == _sha256(thresholds)
+    assert "path" not in declaration
+    assert "sha256" not in declaration
+    assert "run_root" not in declaration
+    assert "publication_gate_purpose" not in declaration
+
+
+def test_campaign_prerequisites_accept_explicit_sample_waiver_without_relaxing_jobs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, sample_calls = _valid_campaign(tmp_path, monkeypatch)
+    thresholds = tmp_path / "thresholds.json"
+    _write_json(thresholds, {"schema_version": 3})
+    release_identity = manifest["sample_validation"]["release_identity"]
+    manifest["sample_validation"] = {
+        "status": campaign.RESEARCHER_SAMPLE_WAIVER_STATUS,
+        "authorization": campaign.RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION,
+        "required_gate": campaign.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+        "reason": "Researcher directed immediate confirmatory campaign.",
+        "authorized_at": "2026-09-11T00:00:00+00:00",
+        "thresholds_path": thresholds.relative_to(tmp_path).as_posix(),
+        "thresholds_sha256": _sha256(thresholds),
+        "release_identity": release_identity,
+    }
+
+    assert campaign._campaign_prerequisite_errors(tmp_path, manifest) == []
+    assert sample_calls == []
+    assert all(
+        pair["online"]["publication_gate_purpose"]
+        == campaign.PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+        for pair in manifest["run_pairs"]
+    )
+
+
 def test_campaign_prerequisites_accept_explicit_online_and_frozen_plan(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -12,6 +12,8 @@ from pathlib import Path
 import pytest
 
 from scripts.research.chapter4_evidence import (
+    RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION,
+    RESEARCHER_SAMPLE_WAIVER_STATUS,
     _bootstrap_mean_ci,
     _h2_confirmatory_status,
     _randomization_p,
@@ -453,6 +455,55 @@ def _dual_endpoint_run_and_manifest(tmp_path: Path) -> tuple[Path, dict]:
         }
     )
     return candidate_dir / "result_summary.json", manifest
+
+
+def test_dual_endpoint_verification_accepts_explicit_hashed_sample_waiver(
+    tmp_path: Path,
+) -> None:
+    _, manifest = _dual_endpoint_run_and_manifest(tmp_path)
+    sample_path = tmp_path / manifest["sample_validation"]["path"]
+    sample_report = json.loads(sample_path.read_text(encoding="utf-8"))
+    manifest["sample_validation"] = {
+        "status": RESEARCHER_SAMPLE_WAIVER_STATUS,
+        "authorization": RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION,
+        "required_gate": "release-sample",
+        "reason": "Researcher directed immediate confirmatory campaign.",
+        "authorized_at": "2026-09-11T00:00:00+00:00",
+        "thresholds_path": sample_report["thresholds_path"],
+        "thresholds_sha256": sample_report["thresholds_sha256"],
+    }
+
+    measurement = verify_run_endpoint_measurements(
+        repo_root=tmp_path,
+        campaign_manifest=manifest,
+        entry=manifest["run_pairs"][0]["online"],
+    )
+
+    assert measurement["status"] == "pass"
+
+
+def test_dual_endpoint_verification_rejects_unauthorized_sample_waiver(
+    tmp_path: Path,
+) -> None:
+    _, manifest = _dual_endpoint_run_and_manifest(tmp_path)
+    sample_path = tmp_path / manifest["sample_validation"]["path"]
+    sample_report = json.loads(sample_path.read_text(encoding="utf-8"))
+    manifest["sample_validation"] = {
+        "status": RESEARCHER_SAMPLE_WAIVER_STATUS,
+        "authorization": "not-explicit",
+        "required_gate": "release-sample",
+        "reason": "Researcher directed immediate confirmatory campaign.",
+        "authorized_at": "2026-09-11T00:00:00+00:00",
+        "thresholds_path": sample_report["thresholds_path"],
+        "thresholds_sha256": sample_report["thresholds_sha256"],
+    }
+
+    with pytest.raises(ValueError, match="waiver is not authorized"):
+        verify_run_endpoint_measurements(
+            repo_root=tmp_path,
+            campaign_manifest=manifest,
+            entry=manifest["run_pairs"][0]["online"],
+        )
 
 
 def test_builds_hypothesis_metrics_and_drilldowns(tmp_path: Path) -> None:

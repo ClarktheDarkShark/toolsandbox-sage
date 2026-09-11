@@ -24,6 +24,8 @@ from typing import Any, Iterator, cast
 from scripts.research.chapter4_evidence import (
     EVIDENCE_DATA_NAME,
     EVIDENCE_HTML_NAME,
+    RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION,
+    RESEARCHER_SAMPLE_WAIVER_STATUS,
     load_run_evidence,
     verify_run_endpoint_measurements,
     write_evidence_dashboard,
@@ -664,6 +666,64 @@ def _validated_sample_report(
     }
 
 
+def _sample_validation_declaration(
+    repo_root: Path,
+    expected_identity: dict[str, Any],
+    *,
+    report_path: Path | None,
+    waiver_requested: bool,
+    waiver_reason: str | None,
+) -> dict[str, Any]:
+    """Return one explicit, identity-bound sample-gate declaration.
+
+    The waiver is intentionally not a passing sample. It records the researcher's
+    decision to start the confirmatory campaign without repeating that preliminary
+    gate while retaining the content-addressed endpoint inputs needed to validate
+    every campaign replication.
+    """
+
+    if (report_path is not None) == waiver_requested:
+        raise ValueError(
+            "Declare exactly one of --sample-validation-report or "
+            "--researcher-waived-sample-validation."
+        )
+    normalized_reason = waiver_reason.strip() if waiver_reason is not None else ""
+    if report_path is not None:
+        if normalized_reason:
+            raise ValueError(
+                "--sample-validation-waiver-reason is valid only with "
+                "--researcher-waived-sample-validation."
+            )
+        return _validated_sample_report(
+            repo_root,
+            (repo_root / report_path),
+            expected_identity,
+        )
+    if not normalized_reason:
+        raise ValueError(
+            "--researcher-waived-sample-validation requires a nonempty "
+            "--sample-validation-waiver-reason."
+        )
+
+    thresholds_path = (repo_root / _sample_verifier.DEFAULT_THRESHOLDS).resolve()
+    if not thresholds_path.is_file():
+        raise ValueError(
+            f"Publication validation thresholds not found: {thresholds_path}"
+        )
+    return {
+        "status": RESEARCHER_SAMPLE_WAIVER_STATUS,
+        "authorization": RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION,
+        "required_gate": PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+        "reason": normalized_reason,
+        "authorized_at": _now(),
+        "thresholds_path": _relative(repo_root, thresholds_path),
+        "thresholds_sha256": _sha256(thresholds_path),
+        "release_identity": {
+            field: expected_identity[field] for field in SAMPLE_RELEASE_IDENTITY_FIELDS
+        },
+    }
+
+
 def _relative(repo_root: Path, path: Path) -> str:
     return str(path.resolve().relative_to(repo_root.resolve()))
 
@@ -850,10 +910,14 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
     planned_arms = _planned_arms(campaign_scope)
     try:
         configuration_identity = _require_clean_git(repo_root)
-        sample_validation = _validated_sample_report(
+        sample_validation = _sample_validation_declaration(
             repo_root,
-            (repo_root / args.sample_validation_report),
             configuration_identity,
+            report_path=getattr(args, "sample_validation_report", None),
+            waiver_requested=bool(
+                getattr(args, "researcher_waived_sample_validation", False)
+            ),
+            waiver_reason=getattr(args, "sample_validation_waiver_reason", None),
         )
     except (ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
@@ -1378,12 +1442,12 @@ def _campaign_prerequisite_errors(
 
     sample = manifest.get("sample_validation")
     if not isinstance(sample, dict):
-        errors.append("passing publication sample validation is not declared")
-    else:
+        errors.append(
+            "publication sample validation or explicit waiver is not declared"
+        )
+    elif sample.get("status") == "pass":
         sample_path = repo_root / str(sample.get("path") or "")
-        if sample.get("status") != "pass":
-            errors.append("publication sample validation is not passing")
-        elif (
+        if (
             sample.get("publication_gate_purpose")
             != PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
         ):
@@ -1443,6 +1507,46 @@ def _campaign_prerequisite_errors(
                         errors.append("publication sample release identity changed")
             except ValueError as exc:
                 errors.append(f"publication sample verification failed: {exc}")
+    elif sample.get("status") == RESEARCHER_SAMPLE_WAIVER_STATUS:
+        if sample.get("authorization") != RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION:
+            errors.append("publication sample waiver authorization is invalid")
+        if sample.get("required_gate") != PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE:
+            errors.append("publication sample waiver does not identify release-sample")
+        reason = sample.get("reason")
+        if not isinstance(reason, str) or not reason or reason != reason.strip():
+            errors.append("publication sample waiver reason is not a nonempty string")
+        authorized_at = sample.get("authorized_at")
+        if not isinstance(authorized_at, str) or not authorized_at:
+            errors.append("publication sample waiver authorization time is missing")
+        for prohibited_field in (
+            "path",
+            "sha256",
+            "run_root",
+            "publication_gate_purpose",
+        ):
+            if prohibited_field in sample:
+                errors.append(
+                    "publication sample waiver must not claim passing-report field "
+                    f"{prohibited_field}"
+                )
+        thresholds_path_value = sample.get("thresholds_path")
+        thresholds_sha256 = sample.get("thresholds_sha256")
+        if not isinstance(thresholds_path_value, str) or not thresholds_path_value:
+            errors.append("publication sample waiver thresholds path is missing")
+        else:
+            thresholds_path = _resolve_repo_path(repo_root, thresholds_path_value)
+            if not thresholds_path.is_file():
+                errors.append(
+                    f"publication sample waiver thresholds are missing: {thresholds_path}"
+                )
+            elif not isinstance(thresholds_sha256, str) or not thresholds_sha256:
+                errors.append("publication sample waiver thresholds hash is missing")
+            elif _sha256(thresholds_path) != thresholds_sha256:
+                errors.append("publication sample waiver thresholds bytes changed")
+    else:
+        errors.append(
+            "publication sample validation is neither passing nor explicitly waived"
+        )
 
     identity = manifest.get("configuration_identity")
     if not isinstance(identity, dict):
@@ -2796,11 +2900,26 @@ def main() -> None:
         ),
     )
     prepare.add_argument("--expected-online-runs", type=int, default=10)
-    prepare.add_argument(
+    sample_validation = prepare.add_mutually_exclusive_group(required=True)
+    sample_validation.add_argument(
         "--sample-validation-report",
         type=Path,
-        required=True,
         help="Passing report from the one-run strict publication validation gate.",
+    )
+    sample_validation.add_argument(
+        "--researcher-waived-sample-validation",
+        action="store_true",
+        help=(
+            "Record an explicit researcher-authorized waiver of the preliminary "
+            "one-run sample gate; campaign-replication integrity gates remain strict."
+        ),
+    )
+    prepare.add_argument(
+        "--sample-validation-waiver-reason",
+        help=(
+            "Required nonempty audit reason when the preliminary sample gate is "
+            "explicitly waived."
+        ),
     )
     prepare.add_argument(
         "--benchmark-manifest",
