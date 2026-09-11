@@ -42,6 +42,12 @@ except ModuleNotFoundError:  # Direct `python scripts/...` execution.
 verify_environment = _environment_verifier.verify_environment
 verify_run = _run_verifier.verify_run
 verify_sample = _sample_verifier.verify_sample
+PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE = (
+    _run_verifier.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+)
+PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION = (
+    _run_verifier.PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+)
 
 DEFAULT_BENCHMARK = Path(
     "docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json"
@@ -206,6 +212,10 @@ def _expected_claim_safeguards() -> dict[str, Any]:
         "cross_run_failure_memory": "disabled",
         "fresh_control_required": True,
         "parallel_arms": True,
+        "release_sample_gate_purpose": PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+        "replication_gate_purpose": (PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION),
+        "replication_inclusion_policy": ("integrity_provenance_completeness_only"),
+        "observed_performance_controls_replication_inclusion": False,
         "online_reflection_control": "same_run_fresh",
         "online_registry_start": "empty",
         "frozen_generation": "off",
@@ -614,6 +624,11 @@ def _validated_sample_report(
     payload = json.loads(resolved.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or payload.get("status") != "pass":
         raise ValueError("Publication sample report is not a passing report.")
+    if (
+        payload.get("publication_gate_purpose")
+        != PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+    ):
+        raise ValueError("Publication sample did not use the release-sample gate.")
     run_root_value = payload.get("run_root")
     if not isinstance(run_root_value, str) or not run_root_value:
         raise ValueError("Publication sample report does not identify its run root.")
@@ -644,6 +659,7 @@ def _validated_sample_report(
         "sha256": _sha256(resolved),
         "run_root": _relative(repo_root, verified_run_root),
         "status": "pass",
+        "publication_gate_purpose": PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
         "release_identity": release_identity,
     }
 
@@ -914,6 +930,7 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
         online_artifacts = artifact_root / "online" / rep_label
         online = {
             "source": "campaign_online_build_fresh_control",
+            "publication_gate_purpose": (PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION),
             "run_root": "",
             "search_root": _relative(repo_root, online_output),
             "registry_dir": _relative(
@@ -932,6 +949,9 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
             frozen_artifacts = artifact_root / "frozen" / rep_label
             pair["frozen"] = {
                 "source": "paired_frozen_registry_reuse",
+                "publication_gate_purpose": (
+                    PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+                ),
                 "run_root": "",
                 "search_root": _relative(repo_root, frozen_output),
                 "registry_dir": _relative(
@@ -1202,6 +1222,14 @@ def _campaign_prerequisite_errors(
             expected_search_root,
             expected_registry,
         ) in expected_arm_paths:
+            if (
+                entry.get("publication_gate_purpose")
+                != PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+            ):
+                errors.append(
+                    f"replication {expected_replication} {arm_name} gate purpose "
+                    "is not campaign-inclusion"
+                )
             if entry.get("search_root") != expected_search_root:
                 errors.append(
                     f"replication {expected_replication} {arm_name} search_root "
@@ -1355,6 +1383,11 @@ def _campaign_prerequisite_errors(
         sample_path = repo_root / str(sample.get("path") or "")
         if sample.get("status") != "pass":
             errors.append("publication sample validation is not passing")
+        elif (
+            sample.get("publication_gate_purpose")
+            != PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+        ):
+            errors.append("publication sample gate purpose is not release-sample")
         elif not sample_path.is_file():
             errors.append(f"publication sample report is missing: {sample_path}")
         elif _sha256(sample_path) != sample.get("sha256"):
@@ -1512,6 +1545,7 @@ def _verify_publication_entry(
         expected_fixture_sha256=PINNED_EXTERNAL_FIXTURE_SHA256,
         expected_benchmark_sha256=PINNED_BENCHMARK_SHA256,
         expected_scenario_order_sha256=PINNED_SCENARIO_ORDER_SHA256,
+        gate_purpose=PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
     )
     if not isinstance(result, dict):
         raise ValueError(f"{arm} publication verifier returned a non-object result.")
@@ -1744,6 +1778,7 @@ def _job_command(
         "full",
         str(port),
         mode,
+        PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
     ]
     log_path = artifact_root / "launcher_logs" / f"{rep_label}_{arm}.log"
     return command, env, log_path

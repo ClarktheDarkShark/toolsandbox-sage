@@ -7,12 +7,17 @@ cd "$ROOT_DIR"
 SIZE="${1:-full}"
 DASHBOARD_PORT="${2:-63105}"
 EXECUTION_MODE="${3:-native-only}"
+PUBLICATION_GATE_PURPOSE="${4:-release-sample}"
 if [[ "$SIZE" != "full" ]]; then
   echo "Only the complete 1,032-task publication cohort is supported." >&2
   exit 2
 fi
 if [[ "$EXECUTION_MODE" != "native-only" && "$EXECUTION_MODE" != "frozen-only" ]]; then
   echo "Execution mode must be native-only or frozen-only." >&2
+  exit 2
+fi
+if [[ "$PUBLICATION_GATE_PURPOSE" != "release-sample" && "$PUBLICATION_GATE_PURPOSE" != "campaign-inclusion" ]]; then
+  echo "Publication gate purpose must be release-sample or campaign-inclusion." >&2
   exit 2
 fi
 if [[ -n "${RESUME_RUN_ROOT:-}" || -n "${RESUME_COMPLETED_LIMIT:-}" ]]; then
@@ -230,6 +235,7 @@ CMD=(
   --generation "$GENERATION"
   --control-cache off
   --require-fresh-control
+  --publication-gate-purpose "$PUBLICATION_GATE_PURPOSE"
   --parallel-arms
   --validated-external-fixture "$TOOLSANDBOX_RAPID_CACHE_PATH"
   --validated-external-fixture-sha256 "$PINNED_RAPID_FIXTURE_SHA256"
@@ -265,6 +271,7 @@ CMD=(
   echo "fixed_now=$TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"
   echo "control_cache=off"
   echo "fresh_control_required=true"
+  echo "publication_gate_purpose=$PUBLICATION_GATE_PURPOSE"
   echo "reflection_control=$REFLECTION_EXPECTATION"
   echo "openai_response_cache=off"
   echo "openai_response_cache_scope=persistent_repository_whole_response_replay"
@@ -299,5 +306,6 @@ echo "[$ARM] log: $LOG_FILE"
 "$PYTHON_EXECUTABLE" scripts/verify_publication_run.py \
   --search-root "$ARM_OUTPUT" \
   --expected-tasks 1032 \
-  --expect-reflection "$REFLECTION_EXPECTATION" | tee -a "$LOG_FILE"
+  --expect-reflection "$REFLECTION_EXPECTATION" \
+  --gate-purpose "$PUBLICATION_GATE_PURPOSE" | tee -a "$LOG_FILE"
 echo "Strict fresh-control publication run complete: full_$RUN_STAMP"

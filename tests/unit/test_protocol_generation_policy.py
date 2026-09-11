@@ -7,6 +7,8 @@ import pytest
 
 from scripts.run_sage_protocol import (
     DIAGNOSTIC_FORCE_ENV_VARS,
+    PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+    PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
     SAGE_POLICY_AUTO,
     SAGE_POLICY_NONE,
     SAGE_POLICY_SELF_EVOLVING_PRAXIS,
@@ -14,6 +16,7 @@ from scripts.run_sage_protocol import (
     _apply_sage_policy_preset,
     _generation_enabled_by_default,
     _protocol_gate_decision,
+    _publication_gate_decisions,
     _resolve_sage_policy_preset,
     _restore_registry_after_failed_gate,
     _route_mismatch_qualified,
@@ -196,6 +199,117 @@ def test_strict_publication_gate_fails_when_outcome_is_unavailable() -> None:
     assert passed is False
     assert "outcome_score_unavailable" in reasons
     assert all("canonical" not in reason for reason in reasons)
+
+
+def test_campaign_inclusion_ignores_performance_but_records_its_failure() -> None:
+    comparison = {
+        "mean_similarity_delta": -0.5,
+        "mean_outcome_similarity_delta": -0.25,
+        "exact_success_delta": -20,
+        "gain_count": 1,
+        "regression_count": 20,
+        "outcome_gain_count": 1,
+        "outcome_regression_count": 20,
+        "runtime_exception_count": 0,
+        "candidate_stopped_early": False,
+        "control": {
+            "run_status": "complete",
+            "scenario_count": 40,
+            "planned_scenario_count": 40,
+            "exception_count": 0,
+        },
+        "candidate": {
+            "run_status": "complete",
+            "scenario_count": 40,
+            "planned_scenario_count": 40,
+            "exception_count": 0,
+            "accepted_tool_count": 0,
+            "generated_tool_called_scenarios": 0,
+        },
+    }
+
+    selected, selected_reasons, performance, performance_reasons = (
+        _publication_gate_decisions(
+            comparison,
+            scenario_count=40,
+            outcome_only=True,
+            purpose=PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+        )
+    )
+
+    assert selected is True
+    assert selected_reasons == []
+    assert performance is False
+    assert "non_positive_outcome_delta" in performance_reasons
+    assert "confirmation_outcome_delta_below_0_08" in performance_reasons
+
+
+def test_release_sample_retains_the_performance_gate_exactly() -> None:
+    comparison = {
+        "mean_similarity_delta": 0.0,
+        "mean_outcome_similarity_delta": -0.25,
+        "exact_success_delta": 0,
+        "gain_count": 1,
+        "regression_count": 1,
+        "outcome_gain_count": 1,
+        "outcome_regression_count": 2,
+        "runtime_exception_count": 0,
+        "candidate_stopped_early": False,
+        "candidate": {
+            "accepted_tool_count": 0,
+            "generated_tool_called_scenarios": 0,
+        },
+    }
+
+    expected = _protocol_gate_decision(
+        comparison,
+        scenario_count=40,
+        outcome_only=True,
+    )
+    selected, selected_reasons, performance, performance_reasons = (
+        _publication_gate_decisions(
+            comparison,
+            scenario_count=40,
+            outcome_only=True,
+            purpose=PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+        )
+    )
+
+    assert (selected, selected_reasons) == expected
+    assert (performance, performance_reasons) == expected
+
+
+def test_campaign_inclusion_rejects_runtime_or_completeness_failure() -> None:
+    comparison = {
+        "runtime_exception_count": 1,
+        "candidate_stopped_early": True,
+        "control": {
+            "run_status": "complete",
+            "scenario_count": 40,
+            "planned_scenario_count": 40,
+            "exception_count": 0,
+        },
+        "candidate": {
+            "run_status": "stopped_early",
+            "scenario_count": 39,
+            "planned_scenario_count": 40,
+            "exception_count": 1,
+        },
+    }
+
+    selected, reasons, _, _ = _publication_gate_decisions(
+        comparison,
+        scenario_count=40,
+        outcome_only=True,
+        purpose=PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+    )
+
+    assert selected is False
+    assert "runtime_exceptions_present" in reasons
+    assert "candidate_stopped_early" in reasons
+    assert "candidate_run_incomplete" in reasons
+    assert "candidate_scenario_count_incomplete" in reasons
+    assert "candidate_exceptions_present" in reasons
 
 
 def test_protocol_gate_accepts_outcome_success_with_exact_canonical_accounting_loss() -> (

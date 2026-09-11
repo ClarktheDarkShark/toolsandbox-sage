@@ -187,14 +187,20 @@ def _stub_integrity(
     monkeypatch: pytest.MonkeyPatch,
     run_root: Path,
 ) -> None:
-    monkeypatch.setattr(
-        sample_verifier,
-        "verify_run",
-        lambda *args, **kwargs: {
+    def verify_release_sample(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        assert kwargs["gate_purpose"] == (
+            sample_verifier.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+        )
+        return {
             "status": "pass",
             "run_root": str(run_root),
             "scenario_count": 2,
-        },
+        }
+
+    monkeypatch.setattr(
+        sample_verifier,
+        "verify_run",
+        verify_release_sample,
     )
     monkeypatch.setattr(
         sample_verifier,
@@ -220,6 +226,7 @@ def test_sample_verifier_separates_audited_lift_from_paper_historical_gate(
     )
 
     assert result["status"] == "pass"
+    assert result["publication_gate_purpose"] == "release-sample"
     assert result["metrics"]["audited_current_all_tasks"][
         "same_run_relative_lift_percent"
     ] == pytest.approx(56.0)

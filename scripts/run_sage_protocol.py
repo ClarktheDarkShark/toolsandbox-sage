@@ -91,6 +91,12 @@ SAGE_POLICY_NONE = "none"
 SAGE_POLICY_AUTO = "auto"
 SAGE_POLICY_SELF_EVOLVING_PRAXIS = "self-evolving-praxis"
 ACTOR_SELECTION_MODE = "policy"
+PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE = "release-sample"
+PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION = "campaign-inclusion"
+PUBLICATION_GATE_PURPOSES = (
+    PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+    PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+)
 SAGE_POLICIES = (
     SAGE_POLICY_AUTO,
     SAGE_POLICY_NONE,
@@ -970,6 +976,84 @@ def _protocol_gate_decision(
     return not reasons, reasons
 
 
+def _campaign_inclusion_gate_decision(
+    comparison: dict[str, Any],
+    *,
+    scenario_count: int,
+) -> tuple[bool, list[str]]:
+    """Gate a prespecified campaign replication on run integrity only.
+
+    Full provenance, cache, ordering, dashboard, and artifact checks are applied
+    by ``verify_publication_run.py`` after the protocol manifest is written. The
+    runner-level decision intentionally does not inspect outcome performance.
+    """
+
+    reasons: list[str] = []
+    runtime_exceptions = comparison.get("runtime_exception_count")
+    if (
+        isinstance(runtime_exceptions, bool)
+        or not isinstance(runtime_exceptions, int)
+        or runtime_exceptions != 0
+    ):
+        reasons.append("runtime_exceptions_present")
+    if comparison.get("candidate_stopped_early") is not False:
+        reasons.append("candidate_stopped_early")
+    for arm_name in ("control", "candidate"):
+        arm = comparison.get(arm_name)
+        if not isinstance(arm, dict):
+            reasons.append(f"{arm_name}_summary_missing")
+            continue
+        if arm.get("run_status") != "complete":
+            reasons.append(f"{arm_name}_run_incomplete")
+        if arm.get("scenario_count") != scenario_count:
+            reasons.append(f"{arm_name}_scenario_count_incomplete")
+        if arm.get("planned_scenario_count") != scenario_count:
+            reasons.append(f"{arm_name}_planned_scenario_count_mismatch")
+        exception_count = arm.get("exception_count")
+        if (
+            isinstance(exception_count, bool)
+            or not isinstance(exception_count, int)
+            or exception_count != 0
+        ):
+            reasons.append(f"{arm_name}_exceptions_present")
+    return not reasons, reasons
+
+
+def _publication_gate_decisions(
+    comparison: dict[str, Any],
+    *,
+    scenario_count: int,
+    outcome_only: bool,
+    purpose: str,
+) -> tuple[bool, list[str], bool, list[str]]:
+    """Return selected acceptance and the always-recorded performance result."""
+
+    performance_passed, performance_reasons = _protocol_gate_decision(
+        comparison,
+        scenario_count=scenario_count,
+        outcome_only=outcome_only,
+    )
+    if purpose == PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE:
+        return (
+            performance_passed,
+            list(performance_reasons),
+            performance_passed,
+            performance_reasons,
+        )
+    if purpose == PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION:
+        inclusion_passed, inclusion_reasons = _campaign_inclusion_gate_decision(
+            comparison,
+            scenario_count=scenario_count,
+        )
+        return (
+            inclusion_passed,
+            inclusion_reasons,
+            performance_passed,
+            performance_reasons,
+        )
+    raise ValueError(f"Unknown publication gate purpose: {purpose!r}")
+
+
 def _resume_arm_dir(resume_run_root: Path | None, arm: str) -> Path | None:
     if resume_run_root is None:
         return None
@@ -1407,6 +1491,16 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--publication-gate-purpose",
+        choices=PUBLICATION_GATE_PURPOSES,
+        default=PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+        help=(
+            "Select the recorded publication acceptance rule. release-sample "
+            "retains the predeclared performance gate; campaign-inclusion uses "
+            "integrity/completeness only and reports performance diagnostically."
+        ),
+    )
+    parser.add_argument(
         "--freeze-toolsandbox-clock",
         action="store_true",
         default=os.environ.get("SAGE_TS_FREEZE_TOOLSANDBOX_CLOCK") == "1",
@@ -1480,6 +1574,22 @@ def main() -> None:
         raise SystemExit(
             "--require-fresh-control requires --control-cache off; cache lookup "
             "and collection are prohibited in publication runs."
+        )
+    if (
+        args.publication_gate_purpose == PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+        and not args.require_fresh_control
+    ):
+        raise SystemExit(
+            "--publication-gate-purpose campaign-inclusion requires "
+            "--require-fresh-control."
+        )
+    if (
+        args.publication_gate_purpose == PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+        and args.mode not in {"online_build_full", "full_benchmark"}
+    ):
+        raise SystemExit(
+            "--publication-gate-purpose campaign-inclusion is restricted to "
+            "complete publication benchmark modes."
         )
     if args.require_fresh_control and not args.parallel_arms:
         raise SystemExit(
@@ -2301,11 +2411,20 @@ def main() -> None:
     comparison["model_metadata"] = model_metadata
     comparison["comparison_model_key"] = model_metadata["comparison_key"]
     comparison["route_mismatch_qualified"] = _route_mismatch_qualified(comparison)
-    protocol_gate_passed, protocol_gate_reasons = _protocol_gate_decision(
+    (
+        protocol_gate_passed,
+        protocol_gate_reasons,
+        performance_gate_passed,
+        performance_gate_reasons,
+    ) = _publication_gate_decisions(
         comparison,
         scenario_count=len(scenario_names),
         outcome_only=args.require_fresh_control,
+        purpose=args.publication_gate_purpose,
     )
+    comparison["publication_gate_purpose"] = args.publication_gate_purpose
+    comparison["performance_gate_passed"] = performance_gate_passed
+    comparison["performance_gate_reasons"] = performance_gate_reasons
     comparison["protocol_gate_passed"] = protocol_gate_passed
     comparison["protocol_gate_reasons"] = protocol_gate_reasons
     comparison_path = run_root / "paired_comparison.json"
@@ -2347,6 +2466,9 @@ def main() -> None:
             "outcome_gain_count": comparison.get("outcome_gain_count"),
             "outcome_regression_count": comparison.get("outcome_regression_count"),
             "route_mismatch_qualified": comparison.get("route_mismatch_qualified"),
+            "publication_gate_purpose": args.publication_gate_purpose,
+            "performance_gate_passed": performance_gate_passed,
+            "performance_gate_reasons": performance_gate_reasons,
             "protocol_gate_reasons": protocol_gate_reasons,
             "registry_gate_restore": registry_gate_restore,
         },
@@ -2487,6 +2609,9 @@ def main() -> None:
             "mean_outcome_similarity_delta"
         ),
         "route_mismatch_qualified": comparison.get("route_mismatch_qualified"),
+        "publication_gate_purpose": args.publication_gate_purpose,
+        "performance_gate_passed": performance_gate_passed,
+        "performance_gate_reasons": performance_gate_reasons,
         "protocol_gate_passed": protocol_gate_passed,
         "protocol_gate_reasons": protocol_gate_reasons,
     }
@@ -2555,6 +2680,9 @@ def main() -> None:
             "mean_outcome_similarity_delta": comparison.get(
                 "mean_outcome_similarity_delta"
             ),
+            "publication_gate_purpose": args.publication_gate_purpose,
+            "performance_gate_passed": performance_gate_passed,
+            "performance_gate_reasons": performance_gate_reasons,
             "protocol_gate_passed": protocol_gate_passed,
             "protocol_gate_reasons": protocol_gate_reasons,
         },

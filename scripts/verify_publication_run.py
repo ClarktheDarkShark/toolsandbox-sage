@@ -38,6 +38,12 @@ PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP = 1784832588
 PUBLICATION_MODEL = "gpt-4o-mini"
 PUBLICATION_TIMEZONE = "America/New_York"
 PUBLICATION_OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v9"
+PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE = "release-sample"
+PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION = "campaign-inclusion"
+PUBLICATION_GATE_PURPOSES = (
+    PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+    PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+)
 PUBLICATION_EXECUTION_ENV = {
     "TZ": PUBLICATION_TIMEZONE,
     "SAGE_OPENAI_MAX_RETRIES": "5",
@@ -1013,7 +1019,10 @@ def verify_run(
     expected_fixture_sha256: str = PINNED_RAPID_FIXTURE_SHA256,
     expected_benchmark_sha256: str = PINNED_BENCHMARK_SHA256,
     expected_scenario_order_sha256: str = PINNED_SCENARIO_ORDER_SHA256,
+    gate_purpose: str = PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
 ) -> dict[str, Any]:
+    if gate_purpose not in PUBLICATION_GATE_PURPOSES:
+        raise ValueError(f"Unknown publication gate purpose: {gate_purpose!r}.")
     runs = _completed_run_roots(search_root)
     if not runs:
         raise ValueError(f"No completed paired run found under {search_root}.")
@@ -1076,6 +1085,7 @@ def verify_run(
             "Protocol ordered scenario names do not match the publication pin."
         )
     required_protocol = {
+        "publication_gate_purpose": gate_purpose,
         "protocol_gate_passed": True,
         "protocol_gate_reasons": [],
         "fresh_control_required": True,
@@ -1119,6 +1129,30 @@ def verify_run(
         raise ValueError("Paired comparison protocol gate did not pass.")
     if comparison.get("protocol_gate_reasons") != []:
         raise ValueError("Paired comparison contains protocol gate failure reasons.")
+    if comparison.get("publication_gate_purpose") != gate_purpose:
+        raise ValueError(
+            "Paired comparison publication gate purpose does not match verification."
+        )
+    performance_gate_passed = protocol.get("performance_gate_passed")
+    performance_gate_reasons = protocol.get("performance_gate_reasons")
+    if not isinstance(performance_gate_passed, bool):
+        raise ValueError("Protocol performance gate result is not boolean.")
+    if not isinstance(performance_gate_reasons, list) or any(
+        not isinstance(reason, str) or not reason for reason in performance_gate_reasons
+    ):
+        raise ValueError("Protocol performance gate reasons are malformed.")
+    if performance_gate_passed != (not performance_gate_reasons):
+        raise ValueError(
+            "Protocol performance gate result and reasons are inconsistent."
+        )
+    if comparison.get("performance_gate_passed") is not performance_gate_passed:
+        raise ValueError("Paired comparison performance gate result disagrees.")
+    if comparison.get("performance_gate_reasons") != performance_gate_reasons:
+        raise ValueError("Paired comparison performance gate reasons disagree.")
+    if gate_purpose == PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE and (
+        performance_gate_passed is not True or performance_gate_reasons != []
+    ):
+        raise ValueError("Release-sample performance gate did not pass.")
     runtime_exception_count = comparison.get("runtime_exception_count")
     if (
         isinstance(runtime_exception_count, bool)
@@ -1325,6 +1359,9 @@ def verify_run(
     return {
         "status": "pass",
         "run_root": str(run_root),
+        "publication_gate_purpose": gate_purpose,
+        "performance_gate_passed": performance_gate_passed,
+        "performance_gate_reasons": performance_gate_reasons,
         "scenario_count": expected_tasks,
         "cached_control_tasks": 0,
         # Backward-compatible name: this counts repository response replays,
@@ -1386,12 +1423,18 @@ def main() -> None:
         choices=("same-run-fresh", "not-applicable"),
         required=True,
     )
+    parser.add_argument(
+        "--gate-purpose",
+        choices=PUBLICATION_GATE_PURPOSES,
+        default=PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+    )
     args = parser.parse_args()
     try:
         result = verify_run(
             args.search_root,
             expected_tasks=args.expected_tasks,
             expect_reflection=args.expect_reflection,
+            gate_purpose=args.gate_purpose,
         )
     except ValueError as exc:
         raise SystemExit(f"publication_run_verification=failed\n{exc}") from exc

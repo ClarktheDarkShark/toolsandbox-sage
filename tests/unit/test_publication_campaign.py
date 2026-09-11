@@ -73,6 +73,7 @@ def _valid_campaign(
     sample_payload = {
         "schema_version": 1,
         "status": "pass",
+        "publication_gate_purpose": (campaign.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE),
         "run_root": str(sample_run_root),
         "integrity_verification": {
             "status": "pass",
@@ -120,6 +121,9 @@ def _valid_campaign(
             "replication": replication,
             "online": {
                 "source": "campaign_online_build_fresh_control",
+                "publication_gate_purpose": (
+                    campaign.PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+                ),
                 "run_root": "",
                 "search_root": campaign._relative(
                     tmp_path,
@@ -132,6 +136,9 @@ def _valid_campaign(
         if scope == "online-and-frozen":
             pair["frozen"] = {
                 "source": "paired_frozen_registry_reuse",
+                "publication_gate_purpose": (
+                    campaign.PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+                ),
                 "run_root": "",
                 "search_root": campaign._relative(
                     tmp_path,
@@ -175,6 +182,9 @@ def _valid_campaign(
             "sha256": _sha256(sample_report),
             "run_root": sample_run_root.relative_to(tmp_path).as_posix(),
             "status": "pass",
+            "publication_gate_purpose": (
+                campaign.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+            ),
             "release_identity": {
                 field: identity[field]
                 for field in campaign.SAMPLE_RELEASE_IDENTITY_FIELDS
@@ -624,14 +634,19 @@ def test_campaign_entry_requires_exact_dual_endpoint_measurements(
     }
     manifest = {"expected_tasks_per_run": campaign.EXPECTED_TASKS_PER_RUN}
     endpoint_calls: list[dict[str, Any]] = []
+    verifier_calls: list[dict[str, Any]] = []
+
+    def verify_publication_run(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        verifier_calls.append(kwargs)
+        return {
+            "status": "pass",
+            "run_root": str(run_root),
+        }
 
     monkeypatch.setattr(
         campaign,
         "verify_run",
-        lambda *args, **kwargs: {
-            "status": "pass",
-            "run_root": str(run_root),
-        },
+        verify_publication_run,
     )
 
     def verify_endpoints(**kwargs: Any) -> dict[str, Any]:
@@ -661,6 +676,7 @@ def test_campaign_entry_requires_exact_dual_endpoint_measurements(
             "entry": {**entry, "run_root": str(run_root.resolve())},
         }
     ]
+    assert verifier_calls[0]["gate_purpose"] == "campaign-inclusion"
 
 
 def test_force_replacement_rejects_stale_arm_and_registry_artifacts(
@@ -969,6 +985,7 @@ def test_sample_report_validation_is_read_only(
     report = tmp_path / "publication_validation_report.json"
     payload: dict[str, Any] = {
         "status": "pass",
+        "publication_gate_purpose": (campaign.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE),
         "run_root": "run",
         "thresholds_path": "thresholds.json",
         "integrity_verification": {
@@ -1009,6 +1026,9 @@ def test_sample_report_validation_is_read_only(
         )
         return {
             "status": "pass",
+            "publication_gate_purpose": (
+                campaign.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+            ),
             "run_root": str(run_root),
             "thresholds_path": str(tmp_path / "thresholds.json"),
             "integrity_verification": {
@@ -1068,6 +1088,7 @@ def test_sample_report_validation_rejects_different_current_tree(
     }
     payload = {
         "status": "pass",
+        "publication_gate_purpose": (campaign.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE),
         "run_root": str(run_root),
         "integrity_verification": {
             "status": "pass",
@@ -1144,6 +1165,16 @@ def test_default_campaign_scope_is_one_online_wave_with_dual_v3_endpoints() -> N
         "aggregate_statistics": None,
     }
     assert campaign._expected_claim_safeguards()["parallel_arms"] is True
+    assert (
+        campaign._expected_claim_safeguards()["replication_inclusion_policy"]
+        == "integrity_provenance_completeness_only"
+    )
+    assert (
+        campaign._expected_claim_safeguards()[
+            "observed_performance_controls_replication_inclusion"
+        ]
+        is False
+    )
 
 
 def test_optional_frozen_scope_requires_an_explicit_second_wave() -> None:
@@ -1176,7 +1207,7 @@ def test_job_command_exports_provenance_and_exact_interpreter_path(
         port=64200,
     )
 
-    assert command[-2:] == ["64200", "native-only"]
+    assert command[-3:] == ["64200", "native-only", "campaign-inclusion"]
     assert env["PATH"].split(os.pathsep)[0] == str(publication_python.parent.resolve())
     assert env["SAGE_TS_RUNTIME_DIGEST"] == "runtime"
     assert env["SAGE_TS_GENERATION_SETTINGS_DIGEST"] == "generation"

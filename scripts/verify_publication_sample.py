@@ -24,6 +24,9 @@ try:
 except ModuleNotFoundError:  # Direct ``python scripts/...`` execution.
     _run_verifier = importlib.import_module("verify_publication_run")
 verify_run = _run_verifier.verify_run
+PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE = (
+    _run_verifier.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+)
 
 DEFAULT_THRESHOLDS = Path(
     "docs/sage_protocol/publication_validation_thresholds_v3.json"
@@ -310,6 +313,7 @@ def verify_sample(
         expected_fixture_sha256=str(integrity["validated_external_fixture_sha256"]),
         expected_benchmark_sha256=str(benchmark["manifest_sha256"]),
         expected_scenario_order_sha256=str(benchmark["ordered_task_name_sha256"]),
+        gate_purpose=PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
     )
     run_root = Path(str(integrity_result["run_root"]))
     comparison = _read_object(run_root / "paired_comparison.json")
@@ -603,6 +607,7 @@ def verify_sample(
         "schema_version": 3,
         "status": "pass" if not failures else "fail",
         "purpose": thresholds.get("purpose"),
+        "publication_gate_purpose": PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
         "performance_endpoint_policy": thresholds.get("performance_endpoint_policy"),
         "canonical_metric_policy": thresholds.get("canonical_metric_policy"),
         "run_root": str(run_root),

@@ -471,6 +471,11 @@ def _fresh_run(tmp_path: Path) -> Path:
     _write_json(
         run_root / "protocol_manifest.json",
         {
+            "publication_gate_purpose": (
+                publication_verifier.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+            ),
+            "performance_gate_passed": True,
+            "performance_gate_reasons": [],
             "protocol_gate_passed": True,
             "protocol_gate_reasons": [],
             "agent": publication_verifier.PUBLICATION_MODEL,
@@ -586,6 +591,11 @@ def _fresh_run(tmp_path: Path) -> Path:
     _write_json(
         run_root / "paired_comparison.json",
         {
+            "publication_gate_purpose": (
+                publication_verifier.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+            ),
+            "performance_gate_passed": True,
+            "performance_gate_reasons": [],
             "protocol_gate_passed": True,
             "protocol_gate_reasons": [],
             "runtime_exception_count": 0,
@@ -716,6 +726,71 @@ def test_verifier_rejects_paired_runtime_exception_gate(tmp_path: Path) -> None:
             run_root.parent,
             expected_tasks=2,
             expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_campaign_inclusion_accepts_integrity_valid_performance_failure(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    performance_reasons = [
+        "non_positive_outcome_delta",
+        "confirmation_outcome_delta_below_0_08",
+    ]
+    for filename in ("protocol_manifest.json", "paired_comparison.json"):
+        path = run_root / filename
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["publication_gate_purpose"] = (
+            publication_verifier.PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+        )
+        payload["performance_gate_passed"] = False
+        payload["performance_gate_reasons"] = performance_reasons
+        _write_json(path, payload)
+
+    result = verify_run(
+        run_root.parent,
+        expected_tasks=2,
+        expect_reflection="same-run-fresh",
+        gate_purpose=(publication_verifier.PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION),
+        **_verification_pins(run_root),
+    )
+
+    assert result["status"] == "pass"
+    assert result["publication_gate_purpose"] == "campaign-inclusion"
+    assert result["performance_gate_passed"] is False
+    assert result["performance_gate_reasons"] == performance_reasons
+
+
+def test_release_sample_rejects_recorded_performance_failure(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    for filename in ("protocol_manifest.json", "paired_comparison.json"):
+        path = run_root / filename
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["performance_gate_passed"] = False
+        payload["performance_gate_reasons"] = ["non_positive_outcome_delta"]
+        _write_json(path, payload)
+
+    with pytest.raises(ValueError, match="Release-sample performance gate"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_gate_purpose_mismatch(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+
+    with pytest.raises(ValueError, match="publication_gate_purpose"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            gate_purpose=(
+                publication_verifier.PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+            ),
             **_verification_pins(run_root),
         )
 
@@ -1735,6 +1810,7 @@ def test_campaign_job_removes_every_baseline_cache_env(
         "full",
         "63000",
         "native-only",
+        "campaign-inclusion",
     ]
     assert env["CONTROL_CACHE"] == "off"
     assert env["SAGE_BENCHMARK_MANIFEST"] == str(tmp_path / "benchmark.json")
