@@ -2,8 +2,11 @@
 # Copyright (C) 2024 Apple Inc. All Rights Reserved.
 """Unit tests for tool_sandbox.roles.execution_environment"""
 
+import json
+import sys
 import textwrap
-from typing import Iterator
+import warnings
+from typing import Iterator, TextIO
 
 import polars as pl
 import pytest
@@ -18,6 +21,18 @@ from tool_sandbox.common.execution_context import (
 from tool_sandbox.common.message_conversion import Message
 from tool_sandbox.common.utils import deterministic_uuid
 from tool_sandbox.roles.execution_environment import ExecutionEnvironment
+
+
+def _show_warning_on_stderr(
+    message: Warning | str,
+    category: type[Warning],
+    filename: str,
+    lineno: int,
+    file: TextIO | None = None,
+    line: str | None = None,
+) -> None:
+    target = sys.stderr if file is None else file
+    target.write(warnings.formatwarning(message, category, filename, lineno, line))
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -135,6 +150,105 @@ def test_execution_environment_successful_execution(
         content=textwrap.dedent(content),
         conversation_active=True,
     )
+
+
+def test_traced_none_contact_search_keeps_successful_response_and_trace(
+    execution_environment: ExecutionEnvironment,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(warnings, "showwarning", _show_warning_on_stderr)
+    current_context = get_current_context()
+    current_context.trace_tool = True
+    execution_environment.add_messages(
+        [
+            Message(
+                sender=RoleType.AGENT,
+                recipient=RoleType.EXECUTION_ENVIRONMENT,
+                content=(
+                    "execution_count = 0\n"
+                    "import warnings\n"
+                    "from tool_sandbox.tools.contact import search_contacts"
+                ),
+            )
+        ]
+    )
+    execution_environment.respond()
+    execution_environment.add_messages(
+        [
+            Message(
+                sender=RoleType.AGENT,
+                recipient=RoleType.EXECUTION_ENVIRONMENT,
+                content=(
+                    "execution_count += 1\n"
+                    "with warnings.catch_warnings():\n"
+                    "    warnings.simplefilter('always')\n"
+                    "    result = search_contacts(person_id=None)\n"
+                    "print(repr(result))"
+                ),
+                openai_tool_call_id="call_none_contact",
+                openai_function_name="search_contacts",
+            )
+        ]
+    )
+    message_count_after_request = len(execution_environment.get_messages())
+
+    execution_environment.respond()
+
+    messages = execution_environment.get_messages()
+    assert len(messages) == message_count_after_request + 1
+    response = messages[-1]
+    assert response.content == "[]"
+    assert response.tool_call_exception is None
+    assert response.tool_trace is not None
+    assert len(response.tool_trace) == 1
+    trace = json.loads(response.tool_trace[0])
+    assert trace == {
+        "tool_name": "search_contacts",
+        "arguments": {"person_id": None},
+        "result": [],
+    }
+    assert get_current_context().interactive_console.locals["execution_count"] == 1
+
+
+def test_polars_none_warning_does_not_hide_a_following_error(
+    execution_environment: ExecutionEnvironment,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(warnings, "showwarning", _show_warning_on_stderr)
+    execution_environment.add_messages(
+        [
+            Message(
+                sender=RoleType.AGENT,
+                recipient=RoleType.EXECUTION_ENVIRONMENT,
+                content=(
+                    "import warnings\n"
+                    "from tool_sandbox.tools.contact import search_contacts"
+                ),
+            )
+        ]
+    )
+    execution_environment.respond()
+    execution_environment.add_messages(
+        [
+            Message(
+                sender=RoleType.AGENT,
+                recipient=RoleType.EXECUTION_ENVIRONMENT,
+                content=(
+                    "with warnings.catch_warnings():\n"
+                    "    warnings.simplefilter('always')\n"
+                    "    search_contacts(person_id=None)\n"
+                    "raise ValueError('real tool-call failure')"
+                ),
+            )
+        ]
+    )
+
+    execution_environment.respond()
+
+    response = execution_environment.get_messages()[-1]
+    assert response.content == "ValueError: real tool-call failure"
+    assert response.tool_call_exception == "ValueError: real tool-call failure"
+    assert response.tool_trace is None
 
 
 def test_valid_parallel_tool_call(

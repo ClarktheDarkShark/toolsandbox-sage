@@ -23,6 +23,26 @@ from tool_sandbox.common.execution_context import (
 from tool_sandbox.common.message_conversion import Message
 from tool_sandbox.roles.base_role import BaseRole
 
+_BENIGN_POLARS_NONE_COMPARISON_WARNING = (
+    "Comparisons with None always result in null. Consider using `.is_null()` or "
+    "`.is_not_null()`."
+)
+_BENIGN_POLARS_NONE_COMPARISON_SOURCE = (
+    "return dataframe.filter(pl.col(column_name) == value)"
+)
+
+
+def _is_benign_polars_none_comparison_warning(stderr_message: str) -> bool:
+    """Recognize the warning emitted by a successful exact-match search for None."""
+    stderr_lines = stderr_message.rstrip().splitlines()
+    return (
+        len(stderr_lines) == 2
+        and stderr_lines[0].endswith(
+            f": UserWarning: {_BENIGN_POLARS_NONE_COMPARISON_WARNING}"
+        )
+        and stderr_lines[1].strip() == _BENIGN_POLARS_NONE_COMPARISON_SOURCE
+    )
+
 
 def respond_to_single_message(
     interactive_console: code.InteractiveConsole,
@@ -94,7 +114,9 @@ def respond_to_single_message(
         stderr_message = f_stderr.getvalue()
         # Start with stdout, it ends with newline
         content_lines = stdout_message.rstrip().split("\n") if stdout_message else []
-        if stderr_message:
+        if stderr_message and not _is_benign_polars_none_comparison_warning(
+            stderr_message
+        ):
             stderr_lines = stderr_message.rstrip().split("\n")
             exception_str = stderr_lines[-1]
             content_lines.append(exception_str)
