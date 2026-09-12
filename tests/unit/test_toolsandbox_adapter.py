@@ -26,6 +26,21 @@ def test_write_run_manifest(tmp_path: Path) -> None:
     assert "baseline" in text
 
 
+def test_write_run_manifest_records_native_toolsandbox_actor(tmp_path: Path) -> None:
+    config = ToolSandboxRunConfig(
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        scenario_names=("wifi_off",),
+        output_dir=tmp_path,
+        agent_runtime="toolsandbox_native",
+    )
+
+    payload = json.loads(write_run_manifest(config).read_text(encoding="utf-8"))
+
+    assert payload["agent_runtime"] == "toolsandbox_native"
+    assert payload["actor_selection_mode"] == "toolsandbox_native"
+
+
 def test_run_scenario_sequence_continues_after_transform_failure(
     tmp_path: Path,
     monkeypatch,
@@ -56,10 +71,12 @@ def test_run_scenario_sequence_continues_after_transform_failure(
         _scenario: Scenario,
         *,
         agent: str,
+        agent_runtime: str,
         user: str,
         output_directory: Path,
     ) -> dict[str, object]:
         assert agent == "Unhelpful"
+        assert agent_runtime == "sage_wrapped"
         assert user == "GPT_4_o_2024_05_13"
         assert str(output_directory).startswith(str(output_dir))
         assert output_directory.name.startswith(
@@ -193,10 +210,12 @@ def test_run_scenario_sequence_resume_completed_limit(
         _scenario: Scenario,
         *,
         agent: str,
+        agent_runtime: str,
         user: str,
         output_directory: Path,
     ) -> dict[str, object]:
         calls.append(name)
+        assert agent_runtime == "sage_wrapped"
         return {
             "name": name,
             "categories": [],

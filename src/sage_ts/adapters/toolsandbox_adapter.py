@@ -16,7 +16,12 @@ from typing import Any, Callable, Optional
 import polars as pl
 from tqdm import tqdm
 
-from sage_ts.adapters.role_factory import make_agent, make_user
+from sage_ts.adapters.role_factory import (
+    SAGE_WRAPPED_AGENT_RUNTIME,
+    TOOL_SANDBOX_NATIVE_AGENT_RUNTIME,
+    make_agent,
+    make_user,
+)
 from sage_ts.evaluation.llm_usage import (
     clear_scenario_usage,
     install_llm_usage_tracking,
@@ -63,6 +68,7 @@ class ToolSandboxRunConfig:
     processes: int = 1
     run_type: str = "baseline"
     base_tool_policy: str = UPSTREAM_POLICY
+    agent_runtime: str = SAGE_WRAPPED_AGENT_RUNTIME
     resume_from_dir: Path | None = None
     resume_completed_limit: int | None = None
 
@@ -80,7 +86,11 @@ def write_run_manifest(config: ToolSandboxRunConfig) -> Path:
     payload: dict[str, Any] = {
         **asdict(config),
         "output_dir": str(config.output_dir),
-        "actor_selection_mode": "policy",
+        "actor_selection_mode": (
+            "toolsandbox_native"
+            if config.agent_runtime == TOOL_SANDBOX_NATIVE_AGENT_RUNTIME
+            else "policy"
+        ),
         "outcome_evaluator": outcome_evaluator_manifest(),
         "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
         "timezone": os.environ.get("TZ"),
@@ -286,6 +296,7 @@ def run_one_scenario(
     scenario: Scenario,
     *,
     agent: str,
+    agent_runtime: str,
     user: str,
     output_directory: Path,
 ) -> dict[str, Any]:
@@ -295,7 +306,7 @@ def run_one_scenario(
         roles: dict[RoleType, BaseRole] = {
             RoleType("USER"): make_user(user),
             RoleType("EXECUTION_ENVIRONMENT"): ExecutionEnvironment(),
-            RoleType("AGENT"): make_agent(agent),
+            RoleType("AGENT"): make_agent(agent, runtime=agent_runtime),
         }
         try:
             result = scenario.play_and_evaluate(
@@ -509,6 +520,7 @@ def run_scenario_sequence(
             name,
             active_scenario,
             agent=config.agent,
+            agent_runtime=config.agent_runtime,
             user=config.user,
             output_directory=output_directory,
         )
