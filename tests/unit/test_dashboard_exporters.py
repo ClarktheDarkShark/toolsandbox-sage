@@ -1613,3 +1613,91 @@ def test_task_focus_resolves_arm_roots_and_renders_paired_compare(
     assert "Baseline Progress" in html
     assert "SAGE Progress" in html
     assert "status-pair" in html
+
+
+def test_task_compare_keeps_external_control_named_run_on_candidate_side(
+    tmp_path: Path,
+) -> None:
+    """A historical control directory can be the semantic comparison candidate."""
+    run_root = tmp_path / "pure_native_run"
+    native_control = run_root / "control" / "native_actor_run"
+    external_wrapped = (
+        tmp_path / "historical_campaign" / "control" / "wrapped_actor_run"
+    )
+    scenario = "external_control_named_comparison"
+
+    for run_dir in (native_control, external_wrapped):
+        run_dir.parent.mkdir(parents=True, exist_ok=True)
+        (run_dir.parent / "sage_ts_run_manifest.json").write_text(
+            json.dumps({"scenario_names": [scenario]}) + "\n",
+            encoding="utf-8",
+        )
+    _write_summary(
+        native_control,
+        [
+            {
+                "name": scenario,
+                "similarity": 0.25,
+                "outcome_similarity": 0.4,
+                "turn_count": 2,
+                "categories": [],
+            }
+        ],
+    )
+    _write_summary(
+        external_wrapped,
+        [
+            {
+                "name": scenario,
+                "similarity": 0.75,
+                "outcome_similarity": 0.8,
+                "turn_count": 3,
+                "categories": [],
+            }
+        ],
+    )
+
+    index = write_protocol_dashboard(
+        run_root,
+        mode="pure_toolsandbox_vs_sage_wrapped_control",
+        status="complete",
+        phase="control",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        generation_enabled=False,
+        base_tool_policy="upstream",
+        scenario_count=1,
+        control_dir=native_control,
+        candidate_dir=external_wrapped,
+    )
+
+    task_compare = json.loads(
+        (index.parent / "task_compare_data.json").read_text(encoding="utf-8")
+    )
+    pair = task_compare["pairs"][0]
+    summary = task_compare["summary"]
+    assert pair["control"]["run_type"] == "native_actor_run"
+    assert pair["candidate"]["run_type"] == "wrapped_actor_run"
+    assert pair["candidate"]["phase"] == "candidate"
+    assert summary["control_mean_similarity"] == pytest.approx(0.25)
+    assert summary["candidate_mean_similarity"] == pytest.approx(0.75)
+    assert summary["control_mean_outcome_similarity"] == pytest.approx(0.4)
+    assert summary["candidate_mean_outcome_similarity"] == pytest.approx(0.8)
+
+    html = (index.parent / "task_compare.html").read_text(encoding="utf-8")
+    assert (
+        "summary.balanced_control_mean_similarity ?? "
+        "summary.control_mean_similarity" in html
+    )
+    assert (
+        "summary.balanced_candidate_mean_similarity ?? "
+        "summary.candidate_mean_similarity" in html
+    )
+    assert (
+        "summary.balanced_control_mean_outcome_similarity ?? "
+        "summary.control_mean_outcome_similarity" in html
+    )
+    assert (
+        "summary.balanced_candidate_mean_outcome_similarity ?? "
+        "summary.candidate_mean_outcome_similarity" in html
+    )

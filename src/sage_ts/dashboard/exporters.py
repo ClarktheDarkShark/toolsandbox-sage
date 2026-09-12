@@ -1175,6 +1175,8 @@ def _build_evaluation_payload(
 def _task_focus_rows(
     run_root: Path,
     run_dir: Path | None,
+    *,
+    arm: str | None = None,
 ) -> list[dict[str, Any]]:
     run_dir = _resolve_run_dir(run_dir)
     if run_dir is None:
@@ -1222,7 +1224,9 @@ def _task_focus_rows(
             relative_parts = run_dir.relative_to(run_root).parts
         except ValueError:
             relative_parts = ()
-        if relative_parts:
+        if arm in {"control", "candidate"}:
+            phase = arm
+        elif relative_parts:
             phase = relative_parts[0]
         else:
             path_hint = "/".join(run_dir.parts[-3:]).lower()
@@ -1448,8 +1452,11 @@ def _write_task_focus_dashboard(
     control_dir: Path | None,
     candidate_dir: Path | None,
 ) -> dict[str, Any]:
-    control_tasks = _task_focus_rows(run_root, control_dir)
-    candidate_tasks = _task_focus_rows(run_root, candidate_dir)
+    # The comparison run may live outside ``run_root`` and may itself be stored
+    # in a directory named ``control``.  Pass the semantic arm explicitly so
+    # its rows are not accidentally classified as baseline rows.
+    control_tasks = _task_focus_rows(run_root, control_dir, arm="control")
+    candidate_tasks = _task_focus_rows(run_root, candidate_dir, arm="candidate")
     tasks = [*control_tasks, *candidate_tasks]
     pair_lookup: dict[str, dict[str, Any]] = {}
     for task in tasks:

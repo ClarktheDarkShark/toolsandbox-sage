@@ -1356,10 +1356,10 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         pairedCount: paired.length,
         scoreCount: scoreRows.length,
         outcomeCount: outcomeRows.length,
-        baselineScore: baselineScore ?? summary.balanced_control_mean_similarity ?? null,
-        sageScore: sageScore ?? summary.balanced_candidate_mean_similarity ?? null,
-        baselineOutcome: baselineOutcome ?? summary.balanced_control_mean_outcome_similarity ?? null,
-        sageOutcome: sageOutcome ?? summary.balanced_candidate_mean_outcome_similarity ?? null,
+        baselineScore: baselineScore ?? summary.balanced_control_mean_similarity ?? summary.control_mean_similarity ?? null,
+        sageScore: sageScore ?? summary.balanced_candidate_mean_similarity ?? summary.candidate_mean_similarity ?? null,
+        baselineOutcome: baselineOutcome ?? summary.balanced_control_mean_outcome_similarity ?? summary.control_mean_outcome_similarity ?? null,
+        sageOutcome: sageOutcome ?? summary.balanced_candidate_mean_outcome_similarity ?? summary.candidate_mean_outcome_similarity ?? null,
       };
     }
     let payload = null;
