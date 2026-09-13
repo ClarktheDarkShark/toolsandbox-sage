@@ -2368,20 +2368,27 @@ class OnlineBirthController:
                 )
                 continue
 
-            repair_errors = list(_repair_prompt_errors(prior_validation.errors))
-            repair_errors.extend(
+            immutable_repair_errors = [
                 f"post_deployment_{reason}"
                 for reason in lifecycle_request.get("trigger_reason_codes", [])
-            )
-            if not repair_errors:
-                repair_errors.append(
+            ]
+            if not immutable_repair_errors:
+                immutable_repair_errors.append(
                     "post_deployment_public_contract_or_adoption_shortfall"
                 )
+            immutable_repair_errors = list(dict.fromkeys(immutable_repair_errors))
 
             best_tool: GeneratedTool | None = None
             best_validation: ValidationResult | None = None
             seed_tool = entry.tool
-            seed_errors = tuple(dict.fromkeys(repair_errors))
+            seed_errors = tuple(
+                dict.fromkeys(
+                    (
+                        *immutable_repair_errors,
+                        *_repair_prompt_errors(prior_validation.errors),
+                    )
+                )
+            )
             for attempt in range(1, CANDIDATE_REPAIR_ATTEMPTS + 1):
                 try:
                     candidates_method = getattr(
@@ -2464,9 +2471,17 @@ class OnlineBirthController:
                     },
                 )
                 seed_tool = candidate
+                # Feedback must describe the candidate supplied to the next repair
+                # call.  Retaining failures from superseded candidates presents stale
+                # ACTUAL values as if they came from the current code and prevents a
+                # bounded iterative repair from converging.  Lifecycle trigger reasons
+                # remain immutable; all candidate-specific errors are freshly replaced.
                 seed_errors = tuple(
                     dict.fromkeys(
-                        (*seed_errors, *_repair_prompt_errors(validation.errors))
+                        (
+                            *immutable_repair_errors,
+                            *_repair_prompt_errors(validation.errors),
+                        )
                     )
                 )
                 if validation.accepted:

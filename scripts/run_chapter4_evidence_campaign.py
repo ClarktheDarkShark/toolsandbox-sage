@@ -24,11 +24,15 @@ from typing import Any, Iterator, cast
 from scripts.research.chapter4_evidence import (
     EVIDENCE_DATA_NAME,
     EVIDENCE_HTML_NAME,
-    RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION,
-    RESEARCHER_SAMPLE_WAIVER_STATUS,
     load_run_evidence,
     verify_run_endpoint_measurements,
     write_evidence_dashboard,
+)
+from scripts.research.chapter4_evidence import (
+    RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION as RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION,
+)
+from scripts.research.chapter4_evidence import (
+    RESEARCHER_SAMPLE_WAIVER_STATUS as RESEARCHER_SAMPLE_WAIVER_STATUS,
 )
 
 try:

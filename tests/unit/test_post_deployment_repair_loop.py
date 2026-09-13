@@ -297,6 +297,33 @@ class DeterministicRepairGenerator:
         return (self.candidate,)
 
 
+class SequencedRepairGenerator(DeterministicRepairGenerator):
+    def __init__(
+        self,
+        *,
+        store: RegistryStore,
+        candidates: tuple[GeneratedTool, ...],
+    ) -> None:
+        if not candidates:
+            raise ValueError("at least one repair candidate is required")
+        super().__init__(store=store, candidate=candidates[-1])
+        self.candidates = candidates
+
+    def repair_candidates(
+        self,
+        request: ToolGenerationRequest,
+        rejected_tool: GeneratedTool,
+        errors: tuple[str, ...],
+    ) -> tuple[GeneratedTool, ...]:
+        self.repair_calls += 1
+        self.requests.append(request)
+        self.error_inputs.append(errors)
+        current = self.store.get(TOOL_NAME)
+        self.retired_during_calls.append(bool(current and current.retired))
+        index = min(self.repair_calls - 1, len(self.candidates) - 1)
+        return (self.candidates[index],)
+
+
 def _controller(
     tmp_path: Path,
     generator: DeterministicRepairGenerator,
@@ -314,6 +341,65 @@ def _controller(
             else None
         ),
     )
+
+
+def test_bounded_repair_replaces_stale_candidate_errors_but_keeps_trigger(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    candidate_a = replace(_faulty_tool(), code=_faulty_tool().code + "# candidate_a\n")
+    candidate_b = replace(_faulty_tool(), code=_faulty_tool().code + "# candidate_b\n")
+    generator = SequencedRepairGenerator(
+        store=store,
+        candidates=(candidate_a, candidate_b, _repaired_tool()),
+    )
+    controller = _controller(tmp_path, generator)
+    controller.observations_by_tool_name[TOOL_NAME] = _observation()
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+
+    prior_error = "source_prior_mismatch:stale_actual!=expected"
+    candidate_a_error = "source_current_a_mismatch:actual_a!=expected"
+    candidate_b_error = "source_current_b_mismatch:actual_b!=expected"
+    monkeypatch.setattr(
+        online_birth,
+        "validate_generated_tool",
+        lambda *_args, **_kwargs: ValidationResult(False, (prior_error,)),
+    )
+
+    def gate_and_validate(
+        tool: GeneratedTool,
+        _observation: CapabilityObservation,
+    ) -> tuple[None, None, ValidationResult]:
+        if "# candidate_a" in tool.code:
+            result = ValidationResult(False, (candidate_a_error,))
+        elif "# candidate_b" in tool.code:
+            result = ValidationResult(False, (candidate_b_error,))
+        else:
+            result = ValidationResult(True, (), runtime_smoke_passed=True)
+        return None, None, result
+
+    monkeypatch.setattr(controller, "_gate_and_validate", gate_and_validate)
+
+    assert controller.process_pending_repairs(completed_count=8) == (TOOL_NAME,)
+    assert len(generator.error_inputs) == 3
+    first_errors, second_errors, third_errors = generator.error_inputs
+    trigger_error = "post_deployment_deterministic_public_contract_failure"
+
+    assert trigger_error in first_errors
+    assert trigger_error in second_errors
+    assert trigger_error in third_errors
+    assert prior_error in first_errors
+    assert prior_error not in second_errors
+    assert prior_error not in third_errors
+    assert candidate_a_error in second_errors
+    assert candidate_a_error not in third_errors
+    assert candidate_b_error in third_errors
+    assert candidate_b_error not in second_errors
+    assert first_errors[-1] == "repair_strategy:1"
+    assert second_errors[-1] == "repair_strategy:2"
+    assert third_errors[-1] == "repair_strategy:3"
 
 
 def test_queued_repair_waits_for_future_processing_then_stores_v2_and_acknowledges(
